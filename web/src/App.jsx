@@ -1,4 +1,4 @@
-import React from 'react'
+import React, {useEffect} from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import SideBar from '@/components/SideBar'
 import NavBar from '@/components/NavBar'
@@ -6,12 +6,13 @@ import { routes } from '@/routes/routes.jsx'
 import './App.css'
 
 function App() {
+
     return (
         <BrowserRouter>
-            <div className="flex flex-col h-screen">
+            <div className="flex flex-col h-screen  ">
                 {/* NavBar always on top */}
                 <div className="bg-base-100 shadow">
-                    <NavBar />
+                    <NavBar/>
                 </div>
                 {/* Main area with sidebar and content */}
                 <div className="flex flex-1 overflow-hidden">
