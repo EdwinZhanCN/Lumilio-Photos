@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useState} from "react";
 
 // 示例照片数据（已扩展字段以便分组）
 const photos = [
@@ -111,15 +111,17 @@ const groupPhotosByType = (photos) => {
     }, {});
 };
 
+
+
 // 渲染组件
 const Photos = () => {
-    // 按日期分组照片数据
-    const groupedPhotos = groupPhotosByDate(photos);
+    const [groupedPhotos, setGroupedPhotos] = useState(groupPhotosByDate(photos));
 
     return (
         <div className="p-4 w-full max-w-screen-lg mx-auto">
             {/* 根据日期渲染照片板块 */}
-            {Object.keys(groupedPhotos).map((date) => (
+
+            {groupedPhotos ? Object.keys(groupedPhotos).map((date) => (
                 <div key={date} className="my-6">
                     {/* 日期标题 */}
                     <h2 className="text-xl font-bold mb-4 text-left">{date}</h2>
@@ -136,7 +138,9 @@ const Photos = () => {
                         ))}
                     </div>
                 </div>
-            ))}
+            ))
+                :(<div className="skeleton h-32 w-32"></div>)
+            }
         </div>
     );
 };
