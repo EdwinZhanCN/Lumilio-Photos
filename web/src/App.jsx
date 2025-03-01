@@ -6,7 +6,12 @@ import { routes } from '@/routes/routes.jsx'
 import './App.css'
 
 function App() {
+    const theme=localStorage.getItem("theme") || "light"
 
+    useEffect(() => {
+        document.documentElement.setAttribute("data-theme", theme);
+    }, []);
+    
     return (
         <BrowserRouter>
             <div className="flex flex-col h-screen  ">
