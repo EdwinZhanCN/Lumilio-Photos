@@ -1,5 +1,6 @@
 import Home from "@/pages/Home"
 import Photos from "@/pages/Photos"
+import UploadPhotos from "@/pages/UploadPhotos.jsx";
 
 export const routes = [
     {
@@ -13,5 +14,9 @@ export const routes = [
     {
         path: "/photos",
         element: <Photos />,
+    },
+    {
+        path: "/upload-photos",
+        element: <UploadPhotos />,
     }
 ]
