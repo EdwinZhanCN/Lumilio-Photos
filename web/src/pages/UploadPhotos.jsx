@@ -142,23 +142,26 @@ const UploadPhotos = () => {
 
         try {
             setProgress(0);
-            // 模拟上传进度
-            const interval = setInterval(() => {
-                setProgress(prev => {
-                    if (prev >= 95) {
-                        clearInterval(interval);
-                        return 95;
-                    }
-                    return prev + 5;
+            let uploadedCount = 0;
+
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch('http://localhost:8080/api/photos', {
+                    method: 'POST',
+                    body: formData,
                 });
-            }, 100);
 
-            // 这里可以替换为真实的API调用
-            await new Promise(resolve => setTimeout(resolve, 2000));
+                if (!response.ok) {
+                    throw new Error(`Upload failed for ${file.name}`);
+                }
 
-            clearInterval(interval);
-            setProgress(100);
-            setSuccess('Photo Upload Success！');
+                uploadedCount++;
+                setProgress((uploadedCount / files.length) * 100);
+            }
+
+            setSuccess('Photos uploaded successfully!');
             setTimeout(() => {
                 setSuccess('');
                 setFiles([]);
@@ -166,7 +169,7 @@ const UploadPhotos = () => {
                 setProgress(0);
             }, 2000);
         } catch (err) {
-            setError('Upload Failed, Please Try Again');
+            setError(err.message || 'Upload failed, please try again');
             setTimeout(() => setError(''), 3000);
         }
     };

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"server/cmd/web"
 	"server/internal/service"
 )
 
@@ -15,7 +16,7 @@ func NewPhotoController(s service.PhotoService) *PhotoController {
 
 // UploadPhoto 处理文件上传请求
 func (c *PhotoController) UploadPhoto(w http.ResponseWriter, r *http.Request) {
-	// 1. 解析请求参数
+	// 1. Parse request parameters
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Invalid file upload", http.StatusBadRequest)
@@ -23,18 +24,20 @@ func (c *PhotoController) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// 2. 调用 Service 层
-	photo, err := c.photoService.UploadPhoto(r.Context(), file, header.Filename)
+	// 2. Call Service layer
+	photo, err := c.photoService.UploadPhoto(r.Context(), file, header.Filename, header.Size)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// 3. 返回标准化响应
+	// 3. Return standardized response
 	response := map[string]interface{}{
-		"id":   photo.ID,
+		"id":   photo.PhotoID,
 		"url":  photo.StoragePath,
 		"size": photo.FileSize,
 	}
-	jsonResponse(w, response, http.StatusCreated)
+
+	// Send success response
+	web.Success(w, response)
 }
