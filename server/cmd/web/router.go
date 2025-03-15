@@ -2,6 +2,7 @@ package web
 
 import (
 	"github.com/gorilla/mux"
+	"log"
 	"net/http"
 )
 
@@ -19,8 +20,9 @@ func NewRouter(photoController PhotoControllerInterface) *mux.Router {
 
 	// Photo routes
 	photoRoutes := api.PathPrefix("/photos").Subrouter()
-	photoRoutes.HandleFunc("", photoController.UploadPhoto).Methods("POST")
 
+	photoRoutes.HandleFunc("", photoController.UploadPhoto).Methods("POST")
+	log.Println("Starting Controller")
 	// Add CORS middleware
 	r.Use(corsMiddleware)
 
