@@ -148,7 +148,7 @@ const UploadPhotos = () => {
                 const formData = new FormData();
                 formData.append('file', file);
 
-                const response = await fetch('http://localhost:8080/api/photos', {
+                const response = await fetch('http://localhost:3001/api/photos', {
                     method: 'POST',
                     body: formData,
                 });

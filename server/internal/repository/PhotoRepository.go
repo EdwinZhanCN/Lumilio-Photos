@@ -17,6 +17,7 @@ type PhotoRepository interface {
 	AddTagToPhoto(ctx context.Context, photoID uuid.UUID, tagID int, confidence float32, source string) error
 	RemoveTagFromPhoto(ctx context.Context, photoID uuid.UUID, tagID int) error
 	CreateThumbnail(ctx context.Context, thumbnail *models.Thumbnail) error
+	UpdatePhotoMetadata(ctx context.Context, metadata *models.PhotoMetadata) error
 }
 
 type gormPhotoRepo struct {
@@ -62,4 +63,9 @@ func (r *gormPhotoRepo) RemoveTagFromPhoto(ctx context.Context, photoID uuid.UUI
 
 func (r *gormPhotoRepo) CreateThumbnail(ctx context.Context, thumbnail *models.Thumbnail) error {
 	return r.db.WithContext(ctx).Create(thumbnail).Error
+}
+
+// UpdatePhotoMetadata 直接更新照片元数据
+func (r *gormPhotoRepo) UpdatePhotoMetadata(ctx context.Context, metadata *models.PhotoMetadata) error {
+	return r.db.WithContext(ctx).Save(metadata).Error
 }

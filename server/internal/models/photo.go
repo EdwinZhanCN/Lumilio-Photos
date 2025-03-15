@@ -44,8 +44,7 @@ func (PhotoMetadata) TableName() string {
 }
 
 type PhotoMetadata struct {
-	MetadataID   int       `gorm:"primaryKey;autoIncrement"`
-	PhotoID      uuid.UUID `gorm:"type:uuid;unique;not null"`
+	PhotoID      uuid.UUID `gorm:"type:uuid;primaryKey;not null"`
 	TakenTime    *time.Time
 	CameraModel  string  `gorm:"type:varchar(100)"`
 	LensModel    string  `gorm:"type:varchar(100)"`

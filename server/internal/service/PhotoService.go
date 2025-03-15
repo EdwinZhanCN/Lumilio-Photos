@@ -4,14 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"io"
+	"log"
 	"mime"
 	"path/filepath"
 	"server/internal/models"
 	"server/internal/repository"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Error constants
@@ -52,6 +54,8 @@ func NewPhotoService(r repository.PhotoRepository, s CloudStorage) PhotoService 
 
 // UploadPhoto handles the photo upload process
 func (s *photoService) UploadPhoto(ctx context.Context, file io.Reader, filename string, fileSize int64) (*models.Photo, error) {
+	log.Println("Uploading photo")
+
 	// 1. Validate file type
 	if !isValidImageType(filename) {
 		return nil, ErrInvalidFileType
@@ -116,18 +120,22 @@ func (s *photoService) DeletePhoto(ctx context.Context, id uuid.UUID) error {
 
 // UpdatePhotoMetadata updates the metadata for a photo
 func (s *photoService) UpdatePhotoMetadata(ctx context.Context, id uuid.UUID, metadata *models.PhotoMetadata) error {
+	log.Println("Updating photo metadata")
 	photo, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to find photo: %w", err)
 	}
 
 	// Ensure the PhotoID matches
-	metadata.PhotoID = id
+	if metadata.PhotoID != photo.PhotoID {
+		return errors.New("photo ID mismatch")
+	}
 
-	// Update the metadata
-	photo.Metadata = *metadata
+	// print metadata
+	log.Printf("Updating metadata for photo ID: %s %d", photo.PhotoID, metadata.IsoSpeed)
 
-	return s.repo.UpdatePhoto(ctx, photo)
+	// 直接更新元数据记录，而不是通过photo对象
+	return s.repo.UpdatePhotoMetadata(ctx, metadata)
 }
 
 // AddPhotoToAlbum adds a photo to an album

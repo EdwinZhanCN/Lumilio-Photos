@@ -3,12 +3,12 @@ package storage
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"os"
 	"path/filepath"
-	"time"
-	"github.com/google/uuid"
 	"server/internal/service"
+	"time"
 )
 
 type LocalStorage struct {
