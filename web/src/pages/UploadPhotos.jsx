@@ -9,57 +9,153 @@ const UploadPhotos = () => {
     const [success, setSuccess] = useState('');
     const fileInputRef = useRef(null);
     const [maxFiles] = useState(30);
+    const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
     const rawFileExtensions = ['.raw', '.cr2', '.nef', '.orf', '.sr2',
         '.arw', '.rw2', '.dng', '.k25', '.kdc', '.mrw', '.pef', '.raf', '.3fr', '.fff'];
+    // 清理所有生成的URL
+    const revokePreviews = useCallback((urls) => {
+        urls.forEach(url => URL.revokeObjectURL(url));
+    }, []);
+
 
     // 生成预览图
-    const generatePreviews = useCallback((files) => {
-        const urls = [];
-        const rawMimeTypes = [
-            'image/x-canon-cr2',    // Canon
-            'image/x-nikon-nef',    // Nikon
-            'image/x-sony-arw',     // Sony
-            'image/x-adobe-dng',    // Adobe
-            'image/x-fuji-raf',     // Fujifilm
-            'image/x-panasonic-rw2' // Panasonic
-        ];
-        const rawExtensions = ['cr2', 'nef', 'arw', 'raf', 'rw2', 'dng', 'cr3', '3fr', 'orf'];
+    const generatePreviews = useCallback(async (files) => {
+        setIsGeneratingPreview(true);
+        const startIndex = previews.length;
 
-        for (const file of files) {
-            // 处理视频文件
-            if (file.type.startsWith('video/')) {
-                urls.push(URL.createObjectURL(new Blob(
-                    ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="#ccc" d="M16 16c0 1.104-.896 2-2 2H4c-1.104 0-2-.896-2-2V8c0-1.104.896-2 2-2h10c1.104 0 2 .896 2 2v8zm4-10h-2v2h2v8h-2v2h4V6z"/></svg>'],
-                    { type: 'image/svg+xml' }
-                )));
-            }
-            // 处理RAW文件
-            else if (
-                rawMimeTypes.includes(file.type) ||
-                rawExtensions.includes(file.name.split('.').pop().toLowerCase())
-            ) {
-                const extension = file.name.split('.').pop().toUpperCase();
-                const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-                    <rect width="100%" height="100%" fill="#e2e8f0" rx="8" ry="8"/>
-                    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
-                          font-family="system-ui, -apple-system, sans-serif"
-                          font-weight="600"
-                          fill="#475569">
-                        <tspan x="50%" dy="-0.6em" font-size="14">RAW</tspan>
-                        <tspan x="50%" dy="1.8em" font-size="12">${extension}</tspan>
-                    </text>
-                </svg>`;
+        // 初始化占位数组
+        setPreviews(prev => [...prev, ...Array(files.length).fill(null)]);
 
-                urls.push(URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })));
+        // RAW文件配置
+        const rawConfig = {
+            mimeTypes: [
+                'image/x-canon-cr2',
+                'image/x-nikon-nef',
+                'image/x-sony-arw',
+                'image/x-adobe-dng',
+                'image/x-fuji-raf',
+                'image/x-panasonic-rw2'
+            ],
+            extensions: ['cr2', 'nef', 'arw', 'raf', 'rw2', 'dng', 'cr3', '3fr', 'orf']
+        };
+
+        // 生成视频预览
+        const createVideoPreview = () => {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path fill="#ccc" d="M16 16c0 1.104-.896 2-2 2H4c-1.104 0-2-.896-2-2V8c0-1.104.896-2 2-2h10c1.104 0 2 .896 2 2v8zm4-10h-2v2h2v8h-2v2h4V6z"/>
+      </svg>`;
+            return URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+        };
+
+        // 生成RAW预览
+        const createRawPreview = (file) => {
+            const extension = file.name.split('.').pop().toUpperCase();
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+        <rect width="100%" height="100%" fill="#e2e8f0" rx="8" ry="8"/>
+        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+              font-family="system-ui, -apple-system, sans-serif"
+              font-weight="600"
+              fill="#475569">
+          <tspan x="50%" dy="-0.6em" font-size="14">RAW</tspan>
+          <tspan x="50%" dy="1.8em" font-size="12">${extension}</tspan>
+        </text>
+      </svg>`;
+            return URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+        };
+
+        // 压缩图片（使用OffscreenCanvas提升性能）
+        const compressImage = async (file) => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    img.onload = async () => {
+                        try {
+                            const canvas = new OffscreenCanvas(img.width, img.height);
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+
+                            // 调整尺寸
+                            const MAX_SIZE = 300;
+                            let width = img.width;
+                            let height = img.height;
+
+                            if (width > height && width > MAX_SIZE) {
+                                height = Math.round(height * MAX_SIZE / width);
+                                width = MAX_SIZE;
+                            } else if (height > MAX_SIZE) {
+                                width = Math.round(width * MAX_SIZE / height);
+                                height = MAX_SIZE;
+                            }
+
+                            // 高质量缩放
+                            const resizedCanvas = new OffscreenCanvas(width, height);
+                            const resizedCtx = resizedCanvas.getContext('2d');
+                            resizedCtx.drawImage(canvas, 0, 0, width, height);
+
+                            // 转换为Blob
+                            const blob = await resizedCanvas.convertToBlob({
+                                type: 'image/jpeg',
+                                quality: 0.7
+                            });
+
+                            resolve(URL.createObjectURL(blob));
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+
+                    img.onerror = reject;
+                    img.src = e.target.result;
+                };
+
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        };
+
+        // 分批次处理
+        const BATCH_SIZE = 4;
+        try {
+            for (let i = 0; i < files.length; i += BATCH_SIZE) {
+                const batch = files.slice(i, i + BATCH_SIZE);
+
+                const batchPromises = batch.map((file, batchIndex) => {
+                    // 视频文件
+                    if (file.type.startsWith('video/')) {
+                        return createVideoPreview();
+                    }
+
+                    // RAW文件
+                    if (rawConfig.mimeTypes.includes(file.type) ||
+                        rawConfig.extensions.includes(file.name.split('.').pop().toLowerCase())) {
+                        return createRawPreview(file);
+                    }
+
+                    // 普通图片
+                    return compressImage(file);
+                });
+
+                const processedUrls = await Promise.all(batchPromises);
+
+                // 更新对应位置的预览
+                setPreviews(prev => {
+                    const newPreviews = [...prev];
+                    processedUrls.forEach((url, index) => {
+                        newPreviews[startIndex + i + index] = url;
+                    });
+                    return newPreviews;
+                });
             }
-            // 处理普通图片
-            else {
-                urls.push(URL.createObjectURL(file));
-            }
+        } catch (error) {
+            console.error('Preview generation error:', error);
+            revokePreviews(previews);
+            setPreviews([]);
+        } finally {
+            setIsGeneratingPreview(false);
         }
-        // 设置预览图, 旧的加新的
-        setPreviews(prev => [...prev, ...urls]);
-    }, []);
+    }, [previews, revokePreviews]);
 
 
 
@@ -132,7 +228,7 @@ const UploadPhotos = () => {
         handleFiles(droppedFiles);
     };
 
-    // 模拟上传过程
+    // 上传 - 使用批量上传API
     const handleUpload = async () => {
         if (files.length === 0) {
             setError('Please select photos to upload');
@@ -142,26 +238,35 @@ const UploadPhotos = () => {
 
         try {
             setProgress(0);
-            let uploadedCount = 0;
-
-            for (const file of files) {
-                const formData = new FormData();
-                formData.append('file', file);
-
-                const response = await fetch('http://localhost:3001/api/photos', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Upload failed for ${file.name}`);
-                }
-
-                uploadedCount++;
-                setProgress((uploadedCount / files.length) * 100);
+            
+            // 创建FormData对象用于批量上传
+            const formData = new FormData();
+            
+            // 添加所有文件到formData，使用相同的字段名'files'
+            files.forEach(file => {
+                formData.append('files', file);
+            });
+            
+            // 调用批量上传API
+            const response = await fetch('http://localhost:3001/api/photos/batch', {
+                method: 'POST',
+                body: formData,
+            });
+            
+            if (!response.ok) {
+                throw new Error('Batch upload failed');
             }
+            
+            const result = await response.json();
+            
+            // 设置进度为100%表示完成
+            setProgress(100);
+            
+            // 显示成功消息，包含成功上传的数量
+            console.log(result)
+            setSuccess(`Successfully uploaded ${result.data.successful} of ${result.data.total} photos!`);
 
-            setSuccess('Photos uploaded successfully!');
+            // 清理状态
             setTimeout(() => {
                 setSuccess('');
                 setFiles([]);
@@ -172,7 +277,7 @@ const UploadPhotos = () => {
             setError(err.message || 'Upload failed, please try again');
             setTimeout(() => setError(''), 3000);
         }
-    };
+    }
 
     return (
         <div className="min-h-screen px-2">
@@ -252,6 +357,14 @@ const UploadPhotos = () => {
                     </div>
                 )}
 
+                {/* Loading indicator when generating previews */}
+                {isGeneratingPreview && (
+                    <div className="flex justify-center items-center mb-6">
+                        <span className="loading loading-dots loading-md"></span>
+                        <span className="ml-2 text-sm text-gray-500">Generating previews...</span>
+                    </div>
+                )}
+
                 {/* 进度条 */}
                 {progress > 0 && (
                     <div className="mb-4">
@@ -282,7 +395,8 @@ const UploadPhotos = () => {
                     </button>
                     <button
                         onClick={handleUpload}
-                        className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                        className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors
+                        hover:cursor-pointer disabled:cursor-not-allowed"
                         disabled={files.length === 0 || progress > 0}
                     >
                         {progress > 0 ? 'Uploading...' : 'Start Upload'}
@@ -298,7 +412,7 @@ const UploadPhotos = () => {
                     </div>
                 )}
                 {success && (
-                    <div className="toast toast-top toast-right">
+                    <div className="toast toast-top toast-right duration-500">
                         <div className="alert alert-success">
                             {success}
                         </div>

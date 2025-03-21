@@ -11,6 +11,7 @@ import (
 	"server/internal/models"
 	"server/internal/repository"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,6 +41,7 @@ type PhotoService interface {
 	AddTagToPhoto(ctx context.Context, photoID uuid.UUID, tagID int, confidence float32, source string) error
 	RemoveTagFromPhoto(ctx context.Context, photoID uuid.UUID, tagID int) error
 	CreateThumbnail(ctx context.Context, photoID uuid.UUID, size string, thumbnailPath string) (*models.Thumbnail, error)
+	BatchUploadPhotos(ctx context.Context, files []io.Reader, filenames []string, fileSizes []int64) ([]*models.Photo, []error)
 }
 
 type photoService struct {
@@ -91,11 +93,73 @@ func (s *photoService) UploadPhoto(ctx context.Context, file io.Reader, filename
 
 	if err := s.repo.CreatePhoto(ctx, photo); err != nil {
 		// Compensating transaction: delete the uploaded file
-		go s.storage.Delete(ctx, storagePath)
+		go func() {
+			err := s.storage.Delete(ctx, storagePath)
+			if err != nil {
+				log.Printf("Failed to delete uploaded file: %v", err)
+			} else {
+				log.Println("Successfully deleted uploaded file")
+			}
+		}()
 		return nil, fmt.Errorf("failed to create record: %w", err)
 	}
 
 	return photo, nil
+}
+
+// BatchUploadPhotos 新增批量上传方法
+func (s *photoService) BatchUploadPhotos(ctx context.Context, files []io.Reader, filenames []string, fileSizes []int64) ([]*models.Photo, []error) {
+	// 参数校验
+	if len(files) != len(filenames) || len(files) != len(fileSizes) {
+		return nil, []error{errors.New("参数长度不一致")}
+	}
+
+	// 并发控制（根据实际情况调整数值）
+	maxConcurrency := 5
+	sem := make(chan struct{}, maxConcurrency)
+
+	var wg sync.WaitGroup
+	resultChan := make(chan *models.Photo, len(files))
+	errorChan := make(chan uploadError, len(files))
+
+	// 启动worker
+	for i := range files {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			// 处理单个上传
+			photo, err := s.UploadPhoto(ctx, files[index], filenames[index], fileSizes[index])
+			if err != nil {
+				errorChan <- uploadError{Index: index, Err: err}
+				return
+			}
+			resultChan <- photo
+		}(i)
+	}
+
+	// 结果收集
+	go func() {
+		wg.Wait()
+		close(resultChan)
+		close(errorChan)
+	}()
+
+	// 处理结果
+	var photos []*models.Photo
+	for photo := range resultChan {
+		photos = append(photos, photo)
+	}
+
+	// 处理错误（保持原始顺序）
+	errs := make([]error, len(files))
+	for e := range errorChan {
+		errs[e.Index] = e.Err
+	}
+
+	return photos, errs
 }
 
 // GetPhoto retrieves a photo by its ID
@@ -196,4 +260,10 @@ func getContentType(filename string) string {
 		return "application/octet-stream"
 	}
 	return mimeType
+}
+
+// 错误结构体保持索引信息
+type uploadError struct {
+	Index int
+	Err   error
 }

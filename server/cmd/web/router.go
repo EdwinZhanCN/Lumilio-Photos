@@ -1,14 +1,16 @@
 package web
 
 import (
-	"github.com/gorilla/mux"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/mux"
 )
 
 // PhotoControllerInterface defines the interface for photo controllers
 type PhotoControllerInterface interface {
 	UploadPhoto(w http.ResponseWriter, r *http.Request)
+	BatchUploadPhotos(w http.ResponseWriter, r *http.Request)
 }
 
 // NewRouter creates and configures a new router
@@ -22,6 +24,7 @@ func NewRouter(photoController PhotoControllerInterface) *mux.Router {
 	photoRoutes := api.PathPrefix("/photos").Subrouter()
 
 	photoRoutes.HandleFunc("", photoController.UploadPhoto).Methods("POST")
+	photoRoutes.HandleFunc("/batch", photoController.BatchUploadPhotos).Methods("POST")
 	log.Println("Starting Controller")
 	// Add CORS middleware
 	r.Use(corsMiddleware)
