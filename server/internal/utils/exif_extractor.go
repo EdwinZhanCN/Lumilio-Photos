@@ -1,50 +1,29 @@
 package utils
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
-
+	"github.com/barasher/go-exiftool"
 	"server/internal/models"
-
-	"github.com/rwcarlsen/goexif/exif"
+	"strconv"
+	"time"
 )
-
-func init() {
-	// Register known manufacturers' makernote parsers
-	exif.RegisterParsers()
-}
 
 // ExtractImageMetadata extracts EXIF metadata from an image file
 func (p *ImageProcessor) ExtractImageMetadata(ctx context.Context, photoID string, storagePath string) (*models.PhotoMetadata, error) {
-	// 1. Get the original image
-	file, err := p.storage.Get(ctx, storagePath)
+	// 1. Start the ExifTool process
+	et, err := exiftool.NewExiftool()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get original image: %w", err)
+		return nil, fmt.Errorf("failed to intialize exiftool: %w", err)
 	}
-	defer file.Close()
+	defer et.Close()
 
-	// 2. Read the image data
-	imgData, err := io.ReadAll(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read image data: %w", err)
-	}
+	// 2. Extract metadata
+	metaData := et.ExtractMetadata("./data/photos/" + storagePath)
 
-	// 3. Parse EXIF data
-	x, err := exif.Decode(bytes.NewReader(imgData))
-	if err != nil {
-		// Not all images have EXIF data, so we'll create a basic metadata object
-		photoUUID, parseErr := models.ParseUUID(photoID)
-		if parseErr != nil {
-			return nil, fmt.Errorf("invalid photo ID: %w", parseErr)
-		}
-		return &models.PhotoMetadata{
-			PhotoID: photoUUID,
-		}, nil
-	}
+	// 3. Get the important metadata fields
+	// taken_time, camera_model, lens_model, exposure_time, f_number, iso_speed, gps_latitude, gps_longitude
 
-	// 4. Extract metadata fields
 	photoUUID, err := models.ParseUUID(photoID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid photo ID: %w", err)
@@ -55,50 +34,63 @@ func (p *ImageProcessor) ExtractImageMetadata(ctx context.Context, photoID strin
 	}
 
 	// Extract date and time
-	if datetime, err := x.DateTime(); err == nil {
-		metadata.TakenTime = &datetime
+	if datetimeStr, err := metaData[0].GetString("DateTimeOriginal"); err == nil {
+		datetime, err := time.Parse("2006:01:02 15:04:05", datetimeStr)
+		if err == nil {
+			metadata.TakenTime = &datetime
+		}
 	}
 
 	// Extract camera model
-	if model, err := x.Get(exif.Model); err == nil {
-		if str, err := model.StringVal(); err == nil {
-			metadata.CameraModel = str
-		}
+	if cameraModelStr, err := metaData[0].GetString("Model"); err == nil {
+		metadata.CameraModel = cameraModelStr
 	}
 
 	// Extract lens model
-	if lens, err := x.Get(exif.LensModel); err == nil {
-		if str, err := lens.StringVal(); err == nil {
-			metadata.LensModel = str
-		}
+	if lensModelStr, err := metaData[0].GetString("Lens"); err == nil {
+		metadata.LensModel = lensModelStr
 	}
 
 	// Extract exposure time
-	if exposure, err := x.Get(exif.ExposureTime); err == nil {
-		if str, err := exposure.StringVal(); err == nil {
-			metadata.ExposureTime = str
-		}
+	if exposureTimeStr, err := metaData[0].GetString("ExposureTime"); err == nil {
+		metadata.ExposureTime = exposureTimeStr
 	}
 
 	// Extract f-number
-	if fnumber, err := x.Get(exif.FNumber); err == nil {
-		if num, err := fnumber.Float(32); err == nil {
-			metadata.FNumber = float32(num)
+	if fNumberStr, err := metaData[0].GetString("FNumber"); err == nil {
+		// Convert f-number to float32
+		fNumber, err := strconv.ParseFloat(fNumberStr, 32)
+		if err == nil {
+			metadata.FNumber = float32(fNumber)
 		}
 	}
 
 	// Extract ISO speed
-	if iso, err := x.Get(exif.ISOSpeedRatings); err == nil {
-		if val, err := iso.Int(0); err == nil {
-			metadata.IsoSpeed = val
+	if isoSpeedStr, err := metaData[0].GetString("ISO"); err == nil {
+		// Convert ISO speed to int
+		isoSpeed, err := strconv.Atoi(isoSpeedStr)
+		if err == nil {
+			metadata.IsoSpeed = isoSpeed
 		}
 	}
 
 	// Extract GPS coordinates
-	if lat, long, err := x.LatLong(); err == nil {
-		metadata.GPSLatitude = lat
-		metadata.GPSLongitude = long
+	if gpsLatitudeStr, err := metaData[0].GetString("GPSLatitude"); err == nil {
+		// Convert GPS latitude to float64
+		gpsLatitude, err := strconv.ParseFloat(gpsLatitudeStr, 64)
+		if err == nil {
+			metadata.GPSLatitude = gpsLatitude
+		}
+	}
+
+	if gpsLongitudeStr, err := metaData[0].GetString("GPSLongitude"); err == nil {
+		// Convert GPS longitude to float64
+		gpsLongitude, err := strconv.ParseFloat(gpsLongitudeStr, 64)
+		if err == nil {
+			metadata.GPSLongitude = gpsLongitude
+		}
 	}
 
 	return metadata, nil
+
 }
