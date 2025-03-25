@@ -1,29 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import tailwindcss from '@tailwindcss/vite'
-import wasmPack from '@wasm-tool/wasm-pack-plugin'
 import wasm from 'vite-plugin-wasm'
+import topLevelAwait from 'vite-plugin-top-level-await'
+import wasmPack from 'vite-plugin-wasm-pack'
+import tailwindcss from '@tailwindcss/vite'
 
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-      react(),
-      tailwindcss(),
-      wasm(),
-      wasmPack({
-          crateDirectory: './thumbnail-wasm', // Rust 项目路径
-          outDir: './src/wasm' // 输出目录
-      })
-  ],
-    optimizeDeps: {
-        exclude: ['@wasm-tool/wasm-pack-plugin']
-    },
-    //set alias of src folder
+    plugins: [
+        react(),
+        tailwindcss(),
+        wasm(),
+        topLevelAwait(),
+        wasmPack(['./thumbnail-wasm']) // Path to your Rust project
+    ],
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, './src')
+            '@': path.resolve(__dirname, './src'),
+            '@wasm': path.resolve(__dirname, './thumbnail-wasm/pkg')
         }
     },
+    build: {
+        target: 'esnext', // Ensure proper WASM support
+    }
 })

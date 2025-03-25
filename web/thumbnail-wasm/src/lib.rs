@@ -21,8 +21,9 @@ impl ThumbnailResult {
     pub fn data(&self) -> Vec<u8> { self.data.clone() }
 }
 
+
 #[wasm_bindgen]
-pub fn generate_thumbnail(buffer: &[u8], max_size: u32) -> Result<ThumbnailResult, JsError> {
+pub fn generate_thumbnail(buffer: &[u8], max_size: u32) -> Result<Vec<u8>, JsError> {
     let img = match ImageReader::new(Cursor::new(buffer))
         .with_guessed_format()?
         .decode()
@@ -34,15 +35,14 @@ pub fn generate_thumbnail(buffer: &[u8], max_size: u32) -> Result<ThumbnailResul
     let (width, height) = calculate_size(img.width(), img.height(), max_size);
     let thumbnail = img.thumbnail(width, height);
 
+    // Convert to RGB8 which is supported by JPEG encoder
+    let rgb_image = thumbnail.into_rgb8();
+
     let mut output = Cursor::new(Vec::new());
-    thumbnail.write_to(&mut output, ImageFormat::Jpeg)
+    rgb_image.write_to(&mut output, ImageFormat::Jpeg)
         .map_err(|e| JsError::new(&format!("Encode error: {}", e)))?;
 
-    Ok(ThumbnailResult {
-        width,
-        height,
-        data: output.into_inner()
-    })
+    Ok(output.into_inner())
 }
 
 fn calculate_size(orig_w: u32, orig_h: u32, max_size: u32) -> (u32, u32) {
