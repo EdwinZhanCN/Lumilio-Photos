@@ -44,6 +44,7 @@ func main() {
 		&models.Tag{},
 		&models.Album{},
 	)
+
 	if err != nil {
 		log.Fatalf("Failed to run database migrations: %v", err)
 	}
