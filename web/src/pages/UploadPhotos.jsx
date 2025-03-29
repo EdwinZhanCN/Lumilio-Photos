@@ -1,5 +1,6 @@
 import {useState, useRef, useCallback, useEffect} from 'react';
 import { useWasm } from '@/hooks/useWasm';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 
 const UploadPhotos = () => {
@@ -248,8 +249,7 @@ const UploadPhotos = () => {
             });
             
             // 调用批量上传API
-            const response = await fetch('http://localhost:3001/api/photos/batch', {
-                method: 'POST',
+            const response = await fetch(`${API_URL}/api/photos/batch`, {                method: 'POST',
                 body: formData,
             });
             
