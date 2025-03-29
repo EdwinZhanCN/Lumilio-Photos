@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "9000:8080"
     volumes:
       - photo-storage:/app/data/photos
     environment:
@@ -17,6 +17,15 @@ services:
       - DB_PASSWORD=Kr.lm<7knzb.;3^o
     depends_on:
       - postgres
+
+  frontend:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - app
 
   postgres:
     image: postgres:alpine
