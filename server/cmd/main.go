@@ -20,10 +20,11 @@ import (
 func init() {
 	log.SetOutput(os.Stdout)
 
-	// load .env file
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Warning: .env file not found, using environment variables")
+	// Try to load .env file but continue if it's not found
+	if err := godotenv.Load(); err != nil {
+		log.Println("Running without .env file, using environment variables")
+	} else {
+		log.Println("Environment variables loaded from .env file")
 	}
 }
 
