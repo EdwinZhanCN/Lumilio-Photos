@@ -4,7 +4,7 @@ FROM rust:1.85-slim as wasm-build
 # Install required dependencies for wasm-pack
 RUN apt-get update && apt-get install -y curl pkg-config libssl-dev
 
-# Install wasm-pack (with more robust error handling)
+# Install wasm-pack
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh || \
     (echo "Failed to install wasm-pack via script, trying cargo install" && \
     cargo install wasm-pack)
@@ -29,8 +29,8 @@ RUN npm ci
 # Copy frontend source code
 COPY web/ ./
 
-# Copy WASM build output
-COPY --from=wasm-build /wasm/pkg/ ./public/wasm/
+# Copy WASM build output to match the path in vite.config.js
+COPY --from=wasm-build /wasm/pkg/ ./thumbnail-wasm/pkg/
 
 # Create env file at build time
 RUN echo "VITE_API_URL=http://app:8080" > .env
@@ -45,7 +45,7 @@ FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Add configuration for nginx
-COPY web/nginx.conf /etc/nginx/templates/default.conf.template
+COPY web/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port
 EXPOSE 80
