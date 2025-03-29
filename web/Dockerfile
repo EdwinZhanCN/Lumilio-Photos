@@ -1,26 +1,48 @@
+# Build WASM stage
+FROM rust:1.76-slim as wasm-build
+
+# Install wasm-pack
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+WORKDIR /wasm
+COPY web/thumbnail-wasm/ ./
+
+# Build the WASM package
+RUN wasm-pack build --target web --out-dir pkg
+
+# Build React app stage
 FROM node:22.3.0-alpine as build
 
 WORKDIR /app
 
+# Copy package.json files
 COPY web/package*.json ./
 
+# Install dependencies
 RUN npm ci
 
+# Copy frontend source code
 COPY web/ ./
 
-# Create env file at build time with the correct backend URL
-# This assumes the backend is available at 'app:8080' inside the Docker network
+# Copy WASM build output
+COPY --from=wasm-build /wasm/pkg/ ./public/wasm/
+
+# Create env file at build time
 RUN echo "VITE_API_URL=http://app:8080" > .env
 
+# Build the application
 RUN npm run build
 
+# Production stage
 FROM nginx:alpine
 
+# Copy built files from build stage to nginx
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Add configuration to allow runtime environment variables (optional)
+# Add configuration for nginx
 COPY web/nginx.conf /etc/nginx/templates/default.conf.template
 
+# Expose port
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
