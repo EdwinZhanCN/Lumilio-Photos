@@ -1,8 +1,13 @@
 # Build WASM stage
-FROM rust:1.76-slim as wasm-build
+FROM rust:1.85-slim as wasm-build
 
-# Install wasm-pack
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+# Install required dependencies for wasm-pack
+RUN apt-get update && apt-get install -y curl pkg-config libssl-dev
+
+# Install wasm-pack (with more robust error handling)
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh || \
+    (echo "Failed to install wasm-pack via script, trying cargo install" && \
+    cargo install wasm-pack)
 
 WORKDIR /wasm
 COPY web/thumbnail-wasm/ ./
@@ -37,7 +42,7 @@ RUN npm run build
 FROM nginx:alpine
 
 # Copy built files from build stage to nginx
-COPY --from=build /app/build /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 
 # Add configuration for nginx
 COPY web/nginx.conf /etc/nginx/templates/default.conf.template
