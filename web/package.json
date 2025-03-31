@@ -24,7 +24,7 @@
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
     "@wasm-tool/wasm-pack-plugin": "^1.7.0",
-    "daisyui": "^5.0.0-beta.8",
+    "daisyui": "^5.0.9",
     "eslint": "^9.19.0",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.0.0",
