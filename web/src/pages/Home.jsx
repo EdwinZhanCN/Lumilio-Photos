@@ -3,7 +3,7 @@ import { ExifInfo } from '../utils/exifInfo';
 import { SparklesIcon, MapIcon, ClockIcon, CameraIcon, SwatchIcon, GlobeAltIcon } from '@heroicons/react/24/outline';
 import MapComponent from '../components/MapComponent';
 import Heatmap from 'react-calendar-heatmap';
-import '@/styles/Heatmap.css';
+import '@/styles/heatmap.css';
 
 function Home() {
     const [hoverIndex, setHoverIndex] = useState(null);
