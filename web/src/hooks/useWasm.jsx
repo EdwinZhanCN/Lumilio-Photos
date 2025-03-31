@@ -1,6 +1,6 @@
 // hooks/useWasm.jsx
 import { useState, useEffect, useRef } from 'react';
-import init, { generate_thumbnail } from '@wasm/thumbnail_wasm';
+import init, { generate_thumbnail } from '@/wasm/thumbnail_wasm';
 
 export function useWasm() {
     const [wasmReady, setWasmReady] = useState(false);

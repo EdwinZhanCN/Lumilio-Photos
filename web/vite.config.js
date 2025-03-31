@@ -13,12 +13,11 @@ export default defineConfig({
         tailwindcss(),
         wasm(),
         topLevelAwait(),
-        wasmPack(['./thumbnail-wasm']) // Path to your Rust project
     ],
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),
-            '@wasm': path.resolve(__dirname, './thumbnail-wasm/pkg')
+            '@wasm': path.resolve(__dirname, './public/wasm'),
         }
     },
     build: {
