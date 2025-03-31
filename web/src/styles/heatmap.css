@@ -1,0 +1,26 @@
+.react-calendar-heatmap .color-empty {
+    fill: var(--color-base-300);
+}
+
+.react-calendar-heatmap .color-scale-0 {
+    fill: oklch(0.882 0.059 254.128);
+}
+
+.react-calendar-heatmap .color-scale-1 {
+    fill: oklch(0.809 0.105 251.813);
+}
+.react-calendar-heatmap .color-scale-2 {
+    fill: oklch(0.707 0.165 254.624);
+}
+
+.react-calendar-heatmap .color-scale-3 {
+    fill: oklch(0.623 0.214 259.815);
+}
+
+.react-calendar-heatmap .color-scale-4 {
+    fill: oklch(0.546 0.245 262.881);
+}
+
+.react-calendar-heatmap .color-scale-5 {
+    fill: oklch(0.488 0.243 264.376);
+}

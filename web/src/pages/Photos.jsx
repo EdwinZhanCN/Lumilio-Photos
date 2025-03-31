@@ -222,12 +222,11 @@ const Photos = () => {
                         {groupKey}
                     </h2>
 
-                    {/* 瀑布流布局的图片 */}
-                    <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-1">
                         {groupedPhotos[groupKey].map((photo) => (
                             <div
                                 key={photo.id}
-                                className="flex justify-center shadow-2xs hover:bg-base-300 hover:border-4 cursor-pointer"
+                                className="break-inside-avoid hover:bg-base-300 cursor-pointer transition-all"
                                 onClick={() => {
                                     // 计算照片在全局数组中的索引
                                     const allPhotos = Object.values(groupedPhotos).flat();
@@ -239,7 +238,7 @@ const Photos = () => {
                                 <img
                                     src={photo.url}
                                     alt={photo.description}
-                                    className="w-full h-auto object-contain"
+                                    className="w-full h-auto"
                                 />
                             </div>
                         ))}

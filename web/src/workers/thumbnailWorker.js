@@ -1,5 +1,5 @@
 // web/src/workers/thumbnailWorker.js
-import init, { generate_thumbnail } from '@wasm/thumbnail_wasm';
+import init, { generate_thumbnail } from '@/wasm/thumbnail_wasm';
 
 // Initialize WASM module at worker startup
 let wasmInitialized = false;
