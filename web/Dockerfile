@@ -1,19 +1,19 @@
-# Build WASM stage
-FROM rust:1.85-slim as wasm-build
-
-# Install required dependencies for wasm-pack
-RUN apt-get update && apt-get install -y curl pkg-config libssl-dev
-
-# Install wasm-pack
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh || \
-    (echo "Failed to install wasm-pack via script, trying cargo install" && \
-    cargo install wasm-pack)
-
-WORKDIR /wasm
-COPY web/thumbnail-wasm/ ./
-
-# Build the WASM package
-RUN wasm-pack build --target web --out-dir pkg
+## Build WASM stage
+#FROM rust:1.85-slim as wasm-build
+#
+## Install required dependencies for wasm-pack
+#RUN apt-get update && apt-get install -y curl pkg-config libssl-dev
+#
+## Install wasm-pack
+#RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh || \
+#    (echo "Failed to install wasm-pack via script, trying cargo install" && \
+#    cargo install wasm-pack)
+#
+#WORKDIR /wasm
+#COPY web/thumbnail-wasm/ ./
+#
+## Build the WASM package
+#RUN wasm-pack build --target web --out-dir pkg
 
 # Build React app stage
 FROM node:22.3.0-alpine as build
@@ -30,7 +30,7 @@ RUN npm ci
 COPY web/ ./
 
 # Copy WASM build output to match the path in vite.config.js
-COPY --from=wasm-build /wasm/pkg/ ./thumbnail-wasm/pkg/
+#COPY --from=wasm-build /wasm/pkg/ ./thumbnail-wasm/pkg/
 
 # Create env file at build time
 RUN echo "VITE_API_URL=http://app:8080" > .env
