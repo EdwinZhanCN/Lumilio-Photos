@@ -6,6 +6,7 @@ import {CalendarIcon, DocumentIcon, LanguageIcon, TagIcon} from "@heroicons/reac
 function NavBar() {
     const [searchText, setSearchText] = useState("");
     const [searchOption, setSearchOption] = useState(null);
+    const [isDarkMode, setIsDarkMode] = useState(localStorage.getItem("theme") === "dark");
 
     const handleOptionSelect = (option) => {
         setSearchOption(option);
@@ -90,6 +91,13 @@ function NavBar() {
                 <input type="checkbox"
                        className="theme-controller"
                        value="dark"
+                       checked={isDarkMode}
+                       onChange={(e) => {
+                           const newTheme = e.target.checked ? "dark" : "light";
+                           localStorage.setItem("theme", newTheme);
+                           document.documentElement.setAttribute("data-theme", newTheme);
+                           setIsDarkMode(e.target.checked);
+                       }}
                 />
 
                 {/* sun icon */}

@@ -11,22 +11,25 @@ function Home() {
     
     return (
         <div className="flex flex-col gap-8 p-6 relative">
-            {/* 玻璃拟态风格Tab切换 */}
-            <div className="tabs tabs-boxed bg-base-100/20 backdrop-blur-lg rounded-box p-1 absolute top-4 right-4 z-10 shadow-lg">
-                <a 
-                    className={`tab tab-lg rounded-box p-1 m-1 ${displayMode === 'gallery' ? 'tab-active bg-primary/20 text-primary' : ''}`}
-                    onClick={() => setDisplayMode('gallery')}
-                >
-                    <SparklesIcon className="size-5 mr-2" />
-                    画廊模式
-                </a> 
-                <a 
-                    className={`tab tab-lg rounded-box p-1 m-1 ${displayMode === 'stats' ? 'tab-active bg-primary/20 text-primary' : ''}`}
-                    onClick={() => setDisplayMode('stats')}
-                >
-                    <CameraIcon className="size-5 mr-2" />
-                    数据统计
-                </a>
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold">Home</h1>
+                {/* 玻璃拟态风格Tab切换 */}
+                <div className="tabs tabs-boxed bg-base-100/20 w-max backdrop-blur-lg rounded-box p-1 shadow-lg">
+                    <a
+                        className={`tab tab-lg rounded-box p-1 m-1 ${displayMode === 'gallery' ? 'tab-active bg-primary/20 text-primary' : ''}`}
+                        onClick={() => setDisplayMode('gallery')}
+                    >
+                        <SparklesIcon className="size-5 mr-2" />
+                        画廊模式
+                    </a>
+                    <a
+                        className={`tab tab-lg rounded-box p-1 m-1 ${displayMode === 'stats' ? 'tab-active bg-primary/20 text-primary' : ''}`}
+                        onClick={() => setDisplayMode('stats')}
+                    >
+                        <CameraIcon className="size-5 mr-2" />
+                        数据统计
+                    </a>
+                </div>
             </div>
 
             {/* 画廊模式内容 */}
@@ -47,7 +50,7 @@ function Home() {
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                                     {hoverIndex === i && (
                                         <div className="absolute inset-0 p-3 bg-black/80 backdrop-blur-sm flex flex-col justify-center">
-                                            <div className="text-xs text-primary mb-2">摄影参数</div>
+                                            <div className="text-xs text-white/80 mb-2">摄影参数</div>
                                             <div className="text-[11px] space-y-1 text-white/80">
                                                 <div>📷 {ExifInfo.getSample().camera}</div>
                                                 <div>🔍 {ExifInfo.getSample().lens}</div>
