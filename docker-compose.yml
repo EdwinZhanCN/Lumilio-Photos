@@ -18,15 +18,6 @@ services:
     depends_on:
       - postgres
 
-  frontend:
-    build:
-      context: .
-      dockerfile: web/Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      - app
-
   postgres:
     image: postgres:alpine
     environment:

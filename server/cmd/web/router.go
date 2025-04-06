@@ -3,8 +3,9 @@ package web
 import (
 	"log"
 	"net/http"
+	"strings"
 
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 )
 
 // PhotoControllerInterface defines the interface for photo controllers
@@ -14,20 +15,42 @@ type PhotoControllerInterface interface {
 }
 
 // NewRouter creates and configures a new router
-func NewRouter(photoController PhotoControllerInterface) *mux.Router {
-	r := mux.NewRouter()
+func NewRouter(photoController PhotoControllerInterface) *gin.Engine {
+	r := gin.Default()
+
+	// Add CORS middleware
+	r.Use(func(c *gin.Context) {
+		corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			c.Next()
+		})).ServeHTTP(c.Writer, c.Request)
+	})
+
+	r.Use(func(c *gin.Context) {
+		if strings.HasSuffix(c.Request.URL.Path, ".wasm") {
+			c.Writer.Header().Set("Content-Type", "application/wasm")
+		}
+		c.Next()
+	})
+
+	r.Static("/", "/app/web/dist")
 
 	// API routes
-	api := r.PathPrefix("/api").Subrouter()
+	api := r.Group("/api")
 
 	// Photo routes
-	photoRoutes := api.PathPrefix("/photos").Subrouter()
+	photoRoutes := api.Group("/photos")
 
-	photoRoutes.HandleFunc("", photoController.UploadPhoto).Methods("POST")
-	photoRoutes.HandleFunc("/batch", photoController.BatchUploadPhotos).Methods("POST")
+	photoRoutes.POST("", func(c *gin.Context) {
+		photoController.UploadPhoto(c.Writer, c.Request)
+	})
+	photoRoutes.POST("/batch", func(c *gin.Context) {
+		photoController.BatchUploadPhotos(c.Writer, c.Request)
+	})
 	log.Println("Starting Controller")
-	// Add CORS middleware
-	r.Use(corsMiddleware)
+
+	r.NoRoute(func(c *gin.Context) {
+		c.File("/app/web/dist/index.html")
+	})
 
 	return r
 }
