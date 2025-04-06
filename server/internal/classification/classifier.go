@@ -8,6 +8,7 @@ import (
 	"image"
 	"io"
 	"log"
+	"math"
 	"os"
 	"sort"
 
@@ -41,6 +42,9 @@ type ClassificationResult struct {
 
 // NewImageClassifier creates a new image classifier with the given ONNX model and class index
 func NewImageClassifier(modelPath, classIndexPath string) (*ImageClassifier, error) {
+	//TODO: use homebrew path
+	onnxruntime_go.SetSharedLibraryPath("/opt/homebrew/Cellar/onnxruntime/1.21.0/lib/libonnxruntime.dylib")
+
 	// Initialize ONNX runtime environment if not already initialized
 	err := onnxruntime_go.InitializeEnvironment()
 	if err != nil {
@@ -61,7 +65,7 @@ func NewImageClassifier(modelPath, classIndexPath string) (*ImageClassifier, err
 	defer options.Destroy()
 
 	// Define input and output shapes
-	inputShape := onnxruntime_go.NewShape(1, 3, 224, 224) // Standard ImageNet input size
+	inputShape := onnxruntime_go.NewShape(1, 3, 384, 384) // 224x224 input size for qualcomm, 300x300 for timm, 384x384 for mobilenet
 	outputShape := onnxruntime_go.NewShape(1, 1000)       // Assuming 1000 classes for ImageNet
 
 	// Create input and output tensors
@@ -79,8 +83,8 @@ func NewImageClassifier(modelPath, classIndexPath string) (*ImageClassifier, err
 	// Create advanced session
 	session, err := onnxruntime_go.NewAdvancedSession(
 		modelPath,
-		[]string{"input"},  // Input name
-		[]string{"output"}, // Output name
+		[]string{"pixel_values"}, // Input name, qualcomm: image_tensor, mobilenet: pixel_values
+		[]string{"logits"},       // Output name, qualcomm: class_logits, mobilenet: logits
 		[]onnxruntime_go.ArbitraryTensor{inputTensor},
 		[]onnxruntime_go.ArbitraryTensor{outputTensor},
 		options,
@@ -120,7 +124,7 @@ func loadClassIndex(path string) (ClassIndex, error) {
 // This is now a utility function since we define the shape explicitly when creating tensors
 func getInputShape() []int64 {
 	// Standard ImageNet input size: [batch_size, channels, height, width]
-	return []int64{1, 3, 224, 224}
+	return []int64{1, 3, 384, 384} //224x224 input size for qualcomm, 300x300 for timm, 384x384 for mobilenet
 }
 
 // Classify classifies an image and returns the top N results
@@ -164,6 +168,10 @@ func (c *ImageClassifier) prepareInput(img image.Image) error {
 	redChannel := data[0:channelSize]
 	greenChannel := data[channelSize : channelSize*2]
 	blueChannel := data[channelSize*2 : channelSize*3]
+	// BGR
+	//blueChannel := data[0:channelSize]
+	//greenChannel := data[channelSize : channelSize*2]
+	//redChannel := data[channelSize*2 : channelSize*3]
 
 	// Resize the image to the model's input shape
 	resized := imaging.Resize(img, width, height, imaging.Lanczos)
@@ -174,15 +182,15 @@ func (c *ImageClassifier) prepareInput(img image.Image) error {
 		for x := 0; x < width; x++ {
 			r, g, b, _ := resized.At(x, y).RGBA()
 
-			// Convert from uint32 to float32 and normalize to [0, 1]
+			// First normalize to [0, 1]
 			redChannel[i] = float32(r>>8) / 255.0
 			greenChannel[i] = float32(g>>8) / 255.0
 			blueChannel[i] = float32(b>>8) / 255.0
 
-			// For ImageNet models, you might want to normalize using mean and std
-			//redChannel[i] = (redChannel[i] - 0.485) / 0.229
-			//greenChannel[i] = (greenChannel[i] - 0.456) / 0.224
-			//blueChannel[i] = (blueChannel[i] - 0.406) / 0.225
+			// Then apply ImageNet normalization
+			redChannel[i] = (redChannel[i] - 0.485) / 0.229
+			greenChannel[i] = (greenChannel[i] - 0.456) / 0.224
+			blueChannel[i] = (blueChannel[i] - 0.406) / 0.225
 
 			i++
 		}
@@ -196,13 +204,16 @@ func (c *ImageClassifier) processResults(topN int) ([]ClassificationResult, erro
 	// Get the output tensor data
 	outputTensor := c.outputTensor.GetData()
 
+	// Apply softmax to convert logits to probabilities
+	softmaxScores := applySoftmax(outputTensor)
+
 	// Create a slice of (index, score) pairs
 	scores := make([]struct {
 		Index int
 		Score float32
-	}, len(outputTensor))
+	}, len(softmaxScores))
 
-	for i, score := range outputTensor {
+	for i, score := range softmaxScores {
 		scores[i] = struct {
 			Index int
 			Score float32
@@ -287,4 +298,30 @@ func (c *ImageClassifier) Close() {
 		c.outputTensor.Destroy()
 		c.outputTensor = nil
 	}
+}
+
+// applySoftmax applies the softmax function to a slice of float32 values
+func applySoftmax(values []float32) []float32 {
+	result := make([]float32, len(values))
+	var sum float32 = 0.0
+
+	// 找出最大值并计算exp
+	var maxVal float32 = -99999
+	for _, v := range values {
+		if v > maxVal {
+			maxVal = v
+		}
+	}
+
+	for i, v := range values {
+		result[i] = float32(math.Exp(float64(v - maxVal)))
+		sum += result[i]
+	}
+
+	// 归一化
+	for i := range result {
+		result[i] /= sum
+	}
+
+	return result
 }
