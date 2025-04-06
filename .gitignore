@@ -43,3 +43,8 @@ go.work
 *.log
 *.gz
 .vercel
+
+# Go specific
+/server/internal/classification/data
+/server/internal/classification/mobileCLIP/
+/server/internal/classification/models/
