@@ -48,3 +48,4 @@ go.work
 /server/internal/classification/data
 /server/internal/classification/mobileCLIP/
 /server/internal/classification/models/
+/pml/pt/*.pt
