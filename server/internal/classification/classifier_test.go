@@ -11,8 +11,8 @@ import (
 
 func TestImageClassifier(t *testing.T) {
 	// 设置测试模型和类索引路径
-	modelPath := filepath.Join(".", "mobilenet-v4-l.onnx")
-	classIndexPath := filepath.Join(".", "imagenet_class_index.json")
+	modelPath := filepath.Join(".", "/models/mobilenet-v4-l.onnx")
+	classIndexPath := filepath.Join(".", "./models/imagenet_class_index.json")
 
 	// 创建分类器
 	classifier, err := NewImageClassifier(modelPath, classIndexPath)
