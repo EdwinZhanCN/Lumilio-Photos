@@ -4,9 +4,9 @@ import mobileclip
 import json  # 新增json模块导入
 
 model, _, preprocess = mobileclip.create_model_and_transforms('mobileclip_s1', pretrained='./pt/mobileclip_s1.pt')
-tokenizer = mobileclip.get_tokenizer('mobileclip_s0')
+tokenizer = mobileclip.get_tokenizer('mobileclip_s1')
 
-image = preprocess(Image.open("cat.jpeg").convert('RGB')).unsqueeze(0)
+image = preprocess(Image.open("dog.jpeg").convert('RGB')).unsqueeze(0)
 # text = tokenizer(["a diagram", "a dog", "a cat"])
 
 # 加载ImageNet类别映射（适配标准格式）

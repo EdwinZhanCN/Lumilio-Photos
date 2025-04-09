@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/barasher/go-exiftool"
+	"os"
 	"server/internal/models"
 	"strconv"
 	"time"
@@ -14,12 +15,21 @@ func (p *ImageProcessor) ExtractImageMetadata(ctx context.Context, photoID strin
 	// 1. Start the ExifTool process
 	et, err := exiftool.NewExiftool()
 	if err != nil {
-		return nil, fmt.Errorf("failed to intialize exiftool: %w", err)
+		photoUUID, err := models.ParseUUID(photoID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid photo ID: %w", err)
+		}
+
+		metadata := &models.PhotoMetadata{
+			PhotoID: photoUUID,
+		}
+		return metadata, fmt.Errorf("failed to intialize exiftool: %w", err)
 	}
 	defer et.Close()
 
 	// 2. Extract metadata
-	metaData := et.ExtractMetadata("./data/photos/" + storagePath)
+	rootStoragePath := os.Getenv("STORAGE_PATH")
+	metaData := et.ExtractMetadata(rootStoragePath + "/" + storagePath)
 
 	// 3. Get the important metadata fields
 	// taken_time, camera_model, lens_model, exposure_time, f_number, iso_speed, gps_latitude, gps_longitude
