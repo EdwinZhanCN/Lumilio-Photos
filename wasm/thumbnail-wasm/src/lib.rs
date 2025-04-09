@@ -1,5 +1,5 @@
 use wasm_bindgen::prelude::*;
-use image::{DynamicImage, ImageFormat, ImageReader};
+use image::{ImageFormat, ImageReader};
 use std::io::Cursor;
 
 #[wasm_bindgen]

@@ -1,14 +1,7 @@
 // web/src/workers/thumbnailWorker.js
-import init, { generate_thumbnail } from '@/wasm/thumbnail_wasm';
+import  {useWasm} from "@/hooks/useWasm.jsx";
 
-// Initialize WASM module at worker startup
-let wasmInitialized = false;
-let initializationPromise = init().then(() => {
-    console.log('WASM module initialized in worker');
-    wasmInitialized = true;
-}).catch(err => {
-    console.error('Failed to initialize WASM in worker:', err);
-});
+const {wasmReady, generate_thumbnail } = useWasm()
 
 self.onmessage = async (event) => {
     const { type, payload } = event.data;
@@ -17,11 +10,6 @@ self.onmessage = async (event) => {
         const { files, batchIndex, startIndex } = payload;
 
         try {
-            // Ensure WASM is initialized before processing
-            if (!wasmInitialized) {
-                await initializationPromise;
-            }
-
             const results = [];
 
             for (let i = 0; i < files.length; i++) {

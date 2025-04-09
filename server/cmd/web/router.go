@@ -43,9 +43,11 @@ func NewRouter(photoController PhotoControllerInterface) *gin.Engine {
 	photoRoutes.POST("", func(c *gin.Context) {
 		photoController.UploadPhoto(c.Writer, c.Request)
 	})
+
 	photoRoutes.POST("/batch", func(c *gin.Context) {
 		photoController.BatchUploadPhotos(c.Writer, c.Request)
 	})
+
 	log.Println("Starting Controller")
 
 	r.NoRoute(func(c *gin.Context) {

@@ -19,7 +19,11 @@ RUN npm run build
 FROM alpine:latest
 
 # 安装运行时依赖
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add \
+    ca-certificates \
+    tzdata \
+    exiftool \
+    perl-image-exiftool
 
 # 复制后端二进制
 COPY --from=builder-backend /app/rkphoto-server /usr/local/bin/

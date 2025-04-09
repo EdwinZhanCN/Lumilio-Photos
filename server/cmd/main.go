@@ -33,7 +33,7 @@ func main() {
 	log.Println("Starting application...")
 
 	// Connect to the database
-	database := db.Connect("lumina-photos")
+	database := db.Connect("lumilio-photos")
 
 	// Auto-migrate database models
 	log.Println("Running database migrations...")
