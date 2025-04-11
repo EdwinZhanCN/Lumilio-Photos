@@ -86,7 +86,7 @@ const UploadPhotos = () => {
     useEffect(() => {
         if (!workerClientRef.current) {
             // relative path to the workerClient.js
-            const workerUrl = new URL('@/workers/thumbnail.worker.js', import.meta.url);
+            const workerUrl = new URL('../workers/thumbnail.worker.js', import.meta.url);
             workerClientRef.current = new WasmWorkerClient(workerUrl);
         }
 
