@@ -86,7 +86,7 @@ const UploadPhotos = () => {
     useEffect(() => {
         if (!workerClientRef.current) {
             // relative path to the workerClient.js
-            const workerUrl = new URL('../workers/thumbnail.worker.js', import.meta.url);
+            const workerUrl = new URL('/src/workers/thumbnail.worker.js', import.meta.url).href;
             workerClientRef.current = new WasmWorkerClient(workerUrl);
         }
 
@@ -120,20 +120,18 @@ const UploadPhotos = () => {
             return;
         }
 
+        const removeProgressListener = workerClientRef.current.addProgressListener(({ processed }) => {
+            setThumbnailProgress(prev => ({
+                ...prev,
+                numberProcessed: processed,
+                total: files.length
+            }));
+        });
+
         try {
             setIsGeneratingThumbnails(true);
-
             const startIndex = previews.length;
             setPreviews(prev => [...prev, ...Array(files.length).fill(null)]);
-            const removeProgressListener = workerClientRef.current.addProgressListener(({ processed }) => {
-                setThumbnailProgress(prev => ({
-                    ...prev,
-                    numberProcessed: processed,
-                    total: files.length
-                }));
-            });
-    
-
             // Process files in smaller batches for better performance
             const fileArray = Array.from(files);
 
