@@ -1,28 +1,35 @@
 import {useState, useRef, useCallback, useEffect} from 'react';
-import { useWasm } from '@/hooks/useWasm';
+import { WasmWorkerClient } from "@/workers/workerClient.js";
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-
+import React from 'react';
 
 const UploadPhotos = () => {
+    const [wasmError, setWasmError] = useState(false);
+    const rawFileExtensions = ['.raw', '.cr2', '.nef', '.orf', '.sr2',
+        '.arw', '.rw2', '.dng', '.k25', '.kdc', '.mrw', '.pef', '.raf', '.3fr', '.fff'];
     const [files, setFiles] = useState([]);
     const [previews, setPreviews] = useState([]);
     const [isDragging, setIsDragging] = useState(false);
-    const [progress, setProgress] = useState(0);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const fileInputRef = useRef(null);
     const [maxFiles] = useState(30);
-    const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
-    const { wasmReady, generateThumbnail } = useWasm();
-    const [wasmError, setWasmError] = useState(false);
-    const rawFileExtensions = ['.raw', '.cr2', '.nef', '.orf', '.sr2',
-        '.arw', '.rw2', '.dng', '.k25', '.kdc', '.mrw', '.pef', '.raf', '.3fr', '.fff'];
+
+    // New state for tracking thumbnail generation progress
+    const [thumbnailProgress, setThumbnailProgress] = useState(null);
+    const [isGeneratingThumbnails, setIsGeneratingThumbnails] = useState(false);
+    const [wasmReady, setWasmReady] = useState(false);
+
+    const workerClientRef = useRef(null);
+
 
     // 清理所有生成的URL
     const revokePreviews = useCallback((urls) => {
         urls.forEach(url => URL.revokeObjectURL(url));
     }, []);
 
+    //#region Legacy Compress Image
     const legacyCompressImage = useCallback(async (file) => {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -73,94 +80,105 @@ const UploadPhotos = () => {
             reader.readAsDataURL(file);
         });
     },[]);
+    //#endregion
 
-
-    const workerRef = useRef(null);
-
+    // Initialize worker client
     useEffect(() => {
-        // Initialize worker
-        if (typeof Worker !== 'undefined' && !workerRef.current) {
-            workerRef.current = new Worker(
-                new URL('../workers/thumbnailWorker.js', import.meta.url),
-                { type: 'module' }
-            );
-
-            // Set up worker message handlers
-            workerRef.current.onmessage = (event) => {
-                const { type, payload } = event.data;
-
-                if (type === 'BATCH_COMPLETE') {
-                    const { results } = payload;
-                    setPreviews(prev => {
-                        const newPreviews = [...prev];
-                        results.forEach(({ index, url }) => {
-                            newPreviews[index] = url;
-                        });
-                        return newPreviews;
-                    });
-                    setIsGeneratingPreview(false);
-                } else if (type === 'ERROR') {
-                    console.error('Worker error:', payload.error);
-                    setError('Failed to generate some previews');
-                }
-            };
+        if (!workerClientRef.current) {
+            workerClientRef.current = new WasmWorkerClient('thumbnail.worker.js');
         }
 
-        // Clean up worker on component unmount
+        // Initialize WASM
+        const initWasm = async () => {
+            try {
+                await workerClientRef.current.initWASM();
+                setWasmReady(true);
+                console.log('WASM module initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize WASM:', error);
+                setError('Failed to initialize WebAssembly module');
+            }
+        };
+
+        initWasm();
+
+        // Cleanup worker when component unmounts
         return () => {
-            if (workerRef.current) {
-                workerRef.current.terminate();
-                workerRef.current = null;
+            if (workerClientRef.current) {
+                workerClientRef.current.terminate();
             }
         };
     }, []);
 
-    const generatePreviews = useCallback(async (files) => {
-        setIsGeneratingPreview(true);
-        const startIndex = previews.length;
+    const BATCH_SIZE = 10;
 
-        // Initialize placeholder previews with skeletons
-        setPreviews(prev => [...prev, ...Array(files.length).fill(null)]);
+    const generatePreviews = useCallback(async (files) => {
+        if (!workerClientRef.current || !wasmReady) {
+            setError('WebAssembly module is not ready yet');
+            return;
+        }
 
         try {
+            setIsGeneratingThumbnails(true);
 
-            if (workerRef.current) {
-                // Send all files to the worker at once
-                workerRef.current.postMessage({
-                    type: 'PROCESS_FILES',
-                    payload: {
-                        files: Array.from(files),
-                        batchIndex: 0,
-                        startIndex: startIndex
-                    }
+            const startIndex = previews.length;
+            setPreviews(prev => [...prev, ...Array(files.length).fill(null)]);
+            const removeProgressListener = workerClientRef.current.addProgressListener(({ processed }) => {
+                setThumbnailProgress(prev => ({
+                    ...prev,
+                    numberProcessed: processed,
+                    total: files.length
+                }));
+            });
+    
+
+            // Process files in smaller batches for better performance
+            const fileArray = Array.from(files);
+
+            for (let i = 0; i < fileArray.length; i += BATCH_SIZE) {
+                const batch = fileArray.slice(i, i + BATCH_SIZE);
+                const batchIndex = i / BATCH_SIZE;
+
+                // Call worker client directly
+                const result = await workerClientRef.current.generateThumbnail({
+                    files: batch,
+                    batchIndex: batchIndex,
+                    startIndex: startIndex + i
                 });
-            } else {
-                // Fallback if web workers not supported
-                console.warn('Web Workers not supported, processing on main thread');
-
-                // Process files one by one to keep UI responsive
-                for (let i = 0; i < files.length; i++) {
-                    const url = await legacyCompressImage(files[i]);
-
+                if (result.status === 'complete' && result.results) {
                     setPreviews(prev => {
                         const newPreviews = [...prev];
-                        newPreviews[startIndex + i] = url;
+                        result.results.forEach(({ index, url }) => {
+                            const actualIndex = startIndex + index;
+                            if (url && actualIndex < newPreviews.length) {
+                                newPreviews[actualIndex] = url;
+                            } else {
+                                console.warn('Invalid preview index:', actualIndex);
+                            }
+                        });
                         return newPreviews;
                     });
                 }
             }
         } catch (error) {
-            console.error('Preview generation error:', error);
-            revokePreviews(previews);
-            setPreviews([]);
-            setError('Failed to generate previews');
+            console.error('Error generating thumbnails:', error);
+            setError(`Thumbnail generation failed: ${error?.message || 'Unknown error'}`);
+            setThumbnailProgress(prev => ({
+              ...prev,
+              error: error?.message,
+              failedAt: Date.now()
+            }));
+        } finally {
+            setIsGeneratingThumbnails(false);
+            removeProgressListener(); 
+            // Reset progress only after all batches complete
+            console.log('All batches processed - clearing progress');
+            setThumbnailProgress(null);
         }
-    }, [previews, revokePreviews, legacyCompressImage]);
+    }, [previews, wasmReady]);
 
 
-
-
-    // 处理文件选择
+    // 处理文件类型
     const isValidFileType = (file) => {
         const supportedImageTypes = [
             'image/',
@@ -188,6 +206,10 @@ const UploadPhotos = () => {
         );
     };
 
+    /**
+     * Handle file selection
+     * @param selectedFiles {FileList} - The selected files from the input
+     */
     const handleFiles = (selectedFiles) => {
         const validFiles = Array.from(selectedFiles).filter(file =>
             isValidFileType(file)
@@ -238,7 +260,7 @@ const UploadPhotos = () => {
         }
 
         try {
-            setProgress(0);
+            setUploadProgress(0);
             
             // 创建FormData对象用于批量上传
             const formData = new FormData();
@@ -261,7 +283,7 @@ const UploadPhotos = () => {
             const result = await response.json();
             
             // 设置进度为100%表示完成
-            setProgress(100);
+            setUploadProgress(100);
             
             // 显示成功消息，包含成功上传的数量
             console.log(result)
@@ -272,7 +294,7 @@ const UploadPhotos = () => {
                 setSuccess('');
                 setFiles([]);
                 setPreviews([]);
-                setProgress(0);
+                setUploadProgress(0);
             }, 2000);
         } catch (err) {
             setError(err.message || 'Upload failed, please try again');
@@ -292,7 +314,7 @@ const UploadPhotos = () => {
                 {/* 拖放区域 */}
                 <div
                     className={`border-2 border-dashed rounded-xl p-8 mb-6 text-center transition-colors
-            ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'}`}
+                                ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'}`}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
@@ -340,8 +362,23 @@ const UploadPhotos = () => {
                     />
                 </div>
 
+                {isGeneratingThumbnails && thumbnailProgress && (
+                    <div className="mb-4">
+                        <div className="flex items-center gap-2">
+                            <progress
+                                className="progress w-56"
+                                value={thumbnailProgress.numberProcessed}
+                                max={thumbnailProgress.total}
+                            ></progress>
+                            <span className="text-sm text-gray-500">
+                            {thumbnailProgress.numberProcessed}/{thumbnailProgress.total}
+                        </span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Loading indicator when generating previews */}
-                {isGeneratingPreview && (
+                {isGeneratingThumbnails && (
                     <div className="flex justify-center items-center mb-6">
                         <span className="loading loading-dots loading-md"></span>
                         <span className="ml-2 text-sm text-gray-500">Generating previews...</span>
@@ -371,16 +408,16 @@ const UploadPhotos = () => {
                 )}
 
                 {/* 进度条 */}
-                {progress > 0 && (
+                {uploadProgress > 0 && (
                     <div className="mb-4">
                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                             <div
                                 className="h-full bg-blue-500 transition-all duration-300"
-                                style={{ width: `${progress}%` }}
+                                style={{ width: `${uploadProgress}%` }}
                             />
                         </div>
                         <p className="text-sm text-gray-600 mt-1">
-                            Uploading... {Math.min(progress, 99)}%
+                            Uploading... {Math.min(uploadProgress, 99)}%
                         </p>
                     </div>
                 )}
@@ -392,10 +429,10 @@ const UploadPhotos = () => {
                         onClick={() => {
                             setFiles([]);
                             setPreviews([]);
-                            setProgress(0);
+                            setUploadProgress(0);
                         }}
                         className="px-4 py-2 text-base-content/50 hover:text-base-content disabled:opacity-50"
-                        disabled={files.length === 0 || progress > 0}
+                        disabled={files.length === 0 || uploadProgress > 0}
                     >
                         Clear
                     </button>
@@ -403,9 +440,9 @@ const UploadPhotos = () => {
                         onClick={handleUpload}
                         className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors
                         hover:cursor-pointer disabled:cursor-not-allowed"
-                        disabled={files.length === 0 || progress > 0}
+                        disabled={files.length === 0 || uploadProgress > 0}
                     >
-                        {progress > 0 ? 'Uploading...' : 'Start Upload'}
+                        {uploadProgress > 0 ? 'Uploading...' : 'Start Upload'}
                     </button>
                 </div>
 
