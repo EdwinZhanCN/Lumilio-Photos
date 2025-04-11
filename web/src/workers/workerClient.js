@@ -5,10 +5,10 @@
 export class  WasmWorkerClient {
     /**
      * Creates an instance of WasmWorkerClient.
-     * @param workerPath {string} - The path to the Web Worker script.
+     * @param workerPath {URL} - The path to the Web Worker script.
      */
     constructor( workerPath ) {
-        this.worker = new Worker(new  URL(workerPath, import.meta.url), {
+        this.worker = new Worker(workerPath, {
             type: 'module',
         })
         this.eventTarget = new EventTarget();
