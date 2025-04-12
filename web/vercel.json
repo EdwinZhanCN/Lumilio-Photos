@@ -1,5 +1,19 @@
 {
-  "rewrites":  [
-    {"source": "/(.*)", "destination": "/"}
+  "rewrites": [
+    {
+      "source": "/^(?!.*\\.(worker\\.js|css|js|json|ico|png|jpg|svg)$).*$",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/assets/.*\\.worker\\.js",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript"
+        }
+      ]
+    }
   ]
 }
