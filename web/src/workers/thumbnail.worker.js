@@ -1,4 +1,4 @@
-import init, { generate_thumbnail } from '@/wasm/thumbnail_wasm.js';
+import init, { generate_thumbnail } from '@/wasm/thumbnail_wasm.js?module';
 
 let wasmReady = false;
 let numberOfFilesProcessed = 0;
