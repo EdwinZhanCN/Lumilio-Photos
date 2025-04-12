@@ -1,13 +1,25 @@
 {
   "rewrites": [
     {
-      "source": "/^(?!.*\\.(worker\\.js|css|js|json|ico|png|jpg|svg)$).*$",
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": "text/html"
+        },
+        {
+          "type": "header",
+          "key": "sec-fetch-dest",
+          "value": "document"
+        }
+      ],
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/assets/.*\\.worker\\.js",
+      "source": "/assets/:path*.worker.js",
       "headers": [
         {
           "key": "Content-Type",
