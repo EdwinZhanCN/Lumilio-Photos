@@ -1,4 +1,4 @@
-import init, { generate_thumbnail } from '@/wasm/thumbnail_wasm.js?module';
+import init, { generate_thumbnail } from '@/wasm/thumbnail_wasm.js';
 
 let wasmReady = false;
 let numberOfFilesProcessed = 0;
@@ -7,11 +7,12 @@ let numberOfFilesProcessed = 0;
  * Initializes the WebAssembly module in thumbnail worker.
  * @returns {Promise<void>}
  */
-async function initialize(){
-    await init()
-    wasmReady = true
+async function initialize() {
+    await init();
+    wasmReady = true;
     self.postMessage({ type: 'WASM_READY' });
 }
+
 
 self.onmessage = async (e) => {
     const { type, data } = e.data;
