@@ -1,4 +1,4 @@
-import initWasm, { generate_thumbnail } from '@/wasm/thumbnail_wasm';
+import init, { generate_thumbnail } from '@/wasm/thumbnail_wasm.js';
 
 let wasmReady = false;
 let numberOfFilesProcessed = 0;
@@ -8,7 +8,7 @@ let numberOfFilesProcessed = 0;
  * @returns {Promise<void>}
  */
 async function initialize(){
-    await initWasm()
+    await init()
     wasmReady = true
     self.postMessage({ type: 'WASM_READY' });
 }

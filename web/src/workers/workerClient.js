@@ -11,6 +11,7 @@ export class  WasmWorkerClient {
         this.worker = new Worker(new URL(workerPath, import.meta.url), {
             type: 'module',
         })
+        console.log('Worker created', this.worker)
         this.eventTarget = new EventTarget();
     }
 
