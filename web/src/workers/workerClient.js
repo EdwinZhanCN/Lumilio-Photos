@@ -8,7 +8,7 @@ export class  WasmWorkerClient {
      * @param workerPath {string} - The path to the Web Worker script.
      */
     constructor( workerPath ) {
-        this.worker = new Worker(new URL(workerPath), {
+        this.worker = new Worker(new URL(workerPath, import.meta.url), {
             type: 'module',
         })
         this.eventTarget = new EventTarget();
