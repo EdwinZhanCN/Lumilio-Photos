@@ -5,12 +5,12 @@
 export class  WasmWorkerClient {
     /**
      * Creates an instance of WasmWorkerClient.
-     * @param workerPath {string} - The path to the Web Worker script.
+     * @param workerInstance {Worker} - The path to the Web Worker script.
      */
-    constructor( workerPath ) {
-        this.worker = new Worker(new URL(workerPath, import.meta.url), {
-            type: 'module',
-        })
+    constructor() {
+        this.generateThumbnailworker = new Worker(new URL('./thumbnail.worker.js', import.meta.url), {
+            type: 'module'
+        });
         console.log('Worker created', this.worker)
         this.eventTarget = new EventTarget();
     }
@@ -30,28 +30,28 @@ export class  WasmWorkerClient {
      * Initializes the WebAssembly module in current worker script.
      * @returns {Promise<void>}
      */
-    async initWASM(timeoutMs = 10000) {
+    async initWASM(timeoutMs = 100000) {
         return new Promise((resolve, reject) => {
             const handler = (event) => {
                 if (event.data.type === 'WASM_READY') {
                     clearTimeout(timeoutId);
-                    this.worker.removeEventListener('message', handler);
+                    this.generateThumbnailworker.removeEventListener('message', handler);
                     resolve({status: 'complete'});
                 }
                 if (event.data.type === 'ERROR') {
                     clearTimeout(timeoutId);
-                    this.worker.removeEventListener('message', handler);
+                    this.generateThumbnailworker.removeEventListener('message', handler);
                     reject(new Error(event.data.payload?.error || 'WASM initialization failed'));
                 }
             };
 
             const timeoutId = setTimeout(() => {
-                this.worker.removeEventListener('message', handler);
+                this.generateThumbnailworker.removeEventListener('message', handler);
                 reject(new Error('WASM initialization timed out'));
             }, timeoutMs);
 
-            this.worker.addEventListener('message', handler);
-            this.worker.postMessage({type: 'INIT_WASM'});
+            this.generateThumbnailworker.addEventListener('message', handler);
+            this.generateThumbnailworker.postMessage({type: 'INIT_WASM'});
         });
     }
 
@@ -84,7 +84,7 @@ export class  WasmWorkerClient {
                             results: e.data.payload.results,
                             status: 'complete'
                         });
-                        this.worker.removeEventListener('message', handler);
+                        this.generateThumbnailworker.removeEventListener('message', handler);
                         break;
                     case 'ERROR':
                         // In ERROR Message {data.}, the worker will send:
@@ -94,7 +94,7 @@ export class  WasmWorkerClient {
                         // - payload.errorName: The name of the error
                         // - payload.errorStack: The stack trace of the error
                         console.error(
-                            `Worker error in batch ${e.data.batchIndex}: ${e.data.payload.errorName} - ${e.data.payload.error}`,
+                            `GenerateThumbnail worker error in batch ${e.data.batchIndex}: ${e.data.payload.errorName} - ${e.data.payload.error}`,
                             {
                                 errorStack: e.data.payload.errorStack,
                                 batchIndex: e.data.batchIndex,
@@ -104,7 +104,7 @@ export class  WasmWorkerClient {
                         const error = new Error(e.data.payload.error);
                         error.name = e.data.payload.errorName;
                         error.stack = e.data.payload.errorStack;
-                        this.worker.removeEventListener('message', handler);
+                        this.generateThumbnailworker.removeEventListener('message', handler);
                         // use catch to handle the error
                         reject(error);
                         break;
@@ -118,19 +118,16 @@ export class  WasmWorkerClient {
                             }
                         }));
                         break;
-                    case 'WASM_READY':
-                        resolve({status: 'in-complete'})
-                        break;
                     default:
                         console.warn('Unknown message type:', e.data.type);
                 }
             }
 
             // Add the event listener for the worker message
-            this.worker.addEventListener('message', handler)
+            this.generateThumbnailworker.addEventListener('message', handler)
 
             // Send the data to the worker for processing
-            this.worker.postMessage ({
+            this.generateThumbnailworker.postMessage ({
                 type: 'GENERATE_THUMBNAIL',
                 data
             })
