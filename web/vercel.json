@@ -2,18 +2,6 @@
   "rewrites": [
     {
       "source": "/:path*",
-      "has": [
-        {
-          "type": "header",
-          "key": "accept",
-          "value": "text/html"
-        },
-        {
-          "type": "header",
-          "key": "sec-fetch-dest",
-          "value": "document"
-        }
-      ],
       "destination": "/index.html"
     }
   ],
