@@ -3,6 +3,11 @@ import { useState, useEffect, useRef } from 'react';
 import initThumbnail, { generate_thumbnail } from '@/wasm/thumbnail_wasm';
 import initBlake3, { hash_asset, verify_asset_hash, compare_assets } from '@/wasm/blake3_wasm';
 
+/**
+ * Custom hook to initialize and use WASM modules for thumbnail generation and file hashing.
+ * The useWasm() hook can only be used in JSX components, not in regular JavaScript files.
+ * @returns any
+ */
 export function useWasm() {
     const [wasmReady, setWasmReady] = useState(false);
     const initPromise = useRef(null);

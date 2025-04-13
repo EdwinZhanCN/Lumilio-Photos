@@ -8,13 +8,27 @@ let numberOfFilesProcessed = 0;
  * @returns {Promise<void>}
  */
 async function initialize() {
-    await init();
-    wasmReady = true;
-    self.postMessage({ type: 'WASM_READY' });
+    try {
+        await init();
+        wasmReady = true;
+        self.postMessage({ type: 'WASM_READY' });
+    } catch (error) {
+        console.error('Error initializing genThumbnail WebAssembly module:', error);
+        self.postMessage(
+            {
+                type: 'ERROR', 
+                payload:{
+                    error: error.message || 'Unknown worker error',
+                }
+            }
+        );
+    }
 }
 
 
 self.onmessage = async (e) => {
+    // - type: The type of the message.
+    // - data: The FileList of files to be processed.
     const { type, data } = e.data;
     switch (type){
         case 'INIT_WASM':

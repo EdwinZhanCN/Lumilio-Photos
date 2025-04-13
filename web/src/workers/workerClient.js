@@ -5,13 +5,14 @@
 export class  WasmWorkerClient {
     /**
      * Creates an instance of WasmWorkerClient.
-     * @param workerInstance {Worker} - The path to the Web Worker script.
      */
     constructor() {
         this.generateThumbnailworker = new Worker(new URL('./thumbnail.worker.js', import.meta.url), {
             type: 'module'
         });
-        console.log('Worker created', this.worker)
+        this.hashAssetsworker = new Worker(new URL('./hash.worker.js', import.meta.url),{
+            type:'module'
+        })
         this.eventTarget = new EventTarget();
     }
 
@@ -27,10 +28,10 @@ export class  WasmWorkerClient {
     }
 
     /**
-     * Initializes the WebAssembly module in current worker script.
+     * Initializes the WebAssembly module in genThumbnail worker script.
      * @returns {Promise<void>}
      */
-    async initWASM(timeoutMs = 100000) {
+    async initGenThumbnailWASM(timeoutMs = 100000) {
         return new Promise((resolve, reject) => {
             const handler = (event) => {
                 if (event.data.type === 'WASM_READY') {
@@ -74,7 +75,7 @@ export class  WasmWorkerClient {
                 switch (e.data.type) {
                     case 'BATCH_COMPLETE':
                         console.log('BATCH_COMPLETE received', e.data.payload.results.length);
-                        // In RESULT Message {data.}, the worker will send:
+                        // In BATCH_COMPLETE Message {data.}, the worker will send:
                         // - type: The type of the message
                         // - payload: The object containing the result
                         // - payload.batchIndex: The index of the batch
@@ -119,7 +120,7 @@ export class  WasmWorkerClient {
                         }));
                         break;
                     default:
-                        console.warn('Unknown message type:', e.data.type);
+                        console.warn('Unknown message type from genThumbnailWorker:', e.data.type);
                 }
             }
 
@@ -136,9 +137,123 @@ export class  WasmWorkerClient {
     }
 
     /**
-     * Terminates the worker.
+     * This function is used to initialize the WebAssembly module in genHash worker script.
+     * @param {number} timeoutMs 
+     * @returns 
      */
-    terminate() {
-        this.worker.terminate();
+    async initGenHashWASM(timeoutMs = 100000) {
+        return new Promise((resolve, reject) => {
+            const handler = (event) => {
+                if (event.data.type === 'WASM_READY') {
+                    clearTimeout(timeoutId);
+                    this.hashAssetsworker.removeEventListener('message', handler);
+                    resolve({status: 'complete'});
+                }
+                if (event.data.type === 'ERROR') {
+                    clearTimeout(timeoutId);
+                    this.hashAssetsworker.removeEventListener('message', handler);
+                    reject(new Error(event.data.payload?.error || 'WASM initialization failed'));
+                }
+            };
+
+            const timeoutId = setTimeout(() => {
+                this.hashAssetsworker.removeEventListener('message', handler);
+                reject(new Error('WASM initialization timed out'));
+            }, timeoutMs);
+
+            this.hashAssetsworker.addEventListener('message', handler);
+            this.hashAssetsworker.postMessage({type: 'INIT_WASM'});
+        });
+    }
+
+
+    /**
+     * Processes files into hashcodes, sending the results hash back to the main thread.
+     * You may want to use catch to handle the error.
+     * @requires FileList
+     * @param data {[FileList]} - The data to be processed. List of files.
+     * @returns {Promise<any>}
+     */
+    async generateHash(data){
+        return new Promise((resolve, reject) =>{
+            /**
+             * Handler for messages from the worker.
+             * @param e {MessageEvent} - The message event from the worker.
+             * @param e.data {string, Object} - The type of the message, and the data to be processed.
+             * 
+             */
+            const handler = (e) => {
+                // A listener for messages from the worker
+                switch (e.data.type) {
+                    case 'HASH_COMPLETE':
+                        // In HASH_COMPLETE Message {data.}, the worker will send:
+                        // - type: The type of the message
+                        // - hashResult: The list contains the all hashcode results
+                        // [
+                        //     {index: 0, hash: 'f0e1...'},
+                        //     {index: 1, hash: '0000...'}, 
+                        //     {index: 2, hash: 'a1b2...'},
+                        //     ...
+                        // ]
+                        resolve({
+                            results: e.data.hashResult,
+                            status: 'complete'
+                        });
+                        this.hashAssetsworker.removeEventListener('message', handler);
+                        break;
+                    case 'ERROR':
+                        // In ERROR Message {data.}, the worker will send:
+                        // - type: The type of the message
+                        // - error: The error message [index]err.message
+                        // - fileName: The name of the file that caused the error
+                        console.error(
+                            `Hash worker error: ${e.data.error}`,
+                            {
+                                fileName: e.data.fileName,
+                                errorDetails: e.data.error
+                            }
+                        );
+                        const error = new Error(e.data.error);
+                        error.fileName = e.data.fileName;
+                        this.hashAssetsworker.removeEventListener('message', handler);
+                        reject(error);
+                        break;
+                    case 'PROGRESS':
+                        // For Frontend progress bar
+                        // the numberProcessed is the number of files processed out of the total files user uploaded
+                        this.eventTarget.dispatchEvent(new CustomEvent('progress', {
+                            detail: {
+                                processed: e.data.payload.processed
+                            }
+                        }));
+                        break;
+                    default:
+                        console.warn('Unknown message type from genHashWorker:', e.data.type);
+                }
+            }
+            // Add the event listener for the worker message
+            this.hashAssetsworker.addEventListener('message', handler);
+            // Send the data to the worker for processing
+            this.hashAssetsworker.postMessage({
+                type: 'GENERATE_HASH',
+                data
+            });
+        })
+    }
+
+
+
+    /**
+     * Terminates the genThumbnail worker.
+     */
+    terminateGenerateThumbnailWorker() {
+        this.generateThumbnailworker.terminate();
+    }
+
+    /**
+     * Terminates the genHash worker.
+     */
+    terminateGenerateHashWorker() {
+        this.hashAssetsworker.terminate();
     }
 }

@@ -2,26 +2,82 @@ import {useState, useRef, useCallback, useEffect} from 'react';
 import { WasmWorkerClient } from "@/workers/workerClient.js";
 // const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 import React from 'react';
+import {useGenerateThumbnail} from "@/hooks/useGenerateThumbnail.jsx";
+import {useGenerateHashcode} from "@/hooks/useGenerateHashcode.jsx";
+import { formatBytes } from '../utils/formatters'; // Utility to format byte sizes
+
 
 const UploadPhotos = () => {
-    const [wasmError, setWasmError] = useState(false);
     const rawFileExtensions = ['.raw', '.cr2', '.nef', '.orf', '.sr2',
         '.arw', '.rw2', '.dng', '.k25', '.kdc', '.mrw', '.pef', '.raf', '.3fr', '.fff'];
+
+
     const [files, setFiles] = useState([]);
     const [previews, setPreviews] = useState([]);
+    const [hashResults, setHashResults] = useState([]);
+
+    // User feedback
     const [isDragging, setIsDragging] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const fileInputRef = useRef(null);
+
+    // Error/Success Status display
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const fileInputRef = useRef(null);
     const [maxFiles] = useState(30);
 
-    // New state for tracking thumbnail generation progress
-    const [thumbnailProgress, setThumbnailProgress] = useState(null);
-    const [isGeneratingThumbnails, setIsGeneratingThumbnails] = useState(false);
+    // Wasm Initialization
     const [wasmReady, setWasmReady] = useState(false);
 
+    // States for tracking thumbnail generation progress
+    const [thumbnailProgress, setThumbnailProgress] = useState(null);
+    const [isGeneratingThumbnails, setIsGeneratingThumbnails] = useState(false);
+
+    // States for tracking hashcode generation progress
+    const [hashcodeProgress, setHashcodeProgress] = useState(null);
+    const [isGeneratingHashCodes, setIsGeneratingHashCodes] = useState(false);
+
+    // Use web worker
     const workerClientRef = useRef(null);
+
+    //#region define import hooks
+    const { generatePreviews } = useGenerateThumbnail({
+        workerClientRef,
+        wasmReady,
+        setError,
+        setPreviews,
+        setIsGeneratingThumbnails,
+        setThumbnailProgress,
+    });
+
+    const handlePerformanceMetrics = (metrics) => {
+        // Format metrics for user-friendly display
+        const formattedSpeed = formatBytes(metrics.bytesPerSecond) + '/s';
+        const timeInSeconds = (metrics.processingTime / 1000).toFixed(2);
+        const formattedSize = formatBytes(metrics.totalSize);
+
+        // Create the success message
+        const message = `Hash generation complete! Processed ${metrics.fileCount} files (${formattedSize}) in ${timeInSeconds}s (${formattedSpeed})`;
+
+        // Set the success message to display in the toast
+        setSuccess(message);
+
+        // Auto-hide after some time
+        setTimeout(() => setSuccess(''), 5000);
+    };
+
+    const { generateHashCodes } = useGenerateHashcode({
+        workerClientRef,
+        wasmReady,
+        setError,
+        setHashResults,
+        setIsGeneratingHashCodes,
+        setHashcodeProgress,
+        onPerformanceMetrics: handlePerformanceMetrics,
+    });
+    //#endregion
+
+
 
 
     // 清理所有生成的URL
@@ -84,15 +140,14 @@ const UploadPhotos = () => {
 
     useEffect(() => {
         if (!workerClientRef.current) {
-            // relative path to the workerClient.js
-            
             workerClientRef.current = workerClientRef.current = new WasmWorkerClient();
         }
 
         // Initialize WASM
         const initWasm = async () => {
             try {
-                await workerClientRef.current.initWASM();
+                await workerClientRef.current.initGenThumbnailWASM();
+                await workerClientRef.current.initGenHashWASM();
                 setWasmReady(true);
                 console.log('WASM module initialized successfully');
             } catch (error) {
@@ -101,80 +156,16 @@ const UploadPhotos = () => {
             }
         };
 
-        initWasm();
+        initWasm().then(r => console.log(r));
 
-        // Cleanup worker when component unmounts
+        // Cleanup worker when component unmount
         return () => {
             if (workerClientRef.current) {
-                workerClientRef.current.terminate();
+                workerClientRef.current.terminateGenerateThumbnailWorker();
+                workerClientRef.current.terminateGenerateHashWorker();
             }
         };
     }, []);
-
-    const BATCH_SIZE = 10;
-
-    const generatePreviews = useCallback(async (files) => {
-        if (!workerClientRef.current || !wasmReady) {
-            setError('WebAssembly module is not ready yet');
-            return;
-        }
-
-        const removeProgressListener = workerClientRef.current.addProgressListener(({ processed }) => {
-            setThumbnailProgress(prev => ({
-                ...prev,
-                numberProcessed: processed,
-                total: files.length
-            }));
-        });
-
-        try {
-            setIsGeneratingThumbnails(true);
-            const startIndex = previews.length;
-            setPreviews(prev => [...prev, ...Array(files.length).fill(null)]);
-            // Process files in smaller batches for better performance
-            const fileArray = Array.from(files);
-
-            for (let i = 0; i < fileArray.length; i += BATCH_SIZE) {
-                const batch = fileArray.slice(i, i + BATCH_SIZE);
-                const batchIndex = i / BATCH_SIZE;
-
-                // Call worker client directly
-                const result = await workerClientRef.current.generateThumbnail({
-                    files: batch,
-                    batchIndex: batchIndex,
-                    startIndex: startIndex + i
-                });
-                if (result.status === 'complete' && result.results) {
-                    setPreviews(prev => {
-                        const newPreviews = [...prev];
-                        result.results.forEach(({ index, url }) => {
-                            const actualIndex = startIndex + index;
-                            if (url && actualIndex < newPreviews.length) {
-                                newPreviews[actualIndex] = url;
-                            } else {
-                                console.warn('Invalid preview index:', actualIndex);
-                            }
-                        });
-                        return newPreviews;
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Error generating thumbnails:', error);
-            setError(`Thumbnail generation failed: ${error?.message || 'Unknown error'}`);
-            setThumbnailProgress(prev => ({
-              ...prev,
-              error: error?.message,
-              failedAt: Date.now()
-            }));
-        } finally {
-            setIsGeneratingThumbnails(false);
-            removeProgressListener(); 
-            // Reset progress only after all batches complete
-            console.log('All batches processed - clearing progress');
-            setThumbnailProgress(null);
-        }
-    }, [previews, wasmReady]);
 
 
     // 处理文件类型
@@ -229,6 +220,14 @@ const UploadPhotos = () => {
         }
 
         setFiles(prev => [...prev, ...filteredFiles]);
+        setPreviews(prev => {
+            const newPreviews = [...prev];
+            // Add null placeholders for new files
+            for (let i = 0; i < filteredFiles.length; i++) {
+                newPreviews.push(null);
+            }
+            return newPreviews;
+        });
         generatePreviews(filteredFiles);
     };
 
@@ -303,16 +302,22 @@ const UploadPhotos = () => {
 
     return (
         <div className="min-h-screen px-2">
-            <div className="max-w-3xl mx-auto">
-                <h1 className="text-3xl font-bold mb-8">Upload Photos</h1>
-                <small className="text-sm text-base-content/70 mb-4">
-                    This page is for temporary upload, if you want to upload more photos at once,
-                    please directly change the directory in the file system.
+            <section id = "preview-upload-photos" className="max-w-3xl mx-auto">
+                <h1 className="text-3xl font-bold mb-8">Preview Upload Photos</h1>
+                {!wasmReady && (
+                    <div className="text-xs text-amber-500 mt-1">
+                        WebAssembly module is loading...
+                    </div>
+                )}
+                <small className="text-sm text-base-content/70">
+                    This Section is for previewing the photos you want to upload. <br />
+                    The maximum number of files you can upload is {maxFiles}. <br />
+                    You can change the maximum number of files in the system setting.
                 </small>
 
                 {/* 拖放区域 */}
                 <div
-                    className={`border-2 border-dashed rounded-xl p-8 mb-6 text-center transition-colors
+                    className={`mt-5 border-2 border-dashed rounded-xl p-8 mb-6 text-center transition-colors
                                 ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'}`}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
@@ -444,30 +449,83 @@ const UploadPhotos = () => {
                         {uploadProgress > 0 ? 'Uploading...' : 'Start Upload'}
                     </button>
                 </div>
-
-                {/* 状态提示 */}
-                {error && (
-                    <div className="toast toast-top toast-right">
-                        <div className="alert alert-error">
-                            {error}
+            </section>
+            <section id = "batch-upload-photos" className="max-w-3xl mx-auto">
+                <h1 className="text-3xl font-bold mb-8">Batch Upload Photos</h1>
+                {/* 进度条 */}
+                {isGeneratingHashCodes && hashcodeProgress && (
+                    <div className="mb-4">
+                        <div className="flex items-center gap-2">
+                            <progress
+                                className="progress w-56"
+                                value={hashcodeProgress.numberProcessed}
+                                max={hashcodeProgress.total}
+                            ></progress>
+                            <span className="text-sm text-gray-500">
+                            {hashcodeProgress.numberProcessed}/{hashcodeProgress.total}
+                        </span>
                         </div>
                     </div>
                 )}
-                {success && (
-                    <div className="toast toast-top toast-right duration-500">
-                        <div className="alert alert-success">
-                            {success}
+                {/* 拖放区域 */}
+                <div
+                    className={`mt-5 border-2 border-dashed rounded-xl p-8 mb-6 text-center transition-colors
+                                ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'}`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current.click()}
+                >
+                    <div className="space-y-4">
+                        <svg
+                            className="mx-auto h-12 w-12 text-gray-400"
+                            stroke="currentColor"
+                            fill="none"
+                            viewBox="0 0 48 48"
+                        >
+                            <path
+                                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                        <div className="text-base-content/50">
+                            <p className="font-medium">Drag or Click Here to Upload</p>
+                            <p className="text-sm">Supports JPEG, PNG, RAW</p>
                         </div>
                     </div>
-                )}
+                </div>
 
-
-                {!wasmReady && (
-                    <div className="text-xs text-amber-500 mt-1">
-                        WebAssembly module is loading...
+                {/* 隐藏的文件输入 */}
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    multiple
+                    accept="image/*,
+                          video/*,
+                          .cr2, .nef, .arw, .raf, .rw2, .dng,
+                          .mov, .mp4, .avi, .mkv"
+                    onChange={(e) => generateHashCodes(e.target.files)}
+                />
+            </section>
+            {/* 状态提示 */}
+            {error && (
+                <div className="toast toast-top toast-right duration-500">
+                    <div className="alert alert-error">
+                        {error}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
+
+            {success && (
+                <div className="toast toast-top toast-right duration-500">
+                    <div className="alert alert-success">
+                        {success}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
