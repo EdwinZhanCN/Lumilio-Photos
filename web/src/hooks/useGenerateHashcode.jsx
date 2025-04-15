@@ -8,17 +8,15 @@ import { useCallback, useRef } from 'react';
  * @param {Object} props.workerClientRef - The worker client reference.
  * @param {boolean} props.wasmReady - Flag indicating if WebAssembly is ready.
  * @param {Function} props.setError - Function to set the error state.
- * @param {Function} props.setHashResults - Function to set the hash results state.
  * @param {Function} props.setIsGeneratingHashCodes - Function to set the is generating hashCode state.
  * @param {Function} props.setHashcodeProgress - Function to set the hashcode progress state.
  * @param {Function} props.onPerformanceMetrics - Function to handle performance metrics.
- * @returns {{generateHashCodes: ((function(*): Promise<void>)|*)}}
+ * @returns {[{index:number, hash:string}] | Error}
  */
 export const useGenerateHashcode = ({
     workerClientRef,
     wasmReady,
     setError,
-    setHashResults,
     setIsGeneratingHashCodes,
     setHashcodeProgress,
     onPerformanceMetrics,
@@ -26,7 +24,8 @@ export const useGenerateHashcode = ({
     const perfMetricsRef = useRef({});
 
     /**
-     * Generates hashcode for the given files.
+     * Generates hashcode for the given files, put the result by setHashResult.
+     * And tracks the performance metrics.
      * @param {FileList} files - The files for which hashcode need to be generated.
      */
     const generateHashCodes = useCallback(async (files) => {
@@ -35,7 +34,8 @@ export const useGenerateHashcode = ({
 
         if (!workerClientRef.current || !wasmReady) {
             setError('WebAssembly module is not ready yet');
-            return;
+            setTimeout(() => setError(''), 3000);
+            return new Error("WebAssembly module is not ready yet");
         }
 
         // Initialize performance metrics
@@ -55,8 +55,8 @@ export const useGenerateHashcode = ({
         });
 
         try {
-            // Start hash generation
-            const { results } = await workerClientRef.current.generateHash(Array.from(files));
+            // The hash result if an array of objects, [{index:number,hash:string},...]
+            const { hashResults } = await workerClientRef.current.generateHash(Array.from(files));
 
             // Calculate performance metrics
             const endTime = performance.now();
@@ -74,11 +74,14 @@ export const useGenerateHashcode = ({
                 onPerformanceMetrics(metrics);
             }
 
-            // Log metrics for debugging
-            console.debug('Hash generation performance:', metrics);
-            
-            setHashResults(results);
-            return results;
+            if (!hashResults){
+                setError('HashCode generation failed: No hash result');
+                setTimeout(() => setError(''), 3000);
+                return new Error("HashCode generation failed: No hash result");
+            }
+
+            // The hash result if an array of objects, [{index:number,hash:string},...]
+            return hashResults;
         } catch (error) {
             setError(`HashCode generation failed: ${error?.message || 'Unknown error'}`);
             setHashcodeProgress(prev => ({
@@ -91,7 +94,7 @@ export const useGenerateHashcode = ({
             removeProgressListener();
             setHashcodeProgress(null);
         }
-    }, [workerClientRef, wasmReady, setError, setHashResults, setIsGeneratingHashCodes, setHashcodeProgress, onPerformanceMetrics]);
+    }, [workerClientRef, wasmReady, setError, setIsGeneratingHashCodes, setHashcodeProgress, onPerformanceMetrics]);
 
     return {
         generateHashCodes

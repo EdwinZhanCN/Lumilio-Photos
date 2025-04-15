@@ -1,4 +1,4 @@
-import init, { hash_asset } from '@/wasm/blake3_wasm.js'
+import init, {hash_asset, HashResult} from '@/wasm/blake3_wasm.js'
 
 
 let wasmReady = false;
@@ -33,8 +33,6 @@ self.onmessage = async (e) => {
     switch (type) {
         case 'ABORT':
             abortController.abort();
-            // clean
-            hashResult.splice(0);
             break;
         case 'INIT_WASM':
             await initialize();
@@ -45,6 +43,7 @@ self.onmessage = async (e) => {
                 return;
             }
             try {
+                // The hash result if an array of objects, [{index,HashResult{ptr,hash}},...]
                 const hashResult = await hashMultipleAssets(data);
                 self.postMessage({
                     type: 'HASH_COMPLETE', 
@@ -52,11 +51,10 @@ self.onmessage = async (e) => {
                 });
             }catch(err){
                 console.error(`Error generating hash for file ${i}:`, err);
-                // Log detailed error information
+                // Log detailed error information, this might be unusual error.
                 self.postMessage({
                     type: 'ERROR',
-                    error: `[${i}]${err.message}`,
-                    fileName: asset.name
+                    error: err,
                 });
             }
             break;
@@ -70,7 +68,7 @@ self.onmessage = async (e) => {
  */
 async function hashMultipleAssets(assets) {
     // TODO: make this optional in system settings.
-    const CONCURRENCY = assets[0]?.size > 100_000_000 ? 2 : 4; // dynamic concurrency level, consider to be changable.
+    const CONCURRENCY = assets[0]?.size > 100_000_000 ? 10 : 100; // dynamic concurrency level, consider to be changable.
     const hashResult = [];
     
     // process assets in batches
@@ -90,7 +88,10 @@ async function hashMultipleAssets(assets) {
                     hash
                 };
             } catch(err) {
-                console.error(`Error generating hash for [${globalIndex}]${asset.name}:`, err);
+                self.postMessage({
+                    type: 'ERROR',
+                    error: `Error generating hash for [${globalIndex}]${asset.name}:`, err,
+                });
                 return {
                     index: globalIndex,
                     hash: '0'.repeat(64), // 0-filled hash
@@ -107,9 +108,16 @@ async function hashMultipleAssets(assets) {
 
         // wait for all promises in this batch to resolve
         const batchResults = await Promise.all(promises);
-        hashResult.push(...batchResults);
+        const processedResults = batchResults.map(result => {
+            return {
+                index: result.index,
+                hash: result.hash?.hash || result.hash // Extract nested hash string if available
+            };
+        });
+        hashResult.push(...processedResults);
     }
-
     // The result is sorted by index.
-    return hashResult.sort((a, b) => a.index - b.index).map(x => x.hash);
+    return hashResult.sort((a, b) => a.index - b.index);
 }
+
+
