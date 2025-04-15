@@ -1,6 +1,5 @@
 import Home from "@/pages/Home"
 import Photos from "@/pages/Photos"
-import UploadPhotos from "@/pages/UploadPhotos.jsx";
 import UploadAssets from "@/pages/UploadAssets.jsx";
 
 export const routes = [
