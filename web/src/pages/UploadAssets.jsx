@@ -318,7 +318,7 @@ const UploadPhotos = () => {
                 ref={fileInputRef}
                 className="hidden"
                 multiple
-                accept={"image/*,video/*,.cr2, .nef, .arw, .raf, .rw2, .dng,.mov, .mp4, .avi, .mkv"+rawFileExtensions}
+                accept={"image/*,video/*,.cr2, .nef, .arw, .raf, .rw2, .dng,.mov, .mp4, .avi, .mkv," + rawFileExtensions.join(',')}
                 onChange={(e) => {
                     handleFiles(e.target.files);
                 }}
