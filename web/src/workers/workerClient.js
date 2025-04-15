@@ -172,7 +172,7 @@ export class  WasmWorkerClient {
      * You may want to use catch to handle the error.
      * @requires FileList
      * @param data {[FileList]} - The data to be processed. List of files.
-     * @returns {Promise<any>}
+     * @returns {Promise<hashResult>} - hashResult:[{index,hash:{_wbg_ptr}},...]
      */
     async generateHash(data){
         return new Promise((resolve, reject) =>{
@@ -196,7 +196,9 @@ export class  WasmWorkerClient {
                         //     ...
                         // ]
                         resolve({
-                            results: e.data.hashResult,
+                            // The hashResult is the list contains the all hashcode results
+                            // The hash result if an array of objects, [{index:number,hash:string},...]
+                            hashResults: e.data.hashResult,
                             status: 'complete'
                         });
                         this.hashAssetsworker.removeEventListener('message', handler);
