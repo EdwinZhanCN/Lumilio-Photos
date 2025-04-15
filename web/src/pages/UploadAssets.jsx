@@ -340,7 +340,7 @@ const UploadPhotos = () => {
                                 if (r instanceof Error){
                                     setError(r.message);
                                     setTimeout(() => setError(''), 3000);
-                                    throw Error
+                                    throw new Error("An error occurred during hash code generation.");
                                 }else {
                                     BatchUploadAssets(e.target.files, r)
                                 }
