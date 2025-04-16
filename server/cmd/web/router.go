@@ -3,7 +3,6 @@ package web
 import (
 	"log"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,15 +24,6 @@ func NewRouter(photoController PhotoControllerInterface) *gin.Engine {
 		})).ServeHTTP(c.Writer, c.Request)
 	})
 
-	r.Use(func(c *gin.Context) {
-		if strings.HasSuffix(c.Request.URL.Path, ".wasm") {
-			c.Writer.Header().Set("Content-Type", "application/wasm")
-		}
-		c.Next()
-	})
-
-	r.Static("/", "/app/web/dist")
-
 	// API routes
 	api := r.Group("/api")
 
@@ -49,10 +39,6 @@ func NewRouter(photoController PhotoControllerInterface) *gin.Engine {
 	})
 
 	log.Println("Starting Controller")
-
-	r.NoRoute(func(c *gin.Context) {
-		c.File("/app/web/dist/index.html")
-	})
 
 	return r
 }
