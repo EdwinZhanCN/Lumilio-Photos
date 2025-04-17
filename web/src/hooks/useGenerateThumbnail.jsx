@@ -1,31 +1,29 @@
-// hooks/useGenerateThumbnail.js
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
+import { useUpload } from '@/contexts/UploadContext';
 
 const BATCH_SIZE = 10; // TODO: add this in system config
 
 /**
  * Custom hook to generate thumbnails using a Web Worker.
- * To use this hook, ensure that the Web Worker is initialized and ready to handle thumbnail generation.
+ *
  * @author Edwin Zhan
- * @param workerClientRef - A reference to the Web Worker client.
- * @param wasmReady - A boolean indicating if the WebAssembly module is ready.
- * @param setError - A function to set error messages.
- * @param setPreviews - A function to set the generated thumbnail previews.
- * @param setIsGeneratingThumbnails - A function to set the thumbnail generation status.
- * @param setThumbnailProgress - A function to set the thumbnail generation progress.
- * @returns {{generatePreviews: ((function(*): Promise<void>)|*)}}
+ * @param {Object} options - Configuration options
+ * @param {Function} options.setGenThumbnailProgress - Function to set the progress of thumbnail generation
+ * @param {Function} options.setIsGenThumbnails - Function to set the state of thumbnail generation
+ * @returns {Object} Object containing the generatePreviews function
  */
-export const useGenerateThumbnail = ({
-    workerClientRef,
-    wasmReady,
-    setError,
-    setPreviews,
-    setIsGeneratingThumbnails,
-    setThumbnailProgress,
-}) => {
+export const useGenerateThumbnail = ({setGenThumbnailProgress, setIsGenThumbnails}) => {
+    // General State
+    const {
+        setError,
+        setPreviews,
+        workerClientRef,
+        wasmReady,
+    } = useUpload();
+
     /**
      * Generates thumbnails for the given files.
-     * @param files - The files for which thumbnails need to be generated.
+     * @param {File[]} files - The files for which thumbnails need to be generated.
      */
     const generatePreviews = useCallback(async (files) => {
         if (!workerClientRef.current || !wasmReady) {
@@ -34,7 +32,7 @@ export const useGenerateThumbnail = ({
         }
 
         const removeProgressListener = workerClientRef.current.addProgressListener(({ processed }) => {
-            setThumbnailProgress(prev => ({
+            setGenThumbnailProgress(prev => ({
                 ...prev,
                 numberProcessed: processed,
                 total: files.length,
@@ -42,8 +40,8 @@ export const useGenerateThumbnail = ({
         });
 
         try {
-            setIsGeneratingThumbnails(true);
-            const startIndex = 0; // 根据实际逻辑调整
+            setIsGenThumbnails(true);
+            const startIndex = 0;
             const fileArray = Array.from(files);
 
             for (let i = 0; i < fileArray.length; i += BATCH_SIZE) {
@@ -69,17 +67,17 @@ export const useGenerateThumbnail = ({
             }
         } catch (error) {
             setError(`Thumbnail generation failed: ${error?.message || 'Unknown error'}`);
-            setThumbnailProgress(prev => ({
+            setGenThumbnailProgress(prev => ({
                 ...prev,
                 error: error?.message,
                 failedAt: Date.now(),
             }));
         } finally {
-            setIsGeneratingThumbnails(false);
+            setIsGenThumbnails(false);
             removeProgressListener();
-            setThumbnailProgress(null);
+            setGenThumbnailProgress(null);
         }
-    }, [wasmReady, workerClientRef, setError, setPreviews, setIsGeneratingThumbnails, setThumbnailProgress]);
+    }, [wasmReady, workerClientRef, setError, setPreviews, setIsGenThumbnails, setGenThumbnailProgress]);
 
     return { generatePreviews };
 };
