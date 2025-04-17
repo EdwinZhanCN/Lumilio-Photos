@@ -36,8 +36,6 @@ export const useGenerateHashcode = ({
         setError(null);
 
         if (!workerClientRef.current || !wasmReady) {
-            console.log(wasmReady);
-            console.log(workerClientRef.current);
             setError('WebAssembly module is not ready yet');
             setIsGeneratingHashCodes(false);
             setTimeout(() => setError(''), 3000);
