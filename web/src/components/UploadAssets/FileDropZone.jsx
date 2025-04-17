@@ -1,20 +1,26 @@
 import React from 'react';
+import { useUpload } from '@/contexts/UploadContext';
 
-const FileUploadZone = ({
-                            isDragging,
-                            handleDragOver,
-                            handleDragLeave,
-                            handleDrop,
-                            fileInputRef,
-                            children
-                        }) => {
+const FileDropZone = ({fileInputRef, children, onFilesDropped}) => {
+    const {
+        isDragging,
+        handleDragOver,
+        handleDragLeave,
+        handleDrop
+    } = useUpload();
+
+    // Create a wrapper for handleDrop that calls the specific file handler
+    const onDrop = (e) => {
+        handleDrop(e, onFilesDropped);
+    };
+
     return (
         <div
             className={`mt-5 border-2 border-dashed rounded-xl p-8 mb-6 text-center transition-colors
                 ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400'}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
+            onDrop={onDrop}
             onClick={() => fileInputRef.current.click()}
         >
             <div className="space-y-4">
@@ -44,4 +50,4 @@ const FileUploadZone = ({
     );
 };
 
-export default FileUploadZone;
+export default FileDropZone;
