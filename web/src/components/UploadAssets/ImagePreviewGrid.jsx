@@ -8,7 +8,7 @@ const ImagePreviewGrid = ({ previews }) => {
             {previews.map((url, index) => (
                 <div
                     key={index}
-                    className="aspect-square bg-gray-100 rounded-lg overflow-hidden shadow-sm"
+                    className="aspect-square rounded-lg overflow-hidden shadow-sm"
                 >
                     {url ? (
                         <img

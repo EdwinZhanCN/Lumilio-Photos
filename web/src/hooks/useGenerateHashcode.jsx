@@ -1,26 +1,29 @@
 import { useCallback, useRef } from 'react';
+import {useUpload} from "@/contexts/UploadContext.jsx";
 
 /**
  * Custom hook for generating hashcode.
  * To use this hook, ensure that the Web Worker is initialized and ready to handle hash generation.
  * @author Edwin Zhan
- * @param {Object} props - The properties for the hook.
- * @param {Object} props.workerClientRef - The worker client reference.
- * @param {boolean} props.wasmReady - Flag indicating if WebAssembly is ready.
- * @param {Function} props.setError - Function to set the error state.
- * @param {Function} props.setIsGeneratingHashCodes - Function to set the is generating hashCode state.
- * @param {Function} props.setHashcodeProgress - Function to set the hashcode progress state.
- * @param {Function} props.onPerformanceMetrics - Function to handle performance metrics.
+ * @param {Object} options - The properties for the hook.
+ * @param {Function} options.setIsGeneratingHashCodes - Function to set the is generating hashCode state.
+ * @param {Function} options.setHashcodeProgress - Function to set the hashcode progress state.
+ * @param {Function} options.onPerformanceMetrics - Function to handle performance metrics.
  * @returns {[{index:number, hash:string}] | Error}
  */
 export const useGenerateHashcode = ({
-    workerClientRef,
-    wasmReady,
-    setError,
     setIsGeneratingHashCodes,
     setHashcodeProgress,
     onPerformanceMetrics,
 }) => {
+    // General State
+    const {
+        setError,
+        workerClientRef,
+        wasmReady,
+    } = useUpload();
+
+
     const perfMetricsRef = useRef({});
 
     /**
@@ -33,7 +36,10 @@ export const useGenerateHashcode = ({
         setError(null);
 
         if (!workerClientRef.current || !wasmReady) {
+            console.log(wasmReady);
+            console.log(workerClientRef.current);
             setError('WebAssembly module is not ready yet');
+            setIsGeneratingHashCodes(false);
             setTimeout(() => setError(''), 3000);
             return new Error("WebAssembly module is not ready yet");
         }
