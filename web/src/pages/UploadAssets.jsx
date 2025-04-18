@@ -2,7 +2,6 @@ import React from 'react';
 import PreviewUploadSection from '@/components/UploadAssets/PreviewUploadSection';
 import BatchUploadSection from '@/components/UploadAssets/BatchUploadSection.jsx';
 import UploadProvider from "@/contexts/UploadContext.jsx";
-import UploadNotifications from "@/components/UploadAssets/UploadNotifications.jsx";
 import ErrorBoundary from "@/ErrorBoundary.jsx";
 import ErrorFallBack from "@/pages/ErrorFallBack.jsx";
 
@@ -33,7 +32,6 @@ const UploadPhotos = () => {
             >
                 <BatchUploadSection/>
             </ErrorBoundary>
-            <UploadNotifications/>
         </UploadProvider>
     );
 };
