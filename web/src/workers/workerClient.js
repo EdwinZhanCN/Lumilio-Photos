@@ -60,7 +60,7 @@ export class  WasmWorkerClient {
      * Processes files in batches, sending the results thumbnails back to the main thread.
      * You may want to use catch to handle the error.
      * @requires FileList
-     * @param data {[FileList,number,number]} - The data to be processed. List of files, batch index, and start index.
+     * @param data {{FileList,number,number}} - The data to be processed. List of files, batch index, and start index.
      * @returns {Promise<any>}
      */
     async generateThumbnail(data){
@@ -172,7 +172,7 @@ export class  WasmWorkerClient {
      * You may want to use catch to handle the error.
      * @requires FileList
      * @param data {[FileList]} - The data to be processed. List of files.
-     * @returns {Promise<hashResult>} - hashResult:[{index,hash:{_wbg_ptr}},...]
+     * @returns {Promise<[{index:number,hash:string}]>} - hashResult:[{index:number,hash:string},...]
      */
     async generateHash(data){
         return new Promise((resolve, reject) =>{

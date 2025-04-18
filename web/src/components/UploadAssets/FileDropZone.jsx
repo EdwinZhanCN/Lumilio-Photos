@@ -1,5 +1,5 @@
 import React from 'react';
-import { useUpload } from '@/contexts/UploadContext';
+import { useUploadContext } from '@/contexts/UploadContext';
 
 const FileDropZone = ({fileInputRef, children, onFilesDropped}) => {
     const {
@@ -7,7 +7,7 @@ const FileDropZone = ({fileInputRef, children, onFilesDropped}) => {
         handleDragOver,
         handleDragLeave,
         handleDrop
-    } = useUpload();
+    } = useUploadContext();
 
     // Create a wrapper for handleDrop that calls the specific file handler
     const onDrop = (e) => {

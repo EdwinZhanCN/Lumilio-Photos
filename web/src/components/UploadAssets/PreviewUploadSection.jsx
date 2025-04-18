@@ -2,10 +2,12 @@ import React, {useRef, useState, useEffect} from 'react';
 import FileDropZone from '@/components/UploadAssets/FileDropZone.jsx';
 import ProgressIndicator from '@/components/UploadAssets/ProgressIndicator';
 import ImagePreviewGrid from '@/components/UploadAssets/ImagePreviewGrid';
-import { useUpload } from '@/contexts/UploadContext';
-import {useGenerateThumbnail} from "@/hooks/useGenerateThumbnail.jsx";
+import { useUploadContext } from '@/contexts/UploadContext';
+import {useGenerateThumbnail} from "@/hooks/wasm-hooks/useGenerateThumbnail.jsx";
 import ValidateFile from "@/utils/validate-file.js";
 import {acceptFileExtensions} from "@/utils/accept-file-extensions.js";
+import {useUploadProcess} from "@/hooks/api-hooks/useUploadProcess.jsx";
+import {useMessage} from "@/hooks/util-hooks/useMessage.jsx";
 
 function PreviewUploadSection(){
     // Import general states and methods from the UploadContext
@@ -13,12 +15,16 @@ function PreviewUploadSection(){
         files,
         previews,
         maxPreviewFiles,
-        setError,
         setPreviews,
         setFiles,
         clearFiles,
-        setSuccess,
-    } = useUpload();
+        workerClientRef,
+        wasmReady,
+        uploadProgress,
+    } = useUploadContext();
+
+    const showMessage = useMessage();
+
 
     // Progress for generating thumbnail, special for this section
     const [genThumbnailProgress, setGenThumbnailProgress] = useState(0);
@@ -26,8 +32,10 @@ function PreviewUploadSection(){
 
     // file upload related
     const fileInputRef = useRef(null);
-    const [uploadProgress, setUploadProgress] = useState(0);
     const timeoutRef = useRef(null);
+
+    // import the upload function from the UploadContext
+    const { handleUpload } = useUploadProcess();
 
     // Cleanup timeouts when component unmounts
     useEffect(() => {
@@ -36,7 +44,13 @@ function PreviewUploadSection(){
         };
     }, []);
 
-    const { generatePreviews } = useGenerateThumbnail({setGenThumbnailProgress, setIsGenThumbnails});
+    const { generatePreviews } = useGenerateThumbnail({
+        setGenThumbnailProgress,
+        setIsGenThumbnails,
+        workerClientRef,
+        wasmReady,
+        setPreviews,
+    });
 
     /**
      * Handle file selection and validation
@@ -50,15 +64,13 @@ function PreviewUploadSection(){
         // Apply file limit
         const availableSlots = maxPreviewFiles - files.length;
         if (availableSlots <= 0) {
-            setError(`You can only upload at most ${maxPreviewFiles} files`);
-            timeoutRef.current = setTimeout(() => setError(''), 3000);
+            showMessage('hint',`You can only upload at most ${maxPreviewFiles} files`);
             return;
         }
 
         const filteredFiles = validFiles.slice(0, availableSlots);
         if (validFiles.length > availableSlots) {
-            setError(`The exceeded ${validFiles.length - availableSlots} files have been removed`);
-            timeoutRef.current = setTimeout(() => setError(''), 3000);
+            showMessage('error',`The exceeded ${validFiles.length - availableSlots} files have been removed`);
         }
 
         setFiles(prev => [...prev, ...filteredFiles]);
@@ -74,46 +86,15 @@ function PreviewUploadSection(){
         });
 
         // Generate previews for the new files
-        generatePreviews(filteredFiles);
-    };
-
-    // File upload handler
-    const handleUpload = async () => {
-        if (files.length === 0) {
-            setError('Please select photos to upload');
-            timeoutRef.current = setTimeout(() => setError(''), 3000);
-            return;
-        }
-
-        try {
-            setUploadProgress(0);
-            const formData = new FormData();
-            files.forEach(file => {
-                formData.append('files', file);
-            });
-
-            const response = await fetch(`/api/photos/batch`, {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                throw new Error('Batch upload failed');
+        generatePreviews(filteredFiles).then(
+            r => {
+                if (r instanceof Error){
+                    throw r;
+                }
             }
-
-            const result = await response.json();
-            setUploadProgress(100);
-            setSuccess(`Successfully uploaded ${result.data.successful} of ${result.data.total} photos!`);
-
-            timeoutRef.current = setTimeout(() => {
-                setSuccess('');
-                clearFiles();
-            }, 2000);
-        } catch (err) {
-            setError(err.message || 'Upload failed, please try again');
-            timeoutRef.current = setTimeout(() => setError(''), 3000);
-        }
+        );
     };
+
 
     // Handler for clearing files
     const handleClear = () => {
@@ -198,6 +179,6 @@ function PreviewUploadSection(){
             </div>
         </section>
     );
-};
+}
 
 export default PreviewUploadSection;

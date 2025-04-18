@@ -1,8 +1,10 @@
 import {createContext, useCallback, useContext, useEffect, useRef, useState} from 'react';
 import {WasmWorkerClient} from "@/workers/workerClient.js";
+import {useUploadProcess} from "@/hooks/api-hooks/useUploadProcess.jsx";
+import {useMessage} from "@/hooks/util-hooks/useMessage.jsx";
 
 // UploadContext is a context for uploadAssets page
-export const UploadContext = createContext();
+export const UploadContext = createContext({});
 
 /**
  * UploadProvider is a provider component for the upload assets page
@@ -20,18 +22,18 @@ export const UploadContext = createContext();
  *
  * @author Edwin Zhan
  * @param {React.ReactNode} children - Child components that will have access to the context
- * @returns {JSX.Element} - The provider component
+ * @returns - The provider component
  */
 export default function UploadProvider({ children }) {
     // General states
     const [files, setFiles] = useState([]);
     const [previews, setPreviews] = useState([]);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
     const [maxPreviewFiles] = useState(30);
     const [isDragging, setIsDragging] = useState(false);
     const [wasmReady, setWasmReady] = useState(false);
-    const [hint, setHint] = useState('');
+
+    const showMessage = useMessage();
+
 
     // Worker client reference
     const workerClientRef = useRef(null);
@@ -93,7 +95,7 @@ export default function UploadProvider({ children }) {
                 console.log('WASM module initialized successfully');
             } catch (error) {
                 console.error('Failed to initialize WASM:', error);
-                setError('Failed to initialize WebAssembly module');
+
             }
         };
 
@@ -109,6 +111,37 @@ export default function UploadProvider({ children }) {
         };
     }, []);
 
+    // Upload process Usage
+    const uploadProcess = useUploadProcess(workerClientRef, wasmReady);
+
+    /**
+     * BatchUpload function to handle batch upload of files.
+     * @type {(function(*): Promise<void>)|*}
+     * @param {FileList} selectedFiles - The files to be uploaded
+     */
+    const BatchUpload = useCallback(async (selectedFiles) => {
+        if (!wasmReady || !selectedFiles.length) {
+            showMessage('error','Cannot upload: WASM not initialized or no files selected');
+            return;
+        }
+        try {
+            const results = await uploadProcess.processFiles(selectedFiles);
+
+            showMessage('success',`Successfully uploaded ${results.uploaded.length} files`);
+
+            if (results.duplicates.length) {
+                showMessage('hint',`${results.duplicates.length} duplicate files were skipped`);
+            }
+
+            if (results.failed.length) {
+                showMessage('error',`Failed to upload ${results.failed.length} files`);
+            }
+
+        } catch (error) {
+            showMessage('error',`Upload process failed: ${error.message}`);
+        }
+    }, [wasmReady, workerClientRef, uploadProcess]);
+
 
     return (
         <UploadContext.Provider value={{
@@ -116,10 +149,6 @@ export default function UploadProvider({ children }) {
             setFiles,
             previews,
             setPreviews,
-            error,
-            setError,
-            success,
-            setSuccess,
             maxPreviewFiles,
             isDragging,
             handleDragOver,
@@ -128,8 +157,12 @@ export default function UploadProvider({ children }) {
             wasmReady,
             workerClientRef,
             clearFiles,
-            hint,
-            setHint,
+            BatchUpload,
+            isProcessing: uploadProcess.isChecking || uploadProcess.isUploading,
+            resetUploadStatus: uploadProcess.resetStatus,
+            uploadProgress: uploadProcess.uploadProgress,
+            hashcodeProgress: uploadProcess.hashcodeProgress,
+            isGeneratingHashCodes: uploadProcess.isGeneratingHashCodes,
         }}>
             <div className="min-h-screen px-2">
                 {children}
@@ -138,4 +171,5 @@ export default function UploadProvider({ children }) {
     );
 }
 
-export const useUpload = () => useContext(UploadContext);
+
+export const useUploadContext = () => useContext(UploadContext);
