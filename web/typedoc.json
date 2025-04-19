@@ -1,5 +1,11 @@
    {
-     "plugin": ["typedoc-plugin-markdown"],
-     "entryPoints": ["src/hooks/**/*.tsx"],
-     "out": "docs"
+     "plugin": ["typedoc-plugin-markdown", "typedoc-vitepress-theme"],
+     "entryPoints": ["src/hooks/**/*.tsx", "src/workers/*.ts", "src/utils/*.ts", "src/contexts/*.tsx"],
+     "out": "docs",
+     "sidebar": {
+       "autoConfiguration": true,
+       "format": "vitepress",
+       "pretty": false,
+       "collapsed": true
+     }
    }
