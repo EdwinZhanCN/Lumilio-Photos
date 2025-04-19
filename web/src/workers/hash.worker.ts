@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import init, { hash_asset, HashResult } from '@/wasm/blake3_wasm.js';
+import init, { hash_asset, HashResult } from '@/wasm/blake3_wasm';
 
 let wasmReady = false;
 let numberOfFilesProcessed = 0;

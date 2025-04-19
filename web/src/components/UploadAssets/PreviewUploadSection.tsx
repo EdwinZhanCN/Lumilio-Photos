@@ -88,10 +88,10 @@ function PreviewUploadSection(): React.JSX.Element {
         ]);
 
 
-        generatePreviews(filteredFiles).then((r) => {
-            if (r instanceof Error) {
-                throw r;
-            }
+        generatePreviews(filteredFiles).catch((error) => {
+            console.error('Thumbnail generation failed:', error);
+            showMessage('error', 'Failed to generate previews');
+            clearFiles(fileInputRef);
         });
     };
 
@@ -124,6 +124,7 @@ function PreviewUploadSection(): React.JSX.Element {
                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
                     if (e.target.files) {
                         handleFiles(e.target.files);
+                        e.target.value = ''; // 添加这行重置input值
                     }
                 }}
             />
@@ -149,7 +150,7 @@ function PreviewUploadSection(): React.JSX.Element {
                 </div>
             )}
 
-            <ImagePreviewGrid previews={previews?.filter((preview) => preview !== null)} />
+            <ImagePreviewGrid previews={previews} />
 
             {uploadProgress > 0 && (
                 <progress

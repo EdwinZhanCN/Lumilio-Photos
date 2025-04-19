@@ -1,4 +1,4 @@
-import init, { generate_thumbnail } from '@/wasm/thumbnail_wasm.js';
+import init, { generate_thumbnail } from '@/wasm/thumbnail_wasm';
 
 /**
  * Interface describing the data passed with each worker message.
