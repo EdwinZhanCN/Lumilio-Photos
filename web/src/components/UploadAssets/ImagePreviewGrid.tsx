@@ -1,5 +1,5 @@
 type ImagePreviewGridProps = {
-    previews: string[];
+    previews: (string|null)[];
 };
 
 const ImagePreviewGrid = ({ previews }:ImagePreviewGridProps) => {
