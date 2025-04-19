@@ -137,8 +137,8 @@ export default function UploadProvider({ children }: UploadProviderProps) {
         // Cleanup worker when component unmounts
         return () => {
             if (workerClientRef.current) {
-                workerClientRef.current.terminateGenerateThumbnailWorker();
-                workerClientRef.current.terminateGenerateHashWorker();
+                // workerClientRef.current.terminateGenerateThumbnailWorker();
+                // workerClientRef.current.terminateGenerateHashWorker();
             }
             revokePreviews(previews);
         };
