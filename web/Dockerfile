@@ -29,7 +29,7 @@ RUN npm ci
 # Copy frontend source code
 COPY web/ ./
 
-# Copy WASM build output to match the path in vite.config.js
+# Copy WASM build output to match the path in vite.config.mts
 #COPY --from=wasm-build /wasm/pkg/ ./thumbnail-wasm/pkg/
 
 # Create env file at build time
