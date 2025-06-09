@@ -32,22 +32,22 @@ var (
 
 // ImageProcessor handles image processing operations
 type ImageProcessor struct {
-	photoService service.PhotoService
+	assetService service.AssetService
 	storage      service.CloudStorage
 	basePath     string
 }
 
 // NewImageProcessor creates a new image processor
-func NewImageProcessor(photoService service.PhotoService, storage service.CloudStorage, basePath string) *ImageProcessor {
+func NewImageProcessor(assetService service.AssetService, storage service.CloudStorage, basePath string) *ImageProcessor {
 	return &ImageProcessor{
-		photoService: photoService,
+		assetService: assetService,
 		storage:      storage,
 		basePath:     basePath,
 	}
 }
 
-// ProcessUploadedImage processes an uploaded image, extracts metadata, and generates thumbnails
-func (p *ImageProcessor) ProcessUploadedImage(ctx context.Context, photoID string, storagePath string) error {
+// ProcessUploadedAsset processes an uploaded image asset, extracts metadata, and generates thumbnails
+func (p *ImageProcessor) ProcessUploadedAsset(ctx context.Context, assetID string, storagePath string) error {
 	// 1. Get the original image
 	file, err := p.storage.Get(ctx, storagePath)
 	if err != nil {
@@ -68,15 +68,15 @@ func (p *ImageProcessor) ProcessUploadedImage(ctx context.Context, photoID strin
 	}
 
 	// 4. Generate thumbnails
-	photoUUID, err := models.ParseUUID(photoID)
+	assetUUID, err := models.ParseUUID(assetID)
 	if err != nil {
-		return fmt.Errorf("invalid photo ID: %w", err)
+		return fmt.Errorf("invalid asset ID: %w", err)
 	}
 
 	// Generate thumbnails for different sizes
 	thumbnailSizes := []ThumbnailSize{SmallThumbnail, MediumThumbnail, LargeThumbnail}
 	for _, size := range thumbnailSizes {
-		if err := p.generateThumbnail(ctx, img, format, photoUUID, size); err != nil {
+		if err := p.generateThumbnail(ctx, img, format, assetUUID, size); err != nil {
 			return fmt.Errorf("failed to generate %s thumbnail: %w", size.Name, err)
 		}
 	}
@@ -84,8 +84,13 @@ func (p *ImageProcessor) ProcessUploadedImage(ctx context.Context, photoID strin
 	return nil
 }
 
+// ProcessUploadedImage - Deprecated: Use ProcessUploadedAsset instead
+func (p *ImageProcessor) ProcessUploadedImage(ctx context.Context, photoID string, storagePath string) error {
+	return p.ProcessUploadedAsset(ctx, photoID, storagePath)
+}
+
 // generateThumbnail creates a thumbnail of the specified size
-func (p *ImageProcessor) generateThumbnail(ctx context.Context, img image.Image, format string, photoID models.UUID, size ThumbnailSize) error {
+func (p *ImageProcessor) generateThumbnail(ctx context.Context, img image.Image, format string, assetID models.UUID, size ThumbnailSize) error {
 	// 1. Resize the image
 	thumbnail := imaging.Fit(img, size.Width, size.Height, imaging.Lanczos)
 
@@ -125,8 +130,8 @@ func (p *ImageProcessor) generateThumbnail(ctx context.Context, img image.Image,
 		return fmt.Errorf("failed to upload thumbnail: %w", err)
 	}
 
-	// 6. Create thumbnail record in database
-	_, err = p.photoService.CreateThumbnail(ctx, photoID, size.Name, thumbnailPath)
+	// 6. Create thumbnail record in database using asset service
+	_, err = p.assetService.CreateThumbnail(ctx, assetID, size.Name, thumbnailPath)
 	if err != nil {
 		// Try to clean up the uploaded thumbnail if record creation fails
 		p.storage.Delete(ctx, thumbnailPath)
