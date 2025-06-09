@@ -71,7 +71,7 @@ func (c *PhotoController) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 
 // BatchUploadPhotos handles multiple file uploads in a single request
 func (c *PhotoController) BatchUploadPhotos(w http.ResponseWriter, r *http.Request) {
-	// 0. get the time bbnm,,,,,,,,,,,,,,,,,,,,,
+	// 0. get the time
 
 	// 1. Parse the multipart form with a reasonable max memory
 	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB max memory
@@ -117,20 +117,14 @@ func (c *PhotoController) BatchUploadPhotos(w http.ResponseWriter, r *http.Reque
 		go func(p *models.Photo) {
 			ctx := context.Background()
 			photoID := p.PhotoID.String()
-
-			log.Printf("Processing uploaded image in the background for photo: %s", photoID)
 			if err := c.imageProcessor.ProcessUploadedImage(ctx, photoID, p.StoragePath); err != nil {
 				log.Printf("Failed to process image %s: %v", photoID, err)
 			}
 
-			log.Printf("Extracting metadata for photo: %s from path: %s", photoID, p.StoragePath)
 			metadata, err := c.imageProcessor.ExtractImageMetadata(ctx, photoID, p.StoragePath)
 			if err == nil && metadata != nil {
 				if err := c.photoService.UpdatePhotoMetadata(ctx, p.PhotoID, metadata); err != nil {
 					log.Printf("Failed to update metadata for photo %s: %v", photoID, err)
-				} else {
-					log.Printf("Extracted metadata for photo %s: Camera: %s, FNumber: %.1f, ISO: %d",
-						photoID, metadata.CameraModel, metadata.FNumber, metadata.IsoSpeed)
 				}
 			} else if err != nil {
 				log.Printf("Error extracting metadata for photo %s: %v", photoID, err)
