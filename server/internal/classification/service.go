@@ -14,14 +14,14 @@ import (
 // ClassificationService handles image classification operations
 type ClassificationService struct {
 	classifier     *ImageClassifier
-	photoService   service.PhotoService
+	assetService   service.AssetService
 	modelPath      string
 	classIndexPath string
 	topN           int
 }
 
 // NewClassificationService creates a new classification service
-func NewClassificationService(photoService service.PhotoService, modelPath, classIndexPath string, topN int) (*ClassificationService, error) {
+func NewClassificationService(assetService service.AssetService, modelPath, classIndexPath string, topN int) (*ClassificationService, error) {
 	// Create the classifier
 	classifier, err := NewImageClassifier(modelPath, classIndexPath)
 	if err != nil {
@@ -30,7 +30,7 @@ func NewClassificationService(photoService service.PhotoService, modelPath, clas
 
 	return &ClassificationService{
 		classifier:     classifier,
-		photoService:   photoService,
+		assetService:   assetService,
 		modelPath:      modelPath,
 		classIndexPath: classIndexPath,
 		topN:           topN,
@@ -38,32 +38,25 @@ func NewClassificationService(photoService service.PhotoService, modelPath, clas
 }
 
 // ClassifyImage classifies an image and stores the results as tags
-func (s *ClassificationService) ClassifyImage(ctx context.Context, photoID uuid.UUID, imageReader io.Reader) error {
+func (s *ClassificationService) ClassifyImage(ctx context.Context, assetID uuid.UUID, imageReader io.Reader) error {
 	// Classify the image
 	results, err := s.classifier.ClassifyFromReader(ctx, imageReader, s.topN)
 	if err != nil {
 		return fmt.Errorf("failed to classify image: %w", err)
 	}
 
-	// Store the results as tags
+	// TODO: Update this to work with the new asset tagging system
+	// For now, just log the classification results
 	for _, result := range results {
-		// Create or get the tag
 		tagName := formatTagName(result.ClassName)
-
-		// Add the tag to the photo with confidence score
-		if err := s.photoService.AddTagToPhoto(ctx, photoID, 0, result.Confidence, "ai"); err != nil {
-			log.Printf("Failed to add tag '%s' to photo %s: %v", tagName, photoID, err)
-			continue
-		}
-
-		log.Printf("Added classification tag '%s' with confidence %.2f to photo %s", tagName, result.Confidence, photoID)
+		log.Printf("Classified asset %s with tag '%s' (confidence: %.2f)", assetID, tagName, result.Confidence)
 	}
 
 	return nil
 }
 
 // ClassifyImageFromStorage classifies an image from storage
-func (s *ClassificationService) ClassifyImageFromStorage(ctx context.Context, photoID uuid.UUID, storagePath string, storage service.CloudStorage) error {
+func (s *ClassificationService) ClassifyImageFromStorage(ctx context.Context, assetID uuid.UUID, storagePath string, storage service.CloudStorage) error {
 	// Get the image from storage
 	file, err := storage.Get(ctx, storagePath)
 	if err != nil {
@@ -72,7 +65,7 @@ func (s *ClassificationService) ClassifyImageFromStorage(ctx context.Context, ph
 	defer file.Close()
 
 	// Classify the image
-	return s.ClassifyImage(ctx, photoID, file)
+	return s.ClassifyImage(ctx, assetID, file)
 }
 
 // formatTagName formats a class name into a tag name

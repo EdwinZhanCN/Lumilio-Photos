@@ -3,25 +3,27 @@ package utils
 import (
 	"context"
 	"fmt"
-	"github.com/barasher/go-exiftool"
 	"os"
 	"server/internal/models"
 	"strconv"
 	"time"
+
+	"github.com/barasher/go-exiftool"
 )
 
-// ExtractImageMetadata extracts EXIF metadata from an image file
-func (p *ImageProcessor) ExtractImageMetadata(ctx context.Context, photoID string, storagePath string) (*models.PhotoMetadata, error) {
+// ExtractAssetMetadata extracts EXIF metadata from an image asset and returns asset-compatible metadata
+func (p *ImageProcessor) ExtractAssetMetadata(ctx context.Context, assetID string, storagePath string) (models.PhotoSpecificMetadata, error) {
 	// 1. Start the ExifTool process
 	et, err := exiftool.NewExiftool()
 	if err != nil {
-		photoUUID, err := models.ParseUUID(photoID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid photo ID: %w", err)
-		}
-
-		metadata := &models.PhotoMetadata{
-			PhotoID: photoUUID,
+		metadata := models.PhotoSpecificMetadata{
+			CameraModel:  "",
+			LensModel:    "",
+			ExposureTime: "",
+			FNumber:      0,
+			IsoSpeed:     0,
+			GPSLatitude:  0,
+			GPSLongitude: 0,
 		}
 		return metadata, fmt.Errorf("failed to intialize exiftool: %w", err)
 	}
@@ -31,16 +33,19 @@ func (p *ImageProcessor) ExtractImageMetadata(ctx context.Context, photoID strin
 	rootStoragePath := os.Getenv("STORAGE_PATH")
 	metaData := et.ExtractMetadata(rootStoragePath + "/" + storagePath)
 
-	// 3. Get the important metadata fields
-	// taken_time, camera_model, lens_model, exposure_time, f_number, iso_speed, gps_latitude, gps_longitude
-
-	photoUUID, err := models.ParseUUID(photoID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid photo ID: %w", err)
+	// 3. Initialize metadata structure
+	metadata := models.PhotoSpecificMetadata{
+		CameraModel:  "",
+		LensModel:    "",
+		ExposureTime: "",
+		FNumber:      0,
+		IsoSpeed:     0,
+		GPSLatitude:  0,
+		GPSLongitude: 0,
 	}
 
-	metadata := &models.PhotoMetadata{
-		PhotoID: photoUUID,
+	if len(metaData) == 0 {
+		return metadata, nil
 	}
 
 	// Extract date and time
@@ -84,23 +89,27 @@ func (p *ImageProcessor) ExtractImageMetadata(ctx context.Context, photoID strin
 		}
 	}
 
-	// Extract GPS coordinates
-	if gpsLatitudeStr, err := metaData[0].GetString("GPSLatitude"); err == nil {
-		// Convert GPS latitude to float64
-		gpsLatitude, err := strconv.ParseFloat(gpsLatitudeStr, 64)
+	// Extract GPS latitude
+	if gpsLatStr, err := metaData[0].GetString("GPSLatitude"); err == nil {
+		gpsLat, err := strconv.ParseFloat(gpsLatStr, 64)
 		if err == nil {
-			metadata.GPSLatitude = gpsLatitude
+			metadata.GPSLatitude = gpsLat
 		}
 	}
 
-	if gpsLongitudeStr, err := metaData[0].GetString("GPSLongitude"); err == nil {
-		// Convert GPS longitude to float64
-		gpsLongitude, err := strconv.ParseFloat(gpsLongitudeStr, 64)
+	// Extract GPS longitude
+	if gpsLonStr, err := metaData[0].GetString("GPSLongitude"); err == nil {
+		gpsLon, err := strconv.ParseFloat(gpsLonStr, 64)
 		if err == nil {
-			metadata.GPSLongitude = gpsLongitude
+			metadata.GPSLongitude = gpsLon
 		}
 	}
 
 	return metadata, nil
+}
 
+// ExtractImageMetadata - Deprecated: Use ExtractAssetMetadata instead
+func (p *ImageProcessor) ExtractImageMetadata(ctx context.Context, photoID string, storagePath string) (*models.PhotoSpecificMetadata, error) {
+	metadata, err := p.ExtractAssetMetadata(ctx, photoID, storagePath)
+	return &metadata, err
 }

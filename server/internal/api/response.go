@@ -1,4 +1,4 @@
-package web
+package api
 
 import (
 	"encoding/json"
@@ -19,7 +19,7 @@ func Success(w http.ResponseWriter, data interface{}) {
 		Message: "success",
 		Data:    data,
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(result)
@@ -37,7 +37,7 @@ func Error(w http.ResponseWriter, code int, err error, statusCode int, messages 
 		Message: msg,
 		Error:   err.Error(),
 	}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(result)

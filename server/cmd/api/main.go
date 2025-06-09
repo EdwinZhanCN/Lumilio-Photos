@@ -5,10 +5,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"server/cmd/web"
-	"server/db"
-	"server/internal/controller"
-	"server/internal/repository"
+	"server/config"
+	"server/internal/api"
+	"server/internal/api/handler"
+	"server/internal/models"
+	"server/internal/repository/gorm_repo"
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/utils"
@@ -28,10 +29,25 @@ func init() {
 }
 
 func main() {
-	log.Println("Lumilio Backend is Starting...")
-
+	dbConfig := config.LoadDBConfig()
+	// 添加测试日志，验证日志配置是否生效
+	log.Println("Starting application...")
 	// Connect to the database
-	database := db.Connect("lumilio-photos")
+	database := gorm_repo.InitDB(dbConfig)
+
+	// Auto-migrate database models
+	log.Println("Running database migrations...")
+	err := database.AutoMigrate(
+		&models.Asset{},     // New unified asset model
+		&models.Thumbnail{}, // Updated thumbnail model
+		&models.Tag{},
+		&models.Album{},
+	)
+
+	if err != nil {
+		log.Fatalf("Failed to run database migrations: %v", err)
+	}
+	log.Println("Database migrations completed successfully")
 
 	// Defer closing the database connection
 	sqlDB, err := database.DB()
@@ -47,7 +63,7 @@ func main() {
 	}(sqlDB)
 
 	// Initialize repositories
-	photoRepo := repository.NewPhotoRepository(database)
+	assetRepo := gorm_repo.NewAssetRepository(database)
 
 	// Initialize local storage
 	// Get storage path from environment variable or use default
@@ -63,16 +79,16 @@ func main() {
 	}
 
 	// Initialize services
-	photoService := service.NewPhotoService(photoRepo, localStorage)
+	assetService := service.NewAssetService(assetRepo, localStorage)
 
 	// Initialize image processor
-	imageProcessor := utils.NewImageProcessor(photoService, localStorage, storagePath)
+	imageProcessor := utils.NewImageProcessor(assetService, localStorage, storagePath)
 
 	// Initialize controllers
-	photoController := controller.NewPhotoController(photoService, imageProcessor)
+	assetController := handler.NewAssetHandler(assetService, imageProcessor)
 
-	// Set up router
-	router := web.NewRouter(photoController)
+	// Set up router with new asset endpoints
+	router := api.NewRouter(assetController)
 
 	// Start HTTP server
 	port := os.Getenv("PORT")
