@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// Connect establishes a connection to the PostgresSQL database using GORM.
 func Connect(dbName string) *gorm.DB {
 	// Get database connection details from environment variables with defaults
 	dbHost := os.Getenv("DB_HOST")
@@ -18,7 +19,7 @@ func Connect(dbName string) *gorm.DB {
 
 	dbPort := os.Getenv("DB_PORT")
 	if dbPort == "" {
-		dbPort = "5432" // Changed to standard PostgreSQL port
+		dbPort = "5432"
 	}
 
 	dbUser := os.Getenv("DB_USER")
@@ -64,6 +65,8 @@ func Connect(dbName string) *gorm.DB {
 
 	// Create schema if it doesn't exist and set search path
 	db.Exec("CREATE SCHEMA IF NOT EXISTS public")
+	// After successful connection
+	db.Exec("CREATE EXTENSION IF NOT EXISTS vector")
 	db.Exec("SET search_path TO public")
 
 	return db
