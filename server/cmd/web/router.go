@@ -1,7 +1,6 @@
 package web
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -30,6 +29,7 @@ func NewRouter(photoController PhotoControllerInterface) *gin.Engine {
 	// Photo routes
 	photoRoutes := api.Group("/photos")
 
+	// Define how routes should handle requests, use which controller
 	photoRoutes.POST("", func(c *gin.Context) {
 		photoController.UploadPhoto(c.Writer, c.Request)
 	})
@@ -38,7 +38,18 @@ func NewRouter(photoController PhotoControllerInterface) *gin.Engine {
 		photoController.BatchUploadPhotos(c.Writer, c.Request)
 	})
 
-	log.Println("Starting Controller")
+	//TODO: Implement photo routes
+	photoRoutes.GET("/:id", func(c *gin.Context) {
+		photoController.GetPhoto(c.Writer, c.Request)
+	})
+
+	photoRoutes.PUT("/:id", func(c *gin.Context) {
+		photoController.UpdatePhoto(c.Writer, c.Request)
+	})
+
+	photoRoutes.DELETE("/:id", func(c *gin.Context) {
+		photoController.DeletePhoto(c.Writer, c.Request)
+	})
 
 	return r
 }

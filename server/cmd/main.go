@@ -8,7 +8,6 @@ import (
 	"server/cmd/web"
 	"server/db"
 	"server/internal/controller"
-	"server/internal/models"
 	"server/internal/repository"
 	"server/internal/service"
 	"server/internal/storage"
@@ -29,26 +28,10 @@ func init() {
 }
 
 func main() {
-	// 添加测试日志，验证日志配置是否生效
-	log.Println("Starting application...")
+	log.Println("Lumilio Backend is Starting...")
 
 	// Connect to the database
 	database := db.Connect("lumilio-photos")
-
-	// Auto-migrate database models
-	log.Println("Running database migrations...")
-	err := database.AutoMigrate(
-		&models.Photo{},
-		&models.PhotoMetadata{},
-		&models.Thumbnail{},
-		&models.Tag{},
-		&models.Album{},
-	)
-
-	if err != nil {
-		log.Fatalf("Failed to run database migrations: %v", err)
-	}
-	log.Println("Database migrations completed successfully")
 
 	// Defer closing the database connection
 	sqlDB, err := database.DB()
