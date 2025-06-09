@@ -1,8 +1,9 @@
 package models
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func (Photo) TableName() string {
@@ -44,14 +45,10 @@ func (PhotoMetadata) TableName() string {
 }
 
 type PhotoMetadata struct {
-	PhotoID      uuid.UUID `gorm:"type:uuid;primaryKey;not null"`
-	TakenTime    *time.Time
-	CameraModel  string  `gorm:"type:varchar(100)"`
-	LensModel    string  `gorm:"type:varchar(100)"`
-	ExposureTime string  `gorm:"type:varchar(20)"`
-	FNumber      float32 `gorm:"type:numeric(3,1)"`
-	IsoSpeed     int
-	GPSLatitude  float64 `gorm:"type:numeric(9,6)"`
-	GPSLongitude float64 `gorm:"type:numeric(9,6)"`
-	Description  string  `gorm:"type:text"`
+	PhotoID          uuid.UUID `gorm:"type:uuid;primaryKey;not null"`
+	TakenTime        *time.Time
+	GPSLatitude      float64                `gorm:"type:numeric(9,6)"`
+	GPSLongitude     float64                `gorm:"type:numeric(9,6)"`
+	Description      string                 `gorm:"type:text"`
+	ExtendedMetadata map[string]interface{} `gorm:"type:jsonb"`
 }

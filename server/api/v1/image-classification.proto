@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package imageclassification;
+option go_package = "server/api/v1/imageclassification";
+
+service ImageClassificationService {
+    rpc ClassifyImage(ClassifyImageRequest) returns (ClassifyImageResponse);
+    rpc BatchClassifyImages(BatchClassifyImagesRequest) returns (BatchClassifyImagesResponse);
+    rpc GetImageEmbedding(ImageEmbeddingRequest) returns (ImageEmbeddingResponse);
+}
+
+message ClassifyImageRequest {
+    oneof image_data {
+        bytes image_bytes = 1;
+        string image_url = 2;
+    }
+    int32 top_k = 3;  // Number of top predictions to return (default 5)
+}
+
+message ClassifyImageResponse {
+    repeated Tag tags = 1;
+    bool success = 2;
+    string error_message = 3;
+    repeated float image_embedding = 4;  // The image embedding vector
+}
+
+message BatchClassifyImagesRequest {
+    repeated ClassifyImageRequest images = 1;
+}
+
+message BatchClassifyImagesResponse {
+    repeated ClassifyImageResult results = 1;
+}
+
+message ClassifyImageResult {
+    repeated Tag tags = 1;
+    bool success = 2;
+    string error_message = 3;
+    string image_id = 4;
+    repeated float image_embedding = 5;  // The image embedding vector
+}
+
+message Tag {
+    string name = 1;
+    string category = 2;
+    float confidence = 3;
+    repeated float embedding = 4;
+}
+
+message ImageEmbeddingRequest {
+    oneof image_data {
+        bytes image_bytes = 1;
+        string image_url = 2;
+    }
+}
+
+message ImageEmbeddingResponse {
+    repeated float embedding = 1;
+    bool success = 2;
+    string error_message = 3;
+}
