@@ -5,10 +5,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+
 	"server/config"
 	"server/internal/api"
 	"server/internal/api/handler"
 	"server/internal/models"
+	"server/internal/queue"
 	"server/internal/repository/gorm_repo"
 	"server/internal/service"
 	"server/internal/storage"
@@ -78,14 +80,44 @@ func main() {
 		log.Fatalf("Failed to initialize local storage: %v", err)
 	}
 
+	// Initialize staging area for temporary file storage
+	stagingPath := os.Getenv("STAGING_PATH")
+	if stagingPath == "" {
+		stagingPath = "/app/staging" // Default path for Docker container
+	}
+	log.Printf("Using staging path: %s", stagingPath)
+
+	// Ensure staging directory exists
+	if err := os.MkdirAll(stagingPath, 0755); err != nil {
+		log.Fatalf("Failed to create staging directory: %v", err)
+	}
+
+	// Initialize task queue
+	queueDir := os.Getenv("QUEUE_DIR")
+	if queueDir == "" {
+		queueDir = "/app/queue"
+	}
+	log.Printf("Using queue directory: %s", queueDir)
+
+	taskQueue, err := queue.NewTaskQueue(queueDir, 100)
+	if err != nil {
+		log.Fatalf("Failed to initialize task queue: %v", err)
+	}
+
+	// Initialize the queue
+	if err := taskQueue.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize task queue: %v", err)
+	}
+	defer taskQueue.Close()
+
 	// Initialize services
 	assetService := service.NewAssetService(assetRepo, localStorage)
 
-	// Initialize image processor
-	imageProcessor := utils.NewImageProcessor(assetService, localStorage, storagePath)
+	// Initialize asset processor
+	assetProcessor := utils.NewAssetProcessor(assetService, localStorage, storagePath)
 
-	// Initialize controllers
-	assetController := handler.NewAssetHandler(assetService, imageProcessor)
+	// Initialize controllers - pass the staging path and task queue to the handler
+	assetController := handler.NewAssetHandler(assetService, assetProcessor, stagingPath, taskQueue)
 
 	// Set up router with new asset endpoints
 	router := api.NewRouter(assetController)

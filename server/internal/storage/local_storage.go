@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"io"
+	"mime"
 	"os"
 	"path/filepath"
-	"server/internal/service"
 	"time"
 )
 
@@ -15,7 +15,7 @@ type LocalStorage struct {
 	basePath string
 }
 
-func NewLocalStorage(basePath string) (service.CloudStorage, error) {
+func NewLocalStorage(basePath string) (Storage, error) {
 	// Ensure the base path exists
 	if err := os.MkdirAll(basePath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)
@@ -27,7 +27,18 @@ func NewLocalStorage(basePath string) (service.CloudStorage, error) {
 func (s *LocalStorage) Upload(ctx context.Context, file io.Reader) (string, error) {
 	// Generate a unique filename using UUID and current timestamp
 	filename := fmt.Sprintf("%s_%d", uuid.New().String(), time.Now().Unix())
+	return s.saveFile(ctx, file, filename, "")
+}
 
+func (s *LocalStorage) UploadWithMetadata(ctx context.Context, file io.Reader, filename string, contentType string) (string, error) {
+	// Create a unique filename while preserving original extension
+	ext := filepath.Ext(filename)
+	baseFilename := fmt.Sprintf("%s_%d%s", uuid.New().String(), time.Now().Unix(), ext)
+	return s.saveFile(ctx, file, baseFilename, contentType)
+}
+
+// saveFile is a helper method used by both Upload methods
+func (s *LocalStorage) saveFile(ctx context.Context, file io.Reader, filename string, contentType string) (string, error) {
 	// Create year/month based directory structure
 	now := time.Now()
 	relativePath := filepath.Join(fmt.Sprintf("%d", now.Year()), fmt.Sprintf("%02d", now.Month()))
@@ -72,4 +83,45 @@ func (s *LocalStorage) Get(ctx context.Context, path string) (io.ReadCloser, err
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 	return file, nil
+}
+
+func (s *LocalStorage) GetInfo(ctx context.Context, path string) (*StorageFile, error) {
+	fullPath := filepath.Join(s.basePath, path)
+
+	fileInfo, err := os.Stat(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file info: %w", err)
+	}
+
+	// Try to determine content type from file extension
+	ext := filepath.Ext(fullPath)
+	contentType := mime.TypeByExtension(ext)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	return &StorageFile{
+		Path:        path,
+		Size:        fileInfo.Size(),
+		ContentType: contentType,
+		ModTime:     fileInfo.ModTime(),
+	}, nil
+}
+
+func (s *LocalStorage) Exists(ctx context.Context, path string) (bool, error) {
+	fullPath := filepath.Join(s.basePath, path)
+	_, err := os.Stat(fullPath)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, fmt.Errorf("failed to check if file exists: %w", err)
+}
+
+func (s *LocalStorage) GetURL(path string) string {
+	// For local storage, we just return the relative path
+	// TODO: This could be expanded to include a base URL if needed
+	return filepath.ToSlash(path)
 }

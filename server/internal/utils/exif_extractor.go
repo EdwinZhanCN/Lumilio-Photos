@@ -12,7 +12,7 @@ import (
 )
 
 // ExtractAssetMetadata extracts EXIF metadata from an image asset and returns asset-compatible metadata
-func (p *ImageProcessor) ExtractAssetMetadata(ctx context.Context, assetID string, storagePath string) (models.PhotoSpecificMetadata, error) {
+func (p *AssetProcessor) ExtractAssetMetadata(ctx context.Context, assetID string, storagePath string) (models.PhotoSpecificMetadata, error) {
 	// 1. Start the ExifTool process
 	et, err := exiftool.NewExiftool()
 	if err != nil {
@@ -109,7 +109,7 @@ func (p *ImageProcessor) ExtractAssetMetadata(ctx context.Context, assetID strin
 }
 
 // ExtractImageMetadata - Deprecated: Use ExtractAssetMetadata instead
-func (p *ImageProcessor) ExtractImageMetadata(ctx context.Context, photoID string, storagePath string) (*models.PhotoSpecificMetadata, error) {
+func (p *AssetProcessor) ExtractImageMetadata(ctx context.Context, photoID string, storagePath string) (*models.PhotoSpecificMetadata, error) {
 	metadata, err := p.ExtractAssetMetadata(ctx, photoID, storagePath)
 	return &metadata, err
 }
