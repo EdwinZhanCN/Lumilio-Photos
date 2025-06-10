@@ -5,7 +5,8 @@ import {
     HeartIcon,
     HomeIcon,
     InformationCircleIcon,
-    PhotoIcon
+    PhotoIcon,
+    PaintBrushIcon
 } from "@heroicons/react/24/outline/index.js";
 
 function SideBar() {
@@ -69,6 +70,12 @@ function SideBar() {
                     >
                         <ArrowUpTrayIcon className="size-5"/>
                         Upload
+                    </Link>
+                </li>
+                <li>
+                    <Link to={"/studio"}>
+                        <PaintBrushIcon className="size-5"/>
+                        Studio
                     </Link>
                 </li>
                 <li>

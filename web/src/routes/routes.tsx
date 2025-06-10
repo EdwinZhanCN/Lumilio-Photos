@@ -1,6 +1,7 @@
 import Home from "@/pages/Home"
 import Photos from "@/pages/Photos"
 import UploadAssets from "@/pages/UploadAssets.tsx";
+import {Studio} from "@/pages/Studio.tsx";
 
 export const routes = [
     {
@@ -18,5 +19,9 @@ export const routes = [
     {
         path: "/upload-photos",
         element: <UploadAssets />,
+    },
+    {
+        path: "/studio",
+        element: <Studio />,
     }
 ]
