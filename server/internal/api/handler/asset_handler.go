@@ -1,33 +1,39 @@
 package handler
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"server/internal/api"
 	"server/internal/models"
+	"server/internal/queue"
 	"server/internal/service"
 	"server/internal/utils"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-// AssetHandler handles HTTP requests for asset operations
+// AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
-	assetService   service.AssetService
-	imageProcessor *utils.ImageProcessor // For backward compatibility with photo processing
+	assetService    service.AssetService
+	assetProcessor *utils.AssetProcessor
+	stagingPath    string
+	taskQueue      *queue.TaskQueue
 }
 
 // NewAssetHandler creates a new AssetHandler instance
-func NewAssetHandler(s service.AssetService, p *utils.ImageProcessor) *AssetHandler {
+func NewAssetHandler(s service.AssetService, p *utils.AssetProcessor, stagingPath string, q *queue.TaskQueue) *AssetHandler {
 	return &AssetHandler{
 		assetService:   s,
-		imageProcessor: p,
+		assetProcessor: p,
+		stagingPath:    stagingPath,
+		taskQueue:      q,
 	}
 }
 
@@ -48,71 +54,79 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// Optional: Parse owner ID if provided
-	var ownerID *int
-	if ownerIDStr := c.Request.FormValue("owner_id"); ownerIDStr != "" {
-		if id, err := strconv.Atoi(ownerIDStr); err == nil {
-			ownerID = &id
-		}
+	// Get client-provided hash from header (if available)
+	clientHash := c.GetHeader("X-Content-Hash")
+	if clientHash == "" {
+		log.Println("Warning: No content hash provided by client")
+		// We could calculate it server-side, but for now we'll just generate a random ID
+		// In a real implementation, we should calculate the hash here
+		clientHash = uuid.New().String()
 	}
 
-	// Upload the asset
-	asset, err := h.assetService.UploadAsset(
-		c.Request.Context(),
-		file,
-		header.Filename,
-		header.Size,
-		ownerID,
-	)
+	// Create a unique filename in staging area
+	stagingFileName := uuid.New().String()
+	fileExt := filepath.Ext(header.Filename)
+	stagingFilePath := filepath.Join(h.stagingPath, stagingFileName+fileExt)
 
-	if err != nil {
-		log.Printf("Asset upload failed: %v", err)
+	// Ensure staging directory exists
+	if err := os.MkdirAll(h.stagingPath, 0755); err != nil {
+		log.Printf("Failed to create staging directory: %v", err)
 		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
 		return
 	}
 
-	// Queue background processing for photos
-	if asset.IsPhoto() && h.imageProcessor != nil {
-		go func() {
-			assetID := asset.AssetID.String()
+	// Create destination file
+	stagingFile, err := os.Create(stagingFilePath)
+	if err != nil {
+		log.Printf("Failed to create staging file: %v", err)
+		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
+		return
+	}
+	defer stagingFile.Close()
 
-			// Process thumbnails
-			if err := h.imageProcessor.ProcessUploadedAsset(context.Background(), assetID, asset.StoragePath); err != nil {
-				log.Printf("Error processing asset %s: %v", assetID, err)
-			}
-
-			// Extract metadata for photos
-			if photoMetadata, err := h.imageProcessor.ExtractAssetMetadata(context.Background(), assetID, asset.StoragePath); err == nil {
-				// Convert PhotoSpecificMetadata to SpecificMetadata map
-				metadataMap := make(models.SpecificMetadata)
-				if data, err := json.Marshal(photoMetadata); err == nil {
-					if err := json.Unmarshal(data, &metadataMap); err == nil {
-						// Update asset with extracted metadata
-						if err := h.assetService.UpdateAssetMetadata(context.Background(), asset.AssetID, metadataMap); err != nil {
-							log.Printf("Error updating metadata for asset %s: %v", assetID, err)
-						} else {
-							log.Printf("Extracted metadata for asset %s: Camera: %s, FNumber: %.1f, ISO: %d",
-								assetID, photoMetadata.CameraModel, photoMetadata.FNumber, photoMetadata.IsoSpeed)
-						}
-					} else {
-						log.Printf("Error converting metadata to map for asset %s: %v", assetID, err)
-					}
-				} else {
-					log.Printf("Error marshaling metadata for asset %s: %v", assetID, err)
-				}
-			} else {
-				log.Printf("Error extracting metadata for asset %s: %v", assetID, err)
-			}
-		}()
+	// Copy uploaded file to staging area
+	_, err = io.Copy(stagingFile, file)
+	if err != nil {
+		log.Printf("Failed to copy file to staging: %v", err)
+		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
+		return
 	}
 
-	// Return response
+	// Get user ID (in a real app, get this from authentication)
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = "anonymous" // Default user ID if not authenticated
+	}
+
+	// Create task for processing
+	task := queue.Task{
+		TaskID:      uuid.New().String(),
+		ClientHash:  clientHash,
+		StagedPath:  stagingFilePath,
+		UserID:      userID,
+		Timestamp:   time.Now(),
+		ContentType: header.Header.Get("Content-Type"),
+		FileName:    header.Filename,
+	}
+
+	// Enqueue task
+	err = h.taskQueue.EnqueueTask(task)
+	if err != nil {
+		log.Printf("Failed to enqueue task: %v", err)
+		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
+		return
+	}
+
+	log.Printf("Task %s enqueued for processing file %s", task.TaskID, header.Filename)
+
+	// Return response indicating the task was accepted
 	response := map[string]interface{}{
-		"id":        asset.AssetID,
-		"type":      asset.Type,
-		"url":       asset.StoragePath,
-		"size":      asset.FileSize,
-		"mime_type": asset.MimeType,
+		"task_id":      task.TaskID,
+		"status":       "processing",
+		"file_name":    header.Filename,
+		"size":         header.Size,
+		"content_hash": clientHash,
+		"message":      "File received and queued for processing",
 	}
 	api.Success(c.Writer, response)
 }
