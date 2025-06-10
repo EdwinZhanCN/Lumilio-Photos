@@ -21,7 +21,7 @@ func LoadDBConfig() DatabaseConfig {
 		Port:     "5432",
 		User:     "postgres",
 		Password: "postgres",
-		DBName:   "phasma_db", // A sensible default name
+		DBName:   "photolibrary", // Default matches Docker Compose configuration
 	}
 
 	if host := os.Getenv("DB_HOST"); host != "" {
