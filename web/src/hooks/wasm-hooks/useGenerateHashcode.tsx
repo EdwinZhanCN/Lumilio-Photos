@@ -1,5 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import {useMessage} from "@/hooks/util-hooks/useMessage.tsx";
+import {WasmWorkerClient} from "@/workers/workerClient.ts";
 
 
 interface UseGenerateHashcodeProps {
@@ -19,10 +20,7 @@ interface UseGenerateHashcodeProps {
         bytesPerSecond: number;
         numberProcessed: number;
     }) => void;
-    workerClientRef: React.RefObject<{
-        addProgressListener: (listener: (progress: { processed: number }) => void) => () => void;
-        generateHash: (files: File[]) => Promise<{ hashResults: { index: number; hash: string }[] }>;
-    } | null>;
+    workerClientRef:  React.RefObject<WasmWorkerClient | null>;
     wasmReady: boolean;
 }
 
@@ -100,7 +98,7 @@ export const useGenerateHashcode = ({
 
         try {
             // The hash result if an array of objects, [{index:number,hash:string},...]
-            const { hashResults } = await workerClientRef.current.generateHash(Array.from(files));
+            const { hashResults } = await workerClientRef.current.generateHash(files);
 
             // Calculate performance metrics
             const endTime = performance.now();

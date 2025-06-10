@@ -171,11 +171,11 @@ export class WasmWorkerClient {
     /**
      * Processes files into hashcodes, sending the results hash back to the main thread.
      * You may want to use catch to handle the error.
-     * @requires FileList
+     * @requires FileList | File[] - The data to be processed. List of files.
      * @param data - The data to be processed. List of files.
      * @returns {Promise<{hashResults: Array<{index: number, hash: string}>, status: string}>}
      */
-    async generateHash(data: FileList): Promise<{ hashResults: Array<{ index: number, hash: string }>, status: string }> {
+    async generateHash(data: FileList | File[]): Promise<{ hashResults: Array<{ index: number, hash: string }>, status: string }> {
         return new Promise((resolve, reject) => {
             /**
              * Handler for messages from the worker.
@@ -234,10 +234,14 @@ export class WasmWorkerClient {
             };
             // Add the event listener for the worker message
             this.hashAssetsworker.addEventListener('message', handler);
+
+            // Convert FileList to File[] before sending to the worker
+            const filesArray = Array.isArray(data) ? data : Array.from(data);
+
             // Send the data to the worker for processing
             this.hashAssetsworker.postMessage({
                 type: 'GENERATE_HASH',
-                data
+                data: filesArray // Pass the converted array
             });
         });
     }
@@ -254,5 +258,104 @@ export class WasmWorkerClient {
      */
     terminateGenerateHashWorker(): void {
         this.hashAssetsworker.terminate();
+    }
+
+
+}
+
+export class WorkerClient{
+    private extractExifWorker: Worker;
+    private eventTarget: EventTarget;
+
+
+    constructor() {
+        this.extractExifWorker = new Worker(new URL('./exif.worker.ts', import.meta.url), {
+            type: 'module'
+        });
+        this.eventTarget = new EventTarget();
+    }
+
+    /**
+     * Adds a progress listener to the worker.
+     * @param callback - Function to handle progress events
+     * @returns {function(): void} - Function to remove the event listener
+     */
+    addProgressListener(callback: (detail: any) => void): () => void {
+        const handler = (e: CustomEvent) => callback(e.detail);
+        this.eventTarget.addEventListener('progress', handler as EventListener);
+        return () => this.eventTarget.removeEventListener('progress', handler as EventListener);
+    }
+
+
+    async extractExif(files: FileList | File[]): Promise<{ exifResults: Array<{ index: number, exifData: Record<string, any> }>, status: string }> {
+        return new Promise((resolve, reject) => {
+            /**
+             * Handler for messages from the worker.
+             * @param e {MessageEvent} - The message event from the worker.
+             */
+            const handler = (e: MessageEvent) => {
+                // A listener for messages from the worker
+                switch (e.data.type) {
+                    case 'EXIF_COMPLETE':
+                        // In EXIF_COMPLETE Message {data.}, the worker will send:
+                        // - type: The type of the message
+                        // - payload: The object containing the result
+                        // - payload.results: The results of the batch, exif data specifically
+                        resolve({
+                            exifResults: e.data.payload.results, // No batchIndex
+                            status: 'complete'
+                        });
+                        this.extractExifWorker.removeEventListener('message', handler);
+                        break;
+                    case 'ERROR':
+                        // In ERROR Message {data.}, the worker will send:
+                        // - type: The type of the message
+                        // - payload: The object containing the error details
+                        // - payload.error: The error message
+                        console.error(
+                            `ExtractExif worker error: ${e.data.payload.error}`, // No batchIndex in log
+                            {
+                                errorDetails: e.data.payload,
+                            }
+                        );
+                        const error = new Error(e.data.payload.error);
+                        this.extractExifWorker.removeEventListener('message', handler);
+                        reject(error);
+                        break;
+                    case 'PROGRESS':
+                        // For Frontend progress bar
+                        // payload.processed: The number of files processed
+                        this.eventTarget.dispatchEvent(new CustomEvent('progress', {
+                            detail: {
+                                processed: e.data.payload.processed, // No batchIndex
+                                total: e.data.payload.total // Added total for progress tracking
+                            }
+                        }));
+                        break;
+                    default:
+                        console.warn('Unknown message type from extractExifWorker:', e.data.type);
+                }
+            };
+
+            // Add the event listener for the worker message
+            this.extractExifWorker.addEventListener('message', handler);
+
+            // Convert FileList to File[] for consistency, though current exif.worker.ts might not strictly need it
+            const filesArray = Array.isArray(files) ? files : Array.from(files);
+
+            // Send the data to the worker for processing
+            this.extractExifWorker.postMessage({
+                type: 'EXTRACT_EXIF',
+                data: { files: filesArray } // Pass the converted array within the data object
+            });
+        });
+    }
+
+
+    /**
+     * Terminates the extractExif worker.
+     */
+    terminateExtractExifWorker(): void {
+        this.extractExifWorker.terminate();
     }
 }
