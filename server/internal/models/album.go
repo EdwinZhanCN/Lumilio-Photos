@@ -1,8 +1,9 @@
 package models
 
 import (
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Album struct {
@@ -12,15 +13,15 @@ type Album struct {
 	CreatedAt    time.Time  `gorm:"default:CURRENT_TIMESTAMP"`
 	UpdatedAt    time.Time  `gorm:"default:CURRENT_TIMESTAMP"`
 	Description  string     `gorm:"type:text"`
-	CoverPhotoID *uuid.UUID `gorm:"type:uuid"`
-	CoverPhoto   Photo      `gorm:"foreignKey:CoverPhotoID"`
+	CoverAssetID *uuid.UUID `gorm:"type:uuid"`
+	CoverAsset   Asset      `gorm:"foreignKey:CoverAssetID"`
 
-	Photos []Photo `gorm:"many2many:album_photos;foreignKey:AlbumID;joinForeignKey:AlbumID;References:PhotoID;joinReferences:PhotoID"`
+	Assets []Asset `gorm:"many2many:album_assets;foreignKey:AlbumID;joinForeignKey:AlbumID;References:AssetID;joinReferences:AssetID"`
 }
 
-type AlbumPhoto struct {
+type AlbumAsset struct {
 	AlbumID   int       `gorm:"primaryKey"`
-	PhotoID   uuid.UUID `gorm:"type:uuid;primaryKey"`
+	AssetID   uuid.UUID `gorm:"type:uuid;primaryKey"`
 	Position  int       `gorm:"default:0"`
 	AddedTime time.Time `gorm:"default:CURRENT_TIMESTAMP"`
 }
