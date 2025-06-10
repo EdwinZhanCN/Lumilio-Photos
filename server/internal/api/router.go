@@ -1,7 +1,6 @@
 package api
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -17,13 +16,6 @@ type AssetControllerInterface interface {
 	BatchUploadAssets(c *gin.Context)
 	AddAssetToAlbum(c *gin.Context)
 	GetAssetTypes(c *gin.Context)
-}
-
-// PhotoControllerInterface defines the interface for photo controllers (legacy)
-// TODO: Remove this interface after complete migration to AssetControllerInterface
-type PhotoControllerInterface interface {
-	UploadPhoto(w http.ResponseWriter, r *http.Request)
-	BatchUploadPhotos(w http.ResponseWriter, r *http.Request)
 }
 
 // NewRouter creates and configures a new router with asset endpoints
@@ -59,40 +51,10 @@ func NewRouter(assetController AssetControllerInterface) *gin.Engine {
 	return r
 }
 
-// NewLegacyRouter creates a router with legacy photo endpoints for backward compatibility
-// TODO: Remove this function after complete migration
-func NewLegacyRouter(photoController PhotoControllerInterface) *gin.Engine {
-	r := gin.Default()
-
-	// Add CORS middleware
-	r.Use(func(c *gin.Context) {
-		corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			c.Next()
-		})).ServeHTTP(c.Writer, c.Request)
-	})
-
-	// API routes
-	api := r.Group("/api")
-
-	// Photo routes
-	photoRoutes := api.Group("/v1")
-
-	photoRoutes.POST("/photo", func(c *gin.Context) {
-		photoController.UploadPhoto(c.Writer, c.Request)
-	})
-
-	photoRoutes.POST("/photo-batch", func(c *gin.Context) {
-		photoController.BatchUploadPhotos(c.Writer, c.Request)
-	})
-
-	log.Println("Starting Controller")
-
-	return r
-}
-
 // corsMiddleware handles CORS headers
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// TODO: Add frontend URL from config
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"server/internal/models"
 	"server/internal/repository"
+	"server/internal/storage"
 	"strings"
 	"time"
 
@@ -45,11 +46,11 @@ type AssetService interface {
 
 type assetService struct {
 	repo    repository.AssetRepository
-	storage CloudStorage
+	storage storage.Storage
 }
 
 // NewAssetService creates a new instance of AssetService
-func NewAssetService(r repository.AssetRepository, s CloudStorage) AssetService {
+func NewAssetService(r repository.AssetRepository, s storage.Storage) AssetService {
 	return &assetService{
 		repo:    r,
 		storage: s,
