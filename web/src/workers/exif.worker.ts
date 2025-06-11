@@ -1,5 +1,4 @@
-import { exiftool } from "exiftool-vendored";
-
+import { parseMetadata } from '@uswriting/exiftool';
 
 let abortController = new AbortController();
 
@@ -39,8 +38,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                         break;
                     }
                     const file = files[i];
-                    const fileURL = URL.createObjectURL(file);
-                    const exifData = await exiftool.read(fileURL);
+                    const exifData = await parseMetadata(file, {
+                        args: ["-json"],
+                        transform: (data) => JSON.parse(data)
+                    });
                     results.push({ index: i, exifData });
                     // Send progress update
                     self.postMessage({

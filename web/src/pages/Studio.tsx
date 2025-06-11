@@ -1,11 +1,21 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { WorkerClient } from '@/workers/workerClient.ts';
 import { useExtractExifdata } from '@/hooks/util-hooks/useExtractExifdata.tsx';
-import { ArrowUpTrayIcon, DocumentTextIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import {
+    ArrowUpTrayIcon,
+    DocumentTextIcon,
+    ExclamationCircleIcon,
+    AdjustmentsHorizontalIcon,
+    PhotoIcon,
+    Cog6ToothIcon,
+    InformationCircleIcon
+} from '@heroicons/react/24/outline';
 
 export function Studio() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
+    const [activePanel, setActivePanel] = useState<'exif' | 'develop' | 'export'>('exif');
+    const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
     // State for the hook to populate (Record<number, any>)
     const [rawExifDataFromHook, setRawExifDataFromHook] = useState<Record<number, any> | null>(null);
@@ -26,9 +36,7 @@ export function Studio() {
     // Initialize WorkerClient
     useEffect(() => {
         workerClientRef.current = new WorkerClient();
-        // console.log("WorkerClient initialized");
         return () => {
-            // console.log("Terminating EXIF worker");
             workerClientRef.current?.terminateExtractExifWorker();
         };
     }, []);
@@ -68,12 +76,9 @@ export function Studio() {
 
     const handleExtractExif = useCallback(async () => {
         if (selectedFile && workerClientRef.current) {
-            // console.log("Starting EXIF extraction for:", selectedFile.name);
             setExifToDisplay(null); // Clear previous results
             await extractExifData([selectedFile]);
-        } else {
-            // console.log("No file selected or worker not ready");
-            // Optionally, show a message to the user via useMessage if integrated
+            setActivePanel('exif');
         }
     }, [selectedFile, extractExifData]);
 
@@ -81,133 +86,324 @@ export function Studio() {
         fileInputRef.current?.click();
     };
 
+    const toggleSidebar = () => {
+        setSidebarCollapsed(!sidebarCollapsed);
+    };
+
     const renderExifData = () => {
         if (!exifToDisplay) return null;
 
-        const entries = Object.entries(exifToDisplay);
-        if (entries.length === 0) {
+        if (!exifToDisplay || Object.keys(exifToDisplay).length === 0) {
             return <p className="text-center text-gray-500">No EXIF data found for this image.</p>;
         }
 
-        // Filter out specific large binary data like ThumbnailImage for better display
-        const filteredEntries = entries.filter(([key]) => !key.toLowerCase().includes('thumbnailimage'));
+        // Extract the EXIF data from the array format returned by the hook
+        let processedExifData: Record<string, any> = {};
+
+        // Check if exifToDisplay is directly an array (some hook implementations)
+        if (Array.isArray(exifToDisplay)) {
+            if (exifToDisplay.length > 0 && typeof exifToDisplay[0] === 'object') {
+                processedExifData = exifToDisplay[0];
+            }
+        }
+        // Check if exifToDisplay has a data field that's already parsed as an array
+        else if (exifToDisplay.data && Array.isArray(exifToDisplay.data)) {
+            if (exifToDisplay.data.length > 0 && typeof exifToDisplay.data[0] === 'object') {
+                processedExifData = exifToDisplay.data[0];
+            }
+        }
+        // Check if exifToDisplay has a data field that's a JSON string
+        else if (exifToDisplay.data && typeof exifToDisplay.data === 'string') {
+            try {
+                const parsed = JSON.parse(exifToDisplay.data);
+
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    // Use the first object in the array directly
+                    processedExifData = parsed[0];
+                } else if (typeof parsed === 'object' && parsed !== null) {
+                    // Or use the parsed object directly
+                    processedExifData = parsed;
+                }
+            } catch (e) {
+                // If parsing fails, use the original data without the data field
+                const { data, ...restData } = exifToDisplay;
+                processedExifData = restData;
+            }
+        }
+        // Use the object directly if no special handling needed
+        else {
+            processedExifData = exifToDisplay;
+        }
+
+        // Helper function to format EXIF values more readable
+        const formatExifValue = (key: string, value: any): string => {
+            if (value === null || value === undefined) return 'N/A';
+
+            // Handle special cases for better readability
+            if (key.toLowerCase().includes('date') || key.toLowerCase().includes('time')) {
+                if (value instanceof Date || !isNaN(new Date(value).getTime())) {
+                    return new Date(value).toLocaleString();
+                }
+            } else if (key.toLowerCase().includes('gps') && typeof value === 'number') {
+                return value.toFixed(6).toString();
+            } else if (typeof value === 'number') {
+                // Handle fractions like exposure values (1/100)
+                if (Math.abs(value) < 0.01 && value !== 0) {
+                    const denominator = Math.round(1 / value);
+                    return `1/${denominator}`;
+                }
+                // Format decimal numbers nicely
+                return Number.isInteger(value) ? value.toString() : value.toFixed(2);
+            } else if (typeof value === 'object') {
+                try {
+                    return JSON.stringify(value);
+                } catch (e) {
+                    return '[Complex Object]';
+                }
+            }
+
+            return String(value);
+        };
+
+        // Filter out system info keys
+        const excludedKeys = ['success', 'error', 'exitcode'];
+
+        // Get all entries, filter excluded keys, and sort alphabetically
+        const entries = Object.entries(processedExifData)
+            .filter(([key]) => !excludedKeys.some(excluded => key.toLowerCase().includes(excluded)))
+            .sort((a, b) => a[0].localeCompare(b[0]));
+
+        // Function to format field names more readable
+        const formatFieldName = (key: string): string => {
+            // Replace camelCase with spaces
+            let formatted = key.replace(/([A-Z])/g, ' $1');
+            // Replace underscores with spaces
+            formatted = formatted.replace(/_/g, ' ');
+            // Capitalize first letter of each word
+            formatted = formatted.replace(/\w\S*/g, (txt) => {
+                return txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase();
+            });
+            return formatted;
+        };
 
         return (
-            <div className="overflow-x-auto max-h-96">
-                <table className="table table-zebra table-sm w-full">
-                    <thead>
-                        <tr>
-                            <th className="sticky top-0 bg-base-200 z-10">Tag</th>
-                            <th className="sticky top-0 bg-base-200 z-10">Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredEntries.map(([key, value]) => (
-                            <tr key={key}>
-                                <td className="font-semibold break-all">{key}</td>
-                                <td className="break-all">
-                                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-        );
-    };
-
-    return (
-        <div className="container mx-auto p-4 md:p-8 min-h-screen bg-base-100">
-            <header className="mb-8 text-center">
-                <h1 className="text-4xl font-bold text-primary">Image EXIF Studio</h1>
-                <p className="text-lg text-base-content/70">Select an image to view its EXIF metadata.</p>
-            </header>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Image Selection and Preview Card */}
-                <div className="card bg-base-200 shadow-xl">
-                    <div className="card-body">
-                        <h2 className="card-title text-2xl mb-4">
-                            <ArrowUpTrayIcon className="w-6 h-6 mr-2"/>
-                            Select Image
-                        </h2>
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                            accept="image/jpeg, image/png, image/tiff, image.heic, image.heif, image.webp"
-                            className="hidden"
-                        />
-                        <button
-                            onClick={triggerFileInput}
-                            className="btn btn-primary w-full mb-4"
-                        >
-                            Choose Image
-                        </button>
-
-                        {imageUrl && selectedFile && (
-                            <div className="mt-4">
-                                <h3 className="text-xl font-semibold mb-2">Preview:</h3>
-                                <img src={imageUrl} alt={selectedFile.name} className="rounded-lg shadow-md max-h-96 w-full object-contain"/>
-                                <div className="mt-4 flex flex-col space-y-2">
-                                    <p className="text-sm"><span className="font-semibold">File:</span> {selectedFile.name}</p>
-                                    <p className="text-sm"><span className="font-semibold">Size:</span> {(selectedFile.size / 1024).toFixed(2)} KB</p>
-                                    <button
-                                        onClick={handleExtractExif}
-                                        className="btn btn-secondary w-full mt-2"
-                                        disabled={isExtracting}
-                                    >
-                                        {isExtracting ? 'Extracting...' : 'Extract EXIF Data'}
-                                    </button>
+            <div className="overflow-y-auto overflow-x-hidden max-h-[calc(100vh-200px)] px-1">
+                {entries.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500">No metadata to display</div>
+                ) : (
+                    <div className="rounded-lg bg-base-100 shadow-sm mb-4">
+                        <div className="bg-base-300 p-2 rounded-t-lg flex items-center">
+                            <h3 className="text-sm font-bold text-base-content">EXIF Data</h3>
+                            <span className="ml-2 text-xs opacity-60">({entries.length} fields)</span>
+                        </div>
+                        <div className="divide-y divide-base-300/20">
+                            {entries.map(([key, value]) => (
+                                <div key={key} className="flex py-2 px-3 hover:bg-base-200/40 transition-colors">
+                                    <div className="font-medium text-xs text-base-content/80 w-1/2 pr-2">
+                                        {formatFieldName(key)}
+                                    </div>
+                                    <div className="text-xs flex-1 break-all font-mono">
+                                        {formatExifValue(key, value)}
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-
-                        {isExtracting && progress && (
-                            <div className="mt-4">
-                                <p className="text-sm text-center mb-1">Processing: {progress.numberProcessed} / {progress.total}</p>
-                                <progress
-                                    className="progress progress-primary w-full"
-                                    value={progress.numberProcessed}
-                                    max={progress.total}
-                                ></progress>
-                            </div>
-                        )}
-
-                        {progress?.error && (
-                            <div role="alert" className="alert alert-error mt-4">
-                                <ExclamationCircleIcon className="w-6 h-6"/>
-                                <div>
-                                    <h3 className="font-bold">Error!</h3>
-                                    <div className="text-xs">{progress.error}</div>
-                                 </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* EXIF Data Display Card */}
-                {(exifToDisplay || isExtracting || progress?.error) && (
-                    <div className="card bg-base-200 shadow-xl">
-                        <div className="card-body">
-                            <h2 className="card-title text-2xl mb-4">
-                                <DocumentTextIcon className="w-6 h-6 mr-2"/>
-                                EXIF Metadata
-                            </h2>
-                            {isExtracting && !exifToDisplay && !progress?.error && (
-                                <div className="text-center py-8">
-                                    <span className="loading loading-lg loading-spinner text-primary"></span>
-                                    <p className="mt-2">Extracting data...</p>
-                                </div>
-                            )}
-                            {!isExtracting && renderExifData()}
+                            ))}
                         </div>
                     </div>
                 )}
             </div>
-             <footer className="text-center mt-12 py-4 border-t border-base-300">
-                <p className="text-sm text-base-content/60">Image EXIF Studio &copy; 2025</p>
-            </footer>
+        );
+    };
+
+    // Placeholder for future panels
+    const renderDevelopPanel = () => (
+        <div className="p-4 bg-base-300 rounded-lg h-full min-h-[300px] flex items-center justify-center">
+            <div className="text-center">
+                <AdjustmentsHorizontalIcon className="w-12 h-12 mx-auto text-base-content/50" />
+                <h3 className="mt-2 text-lg font-semibold">Development Tools</h3>
+                <p className="mt-1 text-sm text-base-content/70">Coming soon...</p>
+            </div>
+        </div>
+    );
+
+    const renderExportPanel = () => (
+        <div className="p-4 bg-base-300 rounded-lg h-full min-h-[300px] flex items-center justify-center">
+            <div className="text-center">
+                <Cog6ToothIcon className="w-12 h-12 mx-auto text-base-content/50" />
+                <h3 className="mt-2 text-lg font-semibold">Export Options</h3>
+                <p className="mt-1 text-sm text-base-content/70">Coming soon...</p>
+            </div>
+        </div>
+    );
+
+    const renderCurrentPanel = () => {
+        switch (activePanel) {
+            case 'exif':
+                return (
+                    <div className="h-full">
+                        <div className="flex items-center mb-4">
+                            <InformationCircleIcon className="w-5 h-5 mr-2" />
+                            <h2 className="text-lg font-semibold">EXIF Metadata</h2>
+                        </div>
+                        {isExtracting && !exifToDisplay && !progress?.error ? (
+                            <div className="text-center py-8">
+                                <span className="loading loading-lg loading-spinner text-primary"></span>
+                                <p className="mt-2">Extracting data...</p>
+                            </div>
+                        ) : (
+                            renderExifData()
+                        )}
+                    </div>
+                );
+            case 'develop':
+                return renderDevelopPanel();
+            case 'export':
+                return renderExportPanel();
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <div className="flex flex-col h-screen bg-base-100 overflow-hidden">
+            {/* Top Toolbar */}
+            <header className="bg-base-300 py-2 px-4 border-b border-base-content/10 flex justify-between items-center">
+                <div className="flex items-center space-x-2">
+                    <PhotoIcon className="w-6 h-6 text-primary" />
+                    <h1 className="text-xl font-bold">Photo Studio</h1>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept="image/jpeg, image/png, image/tiff, image.heic, image.heif, image.webp"
+                        className="hidden"
+                    />
+                    <button
+                        onClick={triggerFileInput}
+                        className="btn btn-sm btn-primary"
+                    >
+                        <ArrowUpTrayIcon className="w-4 h-4 mr-1" />
+                        Open Image
+                    </button>
+                </div>
+            </header>
+
+            {/* Main Content */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Left Sidebar - Modules */}
+                <div className={`bg-base-200 border-r border-base-content/10 flex flex-col ${sidebarCollapsed ? 'w-14' : 'w-44'} transition-all duration-300`}>
+                    <div className="p-2">
+                        <button
+                            className={`btn btn-sm w-full mb-2 ${activePanel === 'exif' ? 'btn-primary' : 'btn-ghost'} ${sidebarCollapsed ? 'justify-center px-0' : 'justify-start'}`}
+                            onClick={() => setActivePanel('exif')}
+                        >
+                            <DocumentTextIcon className="w-5 h-5 flex-shrink-0" />
+                            {!sidebarCollapsed && <span className="ml-1">EXIF Data</span>}
+                        </button>
+                        <button
+                            className={`btn btn-sm w-full mb-2 ${activePanel === 'develop' ? 'btn-primary' : 'btn-ghost'} ${sidebarCollapsed ? 'justify-center px-0' : 'justify-start'}`}
+                            onClick={() => setActivePanel('develop')}
+                        >
+                            <AdjustmentsHorizontalIcon className="w-5 h-5 flex-shrink-0" />
+                            {!sidebarCollapsed && <span className="ml-1">Develop</span>}
+                        </button>
+                        <button
+                            className={`btn btn-sm w-full ${activePanel === 'export' ? 'btn-primary' : 'btn-ghost'} ${sidebarCollapsed ? 'justify-center px-0' : 'justify-start'}`}
+                            onClick={() => setActivePanel('export')}
+                        >
+                            <Cog6ToothIcon className="w-5 h-5 flex-shrink-0" />
+                            {!sidebarCollapsed && <span className="ml-1">Export</span>}
+                        </button>
+                    </div>
+                    <div className="mt-auto p-2">
+                        <button
+                            className="btn btn-sm btn-ghost w-full justify-center"
+                            onClick={toggleSidebar}
+                        >
+                            {sidebarCollapsed ? '»' : '«'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Main Editor Area */}
+                {imageUrl ? (
+                    <div className="flex-1 overflow-hidden bg-base-300 relative">
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <img
+                                src={imageUrl}
+                                alt={selectedFile?.name || 'Preview'}
+                                className="max-h-full max-w-full object-contain"
+                            />
+                        </div>
+                        {/* Image Info Overlay */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-base-300/80 backdrop-blur-sm p-2 text-xs">
+                            {selectedFile && (
+                                <>
+                                    <span className="font-semibold mr-2">{selectedFile.name}</span>
+                                    <span>{(selectedFile.size / 1024).toFixed(2)} KB</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex-1 flex items-center justify-center bg-base-300">
+                        <div className="text-center p-8">
+                            <PhotoIcon className="w-16 h-16 mx-auto text-base-content/30" />
+                            <p className="mt-4">No image selected</p>
+                            <button
+                                onClick={triggerFileInput}
+                                className="btn btn-primary mt-4"
+                            >
+                                Open an Image
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {/* Right Panel - Tools and Properties */}
+                <div className="bg-base-200 border-l border-base-content/10 w-80 overflow-y-auto">
+                    {selectedFile ? (
+                        <div className="p-4">
+                            {!exifToDisplay && !isExtracting && (
+                                <div className="mb-4">
+                                    <button
+                                        onClick={handleExtractExif}
+                                        className="btn btn-secondary w-full"
+                                        disabled={isExtracting}
+                                    >
+                                        {isExtracting ? 'Extracting...' : 'Extract Metadata'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {isExtracting && progress && (
+                                <div className="mb-4">
+                                    <p className="text-sm text-center mb-1">Processing: {progress.numberProcessed} / {progress.total}</p>
+                                    <progress
+                                        className="progress progress-primary w-full"
+                                        value={progress.numberProcessed}
+                                        max={progress.total}
+                                    ></progress>
+                                </div>
+                            )}
+
+                            {progress?.error && (
+                                <div role="alert" className="alert alert-error mb-4">
+                                    <ExclamationCircleIcon className="w-5 h-5"/>
+                                    <div className="text-xs">{progress.error}</div>
+                                </div>
+                            )}
+
+                            {/* Render current panel content */}
+                            {renderCurrentPanel()}
+                        </div>
+                    ) : (
+                        <div className="p-4 text-center text-base-content/70">
+                            <p>Select an image to view its properties and apply edits</p>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
