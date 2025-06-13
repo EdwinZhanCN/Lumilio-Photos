@@ -14,7 +14,6 @@ import (
 	"server/internal/repository/gorm_repo"
 	"server/internal/service"
 	"server/internal/storage"
-	"server/internal/utils"
 
 	"github.com/joho/godotenv"
 )
@@ -30,6 +29,8 @@ func init() {
 	}
 }
 
+// 该主程序启动API层，API层只且仅只处理认证，接受文件，任务入队
+// 只在除了文件上传之外的任务调用AssetsService及其方法
 func main() {
 	dbConfig := config.LoadDBConfig()
 	// 添加测试日志，验证日志配置是否生效
@@ -71,7 +72,7 @@ func main() {
 	// Get storage path from environment variable or use default
 	storagePath := os.Getenv("STORAGE_PATH")
 	if storagePath == "" {
-		storagePath = "/app/data/photos" // Default path for Docker container
+		storagePath = "/app/data/photos" // 最终储存区，required by AssetsService
 	}
 	log.Printf("Using storage path: %s", storagePath)
 
@@ -83,7 +84,7 @@ func main() {
 	// Initialize staging area for temporary file storage
 	stagingPath := os.Getenv("STAGING_PATH")
 	if stagingPath == "" {
-		stagingPath = "/app/staging" // Default path for Docker container
+		stagingPath = "/app/staging" // 临时暂存区，用于初次存储用户上传的文件
 	}
 	log.Printf("Using staging path: %s", stagingPath)
 
@@ -95,7 +96,7 @@ func main() {
 	// Initialize task queue
 	queueDir := os.Getenv("QUEUE_DIR")
 	if queueDir == "" {
-		queueDir = "/app/queue"
+		queueDir = "/app/queue" // 持久化队列
 	}
 	log.Printf("Using queue directory: %s", queueDir)
 
@@ -110,14 +111,11 @@ func main() {
 	}
 	defer taskQueue.Close()
 
-	// Initialize services
+	// Initialize services, service layer inside the api layer only responsible for non-upload logic
 	assetService := service.NewAssetService(assetRepo, localStorage)
 
-	// Initialize asset processor
-	assetProcessor := utils.NewAssetProcessor(assetService, localStorage, storagePath)
-
 	// Initialize controllers - pass the staging path and task queue to the handler
-	assetController := handler.NewAssetHandler(assetService, assetProcessor, stagingPath, taskQueue)
+	assetController := handler.NewAssetHandler(assetService, stagingPath, taskQueue)
 
 	// Set up router with new asset endpoints
 	router := api.NewRouter(assetController)

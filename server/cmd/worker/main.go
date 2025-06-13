@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"server/config"
-	"server/internal/models"
 	"server/internal/queue"
 	"server/internal/repository/gorm_repo"
 	"server/internal/service"
@@ -29,6 +28,7 @@ func init() {
 	}
 }
 
+// 该Worker主程序，只且仅只负责处理重负载任务，如图像处理，哈希算法，机器学习微服务调用
 func main() {
 	log.Println("Starting worker service...")
 
@@ -36,18 +36,8 @@ func main() {
 	dbConfig := config.LoadDBConfig()
 
 	// Connect to the database
+	// 数据库服务应该由API层启动，worker直接链接
 	database := gorm_repo.InitDB(dbConfig)
-
-	// Auto-migrate database models if needed
-	err := database.AutoMigrate(
-		&models.Asset{},
-		&models.Thumbnail{},
-		&models.Tag{},
-		&models.Album{},
-	)
-	if err != nil {
-		log.Fatalf("Failed to run database migrations: %v", err)
-	}
 
 	// Defer closing the database connection
 	sqlDB, err := database.DB()
@@ -62,15 +52,17 @@ func main() {
 	}(sqlDB)
 
 	// Initialize repositories
+	// 构建数据库通道
 	assetRepo := gorm_repo.NewAssetRepository(database)
 
 	// Initialize local storage
 	storagePath := os.Getenv("STORAGE_PATH")
 	if storagePath == "" {
-		storagePath = "/app/data/photos" // Default path for Docker container
+		storagePath = "/app/data/photos" // 最终写入地址
 	}
 	log.Printf("Using storage path: %s", storagePath)
 
+	// 构建写入存储通道
 	localStorage, err := storage.NewLocalStorage(storagePath)
 	if err != nil {
 		log.Fatalf("Failed to initialize local storage: %v", err)
@@ -80,12 +72,13 @@ func main() {
 	assetService := service.NewAssetService(assetRepo, localStorage)
 
 	// Initialize asset processor
+	// 该实例只能，也只应该在worker端创建
 	assetProcessor := utils.NewAssetProcessor(assetService, localStorage, storagePath)
 
 	// Initialize task queue
 	queueDir := os.Getenv("QUEUE_DIR")
 	if queueDir == "" {
-		queueDir = "/app/queue"
+		queueDir = "/app/queue" // 持久化队列
 	}
 	log.Printf("Using queue directory: %s", queueDir)
 

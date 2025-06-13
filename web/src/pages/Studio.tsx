@@ -8,7 +8,7 @@ import {
     AdjustmentsHorizontalIcon,
     PhotoIcon,
     Cog6ToothIcon,
-    InformationCircleIcon
+    InformationCircleIcon, ArrowLeftIcon, ArrowRightIcon, PaintBrushIcon
 } from '@heroicons/react/24/outline';
 
 export function Studio() {
@@ -173,21 +173,8 @@ export function Studio() {
             .filter(([key]) => !excludedKeys.some(excluded => key.toLowerCase().includes(excluded)))
             .sort((a, b) => a[0].localeCompare(b[0]));
 
-        // Function to format field names more readable
-        const formatFieldName = (key: string): string => {
-            // Replace camelCase with spaces
-            let formatted = key.replace(/([A-Z])/g, ' $1');
-            // Replace underscores with spaces
-            formatted = formatted.replace(/_/g, ' ');
-            // Capitalize first letter of each word
-            formatted = formatted.replace(/\w\S*/g, (txt) => {
-                return txt.charAt(0).toUpperCase() + txt.slice(1).toLowerCase();
-            });
-            return formatted;
-        };
-
         return (
-            <div className="overflow-y-auto overflow-x-hidden max-h-[calc(100vh-200px)] px-1">
+            <div className="overflow-y-auto overflow-x-hidden max-h-[calc(60vh)] px-1">
                 {entries.length === 0 ? (
                     <div className="text-center py-4 text-gray-500">No metadata to display</div>
                 ) : (
@@ -199,8 +186,8 @@ export function Studio() {
                         <div className="divide-y divide-base-300/20">
                             {entries.map(([key, value]) => (
                                 <div key={key} className="flex py-2 px-3 hover:bg-base-200/40 transition-colors">
-                                    <div className="font-medium text-xs text-base-content/80 w-1/2 pr-2">
-                                        {formatFieldName(key)}
+                                    <div className="font-medium text-xs text-base-content/80 w-1/2 mr-2">
+                                        {key}
                                     </div>
                                     <div className="text-xs flex-1 break-all font-mono">
                                         {formatExifValue(key, value)}
@@ -264,12 +251,12 @@ export function Studio() {
     };
 
     return (
-        <div className="flex flex-col h-screen bg-base-100 overflow-hidden">
+        <div className="flex flex-col h-[calc(85vh)]  bg-base-100 overflow-hidden">
             {/* Top Toolbar */}
-            <header className="bg-base-300 py-2 px-4 border-b border-base-content/10 flex justify-between items-center">
+            <header className="py-2 px-4 border-b border-base-content/10 flex justify-between items-center">
                 <div className="flex items-center space-x-2">
-                    <PhotoIcon className="w-6 h-6 text-primary" />
-                    <h1 className="text-xl font-bold">Photo Studio</h1>
+                    <PaintBrushIcon className="w-6 h-6 text-primary" />
+                    <h1 className="text-xl font-bold">Studio</h1>
                 </div>
                 <div className="flex items-center space-x-2">
                     <input
@@ -295,11 +282,19 @@ export function Studio() {
                 <div className={`bg-base-200 border-r border-base-content/10 flex flex-col ${sidebarCollapsed ? 'w-14' : 'w-44'} transition-all duration-300`}>
                     <div className="p-2">
                         <button
+                            className="btn btn-sm btn-ghost w-full justify-center"
+                            onClick={toggleSidebar}
+                        >
+                            {sidebarCollapsed ? <ArrowRightIcon className="w-5 h-5 flex-shrink-0"/> : <ArrowLeftIcon className="w-5 h-5 flex-shrink-0"/> }
+                        </button>
+                    </div>
+                    <div className="p-2">
+                        <button
                             className={`btn btn-sm w-full mb-2 ${activePanel === 'exif' ? 'btn-primary' : 'btn-ghost'} ${sidebarCollapsed ? 'justify-center px-0' : 'justify-start'}`}
                             onClick={() => setActivePanel('exif')}
                         >
                             <DocumentTextIcon className="w-5 h-5 flex-shrink-0" />
-                            {!sidebarCollapsed && <span className="ml-1">EXIF Data</span>}
+                            {!sidebarCollapsed && <span className="ml-1">EXIF</span>}
                         </button>
                         <button
                             className={`btn btn-sm w-full mb-2 ${activePanel === 'develop' ? 'btn-primary' : 'btn-ghost'} ${sidebarCollapsed ? 'justify-center px-0' : 'justify-start'}`}
@@ -314,14 +309,6 @@ export function Studio() {
                         >
                             <Cog6ToothIcon className="w-5 h-5 flex-shrink-0" />
                             {!sidebarCollapsed && <span className="ml-1">Export</span>}
-                        </button>
-                    </div>
-                    <div className="mt-auto p-2">
-                        <button
-                            className="btn btn-sm btn-ghost w-full justify-center"
-                            onClick={toggleSidebar}
-                        >
-                            {sidebarCollapsed ? '»' : '«'}
                         </button>
                     </div>
                 </div>

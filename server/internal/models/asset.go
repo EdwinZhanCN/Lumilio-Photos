@@ -107,7 +107,12 @@ func (a *Asset) GetPhotoMetadata() (*PhotoSpecificMetadata, error) {
 	}
 
 	var metadata PhotoSpecificMetadata
-	err := json.Unmarshal(a.SpecificMetadata, &metadata)
+
+	data, err := json.Marshal(a.SpecificMetadata)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(data, &metadata)
 	if err != nil {
 		return nil, err
 	}

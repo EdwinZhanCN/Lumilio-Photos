@@ -11,7 +11,6 @@ import (
 	"server/internal/models"
 	"server/internal/queue"
 	"server/internal/service"
-	"server/internal/utils"
 	"strconv"
 	"time"
 
@@ -21,19 +20,17 @@ import (
 
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
-	assetService    service.AssetService
-	assetProcessor *utils.AssetProcessor
-	stagingPath    string
-	taskQueue      *queue.TaskQueue
+	assetService service.AssetService
+	stagingPath  string
+	taskQueue    *queue.TaskQueue
 }
 
 // NewAssetHandler creates a new AssetHandler instance
-func NewAssetHandler(s service.AssetService, p *utils.AssetProcessor, stagingPath string, q *queue.TaskQueue) *AssetHandler {
+func NewAssetHandler(assetService service.AssetService, stagingPath string, taskQueue *queue.TaskQueue) *AssetHandler {
 	return &AssetHandler{
-		assetService:   s,
-		assetProcessor: p,
-		stagingPath:    stagingPath,
-		taskQueue:      q,
+		assetService: assetService,
+		stagingPath:  stagingPath,
+		taskQueue:    taskQueue,
 	}
 }
 
@@ -287,56 +284,109 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		return
 	}
 
-	// Optional: Parse owner ID if provided
-	var ownerID *int
-	if ownerIDStr := c.Request.FormValue("owner_id"); ownerIDStr != "" {
-		if id, err := strconv.Atoi(ownerIDStr); err == nil {
-			ownerID = &id
-		}
+	// Get user ID (in a real app, get this from authentication)
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = "anonymous"
 	}
 
-	// Prepare file readers
-	fileReaders := make([]io.Reader, len(files))
-	filenames := make([]string, len(files))
-	fileSizes := make([]int64, len(files))
+	results := make([]map[string]interface{}, len(files))
 
 	for i, header := range files {
 		file, err := header.Open()
 		if err != nil {
-			api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to open file: "+header.Filename)
-			return
-		}
-		defer file.Close()
-
-		fileReaders[i] = file
-		filenames[i] = header.Filename
-		fileSizes[i] = header.Size
-	}
-
-	// Batch upload
-	assets, errors := h.assetService.BatchUploadAssets(
-		c.Request.Context(),
-		fileReaders,
-		filenames,
-		fileSizes,
-		ownerID,
-	)
-
-	// Prepare response
-	results := make([]map[string]interface{}, len(assets))
-	for i := range assets {
-		if errors[i] != nil {
 			results[i] = map[string]interface{}{
-				"filename": filenames[i],
-				"error":    errors[i].Error(),
+				"filename": header.Filename,
+				"error":    "Failed to open file: " + err.Error(),
 				"success":  false,
 			}
-		} else {
+			continue
+		}
+
+		// Get client-provided hash from header (if available)
+		clientHash := c.GetHeader("X-Content-Hash")
+		if clientHash == "" {
+			log.Println("Warning: No content hash provided by client for file", header.Filename)
+			clientHash = uuid.New().String()
+		}
+
+		// Create a unique filename in staging area
+		stagingFileName := uuid.New().String()
+		fileExt := filepath.Ext(header.Filename)
+		stagingFilePath := filepath.Join(h.stagingPath, stagingFileName+fileExt)
+
+		// Ensure staging directory exists
+		if err := os.MkdirAll(h.stagingPath, 0755); err != nil {
+			log.Printf("Failed to create staging directory: %v", err)
 			results[i] = map[string]interface{}{
-				"filename": filenames[i],
-				"asset":    assets[i],
-				"success":  true,
+				"filename": header.Filename,
+				"error":    "Failed to create staging directory: " + err.Error(),
+				"success":  false,
 			}
+			file.Close()
+			continue
+		}
+
+		// Create destination file
+		stagingFile, err := os.Create(stagingFilePath)
+		if err != nil {
+			log.Printf("Failed to create staging file: %v", err)
+			results[i] = map[string]interface{}{
+				"filename": header.Filename,
+				"error":    "Failed to create staging file: " + err.Error(),
+				"success":  false,
+			}
+			file.Close()
+			continue
+		}
+
+		// Copy uploaded file to staging area
+		_, err = io.Copy(stagingFile, file)
+		stagingFile.Close()
+		file.Close()
+		if err != nil {
+			log.Printf("Failed to copy file to staging: %v", err)
+			results[i] = map[string]interface{}{
+				"filename": header.Filename,
+				"error":    "Failed to copy file to staging: " + err.Error(),
+				"success":  false,
+			}
+			continue
+		}
+
+		// Create task for processing
+		task := queue.Task{
+			TaskID:      uuid.New().String(),
+			ClientHash:  clientHash,
+			StagedPath:  stagingFilePath,
+			UserID:      userID,
+			Timestamp:   time.Now(),
+			ContentType: header.Header.Get("Content-Type"),
+			FileName:    header.Filename,
+		}
+
+		// Enqueue task
+		err = h.taskQueue.EnqueueTask(task)
+		if err != nil {
+			log.Printf("Failed to enqueue task: %v", err)
+			results[i] = map[string]interface{}{
+				"filename": header.Filename,
+				"error":    "Failed to enqueue task: " + err.Error(),
+				"success":  false,
+			}
+			continue
+		}
+
+		log.Printf("Task %s enqueued for processing file %s", task.TaskID, header.Filename)
+
+		results[i] = map[string]interface{}{
+			"task_id":      task.TaskID,
+			"status":       "processing",
+			"file_name":    header.Filename,
+			"size":         header.Size,
+			"content_hash": clientHash,
+			"success":      true,
+			"message":      "File received and queued for processing",
 		}
 	}
 
