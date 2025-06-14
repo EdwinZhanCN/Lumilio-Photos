@@ -1,45 +1,92 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "9000:8080"
-    volumes:
-      - photo-storage:/app/data/photos
-    environment:
-      - STORAGE_PATH=/app/data/photos
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=dev
-      - DB_PASSWORD=Kr.lm<7knzb.;3^o
-    depends_on:
-      - postgres
+    db:
+        image: postgres:15-alpine
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        environment:
+            - POSTGRES_PASSWORD=postgres
+            - POSTGRES_USER=postgres
+            - POSTGRES_DB=lumiliophotos
+        ports:
+            - "5432:5432"
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
 
-  frontend:
-    build:
-      context: .
-      dockerfile: web/Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      - app
+    api:
+        build:
+            context: .
+            dockerfile: server/Dockerfile.api
+        depends_on:
+            db:
+                condition: service_healthy
+        ports:
+            - "8080:8080"
+        environment:
+            - DB_HOST=db
+            - DB_PORT=5432
+            - DB_USER=postgres
+            - DB_PASSWORD=postgres
+            - DB_NAME=lumiliophotos
+            - PORT=8080
+            - STORAGE_PATH=/app/data/photos
+            - STAGING_PATH=/app/staging
+            - QUEUE_DIR=/app/queue
+        volumes:
+            - photo_storage:/app/data/photos
+            - staging_area:/app/staging
+            - task_queue:/app/queue
 
-  postgres:
-    image: postgres:alpine
-    environment:
-      - POSTGRES_USER=dev
-      - POSTGRES_PASSWORD=Kr.lm<7knzb.;3^o
-      - POSTGRES_DB=lumilio-photos
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    worker:
+        build:
+            context: .
+            dockerfile: server/Dockerfile.worker
+        depends_on:
+            db:
+                condition: service_healthy
+            api:
+                condition: service_started
+        environment:
+            - DB_HOST=db
+            - DB_PORT=5432
+            - DB_USER=postgres
+            - DB_PASSWORD=postgres
+            - DB_NAME=lumiliophotos
+            - STORAGE_PATH=/app/data/photos
+            - STAGING_PATH=/app/staging
+            - QUEUE_DIR=/app/queue
+        volumes:
+            - photo_storage:/app/data/photos
+            - staging_area:/app/staging
+            - task_queue:/app/queue
+
+    frontend:
+        build:
+            context: .
+            dockerfile: web/Dockerfile
+        ports:
+            - "3000:80"
+        depends_on:
+            - app
+
+    ml:
+        build:
+            context: .
+            dockerfile: pml/Dockerfile
+        environment:
+            - MODEL_PATH=/app/models
+        volumes:
+            - ai_models:/app/models
+        ports:
+            - "8081:8081"
 
 volumes:
-  photo-storage:
-    driver: local
-  postgres-data:
-    driver: local
+    postgres_data:
+    photo_storage:
+    staging_area:
+    task_queue:
+    # ai_models:
