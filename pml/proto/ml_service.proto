@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package prediction;
 
-option go_package = "github.com/EdwinZhanCN/Lumilio-Photos/proto";
-
 // PredictionService: 通用机器学习预测服务接口
 service PredictionService {
     // ProcessImageForCLIP: 专为CLIP模型设计，处理图像并返回特征向量和可选标签
@@ -67,7 +65,7 @@ message PredictRequest {
     // 或者使用 Oneof 针对常见类型：
     oneof input_data {
         bytes raw_data = 1;
-        repeated float float_features = 2;
+        FloatFeatures float_features = 2;
         string text_input = 3;
         // 更多特定类型可以在这里添加
     }
@@ -79,7 +77,7 @@ message PredictRequest {
 message PredictResponse {
     // 同样，使用 Any 或 Oneof 来处理不同模型的输出
     oneof output_data {
-        repeated float prediction_floats = 1;
+        PredictionFloats prediction_floats = 1;
         string prediction_text = 2;
         // 更多特定类型可以在这里添加
     }
@@ -100,6 +98,16 @@ message BatchPredictResponse {
     repeated PredictResponse responses = 1;
     int32 success_count = 2;
     int32 failed_count = 3;
+}
+
+// --- Wrapper messages for repeated fields in oneof ---
+
+message FloatFeatures {
+    repeated float values = 1;
+}
+
+message PredictionFloats {
+    repeated float values = 1;
 }
 
 // HealthCheckRequest: 健康检查请求

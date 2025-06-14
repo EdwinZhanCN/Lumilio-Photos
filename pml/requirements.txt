@@ -1,6 +1,10 @@
 open-clip-torch>=2.20.0
 timm>=0.9.5
-torch==2.7.1
-torchvision==0.22.1
+torch>=2.1.0
+torchvision==0.14.1
 git+https://github.com/EdwinZhanCN/ml-mobileclip#directory=mobileclip
-pillow~=11.2.1
+pillow==11.1.0
+grpcio==1.60.0
+grpcio-tools==1.60.0
+protobuf==4.25.0
+numpy==1.24.0
