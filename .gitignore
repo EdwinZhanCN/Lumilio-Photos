@@ -3,6 +3,7 @@ node_modules/
 /vendor/
 package-lock.json
 yarn.lock
+__pycache__
 
 # Build outputs
 /build/
