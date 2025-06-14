@@ -28,7 +28,7 @@ func init() {
 	}
 }
 
-// 该Worker主程序，只且仅只负责处理重负载任务，如图像处理，哈希算法，机器学习微服务调用
+// 该Worker主程序，只且仅只负责处理重负载任务，如图像处理，哈希算法，机器学习微服务调用, gRPC客户端
 func main() {
 	log.Println("Starting worker service...")
 
@@ -54,6 +54,7 @@ func main() {
 	// Initialize repositories
 	// 构建数据库通道
 	assetRepo := gorm_repo.NewAssetRepository(database)
+	tagRepo := gorm_repo.NewTagRepository(database)
 
 	// Initialize local storage
 	storagePath := os.Getenv("STORAGE_PATH")
@@ -69,11 +70,15 @@ func main() {
 	}
 
 	// Initialize services
-	assetService := service.NewAssetService(assetRepo, localStorage)
+	assetService := service.NewAssetService(assetRepo, tagRepo, localStorage)
+	mlService, err := service.NewMLClient("localhost:50051")
+	if err != nil {
+		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
+	}
 
 	// Initialize asset processor
 	// 该实例只能，也只应该在worker端创建
-	assetProcessor := utils.NewAssetProcessor(assetService, localStorage, storagePath)
+	assetProcessor := utils.NewAssetProcessor(assetService, localStorage, storagePath, mlService)
 
 	// Initialize task queue
 	queueDir := os.Getenv("QUEUE_DIR")

@@ -67,6 +67,7 @@ func main() {
 
 	// Initialize repositories
 	assetRepo := gorm_repo.NewAssetRepository(database)
+	tagRepo := gorm_repo.NewTagRepository(database)
 
 	// Initialize local storage
 	// Get storage path from environment variable or use default
@@ -112,7 +113,7 @@ func main() {
 	defer taskQueue.Close()
 
 	// Initialize services, service layer inside the api layer only responsible for non-upload logic
-	assetService := service.NewAssetService(assetRepo, localStorage)
+	assetService := service.NewAssetService(assetRepo, tagRepo, localStorage)
 
 	// Initialize controllers - pass the staging path and task queue to the handler
 	assetController := handler.NewAssetHandler(assetService, stagingPath, taskQueue)

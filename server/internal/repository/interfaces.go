@@ -24,3 +24,8 @@ type AssetRepository interface {
 	SearchAssets(ctx context.Context, query string, assetType *models.AssetType, limit, offset int) ([]*models.Asset, error)
 	GetAssetsByHash(ctx context.Context, hash string) ([]*models.Asset, error)
 }
+
+type TagRepository interface {
+	GetByName(ctx context.Context, name string) (*models.Tag, error)
+	Create(ctx context.Context, tag *models.Tag) error
+}
