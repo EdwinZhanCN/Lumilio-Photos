@@ -8,7 +8,7 @@ from typing import Optional
 # Add parent directory to path for proto imports
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-from pml.proto import ml_service_pb2, ml_service_pb2_grpc
+from proto import ml_service_pb2, ml_service_pb2_grpc
 from .clip_model import CLIPModelManager
 
 # Configure logging

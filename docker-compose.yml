@@ -71,7 +71,8 @@ services:
         ports:
             - "3000:80"
         depends_on:
-            - app
+            api:
+                condition: service_started
 
     ml:
         build:
@@ -89,4 +90,4 @@ volumes:
     photo_storage:
     staging_area:
     task_queue:
-    # ai_models:
+    ai_models:
