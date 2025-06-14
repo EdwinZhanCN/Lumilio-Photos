@@ -12,6 +12,7 @@ import (
 )
 
 // ExtractAssetMetadata extracts EXIF metadata from an image asset and returns asset-compatible metadata
+// (p *AssetProcessor) 让该方法成为AssetProcessor的成员方法
 func (p *AssetProcessor) ExtractAssetMetadata(ctx context.Context, assetID string, storagePath string) (models.PhotoSpecificMetadata, error) {
 	// 1. Start the ExifTool process
 	et, err := exiftool.NewExiftool()

@@ -42,17 +42,20 @@ type AssetService interface {
 	BatchUploadAssets(ctx context.Context, files []io.Reader, filenames []string, fileSizes []int64, ownerID *int) ([]*models.Asset, []error)
 	SearchAssets(ctx context.Context, query string, assetType *models.AssetType, limit, offset int) ([]*models.Asset, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]*models.Asset, error)
+	GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*models.Tag, error)
 }
 
 type assetService struct {
 	repo    repository.AssetRepository
+	tagRepo repository.TagRepository
 	storage storage.Storage
 }
 
 // NewAssetService creates a new instance of AssetService
-func NewAssetService(r repository.AssetRepository, s storage.Storage) AssetService {
+func NewAssetService(r repository.AssetRepository, tagR repository.TagRepository, s storage.Storage) AssetService {
 	return &assetService{
 		repo:    r,
+		tagRepo: tagR,
 		storage: s,
 	}
 }
@@ -287,4 +290,21 @@ func (s *assetService) queueProcessingTasks(ctx context.Context, asset *models.A
 	default:
 		log.Printf("No specific processing tasks for asset type %s", asset.Type)
 	}
+}
+
+func (s *assetService) GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*models.Tag, error) {
+	tag, err := s.tagRepo.GetByName(ctx, name)
+	if err == nil {
+		return tag, nil
+	}
+	// Assuming gorm.ErrRecordNotFound is imported or handled at repo layer
+	tag = &models.Tag{
+		TagName:       name,
+		Category:      category,
+		IsAIGenerated: isAIGenerated,
+	}
+	if err := s.tagRepo.Create(ctx, tag); err != nil {
+		return nil, err
+	}
+	return tag, nil
 }

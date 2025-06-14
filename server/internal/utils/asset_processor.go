@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +10,8 @@ import (
 	"server/internal/storage"
 	"strings"
 	"time"
+
+	pb "server/proto"
 
 	"github.com/google/uuid"
 )
@@ -21,6 +22,7 @@ type AssetProcessor struct {
 	assetService service.AssetService
 	storage      storage.Storage
 	storagePath  string
+	mlService    service.MLService
 }
 
 // ProcessAsset processes an asset based on its type
@@ -95,15 +97,8 @@ func (ap *AssetProcessor) ProcessNewAsset(stagedPath string, userID string, file
 		SpecificMetadata: make(models.SpecificMetadata),
 	}
 
-	// Extract metadata if possible based on asset type
-	if assetType == models.AssetTypePhoto {
-		photoMetadata, err := ap.ExtractAssetMetadata(ctx, asset.AssetID.String(), stagedPath)
-		if err == nil {
-			// Convert photo metadata to generic specific metadata
-			metadataJSON, _ := json.Marshal(photoMetadata)
-			json.Unmarshal(metadataJSON, &asset.SpecificMetadata)
-		}
-	}
+	// Universal way to process the asset
+	ap.ProcessAsset(ctx, asset)
 
 	// Save the asset to the database
 	uploadedAsset, err := ap.assetService.UploadAsset(ctx, file, fileName, fileInfo.Size(), ownerIDPtr)
@@ -156,6 +151,31 @@ func determineAssetType(fileName string) models.AssetType {
 func (ap *AssetProcessor) processPhoto(ctx context.Context, asset *models.Asset) error {
 	// Extract photo metadata, generate thumbnails, etc.
 	// This would integrate with existing photo processing logic
+	// 1. Extract Metadata
+	metadata, err := ap.ExtractAssetMetadata(ctx, asset.StoragePath, asset.OriginalFilename)
+	if err != nil {
+		return fmt.Errorf("failed to extract asset metadata: %w", err)
+	}
+	asset.SetPhotoMetadata(&metadata)
+	// 2. Get AI generated tags
+	// Create a formal ImageProcessRequest
+	imageBytes, err := os.ReadFile(asset.StoragePath)
+	if err != nil {
+		return fmt.Errorf("failed to read image file: %w", err)
+	}
+
+	imageProcessRequest := pb.ImageProcessRequest{
+		ImageId:   asset.AssetID.String(),
+		ImageData: imageBytes,
+	}
+
+	imageProcessReponse, err := ap.mlService.ProcessImageForCLIP(&imageProcessRequest)
+	if err != nil {
+		return fmt.Errorf("failed to process image for CLIP: %w", err)
+	}
+
+	ap.saveCLIPTagsToAsset(ctx, asset, imageProcessReponse)
+
 	return nil
 }
 
@@ -241,10 +261,33 @@ func getMimeTypeFromFileName(fileName string) string {
 }
 
 // NewAssetProcessor creates a new asset processor
-func NewAssetProcessor(assetService service.AssetService, storage storage.Storage, storagePath string) *AssetProcessor {
+func NewAssetProcessor(assetService service.AssetService, storage storage.Storage, storagePath string, mlService service.MLService) *AssetProcessor {
 	return &AssetProcessor{
 		assetService: assetService,
 		storage:      storage,
 		storagePath:  storagePath,
+		mlService:    mlService,
 	}
+}
+
+// Helper function to get the Top-3 confidence labels from CLIP response
+func (ap *AssetProcessor) saveCLIPTagsToAsset(ctx context.Context, asset *models.Asset, resp *pb.ImageProcessResponse) error {
+	topN := 3
+	labels := resp.PredictedLabels
+	if len(labels) > topN {
+		labels = labels[:topN]
+	}
+	for _, label := range labels {
+		// 1. 查找或创建Tag
+		tag, err := ap.assetService.GetOrCreateTagByName(ctx, label, "CLIP", true)
+		if err != nil {
+			return err
+		}
+		// 2. 关联Asset和Tag
+		err = ap.assetService.AddTagToAsset(ctx, asset.AssetID, tag.TagID, resp.SimilarityScore, "ai")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

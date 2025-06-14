@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package prediction;
 
+option go_package = "rkphoto-manager/server/proto";
 // PredictionService: 通用机器学习预测服务接口
 service PredictionService {
     // ProcessImageForCLIP: 专为CLIP模型设计，处理图像并返回特征向量和可选标签
