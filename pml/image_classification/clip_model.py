@@ -15,17 +15,21 @@ logger = logging.getLogger(__name__)
 class CLIPModelManager:
     """Manages CLIP model loading and inference for image classification"""
 
-    def __init__(self, model_path: str = './pt/mobileclip_s1.pt', imagenet_classes_path: str = './imagenet_class_index.json'):
-        self.model = None
-        self.preprocess = None
-        self.tokenizer = None
-        self.imagenet_labels = None
-        self.text_descriptions = None
-        self.model_version = 'mobileclip_s1'
-        self.model_path = model_path
-        self.imagenet_classes_path = imagenet_classes_path
-        self.load_time = None
-        self.is_loaded = False
+    def __init__(
+        self,
+        model_path: str = './pt/mobileclip_s1.pt',
+        imagenet_classes_path: str = './imagenet_class_index.json'
+    ):
+        self.model: Optional[Any] = None
+        self.preprocess: Optional[Any] = None
+        self.tokenizer: Optional[Any] = None
+        self.imagenet_labels: Optional[Dict[int, Dict[str, str]]] = None
+        self.text_descriptions: Optional[List[str]] = None
+        self.model_version: str = 'mobileclip_s1'
+        self.model_path: str = model_path
+        self.imagenet_classes_path: str = imagenet_classes_path
+        self.load_time: Optional[float] = None
+        self.is_loaded: bool = False
 
     def initialize(self):
         """Initialize the CLIP model and ImageNet classes"""
@@ -173,7 +177,10 @@ class CLIPModelManager:
                         label = label_mapping.get(idx, "unknown")
                     else:
                         label_info = label_mapping.get(idx, {"en": "unknown"})
-                        label = label_info.get("en", "unknown")
+                        if isinstance(label_info, dict):
+                            label = label_info.get("en", "unknown")
+                        else:
+                            label = str(label_info)
                     predicted_labels.append(f"{label} ({prob*100:.2f}%)")
 
                 return predicted_labels, max_similarity
