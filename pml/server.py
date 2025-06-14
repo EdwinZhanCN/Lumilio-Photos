@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional
 # Add current directory to path for imports
 sys.path.append(os.path.dirname(__file__))
 
-from proto import ml_service_pb2, ml_service_pb2_grpc
+from pml.proto import ml_service_pb2, ml_service_pb2_grpc
 from image_classification.clip_service import CLIPService
 
 # Configure logging
