@@ -5,11 +5,18 @@ import sys
 import os
 from concurrent import futures
 from typing import Dict, Any, Optional
+from dotenv import load_dotenv
 
 # Add current directory to path for imports
 sys.path.append(os.path.dirname(__file__))
 
-from pml.proto import ml_service_pb2, ml_service_pb2_grpc
+# Load environment variables
+load_dotenv()
+
+# Get environment variables with defaults
+MODEL_PATH = os.environ.get('MODEL_PATH', './pt')
+
+from proto import ml_service_pb2, ml_service_pb2_grpc
 from image_classification.clip_service import CLIPService
 
 # Configure logging
@@ -53,10 +60,11 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
         """Initialize all available services"""
         try:
             # Initialize CLIP service
-            clip_service = CLIPService()
+            model_filepath = os.path.join(MODEL_PATH, 'mobileclip_s1.pt')
+            clip_service = CLIPService(model_path=model_filepath)
             clip_service.initialize()
             self.model_registry.register_service('clip', clip_service)
-            logger.info("CLIP service initialized successfully")
+            logger.info(f"CLIP service initialized successfully using model at {model_filepath}")
         except Exception as e:
             logger.error(f"Failed to initialize CLIP service: {e}")
 
@@ -230,7 +238,7 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
             )
 
 
-def serve(port: int = 50051, max_workers: int = 10):
+def serve(port: int = 8081, max_workers: int = 10):
     """Start the gRPC server"""
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))
 
@@ -264,7 +272,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='ML Prediction gRPC Server')
-    parser.add_argument('--port', type=int, default=50051, help='Server port')
+    parser.add_argument('--port', type=int, default=8081, help='Server port')
     parser.add_argument('--workers', type=int, default=10, help='Max worker threads')
 
     args = parser.parse_args()
