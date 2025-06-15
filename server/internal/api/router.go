@@ -19,6 +19,11 @@ type AssetControllerInterface interface {
 }
 
 // NewRouter creates and configures a new router with asset endpoints
+// @title RKPhoto Manager API
+// @version 1.0
+// @description Photo management system API with asset upload, processing, and organization features
+// @host localhost:3001
+// @BasePath /api/v1
 func NewRouter(assetController AssetControllerInterface) *gin.Engine {
 	r := gin.Default()
 

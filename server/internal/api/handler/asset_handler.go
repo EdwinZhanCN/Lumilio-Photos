@@ -18,6 +18,43 @@ import (
 	"github.com/google/uuid"
 )
 
+// UploadResponse represents the response structure for file upload
+type UploadResponse struct {
+	TaskID      string `json:"task_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Status      string `json:"status" example:"processing"`
+	FileName    string `json:"file_name" example:"photo.jpg"`
+	Size        int64  `json:"size" example:"1048576"`
+	ContentHash string `json:"content_hash" example:"abcd1234567890"`
+	Message     string `json:"message" example:"File received and queued for processing"`
+}
+
+// BatchUploadResponse represents the response structure for batch upload
+type BatchUploadResponse struct {
+	Results []map[string]interface{} `json:"results"`
+}
+
+// AssetListResponse represents the response structure for asset listing
+type AssetListResponse struct {
+	Assets []*models.Asset `json:"assets"`
+	Limit  int             `json:"limit" example:"20"`
+	Offset int             `json:"offset" example:"0"`
+}
+
+// UpdateAssetRequest represents the request structure for updating asset metadata
+type UpdateAssetRequest struct {
+	Metadata models.SpecificMetadata `json:"metadata"`
+}
+
+// MessageResponse represents a simple message response
+type MessageResponse struct {
+	Message string `json:"message" example:"Operation completed successfully"`
+}
+
+// AssetTypesResponse represents the response structure for asset types
+type AssetTypesResponse struct {
+	Types []models.AssetType `json:"types"`
+}
+
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
 	assetService service.AssetService
@@ -34,8 +71,18 @@ func NewAssetHandler(assetService service.AssetService, stagingPath string, task
 	}
 }
 
-// UploadAsset handles asset upload requests.
-// POST /api/v1/assets
+// UploadAsset handles asset upload requests
+// @Summary Upload a single asset
+// @Description Upload a single photo, video, audio file or document to the system
+// @Tags assets
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "Asset file to upload"
+// @Param X-Content-Hash header string false "Client-calculated BLAKE3 hash of the file"
+// @Success 200 {object} api.Result{data=UploadResponse} "Upload successful"
+// @Failure 400 {object} api.Result "Bad request - no file provided or parse error"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets [post]
 func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	// Parse multipart form
 	err := c.Request.ParseMultipartForm(32 << 20) // 32MB max
@@ -129,7 +176,16 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 }
 
 // GetAsset retrieves a single asset by ID
-// GET /api/v1/assets/:id
+// @Summary Get asset by ID
+// @Description Retrieve detailed information about a specific asset including metadata, thumbnails, tags and albums
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {object} api.Result{data=models.Asset} "Asset found"
+// @Failure 400 {object} api.Result "Invalid asset ID format"
+// @Failure 404 {object} api.Result "Asset not found"
+// @Router /api/v1/assets/{id} [get]
 func (h *AssetHandler) GetAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -148,7 +204,20 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 }
 
 // ListAssets retrieves assets with optional filtering
-// GET /api/v1/assets?type=PHOTO&owner_id=123&limit=20&offset=0&q=search
+// @Summary List assets with filtering
+// @Description Retrieve a paginated list of assets with optional filtering by type, owner, or search query
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param type query string false "Asset type filter" Enums(PHOTO, VIDEO, AUDIO, DOCUMENT) example("PHOTO")
+// @Param owner_id query int false "Filter by owner ID" example(123)
+// @Param q query string false "Search query for filename" example("vacation")
+// @Param limit query int false "Maximum number of results (max 100)" default(20) example(20)
+// @Param offset query int false "Number of results to skip for pagination" default(0) example(0)
+// @Success 200 {object} api.Result{data=AssetListResponse} "Assets retrieved successfully"
+// @Failure 400 {object} api.Result "Invalid parameters"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets [get]
 func (h *AssetHandler) ListAssets(c *gin.Context) {
 	// Parse query parameters
 	limitStr := c.DefaultQuery("limit", "20")
@@ -221,7 +290,17 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 }
 
 // UpdateAsset updates asset metadata
-// PUT /api/v1/assets/:id
+// @Summary Update asset metadata
+// @Description Update the specific metadata of an asset (e.g., photo EXIF data, video metadata)
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Param metadata body UpdateAssetRequest true "Updated metadata"
+// @Success 200 {object} api.Result{data=MessageResponse} "Asset updated successfully"
+// @Failure 400 {object} api.Result "Invalid asset ID or request body"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/{id} [put]
 func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -230,9 +309,7 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 		return
 	}
 
-	var updateData struct {
-		Metadata models.SpecificMetadata `json:"metadata"`
-	}
+	var updateData UpdateAssetRequest
 
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Invalid request body")
@@ -250,7 +327,16 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 }
 
 // DeleteAsset deletes an asset
-// DELETE /api/v1/assets/:id
+// @Summary Delete an asset
+// @Description Soft delete an asset by marking it as deleted (does not remove the physical file)
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {object} api.Result{data=MessageResponse} "Asset deleted successfully"
+// @Failure 400 {object} api.Result "Invalid asset ID format"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/{id} [delete]
 func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -270,7 +356,17 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 }
 
 // BatchUploadAssets handles multiple asset uploads
-// POST /api/v1/assets/batch
+// @Summary Upload multiple assets
+// @Description Upload multiple files in a single request for batch processing
+// @Tags assets
+// @Accept multipart/form-data
+// @Produce json
+// @Param files formData file true "Multiple asset files to upload"
+// @Param X-Content-Hash header string false "Client-calculated BLAKE3 hash (for single file batch)"
+// @Success 200 {object} api.Result{data=BatchUploadResponse} "Batch upload completed"
+// @Failure 400 {object} api.Result "Bad request - no files provided or parse error"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/batch [post]
 func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	err := c.Request.ParseMultipartForm(128 << 20) // 128MB max for batch
 	if err != nil {
@@ -396,7 +492,17 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 }
 
 // AddAssetToAlbum adds an asset to an album
-// POST /api/v1/assets/:id/albums/:albumId
+// @Summary Add asset to album
+// @Description Associate an asset with a specific album
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Param albumId path int true "Album ID" example(123)
+// @Success 200 {object} api.Result{data=MessageResponse} "Asset added to album successfully"
+// @Failure 400 {object} api.Result "Invalid asset ID or album ID"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/{id}/albums/{albumId} [post]
 func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 	assetID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -421,7 +527,13 @@ func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 }
 
 // GetAssetTypes returns available asset types
-// GET /api/v1/assets/types
+// @Summary Get supported asset types
+// @Description Retrieve a list of all supported asset types in the system
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.Result{data=AssetTypesResponse} "Asset types retrieved successfully"
+// @Router /api/v1/assets/types [get]
 func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 	types := []models.AssetType{
 		models.AssetTypePhoto,

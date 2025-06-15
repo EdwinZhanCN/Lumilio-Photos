@@ -5,11 +5,13 @@ import (
 	"net/http"
 )
 
+// Result represents the standard API response format
+// @Description Standard API response wrapper
 type Result struct {
-	Code    int         `json:"code"`            // Business status code
-	Message string      `json:"message"`         // User readable message
-	Data    interface{} `json:"data,omitempty"`  // Business data, ignore empty values
-	Error   string      `json:"error,omitempty"` // Debug error message, ignore empty values
+	Code    int         `json:"code" example:"0"`                        // Business status code (0 for success, non-zero for errors)
+	Message string      `json:"message" example:"success"`               // User readable message
+	Data    interface{} `json:"data,omitempty" swaggertype:"object"`     // Business data, ignore empty values
+	Error   string      `json:"error,omitempty" example:"error details"` // Debug error message, ignore empty values
 }
 
 // Success standardized success response constructor
