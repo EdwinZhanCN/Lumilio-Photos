@@ -52,3 +52,4 @@ go.work
 /pml/pt/*.pt
 
 web/docs/
+/docs/.vitepress/dist/
