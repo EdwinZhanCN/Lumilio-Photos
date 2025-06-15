@@ -12,10 +12,11 @@ hero:
   actions:
     - theme: brand
       text: User Manual
-      link: /markdown-examples
+      link: /user-manual/user-manual-overview
     - theme: alt
       text: Backend API
-      link: /backend-API/backend-api-overview
+      link: /redoc-static.html
+      target: _blank
 
 features:
   - title: Tech Stack

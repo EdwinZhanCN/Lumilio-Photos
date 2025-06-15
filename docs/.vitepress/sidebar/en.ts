@@ -2,15 +2,6 @@ import { DefaultTheme } from "vitepress";
 import typedocSidebar from "./typedoc-sidebar.json";
 
 export const enSidebar: DefaultTheme.Sidebar = {
-    "/backend-API/": [
-        {
-            text: "API Documentation",
-            items: [
-                { text: "Overview", link: "/backend-API/backend-api-overview" },
-                { text: "Assets", link: "/backend-API/assets" },
-            ],
-        },
-    ],
     "/user-manual/": [
         {
             text: "User Manual",
