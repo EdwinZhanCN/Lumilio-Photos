@@ -51,4 +51,4 @@ go.work
 /server/internal/classification/models/
 /pml/pt/*.pt
 
-docs/
+web/docs/

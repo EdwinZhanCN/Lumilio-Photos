@@ -8,7 +8,6 @@ import {
   ExclamationCircleIcon,
   AdjustmentsHorizontalIcon,
   PhotoIcon,
-  Cog6ToothIcon,
   InformationCircleIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
