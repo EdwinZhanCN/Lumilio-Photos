@@ -1,0 +1,573 @@
+basePath: /api/v1
+definitions:
+  api.Result:
+    description: Standard API response wrapper
+    properties:
+      code:
+        description: Business status code (0 for success, non-zero for errors)
+        example: 0
+        type: integer
+      data:
+        description: Business data, ignore empty values
+        type: object
+      error:
+        description: Debug error message, ignore empty values
+        example: error details
+        type: string
+      message:
+        description: User readable message
+        example: success
+        type: string
+    type: object
+  handler.AssetListResponse:
+    properties:
+      assets:
+        items:
+          $ref: '#/definitions/models.Asset'
+        type: array
+      limit:
+        example: 20
+        type: integer
+      offset:
+        example: 0
+        type: integer
+    type: object
+  handler.AssetTypesResponse:
+    properties:
+      types:
+        items:
+          $ref: '#/definitions/models.AssetType'
+        type: array
+    type: object
+  handler.BatchUploadResponse:
+    properties:
+      results:
+        items:
+          additionalProperties: true
+          type: object
+        type: array
+    type: object
+  handler.MessageResponse:
+    properties:
+      message:
+        example: Operation completed successfully
+        type: string
+    type: object
+  handler.UpdateAssetRequest:
+    properties:
+      metadata:
+        $ref: '#/definitions/models.SpecificMetadata'
+    type: object
+  handler.UploadResponse:
+    properties:
+      content_hash:
+        example: abcd1234567890
+        type: string
+      file_name:
+        example: photo.jpg
+        type: string
+      message:
+        example: File received and queued for processing
+        type: string
+      size:
+        example: 1048576
+        type: integer
+      status:
+        example: processing
+        type: string
+      task_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+  models.Album:
+    description: Album for organizing and grouping related assets
+    properties:
+      album_id:
+        example: 1
+        type: integer
+      album_name:
+        example: Vacation 2024
+        type: string
+      assets:
+        items:
+          $ref: '#/definitions/models.Asset'
+        type: array
+      cover_asset:
+        $ref: '#/definitions/models.Asset'
+      cover_asset_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      created_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+      description:
+        example: Photos and videos from our summer vacation
+        type: string
+      updated_at:
+        example: "2024-01-16T10:30:00Z"
+        type: string
+      user_id:
+        example: 123
+        type: integer
+    type: object
+  models.Asset:
+    description: Digital asset (photo, video, audio, document) with metadata and relationships
+    properties:
+      albums:
+        items:
+          $ref: '#/definitions/models.Album'
+        type: array
+      asset_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      deleted_at:
+        example: "2024-01-16T10:30:00Z"
+        type: string
+      duration:
+        description: For video/audio assets in seconds
+        example: 120.5
+        type: number
+      file_size:
+        example: 1048576
+        type: integer
+      hash:
+        example: abcd1234567890efgh
+        type: string
+      height:
+        example: 1080
+        type: integer
+      is_deleted:
+        example: false
+        type: boolean
+      mime_type:
+        example: image/jpeg
+        type: string
+      original_filename:
+        example: vacation_photo.jpg
+        type: string
+      owner_id:
+        example: 123
+        type: integer
+      specific_metadata:
+        allOf:
+        - $ref: '#/definitions/models.SpecificMetadata'
+        description: JSON field for type-specific metadata
+      storage_path:
+        example: 2024/01/abc123.jpg
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/models.Tag'
+        type: array
+      thumbnails:
+        description: Relationships
+        items:
+          $ref: '#/definitions/models.Thumbnail'
+        type: array
+      type:
+        allOf:
+        - $ref: '#/definitions/models.AssetType'
+        example: PHOTO
+      upload_time:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+      width:
+        example: 1920
+        type: integer
+    type: object
+  models.AssetType:
+    description: Type of digital asset
+    enum:
+    - PHOTO
+    - VIDEO
+    - AUDIO
+    - DOCUMENT
+    type: string
+    x-enum-varnames:
+    - AssetTypePhoto
+    - AssetTypeVideo
+    - AssetTypeAudio
+    - AssetTypeDocument
+  models.SpecificMetadata:
+    additionalProperties: true
+    description: Type-specific metadata stored as JSON
+    type: object
+  models.Tag:
+    description: Tag for categorizing and labeling assets
+    properties:
+      assets:
+        items:
+          $ref: '#/definitions/models.Asset'
+        type: array
+      category:
+        example: subject
+        type: string
+      is_ai_generated:
+        example: true
+        type: boolean
+      tag_id:
+        example: 1
+        type: integer
+      tag_name:
+        example: landscape
+        type: string
+    type: object
+  models.Thumbnail:
+    description: Thumbnail image for assets (photos, videos, etc.)
+    properties:
+      asset_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      created_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+      mime_type:
+        description: For video thumbnails, this might be image/jpeg
+        example: image/jpeg
+        type: string
+      size:
+        enum:
+        - small
+        - medium
+        - large
+        example: medium
+        type: string
+      storage_path:
+        example: thumbnails/2024/01/thumb_abc123.jpg
+        type: string
+      thumbnail_id:
+        example: 1
+        type: integer
+    type: object
+host: localhost:3001
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: Photo management system API with asset upload, processing, and organization
+    features
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: RKPhoto Manager API
+  version: "1.0"
+paths:
+  /api/v1/assets:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a paginated list of assets with optional filtering by
+        type, owner, or search query
+      parameters:
+      - description: Asset type filter
+        enum:
+        - PHOTO
+        - VIDEO
+        - AUDIO
+        - DOCUMENT
+        example: '"PHOTO"'
+        in: query
+        name: type
+        type: string
+      - description: Filter by owner ID
+        example: 123
+        in: query
+        name: owner_id
+        type: integer
+      - description: Search query for filename
+        example: '"vacation"'
+        in: query
+        name: q
+        type: string
+      - default: 20
+        description: Maximum number of results (max 100)
+        example: 20
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of results to skip for pagination
+        example: 0
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Assets retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AssetListResponse'
+              type: object
+        "400":
+          description: Invalid parameters
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: List assets with filtering
+      tags:
+      - assets
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a single photo, video, audio file or document to the system
+      parameters:
+      - description: Asset file to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Client-calculated BLAKE3 hash of the file
+        in: header
+        name: X-Content-Hash
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Upload successful
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.UploadResponse'
+              type: object
+        "400":
+          description: Bad request - no file provided or parse error
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Upload a single asset
+      tags:
+      - assets
+  /api/v1/assets/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete an asset by marking it as deleted (does not remove
+        the physical file)
+      parameters:
+      - description: Asset ID (UUID format)
+        example: '"550e8400-e29b-41d4-a716-446655440000"'
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Asset deleted successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.MessageResponse'
+              type: object
+        "400":
+          description: Invalid asset ID format
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Delete an asset
+      tags:
+      - assets
+    get:
+      consumes:
+      - application/json
+      description: Retrieve detailed information about a specific asset including
+        metadata, thumbnails, tags and albums
+      parameters:
+      - description: Asset ID (UUID format)
+        example: '"550e8400-e29b-41d4-a716-446655440000"'
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Asset found
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Asset'
+              type: object
+        "400":
+          description: Invalid asset ID format
+          schema:
+            $ref: '#/definitions/api.Result'
+        "404":
+          description: Asset not found
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Get asset by ID
+      tags:
+      - assets
+    put:
+      consumes:
+      - application/json
+      description: Update the specific metadata of an asset (e.g., photo EXIF data,
+        video metadata)
+      parameters:
+      - description: Asset ID (UUID format)
+        example: '"550e8400-e29b-41d4-a716-446655440000"'
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated metadata
+        in: body
+        name: metadata
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateAssetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Asset updated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.MessageResponse'
+              type: object
+        "400":
+          description: Invalid asset ID or request body
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Update asset metadata
+      tags:
+      - assets
+  /api/v1/assets/{id}/albums/{albumId}:
+    post:
+      consumes:
+      - application/json
+      description: Associate an asset with a specific album
+      parameters:
+      - description: Asset ID (UUID format)
+        example: '"550e8400-e29b-41d4-a716-446655440000"'
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Album ID
+        example: 123
+        in: path
+        name: albumId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Asset added to album successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.MessageResponse'
+              type: object
+        "400":
+          description: Invalid asset ID or album ID
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Add asset to album
+      tags:
+      - assets
+  /api/v1/assets/batch:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload multiple files in a single request for batch processing
+      parameters:
+      - description: Multiple asset files to upload
+        in: formData
+        name: files
+        required: true
+        type: file
+      - description: Client-calculated BLAKE3 hash (for single file batch)
+        in: header
+        name: X-Content-Hash
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Batch upload completed
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.BatchUploadResponse'
+              type: object
+        "400":
+          description: Bad request - no files provided or parse error
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Upload multiple assets
+      tags:
+      - assets
+  /api/v1/assets/types:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a list of all supported asset types in the system
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Asset types retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AssetTypesResponse'
+              type: object
+      summary: Get supported asset types
+      tags:
+      - assets
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
