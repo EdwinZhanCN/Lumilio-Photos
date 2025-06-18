@@ -1,19 +1,24 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"server/config"
+	"server/internal/models"
 	"server/internal/queue"
 	"server/internal/repository/gorm_repo"
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/utils"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
 
@@ -56,21 +61,15 @@ func main() {
 	assetRepo := gorm_repo.NewAssetRepository(database)
 	tagRepo := gorm_repo.NewTagRepository(database)
 
-	// Initialize local storage
-	storagePath := os.Getenv("STORAGE_PATH")
-	if storagePath == "" {
-		storagePath = "/app/data/photos" // 最终写入地址
-	}
-	log.Printf("Using storage path: %s", storagePath)
+	// Load storage configuration
+	storageConfig := storage.LoadStorageConfigFromEnv()
+	log.Printf("Using storage strategy: %s (%s)", storageConfig.Strategy, storageConfig.Strategy.GetDescription())
 
-	// 构建写入存储通道
-	localStorage, err := storage.NewLocalStorage(storagePath)
+	// Initialize services with configurable storage
+	assetService, err := service.NewAssetServiceWithConfig(assetRepo, tagRepo, storageConfig)
 	if err != nil {
-		log.Fatalf("Failed to initialize local storage: %v", err)
+		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
-
-	// Initialize services
-	assetService := service.NewAssetService(assetRepo, tagRepo, localStorage)
 	mlService, err := service.NewMLClient("localhost:50051")
 	if err != nil {
 		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
@@ -78,7 +77,7 @@ func main() {
 
 	// Initialize asset processor
 	// 该实例只能，也只应该在worker端创建
-	assetProcessor := utils.NewAssetProcessor(assetService, localStorage, storagePath, mlService)
+	assetProcessor := utils.NewAssetProcessor(assetService, nil, storageConfig.BasePath, mlService)
 
 	// Initialize task queue
 	queueDir := os.Getenv("QUEUE_DIR")
@@ -100,7 +99,7 @@ func main() {
 
 	// Start the task processor
 	stopChan := make(chan struct{})
-	go processTasksLoop(taskQueue, &assetService, assetProcessor, storagePath, stopChan)
+	go processTasksLoop(taskQueue, assetService, assetProcessor, storageConfig.BasePath, stopChan)
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -115,7 +114,7 @@ func main() {
 }
 
 // processTasksLoop continuously processes tasks from the queue
-func processTasksLoop(taskQueue *queue.TaskQueue, assetService *service.AssetService,
+func processTasksLoop(taskQueue *queue.TaskQueue, assetService service.AssetService,
 	assetProcessor *utils.AssetProcessor, storagePath string, stopChan chan struct{}) {
 	log.Println("Task processor started, waiting for tasks...")
 
@@ -138,57 +137,92 @@ func processTasksLoop(taskQueue *queue.TaskQueue, assetService *service.AssetSer
 		default:
 			task, ok := taskQueue.GetTask()
 			if !ok {
-				// Channel closed or no tasks available
 				time.Sleep(100 * time.Millisecond)
 				continue
 			}
+			switch task.Type {
+			case queue.TaskTypeUpload:
+				// 1) UPLOAD → PROCESS
+				procTask := task
+				procTask.Type = queue.TaskTypeProcess
+				if err := taskQueue.EnqueueTask(procTask); err != nil {
+					log.Printf("[%s] enqueue PROCESS failed: %v", task.TaskID, err)
+				}
 
-			log.Printf("Processing task %s for file: %s", task.TaskID, task.StagedPath)
+			case queue.TaskTypeProcess:
+				// 2) PROCESS → INDEX
+				// Determine if this is from UPLOAD (staged file) or SCAN (existing file)
+				var asset *models.Asset
+				var err error
 
-			// Check if file exists
-			if _, err := os.Stat(task.StagedPath); os.IsNotExist(err) {
-				log.Printf("Error: staged file not found for task %s: %v", task.TaskID, err)
-				continue
-			}
+				// Check if the file path indicates it's in staging area
+				if strings.Contains(task.StagedPath, "staging") || strings.Contains(task.StagedPath, "temp") {
+					// This is from UPLOAD task - process staged file
+					log.Printf("[%s] PROCESS from UPLOAD: %s", task.TaskID, task.StagedPath)
+					asset, err = assetProcessor.ProcessNewAsset(task.StagedPath, task.UserID, task.FileName)
+				} else {
+					// This is from SCAN task - process existing file
+					log.Printf("[%s] PROCESS from SCAN: %s", task.TaskID, task.StagedPath)
+					asset, err = assetProcessor.ProcessExistingAsset(task.StagedPath, task.UserID, task.FileName)
+				}
 
-			// Verify hash (this would use the same Blake3 hash function from utils)
-			calculatedHash, err := utils.CalculateFileHash(task.StagedPath)
-			if err != nil {
-				log.Printf("Error calculating hash for task %s: %v", task.TaskID, err)
-				continue
-			}
+				if err != nil {
+					log.Printf("[%s] PROCESS failed: %v", task.TaskID, err)
+					break
+				}
 
-			if calculatedHash != task.ClientHash {
-				log.Printf("Hash mismatch for task %s: expected %s, got %s",
-					task.TaskID, task.ClientHash, calculatedHash)
-				continue
-			}
+				idxTask := task
+				idxTask.Type = queue.TaskTypeIndex
+				idxTask.ClientHash = asset.Hash // 把最终 hash 透传给 INDEX
+				if err := taskQueue.EnqueueTask(idxTask); err != nil {
+					log.Printf("[%s] enqueue INDEX failed: %v", task.TaskID, err)
+				} else {
+					log.Printf("[%s] PROCESS completed, queued for INDEX", task.TaskID)
+				}
 
-			// Process the asset (extract metadata, create thumbnails, etc.)
-			asset, err := assetProcessor.ProcessNewAsset(task.StagedPath, task.UserID, task.FileName)
-			if err != nil {
-				log.Printf("Error processing asset for task %s: %v", task.TaskID, err)
-				continue
-			}
+			case queue.TaskTypeIndex:
+				// 3) INDEX → 写入数据库并标记完成
+				if err := assetService.SaveAssetIndex(
+					context.Background(), task.TaskID, task.ClientHash,
+				); err != nil {
+					log.Printf("[%s] INDEX failed: %v", task.TaskID, err)
+					break
+				}
+				if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
+					log.Printf("[%s] mark complete failed: %v", task.TaskID, err)
+				} else {
+					log.Printf("[%s] INDEX done", task.TaskID)
+				}
 
-			// Move file to final storage location (CAS)
-			destinationDir := assetProcessor.GetPathForHash(asset.Hash)
-			if err := os.MkdirAll(destinationDir, 0755); err != nil {
-				log.Printf("Error creating directory for asset: %v", err)
-				continue
-			}
+			case queue.TaskTypeScan:
+				// 1) SCAN -> PROCESS
+				log.Printf("[%s] SCAN folder: %s", task.TaskID, task.StagedPath)
+				files, err := utils.ListImagesInDir(task.StagedPath)
+				if err != nil {
+					log.Printf("[%s] scan failed: %v", task.TaskID, err)
+				} else {
+					for _, imgPath := range files {
+						newTask := queue.Task{
+							TaskID:     uuid.New().String(),
+							Type:       queue.TaskTypeProcess,
+							StagedPath: imgPath,
+							UserID:     task.UserID,
+							Timestamp:  time.Now(),
+							FileName:   filepath.Base(imgPath),
+						}
+						if err := taskQueue.EnqueueTask(newTask); err != nil {
+							log.Printf("[%s] enqueue process for %s failed: %v",
+								task.TaskID, imgPath, err)
+						}
+					}
+				}
+				// 自己标记为完成
+				if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
+					log.Printf("[%s] mark SCAN complete failed: %v", task.TaskID, err)
+				}
 
-			destinationPath := assetProcessor.GetFullPathForHash(asset.Hash)
-			if err := os.Rename(task.StagedPath, destinationPath); err != nil {
-				log.Printf("Error moving file to final location: %v", err)
-				continue
-			}
-
-			// Mark task as complete
-			if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
-				log.Printf("Error marking task %s as complete: %v", task.TaskID, err)
-			} else {
-				log.Printf("Task %s completed successfully", task.TaskID)
+			default:
+				log.Printf("[%s] unknown task type %q", task.TaskID, task.Type)
 			}
 		}
 	}

@@ -145,6 +145,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	// Create task for processing
 	task := queue.Task{
 		TaskID:      uuid.New().String(),
+		Type:        queue.TaskTypeUpload,
 		ClientHash:  clientHash,
 		StagedPath:  stagingFilePath,
 		UserID:      userID,
