@@ -70,7 +70,59 @@ func (x HealthCheckResponse_ServingStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use HealthCheckResponse_ServingStatus.Descriptor instead.
 func (HealthCheckResponse_ServingStatus) EnumDescriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{11, 0}
+	return file_ml_service_proto_rawDescGZIP(), []int{12, 0}
+}
+
+type LabelScore struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Label           string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`                                              // 预测的标签
+	SimilarityScore float32                `protobuf:"fixed32,2,opt,name=similarity_score,json=similarityScore,proto3" json:"similarity_score,omitempty"` // 对应的相似度得分
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *LabelScore) Reset() {
+	*x = LabelScore{}
+	mi := &file_ml_service_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LabelScore) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LabelScore) ProtoMessage() {}
+
+func (x *LabelScore) ProtoReflect() protoreflect.Message {
+	mi := &file_ml_service_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LabelScore.ProtoReflect.Descriptor instead.
+func (*LabelScore) Descriptor() ([]byte, []int) {
+	return file_ml_service_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *LabelScore) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *LabelScore) GetSimilarityScore() float32 {
+	if x != nil {
+		return x.SimilarityScore
+	}
+	return 0
 }
 
 // ImageProcessRequest: CLIP图像处理请求
@@ -86,7 +138,7 @@ type ImageProcessRequest struct {
 
 func (x *ImageProcessRequest) Reset() {
 	*x = ImageProcessRequest{}
-	mi := &file_ml_service_proto_msgTypes[0]
+	mi := &file_ml_service_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -98,7 +150,7 @@ func (x *ImageProcessRequest) String() string {
 func (*ImageProcessRequest) ProtoMessage() {}
 
 func (x *ImageProcessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[0]
+	mi := &file_ml_service_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -111,7 +163,7 @@ func (x *ImageProcessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImageProcessRequest.ProtoReflect.Descriptor instead.
 func (*ImageProcessRequest) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{0}
+	return file_ml_service_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ImageProcessRequest) GetImageId() string {
@@ -147,17 +199,16 @@ type ImageProcessResponse struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	ImageId            string                 `protobuf:"bytes,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`                                             // 对应的图片ID
 	ImageFeatureVector []float32              `protobuf:"fixed32,2,rep,packed,name=image_feature_vector,json=imageFeatureVector,proto3" json:"image_feature_vector,omitempty"` // CLIP图像特征向量
-	PredictedLabels    []string               `protobuf:"bytes,3,rep,name=predicted_labels,json=predictedLabels,proto3" json:"predicted_labels,omitempty"`                     // (Optional) 预测的标签列表（如Imagenet标签），可能为空
-	SimilarityScore    float32                `protobuf:"fixed32,4,opt,name=similarity_score,json=similarityScore,proto3" json:"similarity_score,omitempty"`                   // (Optional) 与target_labels的最高相似度得分，或某个默认得分
-	ModelVersion       string                 `protobuf:"bytes,5,opt,name=model_version,json=modelVersion,proto3" json:"model_version,omitempty"`                              // 使用的模型版本
-	ProcessingTimeMs   int64                  `protobuf:"varint,6,opt,name=processing_time_ms,json=processingTimeMs,proto3" json:"processing_time_ms,omitempty"`               // 处理时间（毫秒）
+	PredictedScores    []*LabelScore          `protobuf:"bytes,3,rep,name=predicted_scores,json=predictedScores,proto3" json:"predicted_scores,omitempty"`                     // 预测的标签和对应的相似度得分列表
+	ModelVersion       string                 `protobuf:"bytes,4,opt,name=model_version,json=modelVersion,proto3" json:"model_version,omitempty"`                              // 使用的模型版本
+	ProcessingTimeMs   int64                  `protobuf:"varint,5,opt,name=processing_time_ms,json=processingTimeMs,proto3" json:"processing_time_ms,omitempty"`               // 处理时间（毫秒）
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
 
 func (x *ImageProcessResponse) Reset() {
 	*x = ImageProcessResponse{}
-	mi := &file_ml_service_proto_msgTypes[1]
+	mi := &file_ml_service_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -169,7 +220,7 @@ func (x *ImageProcessResponse) String() string {
 func (*ImageProcessResponse) ProtoMessage() {}
 
 func (x *ImageProcessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[1]
+	mi := &file_ml_service_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -182,7 +233,7 @@ func (x *ImageProcessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ImageProcessResponse.ProtoReflect.Descriptor instead.
 func (*ImageProcessResponse) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{1}
+	return file_ml_service_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ImageProcessResponse) GetImageId() string {
@@ -199,18 +250,11 @@ func (x *ImageProcessResponse) GetImageFeatureVector() []float32 {
 	return nil
 }
 
-func (x *ImageProcessResponse) GetPredictedLabels() []string {
+func (x *ImageProcessResponse) GetPredictedScores() []*LabelScore {
 	if x != nil {
-		return x.PredictedLabels
+		return x.PredictedScores
 	}
 	return nil
-}
-
-func (x *ImageProcessResponse) GetSimilarityScore() float32 {
-	if x != nil {
-		return x.SimilarityScore
-	}
-	return 0
 }
 
 func (x *ImageProcessResponse) GetModelVersion() string {
@@ -238,7 +282,7 @@ type TextEmbeddingRequest struct {
 
 func (x *TextEmbeddingRequest) Reset() {
 	*x = TextEmbeddingRequest{}
-	mi := &file_ml_service_proto_msgTypes[2]
+	mi := &file_ml_service_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -250,7 +294,7 @@ func (x *TextEmbeddingRequest) String() string {
 func (*TextEmbeddingRequest) ProtoMessage() {}
 
 func (x *TextEmbeddingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[2]
+	mi := &file_ml_service_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -263,7 +307,7 @@ func (x *TextEmbeddingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextEmbeddingRequest.ProtoReflect.Descriptor instead.
 func (*TextEmbeddingRequest) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{2}
+	return file_ml_service_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *TextEmbeddingRequest) GetText() string {
@@ -292,7 +336,7 @@ type TextEmbeddingResponse struct {
 
 func (x *TextEmbeddingResponse) Reset() {
 	*x = TextEmbeddingResponse{}
-	mi := &file_ml_service_proto_msgTypes[3]
+	mi := &file_ml_service_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -304,7 +348,7 @@ func (x *TextEmbeddingResponse) String() string {
 func (*TextEmbeddingResponse) ProtoMessage() {}
 
 func (x *TextEmbeddingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[3]
+	mi := &file_ml_service_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -317,7 +361,7 @@ func (x *TextEmbeddingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextEmbeddingResponse.ProtoReflect.Descriptor instead.
 func (*TextEmbeddingResponse) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{3}
+	return file_ml_service_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *TextEmbeddingResponse) GetTextFeatureVector() []float32 {
@@ -364,7 +408,7 @@ type PredictRequest struct {
 
 func (x *PredictRequest) Reset() {
 	*x = PredictRequest{}
-	mi := &file_ml_service_proto_msgTypes[4]
+	mi := &file_ml_service_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -376,7 +420,7 @@ func (x *PredictRequest) String() string {
 func (*PredictRequest) ProtoMessage() {}
 
 func (x *PredictRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[4]
+	mi := &file_ml_service_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -389,7 +433,7 @@ func (x *PredictRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PredictRequest.ProtoReflect.Descriptor instead.
 func (*PredictRequest) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{4}
+	return file_ml_service_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *PredictRequest) GetInputData() isPredictRequest_InputData {
@@ -482,7 +526,7 @@ type PredictResponse struct {
 
 func (x *PredictResponse) Reset() {
 	*x = PredictResponse{}
-	mi := &file_ml_service_proto_msgTypes[5]
+	mi := &file_ml_service_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -494,7 +538,7 @@ func (x *PredictResponse) String() string {
 func (*PredictResponse) ProtoMessage() {}
 
 func (x *PredictResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[5]
+	mi := &file_ml_service_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -507,7 +551,7 @@ func (x *PredictResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PredictResponse.ProtoReflect.Descriptor instead.
 func (*PredictResponse) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{5}
+	return file_ml_service_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PredictResponse) GetOutputData() isPredictResponse_OutputData {
@@ -590,7 +634,7 @@ type BatchPredictRequest struct {
 
 func (x *BatchPredictRequest) Reset() {
 	*x = BatchPredictRequest{}
-	mi := &file_ml_service_proto_msgTypes[6]
+	mi := &file_ml_service_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -602,7 +646,7 @@ func (x *BatchPredictRequest) String() string {
 func (*BatchPredictRequest) ProtoMessage() {}
 
 func (x *BatchPredictRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[6]
+	mi := &file_ml_service_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -615,7 +659,7 @@ func (x *BatchPredictRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchPredictRequest.ProtoReflect.Descriptor instead.
 func (*BatchPredictRequest) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{6}
+	return file_ml_service_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *BatchPredictRequest) GetRequests() []*PredictRequest {
@@ -644,7 +688,7 @@ type BatchPredictResponse struct {
 
 func (x *BatchPredictResponse) Reset() {
 	*x = BatchPredictResponse{}
-	mi := &file_ml_service_proto_msgTypes[7]
+	mi := &file_ml_service_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -656,7 +700,7 @@ func (x *BatchPredictResponse) String() string {
 func (*BatchPredictResponse) ProtoMessage() {}
 
 func (x *BatchPredictResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[7]
+	mi := &file_ml_service_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -669,7 +713,7 @@ func (x *BatchPredictResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BatchPredictResponse.ProtoReflect.Descriptor instead.
 func (*BatchPredictResponse) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{7}
+	return file_ml_service_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *BatchPredictResponse) GetResponses() []*PredictResponse {
@@ -702,7 +746,7 @@ type FloatFeatures struct {
 
 func (x *FloatFeatures) Reset() {
 	*x = FloatFeatures{}
-	mi := &file_ml_service_proto_msgTypes[8]
+	mi := &file_ml_service_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -714,7 +758,7 @@ func (x *FloatFeatures) String() string {
 func (*FloatFeatures) ProtoMessage() {}
 
 func (x *FloatFeatures) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[8]
+	mi := &file_ml_service_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -727,7 +771,7 @@ func (x *FloatFeatures) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FloatFeatures.ProtoReflect.Descriptor instead.
 func (*FloatFeatures) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{8}
+	return file_ml_service_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *FloatFeatures) GetValues() []float32 {
@@ -746,7 +790,7 @@ type PredictionFloats struct {
 
 func (x *PredictionFloats) Reset() {
 	*x = PredictionFloats{}
-	mi := &file_ml_service_proto_msgTypes[9]
+	mi := &file_ml_service_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -758,7 +802,7 @@ func (x *PredictionFloats) String() string {
 func (*PredictionFloats) ProtoMessage() {}
 
 func (x *PredictionFloats) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[9]
+	mi := &file_ml_service_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -771,7 +815,7 @@ func (x *PredictionFloats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PredictionFloats.ProtoReflect.Descriptor instead.
 func (*PredictionFloats) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{9}
+	return file_ml_service_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *PredictionFloats) GetValues() []float32 {
@@ -791,7 +835,7 @@ type HealthCheckRequest struct {
 
 func (x *HealthCheckRequest) Reset() {
 	*x = HealthCheckRequest{}
-	mi := &file_ml_service_proto_msgTypes[10]
+	mi := &file_ml_service_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -803,7 +847,7 @@ func (x *HealthCheckRequest) String() string {
 func (*HealthCheckRequest) ProtoMessage() {}
 
 func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[10]
+	mi := &file_ml_service_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -816,7 +860,7 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{10}
+	return file_ml_service_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *HealthCheckRequest) GetServiceName() string {
@@ -840,7 +884,7 @@ type HealthCheckResponse struct {
 
 func (x *HealthCheckResponse) Reset() {
 	*x = HealthCheckResponse{}
-	mi := &file_ml_service_proto_msgTypes[11]
+	mi := &file_ml_service_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -852,7 +896,7 @@ func (x *HealthCheckResponse) String() string {
 func (*HealthCheckResponse) ProtoMessage() {}
 
 func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_ml_service_proto_msgTypes[11]
+	mi := &file_ml_service_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -865,7 +909,7 @@ func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
 func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
-	return file_ml_service_proto_rawDescGZIP(), []int{11}
+	return file_ml_service_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *HealthCheckResponse) GetStatus() HealthCheckResponse_ServingStatus {
@@ -908,20 +952,23 @@ var File_ml_service_proto protoreflect.FileDescriptor
 const file_ml_service_proto_rawDesc = "" +
 	"\n" +
 	"\x10ml_service.proto\x12\n" +
-	"prediction\"\x99\x01\n" +
+	"prediction\"M\n" +
+	"\n" +
+	"LabelScore\x12\x14\n" +
+	"\x05label\x18\x01 \x01(\tR\x05label\x12)\n" +
+	"\x10similarity_score\x18\x02 \x01(\x02R\x0fsimilarityScore\"\x99\x01\n" +
 	"\x13ImageProcessRequest\x12\x19\n" +
 	"\bimage_id\x18\x01 \x01(\tR\aimageId\x12\x1d\n" +
 	"\n" +
 	"image_data\x18\x02 \x01(\fR\timageData\x12#\n" +
 	"\rtarget_labels\x18\x03 \x03(\tR\ftargetLabels\x12#\n" +
-	"\rmodel_version\x18\x04 \x01(\tR\fmodelVersion\"\x8c\x02\n" +
+	"\rmodel_version\x18\x04 \x01(\tR\fmodelVersion\"\xf9\x01\n" +
 	"\x14ImageProcessResponse\x12\x19\n" +
 	"\bimage_id\x18\x01 \x01(\tR\aimageId\x120\n" +
-	"\x14image_feature_vector\x18\x02 \x03(\x02R\x12imageFeatureVector\x12)\n" +
-	"\x10predicted_labels\x18\x03 \x03(\tR\x0fpredictedLabels\x12)\n" +
-	"\x10similarity_score\x18\x04 \x01(\x02R\x0fsimilarityScore\x12#\n" +
-	"\rmodel_version\x18\x05 \x01(\tR\fmodelVersion\x12,\n" +
-	"\x12processing_time_ms\x18\x06 \x01(\x03R\x10processingTimeMs\"O\n" +
+	"\x14image_feature_vector\x18\x02 \x03(\x02R\x12imageFeatureVector\x12A\n" +
+	"\x10predicted_scores\x18\x03 \x03(\v2\x16.prediction.LabelScoreR\x0fpredictedScores\x12#\n" +
+	"\rmodel_version\x18\x04 \x01(\tR\fmodelVersion\x12,\n" +
+	"\x12processing_time_ms\x18\x05 \x01(\x03R\x10processingTimeMs\"O\n" +
 	"\x14TextEmbeddingRequest\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12#\n" +
 	"\rmodel_version\x18\x02 \x01(\tR\fmodelVersion\"\x9a\x01\n" +
@@ -996,43 +1043,45 @@ func file_ml_service_proto_rawDescGZIP() []byte {
 }
 
 var file_ml_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_ml_service_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_ml_service_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_ml_service_proto_goTypes = []any{
 	(HealthCheckResponse_ServingStatus)(0), // 0: prediction.HealthCheckResponse.ServingStatus
-	(*ImageProcessRequest)(nil),            // 1: prediction.ImageProcessRequest
-	(*ImageProcessResponse)(nil),           // 2: prediction.ImageProcessResponse
-	(*TextEmbeddingRequest)(nil),           // 3: prediction.TextEmbeddingRequest
-	(*TextEmbeddingResponse)(nil),          // 4: prediction.TextEmbeddingResponse
-	(*PredictRequest)(nil),                 // 5: prediction.PredictRequest
-	(*PredictResponse)(nil),                // 6: prediction.PredictResponse
-	(*BatchPredictRequest)(nil),            // 7: prediction.BatchPredictRequest
-	(*BatchPredictResponse)(nil),           // 8: prediction.BatchPredictResponse
-	(*FloatFeatures)(nil),                  // 9: prediction.FloatFeatures
-	(*PredictionFloats)(nil),               // 10: prediction.PredictionFloats
-	(*HealthCheckRequest)(nil),             // 11: prediction.HealthCheckRequest
-	(*HealthCheckResponse)(nil),            // 12: prediction.HealthCheckResponse
+	(*LabelScore)(nil),                     // 1: prediction.LabelScore
+	(*ImageProcessRequest)(nil),            // 2: prediction.ImageProcessRequest
+	(*ImageProcessResponse)(nil),           // 3: prediction.ImageProcessResponse
+	(*TextEmbeddingRequest)(nil),           // 4: prediction.TextEmbeddingRequest
+	(*TextEmbeddingResponse)(nil),          // 5: prediction.TextEmbeddingResponse
+	(*PredictRequest)(nil),                 // 6: prediction.PredictRequest
+	(*PredictResponse)(nil),                // 7: prediction.PredictResponse
+	(*BatchPredictRequest)(nil),            // 8: prediction.BatchPredictRequest
+	(*BatchPredictResponse)(nil),           // 9: prediction.BatchPredictResponse
+	(*FloatFeatures)(nil),                  // 10: prediction.FloatFeatures
+	(*PredictionFloats)(nil),               // 11: prediction.PredictionFloats
+	(*HealthCheckRequest)(nil),             // 12: prediction.HealthCheckRequest
+	(*HealthCheckResponse)(nil),            // 13: prediction.HealthCheckResponse
 }
 var file_ml_service_proto_depIdxs = []int32{
-	9,  // 0: prediction.PredictRequest.float_features:type_name -> prediction.FloatFeatures
-	10, // 1: prediction.PredictResponse.prediction_floats:type_name -> prediction.PredictionFloats
-	5,  // 2: prediction.BatchPredictRequest.requests:type_name -> prediction.PredictRequest
-	6,  // 3: prediction.BatchPredictResponse.responses:type_name -> prediction.PredictResponse
-	0,  // 4: prediction.HealthCheckResponse.status:type_name -> prediction.HealthCheckResponse.ServingStatus
-	1,  // 5: prediction.PredictionService.ProcessImageForCLIP:input_type -> prediction.ImageProcessRequest
-	3,  // 6: prediction.PredictionService.GetTextEmbeddingForCLIP:input_type -> prediction.TextEmbeddingRequest
-	5,  // 7: prediction.PredictionService.Predict:input_type -> prediction.PredictRequest
-	7,  // 8: prediction.PredictionService.BatchPredict:input_type -> prediction.BatchPredictRequest
-	11, // 9: prediction.PredictionService.HealthCheck:input_type -> prediction.HealthCheckRequest
-	2,  // 10: prediction.PredictionService.ProcessImageForCLIP:output_type -> prediction.ImageProcessResponse
-	4,  // 11: prediction.PredictionService.GetTextEmbeddingForCLIP:output_type -> prediction.TextEmbeddingResponse
-	6,  // 12: prediction.PredictionService.Predict:output_type -> prediction.PredictResponse
-	8,  // 13: prediction.PredictionService.BatchPredict:output_type -> prediction.BatchPredictResponse
-	12, // 14: prediction.PredictionService.HealthCheck:output_type -> prediction.HealthCheckResponse
-	10, // [10:15] is the sub-list for method output_type
-	5,  // [5:10] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	1,  // 0: prediction.ImageProcessResponse.predicted_scores:type_name -> prediction.LabelScore
+	10, // 1: prediction.PredictRequest.float_features:type_name -> prediction.FloatFeatures
+	11, // 2: prediction.PredictResponse.prediction_floats:type_name -> prediction.PredictionFloats
+	6,  // 3: prediction.BatchPredictRequest.requests:type_name -> prediction.PredictRequest
+	7,  // 4: prediction.BatchPredictResponse.responses:type_name -> prediction.PredictResponse
+	0,  // 5: prediction.HealthCheckResponse.status:type_name -> prediction.HealthCheckResponse.ServingStatus
+	2,  // 6: prediction.PredictionService.ProcessImageForCLIP:input_type -> prediction.ImageProcessRequest
+	4,  // 7: prediction.PredictionService.GetTextEmbeddingForCLIP:input_type -> prediction.TextEmbeddingRequest
+	6,  // 8: prediction.PredictionService.Predict:input_type -> prediction.PredictRequest
+	8,  // 9: prediction.PredictionService.BatchPredict:input_type -> prediction.BatchPredictRequest
+	12, // 10: prediction.PredictionService.HealthCheck:input_type -> prediction.HealthCheckRequest
+	3,  // 11: prediction.PredictionService.ProcessImageForCLIP:output_type -> prediction.ImageProcessResponse
+	5,  // 12: prediction.PredictionService.GetTextEmbeddingForCLIP:output_type -> prediction.TextEmbeddingResponse
+	7,  // 13: prediction.PredictionService.Predict:output_type -> prediction.PredictResponse
+	9,  // 14: prediction.PredictionService.BatchPredict:output_type -> prediction.BatchPredictResponse
+	13, // 15: prediction.PredictionService.HealthCheck:output_type -> prediction.HealthCheckResponse
+	11, // [11:16] is the sub-list for method output_type
+	6,  // [6:11] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_ml_service_proto_init() }
@@ -1040,12 +1089,12 @@ func file_ml_service_proto_init() {
 	if File_ml_service_proto != nil {
 		return
 	}
-	file_ml_service_proto_msgTypes[4].OneofWrappers = []any{
+	file_ml_service_proto_msgTypes[5].OneofWrappers = []any{
 		(*PredictRequest_RawData)(nil),
 		(*PredictRequest_FloatFeatures)(nil),
 		(*PredictRequest_TextInput)(nil),
 	}
-	file_ml_service_proto_msgTypes[5].OneofWrappers = []any{
+	file_ml_service_proto_msgTypes[6].OneofWrappers = []any{
 		(*PredictResponse_PredictionFloats)(nil),
 		(*PredictResponse_PredictionText)(nil),
 	}
@@ -1055,7 +1104,7 @@ func file_ml_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ml_service_proto_rawDesc), len(file_ml_service_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   12,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

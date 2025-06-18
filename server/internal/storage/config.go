@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // StorageConfig holds configuration for storage services
@@ -29,8 +30,18 @@ type StorageOptions struct {
 
 // DefaultStorageConfig returns default storage configuration
 func DefaultStorageConfig() StorageConfig {
+	// Check if we're in development mode
+	isDev := strings.ToLower(os.Getenv("ENV")) == "development" ||
+		strings.ToLower(os.Getenv("ENVIRONMENT")) == "development" ||
+		os.Getenv("DEV_MODE") == "true"
+
+	basePath := "/app/data/photos" // Default container path
+	if isDev {
+		basePath = "./data/photos" // Development path
+	}
+
 	return StorageConfig{
-		BasePath: "/app/data/photos",
+		BasePath: basePath,
 		Strategy: StorageStrategyDate,
 		Options: StorageOptions{
 			PreserveOriginalFilename: true,

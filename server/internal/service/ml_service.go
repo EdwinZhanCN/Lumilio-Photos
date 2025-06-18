@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
@@ -55,7 +56,7 @@ func NewMLClient(addr string) (MLService, error) {
 	// if err != nil {
 	//     log.Fatalf("Failed to load TLS credentials: %v", err)
 	// }
-	conn, err := grpc.NewClient(addr, grpc.WithInsecure())
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}

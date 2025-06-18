@@ -124,8 +124,11 @@ class CLIPModelManager:
             logger.error(f"Error encoding text: {e}")
             raise
 
-    def classify_image_with_labels(self, image_bytes: bytes, target_labels: Optional[List[str]] = None, top_k: int = 5) -> Tuple[List[str], float]:
-        """Classify image with optional target labels"""
+    def classify_image_with_labels(self, image_bytes: bytes, target_labels: Optional[List[str]] = None, top_k: int = 3) -> List[Tuple[str, float]]:
+        """
+        Classify image with optional target labels.
+        Returns a list of (label, score) tuples for the top_k predictions.
+        """
         if not self.is_loaded:
             raise RuntimeError("Model not initialized. Call initialize() first.")
 
@@ -146,7 +149,7 @@ class CLIPModelManager:
                     label_mapping = self.imagenet_labels or {}
 
                 if not text_descriptions:
-                    return [], 0.0
+                    return []
 
                 # Process text in batches to avoid memory issues
                 batch_size = 100
@@ -169,9 +172,7 @@ class CLIPModelManager:
                 top_indices = top_indices.cpu().numpy()[0]
 
                 # Format results
-                predicted_labels = []
-                max_similarity = float(top_probs[0]) if len(top_probs) > 0 else 0.0
-
+                results = []
                 for idx, prob in zip(top_indices, top_probs):
                     if target_labels:
                         label = label_mapping.get(idx, "unknown")
@@ -181,9 +182,9 @@ class CLIPModelManager:
                             label = label_info.get("en", "unknown")
                         else:
                             label = str(label_info)
-                    predicted_labels.append(f"{label} ({prob*100:.2f}%)")
+                    results.append((label, float(prob)))
 
-                return predicted_labels, max_similarity
+                return results
 
         except Exception as e:
             logger.error(f"Error in image classification: {e}")

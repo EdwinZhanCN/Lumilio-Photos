@@ -6,6 +6,14 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class LabelScore(_message.Message):
+    __slots__ = ("label", "similarity_score")
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    SIMILARITY_SCORE_FIELD_NUMBER: _ClassVar[int]
+    label: str
+    similarity_score: float
+    def __init__(self, label: _Optional[str] = ..., similarity_score: _Optional[float] = ...) -> None: ...
+
 class ImageProcessRequest(_message.Message):
     __slots__ = ("image_id", "image_data", "target_labels", "model_version")
     IMAGE_ID_FIELD_NUMBER: _ClassVar[int]
@@ -19,20 +27,18 @@ class ImageProcessRequest(_message.Message):
     def __init__(self, image_id: _Optional[str] = ..., image_data: _Optional[bytes] = ..., target_labels: _Optional[_Iterable[str]] = ..., model_version: _Optional[str] = ...) -> None: ...
 
 class ImageProcessResponse(_message.Message):
-    __slots__ = ("image_id", "image_feature_vector", "predicted_labels", "similarity_score", "model_version", "processing_time_ms")
+    __slots__ = ("image_id", "image_feature_vector", "predicted_scores", "model_version", "processing_time_ms")
     IMAGE_ID_FIELD_NUMBER: _ClassVar[int]
     IMAGE_FEATURE_VECTOR_FIELD_NUMBER: _ClassVar[int]
-    PREDICTED_LABELS_FIELD_NUMBER: _ClassVar[int]
-    SIMILARITY_SCORE_FIELD_NUMBER: _ClassVar[int]
+    PREDICTED_SCORES_FIELD_NUMBER: _ClassVar[int]
     MODEL_VERSION_FIELD_NUMBER: _ClassVar[int]
     PROCESSING_TIME_MS_FIELD_NUMBER: _ClassVar[int]
     image_id: str
     image_feature_vector: _containers.RepeatedScalarFieldContainer[float]
-    predicted_labels: _containers.RepeatedScalarFieldContainer[str]
-    similarity_score: float
+    predicted_scores: _containers.RepeatedCompositeFieldContainer[LabelScore]
     model_version: str
     processing_time_ms: int
-    def __init__(self, image_id: _Optional[str] = ..., image_feature_vector: _Optional[_Iterable[float]] = ..., predicted_labels: _Optional[_Iterable[str]] = ..., similarity_score: _Optional[float] = ..., model_version: _Optional[str] = ..., processing_time_ms: _Optional[int] = ...) -> None: ...
+    def __init__(self, image_id: _Optional[str] = ..., image_feature_vector: _Optional[_Iterable[float]] = ..., predicted_scores: _Optional[_Iterable[_Union[LabelScore, _Mapping]]] = ..., model_version: _Optional[str] = ..., processing_time_ms: _Optional[int] = ...) -> None: ...
 
 class TextEmbeddingRequest(_message.Message):
     __slots__ = ("text", "model_version")

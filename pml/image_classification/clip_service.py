@@ -48,17 +48,24 @@ class CLIPService:
 
             # Get predictions if target labels are provided or use ImageNet
             target_labels = list(request.target_labels) if request.target_labels else None
-            predicted_labels, similarity_score = self.clip_model.classify_image_with_labels(
-                request.image_data, target_labels
+
+            # The model method now returns a list of (label, score) tuples for top_k
+            predicted_scores_list = self.clip_model.classify_image_with_labels(
+                request.image_data, target_labels, top_k=3
             )
+
+            # Create LabelScore messages for the response
+            label_scores = [
+                ml_service_pb2.LabelScore(label=label, similarity_score=score)
+                for label, score in predicted_scores_list
+            ]
 
             processing_time = int((time.time() - start_time) * 1000)
 
             response = ml_service_pb2.ImageProcessResponse(
                 image_id=request.image_id,
                 image_feature_vector=image_features.tolist(),
-                predicted_labels=predicted_labels,
-                similarity_score=similarity_score,
+                predicted_scores=label_scores,
                 model_version=self.clip_model.model_version,
                 processing_time_ms=processing_time
             )

@@ -18,13 +18,24 @@ type AssetControllerInterface interface {
 	GetAssetTypes(c *gin.Context)
 }
 
-// NewRouter creates and configures a new router with asset endpoints
+// AuthControllerInterface defines the interface for authentication controllers
+type AuthControllerInterface interface {
+	Register(c *gin.Context)
+	Login(c *gin.Context)
+	RefreshToken(c *gin.Context)
+	Logout(c *gin.Context)
+	Me(c *gin.Context)
+	AuthMiddleware() gin.HandlerFunc
+	OptionalAuthMiddleware() gin.HandlerFunc
+}
+
+// NewRouter creates and configures a new router with asset and auth endpoints
 // @title RKPhoto Manager API
 // @version 1.0
 // @description Photo management system API with asset upload, processing, and organization features
 // @host localhost:3001
 // @BasePath /api/v1
-func NewRouter(assetController AssetControllerInterface) *gin.Engine {
+func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface) *gin.Engine {
 	r := gin.Default()
 
 	// Add CORS middleware
@@ -37,10 +48,22 @@ func NewRouter(assetController AssetControllerInterface) *gin.Engine {
 	// API routes
 	api := r.Group("/api")
 
-	// Asset routes (new unified API)
+	// V1 API routes
 	v1 := api.Group("/v1")
 	{
+		// Authentication routes
+		auth := v1.Group("/auth")
+		{
+			auth.POST("/register", authController.Register)
+			auth.POST("/login", authController.Login)
+			auth.POST("/refresh", authController.RefreshToken)
+			auth.POST("/logout", authController.Logout)
+			auth.GET("/me", authController.AuthMiddleware(), authController.Me)
+		}
+
+		// Asset routes (new unified API) - with optional authentication
 		assets := v1.Group("/assets")
+		assets.Use(authController.OptionalAuthMiddleware())
 		{
 			assets.POST("", assetController.UploadAsset)
 			assets.GET("", assetController.ListAssets)
@@ -60,9 +83,10 @@ func NewRouter(assetController AssetControllerInterface) *gin.Engine {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Add frontend URL from config
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)

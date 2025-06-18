@@ -24,6 +24,11 @@ service PredictionService {
 
 // --- CLIP Specific Messages ---
 
+message LabelScore {
+    string label = 1;           // 预测的标签
+    float similarity_score = 2; // 对应的相似度得分
+}
+
 // ImageProcessRequest: CLIP图像处理请求
 message ImageProcessRequest {
     string image_id = 1;      // 图片的唯一ID，用于追踪
@@ -36,10 +41,9 @@ message ImageProcessRequest {
 message ImageProcessResponse {
     string image_id = 1;        // 对应的图片ID
     repeated float image_feature_vector = 2; // CLIP图像特征向量
-    repeated string predicted_labels = 3; // (Optional) 预测的标签列表（如Imagenet标签），可能为空
-    float similarity_score = 4; // (Optional) 与target_labels的最高相似度得分，或某个默认得分
-    string model_version = 5;   // 使用的模型版本
-    int64 processing_time_ms = 6; // 处理时间（毫秒）
+    repeated LabelScore predicted_scores = 3; // 预测的标签和对应的相似度得分列表
+    string model_version = 4;   // 使用的模型版本
+    int64 processing_time_ms = 5; // 处理时间（毫秒）
 }
 
 // TextEmbeddingRequest: CLIP文本嵌入请求

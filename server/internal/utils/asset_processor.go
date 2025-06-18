@@ -1,19 +1,33 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"image"
+	_ "image/gif"
+	"image/jpeg"
+	_ "image/png"
+	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"server/internal/models"
 	"server/internal/service"
 	"server/internal/storage"
+	"strconv"
 	"strings"
 	"time"
 
 	pb "server/proto"
 
 	"github.com/google/uuid"
+	"github.com/nfnt/resize"
+
+	// Extended image format support
+	_ "golang.org/x/image/bmp"
+	_ "golang.org/x/image/tiff"
+	_ "golang.org/x/image/webp"
 )
 
 // AssetProcessor handles processing tasks for different asset types
@@ -23,6 +37,23 @@ type AssetProcessor struct {
 	storage      storage.Storage
 	storagePath  string
 	mlService    service.MLService
+	// Image preprocessing configuration
+	mlImageMaxWidth  uint
+	mlImageMaxHeight uint
+	mlImageQuality   int
+}
+
+// ThumbnailSize defines the name and max dimension for a thumbnail
+type ThumbnailSize struct {
+	Name      string
+	Dimension uint
+}
+
+// Defines the standard sizes for thumbnail generation.
+var thumbnailSizes = []ThumbnailSize{
+	{Name: "small", Dimension: 400},
+	{Name: "medium", Dimension: 800},
+	{Name: "large", Dimension: 1920},
 }
 
 // ProcessAsset processes an asset based on its type
@@ -188,24 +219,42 @@ func determineAssetType(fileName string) models.AssetType {
 
 // processPhoto handles photo-specific processing
 func (ap *AssetProcessor) processPhoto(ctx context.Context, asset *models.Asset) error {
-	// Extract photo metadata, generate thumbnails, etc.
-	// This would integrate with existing photo processing logic
 	// 1. Extract Metadata
-	metadata, err := ap.ExtractAssetMetadata(ctx, asset.StoragePath, asset.OriginalFilename)
+	metadata, err := ap.ExtractAssetMetadata(ctx, asset.AssetID.String(), asset.StoragePath)
 	if err != nil {
 		return fmt.Errorf("failed to extract asset metadata: %w", err)
 	}
-	asset.SetPhotoMetadata(&metadata)
-	// 2. Get AI generated tags
-	// Create a formal ImageProcessRequest
-	imageBytes, err := os.ReadFile(asset.StoragePath)
+	if err := asset.SetPhotoMetadata(&metadata); err != nil {
+		return fmt.Errorf("failed to set photo metadata: %w", err)
+	}
+
+	// 2. Save Metadata to Database
+	if err := ap.assetService.UpdateAssetMetadata(ctx, asset.AssetID, asset.SpecificMetadata); err != nil {
+		return fmt.Errorf("failed to save asset metadata: %w", err)
+	}
+
+	// 3. Get AI generated tags
+	// Construct full path for reading the image file
+	rootStoragePath := os.Getenv("STORAGE_PATH")
+	if rootStoragePath == "" {
+		rootStoragePath = ap.storagePath
+	}
+	fullImagePath := filepath.Join(rootStoragePath, asset.StoragePath)
+
+	// Check if file exists before trying to read
+	if _, err := os.Stat(fullImagePath); os.IsNotExist(err) {
+		return fmt.Errorf("image file not found at path: %s", fullImagePath)
+	}
+
+	// Resize image for ML processing to reduce payload size
+	resizedImageBytes, err := ap.resizeImageForML(fullImagePath, ap.mlImageMaxWidth, ap.mlImageMaxHeight)
 	if err != nil {
-		return fmt.Errorf("failed to read image file: %w", err)
+		return fmt.Errorf("failed to resize image for ML: %w", err)
 	}
 
 	imageProcessRequest := pb.ImageProcessRequest{
 		ImageId:   asset.AssetID.String(),
-		ImageData: imageBytes,
+		ImageData: resizedImageBytes,
 	}
 
 	imageProcessReponse, err := ap.mlService.ProcessImageForCLIP(&imageProcessRequest)
@@ -213,7 +262,15 @@ func (ap *AssetProcessor) processPhoto(ctx context.Context, asset *models.Asset)
 		return fmt.Errorf("failed to process image for CLIP: %w", err)
 	}
 
-	ap.saveCLIPTagsToAsset(ctx, asset, imageProcessReponse)
+	if err := ap.saveCLIPTagsToAsset(ctx, asset, imageProcessReponse); err != nil {
+		return fmt.Errorf("failed to save CLIP tags: %w", err)
+	}
+
+	// 4. Generate and save thumbnails
+	if err := ap.generateAndSaveThumbnails(ctx, asset); err != nil {
+		// Log as a warning because the main asset processing succeeded
+		log.Printf("Warning: failed to generate thumbnails for asset %s: %v", asset.AssetID, err)
+	}
 
 	return nil
 }
@@ -299,34 +356,254 @@ func getMimeTypeFromFileName(fileName string) string {
 	}
 }
 
-// NewAssetProcessor creates a new asset processor
+// NewAssetProcessor creates a new asset processor with configurable ML image preprocessing
 func NewAssetProcessor(assetService service.AssetService, storage storage.Storage, storagePath string, mlService service.MLService) *AssetProcessor {
-	return &AssetProcessor{
-		assetService: assetService,
-		storage:      storage,
-		storagePath:  storagePath,
-		mlService:    mlService,
+	// Load ML image preprocessing configuration from environment variables
+	maxWidth := uint(1024)  // Default
+	maxHeight := uint(1024) // Default
+	quality := 85           // Default
+
+	if envWidth := os.Getenv("ML_IMAGE_MAX_WIDTH"); envWidth != "" {
+		if width, err := strconv.ParseUint(envWidth, 10, 32); err == nil {
+			maxWidth = uint(width)
+		}
 	}
+
+	if envHeight := os.Getenv("ML_IMAGE_MAX_HEIGHT"); envHeight != "" {
+		if height, err := strconv.ParseUint(envHeight, 10, 32); err == nil {
+			maxHeight = uint(height)
+		}
+	}
+
+	if envQuality := os.Getenv("ML_IMAGE_QUALITY"); envQuality != "" {
+		if q, err := strconv.Atoi(envQuality); err == nil && q >= 1 && q <= 100 {
+			quality = q
+		}
+	}
+
+	fmt.Printf("ML Image Preprocessing Config: %dx%d max size, %d%% JPEG quality\n",
+		maxWidth, maxHeight, quality)
+
+	return &AssetProcessor{
+		assetService:     assetService,
+		storage:          storage,
+		storagePath:      storagePath,
+		mlService:        mlService,
+		mlImageMaxWidth:  maxWidth,
+		mlImageMaxHeight: maxHeight,
+		mlImageQuality:   quality,
+	}
+}
+
+// resizeImageForML resizes an image to fit within the specified dimensions while maintaining aspect ratio
+func (ap *AssetProcessor) resizeImageForML(imagePath string, maxWidth, maxHeight uint) ([]byte, error) {
+	// Check file extension first for debugging
+	ext := strings.ToLower(filepath.Ext(imagePath))
+	fmt.Printf("Processing image: %s (extension: %s)\n", imagePath, ext)
+
+	// Open the image file
+	file, err := os.Open(imagePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open image %s: %w", imagePath, err)
+	}
+	defer file.Close()
+
+	// Read first few bytes to check file signature
+	fileHeader := make([]byte, 512)
+	n, _ := file.Read(fileHeader)
+	if n > 0 {
+		fmt.Printf("File header (first %d bytes): %x\n", min(n, 16), fileHeader[:min(n, 16)])
+	}
+
+	// Reset file position for decoding
+	file.Seek(0, 0)
+
+	// Decode the image with better error handling for different formats
+	img, format, err := image.Decode(file)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode image %s (detected format: %s, file extension: %s): %w", imagePath, format, ext, err)
+	}
+
+	fmt.Printf("Successfully decoded image: format=%s, extension=%s\n", format, ext)
+
+	// Get original dimensions
+	bounds := img.Bounds()
+	width := uint(bounds.Dx())
+	height := uint(bounds.Dy())
+
+	// Validate dimensions
+	if width == 0 || height == 0 {
+		return nil, fmt.Errorf("invalid image dimensions: %dx%d", width, height)
+	}
+
+	// Get original file size for comparison
+	originalFileInfo, err := os.Stat(imagePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get original file info: %w", err)
+	}
+	originalFileSize := originalFileInfo.Size()
+
+	// Skip processing if image is already small enough and file size is reasonable
+	if width <= maxWidth && height <= maxHeight && originalFileSize < 2*1024*1024 { // < 2MB
+		// Return original bytes for small images
+		originalBytes, err := os.ReadFile(imagePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read original image: %w", err)
+		}
+		fmt.Printf("Image already optimal for ML: %dx%d, %d KB\n", width, height, originalFileSize/1024)
+		return originalBytes, nil
+	}
+
+	// Calculate new dimensions while maintaining aspect ratio
+	widthRatio := float64(maxWidth) / float64(width)
+	heightRatio := float64(maxHeight) / float64(height)
+	ratio := math.Min(widthRatio, heightRatio)
+
+	newWidth := uint(float64(width) * ratio)
+	newHeight := uint(float64(height) * ratio)
+
+	// Ensure minimum dimensions
+	if newWidth < 224 && newHeight < 224 {
+		// Maintain minimum size for ML models (224x224 is common)
+		if width > height {
+			newWidth = 224
+			newHeight = uint(float64(newWidth) * float64(height) / float64(width))
+		} else {
+			newHeight = 224
+			newWidth = uint(float64(newHeight) * float64(width) / float64(height))
+		}
+	}
+
+	// Resize the image using high-quality Lanczos resampling
+	resizedImg := resize.Resize(newWidth, newHeight, img, resize.Lanczos3)
+
+	// Always encode as JPEG for ML processing (optimal size/quality balance)
+	var buf bytes.Buffer
+	quality := ap.mlImageQuality
+
+	// Adjust quality based on image size for better compression
+	if originalFileSize > 10*1024*1024 { // > 10MB
+		quality = int(float64(quality) * 0.8) // Reduce quality for very large images
+	}
+
+	err = jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: quality})
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode resized image: %w", err)
+	}
+
+	// Calculate compression stats
+	originalPixels := width * height
+	newPixels := newWidth * newHeight
+	pixelReduction := float64(originalPixels) / float64(newPixels)
+	newFileSize := int64(buf.Len())
+	sizeReduction := float64(originalFileSize) / float64(newFileSize)
+
+	fmt.Printf("Resized image for ML: %dx%d → %dx%d (%.1fx pixel reduction, %.1fx size reduction: %d KB → %d KB, quality: %d%%)\n",
+		width, height, newWidth, newHeight, pixelReduction, sizeReduction,
+		originalFileSize/1024, newFileSize/1024, quality)
+
+	return buf.Bytes(), nil
 }
 
 // Helper function to get the Top-3 confidence labels from CLIP response
 func (ap *AssetProcessor) saveCLIPTagsToAsset(ctx context.Context, asset *models.Asset, resp *pb.ImageProcessResponse) error {
+	// The new response contains a list of LabelScore objects
+	predictedScores := resp.GetPredictedScores()
+
+	// The Python service already returns the top 3, but we can still limit it here as a safeguard.
 	topN := 3
-	labels := resp.PredictedLabels
-	if len(labels) > topN {
-		labels = labels[:topN]
+	if len(predictedScores) > topN {
+		predictedScores = predictedScores[:topN]
 	}
-	for _, label := range labels {
-		// 1. 查找或创建Tag
+
+	for _, prediction := range predictedScores {
+		label := prediction.GetLabel()
+		score := prediction.GetSimilarityScore()
+
+		fmt.Printf("Get label from CLIP Model: %s with score %f\n", label, score)
+
+		// 1. Find or create the tag
 		tag, err := ap.assetService.GetOrCreateTagByName(ctx, label, "CLIP", true)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get or create tag: %w", err)
 		}
-		// 2. 关联Asset和Tag
-		err = ap.assetService.AddTagToAsset(ctx, asset.AssetID, tag.TagID, resp.SimilarityScore, "ai")
+
+		// 2. Associate the tag with the asset
+		err = ap.assetService.AddTagToAsset(ctx, asset.AssetID, tag.TagID, float32(score), "ai")
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to add tag to asset: %w", err)
 		}
 	}
+	return nil
+}
+
+// generateAndSaveThumbnails creates, uploads, and records thumbnails for a given asset.
+func (ap *AssetProcessor) generateAndSaveThumbnails(ctx context.Context, asset *models.Asset) error {
+	log.Printf("Generating thumbnails for asset %s", asset.AssetID)
+
+	// Defensive check to prevent panic if storage is not initialized
+	if ap.storage == nil {
+		return fmt.Errorf("storage service is not initialized in AssetProcessor")
+	}
+
+	// Get full path to original image
+	rootStoragePath := os.Getenv("STORAGE_PATH")
+	if rootStoragePath == "" {
+		rootStoragePath = ap.storagePath
+	}
+	fullImagePath := filepath.Join(rootStoragePath, asset.StoragePath)
+
+	// Open and decode the original image
+	file, err := os.Open(fullImagePath)
+	if err != nil {
+		return fmt.Errorf("failed to open original image for thumbnailing: %w", err)
+	}
+	defer file.Close()
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return fmt.Errorf("failed to decode original image for thumbnailing: %w", err)
+	}
+
+	// Check for valid image dimensions
+	bounds := img.Bounds()
+	if bounds.Dx() == 0 || bounds.Dy() == 0 {
+		return fmt.Errorf("invalid image dimensions (0) for thumbnailing asset %s", asset.AssetID)
+	}
+
+	// Generate a thumbnail for each defined size
+	for _, size := range thumbnailSizes {
+		// Use resize.Thumbnail which maintains aspect ratio and is efficient
+		resizedImg := resize.Thumbnail(size.Dimension, size.Dimension, img, resize.Lanczos3)
+
+		// Encode as JPEG
+		var buf bytes.Buffer
+		if err := jpeg.Encode(&buf, resizedImg, &jpeg.Options{Quality: 85}); err != nil {
+			log.Printf("Failed to encode thumbnail %s for asset %s: %v", size.Name, asset.AssetID, err)
+			continue // Don't stop for one failed thumbnail
+		}
+
+		// Determine thumbnail storage path and filename
+		ext := filepath.Ext(asset.OriginalFilename)
+		baseFilename := strings.TrimSuffix(asset.OriginalFilename, ext)
+		thumbFilename := fmt.Sprintf("%s_thumb_%s.jpg", baseFilename, size.Name)
+
+		// Upload thumbnail to storage
+		storagePath, err := ap.storage.UploadWithMetadata(ctx, &buf, thumbFilename, "image/jpeg")
+		if err != nil {
+			log.Printf("Failed to upload thumbnail %s for asset %s: %v", size.Name, asset.AssetID, err)
+			continue
+		}
+
+		// Save thumbnail record to database
+		if _, err := ap.assetService.CreateThumbnail(ctx, asset.AssetID, size.Name, storagePath); err != nil {
+			log.Printf("Failed to save thumbnail record %s for asset %s: %v", size.Name, asset.AssetID, err)
+			// Attempt to clean up orphaned thumbnail file
+			_ = ap.storage.Delete(context.Background(), storagePath)
+			continue
+		}
+		log.Printf("Successfully created and saved thumbnail '%s' for asset %s at %s", size.Name, asset.AssetID, storagePath)
+	}
+
 	return nil
 }

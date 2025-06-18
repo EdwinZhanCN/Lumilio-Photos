@@ -1,8 +1,8 @@
-version: "3.8"
-
 services:
     db:
         image: postgres:15-alpine
+        ports:
+            - "5432:5432"
         volumes:
             - postgres_data:/var/lib/postgresql/data
         environment:
@@ -11,9 +11,6 @@ services:
             - POSTGRES_DB=lumiliophotos
         networks:
             - backend
-        # Remove public port exposure for security
-        # ports:
-        #     - "5432:5432"
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U postgres"]
             interval: 5s
@@ -33,6 +30,7 @@ services:
             - frontend
             - backend
         environment:
+            - ENV=production # Set to 'development' for local dev
             - DB_HOST=db
             - DB_PORT=5432
             - DB_USER=postgres
@@ -63,6 +61,7 @@ services:
             - backend
             - ml-network
         environment:
+            - ENV=production # Set to 'development' for local dev
             - DB_HOST=db
             - DB_PORT=5432
             - DB_USER=postgres
@@ -74,6 +73,10 @@ services:
             - STORAGE_STRATEGY=date # 必须与API保持一致
             - STORAGE_PRESERVE_FILENAME=true
             - STORAGE_DUPLICATE_HANDLING=rename
+            - ML_SERVICE_ADDR=ml:50051
+            - ML_IMAGE_MAX_WIDTH=1024 # Max width for ML processing (default: 1024)
+            - ML_IMAGE_MAX_HEIGHT=1024 # Max height for ML processing (default: 1024)
+            - ML_IMAGE_QUALITY=85 # JPEG quality for ML processing (1-100, default: 85)
         volumes:
             - photo_storage:/app/data/photos
             - staging_area:/app/staging
@@ -99,13 +102,12 @@ services:
             dockerfile: pml/Dockerfile
         networks:
             - ml-network
+        ports:
+            - "50051:50051"
         environment:
             - MODEL_PATH=/app/models
         volumes:
             - ai_models:/app/models
-        # Remove public port exposure for security
-        # ports:
-        #     - "8081:8081"
 
 volumes:
     postgres_data:
@@ -120,7 +122,7 @@ networks:
         internal: false # Allows external access for frontend
     backend:
         driver: bridge
-        internal: true # Database and backend services only
+        internal: false # Database and backend services only
     ml-network:
         driver: bridge
         internal: true # ML service isolated network

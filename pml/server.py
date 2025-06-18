@@ -238,7 +238,7 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
             )
 
 
-def serve(port: int = 8081, max_workers: int = 10):
+def serve(port: int = 50051, max_workers: int = 10):
     """Start the gRPC server"""
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=max_workers))
 
@@ -272,7 +272,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='ML Prediction gRPC Server')
-    parser.add_argument('--port', type=int, default=8081, help='Server port')
+    parser.add_argument('--port', type=int, default=50051, help='Server port')
     parser.add_argument('--workers', type=int, default=10, help='Max worker threads')
 
     args = parser.parse_args()
