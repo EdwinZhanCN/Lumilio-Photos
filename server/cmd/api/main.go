@@ -32,17 +32,15 @@ func init() {
 	}
 }
 
-// @title RKPhoto Manager API
+// @title Lumilio-Photos Manager API
 // @version 1.0
 // @description Photo management system API with asset upload, processing, and organization features
-// @termsOfService http://swagger.io/terms/
 
 // @contact.name API Support
-// @contact.url http://www.swagger.io/support
-// @contact.email support@swagger.io
+// @contact.url http://www.github.com/EdwinZhanCN/Lumilio-Photos
 
-// @license.name MIT
-// @license.url https://opensource.org/licenses/MIT
+// @license.name GPLv3.0
+// @license.url https://opensource.org/licenses/GPL-3.0
 
 // @host localhost:3001
 // @BasePath /api/v1
@@ -92,18 +90,7 @@ func main() {
 	assetRepo := gorm_repo.NewAssetRepository(database)
 	tagRepo := gorm_repo.NewTagRepository(database)
 
-	// Initialize local storage
-	// Get storage path from environment variable or use default
-	storagePath := os.Getenv("STORAGE_PATH")
-	if storagePath == "" {
-		storagePath = "/app/data/photos" // 最终储存区，required by AssetsService
-	}
-	log.Printf("Using storage path: %s", storagePath)
-
-	localStorage, err := storage.NewLocalStorage(storagePath)
-	if err != nil {
-		log.Fatalf("Failed to initialize local storage: %v", err)
-	}
+	// Storage will be initialized through AssetService with configuration
 
 	// Initialize staging area for temporary file storage
 	stagingPath := os.Getenv("STAGING_PATH")
@@ -135,8 +122,15 @@ func main() {
 	}
 	defer taskQueue.Close()
 
+	// Load storage configuration
+	storageConfig := storage.LoadStorageConfigFromEnv()
+	log.Printf("Using storage strategy: %s (%s)", storageConfig.Strategy, storageConfig.Strategy.GetDescription())
+
 	// Initialize services, service layer inside the api layer only responsible for non-upload logic
-	assetService := service.NewAssetService(assetRepo, tagRepo, localStorage)
+	assetService, err := service.NewAssetServiceWithConfig(assetRepo, tagRepo, storageConfig)
+	if err != nil {
+		log.Fatalf("Failed to initialize asset service: %v", err)
+	}
 
 	// Initialize controllers - pass the staging path and task queue to the handler
 	assetController := handler.NewAssetHandler(assetService, stagingPath, taskQueue)

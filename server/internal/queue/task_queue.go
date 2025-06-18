@@ -10,9 +10,19 @@ import (
 	"time"
 )
 
+type TaskType string
+
+const (
+	TaskTypeUpload  TaskType = "UPLOAD"
+	TaskTypeScan    TaskType = "SCAN"
+	TaskTypeProcess TaskType = "PROCESS"
+	TaskTypeIndex   TaskType = "INDEX"
+)
+
 // Task represents a processing job that needs to be performed
 type Task struct {
 	TaskID      string    `json:"taskId"`
+	Type        TaskType  `json:"type"`
 	ClientHash  string    `json:"clientHash"`
 	StagedPath  string    `json:"stagedPath"`
 	UserID      string    `json:"userId"`

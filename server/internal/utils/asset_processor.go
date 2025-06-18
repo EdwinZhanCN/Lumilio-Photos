@@ -41,54 +41,96 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, asset *models.Asset)
 	}
 }
 
-// ProcessNewAsset processes a newly uploaded asset file
+// ProcessNewAsset processes a newly uploaded asset file from staging area
 func (ap *AssetProcessor) ProcessNewAsset(stagedPath string, userID string, fileName string) (*models.Asset, error) {
-	// Create a context
 	ctx := context.Background()
 
-	// Calculate hash for the file (content-addressable storage)
-	hash, err := CalculateFileHash(stagedPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate file hash: %w", err)
-	}
-
-	// Determine asset type from filename
-	assetType := determineAssetType(fileName)
-
-	// Open the file
+	// Open the staged file
 	file, err := os.Open(stagedPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open staged file: %w", err)
 	}
 	defer file.Close()
 
-	// Upload to storage
 	fileInfo, err := file.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file info: %w", err)
 	}
 
-	// Rewind file after getting stats
+	// Parse owner ID if possible
+	var ownerIDPtr *int
+	if userID != "anonymous" {
+		ownerID := 1 // Default owner ID, in real app convert userID string to int
+		ownerIDPtr = &ownerID
+	}
+
+	// Reset file position for reading
 	if _, err := file.Seek(0, 0); err != nil {
 		return nil, fmt.Errorf("failed to reset file position: %w", err)
 	}
 
-	// Parse owner ID if possible
+	// Use AssetService.UploadAsset to handle the upload process
+	// This will calculate hash, check duplicates, upload to storage, and create DB record
+	asset, err := ap.assetService.UploadAsset(ctx, file, fileName, fileInfo.Size(), ownerIDPtr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to upload asset: %w", err)
+	}
+
+	// Now process the asset for metadata extraction and AI tagging
+	if err := ap.ProcessAsset(ctx, asset); err != nil {
+		// Log error but don't fail the entire operation
+		fmt.Printf("Warning: failed to process asset metadata: %v\n", err)
+	}
+
+	// Clean up the staged file since it's now in permanent storage
+	if err := os.Remove(stagedPath); err != nil {
+		fmt.Printf("Warning: failed to remove staged file %s: %v\n", stagedPath, err)
+	}
+
+	return asset, nil
+}
+
+// ProcessExistingAsset processes an existing file that's already in the storage system
+func (ap *AssetProcessor) ProcessExistingAsset(filePath string, userID string, fileName string) (*models.Asset, error) {
+	ctx := context.Background()
+
+	// Calculate hash for the existing file
+	hash, err := CalculateFileHash(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate file hash: %w", err)
+	}
+
+	// Check if this asset already exists in the database
+	existingAssets, err := ap.assetService.DetectDuplicates(ctx, hash)
+	if err == nil && len(existingAssets) > 0 {
+		// Asset already exists, just process it for any missing metadata
+		asset := existingAssets[0]
+		if err := ap.ProcessAsset(ctx, asset); err != nil {
+			fmt.Printf("Warning: failed to process existing asset metadata: %v\n", err)
+		}
+		return asset, nil
+	}
+
+	// Asset doesn't exist in DB, create a new record
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file info: %w", err)
+	}
+
+	// Parse owner ID
 	var ownerIDPtr *int
 	if userID != "anonymous" {
-		// In a real app, you'd convert the userID string to an int
-		// Here we're just creating a placeholder
-		ownerID := 1 // Default owner ID
+		ownerID := 1
 		ownerIDPtr = &ownerID
 	}
 
-	// Create a new asset record
+	// Create asset record directly (file is already in storage)
 	asset := &models.Asset{
 		AssetID:          uuid.New(),
 		OwnerID:          ownerIDPtr,
-		Type:             assetType,
+		Type:             determineAssetType(fileName),
 		OriginalFilename: fileName,
-		StoragePath:      stagedPath, // This will be updated when the file is moved to final storage
+		StoragePath:      filePath,
 		MimeType:         getMimeTypeFromFileName(fileName),
 		FileSize:         fileInfo.Size(),
 		Hash:             hash,
@@ -97,19 +139,16 @@ func (ap *AssetProcessor) ProcessNewAsset(stagedPath string, userID string, file
 		SpecificMetadata: make(models.SpecificMetadata),
 	}
 
-	// Universal way to process the asset
-	ap.ProcessAsset(ctx, asset)
-
-	// Save the asset to the database
-	uploadedAsset, err := ap.assetService.UploadAsset(ctx, file, fileName, fileInfo.Size(), ownerIDPtr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save asset to database: %w", err)
+	// Save to database
+	if err := ap.assetService.CreateAssetRecord(ctx, asset); err != nil {
+		return nil, fmt.Errorf("failed to create asset record: %w", err)
 	}
 
-	// Use the uploaded asset instead of our local one
-	asset = uploadedAsset
+	// Process for metadata and AI tagging
+	if err := ap.ProcessAsset(ctx, asset); err != nil {
+		fmt.Printf("Warning: failed to process asset metadata: %v\n", err)
+	}
 
-	// Return the asset
 	return asset, nil
 }
 

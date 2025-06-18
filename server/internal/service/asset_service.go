@@ -42,6 +42,11 @@ type AssetService interface {
 	BatchUploadAssets(ctx context.Context, files []io.Reader, filenames []string, fileSizes []int64, ownerID *int) ([]*models.Asset, []error)
 	SearchAssets(ctx context.Context, query string, assetType *models.AssetType, limit, offset int) ([]*models.Asset, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]*models.Asset, error)
+	// SaveAssetIndex completes the INDEX step for a processed asset
+	SaveAssetIndex(ctx context.Context, taskID string, hash string) error
+	// CreateAssetRecord creates a new asset record in the database without file upload
+	CreateAssetRecord(ctx context.Context, asset *models.Asset) error
+
 	GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*models.Tag, error)
 }
 
@@ -58,6 +63,20 @@ func NewAssetService(r repository.AssetRepository, tagR repository.TagRepository
 		tagRepo: tagR,
 		storage: s,
 	}
+}
+
+// NewAssetServiceWithConfig creates a new instance of AssetService with storage configuration
+func NewAssetServiceWithConfig(r repository.AssetRepository, tagR repository.TagRepository, storageConfig storage.StorageConfig) (AssetService, error) {
+	s, err := storage.NewStorageWithConfig(storageConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create storage: %w", err)
+	}
+
+	return &assetService{
+		repo:    r,
+		tagRepo: tagR,
+		storage: s,
+	}, nil
 }
 
 // UploadAsset handles the asset upload process with automatic type detection
@@ -307,4 +326,41 @@ func (s *assetService) GetOrCreateTagByName(ctx context.Context, name, category 
 		return nil, err
 	}
 	return tag, nil
+}
+
+// SaveAssetIndex implements the INDEX step: verify asset exists by hash and complete indexing
+func (s *assetService) SaveAssetIndex(ctx context.Context, taskID string, hash string) error {
+	assets, err := s.repo.GetAssetsByHash(ctx, hash)
+	if err != nil {
+		return fmt.Errorf("failed to query asset by hash: %w", err)
+	}
+	if len(assets) == 0 {
+		return fmt.Errorf("no asset found for hash %s", hash)
+	}
+
+	// Get the asset for indexing
+	asset := assets[0]
+
+	// Update asset metadata to mark it as indexed
+	if asset.SpecificMetadata == nil {
+		asset.SpecificMetadata = make(models.SpecificMetadata)
+	}
+
+	// Add indexing completion metadata
+	asset.SpecificMetadata["indexed"] = true
+	asset.SpecificMetadata["index_task_id"] = taskID
+	asset.SpecificMetadata["index_completed_at"] = time.Now().Format(time.RFC3339)
+
+	// Update the asset in the database
+	if err := s.repo.UpdateAsset(ctx, asset); err != nil {
+		return fmt.Errorf("failed to update asset indexing status: %w", err)
+	}
+
+	log.Printf("Asset indexing completed for hash %s, task %s", hash, taskID)
+	return nil
+}
+
+// CreateAssetRecord creates a new asset record in the database
+func (s *assetService) CreateAssetRecord(ctx context.Context, asset *models.Asset) error {
+	return s.repo.CreateAsset(ctx, asset)
 }
