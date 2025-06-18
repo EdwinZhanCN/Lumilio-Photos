@@ -109,7 +109,7 @@ func (s *assetService) UploadAsset(ctx context.Context, file io.Reader, filename
 	}
 
 	// 5. Upload to storage
-	storagePath, err := s.storage.Upload(ctx, fileReader)
+	storagePath, err := s.storage.UploadWithMetadata(ctx, fileReader, filename, s.getContentType(filename))
 	if err != nil {
 		return nil, fmt.Errorf("storage upload failed: %w", err)
 	}
@@ -321,6 +321,7 @@ func (s *assetService) GetOrCreateTagByName(ctx context.Context, name, category 
 		TagName:       name,
 		Category:      category,
 		IsAIGenerated: isAIGenerated,
+		Assets:        []models.Asset{},
 	}
 	if err := s.tagRepo.Create(ctx, tag); err != nil {
 		return nil, err

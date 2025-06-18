@@ -9,8 +9,6 @@ RUN apt-get update && \
     pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt python-dotenv
 
-COPY . .
-
 # 创建模型目录
 RUN mkdir -p /app/models
 
@@ -18,12 +16,14 @@ RUN mkdir -p /app/models
 RUN wget -O /app/models/mobileclip_s1.pt https://docs-assets.developer.apple.com/ml-research/datasets/mobileclip/mobileclip_s1.pt \
     || (echo "Apple Download Link Down, Please Create an Issue at https://github.com/EdwinZhanCN/Lumilio-Photos" && exit 1)
 
+COPY . .
+
 # 如有其他模型，也可类似下载
 # RUN wget -O /app/models/yolov8-lite-s.pt https://your-model-download-link/yolov8-lite-s.pt
 
 ENV PYTHONUNBUFFERED=1
 ENV MODEL_PATH=/app/models
 
-EXPOSE 8081
+EXPOSE 50051
 
-CMD ["python", "pml/server.py", "--port", "8081", "--workers", "10"]
+CMD ["python", "pml/server.py", "--port", "50051", "--workers", "10"]

@@ -14,39 +14,42 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10ml_service.proto\x12\nprediction\"i\n\x13ImageProcessRequest\x12\x10\n\x08image_id\x18\x01 \x01(\t\x12\x12\n\nimage_data\x18\x02 \x01(\x0c\x12\x15\n\rtarget_labels\x18\x03 \x03(\t\x12\x15\n\rmodel_version\x18\x04 \x01(\t\"\xad\x01\n\x14ImageProcessResponse\x12\x10\n\x08image_id\x18\x01 \x01(\t\x12\x1c\n\x14image_feature_vector\x18\x02 \x03(\x02\x12\x18\n\x10predicted_labels\x18\x03 \x03(\t\x12\x18\n\x10similarity_score\x18\x04 \x01(\x02\x12\x15\n\rmodel_version\x18\x05 \x01(\t\x12\x1a\n\x12processing_time_ms\x18\x06 \x01(\x03\";\n\x14TextEmbeddingRequest\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x15\n\rmodel_version\x18\x02 \x01(\t\"g\n\x15TextEmbeddingResponse\x12\x1b\n\x13text_feature_vector\x18\x01 \x03(\x02\x12\x15\n\rmodel_version\x18\x02 \x01(\t\x12\x1a\n\x12processing_time_ms\x18\x03 \x01(\x03\"\xa8\x01\n\x0ePredictRequest\x12\x12\n\x08raw_data\x18\x01 \x01(\x0cH\x00\x12\x33\n\x0e\x66loat_features\x18\x02 \x01(\x0b\x32\x19.prediction.FloatFeaturesH\x00\x12\x14\n\ntext_input\x18\x03 \x01(\tH\x00\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12\x15\n\rmodel_version\x18\x05 \x01(\tB\x0c\n\ninput_data\"\xd1\x01\n\x0fPredictResponse\x12\x39\n\x11prediction_floats\x18\x01 \x01(\x0b\x32\x1c.prediction.PredictionFloatsH\x00\x12\x19\n\x0fprediction_text\x18\x02 \x01(\tH\x00\x12\x12\n\nconfidence\x18\x03 \x01(\x02\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12\x15\n\rmodel_version\x18\x05 \x01(\t\x12\x1a\n\x12prediction_time_ms\x18\x06 \x01(\x03\x42\r\n\x0boutput_data\"W\n\x13\x42\x61tchPredictRequest\x12,\n\x08requests\x18\x01 \x03(\x0b\x32\x1a.prediction.PredictRequest\x12\x12\n\nmodel_name\x18\x02 \x01(\t\"s\n\x14\x42\x61tchPredictResponse\x12.\n\tresponses\x18\x01 \x03(\x0b\x32\x1b.prediction.PredictResponse\x12\x15\n\rsuccess_count\x18\x02 \x01(\x05\x12\x14\n\x0c\x66\x61iled_count\x18\x03 \x01(\x05\"\x1f\n\rFloatFeatures\x12\x0e\n\x06values\x18\x01 \x03(\x02\"\"\n\x10PredictionFloats\x12\x0e\n\x06values\x18\x01 \x03(\x02\"*\n\x12HealthCheckRequest\x12\x14\n\x0cservice_name\x18\x01 \x01(\t\"\x80\x02\n\x13HealthCheckResponse\x12=\n\x06status\x18\x01 \x01(\x0e\x32-.prediction.HealthCheckResponse.ServingStatus\x12\x12\n\nmodel_name\x18\x02 \x01(\t\x12\x15\n\rmodel_version\x18\x03 \x01(\t\x12\x16\n\x0euptime_seconds\x18\x04 \x01(\x03\x12\x0f\n\x07message\x18\x05 \x01(\t\"V\n\rServingStatus\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0b\n\x07SERVING\x10\x01\x12\x0f\n\x0bNOT_SERVING\x10\x02\x12\x1a\n\x16SERVICE_SPECIFIC_ERROR\x10\x03\x32\xba\x03\n\x11PredictionService\x12X\n\x13ProcessImageForCLIP\x12\x1f.prediction.ImageProcessRequest\x1a .prediction.ImageProcessResponse\x12^\n\x17GetTextEmbeddingForCLIP\x12 .prediction.TextEmbeddingRequest\x1a!.prediction.TextEmbeddingResponse\x12\x44\n\x07Predict\x12\x1a.prediction.PredictRequest\x1a\x1b.prediction.PredictResponse\"\x00\x12S\n\x0c\x42\x61tchPredict\x12\x1f.prediction.BatchPredictRequest\x1a .prediction.BatchPredictResponse\"\x00\x12P\n\x0bHealthCheck\x12\x1e.prediction.HealthCheckRequest\x1a\x1f.prediction.HealthCheckResponse\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10ml_service.proto\x12\nprediction\"5\n\nLabelScore\x12\r\n\x05label\x18\x01 \x01(\t\x12\x18\n\x10similarity_score\x18\x02 \x01(\x02\"i\n\x13ImageProcessRequest\x12\x10\n\x08image_id\x18\x01 \x01(\t\x12\x12\n\nimage_data\x18\x02 \x01(\x0c\x12\x15\n\rtarget_labels\x18\x03 \x03(\t\x12\x15\n\rmodel_version\x18\x04 \x01(\t\"\xab\x01\n\x14ImageProcessResponse\x12\x10\n\x08image_id\x18\x01 \x01(\t\x12\x1c\n\x14image_feature_vector\x18\x02 \x03(\x02\x12\x30\n\x10predicted_scores\x18\x03 \x03(\x0b\x32\x16.prediction.LabelScore\x12\x15\n\rmodel_version\x18\x04 \x01(\t\x12\x1a\n\x12processing_time_ms\x18\x05 \x01(\x03\";\n\x14TextEmbeddingRequest\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x15\n\rmodel_version\x18\x02 \x01(\t\"g\n\x15TextEmbeddingResponse\x12\x1b\n\x13text_feature_vector\x18\x01 \x03(\x02\x12\x15\n\rmodel_version\x18\x02 \x01(\t\x12\x1a\n\x12processing_time_ms\x18\x03 \x01(\x03\"\xa8\x01\n\x0ePredictRequest\x12\x12\n\x08raw_data\x18\x01 \x01(\x0cH\x00\x12\x33\n\x0e\x66loat_features\x18\x02 \x01(\x0b\x32\x19.prediction.FloatFeaturesH\x00\x12\x14\n\ntext_input\x18\x03 \x01(\tH\x00\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12\x15\n\rmodel_version\x18\x05 \x01(\tB\x0c\n\ninput_data\"\xd1\x01\n\x0fPredictResponse\x12\x39\n\x11prediction_floats\x18\x01 \x01(\x0b\x32\x1c.prediction.PredictionFloatsH\x00\x12\x19\n\x0fprediction_text\x18\x02 \x01(\tH\x00\x12\x12\n\nconfidence\x18\x03 \x01(\x02\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12\x15\n\rmodel_version\x18\x05 \x01(\t\x12\x1a\n\x12prediction_time_ms\x18\x06 \x01(\x03\x42\r\n\x0boutput_data\"W\n\x13\x42\x61tchPredictRequest\x12,\n\x08requests\x18\x01 \x03(\x0b\x32\x1a.prediction.PredictRequest\x12\x12\n\nmodel_name\x18\x02 \x01(\t\"s\n\x14\x42\x61tchPredictResponse\x12.\n\tresponses\x18\x01 \x03(\x0b\x32\x1b.prediction.PredictResponse\x12\x15\n\rsuccess_count\x18\x02 \x01(\x05\x12\x14\n\x0c\x66\x61iled_count\x18\x03 \x01(\x05\"\x1f\n\rFloatFeatures\x12\x0e\n\x06values\x18\x01 \x03(\x02\"\"\n\x10PredictionFloats\x12\x0e\n\x06values\x18\x01 \x03(\x02\"*\n\x12HealthCheckRequest\x12\x14\n\x0cservice_name\x18\x01 \x01(\t\"\x80\x02\n\x13HealthCheckResponse\x12=\n\x06status\x18\x01 \x01(\x0e\x32-.prediction.HealthCheckResponse.ServingStatus\x12\x12\n\nmodel_name\x18\x02 \x01(\t\x12\x15\n\rmodel_version\x18\x03 \x01(\t\x12\x16\n\x0euptime_seconds\x18\x04 \x01(\x03\x12\x0f\n\x07message\x18\x05 \x01(\t\"V\n\rServingStatus\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0b\n\x07SERVING\x10\x01\x12\x0f\n\x0bNOT_SERVING\x10\x02\x12\x1a\n\x16SERVICE_SPECIFIC_ERROR\x10\x03\x32\xba\x03\n\x11PredictionService\x12X\n\x13ProcessImageForCLIP\x12\x1f.prediction.ImageProcessRequest\x1a .prediction.ImageProcessResponse\x12^\n\x17GetTextEmbeddingForCLIP\x12 .prediction.TextEmbeddingRequest\x1a!.prediction.TextEmbeddingResponse\x12\x44\n\x07Predict\x12\x1a.prediction.PredictRequest\x1a\x1b.prediction.PredictResponse\"\x00\x12S\n\x0c\x42\x61tchPredict\x12\x1f.prediction.BatchPredictRequest\x1a .prediction.BatchPredictResponse\"\x00\x12P\n\x0bHealthCheck\x12\x1e.prediction.HealthCheckRequest\x1a\x1f.prediction.HealthCheckResponse\"\x00\x42\x1eZ\x1crkphoto-manager/server/protob\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'ml_service_pb2', _globals)
 if _descriptor._USE_C_DESCRIPTORS == False:
-  DESCRIPTOR._options = None
-  _globals['_IMAGEPROCESSREQUEST']._serialized_start=32
-  _globals['_IMAGEPROCESSREQUEST']._serialized_end=137
-  _globals['_IMAGEPROCESSRESPONSE']._serialized_start=140
-  _globals['_IMAGEPROCESSRESPONSE']._serialized_end=313
-  _globals['_TEXTEMBEDDINGREQUEST']._serialized_start=315
-  _globals['_TEXTEMBEDDINGREQUEST']._serialized_end=374
-  _globals['_TEXTEMBEDDINGRESPONSE']._serialized_start=376
-  _globals['_TEXTEMBEDDINGRESPONSE']._serialized_end=479
-  _globals['_PREDICTREQUEST']._serialized_start=482
-  _globals['_PREDICTREQUEST']._serialized_end=650
-  _globals['_PREDICTRESPONSE']._serialized_start=653
-  _globals['_PREDICTRESPONSE']._serialized_end=862
-  _globals['_BATCHPREDICTREQUEST']._serialized_start=864
-  _globals['_BATCHPREDICTREQUEST']._serialized_end=951
-  _globals['_BATCHPREDICTRESPONSE']._serialized_start=953
-  _globals['_BATCHPREDICTRESPONSE']._serialized_end=1068
-  _globals['_FLOATFEATURES']._serialized_start=1070
-  _globals['_FLOATFEATURES']._serialized_end=1101
-  _globals['_PREDICTIONFLOATS']._serialized_start=1103
-  _globals['_PREDICTIONFLOATS']._serialized_end=1137
-  _globals['_HEALTHCHECKREQUEST']._serialized_start=1139
-  _globals['_HEALTHCHECKREQUEST']._serialized_end=1181
-  _globals['_HEALTHCHECKRESPONSE']._serialized_start=1184
-  _globals['_HEALTHCHECKRESPONSE']._serialized_end=1440
-  _globals['_HEALTHCHECKRESPONSE_SERVINGSTATUS']._serialized_start=1354
-  _globals['_HEALTHCHECKRESPONSE_SERVINGSTATUS']._serialized_end=1440
-  _globals['_PREDICTIONSERVICE']._serialized_start=1443
-  _globals['_PREDICTIONSERVICE']._serialized_end=1885
+  _globals['DESCRIPTOR']._options = None
+  _globals['DESCRIPTOR']._serialized_options = b'Z\034rkphoto-manager/server/proto'
+  _globals['_LABELSCORE']._serialized_start=32
+  _globals['_LABELSCORE']._serialized_end=85
+  _globals['_IMAGEPROCESSREQUEST']._serialized_start=87
+  _globals['_IMAGEPROCESSREQUEST']._serialized_end=192
+  _globals['_IMAGEPROCESSRESPONSE']._serialized_start=195
+  _globals['_IMAGEPROCESSRESPONSE']._serialized_end=366
+  _globals['_TEXTEMBEDDINGREQUEST']._serialized_start=368
+  _globals['_TEXTEMBEDDINGREQUEST']._serialized_end=427
+  _globals['_TEXTEMBEDDINGRESPONSE']._serialized_start=429
+  _globals['_TEXTEMBEDDINGRESPONSE']._serialized_end=532
+  _globals['_PREDICTREQUEST']._serialized_start=535
+  _globals['_PREDICTREQUEST']._serialized_end=703
+  _globals['_PREDICTRESPONSE']._serialized_start=706
+  _globals['_PREDICTRESPONSE']._serialized_end=915
+  _globals['_BATCHPREDICTREQUEST']._serialized_start=917
+  _globals['_BATCHPREDICTREQUEST']._serialized_end=1004
+  _globals['_BATCHPREDICTRESPONSE']._serialized_start=1006
+  _globals['_BATCHPREDICTRESPONSE']._serialized_end=1121
+  _globals['_FLOATFEATURES']._serialized_start=1123
+  _globals['_FLOATFEATURES']._serialized_end=1154
+  _globals['_PREDICTIONFLOATS']._serialized_start=1156
+  _globals['_PREDICTIONFLOATS']._serialized_end=1190
+  _globals['_HEALTHCHECKREQUEST']._serialized_start=1192
+  _globals['_HEALTHCHECKREQUEST']._serialized_end=1234
+  _globals['_HEALTHCHECKRESPONSE']._serialized_start=1237
+  _globals['_HEALTHCHECKRESPONSE']._serialized_end=1493
+  _globals['_HEALTHCHECKRESPONSE_SERVINGSTATUS']._serialized_start=1407
+  _globals['_HEALTHCHECKRESPONSE_SERVINGSTATUS']._serialized_end=1493
+  _globals['_PREDICTIONSERVICE']._serialized_start=1496
+  _globals['_PREDICTIONSERVICE']._serialized_end=1938
 # @@protoc_insertion_point(module_scope)

@@ -188,6 +188,63 @@ definitions:
     - AssetTypeVideo
     - AssetTypeAudio
     - AssetTypeDocument
+  models.AuthResponse:
+    description: Authentication response containing tokens and user info
+    properties:
+      expiresAt:
+        example: "2024-01-16T10:30:00Z"
+        type: string
+      refreshToken:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      user:
+        $ref: '#/definitions/models.UserResponse'
+    type: object
+  models.LoginRequest:
+    description: Login credentials
+    properties:
+      password:
+        example: securepassword123
+        type: string
+      username:
+        example: john_doe
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.RefreshTokenRequest:
+    description: Refresh token for JWT renewal
+    properties:
+      refreshToken:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+    required:
+    - refreshToken
+    type: object
+  models.RegisterRequest:
+    description: User registration data
+    properties:
+      email:
+        example: john@example.com
+        type: string
+      password:
+        example: securepassword123
+        minLength: 6
+        type: string
+      username:
+        example: john_doe
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
   models.SpecificMetadata:
     additionalProperties: true
     description: Type-specific metadata stored as JSON
@@ -239,19 +296,39 @@ definitions:
         example: 1
         type: integer
     type: object
+  models.UserResponse:
+    description: User information for API responses (excludes sensitive data)
+    properties:
+      created_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+      email:
+        example: john@example.com
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      last_login:
+        example: "2024-01-16T15:45:00Z"
+        type: string
+      user_id:
+        example: 1
+        type: integer
+      username:
+        example: john_doe
+        type: string
+    type: object
 host: localhost:3001
 info:
   contact:
-    email: support@swagger.io
     name: API Support
-    url: http://www.swagger.io/support
+    url: http://www.github.com/EdwinZhanCN/Lumilio-Photos
   description: Photo management system API with asset upload, processing, and organization
     features
   license:
-    name: MIT
-    url: https://opensource.org/licenses/MIT
-  termsOfService: http://swagger.io/terms/
-  title: RKPhoto Manager API
+    name: GPLv3.0
+    url: https://opensource.org/licenses/GPL-3.0
+  title: Lumilio-Photos Manager API
   version: "1.0"
 paths:
   /api/v1/assets:
@@ -510,18 +587,12 @@ paths:
     post:
       consumes:
       - multipart/form-data
-      description: Upload multiple files in a single request for batch processing
-      parameters:
-      - description: Multiple asset files to upload
-        in: formData
-        name: files
-        required: true
-        type: file
-      - description: Client-calculated BLAKE3 hash (for single file batch)
-        in: header
-        name: X-Content-Hash
-        type: string
+      - multipart/form-data
+      description: |-
+        Upload multiple files in a single request for batch processing
+        Batch uploads multiple assets using a multipart/form-data request. The field name for each file part must be its BLAKE3 content hash.
       produces:
+      - application/json
       - application/json
       responses:
         "200":
@@ -541,7 +612,7 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/api.Result'
-      summary: Upload multiple assets
+      summary: Batch upload assets
       tags:
       - assets
   /api/v1/assets/types:
@@ -564,6 +635,187 @@ paths:
       summary: Get supported asset types
       tags:
       - assets
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with username and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.AuthResponse'
+              type: object
+        "400":
+          description: Invalid request data
+          schema:
+            $ref: '#/definitions/api.Result'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Login user
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Revoke the user's refresh token
+      parameters:
+      - description: Refresh token to revoke
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logout successful
+          schema:
+            $ref: '#/definitions/api.Result'
+        "400":
+          description: Invalid request data
+          schema:
+            $ref: '#/definitions/api.Result'
+        "401":
+          description: Invalid refresh token
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Logout user
+      tags:
+      - auth
+  /auth/me:
+    get:
+      consumes:
+      - application/json
+      description: Get information about the currently authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User information retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.UserResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Generate a new access token using a valid refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token refreshed successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.AuthResponse'
+              type: object
+        "400":
+          description: Invalid request data
+          schema:
+            $ref: '#/definitions/api.Result'
+        "401":
+          description: Invalid or expired refresh token
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Refresh access token
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account with username, email, and password
+      parameters:
+      - description: Registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User registered successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.AuthResponse'
+              type: object
+        "400":
+          description: Invalid request data
+          schema:
+            $ref: '#/definitions/api.Result'
+        "409":
+          description: User already exists
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Register a new user
+      tags:
+      - auth
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
@@ -24,11 +25,33 @@ import (
 func init() {
 	log.SetOutput(os.Stdout)
 
+	// Check if we're in development mode
+	isDev := strings.ToLower(os.Getenv("ENV")) == "development" ||
+		strings.ToLower(os.Getenv("ENVIRONMENT")) == "development" ||
+		os.Getenv("DEV_MODE") == "true"
+
 	// Try to load .env file but continue if it's not found
-	if err := godotenv.Load(); err != nil {
-		log.Println("Running without .env file, using environment variables")
+	envFile := ".env"
+	if isDev {
+		// Try development-specific env file first
+		if _, err := os.Stat(".env.development"); err == nil {
+			envFile = ".env.development"
+		}
+	}
+
+	if err := godotenv.Load(envFile); err != nil {
+		log.Printf("Running without %s file, using environment variables", envFile)
 	} else {
-		log.Println("Environment variables loaded from .env file")
+		log.Printf("Environment variables loaded from %s file", envFile)
+	}
+
+	if isDev {
+		log.Println("🔧 Running in DEVELOPMENT mode")
+		log.Println("📋 Development checklist:")
+		log.Println("   1. Database: Make sure PostgreSQL is running on localhost:5432")
+		log.Println("   2. Database: Use 'docker-compose up db' to start only the database")
+		log.Println("   3. Storage: Local directories will be created automatically")
+		log.Println("   4. Access: API will be available at http://localhost:8080")
 	}
 }
 
@@ -54,16 +77,19 @@ func init() {
 // 只在除了文件上传之外的任务调用AssetsService及其方法
 func main() {
 	dbConfig := config.LoadDBConfig()
-	// 添加测试日志，验证日志配置是否生效
-	log.Println("Starting application...")
+	log.Println("🚀 Starting Lumilio Photos API...")
+	log.Printf("📊 Database configuration: %s:%s/%s", dbConfig.Host, dbConfig.Port, dbConfig.DBName)
+
 	// Connect to the database
 	database := gorm_repo.InitDB(dbConfig)
 
 	// Auto-migrate database models
 	log.Println("Running database migrations...")
 	err := database.AutoMigrate(
-		&models.Asset{},     // New unified asset model
-		&models.Thumbnail{}, // Updated thumbnail model
+		&models.RefreshToken{}, // Refresh token model
+		&models.User{},         // User model for authentication
+		&models.Asset{},        // New unified asset model
+		&models.Thumbnail{},    // Updated thumbnail model
 		&models.Tag{},
 		&models.Album{},
 	)
@@ -89,15 +115,21 @@ func main() {
 	// Initialize repositories
 	assetRepo := gorm_repo.NewAssetRepository(database)
 	tagRepo := gorm_repo.NewTagRepository(database)
+	userRepo := gorm_repo.NewUserRepository(database)
+	refreshTokenRepo := gorm_repo.NewRefreshTokenRepository(database)
 
 	// Storage will be initialized through AssetService with configuration
 
 	// Initialize staging area for temporary file storage
 	stagingPath := os.Getenv("STAGING_PATH")
 	if stagingPath == "" {
-		stagingPath = "/app/staging" // 临时暂存区，用于初次存储用户上传的文件
+		if strings.ToLower(os.Getenv("ENV")) == "development" {
+			stagingPath = "./staging" // Local development path
+		} else {
+			stagingPath = "/app/staging" // Container path
+		}
 	}
-	log.Printf("Using staging path: %s", stagingPath)
+	log.Printf("📁 Using staging path: %s", stagingPath)
 
 	// Ensure staging directory exists
 	if err := os.MkdirAll(stagingPath, 0755); err != nil {
@@ -107,9 +139,13 @@ func main() {
 	// Initialize task queue
 	queueDir := os.Getenv("QUEUE_DIR")
 	if queueDir == "" {
-		queueDir = "/app/queue" // 持久化队列
+		if strings.ToLower(os.Getenv("ENV")) == "development" {
+			queueDir = "./queue" // Local development path
+		} else {
+			queueDir = "/app/queue" // Container path
+		}
 	}
-	log.Printf("Using queue directory: %s", queueDir)
+	log.Printf("📋 Using queue directory: %s", queueDir)
 
 	taskQueue, err := queue.NewTaskQueue(queueDir, 100)
 	if err != nil {
@@ -124,7 +160,10 @@ func main() {
 
 	// Load storage configuration
 	storageConfig := storage.LoadStorageConfigFromEnv()
-	log.Printf("Using storage strategy: %s (%s)", storageConfig.Strategy, storageConfig.Strategy.GetDescription())
+	log.Printf("💾 Storage strategy: %s (%s)", storageConfig.Strategy, storageConfig.Strategy.GetDescription())
+	log.Printf("💾 Storage path: %s", storageConfig.BasePath)
+	log.Printf("💾 Preserve filenames: %t", storageConfig.Options.PreserveOriginalFilename)
+	log.Printf("💾 Duplicate handling: %s", storageConfig.Options.HandleDuplicateFilenames)
 
 	// Initialize services, service layer inside the api layer only responsible for non-upload logic
 	assetService, err := service.NewAssetServiceWithConfig(assetRepo, tagRepo, storageConfig)
@@ -132,8 +171,12 @@ func main() {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
 
+	// Initialize authentication service
+	authService := service.NewAuthService(userRepo, refreshTokenRepo)
+
 	// Initialize controllers - pass the staging path and task queue to the handler
 	assetController := handler.NewAssetHandler(assetService, stagingPath, taskQueue)
+	authController := handler.NewAuthHandler(authService)
 
 	// Start HTTP server
 	port := os.Getenv("PORT")
@@ -142,19 +185,21 @@ func main() {
 	}
 
 	// Initialize Swagger docs
-	docs.SwaggerInfo.Title = "RKPhoto Manager API"
+	docs.SwaggerInfo.Title = "Lumilio-Photos API"
 	docs.SwaggerInfo.Description = "Photo management system API with asset upload, processing, and organization features"
 	docs.SwaggerInfo.Version = "1.0"
 	docs.SwaggerInfo.Host = "localhost:" + port
 	docs.SwaggerInfo.BasePath = "/api/v1"
 
-	// Set up router with new asset endpoints
-	router := api.NewRouter(assetController)
+	// Set up router with new asset and auth endpoints
+	router := api.NewRouter(assetController, authController)
 
 	// Add Swagger documentation endpoint
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	log.Printf("Server starting on port %s...", port)
+	log.Printf("🌐 Server starting on port %s...", port)
+	log.Printf("📖 API Documentation: http://localhost:%s/swagger/index.html", port)
+	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", port)
 	if err := http.ListenAndServe(":"+port, router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}

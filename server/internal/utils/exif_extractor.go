@@ -31,8 +31,15 @@ func (p *AssetProcessor) ExtractAssetMetadata(ctx context.Context, assetID strin
 	defer et.Close()
 
 	// 2. Extract metadata
+	// Construct full path for the image file
 	rootStoragePath := os.Getenv("STORAGE_PATH")
-	metaData := et.ExtractMetadata(rootStoragePath + "/" + storagePath)
+	if rootStoragePath == "" {
+		rootStoragePath = p.storagePath
+	}
+
+	// storagePath is already a relative path from storage service
+	// Construct full absolute path
+	fullPath := fmt.Sprintf("%s/%s", rootStoragePath, storagePath)
 
 	// 3. Initialize metadata structure
 	metadata := models.PhotoSpecificMetadata{
@@ -44,6 +51,13 @@ func (p *AssetProcessor) ExtractAssetMetadata(ctx context.Context, assetID strin
 		GPSLatitude:  0,
 		GPSLongitude: 0,
 	}
+
+	// Check if file exists before trying to extract metadata
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		return metadata, fmt.Errorf("image file not found at path: %s", fullPath)
+	}
+
+	metaData := et.ExtractMetadata(fullPath)
 
 	if len(metaData) == 0 {
 		return metadata, nil

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 )
 
 // DatabaseConfig holds all the configuration for the database connection.
@@ -15,15 +16,34 @@ type DatabaseConfig struct {
 
 // LoadDBConfig loads database settings from environment variables.
 func LoadDBConfig() DatabaseConfig {
-	cfg := DatabaseConfig{
-		// Set defaults for easy local development
-		Host:     "db", // In Docker Compose, the hostname is the service name.
-		Port:     "5432",
-		User:     "postgres",
-		Password: "postgres",
-		DBName:   "photolibrary", // Default matches Docker Compose configuration
+	// Check if we're in development mode
+	isDev := strings.ToLower(os.Getenv("ENV")) == "development" ||
+		strings.ToLower(os.Getenv("ENVIRONMENT")) == "development" ||
+		os.Getenv("DEV_MODE") == "true"
+
+	var cfg DatabaseConfig
+
+	if isDev {
+		// Development defaults - connect to localhost
+		cfg = DatabaseConfig{
+			Host:     "localhost", // For development, connect to localhost
+			Port:     "5432",
+			User:     "postgres",
+			Password: "postgres",
+			DBName:   "lumiliophotos", // Match docker-compose database name
+		}
+	} else {
+		// Production/Docker defaults
+		cfg = DatabaseConfig{
+			Host:     "db", // In Docker Compose, the hostname is the service name
+			Port:     "5432",
+			User:     "postgres",
+			Password: "postgres",
+			DBName:   "lumiliophotos", // Match docker-compose database name
+		}
 	}
 
+	// Override with environment variables if set
 	if host := os.Getenv("DB_HOST"); host != "" {
 		cfg.Host = host
 	}

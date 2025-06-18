@@ -64,20 +64,32 @@ func main() {
 	// Load storage configuration
 	storageConfig := storage.LoadStorageConfigFromEnv()
 	log.Printf("Using storage strategy: %s (%s)", storageConfig.Strategy, storageConfig.Strategy.GetDescription())
+	log.Printf("Storage base path: %s", storageConfig.BasePath)
 
-	// Initialize services with configurable storage
-	assetService, err := service.NewAssetServiceWithConfig(assetRepo, tagRepo, storageConfig)
+	// Initialize storage service
+	storageService, err := storage.NewStorageWithConfig(storageConfig)
 	if err != nil {
-		log.Fatalf("Failed to initialize asset service: %v", err)
+		log.Fatalf("Failed to initialize storage service: %v", err)
 	}
-	mlService, err := service.NewMLClient("localhost:50051")
+
+	// Initialize asset service
+	assetService := service.NewAssetService(assetRepo, tagRepo, storageService)
+
+	// Get ML service address from environment or use default
+	mlServiceAddr := os.Getenv("ML_SERVICE_ADDR")
+	if mlServiceAddr == "" {
+		mlServiceAddr = "ml:50051" // Default Docker service name and port
+	}
+	log.Printf("Connecting to ML service at: %s", mlServiceAddr)
+
+	mlService, err := service.NewMLClient(mlServiceAddr)
 	if err != nil {
 		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
 	}
 
 	// Initialize asset processor
 	// 该实例只能，也只应该在worker端创建
-	assetProcessor := utils.NewAssetProcessor(assetService, nil, storageConfig.BasePath, mlService)
+	assetProcessor := utils.NewAssetProcessor(assetService, storageService, storageConfig.BasePath, mlService)
 
 	// Initialize task queue
 	queueDir := os.Getenv("QUEUE_DIR")
@@ -141,15 +153,22 @@ func processTasksLoop(taskQueue *queue.TaskQueue, assetService service.AssetServ
 				continue
 			}
 			switch task.Type {
-			case queue.TaskTypeUpload:
+			case string(queue.TaskTypeUpload):
 				// 1) UPLOAD → PROCESS
 				procTask := task
-				procTask.Type = queue.TaskTypeProcess
+				procTask.Type = string(queue.TaskTypeProcess)
 				if err := taskQueue.EnqueueTask(procTask); err != nil {
 					log.Printf("[%s] enqueue PROCESS failed: %v", task.TaskID, err)
+				} else {
+					// Mark UPLOAD task as complete after successfully queuing PROCESS
+					if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
+						log.Printf("[%s] mark UPLOAD complete failed: %v", task.TaskID, err)
+					} else {
+						log.Printf("[%s] UPLOAD completed, queued for PROCESS", task.TaskID)
+					}
 				}
 
-			case queue.TaskTypeProcess:
+			case string(queue.TaskTypeProcess):
 				// 2) PROCESS → INDEX
 				// Determine if this is from UPLOAD (staged file) or SCAN (existing file)
 				var asset *models.Asset
@@ -172,15 +191,20 @@ func processTasksLoop(taskQueue *queue.TaskQueue, assetService service.AssetServ
 				}
 
 				idxTask := task
-				idxTask.Type = queue.TaskTypeIndex
+				idxTask.Type = string(queue.TaskTypeIndex)
 				idxTask.ClientHash = asset.Hash // 把最终 hash 透传给 INDEX
 				if err := taskQueue.EnqueueTask(idxTask); err != nil {
 					log.Printf("[%s] enqueue INDEX failed: %v", task.TaskID, err)
 				} else {
-					log.Printf("[%s] PROCESS completed, queued for INDEX", task.TaskID)
+					// Mark PROCESS task as complete after successfully queuing INDEX
+					if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
+						log.Printf("[%s] mark PROCESS complete failed: %v", task.TaskID, err)
+					} else {
+						log.Printf("[%s] PROCESS completed, queued for INDEX", task.TaskID)
+					}
 				}
 
-			case queue.TaskTypeIndex:
+			case string(queue.TaskTypeIndex):
 				// 3) INDEX → 写入数据库并标记完成
 				if err := assetService.SaveAssetIndex(
 					context.Background(), task.TaskID, task.ClientHash,
@@ -194,7 +218,7 @@ func processTasksLoop(taskQueue *queue.TaskQueue, assetService service.AssetServ
 					log.Printf("[%s] INDEX done", task.TaskID)
 				}
 
-			case queue.TaskTypeScan:
+			case string(queue.TaskTypeScan):
 				// 1) SCAN -> PROCESS
 				log.Printf("[%s] SCAN folder: %s", task.TaskID, task.StagedPath)
 				files, err := utils.ListImagesInDir(task.StagedPath)
@@ -204,7 +228,7 @@ func processTasksLoop(taskQueue *queue.TaskQueue, assetService service.AssetServ
 					for _, imgPath := range files {
 						newTask := queue.Task{
 							TaskID:     uuid.New().String(),
-							Type:       queue.TaskTypeProcess,
+							Type:       string(queue.TaskTypeProcess),
 							StagedPath: imgPath,
 							UserID:     task.UserID,
 							Timestamp:  time.Now(),
