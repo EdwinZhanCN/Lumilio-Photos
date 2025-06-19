@@ -20,7 +20,7 @@ from proto import ml_service_pb2, ml_service_pb2_grpc
 from image_classification.clip_service import CLIPService
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 

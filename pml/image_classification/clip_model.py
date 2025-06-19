@@ -30,6 +30,7 @@ class CLIPModelManager:
         self.imagenet_classes_path: str = imagenet_classes_path
         self.load_time: Optional[float] = None
         self.is_loaded: bool = False
+        self.device: Optional[torch.device] = None
 
     def initialize(self):
         """Initialize the CLIP model and ImageNet classes"""
@@ -48,13 +49,41 @@ class CLIPModelManager:
             start_time = time.time()
             logger.info(f"Loading CLIP model from {self.model_path}")
 
+            # Determine the device to use
+            logger.debug("--- Device Selection Debug ---")
+            logger.debug(f"PyTorch version: {torch.__version__}")
+
+            # Check for CUDA
+            cuda_available = torch.cuda.is_available()
+            logger.debug(f"CUDA available: {cuda_available}")
+
+            # Check for MPS (Apple Silicon)
+            mps_built = torch.backends.mps.is_built()
+            mps_available = torch.backends.mps.is_available()
+            logger.debug(f"MPS built: {mps_built}")
+            logger.debug(f"MPS available: {mps_available}")
+
+            if cuda_available:
+                self.device = torch.device("cuda")
+                logger.info("Using CUDA for model inference.")
+            elif mps_available:
+                self.device = torch.device("mps")
+                logger.info("Using MPS for model inference on Apple Silicon.")
+            else:
+                self.device = torch.device("cpu")
+                logger.warning("CUDA and MPS not available. Using CPU for model inference.")
+
+            logger.debug(f"Selected device: {self.device}")
+            logger.debug("-----------------------------")
+
             self.model, _, self.preprocess = mobileclip.create_model_and_transforms(
                 'mobileclip_s1',
                 pretrained=self.model_path
             )
             self.tokenizer = mobileclip.get_tokenizer('mobileclip_s1')
 
-            # Set model to evaluation mode
+            # Set model to evaluation mode and move to the selected device
+            self.model.to(self.device)
             self.model.eval()
 
             self.load_time = time.time()
@@ -92,8 +121,8 @@ class CLIPModelManager:
             # Convert bytes to PIL Image
             image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
 
-            # Preprocess image
-            image_tensor = self.preprocess(image).unsqueeze(0)
+            # Preprocess image and move to the correct device
+            image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
 
             # Encode with model
             with torch.no_grad():
@@ -112,7 +141,7 @@ class CLIPModelManager:
             raise RuntimeError("Model not initialized. Call initialize() first.")
 
         try:
-            text_tokens = self.tokenizer([text])
+            text_tokens = self.tokenizer([text]).to(self.device)
 
             with torch.no_grad():
                 text_features = self.model.encode_text(text_tokens)
@@ -135,7 +164,7 @@ class CLIPModelManager:
         try:
             # Get image features
             image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
-            image_tensor = self.preprocess(image).unsqueeze(0)
+            image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
 
             with torch.no_grad():
                 image_features = self.model.encode_image(image_tensor)
@@ -156,7 +185,7 @@ class CLIPModelManager:
                 all_text_features = []
 
                 for i in range(0, len(text_descriptions), batch_size):
-                    batch_text = self.tokenizer(text_descriptions[i:i+batch_size])
+                    batch_text = self.tokenizer(text_descriptions[i:i+batch_size]).to(self.device)
                     text_features = self.model.encode_text(batch_text)
                     text_features = text_features / text_features.norm(dim=-1, keepdim=True)
                     all_text_features.append(text_features)
