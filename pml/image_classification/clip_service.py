@@ -14,11 +14,13 @@ from .clip_model import CLIPModelManager
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Construct a reliable path to the imagenet classes file
+IMAGENET_CLASSES_DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'imagenet_class_index.json')
 
 class CLIPService:
     """CLIP-specific service implementation"""
 
-    def __init__(self, model_path: str = './pt/mobileclip_s1.pt', imagenet_classes_path: str = './imagenet_class_index.json'):
+    def __init__(self, model_path: str = './pt/mobileclip_s1.pt', imagenet_classes_path: str = IMAGENET_CLASSES_DEFAULT_PATH):
         self.clip_model = CLIPModelManager(model_path, imagenet_classes_path)
         self.start_time = time.time()
         self.is_initialized = False
