@@ -79,7 +79,7 @@ type Asset struct {
 
 	// Relationships
 	Thumbnails []Thumbnail `gorm:"foreignKey:AssetID" json:"thumbnails,omitempty"`
-	Tags       []Tag       `gorm:"many2many:asset_tags;foreignKey:AssetID;joinForeignKey:AssetID;References:TagID;joinReferences:TagID" json:"tags,omitempty"`
+	Tags       []Tag       `gorm:"many2many:asset_tags;" json:"tags,omitempty"`
 	Albums     []Album     `gorm:"many2many:album_assets;foreignKey:AssetID;joinForeignKey:AssetID;References:AlbumID;joinReferences:AlbumID" json:"albums,omitempty"`
 }
 

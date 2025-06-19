@@ -505,35 +505,39 @@ func (ap *AssetProcessor) resizeImageForML(imagePath string, maxWidth, maxHeight
 	return buf.Bytes(), nil
 }
 
-// Helper function to get the Top-3 confidence labels from CLIP response
+// saveCLIPTagsToAsset saves tags from the ML service response to the asset.
 func (ap *AssetProcessor) saveCLIPTagsToAsset(ctx context.Context, asset *models.Asset, resp *pb.ImageProcessResponse) error {
-	// The new response contains a list of LabelScore objects
+	fmt.Printf("DEBUG: Starting saveCLIPTagsToAsset for asset ID: %s\n", asset.AssetID)
 	predictedScores := resp.GetPredictedScores()
+	fmt.Printf("DEBUG: Received %d predicted scores\n", len(predictedScores))
 
-	// The Python service already returns the top 3, but we can still limit it here as a safeguard.
 	topN := 3
 	if len(predictedScores) > topN {
 		predictedScores = predictedScores[:topN]
+		fmt.Printf("DEBUG: Limiting to top %d scores\n", topN)
 	}
 
-	for _, prediction := range predictedScores {
+	for i, prediction := range predictedScores {
 		label := prediction.GetLabel()
 		score := prediction.GetSimilarityScore()
 
-		fmt.Printf("Get label from CLIP Model: %s with score %f\n", label, score)
+		fmt.Printf("DEBUG: Processing prediction %d: label='%s', score=%f\n", i+1, label, score)
 
-		// 1. Find or create the tag
 		tag, err := ap.assetService.GetOrCreateTagByName(ctx, label, "CLIP", true)
 		if err != nil {
+			fmt.Printf("ERROR: Failed to get or create tag for label '%s': %v\n", label, err)
 			return fmt.Errorf("failed to get or create tag: %w", err)
 		}
+		fmt.Printf("DEBUG: Successfully got or created tag: ID=%d, Name=%s\n", tag.TagID, tag.TagName)
 
-		// 2. Associate the tag with the asset
 		err = ap.assetService.AddTagToAsset(ctx, asset.AssetID, tag.TagID, float32(score), "ai")
 		if err != nil {
+			fmt.Printf("ERROR: Failed to add tag to asset: AssetID=%s, TagID=%d, Error=%v\n", asset.AssetID, tag.TagID, err)
 			return fmt.Errorf("failed to add tag to asset: %w", err)
 		}
+		fmt.Printf("DEBUG: Successfully added tag to asset: AssetID=%s, TagID=%d\n", asset.AssetID, tag.TagID)
 	}
+	fmt.Printf("DEBUG: Finished saveCLIPTagsToAsset for asset ID: %s\n", asset.AssetID)
 	return nil
 }
 

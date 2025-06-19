@@ -92,6 +92,7 @@ func main() {
 		&models.Thumbnail{},    // Updated thumbnail model
 		&models.Tag{},
 		&models.Album{},
+		&models.AssetTag{}, // Join table for assets and tags with metadata
 	)
 
 	if err != nil {
