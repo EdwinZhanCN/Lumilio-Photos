@@ -1,14 +1,17 @@
-FROM python:3.10-slim
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+
+# ... (安装 python, git, etc.) ...
+RUN apt-get update && \
+    apt-get install -y python3.10 python3-pip git wget && \
+    ln -s /usr/bin/python3 /usr/bin/python && \
+    ln -s /usr/bin/pip3 /usr/bin/pip && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY pml/requirements-base.txt pml/requirements-cpu.txt ./
-
-RUN apt-get update && \
-    apt-get install -y git && \
-    apt-get install -y wget && \
-    pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements-cpu.txt
+# 只复制和安装 GPU 相关的依赖
+COPY pml/requirements-base.txt pml/requirements-gpu.txt ./
+RUN pip install --no-cache-dir -r requirements-gpu.txt
 
 # 创建模型目录
 RUN mkdir -p /app/models
