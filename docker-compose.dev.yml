@@ -1,0 +1,112 @@
+services:
+    db:
+        image: postgres:15-alpine
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        environment:
+            - POSTGRES_PASSWORD=postgres
+            - POSTGRES_USER=postgres
+            - POSTGRES_DB=lumiliophotos
+        networks:
+            - backend
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+
+    api:
+        build:
+            context: .
+            dockerfile: server/Dockerfile.api
+        depends_on:
+            db:
+                condition: service_healthy
+        ports:
+            - "8080:8080"
+        networks:
+            - frontend
+            - backend
+        environment:
+            - ENV=production
+            - DB_HOST=db
+            - DB_PORT=5432
+            - DB_USER=postgres
+            - DB_PASSWORD=postgres
+            - DB_NAME=lumiliophotos
+            - PORT=8080
+            - STORAGE_PATH=/app/data/photos
+            - STAGING_PATH=/app/staging
+            - QUEUE_DIR=/app/queue
+            - STORAGE_STRATEGY=date
+            - STORAGE_PRESERVE_FILENAME=true
+            - STORAGE_DUPLICATE_HANDLING=rename
+        volumes:
+            - photo_storage:/app/data/photos
+            - staging_area:/app/staging
+            - task_queue:/app/queue
+
+    worker:
+        build:
+            context: .
+            dockerfile: server/Dockerfile.worker
+        depends_on:
+            db:
+                condition: service_healthy
+            api:
+                condition: service_started
+        networks:
+            - backend
+        environment:
+            - ENV=production
+            - DB_HOST=db
+            - DB_PORT=5432
+            - DB_USER=postgres
+            - DB_PASSWORD=postgres
+            - DB_NAME=lumiliophotos
+            - STORAGE_PATH=/app/data/photos
+            - STAGING_PATH=/app/staging
+            - QUEUE_DIR=/app/queue
+            - STORAGE_STRATEGY=date
+            - STORAGE_PRESERVE_FILENAME=true
+            - STORAGE_DUPLICATE_HANDLING=rename
+            # --- 关键改动 ---
+            # 指向在macOS主机上运行的ML服务
+            - ML_SERVICE_ADDR=host.docker.internal:50051
+            - ML_IMAGE_MAX_WIDTH=1024
+            - ML_IMAGE_MAX_HEIGHT=1024
+            - ML_IMAGE_QUALITY=85
+        volumes:
+            - photo_storage:/app/data/photos
+            - staging_area:/app/staging
+            - task_queue:/app/queue
+
+    frontend:
+        build:
+            context: .
+            dockerfile: web/Dockerfile
+        ports:
+            - "3000:80"
+        networks:
+            - frontend
+        depends_on:
+            api:
+                condition: service_started
+        environment:
+            - API_URL=http://api:8080 # 容器内部网络访问
+
+# 定义持久化数据卷
+volumes:
+    postgres_data:
+    photo_storage:
+    staging_area:
+    task_queue:
+
+# 定义服务间的网络
+networks:
+    frontend:
+        driver: bridge
+    backend:
+        driver: bridge
