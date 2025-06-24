@@ -21,7 +21,7 @@ interface FileWithHash {
 }
 
 // 定义一个更统一的状态，可以按需使用
-type UploadStatus = "idle" | "hashing" | "uploading" | "error" | "success";
+// type UploadStatus = "idle" | "hashing" | "uploading" | "error" | "success";
 
 export function useUploadProcess(
   workerClientRef: RefObject<any>,
