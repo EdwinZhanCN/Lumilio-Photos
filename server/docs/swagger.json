@@ -170,13 +170,11 @@
         },
         "/api/v1/assets/batch": {
             "post": {
-                "description": "Upload multiple files in a single request for batch processing\nBatch uploads multiple assets using a multipart/form-data request. The field name for each file part must be its BLAKE3 content hash.",
+                "description": "Batch uploads multiple assets using a multipart/form-data request. The field name for each file part must be its BLAKE3 content hash.",
                 "consumes": [
-                    "multipart/form-data",
                     "multipart/form-data"
                 ],
                 "produces": [
-                    "application/json",
                     "application/json"
                 ],
                 "tags": [
@@ -852,9 +850,45 @@
                 "results": {
                     "type": "array",
                     "items": {
-                        "type": "object",
-                        "additionalProperties": true
+                        "$ref": "#/definitions/handler.BatchUploadResult"
                     }
+                }
+            }
+        },
+        "handler.BatchUploadResult": {
+            "type": "object",
+            "properties": {
+                "content_hash": {
+                    "description": "Client-provided content hash",
+                    "type": "string"
+                },
+                "error": {
+                    "description": "Only present for failed uploads",
+                    "type": "string"
+                },
+                "file_name": {
+                    "description": "Original filename",
+                    "type": "string"
+                },
+                "message": {
+                    "description": "Status message",
+                    "type": "string"
+                },
+                "size": {
+                    "description": "Only present for successful uploads",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "Only present for successful uploads",
+                    "type": "string"
+                },
+                "success": {
+                    "description": "Whether the file was successfully queued",
+                    "type": "boolean"
+                },
+                "task_id": {
+                    "description": "Only present for successful uploads",
+                    "type": "string"
                 }
             }
         },

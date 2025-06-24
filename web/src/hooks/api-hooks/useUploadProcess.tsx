@@ -3,70 +3,33 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatBytes } from "@/utils/formatters";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useGenerateHashcode } from "@/hooks/wasm-hooks/useGenerateHashcode";
-import { uploadService } from "@/services/uploadService";
+import { uploadService, BatchUploadResult } from "@/services/uploadService";
 
-/**
- * A single file processing result indicating a failed file with name and error.
- */
+// (接口定义保持不变)
 interface FailedFile {
   name: string;
   error: string;
 }
-
-/**
- * The shape of the processFiles result, containing arrays of file names that were
- * successfully uploaded, or failed.
- */
 interface ProcessResults {
   uploaded: string[];
   failed: FailedFile[];
 }
-
-/**
- * The return type of the processFiles function.
- * (Accepts either FileList or File[] for flexibility)
- */
 type ProcessFilesFn = (files: FileList | File[]) => Promise<ProcessResults>;
-
-/**
- * Represents a file with its associated hash
- */
 interface FileWithHash {
   file: File;
   hash: string;
 }
 
-/**
- * useUploadProcess is a custom hook that handles the upload process of files.
- * @param {React.RefObject} workerClientRef - Reference to your WASM worker client
- * @param {boolean} wasmReady - Indicates if WASM is ready
- * @returns {{
- *   processFiles: (function(*): Promise<{duplicates: *[], uploaded: *[], failed: *[]}>),
- *   isUploading: boolean,
- *   isChecking: boolean,
- *   resetStatus: Function,
- *   uploadProgress: number
- * }}
- */
+// 定义一个更统一的状态，可以按需使用
+type UploadStatus = "idle" | "hashing" | "uploading" | "error" | "success";
+
 export function useUploadProcess(
   workerClientRef: RefObject<any>,
   wasmReady: boolean,
-): {
-  processFiles: ProcessFilesFn;
-  isUploading: boolean;
-  resetStatus: () => void;
-  uploadProgress: number;
-  hashcodeProgress: {
-    numberProcessed?: number | undefined;
-    total?: number | undefined;
-    error?: string | undefined;
-    failedAt?: number | undefined;
-  } | null;
-  isGeneratingHashCodes: boolean;
-} {
+) {
   const queryClient = useQueryClient();
-
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const showMessage = useMessage();
+  const [uploadProgress, setUploadProgress] = useState<number>(0); // 批量上传暂时不方便计算总进度，可保留或移除
   const [hashcodeProgress, setHashcodeProgress] = useState<{
     numberProcessed?: number | undefined;
     total?: number | undefined;
@@ -75,191 +38,134 @@ export function useUploadProcess(
   } | null>(null);
   const [isGeneratingHashCodes, setIsGeneratingHashCodes] =
     useState<boolean>(false);
-  const showMessage = useMessage();
 
-  const handlePerformanceMetrics = (metrics: {
-    numberProcessed: number;
-    totalSize: number;
-    processingTime: number;
-    bytesPerSecond: number;
-  }) => {
-    const formattedSpeed = formatBytes(metrics.bytesPerSecond) + "/s";
-    const timeInSeconds = (metrics.processingTime / 1000).toFixed(2);
-    const formattedSize = formatBytes(metrics.totalSize);
-
-    console.log(
-      "hint",
-      `Processed ${metrics.numberProcessed} files (${formattedSize}) in ${timeInSeconds}s at ${formattedSpeed}`,
-    );
-  };
-
+  // useGenerateHashcode 保持不变...
   const { generateHashCodes } = useGenerateHashcode({
     setIsGeneratingHashCodes,
     setHashcodeProgress,
-    onPerformanceMetrics: handlePerformanceMetrics,
+    onPerformanceMetrics: (metrics) => {
+      const formattedSpeed = formatBytes(metrics.bytesPerSecond) + "/s";
+      const timeInSeconds = (metrics.processingTime / 1000).toFixed(2);
+      const formattedSize = formatBytes(metrics.totalSize);
+
+      console.log(
+        "hash",
+        `Processed ${metrics.numberProcessed} files (${formattedSize}) in ${timeInSeconds}s at ${formattedSpeed}!`,
+      );
+    },
     workerClientRef,
     wasmReady,
   });
 
-  // Batch upload
-  const batchUploadFiles = useMutation({
+  const uploadMutation = useMutation({
+    // mutationFn 的返回值现在是 AxiosResponse<ApiResult<BatchUploadData>>
     mutationFn: (filesWithHash: FileWithHash[]) =>
-      uploadService.batchUploadFiles(filesWithHash),
-    onSuccess: () => {
-      return queryClient.invalidateQueries({
-        queryKey: ["userAssets"],
-      });
-    },
-  });
-
-  // File uploading
-  interface UploadArgs {
-    file: File;
-    hash: string;
-  }
-
-  // You can further refine the mutation types here if needed
-  const uploadFile = useMutation({
-    mutationFn: async ({ file, hash }: UploadArgs) => {
-      return await uploadService.uploadFile(file, hash, {
+      uploadService.batchUploadFiles(filesWithHash, {
         onUploadProgress(progressEvent) {
           const progress = progressEvent.total
             ? Math.round((progressEvent.loaded * 100) / progressEvent.total)
             : 0;
           setUploadProgress(progress);
         },
-      });
-    },
+      }),
     onSuccess: () => {
-      return queryClient.invalidateQueries({ queryKey: ["userAssets"] });
+      queryClient.invalidateQueries({ queryKey: ["userAssets"] });
     },
     onSettled: () => {
-      // Reset progress when upload completes
       setUploadProgress(0);
     },
   });
 
-  /**
-   * Process files by generating hashes and uploading them
-   */
   const processFiles: ProcessFilesFn = async (files) => {
-    const results: ProcessResults = {
-      uploaded: [],
-      failed: [],
-    };
-
-    try {
-      const startTime = performance.now();
-
-      // Show message that we're starting to process files
-      showMessage("info", "Generating file checksums...");
-
-      // 1. Generate hashes using the WASM worker
-      const hashResults = await generateHashCodes(files);
-
-      if (hashResults instanceof Error) {
-        throw hashResults;
-      }
-
-      const endTime = performance.now();
-      showMessage(
-        "info",
-        `Checksums generated in ${((endTime - startTime) / 1000).toFixed(2)} seconds`,
-      );
-
-      // 2. Match each original file with its generated hash
-      const filesWithHash: FileWithHash[] = Array.from(files).map(
-        (file, index) => {
-          const hashResult = hashResults?.find(
-            (result: any) => result.index === index,
-          );
-
-          if (!hashResult?.hash) {
-            throw new Error(`Failed to generate hash for file ${file.name}`);
-          }
-
-          return {
-            file,
-            hash: hashResult.hash,
-          };
-        },
-      );
-
-      // 3. Check if we should upload in batch or individually
-      if (filesWithHash.length > 1) {
-        // Batch upload
-        showMessage("info", `Uploading ${filesWithHash.length} files...`);
-        const response = await batchUploadFiles.mutateAsync(filesWithHash);
-
-        // Process batch upload results
-        if (response.data.results) {
-          response.data.results.forEach((result: any, index: number) => {
-            const fileName = filesWithHash[index]?.file.name || "unknown";
-            if (result.success) {
-              results.uploaded.push(fileName);
-            } else {
-              results.failed.push({
-                name: fileName,
-                error: result.message || "Upload failed",
-              });
-            }
-          });
-        }
-      } else if (filesWithHash.length === 1) {
-        // Single file upload
-        const fileWithHash = filesWithHash[0];
-        showMessage("info", `Uploading ${fileWithHash.file.name}...`);
-
-        try {
-          await uploadFile.mutateAsync({
-            file: fileWithHash.file,
-            hash: fileWithHash.hash,
-          });
-
-          results.uploaded.push(fileWithHash.file.name);
-          showMessage(
-            "success",
-            `Successfully uploaded ${fileWithHash.file.name}`,
-          );
-        } catch (error: any) {
-          results.failed.push({
-            name: fileWithHash.file.name,
-            error: error.message || "Upload failed",
-          });
-          showMessage("error", `Failed to upload ${fileWithHash.file.name}`);
-        }
-      }
-
-      // Show summary
-      if (results.uploaded.length > 0) {
-        showMessage(
-          "success",
-          `Successfully uploaded ${results.uploaded.length} files`,
-        );
-      }
-
-      if (results.failed.length > 0) {
-        showMessage("error", `Failed to upload ${results.failed.length} files`);
-      }
-    } catch (error: any) {
-      console.error("Upload process failed:", error);
-      showMessage("error", error.message || "Upload process failed");
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) {
+      return { uploaded: [], failed: [] };
     }
 
-    return results;
+    try {
+      const hashResults = await generateHashCodes(files);
+      if (hashResults instanceof Error) throw hashResults;
+
+      const filesWithHash: FileWithHash[] = fileArray.map((file, index) => {
+        const hashResult = hashResults?.find(
+          (result: any) => result.index === index,
+        );
+
+        if (!hashResult?.hash) {
+          throw new Error(`Failed to generate hash for file ${file.name}`);
+        }
+
+        return {
+          file,
+          hash: hashResult.hash,
+        };
+      });
+
+      // 2. 统一调用批量上传
+      const response = await uploadMutation.mutateAsync(filesWithHash);
+
+      // --- 关键修正：从 response.data.data.results 获取结果 ---
+      const results: BatchUploadResult[] = response.data?.data?.results || [];
+
+      const uploaded = results.filter((r) => r.success).map((r) => r.file_name);
+
+      const failed: FailedFile[] = results
+        .filter((r) => !r.success)
+        .map((r) => ({
+          name: r.file_name,
+          error: r.message || r.error || "Upload failed",
+        }));
+
+      // --- 关键修正：统一的摘要消息逻辑 ---
+      const totalUploaded = uploaded.length;
+      const totalFailed = failed.length;
+
+      if (totalFailed === 0 && totalUploaded > 0) {
+        // 全部成功
+        showMessage(
+          "success",
+          `${totalUploaded} file(s) uploaded successfully.`,
+        );
+      } else if (totalUploaded === 0 && totalFailed > 0) {
+        // 全部失败
+        showMessage("error", `All ${totalFailed} file(s) failed to upload.`);
+      } else if (totalUploaded > 0 && totalFailed > 0) {
+        // 部分成功
+        showMessage(
+          "error",
+          `Upload complete: ${totalUploaded} succeeded, ${totalFailed} failed.`,
+        );
+      }
+      // 如果没有文件被处理，则不显示消息
+
+      return { uploaded, failed };
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "An unexpected error occurred.";
+      showMessage("error", errorMessage);
+
+      return {
+        uploaded: [],
+        failed: fileArray.map((f) => ({
+          name: f.name,
+          error: "Upload process failed",
+        })),
+      };
+    }
   };
 
   return {
     processFiles,
-    isUploading: uploadFile.isPending || batchUploadFiles.isPending,
+    isUploading: uploadMutation.isPending,
+    isGeneratingHashCodes,
     resetStatus: () => {
-      uploadFile.reset();
-      batchUploadFiles.reset();
+      uploadMutation.reset();
       setUploadProgress(0);
       setHashcodeProgress(null);
     },
     uploadProgress,
     hashcodeProgress,
-    isGeneratingHashCodes,
   };
 }

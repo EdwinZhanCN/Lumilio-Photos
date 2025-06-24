@@ -3,66 +3,91 @@ import { AxiosRequestConfig, AxiosResponse } from "axios";
 
 // Response interfaces based on swagger.yaml
 interface UploadResponse {
-    content_hash: string;
-    file_name: string;
-    message: string;
-    size: number;
-    status: string;
-    task_id: string;
+  content_hash: string;
+  file_name: string;
+  message: string;
+  size: number;
+  status: string;
+  task_id: string;
 }
 
-interface BatchUploadResponse {
-    results: Record<string, any>[];
+// 根据您的 Go 后端和响应示例，这是单个结果的精确类型
+export interface BatchUploadResult {
+  success: boolean;
+  file_name: string;
+  content_hash: string;
+  task_id: string;
+  status: string;
+  size: number;
+  message: string;
+  error?: string; // 失败时可能有
+}
+
+// 这是响应体中 `data` 字段的内容
+export interface BatchUploadData {
+  results: BatchUploadResult[];
+}
+
+// 这是最外层的标准 API 响应结构
+export interface ApiResult<T> {
+  code: number;
+  message: string;
+  data: T;
 }
 
 export const uploadService = {
-    /**
-     * Upload a file to the server
-     * @param file - The file to upload
-     * @param hash - Unique file identifier
-     * @param config - Optional Axios config (e.g., onUploadProgress)
-     * @returns A promise resolving to an Axios response with UploadResponse
-     */
-    uploadFile: async (
-        file: File,
-        hash: string,
-        config?: AxiosRequestConfig,
-    ): Promise<AxiosResponse<UploadResponse>> => {
-        const formData = new FormData();
-        formData.append("file", file);
+  /**
+   * Batch upload multiple files.
+   * The Axios response `data` will be wrapped in our standard ApiResult.
+   */
+  batchUploadFiles: async (
+    files: { file: File; hash: string }[],
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<BatchUploadData>>> => {
+    // <--- 关键类型修正
+    const formData = new FormData();
 
-        // Add the hash as a header instead of form data
-        return api.post<UploadResponse>("/api/v1/assets", formData, {
-            ...config,
-            headers: {
-                "Content-Type": "multipart/form-data",
-                "X-Content-Hash": hash,
-                ...(config?.headers ?? {}),
-            },
-        });
-    },
+    files.forEach((fileObj) => {
+      formData.append(fileObj.hash, fileObj.file, fileObj.file.name);
+    });
 
-    /**
-     * Batch upload multiple files
-     * @param files - Array of files to upload with their hashes
-     * @param config - Optional Axios config
-     */
-    batchUploadFiles: async (
-        files: { file: File; hash: string }[],
-        config?: AxiosRequestConfig,
-    ): Promise<AxiosResponse<BatchUploadResponse>> => {
-        const formData = new FormData();
+    // T in api.post<T> now refers to the entire { code, message, data } object
+    return api.post<ApiResult<BatchUploadData>>(
+      "/api/v1/assets/batch",
+      formData,
+      {
+        ...config,
+        headers: {
+          "Content-Type": "multipart/form-data",
+          ...(config?.headers ?? {}),
+        },
+      },
+    );
+  },
 
-        files.forEach((fileObj) => {
-            formData.append(fileObj.hash, fileObj.file, fileObj.file.name);
-        });
+  /**
+   * Upload a file to the server
+   * @param file - The file to upload
+   * @param hash - Unique file identifier
+   * @param config - Optional Axios config (e.g., onUploadProgress)
+   * @returns A promise resolving to an Axios response with UploadResponse
+   */
+  uploadFile: async (
+    file: File,
+    hash: string,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<UploadResponse>> => {
+    const formData = new FormData();
+    formData.append("file", file);
 
-        return api.post<BatchUploadResponse>("/api/v1/assets/batch", formData, {
-            ...config,
-            headers: {
-                "Content-Type": "multipart/form-data",
-                ...(config?.headers ?? {}),
-            },
-        });
-    },
+    // Add the hash as a header instead of form data
+    return api.post<UploadResponse>("/api/v1/assets", formData, {
+      ...config,
+      headers: {
+        "Content-Type": "multipart/form-data",
+        "X-Content-Hash": hash,
+        ...(config?.headers ?? {}),
+      },
+    });
+  },
 };
