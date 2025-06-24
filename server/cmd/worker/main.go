@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"server/config"
 	"server/internal/models"
 	"server/internal/queue"
@@ -98,132 +99,153 @@ func main() {
 	}
 	log.Printf("Using queue directory: %s", queueDir)
 
-	taskQueue, err := queue.NewTaskQueue(queueDir, 100)
+	taskQueue, err := queue.NewTaskQueue(queueDir, 100) // 缓冲区可以根据需要调整
 	if err != nil {
 		log.Fatalf("Failed to initialize task queue: %v", err)
 	}
 	defer taskQueue.Close()
 
-	// Initialize task queue and start processing
 	if err := taskQueue.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize task queue: %v", err)
 	}
 
-	// Start the task processor
+	// --- Worker Pool 启动部分 ---
+	// 根据CPU核心数设置worker数量，这是一个常见的实践
+	numWorkers := runtime.NumCPU()
+	if numWorkers < 2 {
+		numWorkers = 2 // 保证至少有2个worker
+	}
+	log.Printf("Starting %d worker(s)...", numWorkers)
+
 	stopChan := make(chan struct{})
-	go processTasksLoop(taskQueue, assetService, assetProcessor, storageConfig.BasePath, stopChan)
+	for i := 0; i < numWorkers; i++ {
+		workerID := i + 1
+		// 为每个worker启动一个goroutine
+		go processTasksLoop(workerID, taskQueue, assetService, assetProcessor, storageConfig.BasePath, stopChan)
+	}
+	// --- Worker Pool 启动部分结束 ---
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	log.Println("Shutdown signal received, stopping worker...")
+	log.Println("Shutdown signal received, stopping all workers...")
+
+	// 关闭stopChan会通知所有的worker goroutine停止
 	close(stopChan)
-	// Give tasks some time to complete
-	time.Sleep(2 * time.Second)
+
+	// 给予一小段时间让正在处理的任务完成
+	time.Sleep(3 * time.Second)
 	log.Println("Worker service stopped")
 }
 
 // processTasksLoop continuously processes tasks from the queue
-func processTasksLoop(taskQueue *queue.TaskQueue, assetService service.AssetService,
+// processTasksLoop 接收一个 workerID 用于日志记录
+func processTasksLoop(workerID int, taskQueue *queue.TaskQueue, assetService service.AssetService,
 	assetProcessor *utils.AssetProcessor, storagePath string, stopChan chan struct{}) {
-	log.Println("Task processor started, waiting for tasks...")
 
-	// Create cleanup ticker
+	log.Printf("[Worker %d] Started, waiting for tasks...", workerID)
+
+	// 每个worker独立运行，但清理任务只需要一个worker执行，
+	// 实际生产中可以将清理逻辑移到main或一个单独的goroutine中。
+	// 这里为简单起见，让每个worker都可能触发，但由于时间间隔长，影响不大。
 	cleanupTicker := time.NewTicker(24 * time.Hour)
 	defer cleanupTicker.Stop()
 
 	for {
 		select {
 		case <-stopChan:
-			log.Println("Task processor stopping...")
+			log.Printf("[Worker %d] Stopping...", workerID)
 			return
 
 		case <-cleanupTicker.C:
-			log.Println("Running task queue cleanup...")
-			if err := taskQueue.CleanupProcessedTasks(); err != nil {
-				log.Printf("Error cleaning up processed tasks: %v", err)
+			// 理论上只有一个worker需要做这件事
+			if workerID == 1 {
+				log.Printf("[Worker %d] Running task queue cleanup...", workerID)
+				if err := taskQueue.CleanupProcessedTasks(); err != nil {
+					log.Printf("[Worker %d] Error cleaning up processed tasks: %v", workerID, err)
+				}
 			}
 
 		default:
 			task, ok := taskQueue.GetTask()
 			if !ok {
+				// Channel is closed, or more likely, temporarily empty.
+				// stopChan会处理关闭逻辑，所以这里只需要等待
 				time.Sleep(100 * time.Millisecond)
 				continue
 			}
+
+			log.Printf("[Worker %d] Picked up task %s (Type: %s)", workerID, task.TaskID, task.Type)
+
 			switch task.Type {
 			case string(queue.TaskTypeUpload):
-				// 1) UPLOAD → PROCESS
 				procTask := task
 				procTask.Type = string(queue.TaskTypeProcess)
 				if err := taskQueue.EnqueueTask(procTask); err != nil {
-					log.Printf("[%s] enqueue PROCESS failed: %v", task.TaskID, err)
+					log.Printf("[Worker %d][%s] Enqueue PROCESS failed: %v", workerID, task.TaskID, err)
 				} else {
-					// Mark UPLOAD task as complete after successfully queuing PROCESS
-					if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
-						log.Printf("[%s] mark UPLOAD complete failed: %v", task.TaskID, err)
-					} else {
-						log.Printf("[%s] UPLOAD completed, queued for PROCESS", task.TaskID)
-					}
+					log.Printf("[Worker %d][%s] UPLOAD completed, queued for PROCESS", workerID, task.TaskID)
+				}
+				// 无论转换是否成功，都将原始UPLOAD任务标记为完成，防止僵尸
+				if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
+					log.Printf("[Worker %d][%s] Mark UPLOAD complete failed: %v", workerID, task.TaskID, err)
 				}
 
 			case string(queue.TaskTypeProcess):
-				// 2) PROCESS → INDEX
-				// Determine if this is from UPLOAD (staged file) or SCAN (existing file)
 				var asset *models.Asset
 				var err error
 
-				// Check if the file path indicates it's in staging area
 				if strings.Contains(task.StagedPath, "staging") || strings.Contains(task.StagedPath, "temp") {
-					// This is from UPLOAD task - process staged file
-					log.Printf("[%s] PROCESS from UPLOAD: %s", task.TaskID, task.StagedPath)
 					asset, err = assetProcessor.ProcessNewAsset(task.StagedPath, task.UserID, task.FileName)
 				} else {
-					// This is from SCAN task - process existing file
-					log.Printf("[%s] PROCESS from SCAN: %s", task.TaskID, task.StagedPath)
 					asset, err = assetProcessor.ProcessExistingAsset(task.StagedPath, task.UserID, task.FileName)
 				}
 
 				if err != nil {
-					log.Printf("[%s] PROCESS failed: %v", task.TaskID, err)
-					break
+					log.Printf("[Worker %d][%s] PROCESS failed: %v", workerID, task.TaskID, err)
+					// 即使失败也要标记为完成，防止无限重试
+					if errMark := taskQueue.MarkTaskComplete(task.TaskID); errMark != nil {
+						log.Printf("[Worker %d][%s] Mark FAILED PROCESS complete failed: %v", workerID, task.TaskID, errMark)
+					}
+					break // 结束当前任务的处理
 				}
 
 				idxTask := task
 				idxTask.Type = string(queue.TaskTypeIndex)
-				idxTask.ClientHash = asset.Hash // 把最终 hash 透传给 INDEX
+				idxTask.ClientHash = asset.Hash
 				if err := taskQueue.EnqueueTask(idxTask); err != nil {
-					log.Printf("[%s] enqueue INDEX failed: %v", task.TaskID, err)
+					log.Printf("[Worker %d][%s] Enqueue INDEX failed: %v", workerID, task.TaskID, err)
 				} else {
-					// Mark PROCESS task as complete after successfully queuing INDEX
-					if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
-						log.Printf("[%s] mark PROCESS complete failed: %v", task.TaskID, err)
-					} else {
-						log.Printf("[%s] PROCESS completed, queued for INDEX", task.TaskID)
-					}
+					log.Printf("[Worker %d][%s] PROCESS completed, queued for INDEX", workerID, task.TaskID)
+				}
+				// 标记PROCESS任务完成
+				if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
+					log.Printf("[Worker %d][%s] Mark PROCESS complete failed: %v", workerID, task.TaskID, err)
 				}
 
 			case string(queue.TaskTypeIndex):
-				// 3) INDEX → 写入数据库并标记完成
-				if err := assetService.SaveAssetIndex(
-					context.Background(), task.TaskID, task.ClientHash,
-				); err != nil {
-					log.Printf("[%s] INDEX failed: %v", task.TaskID, err)
-					break
+				if err := assetService.SaveAssetIndex(context.Background(), task.TaskID, task.ClientHash); err != nil {
+					log.Printf("[Worker %d][%s] INDEX failed: %v", workerID, task.TaskID, err)
+					// 即使失败也要标记为完成
+					if errMark := taskQueue.MarkTaskComplete(task.TaskID); errMark != nil {
+						log.Printf("[Worker %d][%s] Mark FAILED INDEX complete failed: %v", workerID, task.TaskID, errMark)
+					}
+					break // 结束当前任务的处理
 				}
+
 				if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
-					log.Printf("[%s] mark complete failed: %v", task.TaskID, err)
+					log.Printf("[Worker %d][%s] Mark INDEX complete failed: %v", workerID, task.TaskID, err)
 				} else {
-					log.Printf("[%s] INDEX done", task.TaskID)
+					log.Printf("[Worker %d][%s] INDEX done.", workerID, task.TaskID)
 				}
 
 			case string(queue.TaskTypeScan):
-				// 1) SCAN -> PROCESS
-				log.Printf("[%s] SCAN folder: %s", task.TaskID, task.StagedPath)
+				log.Printf("[Worker %d][%s] SCAN folder: %s", workerID, task.TaskID, task.StagedPath)
 				files, err := utils.ListImagesInDir(task.StagedPath)
 				if err != nil {
-					log.Printf("[%s] scan failed: %v", task.TaskID, err)
+					log.Printf("[Worker %d][%s] Scan failed: %v", workerID, task.TaskID, err)
 				} else {
 					for _, imgPath := range files {
 						newTask := queue.Task{
@@ -235,18 +257,22 @@ func processTasksLoop(taskQueue *queue.TaskQueue, assetService service.AssetServ
 							FileName:   filepath.Base(imgPath),
 						}
 						if err := taskQueue.EnqueueTask(newTask); err != nil {
-							log.Printf("[%s] enqueue process for %s failed: %v",
-								task.TaskID, imgPath, err)
+							log.Printf("[Worker %d][%s] Enqueue process for %s failed: %v",
+								workerID, task.TaskID, imgPath, err)
 						}
 					}
 				}
-				// 自己标记为完成
+				// 标记SCAN任务完成
 				if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
-					log.Printf("[%s] mark SCAN complete failed: %v", task.TaskID, err)
+					log.Printf("[Worker %d][%s] mark SCAN complete failed: %v", workerID, task.TaskID, err)
 				}
 
 			default:
-				log.Printf("[%s] unknown task type %q", task.TaskID, task.Type)
+				log.Printf("[Worker %d][%s] Unknown task type %q, marking as complete to avoid blocking queue", workerID, task.TaskID, task.Type)
+				// 对未知类型的任务也标记为完成，防止队列阻塞
+				if err := taskQueue.MarkTaskComplete(task.TaskID); err != nil {
+					log.Printf("[Worker %d][%s] Mark UNKNOWN complete failed: %v", workerID, task.TaskID, err)
+				}
 			}
 		}
 	}
