@@ -6,10 +6,10 @@ import {
   BorderOptions,
   BorderParams,
 } from "@/hooks/wasm-hooks/useGenerateBorder";
-import { StudioHeader } from "./studio/StudioHeader";
-import { StudioSidebar } from "./studio/StudioSidebar";
-import { StudioViewport } from "./studio/StudioViewport";
-import { StudioToolsPanel } from "./studio/StudioToolsPanel";
+import { StudioHeader } from "@/components/Studio/StudioHeader";
+import { StudioSidebar } from "@/components/Studio/StudioSidebar";
+import { StudioViewport } from "@/components/Studio/StudioViewport";
+import { StudioToolsPanel } from "@/components/Studio/StudioToolsPanel";
 
 export type PanelType = "exif" | "develop" | "frames";
 

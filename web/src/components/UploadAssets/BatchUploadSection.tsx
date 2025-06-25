@@ -11,7 +11,6 @@ function BatchUploadSection() {
     BatchUpload,
     isGeneratingHashCodes,
     isProcessing,
-    uploadProgress,
     hashcodeProgress,
     filesCount,
     setFilesCount,
