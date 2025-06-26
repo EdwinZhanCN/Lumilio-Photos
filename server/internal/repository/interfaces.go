@@ -23,6 +23,7 @@ type AssetRepository interface {
 	UpdateAssetMetadata(ctx context.Context, assetID uuid.UUID, metadata models.SpecificMetadata) error
 	SearchAssets(ctx context.Context, query string, assetType *models.AssetType, limit, offset int) ([]*models.Asset, error)
 	GetAssetsByHash(ctx context.Context, hash string) ([]*models.Asset, error)
+	GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error)
 }
 
 type TagRepository interface {

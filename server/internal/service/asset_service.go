@@ -48,6 +48,7 @@ type AssetService interface {
 	CreateAssetRecord(ctx context.Context, asset *models.Asset) error
 
 	GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*models.Tag, error)
+	GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error)
 }
 
 type assetService struct {
@@ -364,4 +365,9 @@ func (s *assetService) SaveAssetIndex(ctx context.Context, taskID string, hash s
 // CreateAssetRecord creates a new asset record in the database
 func (s *assetService) CreateAssetRecord(ctx context.Context, asset *models.Asset) error {
 	return s.repo.CreateAsset(ctx, asset)
+}
+
+// GetThumbnailByID retrieves thumbnails by their ID
+func (s *assetService) GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error) {
+	return s.repo.GetThumbnailByID(ctx, thumbnailID)
 }

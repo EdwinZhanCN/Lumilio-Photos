@@ -36,6 +36,7 @@ func (r *gormAssetRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Asse
 func (r *gormAssetRepo) GetByType(ctx context.Context, assetType models.AssetType, limit, offset int) ([]*models.Asset, error) {
 	var assets []*models.Asset
 	err := r.db.WithContext(ctx).
+		Preload("Thumbnails").
 		Where("type = ? AND is_deleted = ?", assetType, false).
 		Limit(limit).
 		Offset(offset).
@@ -99,6 +100,20 @@ func (r *gormAssetRepo) RemoveTagFromAsset(ctx context.Context, assetID uuid.UUI
 
 func (r *gormAssetRepo) CreateThumbnail(ctx context.Context, thumbnail *models.Thumbnail) error {
 	return r.db.WithContext(ctx).Create(thumbnail).Error
+}
+
+// GetThumbnailByID 根据主键ID获取单个Thumbnail记录
+// 注意：函数名和返回值都改为了单数，因为主键ID是唯一的
+func (r *gormAssetRepo) GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error) {
+	var thumbnail models.Thumbnail
+	// 使用 First() 更为合适，它在找到记录时会填充结构体，
+	// 找不到时会返回 gorm.ErrRecordNotFound 错误。
+	err := r.db.WithContext(ctx).
+		First(&thumbnail, thumbnailID).Error // 直接使用主键查询
+
+	// 如果没有错误，返回找到的thumbnail对象的指针和nil error
+	// 如果有错误（包括没找到），直接返回nil和错误
+	return &thumbnail, err
 }
 
 func (r *gormAssetRepo) UpdateAssetMetadata(ctx context.Context, assetID uuid.UUID, metadata models.SpecificMetadata) error {
