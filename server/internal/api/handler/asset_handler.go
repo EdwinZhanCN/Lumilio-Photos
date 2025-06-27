@@ -300,6 +300,18 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	api.Success(c.Writer, response)
 }
 
+// GetThumbnailByID retrieves a thumbnail by its ID
+// @Summary Get thumbnail by ID
+// @Description Retrieve a specific thumbnail image by its ID
+// @Tags thumbnails
+// @Accept json
+// @Produce json
+// @Param id path int true "Thumbnail ID" example(123)
+// @Success 200 {file} string "Thumbnail image file"
+// @Failure 400 {object} api.Result "Invalid thumbnail ID"
+// @Failure 404 {object} api.Result "Thumbnail not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/thumbnails/{id} [get]
 func (h *AssetHandler) GetThumbnailByID(c *gin.Context) {
 	// 1. 解析URL中的ID
 	thumbnailIDStr := c.Param("id")
