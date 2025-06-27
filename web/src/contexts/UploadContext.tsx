@@ -4,39 +4,93 @@ import React, {
   useContext,
   useEffect,
   useRef,
-  useState,
   ReactNode,
   DragEvent,
   RefObject,
+  useReducer,
+  useMemo,
+  Dispatch,
 } from "react";
 import { WasmWorkerClient } from "@/workers/workerClient";
 import { useUploadProcess } from "@/hooks/api-hooks/useUploadProcess";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 
-interface UploadContextValue {
+// 1. 定义 Reducer 的 State, Action 和初始状态
+
+interface UploadState {
   files: File[];
-  setFiles: React.Dispatch<React.SetStateAction<File[]>>;
-  filesCount: number;
-  setFilesCount: React.Dispatch<React.SetStateAction<number>>;
   previews: (string | null)[];
-  setPreviews: React.Dispatch<React.SetStateAction<(string | null)[]>>;
-  maxPreviewFiles: number;
+  filesCount: number;
   isDragging: boolean;
+  wasmReady: boolean;
+  readonly maxPreviewFiles: number;
+}
+
+// 使用联合类型，为 Action 提供类型安全
+type UploadAction =
+  | { type: "SET_DRAGGING"; payload: boolean }
+  | {
+      type: "SET_FILES";
+      payload: { files: File[]; previews: (string | null)[] };
+    }
+  | { type: "SET_WASM_READY"; payload: boolean }
+  | { type: "CLEAR_FILES" };
+
+const initialState: UploadState = {
+  files: [],
+  previews: [],
+  filesCount: 0,
+  isDragging: false,
+  wasmReady: false,
+  maxPreviewFiles: 30, // 只读值，可以放在 initial state
+};
+
+// 2. 创建 Reducer 函数来处理所有状态逻辑
+const uploadReducer = (
+  state: UploadState,
+  action: UploadAction,
+): UploadState => {
+  switch (action.type) {
+    case "SET_DRAGGING":
+      return { ...state, isDragging: action.payload };
+    case "SET_FILES":
+      // 撤销旧的预览 URL 防止内存泄漏
+      state.previews.forEach((url) => url && URL.revokeObjectURL(url));
+      return {
+        ...state,
+        files: action.payload.files,
+        previews: action.payload.previews,
+        filesCount: action.payload.files.length,
+      };
+    case "SET_WASM_READY":
+      return { ...state, wasmReady: action.payload };
+    case "CLEAR_FILES":
+      // 撤销旧的预览 URL
+      state.previews.forEach((url) => url && URL.revokeObjectURL(url));
+      return { ...state, files: [], previews: [], filesCount: 0 };
+    default:
+      return state;
+  }
+};
+
+// 3. 定义 Context 的值类型 (不再暴露 set 方法)
+interface UploadContextValue {
+  state: UploadState;
+  dispatch: Dispatch<UploadAction>; // 暴露 dispatch 以便在组件中有更大的灵活性
+  workerClientRef: React.RefObject<WasmWorkerClient | null>;
   handleDragOver: (e: DragEvent) => void;
   handleDragLeave: (e: DragEvent) => void;
   handleDrop: (e: DragEvent, handleFiles?: (files: FileList) => void) => void;
-  wasmReady: boolean;
-  workerClientRef: React.RefObject<WasmWorkerClient | null>;
   clearFiles: (fileInputRef: RefObject<HTMLInputElement | null>) => void;
   BatchUpload: (selectedFiles: FileList) => Promise<void>;
   isProcessing: boolean;
   resetUploadStatus: () => void;
   uploadProgress: number;
   hashcodeProgress: {
-    numberProcessed?: number | undefined;
-    total?: number | undefined;
-    error?: string | undefined;
-    failedAt?: number | undefined;
+    numberProcessed?: number;
+    total?: number;
+    error?: string;
+    failedAt?: number;
   } | null;
   isGeneratingHashCodes: boolean;
 }
@@ -50,63 +104,48 @@ export const UploadContext = createContext<UploadContextValue | undefined>(
 );
 
 export default function UploadProvider({ children }: UploadProviderProps) {
-  // General states
-  const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<(string | null)[]>([]);
-  const [maxPreviewFiles] = useState<number>(30);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [wasmReady, setWasmReady] = useState<boolean>(false);
-  const [filesCount, setFilesCount] = useState<number>(0);
+  // 4. 使用 useReducer 替换多个 useState
+  const [state, dispatch] = useReducer(uploadReducer, initialState);
+  const { wasmReady, previews } = state; // 从 state 中解构
 
   const showMessage = useMessage();
-
-  // Worker client reference
   const workerClientRef = useRef<WasmWorkerClient | null>(null);
-
-  // useUploadProcess hook usage (no changes here)
   const uploadProcess = useUploadProcess(workerClientRef, wasmReady);
 
+  // 5. 事件处理器现在 dispatch actions
   const handleDragOver = useCallback((e: DragEvent) => {
     e.preventDefault();
-    setIsDragging(true);
+    dispatch({ type: "SET_DRAGGING", payload: true });
   }, []);
 
   const handleDragLeave = useCallback((e: DragEvent) => {
     e.preventDefault();
-    setIsDragging(false);
+    dispatch({ type: "SET_DRAGGING", payload: false });
   }, []);
 
   const handleDrop = useCallback(
     (e: DragEvent, handleFiles?: (files: FileList) => void) => {
       e.preventDefault();
-      setIsDragging(false);
+      dispatch({ type: "SET_DRAGGING", payload: false });
       const droppedFiles = e.dataTransfer?.files;
       if (handleFiles && droppedFiles?.length) {
-        handleFiles(droppedFiles);
+        handleFiles(droppedFiles); // 外部组件的 handleFiles 应该调用 dispatch
       }
     },
     [],
   );
 
-  const revokePreviews = useCallback((urls: (string | null)[]) => {
-    urls.forEach((url) => {
-      if (url) {
-        URL.revokeObjectURL(url);
+  const clearFiles = useCallback(
+    (fileInputRef: RefObject<HTMLInputElement | null>) => {
+      dispatch({ type: "CLEAR_FILES" });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
       }
-    });
-  }, []);
-
-  const clearFiles = (fileInputRef: RefObject<HTMLInputElement | null>) => {
-    revokePreviews(previews);
-    setFiles([]);
-    setPreviews([]);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
+    },
+    [],
+  );
 
   useEffect(() => {
-    // WASM Initialization logic (no changes here)
     if (!workerClientRef.current) {
       workerClientRef.current = new WasmWorkerClient();
     }
@@ -114,23 +153,20 @@ export default function UploadProvider({ children }: UploadProviderProps) {
       try {
         await workerClientRef.current?.initGenThumbnailWASM();
         await workerClientRef.current?.initGenHashWASM();
-        setWasmReady(true);
+        dispatch({ type: "SET_WASM_READY", payload: true });
         console.log("WASM module initialized successfully");
       } catch (error) {
         console.error("Failed to initialize WASM:", error);
       }
     };
     initWasm();
-    return () => {
-      revokePreviews(previews);
-    };
-  }, [revokePreviews, previews]);
 
-  /**
-   * BatchUpload function to handle batch upload of files.
-   * This is now a thin wrapper around the hook's processFiles function.
-   * The hook is responsible for showing the final status messages.
-   */
+    // 组件卸载时，清理最后的预览
+    return () => {
+      previews.forEach((url) => url && URL.revokeObjectURL(url));
+    };
+  }, [previews]); // previews 作为依赖项，确保卸载时使用的是最新的预览列表
+
   const BatchUpload = useCallback(
     async (selectedFiles: FileList) => {
       if (!wasmReady || !selectedFiles.length) {
@@ -141,48 +177,55 @@ export default function UploadProvider({ children }: UploadProviderProps) {
         return;
       }
       try {
-        // The hook now handles all success/error/summary messages internally.
         await uploadProcess.processFiles(selectedFiles);
       } catch (error: any) {
-        // This will catch any unexpected errors from the process.
         showMessage("error", `Upload process failed: ${error.message}`);
       }
     },
     [wasmReady, uploadProcess, showMessage],
   );
 
-  const contextValue: UploadContextValue = {
-    files,
-    setFiles,
-    previews,
-    setPreviews,
-    maxPreviewFiles,
-    isDragging,
-    handleDragOver,
-    handleDragLeave,
-    handleDrop,
-    wasmReady,
-    workerClientRef,
-    clearFiles,
-    BatchUpload,
-    filesCount,
-    setFilesCount,
-    // Correctly determines the processing state from the hook
-    isProcessing:
-      uploadProcess.isGeneratingHashCodes || uploadProcess.isUploading,
-    resetUploadStatus: uploadProcess.resetStatus,
-    uploadProgress: uploadProcess.uploadProgress,
-    hashcodeProgress: uploadProcess.hashcodeProgress,
-    isGeneratingHashCodes: uploadProcess.isGeneratingHashCodes,
-  };
+  // 6. 使用 useMemo 包装 contextValue 以进行性能优化
+  const contextValue = useMemo(
+    () => ({
+      state,
+      dispatch, // 暴露 dispatch
+      workerClientRef,
+      handleDragOver,
+      handleDragLeave,
+      handleDrop,
+      clearFiles,
+      BatchUpload,
+      isProcessing:
+        uploadProcess.isGeneratingHashCodes || uploadProcess.isUploading,
+      resetUploadStatus: uploadProcess.resetStatus,
+      uploadProgress: uploadProcess.uploadProgress,
+      hashcodeProgress: uploadProcess.hashcodeProgress,
+      isGeneratingHashCodes: uploadProcess.isGeneratingHashCodes,
+    }),
+    [
+      state,
+      handleDragOver,
+      handleDragLeave,
+      handleDrop,
+      clearFiles,
+      BatchUpload,
+      uploadProcess.isGeneratingHashCodes,
+      uploadProcess.isUploading,
+      uploadProcess.resetStatus,
+      uploadProcess.uploadProgress,
+      uploadProcess.hashcodeProgress,
+    ],
+  );
 
   return (
     <UploadContext.Provider value={contextValue}>
-      <div className="min-h-screen px-2">{children}</div>
+      {children}
     </UploadContext.Provider>
   );
 }
 
+// 7. useUploadContext 保持不变，但现在返回的是新的 context 值
 export function useUploadContext() {
   const context = useContext(UploadContext);
   if (!context) {
