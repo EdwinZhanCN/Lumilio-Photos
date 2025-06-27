@@ -30,14 +30,14 @@ jobs:
       - name: Generate OpenAPI docs with swag
         run: |
           cd server
-          swag init --output ../docs/openapi
+          swag init -g cmd/api/main.go --output docs/openapi
 
       - name: Install redoc-cli
         run: npm install -g redoc-cli
 
       - name: Generate Redoc static HTML
         run: |
-          npx redoc-cli bundle ./docs/openapi/swagger.json -o redoc-static.html
+          npx redoc-cli bundle ./server/docs/openapi/swagger.json -o redoc-static.html
 
       - name: Move Redoc HTML to docs/public
         run: |
