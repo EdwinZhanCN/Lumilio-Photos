@@ -15,6 +15,8 @@ type Thumbnail struct {
 	StoragePath string    `gorm:"type:varchar(512);not null" json:"storage_path" example:"thumbnails/2024/01/thumb_abc123.jpg"`
 	MimeType    string    `gorm:"type:varchar(50);not null" json:"mime_type" example:"image/jpeg"` // For video thumbnails, this might be image/jpeg
 	CreatedAt   time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"created_at" example:"2024-01-15T10:30:00Z"`
+	// This field is for the response only; it's not in the database.
+	URL string `gorm:"-" json:"url"`
 }
 
 // TableName specifies the table name for the Thumbnail model
