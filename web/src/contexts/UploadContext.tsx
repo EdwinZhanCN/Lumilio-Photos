@@ -181,6 +181,7 @@ export default function UploadProvider({ children }: UploadProviderProps) {
       } catch (error: any) {
         showMessage("error", `Upload process failed: ${error.message}`);
       }
+      uploadProcess.resetStatus();
     },
     [wasmReady, uploadProcess, showMessage],
   );
