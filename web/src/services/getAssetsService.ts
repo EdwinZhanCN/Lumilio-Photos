@@ -1,8 +1,8 @@
-// src/services/assetService.ts
+// src/services/getAssetService.ts
 
 import api from "@/https-common/";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
-import { ApiResult } from "./uploadService"; // 假设 ApiResult 在这里定义
+import { ApiResult } from "./uploadService";
 
 /**
  * @interface AssetListResponse
