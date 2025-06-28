@@ -15,8 +15,6 @@ import { WasmWorkerClient } from "@/workers/workerClient";
 import { useUploadProcess } from "@/hooks/api-hooks/useUploadProcess";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 
-// 1. 定义 Reducer 的 State, Action 和初始状态
-
 interface UploadState {
   files: File[];
   previews: (string | null)[];
@@ -45,7 +43,6 @@ const initialState: UploadState = {
   maxPreviewFiles: 30, // 只读值，可以放在 initial state
 };
 
-// 2. 创建 Reducer 函数来处理所有状态逻辑
 const uploadReducer = (
   state: UploadState,
   action: UploadAction,
@@ -54,7 +51,6 @@ const uploadReducer = (
     case "SET_DRAGGING":
       return { ...state, isDragging: action.payload };
     case "SET_FILES":
-      // 撤销旧的预览 URL 防止内存泄漏
       state.previews.forEach((url) => url && URL.revokeObjectURL(url));
       return {
         ...state,
@@ -65,7 +61,6 @@ const uploadReducer = (
     case "SET_WASM_READY":
       return { ...state, wasmReady: action.payload };
     case "CLEAR_FILES":
-      // 撤销旧的预览 URL
       state.previews.forEach((url) => url && URL.revokeObjectURL(url));
       return { ...state, files: [], previews: [], filesCount: 0 };
     default:
@@ -73,7 +68,6 @@ const uploadReducer = (
   }
 };
 
-// 3. 定义 Context 的值类型 (不再暴露 set 方法)
 interface UploadContextValue {
   state: UploadState;
   dispatch: Dispatch<UploadAction>; // 暴露 dispatch 以便在组件中有更大的灵活性
@@ -104,15 +98,13 @@ export const UploadContext = createContext<UploadContextValue | undefined>(
 );
 
 export default function UploadProvider({ children }: UploadProviderProps) {
-  // 4. 使用 useReducer 替换多个 useState
   const [state, dispatch] = useReducer(uploadReducer, initialState);
-  const { wasmReady, previews } = state; // 从 state 中解构
+  const { wasmReady, previews } = state;
 
   const showMessage = useMessage();
   const workerClientRef = useRef<WasmWorkerClient | null>(null);
   const uploadProcess = useUploadProcess(workerClientRef, wasmReady);
 
-  // 5. 事件处理器现在 dispatch actions
   const handleDragOver = useCallback((e: DragEvent) => {
     e.preventDefault();
     dispatch({ type: "SET_DRAGGING", payload: true });
@@ -129,7 +121,7 @@ export default function UploadProvider({ children }: UploadProviderProps) {
       dispatch({ type: "SET_DRAGGING", payload: false });
       const droppedFiles = e.dataTransfer?.files;
       if (handleFiles && droppedFiles?.length) {
-        handleFiles(droppedFiles); // 外部组件的 handleFiles 应该调用 dispatch
+        handleFiles(droppedFiles);
       }
     },
     [],
@@ -161,7 +153,6 @@ export default function UploadProvider({ children }: UploadProviderProps) {
     };
     initWasm();
 
-    // 组件卸载时，清理最后的预览
     return () => {
       previews.forEach((url) => url && URL.revokeObjectURL(url));
     };
@@ -186,11 +177,10 @@ export default function UploadProvider({ children }: UploadProviderProps) {
     [wasmReady, uploadProcess, showMessage],
   );
 
-  // 6. 使用 useMemo 包装 contextValue 以进行性能优化
   const contextValue = useMemo(
     () => ({
       state,
-      dispatch, // 暴露 dispatch
+      dispatch,
       workerClientRef,
       handleDragOver,
       handleDragLeave,
