@@ -33,6 +33,10 @@ export const enSidebar: DefaultTheme.Sidebar = {
         { text: "Backend", link: "/tech-stack/backend" },
       ],
     },
+    {
+      text: "Business Diagram",
+      items: [{ text: "Upload", link: "/tech-stack/business-diagram/upload" }],
+    },
   ],
   "/docs/": [
     {
