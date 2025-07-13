@@ -2,7 +2,7 @@
 
 # Class: WasmWorkerClient
 
-Defined in: [workers/workerClient.ts:5](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/workers/workerClient.ts#L5)
+Defined in: [workers/workerClient.ts:5](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L5)
 
 This class is a wrapper around the Web Worker API to facilitate communication
 with a WebAssembly worker.
@@ -13,7 +13,7 @@ with a WebAssembly worker.
 
 > **new WasmWorkerClient**(): `WasmWorkerClient`
 
-Defined in: [workers/workerClient.ts:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/workers/workerClient.ts#L13)
+Defined in: [workers/workerClient.ts:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L14)
 
 Creates an instance of WasmWorkerClient.
 
@@ -27,7 +27,7 @@ Creates an instance of WasmWorkerClient.
 
 > **addProgressListener**(`callback`): () => `void`
 
-Defined in: [workers/workerClient.ts:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/workers/workerClient.ts#L28)
+Defined in: [workers/workerClient.ts:41](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L41)
 
 Adds a progress listener to the worker.
 
@@ -51,11 +51,47 @@ Function to handle progress events
 
 ***
 
+### generateBorders()
+
+> **generateBorders**(`files`, `option`, `param`): `Promise`\<\{[`uuid`: `string`]: `object`; \}\>
+
+Defined in: [workers/workerClient.ts:339](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L339)
+
+Processes a list of files to add borders using the specified options and parameters.
+
+#### Parameters
+
+##### files
+
+`File`[]
+
+The list of files to process.
+
+##### option
+
+The type of border to apply.
+
+`"COLORED"` | `"FROSTED"` | `"VIGNETTE"`
+
+##### param
+
+`object`
+
+The parameters for the selected border type.
+
+#### Returns
+
+`Promise`\<\{[`uuid`: `string`]: `object`; \}\>
+
+A promise that resolves with an object mapping UUIDs to processing results.
+
+***
+
 ### generateHash()
 
 > **generateHash**(`data`): `Promise`\<\{ `hashResults`: `object`[]; `status`: `string`; \}\>
 
-Defined in: [workers/workerClient.ts:178](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/workers/workerClient.ts#L178)
+Defined in: [workers/workerClient.ts:225](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L225)
 
 Processes files into hashcodes, sending the results hash back to the main thread.
 You may want to use catch to handle the error.
@@ -64,9 +100,9 @@ You may want to use catch to handle the error.
 
 ##### data
 
-`FileList`
-
 The data to be processed. List of files.
+
+`FileList` | `File`[]
 
 #### Returns
 
@@ -74,7 +110,7 @@ The data to be processed. List of files.
 
 #### Requires
 
-FileList
+FileList | File[] - The data to be processed. List of files.
 
 ***
 
@@ -82,7 +118,7 @@ FileList
 
 > **generateThumbnail**(`data`): `Promise`\<\{ `batchIndex`: `number`; `results`: `any`[]; `status`: `string`; \}\>
 
-Defined in: [workers/workerClient.ts:70](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/workers/workerClient.ts#L70)
+Defined in: [workers/workerClient.ts:93](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L93)
 
 Processes files in batches, sending the results thumbnails back to the main thread.
 You may want to use catch to handle the error.-
@@ -111,11 +147,29 @@ The data to be processed. List of files, batch index, and start index.
 
 ***
 
+### initBorderWASM()
+
+> **initBorderWASM**(`timeoutMs`): `Promise`\<\{ `status`: `string`; \}\>
+
+Defined in: [workers/workerClient.ts:301](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L301)
+
+#### Parameters
+
+##### timeoutMs
+
+`number` = `100000`
+
+#### Returns
+
+`Promise`\<\{ `status`: `string`; \}\>
+
+***
+
 ### initGenHashWASM()
 
 > **initGenHashWASM**(`timeoutMs`): `Promise`\<\{ `status`: `string`; \}\>
 
-Defined in: [workers/workerClient.ts:146](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/workers/workerClient.ts#L146)
+Defined in: [workers/workerClient.ts:187](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L187)
 
 This function is used to initialize the WebAssembly module in genHash worker script.
 
@@ -137,7 +191,7 @@ Timeout in milliseconds
 
 > **initGenThumbnailWASM**(`timeoutMs`): `Promise`\<\{ `status`: `string`; \}\>
 
-Defined in: [workers/workerClient.ts:39](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/workers/workerClient.ts#L39)
+Defined in: [workers/workerClient.ts:56](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L56)
 
 Initializes the WebAssembly module in genThumbnail worker script.
 
@@ -155,11 +209,25 @@ Timeout in milliseconds
 
 ***
 
+### terminateGenerateBorderWorker()
+
+> **terminateGenerateBorderWorker**(): `void`
+
+Defined in: [workers/workerClient.ts:402](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L402)
+
+Terminates the Web Worker.
+
+#### Returns
+
+`void`
+
+***
+
 ### terminateGenerateHashWorker()
 
 > **terminateGenerateHashWorker**(): `void`
 
-Defined in: [workers/workerClient.ts:255](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/workers/workerClient.ts#L255)
+Defined in: [workers/workerClient.ts:416](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L416)
 
 Terminates the genHash worker.
 
@@ -173,7 +241,7 @@ Terminates the genHash worker.
 
 > **terminateGenerateThumbnailWorker**(): `void`
 
-Defined in: [workers/workerClient.ts:248](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/workers/workerClient.ts#L248)
+Defined in: [workers/workerClient.ts:409](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/workers/workerClient.ts#L409)
 
 Terminates the genThumbnail worker.
 

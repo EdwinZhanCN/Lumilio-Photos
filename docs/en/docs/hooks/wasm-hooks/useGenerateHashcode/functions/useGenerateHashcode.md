@@ -4,7 +4,7 @@
 
 > **useGenerateHashcode**(`options`): `UseGenerateHashcodeReturnType`
 
-Defined in: [hooks/wasm-hooks/useGenerateHashcode.tsx:47](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/hooks/wasm-hooks/useGenerateHashcode.tsx#L47)
+Defined in: [hooks/wasm-hooks/useGenerateHashcode.tsx:45](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/hooks/wasm-hooks/useGenerateHashcode.tsx#L45)
 
 Custom hook for generating hashcode.
 To use this hook, ensure that the Web Worker is initialized and ready to handle hash generation.

@@ -5,3 +5,4 @@
 ## Classes
 
 - [WasmWorkerClient](classes/WasmWorkerClient.md)
+- [WorkerClient](classes/WorkerClient.md)
