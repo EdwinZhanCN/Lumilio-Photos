@@ -7,7 +7,8 @@ import {
   ShareIcon,
   HeartIcon,
   TrashIcon,
-  ArrowsPointingOutIcon,
+  // [TODO]
+  // ArrowsPointingOutIcon,
   EllipsisHorizontalIcon,
 } from "@heroicons/react/24/outline";
 

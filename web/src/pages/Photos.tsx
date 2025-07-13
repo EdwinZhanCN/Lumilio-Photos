@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useInView } from "react-intersection-observer";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import FullScreenCarousel from "@/components/Photos/FullScreen/FullScreenCarousel";
+// [TODO]
+// import FullScreenCarousel from "@/components/Photos/FullScreen/FullScreenCarousel";
 import { ListAssetsParams } from "@/services/getAssetsService"; // Assuming you have this service
 
 // --- 1. Type Definitions (based on your input) ---
@@ -144,6 +145,7 @@ const Photos = () => {
     "date" | "type" | "size"
   >("date");
   const [isCarouselOpen, setIsCarouselOpen] = useState(false);
+  // [TODO]
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   // Use our new data fetching hook
@@ -182,6 +184,8 @@ const Photos = () => {
   }, [currentGrouping, allAssets]);
 
   const openCarousel = (assetId: string) => {
+    //[TODO]
+    console.log(currentPhotoIndex);
     const currentIndex = allAssets.findIndex((a) => a.assetId === assetId);
     if (currentIndex !== -1) {
       setCurrentPhotoIndex(currentIndex);
