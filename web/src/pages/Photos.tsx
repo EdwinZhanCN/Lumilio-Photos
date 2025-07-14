@@ -43,7 +43,7 @@ function Photos() {
       <PhotosToolBar />
 
       {isFetching && !isFetchingNextPage && <p>Loading...</p>}
-      {error && <p>Error: {error}</p>}
+      {error?.message && <p>Error: {error.message}</p>}
 
       <PhotosMasonry
         groupedPhotos={groupedPhotos}
