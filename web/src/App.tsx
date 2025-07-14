@@ -47,8 +47,8 @@ function App(): React.ReactNode {
                 </Routes>
               </div>
             </div>
-            <footer className="bg-base-100 text-base-content">
-              <div className="container mx-auto py-4">
+            <footer className="bg-base-100 text-base-content text-xs">
+              <div className="container mx-auto py-0.5">
                 <p className="text-center">
                   © 2025 Lumilio Photos, Brought to you by EdwinZhan
                 </p>
