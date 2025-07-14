@@ -1,8 +1,8 @@
-import React, { useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useMessage } from "@/hooks/util-hooks/useMessage.tsx";
 import { WasmWorkerClient } from "@/workers/workerClient.ts";
 
-const BATCH_SIZE = 5; // Example batch size, consider making this configurable
+const BATCH_SIZE = 5; // [TODO] Example batch size, consider making this configurable
 
 export type BorderOptions = "COLORED" | "FROSTED" | "VIGNETTE";
 
@@ -15,6 +15,7 @@ export type BorderParams = {
     b: number;
     jpeg_quality: number;
   };
+  // [TODO] Add the display text: Camera manufacture logo, Lens Info, ISO, Shutter Speed, and Aperture
   FROSTED: {
     blur_sigma: number;
     brightness_adjustment: number;
@@ -27,49 +28,61 @@ export type BorderParams = {
   };
 };
 
+export type ProcessedImageMap = {
+  [uuid: string]: {
+    originalFileName: string;
+    borderedFileURL?: string;
+    error?: string;
+  };
+};
+
+export type BorderGenerationProgress = {
+  numberProcessed: number;
+  total: number;
+  error?: string;
+  failedAt?: number | null;
+} | null;
+
 type UseGenerateBordersProps = {
-  setGenBordersProgress: React.Dispatch<
-    React.SetStateAction<{
-      numberProcessed: number;
-      total: number;
-      error?: string;
-      failedAt?: number | null;
-    } | null>
-  >;
-  setIsGenBorders: (isGenerating: boolean) => void;
   workerClientRef: React.RefObject<WasmWorkerClient | null>;
   wasmReady: boolean;
-  setProcessedImages: React.Dispatch<
-    React.SetStateAction<{
-      [uuid: string]: {
-        originalFileName: string;
-        borderedFileURL?: string;
-        error?: string;
-      };
-    }>
-  >;
 };
 
 /**
- * Custom hook to generate images with borders using a Web Worker.
+ * Custom hook to generate images with borders using a Web Worker and WebAssembly.
+ * It encapsulates all state related to the generation process.
+ * @author Edwin Zhan
+ * @param {UseGenerateBordersProps} props - Props for the hook.
+ * @returns {boolean}isGenerating
  *
- * @param {UseGenerateBordersProps} options - Configuration options
- * @returns {{ generateBorders: (files: File[], option: BorderOptions, param: BorderParams[BorderOptions]) => Promise<void> }} Object containing the generateBorders function
  */
 export const useGenerateBorders = ({
-  setGenBordersProgress,
-  setIsGenBorders,
   workerClientRef,
   wasmReady,
-  setProcessedImages,
-}: UseGenerateBordersProps): {
-  generateBorders: (
-    files: File[],
-    option: BorderOptions,
-    param: BorderParams[BorderOptions],
-  ) => Promise<void>;
-} => {
+}: UseGenerateBordersProps) => {
   const showMessage = useMessage();
+
+  // Internal state management
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [progress, setProgress] = useState<BorderGenerationProgress>(null);
+  const [processedImages, setProcessedImages] = useState<ProcessedImageMap>({});
+
+  // Effect for progress listener
+  useEffect(() => {
+    if (!workerClientRef.current) return;
+
+    const removeProgressListener = workerClientRef.current.addProgressListener(
+      ({ processed, total }) => {
+        setProgress((prev) =>
+          prev
+            ? { ...prev, numberProcessed: processed, total: total }
+            : { numberProcessed: processed, total: total },
+        );
+      },
+    );
+
+    return () => removeProgressListener();
+  }, [workerClientRef]);
 
   /**
    * Generates bordered images for the given files.
@@ -88,14 +101,10 @@ export const useGenerateBorders = ({
         return;
       }
 
-      const removeProgressListener =
-        workerClientRef.current.addProgressListener(({ processed, total }) => {
-          setGenBordersProgress({ numberProcessed: processed, total: total });
-        });
-
       try {
-        setIsGenBorders(true);
+        setIsGenerating(true);
         setProcessedImages({}); // Clear previous results
+        setProgress({ numberProcessed: 0, total: files.length });
 
         for (let i = 0; i < files.length; i += BATCH_SIZE) {
           const batch = files.slice(i, i + BATCH_SIZE);
@@ -117,7 +126,7 @@ export const useGenerateBorders = ({
             ? error.message
             : String(error || "Unknown error");
         showMessage("error", `Border generation failed: ${errorMessage}`);
-        setGenBordersProgress((prev) =>
+        setProgress((prev) =>
           prev
             ? {
                 ...prev,
@@ -132,22 +141,19 @@ export const useGenerateBorders = ({
               },
         );
       } finally {
-        setIsGenBorders(false);
-        removeProgressListener();
-        setGenBordersProgress(null);
+        setIsGenerating(false);
+        // We don't nullify progress here so the UI can show the final state
       }
     },
-    [
-      wasmReady,
-      workerClientRef,
-      setProcessedImages,
-      setIsGenBorders,
-      setGenBordersProgress,
-      showMessage,
-    ],
+    [wasmReady, workerClientRef, showMessage],
   );
 
+  // Expose state and the trigger function
   return {
+    isGenerating,
+    progress,
+    processedImages,
+    setProcessedImages,
     generateBorders,
   };
 };
