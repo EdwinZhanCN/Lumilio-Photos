@@ -23,38 +23,16 @@ export function Studio() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [wasmReady, setWasmReady] = useState(false);
 
-  // Worker State & Refs
+  // Worker Refs
   const wasmWorkerClientRef = useRef<WasmWorkerClient | null>(null);
   const workerClientRef = useRef<WorkerClient | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // EXIF Hook State
-  const [rawExifData, setRawExifData] = useState<Record<number, any> | null>(
-    null,
-  );
+  // Processed EXIF data for display
   const [exifToDisplay, setExifToDisplay] = useState<Record<
     string,
     any
   > | null>(null);
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [exifProgress, setExifProgress] = useState<{
-    numberProcessed: number;
-    total: number;
-  } | null>(null);
-
-  // Border Generation Hook State
-  const [isGenBorders, setIsGenBorders] = useState(false);
-  const [genBordersProgress, setGenBordersProgress] = useState<{
-    numberProcessed: number;
-    total: number;
-  } | null>(null);
-  const [processedImages, setProcessedImages] = useState<{
-    [uuid: string]: {
-      originalFileName: string;
-      borderedFileURL?: string;
-      error?: string;
-    };
-  }>({});
 
   // Initialize WorkerClient and WASM modules
   useEffect(() => {
@@ -73,31 +51,36 @@ export function Studio() {
   }, []);
 
   // Instantiate Hooks
-  const { extractExifData } = useExtractExifdata({
+  const {
+    isExtracting,
+    exifData,
+    progress: exifProgress,
+    extractExifData,
+  } = useExtractExifdata({
     workerClientRef,
-    setExtractExifProgress: setExifProgress,
-    setIsExtractingExif: setIsExtracting,
-    setExifData: setRawExifData,
   });
 
-  const { generateBorders } = useGenerateBorders({
-    setIsGenBorders,
-    setGenBordersProgress,
+  const {
+    isGenerating: isGenBorders,
+    progress: genBordersProgress,
+    processedImages,
+    setProcessedImages,
+    generateBorders,
+  } = useGenerateBorders({
     workerClientRef: wasmWorkerClientRef,
     wasmReady,
-    setProcessedImages,
   });
 
   // Process raw EXIF data when it changes
   useEffect(() => {
-    if (rawExifData && rawExifData[0]) {
-      setExifToDisplay(rawExifData[0]);
+    if (exifData && exifData[0]) {
+      setExifToDisplay(exifData[0]);
     } else {
       setExifToDisplay(null);
     }
-  }, [rawExifData]);
+  }, [exifData]);
 
-  // --- Handlers ---
+  //#region Handlers
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -109,15 +92,13 @@ export function Studio() {
 
       // Reset all states
       setExifToDisplay(null);
-      setExifProgress(null);
-      setRawExifData(null);
       setProcessedImages({});
       setActivePanel("exif");
     }
   };
 
   const handleExtractExif = useCallback(async () => {
-    if (selectedFile && wasmWorkerClientRef.current) {
+    if (selectedFile) {
       setExifToDisplay(null);
       await extractExifData([selectedFile]);
       setActivePanel("exif");
@@ -132,6 +113,7 @@ export function Studio() {
     },
     [selectedFile, generateBorders],
   );
+  //#endregion
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
