@@ -5,11 +5,9 @@ import { useUploadContext } from "@/contexts/UploadContext.tsx";
 
 function BatchUploadSection() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
   // 1. Updated destructuring from the context hook
   const { BatchUpload, isGeneratingHashCodes, isProcessing, hashcodeProgress } =
     useUploadContext();
-
   // This function correctly calls BatchUpload. No changes needed here.
   const handleFileChange = (uploadFiles: FileList) => {
     if (uploadFiles.length > 0) {

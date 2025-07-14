@@ -2,20 +2,50 @@
 
 # Function: default()
 
-> **default**(`__namedParameters`): `Element`
+> **default**(`props`): `Element`
 
-Defined in: [contexts/UploadContext.tsx:60](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/contexts/UploadContext.tsx#L60)
+Defined in: [contexts/UploadContext.tsx:321](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/contexts/UploadContext.tsx#L321)
 
-UploadProvider is a provider component for the upload assets page
+**Upload Provider Component**
 
-It provides a context with the following states and methods
+Main provider component that manages upload state and provides context to child components.
+Handles WASM initialization, state management, and coordinates upload operations.
 
 ## Parameters
 
-### \_\_namedParameters
+### props
 
 `UploadProviderProps`
+
+Provider props containing children
 
 ## Returns
 
 `Element`
+
+JSX element wrapping children with upload context
+
+## Example
+
+```tsx
+// At the root of your application
+function App() {
+  return (
+    <UploadProvider>
+      <Header />
+      <MainContent />
+      <Footer />
+    </UploadProvider>
+  );
+}
+
+// In any child component
+function FileUploadZone() {
+  const { state, BatchUpload } = useUploadContext();
+  // Component implementation...
+}
+```
+
+## Since
+
+1.0.0

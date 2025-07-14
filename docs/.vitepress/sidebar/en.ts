@@ -2,42 +2,46 @@ import { DefaultTheme } from "vitepress";
 import typedocSidebar from "./typedoc-sidebar.json";
 
 export const enSidebar: DefaultTheme.Sidebar = {
-    "/user-manual/": [
+  "/user-manual/": [
+    {
+      text: "User Manual",
+      items: [
+        { text: "Overview", link: "/user-manual/user-manual-overview" },
+        { text: "Installation", link: "/user-manual/Installation" },
+        { text: "Key Features", link: "/user-manual/key-feature" },
         {
-            text: "User Manual",
-            items: [
-                { text: "Overview", link: "/user-manual/user-manual-overview" },
-                { text: "Installation", link: "/user-manual/Installation" },
-                { text: "Key Features", link: "/user-manual/key-feature" },
-                {
-                    text: "System Settings",
-                    link: "/user-manual/system-setting",
-                },
-                {
-                    text: "Advanced Features",
-                    link: "/user-manual/advanced-feature",
-                },
-                {
-                    text: "Troubleshooting",
-                    link: "/user-manual/troubleshooting",
-                },
-            ],
+          text: "System Settings",
+          link: "/user-manual/system-setting",
         },
-    ],
-    "/tech-stack/": [
         {
-            text: "Tech Stack",
-            items: [
-                { text: "Overview", link: "/tech-stack/techstack-overview" },
-                { text: "Frontend", link: "/tech-stack/frontend" },
-                { text: "Backend", link: "/tech-stack/backend" },
-            ],
+          text: "Advanced Features",
+          link: "/user-manual/advanced-feature",
         },
-    ],
-    "/docs/": [
         {
-            text: "TypeDoc",
-            items: typedocSidebar,
+          text: "Troubleshooting",
+          link: "/user-manual/troubleshooting",
         },
-    ],
+      ],
+    },
+  ],
+  "/tech-stack/": [
+    {
+      text: "Tech Stack",
+      items: [
+        { text: "Overview", link: "/tech-stack/techstack-overview" },
+        { text: "Frontend", link: "/tech-stack/frontend" },
+        { text: "Backend", link: "/tech-stack/backend" },
+      ],
+    },
+    {
+      text: "Business Diagram",
+      items: [{ text: "Upload", link: "/tech-stack/business-diagram/upload" }],
+    },
+  ],
+  "/docs/": [
+    {
+      text: "TypeDoc",
+      items: typedocSidebar,
+    },
+  ],
 };

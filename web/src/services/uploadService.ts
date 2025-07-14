@@ -1,8 +1,7 @@
 import api from "@/https-common";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
-
 // Response interfaces based on swagger.yaml
-interface UploadResponse {
+export interface UploadResponse {
   content_hash: string;
   file_name: string;
   message: string;

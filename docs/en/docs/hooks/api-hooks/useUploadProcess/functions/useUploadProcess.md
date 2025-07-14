@@ -4,9 +4,7 @@
 
 > **useUploadProcess**(`workerClientRef`, `wasmReady`): `object`
 
-Defined in: [hooks/api-hooks/useUploadProcess.tsx:49](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7285497a028269d9cd6a31a72019f8b71eba616/web/src/hooks/api-hooks/useUploadProcess.tsx#L49)
-
-useUploadProcess is a custom hook that handles the upload process of files.
+Defined in: [hooks/api-hooks/useUploadProcess.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/hooks/api-hooks/useUploadProcess.tsx#L26)
 
 ## Parameters
 
@@ -14,13 +12,9 @@ useUploadProcess is a custom hook that handles the upload process of files.
 
 `RefObject`\<`any`\>
 
-Reference to your WASM worker client
-
 ### wasmReady
 
 `boolean`
-
-Indicates if WASM is ready
 
 ## Returns
 
@@ -28,11 +22,7 @@ Indicates if WASM is ready
 
 ### hashcodeProgress
 
-> **hashcodeProgress**: `null` \| \{ `error`: `string`; `failedAt`: `number`; `numberProcessed`: `number`; `total`: `number`; \}
-
-### isChecking
-
-> **isChecking**: `boolean`
+> **hashcodeProgress**: `null` \| \{ `error?`: `string`; `failedAt?`: `number`; `numberProcessed?`: `number`; `total?`: `number`; \}
 
 ### isGeneratingHashCodes
 
@@ -40,7 +30,7 @@ Indicates if WASM is ready
 
 ### isUploading
 
-> **isUploading**: `boolean`
+> **isUploading**: `boolean` = `uploadMutation.isPending`
 
 ### processFiles
 
