@@ -141,7 +141,7 @@ function PreviewUploadSection(): React.JSX.Element {
         onChange={(e: ChangeEvent<HTMLInputElement>) => {
           if (e.target.files) {
             handleFiles(e.target.files);
-            e.target.value = ""; // 添加这行重置input值
+            e.target.value = "";
           }
         }}
       />
