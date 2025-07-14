@@ -53,7 +53,6 @@ type UseGenerateBordersProps = {
  * It encapsulates all state related to the generation process.
  * @author Edwin Zhan
  * @param {UseGenerateBordersProps} props - Props for the hook.
- * @returns {boolean}isGenerating
  *
  */
 export const useGenerateBorders = ({
