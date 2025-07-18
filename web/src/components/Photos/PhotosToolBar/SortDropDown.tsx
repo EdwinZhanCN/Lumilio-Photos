@@ -1,34 +1,49 @@
-export default function SortDropDown() {
+import { SortOrderType } from "@/hooks/usePhotosPageState";
+import {
+  BarsArrowUpIcon,
+  BarsArrowDownIcon,
+} from "@heroicons/react/24/outline";
+
+interface SortDropDownProps {
+  sortOrder: SortOrderType;
+  onSortOrderChange: (sortOrder: SortOrderType) => void;
+}
+
+export default function SortDropDown({
+  sortOrder,
+  onSortOrderChange,
+}: SortDropDownProps) {
   return (
     <div className="dropdown">
-      <div tabIndex={0} role="button" className="btn btn-ghost m-1">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={1.5}
-          stroke="currentColor"
-          className="size-5"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-          />
-        </svg>
+      <div tabIndex={0} role="button" className="btn btn-sm btn-ghost">
+        {sortOrder === "desc" ? (
+          <BarsArrowDownIcon className="size-4" />
+        ) : (
+          <BarsArrowUpIcon className="size-4" />
+        )}
+        Sort {sortOrder === "desc" ? "Newest" : "Oldest"}
       </div>
       <ul
         tabIndex={0}
-        className="dropdown-content menu bg-base-200 rounded-box z-[1] w-52 p-2 shadow"
+        className="dropdown-content menu bg-base-200 rounded-box z-[1] w-40 p-2 shadow"
       >
         <li>
-          <a>Group by Date</a>
+          <a
+            onClick={() => onSortOrderChange("desc")}
+            className={sortOrder === "desc" ? "active" : ""}
+          >
+            <BarsArrowDownIcon className="size-4" />
+            Newest First
+          </a>
         </li>
         <li>
-          <a>Group by Size</a>
-        </li>
-        <li>
-          <a>Group by Type</a>
+          <a
+            onClick={() => onSortOrderChange("asc")}
+            className={sortOrder === "asc" ? "active" : ""}
+          >
+            <BarsArrowUpIcon className="size-4" />
+            Oldest First
+          </a>
         </li>
       </ul>
     </div>
