@@ -118,4 +118,34 @@ export const getAssetService = {
   getAssetTypes: async (): Promise<AxiosResponse<ApiResult<string[]>>> => {
     return api.get<ApiResult<string[]>>(`/api/v1/assets/types`);
   },
+
+  /**
+   * Gets the original file URL for an asset by its ID.
+   * This is useful for creating direct links or when you need the URL string.
+   * Note: For authenticated requests, prefer using getOriginalFile() instead.
+   * @param {string} id - The UUID of the asset.
+   * @returns {string} The URL to fetch the original file.
+   */
+  getOriginalFileUrl: (id: string): string => {
+    const baseURL = api.defaults.baseURL || "http://localhost:8080";
+    return `${baseURL}/api/v1/assets/${id}/original`;
+  },
+
+  /**
+   * Fetches the original file content for an asset by its ID.
+   * This method uses the configured axios instance with proper authentication handling.
+   * Recommended for programmatic file access (e.g., EXIF extraction, processing).
+   * @param {string} id - The UUID of the asset.
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
+   * @returns {Promise<AxiosResponse<Blob>>} A promise resolving to the file blob.
+   */
+  getOriginalFile: async (
+    id: string,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<Blob>> => {
+    return api.get<Blob>(`/api/v1/assets/${id}/original`, {
+      ...config,
+      responseType: "blob",
+    });
+  },
 };

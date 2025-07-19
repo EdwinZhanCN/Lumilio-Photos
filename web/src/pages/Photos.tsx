@@ -1,12 +1,13 @@
 import { useEffect, useMemo } from "react";
 import { useInView } from "react-intersection-observer";
+import { useParams, useNavigate } from "react-router-dom";
 import PhotosToolBar from "@/components/Photos/PhotosToolBar/PhotosToolBar";
 import PhotosMasonry from "@/components/Photos/PhotosMasonry/PhotosMasonry";
-import FullScreenCarousel from "@/components/Photos/FullScreen/FullScreenCarousel";
+import FullScreenCarousel from "@/components/Photos/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import PhotosLoadingSkeleton from "@/components/Photos/PhotosLoadingSkeleton";
 import ErrorFallBack from "@/pages/ErrorFallBack";
 import { useAssetsContext } from "@/contexts/FetchContext";
-import { usePhotosPageState } from "@/hooks/usePhotosPageState";
+import { usePhotosPageState } from "@/hooks/page-hooks/usePhotosPageState";
 import {
   groupAssets,
   getFlatAssetsFromGrouped,
@@ -14,6 +15,8 @@ import {
 } from "@/utils/assetGrouping";
 
 function Photos() {
+  const { assetId } = useParams<{ assetId: string }>();
+  const navigate = useNavigate();
   const {
     assets: allAssets,
     error,
@@ -25,7 +28,6 @@ function Photos() {
   } = useAssetsContext();
 
   const {
-    selectedAssetId,
     isCarouselOpen,
     groupBy,
     sortOrder,
@@ -37,62 +39,42 @@ function Photos() {
     setSortOrder,
     setViewMode,
     setSearchQuery,
-    updateCarouselIndex,
   } = usePhotosPageState();
 
   const { ref, inView } = useInView({
     threshold: 0.5,
   });
 
-  // Sync local search with context search
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      setContextSearchQuery(searchQuery);
-    }, 300); // Debounce search
-
-    return () => clearTimeout(timeoutId);
+    const handler = setTimeout(() => setContextSearchQuery(searchQuery), 300);
+    return () => clearTimeout(handler);
   }, [searchQuery, setContextSearchQuery]);
 
-  // Infinite scroll effect
   useEffect(() => {
     if (inView && hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Group and sort assets
-  const groupedPhotos = useMemo(() => {
-    if (!allAssets || allAssets.length === 0) return {};
-    return groupAssets(allAssets, groupBy, sortOrder);
-  }, [allAssets, groupBy, sortOrder]);
+  const groupedPhotos = useMemo(
+    () => groupAssets(allAssets, groupBy, sortOrder),
+    [allAssets, groupBy, sortOrder],
+  );
 
-  // Flat array for carousel navigation
-  const flatAssets = useMemo(() => {
-    return getFlatAssetsFromGrouped(groupedPhotos);
-  }, [groupedPhotos]);
+  const flatAssets = useMemo(
+    () => getFlatAssetsFromGrouped(groupedPhotos),
+    [groupedPhotos],
+  );
 
-  // Handle carousel navigation
-  const handleCarouselNavigate = (newIndex: number) => {
-    updateCarouselIndex(newIndex);
-    // Update selected asset based on new index
-    if (flatAssets[newIndex]) {
-      // This will update the URL but won't trigger a re-render loop
-      // because we're not changing the carousel state
-      const newAssetId = flatAssets[newIndex].assetId;
-      if (newAssetId) {
-        updateCarouselIndex(newIndex);
-      }
-    }
+  const currentAssetIndex = useMemo(() => {
+    if (!assetId || flatAssets.length === 0) return -1;
+    return findAssetIndex(flatAssets, assetId);
+  }, [flatAssets, assetId]);
+
+  const handleCarouselNavigation = (newAssetId: string) => {
+    navigate(`/photos/${newAssetId}`);
   };
 
-  // Get current carousel index when asset changes
-  const actualCarouselIndex = useMemo(() => {
-    if (!selectedAssetId || !flatAssets.length) return 0;
-    const index = findAssetIndex(flatAssets, selectedAssetId);
-    return index >= 0 ? index : 0;
-  }, [selectedAssetId, flatAssets]);
-
-  // Error state
   if (error) {
     return (
       <ErrorFallBack
@@ -102,11 +84,6 @@ function Photos() {
         reset={() => window.location.reload()}
       />
     );
-  }
-
-  // Initial loading state
-  if (isFetching && !isFetchingNextPage && allAssets.length === 0) {
-    return <PhotosLoadingSkeleton count={12} />;
   }
 
   return (
@@ -120,64 +97,43 @@ function Photos() {
         onSortOrderChange={setSortOrder}
         onViewModeChange={setViewMode}
         onSearchQueryChange={setSearchQuery}
-        onShowExifData={(assetId) => {
-          // TODO: Implement EXIF data modal/drawer
-          console.log("Show EXIF data for asset:", assetId);
-        }}
+        onShowExifData={() => {}}
       />
 
-      <PhotosMasonry
-        groupedPhotos={groupedPhotos}
-        openCarousel={openCarousel}
-        viewMode={viewMode}
-        isLoading={isFetching && allAssets.length === 0}
-        selectedAssetId={selectedAssetId}
-      />
+      {isFetching && allAssets.length === 0 ? (
+        <PhotosLoadingSkeleton count={12} />
+      ) : (
+        <PhotosMasonry
+          groupedPhotos={groupedPhotos}
+          openCarousel={openCarousel}
+          viewMode={viewMode}
+        />
+      )}
 
-      {/* Sentinel element for infinite scroll trigger */}
       <div ref={ref} className="h-10 w-full" />
 
-      {/* Loading states */}
       {isFetchingNextPage && (
         <div className="text-center p-4">
           <span className="loading loading-dots loading-md"></span>
-          <div className="text-sm text-gray-500 mt-2">
-            Loading more photos...
-          </div>
         </div>
       )}
 
-      {/* End of results */}
       {!hasNextPage && allAssets.length > 0 && (
         <div className="text-center p-4 text-gray-500">
-          <div className="text-sm">
-            Showing all {allAssets.length} photo
-            {allAssets.length !== 1 ? "s" : ""}
-          </div>
+          End of results.
         </div>
       )}
 
-      {/* Empty state */}
-      {!isFetching && allAssets.length === 0 && (
-        <div className="text-center py-12">
-          <div className="text-gray-400 text-lg mb-2">No photos found</div>
-          <div className="text-gray-500 text-sm">
-            {searchQuery
-              ? `No results for "${searchQuery}". Try adjusting your search.`
-              : "Upload some photos to get started!"}
-          </div>
-        </div>
-      )}
-
-      {/* Full Screen Carousel */}
-      {isCarouselOpen && selectedAssetId && flatAssets.length > 0 && (
-        <FullScreenCarousel
-          photos={flatAssets}
-          initialSlide={actualCarouselIndex}
-          onClose={closeCarousel}
-          onNavigate={handleCarouselNavigate}
-        />
-      )}
+      {isCarouselOpen &&
+        currentAssetIndex !== -1 &&
+        flatAssets.length > 0 && (
+          <FullScreenCarousel
+            photos={flatAssets}
+            initialSlide={currentAssetIndex}
+            onClose={closeCarousel}
+            onNavigate={handleCarouselNavigation}
+          />
+        )}
     </div>
   );
 }

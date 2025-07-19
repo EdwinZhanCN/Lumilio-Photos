@@ -3,7 +3,6 @@ package handler
 import (
 	"errors"
 	"fmt"
-	"gorm.io/gorm"
 	"io"
 	"log"
 	"net/http"
@@ -15,6 +14,8 @@ import (
 	"server/internal/service"
 	"strconv"
 	"time"
+
+	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -348,6 +349,57 @@ func (h *AssetHandler) GetThumbnailByID(c *gin.Context) {
 	// 5. 使用 c.File() 提供文件服务
 	// Gin会自动处理 Content-Type, Content-Length 等头信息
 	// 它还会安全地处理文件读取，防止路径遍历等问题
+	c.File(fullPath)
+}
+
+// GetOriginalFile serves the original file content by asset ID
+// @Summary Get original file by asset ID
+// @Description Serve the original file content for an asset
+// @Tags assets
+// @Produce application/octet-stream
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {file} file "Original file content"
+// @Failure 400 {object} api.Result "Invalid asset ID"
+// @Failure 404 {object} api.Result "Asset not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/{id}/original [get]
+func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
+	// Parse asset ID from URL parameter
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Invalid asset ID")
+		return
+	}
+
+	// Get asset metadata from service
+	asset, err := h.assetService.GetAsset(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.Error(c.Writer, http.StatusNotFound, err, http.StatusNotFound, "Asset not found")
+			return
+		}
+		log.Printf("Failed to retrieve asset metadata: %v", err)
+		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to retrieve asset")
+		return
+	}
+
+	// Construct full file path
+	fullPath := filepath.Join(h.StorageBasePath, asset.StoragePath)
+
+	// Check if file exists
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		log.Printf("Original file not found at path: %s", fullPath)
+		api.Error(c.Writer, http.StatusNotFound, err, http.StatusNotFound, "Original file not found")
+		return
+	}
+
+	// Set appropriate headers
+	c.Header("Cache-Control", "public, max-age=86400") // Cache for 1 day
+	c.Header("Content-Type", asset.MimeType)
+	c.Header("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", asset.OriginalFilename))
+
+	// Serve the file
 	c.File(fullPath)
 }
 
