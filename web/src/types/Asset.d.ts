@@ -1,50 +1,50 @@
 interface Asset {
   albums?: AssetAlbum[];
-  assetId?: string;
-  deletedAt?: string;
+  asset_id?: string;
+  deleted_at?: string;
   duration?: number; // For video/audio
-  fileSize?: number;
+  file_size?: number;
   hash?: string;
   height?: number;
-  isDeleted?: boolean;
-  mimeType?: string;
-  originalFilename?: string;
-  ownerId?: number;
-  specificMetadata?: JSON;
-  storagePath?: string;
+  is_deleted?: boolean;
+  mime_type?: string;
+  original_filename?: string;
+  owner_id?: number;
+  specific_metadata?: JSON;
+  storage_path?: string;
   tags?: AssetTag[];
   thumbnails?: AssetThumbnail[];
   type?: "PHOTO" | "VIDEO" | "AUDIO" | "DOCUMENT";
-  uploadTime?: string;
+  upload_time?: string;
   width?: number;
 }
 
 interface AssetAlbum {
-  albumId?: number;
-  albumName?: string;
+  album_id?: number;
+  album_name?: string;
   assets?: Asset[];
-  coverAsset?: Asset;
-  coverAssetId?: string;
-  createdAt?: string;
+  cover_asset?: Asset;
+  cover_asset_id?: string;
+  created_at?: string;
   description?: string;
-  updatedAt?: string;
-  userId?: number;
+  updated_at?: string;
+  user_id?: number;
 }
 
 interface AssetTag {
   assets?: Asset[];
   category?: string;
-  isAiGenerated?: boolean;
-  tagId?: number;
-  tagName?: string;
+  is_ai_generated?: boolean;
+  tag_id?: number;
+  tag_name?: string;
 }
 
 interface AssetThumbnail {
-  assetId?: string;
-  createdAt?: string;
-  mimeType?: string; // for video thumbnails
+  asset_id?: string;
+  created_at?: string;
+  mime_type?: string; // for video thumbnails
   size?: "small" | "medium" | "large";
-  storagePath?: string;
-  thumbnailId?: number;
-  URL?: string;
+  storage_path?: string;
+  thumbnail_id?: number;
+  url?: string;
 }

@@ -4,7 +4,7 @@ import {
   GroupByType,
   SortOrderType,
   ViewModeType,
-} from "@/hooks/usePhotosPageState";
+} from "@/hooks/page-hooks/usePhotosPageState";
 import {
   MagnifyingGlassIcon,
   Squares2X2Icon,

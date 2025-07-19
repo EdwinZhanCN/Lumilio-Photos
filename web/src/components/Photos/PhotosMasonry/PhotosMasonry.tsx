@@ -1,12 +1,11 @@
 import PhotosThumbnail from "../PhotosThumbnail/PhotosThumbnail";
-import { ViewModeType } from "@/hooks/usePhotosPageState";
+import { ViewModeType } from "@/hooks/page-hooks/usePhotosPageState";
 
 interface PhotosMasonryProps {
   groupedPhotos: Record<string, Asset[]>;
-  openCarousel: (assetId: string, index?: number) => void;
+  openCarousel: (assetId: string) => void;
   viewMode: ViewModeType;
   isLoading?: boolean;
-  selectedAssetId?: string | null;
 }
 
 const PhotosMasonry = ({
@@ -14,7 +13,6 @@ const PhotosMasonry = ({
   openCarousel,
   viewMode,
   isLoading = false,
-  selectedAssetId,
 }: PhotosMasonryProps) => {
   if (isLoading) {
     return (
@@ -57,20 +55,6 @@ const PhotosMasonry = ({
     );
   }
 
-  // Calculate flat index for carousel navigation
-  const getFlatIndex = (groupKey: string, assetIndex: number): number => {
-    let flatIndex = 0;
-    const groupKeys = Object.keys(groupedPhotos);
-
-    for (const key of groupKeys) {
-      if (key === groupKey) {
-        return flatIndex + assetIndex;
-      }
-      flatIndex += groupedPhotos[key].length;
-    }
-    return flatIndex;
-  };
-
   return (
     <>
       {Object.keys(groupedPhotos).map((groupKey) => (
@@ -84,15 +68,11 @@ const PhotosMasonry = ({
           </div>
 
           <div className={getViewModeClasses(viewMode)}>
-            {groupedPhotos[groupKey].map((asset, assetIndex) => (
+            {groupedPhotos[groupKey].map((asset, index) => (
               <PhotosThumbnail
-                key={asset.assetId}
+                key={asset.asset_id || `asset-${index}`}
                 asset={asset}
-                openCarousel={(assetId) => {
-                  const flatIndex = getFlatIndex(groupKey, assetIndex);
-                  openCarousel(assetId, flatIndex);
-                }}
-                isSelected={selectedAssetId === asset.assetId}
+                openCarousel={openCarousel}
                 viewMode={viewMode}
               />
             ))}
