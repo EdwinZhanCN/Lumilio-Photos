@@ -3,13 +3,11 @@ import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 
 export type GroupByType = "date" | "type" | "album";
 export type SortOrderType = "asc" | "desc";
-export type ViewModeType = "masonry" | "grid";
 
 interface PhotosPageState {
   isCarouselOpen: boolean;
   groupBy: GroupByType;
   sortOrder: SortOrderType;
-  viewMode: ViewModeType;
   searchQuery: string;
 }
 
@@ -18,14 +16,12 @@ interface PhotosPageActions {
   closeCarousel: () => void;
   setGroupBy: (groupBy: GroupByType) => void;
   setSortOrder: (sortOrder: SortOrderType) => void;
-  setViewMode: (viewMode: ViewModeType) => void;
   setSearchQuery: (query: string) => void;
 }
 
 const DEFAULT_STATE: Omit<PhotosPageState, "isCarouselOpen"> = {
   groupBy: "date",
   sortOrder: "desc",
-  viewMode: "masonry",
   searchQuery: "",
 };
 
@@ -40,8 +36,6 @@ export const usePhotosPageState = (): PhotosPageState & PhotosPageActions => {
         (searchParams.get("groupBy") as GroupByType) || DEFAULT_STATE.groupBy,
       sortOrder:
         (searchParams.get("sort") as SortOrderType) || DEFAULT_STATE.sortOrder,
-      viewMode:
-        (searchParams.get("view") as ViewModeType) || DEFAULT_STATE.viewMode,
       searchQuery: searchParams.get("q") || DEFAULT_STATE.searchQuery,
     }),
   );
@@ -55,9 +49,6 @@ export const usePhotosPageState = (): PhotosPageState & PhotosPageActions => {
     }
     if (state.sortOrder !== DEFAULT_STATE.sortOrder) {
       params.set("sort", state.sortOrder);
-    }
-    if (state.viewMode !== DEFAULT_STATE.viewMode) {
-      params.set("view", state.viewMode);
     }
     if (state.searchQuery) {
       params.set("q", state.searchQuery);
@@ -86,8 +77,6 @@ export const usePhotosPageState = (): PhotosPageState & PhotosPageActions => {
     setState((prev) => ({ ...prev, groupBy }));
   const setSortOrder = (sortOrder: SortOrderType) =>
     setState((prev) => ({ ...prev, sortOrder }));
-  const setViewMode = (viewMode: ViewModeType) =>
-    setState((prev) => ({ ...prev, viewMode }));
   const setSearchQuery = (searchQuery: string) =>
     setState((prev) => ({ ...prev, searchQuery }));
 
@@ -98,7 +87,6 @@ export const usePhotosPageState = (): PhotosPageState & PhotosPageActions => {
     closeCarousel,
     setGroupBy,
     setSortOrder,
-    setViewMode,
     setSearchQuery,
   };
 };
