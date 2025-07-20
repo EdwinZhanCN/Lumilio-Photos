@@ -8,8 +8,10 @@
         "@types/node": "^22.14.0",
         "dotenv": "^16.4.5",
         "i": "^0.3.7",
+        "mermaid": "^11.9.0",
         "npm": "^11.3.0",
-        "vitepress": "^1.6.3"
+        "vitepress": "^1.6.3",
+        "vitepress-plugin-mermaid": "^2.0.17"
     },
     "dependencies": {
         "markdown-it-mathjax3": "^4.3.2",

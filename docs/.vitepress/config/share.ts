@@ -2,6 +2,8 @@ import { defineConfig } from 'vitepress'
 import timeline from "vitepress-markdown-timeline"
 import { loadEnv } from 'vite'
 import { groupIconMdPlugin, groupIconVitePlugin } from 'vitepress-plugin-group-icons'
+import { withMermaid } from "vitepress-plugin-mermaid";
+
 
 const mode = process.env.NODE_ENV || 'development'
 const { VITE_BASE_URL } = loadEnv(mode, process.cwd())
@@ -9,7 +11,7 @@ const { VITE_BASE_URL } = loadEnv(mode, process.cwd())
 console.log('Mode:', process.env.NODE_ENV)
 console.log('VITE_BASE_URL:', VITE_BASE_URL)
 
-export const sharedConfig = defineConfig({
+export const sharedConfig = withMermaid(defineConfig({
     head: [
         ['link', { rel: 'icon', href: '/favicon.ico' }],
         [
@@ -64,5 +66,8 @@ export const sharedConfig = defineConfig({
             { icon: 'github', link: 'https://github.com/EdwinZhanCN/Lumilio-Photos' }
         ],
         langMenuLabel: "Change Language",
-    }
-})
+    },
+    mermaid: {
+        
+    },
+}))
