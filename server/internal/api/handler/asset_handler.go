@@ -269,19 +269,6 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 		}
 		assets, err = h.assetService.GetAssetsByType(ctx, assetType, limit, offset)
 
-		for _, asset := range assets {
-			// 遍历每个asset所关联的所有thumbnail
-			for i := range asset.Thumbnails {
-				// 为每个thumbnail的URL字段赋值
-				// 注意：这里我们使用了之前讨论过的专属路由格式
-				asset.Thumbnails[i].URL = fmt.Sprintf(
-					"%s/api/v1/thumbnails/%d",
-					"http://localhost:8080",
-					asset.Thumbnails[i].ThumbnailID,
-				)
-			}
-		}
-
 	default:
 		api.Error(c.Writer, http.StatusBadRequest, errors.New("missing query parameters"), http.StatusBadRequest, "Please specify type, owner_id, or search query")
 		return
@@ -291,6 +278,17 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 		log.Printf("Failed to retrieve assets: %v", err)
 		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to retrieve assets")
 		return
+	}
+
+	// Generate thumbnail URLs for all assets regardless of query type
+	for _, asset := range assets {
+		for i := range asset.Thumbnails {
+			asset.Thumbnails[i].URL = fmt.Sprintf(
+				"%s/api/v1/thumbnails/%d",
+				"http://localhost:8080",
+				asset.Thumbnails[i].ThumbnailID,
+			)
+		}
 	}
 
 	response := AssetListResponse{
@@ -314,41 +312,27 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /api/v1/thumbnails/{id} [get]
 func (h *AssetHandler) GetThumbnailByID(c *gin.Context) {
-	// 1. 解析URL中的ID
 	thumbnailIDStr := c.Param("id")
 	thumbnailID, err := strconv.Atoi(thumbnailIDStr)
 	if err != nil {
-		// Gin有自己的错误返回方式，但你的api.Error也可以
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid thumbnail ID"})
 		return
 	}
 
-	// 2. 调用服务层获取thumbnail的元数据 (注意：现在返回的是单个对象)
-	// 假设你的assetService也已经同步修改了方法签名
 	thumbnail, err := h.assetService.GetThumbnailByID(c.Request.Context(), thumbnailID)
+
 	if err != nil {
-		// 2a. 明确处理“未找到”的情况
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail not found"})
 			return
 		}
-		// 2b. 处理其他数据库错误
 		log.Printf("Failed to retrieve thumbnail metadata: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve thumbnail"})
 		return
 	}
 
-	// 3. 构造完整的文件路径
-	// 这是至关重要的一步，将数据库中存储的相对路径与服务器上的基础路径结合
 	fullPath := filepath.Join(h.StorageBasePath, thumbnail.StoragePath)
-
-	// 4. 设置缓存头 (强烈推荐)
-	// 让浏览器缓存图片，减少服务器压力
-	c.Header("Cache-Control", "public, max-age=86400") // 缓存1天
-
-	// 5. 使用 c.File() 提供文件服务
-	// Gin会自动处理 Content-Type, Content-Length 等头信息
-	// 它还会安全地处理文件读取，防止路径遍历等问题
+	c.Header("Cache-Control", "public, max-age=86400")
 	c.File(fullPath)
 }
 

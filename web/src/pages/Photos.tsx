@@ -31,13 +31,11 @@ function Photos() {
     isCarouselOpen,
     groupBy,
     sortOrder,
-    viewMode,
     searchQuery,
     openCarousel,
     closeCarousel,
     setGroupBy,
     setSortOrder,
-    setViewMode,
     setSearchQuery,
   } = usePhotosPageState();
 
@@ -91,11 +89,9 @@ function Photos() {
       <PhotosToolBar
         groupBy={groupBy}
         sortOrder={sortOrder}
-        viewMode={viewMode}
         searchQuery={searchQuery}
         onGroupByChange={setGroupBy}
         onSortOrderChange={setSortOrder}
-        onViewModeChange={setViewMode}
         onSearchQueryChange={setSearchQuery}
         onShowExifData={() => {}}
       />
@@ -106,7 +102,6 @@ function Photos() {
         <PhotosMasonry
           groupedPhotos={groupedPhotos}
           openCarousel={openCarousel}
-          viewMode={viewMode}
         />
       )}
 
@@ -119,21 +114,17 @@ function Photos() {
       )}
 
       {!hasNextPage && allAssets.length > 0 && (
-        <div className="text-center p-4 text-gray-500">
-          End of results.
-        </div>
+        <div className="text-center p-4 text-gray-500">End of results.</div>
       )}
 
-      {isCarouselOpen &&
-        currentAssetIndex !== -1 &&
-        flatAssets.length > 0 && (
-          <FullScreenCarousel
-            photos={flatAssets}
-            initialSlide={currentAssetIndex}
-            onClose={closeCarousel}
-            onNavigate={handleCarouselNavigation}
-          />
-        )}
+      {isCarouselOpen && currentAssetIndex !== -1 && flatAssets.length > 0 && (
+        <FullScreenCarousel
+          photos={flatAssets}
+          initialSlide={currentAssetIndex}
+          onClose={closeCarousel}
+          onNavigate={handleCarouselNavigation}
+        />
+      )}
     </div>
   );
 }

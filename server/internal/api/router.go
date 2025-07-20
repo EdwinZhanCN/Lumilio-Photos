@@ -77,6 +77,7 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			assets.DELETE("/:id", assetController.DeleteAsset)
 			assets.POST("/:id/albums/:albumId", assetController.AddAssetToAlbum)
 		}
+
 		thumbnails := v1.Group("/thumbnails")
 		thumbnails.Use(authController.OptionalAuthMiddleware())
 		{

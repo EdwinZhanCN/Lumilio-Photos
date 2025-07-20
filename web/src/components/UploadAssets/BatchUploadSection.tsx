@@ -16,12 +16,9 @@ function BatchUploadSection() {
   };
 
   return (
-    <section
-      id="batch-upload-assets"
-      className="max-w-3xl mx-auto p-6 rounded-lg bg-white shadow"
-    >
+    <section id="batch-upload-assets" className="max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold">Batch Upload Assets</h1>
-      <small className="text-sm text-gray-500">
+      <small className="text-sm">
         This Section is for large files like RAW, Video to upload. <br />
       </small>
 
