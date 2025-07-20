@@ -7,7 +7,7 @@ export default function PhotoInfo({ photo, onClose }: PhotoInfoProps) {
   return (
     <div className="fixed top-4 right-4 p-4 rounded-lg shadow-lg backdrop-blur backdrop-brightness-90 bg-base-100">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-bold">{photo.originalFilename}</h3>
+        <h3 className="text-lg font-bold">{photo.original_filename}</h3>
         <button
           onClick={onClose}
           className="text-gray-500 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300"
@@ -30,22 +30,22 @@ export default function PhotoInfo({ photo, onClose }: PhotoInfoProps) {
       </div>
       <p className="text-sm mt-2">
         <strong>Date: </strong>
-        {photo.specificMetadata?.parse("text")}
+        {photo.specific_metadata?.parse("text")}
       </p>
       <p className="text-sm mt-1">
         <strong>Size: </strong>
-        {photo.fileSize} bytes
+        {photo.file_size} bytes
       </p>
       <p className="text-sm mt-1">
         <strong>Tags: </strong>
-        {photo.tags?.map((tag) => tag.tagName).join(", ")}
+        {photo.tags?.map((tag) => tag.tag_name).join(", ")}
       </p>
       <p className="text-sm mt-1">
         <strong>Type: </strong>
-        {photo.mimeType}
+        {photo.mime_type}
       </p>
       <p className="text-sm mt-1">
-        {photo.specificMetadata?.parse("description")}
+        {photo.specific_metadata?.parse("description")}
       </p>
     </div>
   );

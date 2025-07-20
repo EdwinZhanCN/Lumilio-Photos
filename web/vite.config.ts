@@ -7,16 +7,19 @@ import topLevelAwait from "vite-plugin-top-level-await";
 
 // https://vite.dev/config/
 export default defineConfig({
-    //@ts-ignore
-    test: {
-        environment: "jsdom",
-        globals: true,
-        setupFiles: "./vitest.setup.ts",
+  //@ts-ignore
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: "./vitest.setup.ts",
+  },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
     },
-    resolve: {
-        alias: {
-            "@": path.resolve(__dirname, "./src"),
-        },
-    },
-    plugins: [react(), tailwindcss(), wasm(), topLevelAwait()],
+  },
+  server: {
+    port: 3000,
+  },
+  plugins: [react(), tailwindcss(), wasm(), topLevelAwait()],
 });

@@ -25,7 +25,9 @@ func (r *gormAssetRepo) CreateAsset(ctx context.Context, asset *models.Asset) er
 func (r *gormAssetRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Asset, error) {
 	var asset models.Asset
 	err := r.db.WithContext(ctx).
-		Preload("Thumbnails").
+		Preload("Thumbnails", func(db *gorm.DB) *gorm.DB {
+			return db.Order("CASE size WHEN 'small' THEN 1 WHEN 'medium' THEN 2 WHEN 'large' THEN 3 END, thumbnail_id")
+		}).
 		Preload("Tags").
 		Preload("Albums").
 		Where("asset_id = ? AND is_deleted = ?", id, false).
@@ -36,7 +38,9 @@ func (r *gormAssetRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Asse
 func (r *gormAssetRepo) GetByType(ctx context.Context, assetType models.AssetType, limit, offset int) ([]*models.Asset, error) {
 	var assets []*models.Asset
 	err := r.db.WithContext(ctx).
-		Preload("Thumbnails").
+		Preload("Thumbnails", func(db *gorm.DB) *gorm.DB {
+			return db.Order("CASE size WHEN 'small' THEN 1 WHEN 'medium' THEN 2 WHEN 'large' THEN 3 END, thumbnail_id")
+		}).
 		Where("type = ? AND is_deleted = ?", assetType, false).
 		Limit(limit).
 		Offset(offset).
@@ -48,6 +52,9 @@ func (r *gormAssetRepo) GetByType(ctx context.Context, assetType models.AssetTyp
 func (r *gormAssetRepo) GetByOwner(ctx context.Context, ownerID int, limit, offset int) ([]*models.Asset, error) {
 	var assets []*models.Asset
 	err := r.db.WithContext(ctx).
+		Preload("Thumbnails", func(db *gorm.DB) *gorm.DB {
+			return db.Order("CASE size WHEN 'small' THEN 1 WHEN 'medium' THEN 2 WHEN 'large' THEN 3 END, thumbnail_id")
+		}).
 		Where("owner_id = ? AND is_deleted = ?", ownerID, false).
 		Limit(limit).
 		Offset(offset).
@@ -124,7 +131,11 @@ func (r *gormAssetRepo) UpdateAssetMetadata(ctx context.Context, assetID uuid.UU
 }
 
 func (r *gormAssetRepo) SearchAssets(ctx context.Context, query string, assetType *models.AssetType, limit, offset int) ([]*models.Asset, error) {
-	db := r.db.WithContext(ctx).Where("is_deleted = ?", false)
+	db := r.db.WithContext(ctx).
+		Preload("Thumbnails", func(db *gorm.DB) *gorm.DB {
+			return db.Order("CASE size WHEN 'small' THEN 1 WHEN 'medium' THEN 2 WHEN 'large' THEN 3 END, thumbnail_id")
+		}).
+		Where("is_deleted = ?", false)
 
 	if query != "" {
 		db = db.Where("original_filename ILIKE ?", "%"+query+"%")

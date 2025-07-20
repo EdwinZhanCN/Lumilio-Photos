@@ -1,26 +1,32 @@
+import {
+  InformationCircleIcon,
+  ShareIcon,
+  TrashIcon,
+  ArrowDownTrayIcon,
+} from "@heroicons/react/24/outline";
 
-const FullScreenToolbar = () => {
-  // TODO: Implement FullScreenToolbar
-  const handleLike = () => {
-    // TODO: Add to liked photos
-    console.log("Like action placeholder");
-  };
+interface FullScreenToolbarProps {
+  onToggleInfo: () => void;
+}
 
-  const handleDelete = () => {
-    // TODO: Delete photo
-    console.log("Delete action placeholder");
-  };
-
-  const handleAddToAlbum = () => {
-    // TODO: Add to album
-    console.log("Add to album placeholder");
-  };
-
+const FullScreenToolbar = ({ onToggleInfo }: FullScreenToolbarProps) => {
   return (
-    <div>
-      <button onClick={handleLike}>Like</button>
-      <button onClick={handleDelete}>Delete</button>
-      <button onClick={handleAddToAlbum}>Add to Album</button>
+    <div className="absolute top-0 left-0 right-0 bg-base-100/50 p-2 flex justify-between items-center z-10">
+      <div>{/* Placeholder for future actions */}</div>
+      <div className="flex items-center space-x-4">
+        <button className="btn btn-ghost btn-sm" onClick={onToggleInfo}>
+          <InformationCircleIcon className="h-6 w-6" />
+        </button>
+        <button className="btn btn-ghost btn-sm">
+          <ShareIcon className="h-6 w-6" />
+        </button>
+        <button className="btn btn-ghost btn-sm">
+          <ArrowDownTrayIcon className="h-6 w-6" />
+        </button>
+        <button className="btn btn-ghost btn-sm text-error">
+          <TrashIcon className="h-6 w-6" />
+        </button>
+      </div>
     </div>
   );
 };

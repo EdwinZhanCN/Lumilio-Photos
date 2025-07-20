@@ -1,4 +1,4 @@
-import { SortOrderType } from "@/hooks/usePhotosPageState";
+import { SortOrderType } from "@/hooks/page-hooks/usePhotosPageState";
 import {
   BarsArrowUpIcon,
   BarsArrowDownIcon,

@@ -1,28 +1,67 @@
 import PhotosThumbnail from "../PhotosThumbnail/PhotosThumbnail";
-import { ViewModeType } from "@/hooks/usePhotosPageState";
+import { useState, useEffect } from "react";
 
 interface PhotosMasonryProps {
   groupedPhotos: Record<string, Asset[]>;
-  openCarousel: (assetId: string, index?: number) => void;
-  viewMode: ViewModeType;
+  openCarousel: (assetId: string) => void;
   isLoading?: boolean;
-  selectedAssetId?: string | null;
 }
+
+// Utility function to reorder photos for natural reading order in masonry layout
+const reorderForReadingOrder = (photos: Asset[], columns: number): Asset[] => {
+  if (photos.length === 0) return photos;
+
+  const reordered: Asset[] = Array.from({ length: photos.length });
+  const itemsPerColumn = Math.ceil(photos.length / columns);
+
+  // Convert from reading order (row-by-row) to column order for CSS columns
+  for (let i = 0; i < photos.length; i++) {
+    const row = Math.floor(i / columns);
+    const col = i % columns;
+    const newIndex = col * itemsPerColumn + row;
+
+    if (newIndex < photos.length) {
+      reordered[newIndex] = photos[i];
+    }
+  }
+
+  return reordered.filter(Boolean); // Remove undefined entries
+};
+
+// Get current column count based on viewport
+const getColumnCount = (): number => {
+  if (typeof window === "undefined") return 3; // SSR fallback
+
+  const width = window.innerWidth;
+  if (width >= 1280) return 5; // xl
+  if (width >= 1024) return 4; // lg
+  if (width >= 640) return 3; // sm
+  return 2; // default
+};
 
 const PhotosMasonry = ({
   groupedPhotos,
   openCarousel,
-  viewMode,
   isLoading = false,
-  selectedAssetId,
 }: PhotosMasonryProps) => {
+  const [columnCount, setColumnCount] = useState(getColumnCount());
+
+  // Update column count on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setColumnCount(getColumnCount());
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   if (isLoading) {
     return (
       <div className="space-y-6">
         {[1, 2].map((groupIndex) => (
           <div key={groupIndex} className="my-6">
             <div className="skeleton h-6 w-32 mb-4"></div>
-            <div className={getViewModeClasses(viewMode)}>
+            <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-4">
               {Array.from({ length: 8 }).map((_, index) => (
                 <div
                   key={index}
@@ -31,10 +70,7 @@ const PhotosMasonry = ({
                   <div
                     className="skeleton w-full"
                     style={{
-                      height:
-                        viewMode === "grid"
-                          ? "200px"
-                          : `${Math.floor(Math.random() * 200) + 150}px`,
+                      height: `${Math.floor(Math.random() * 200) + 150}px`,
                     }}
                   ></div>
                 </div>
@@ -57,20 +93,6 @@ const PhotosMasonry = ({
     );
   }
 
-  // Calculate flat index for carousel navigation
-  const getFlatIndex = (groupKey: string, assetIndex: number): number => {
-    let flatIndex = 0;
-    const groupKeys = Object.keys(groupedPhotos);
-
-    for (const key of groupKeys) {
-      if (key === groupKey) {
-        return flatIndex + assetIndex;
-      }
-      flatIndex += groupedPhotos[key].length;
-    }
-    return flatIndex;
-  };
-
   return (
     <>
       {Object.keys(groupedPhotos).map((groupKey) => (
@@ -83,34 +105,21 @@ const PhotosMasonry = ({
             </span>
           </div>
 
-          <div className={getViewModeClasses(viewMode)}>
-            {groupedPhotos[groupKey].map((asset, assetIndex) => (
-              <PhotosThumbnail
-                key={asset.assetId}
-                asset={asset}
-                openCarousel={(assetId) => {
-                  const flatIndex = getFlatIndex(groupKey, assetIndex);
-                  openCarousel(assetId, flatIndex);
-                }}
-                isSelected={selectedAssetId === asset.assetId}
-                viewMode={viewMode}
-              />
-            ))}
+          <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-4">
+            {reorderForReadingOrder(groupedPhotos[groupKey], columnCount).map(
+              (asset, index) => (
+                <PhotosThumbnail
+                  key={asset.asset_id || `asset-${index}`}
+                  asset={asset}
+                  openCarousel={openCarousel}
+                />
+              ),
+            )}
           </div>
         </div>
       ))}
     </>
   );
-};
-
-const getViewModeClasses = (viewMode: ViewModeType): string => {
-  switch (viewMode) {
-    case "grid":
-      return "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4";
-    case "masonry":
-    default:
-      return "columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-4";
-  }
 };
 
 export default PhotosMasonry;

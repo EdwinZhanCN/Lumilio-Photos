@@ -10,6 +10,7 @@ import (
 type AssetControllerInterface interface {
 	UploadAsset(c *gin.Context)
 	GetAsset(c *gin.Context)
+	GetOriginalFile(c *gin.Context)
 	ListAssets(c *gin.Context)
 	UpdateAsset(c *gin.Context)
 	DeleteAsset(c *gin.Context)
@@ -71,10 +72,12 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			assets.GET("/types", assetController.GetAssetTypes)
 			assets.POST("/batch", assetController.BatchUploadAssets)
 			assets.GET("/:id", assetController.GetAsset)
+			assets.GET("/:id/original", assetController.GetOriginalFile)
 			assets.PUT("/:id", assetController.UpdateAsset)
 			assets.DELETE("/:id", assetController.DeleteAsset)
 			assets.POST("/:id/albums/:albumId", assetController.AddAssetToAlbum)
 		}
+
 		thumbnails := v1.Group("/thumbnails")
 		thumbnails.Use(authController.OptionalAuthMiddleware())
 		{
@@ -88,7 +91,6 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 // corsMiddleware handles CORS headers
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: Add frontend URL from config
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
