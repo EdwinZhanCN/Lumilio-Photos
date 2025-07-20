@@ -1,0 +1,30 @@
+/* Custom Swiper Navigation Styles */
+
+.swiper-button-next,
+.swiper-button-prev {
+    background-color: rgba(30, 41, 59, 0.3);
+    border-radius: 9999px; /* circle */
+    width: 3rem; /* 48px */
+    height: 3rem; /* 48px */
+    transition: background-color 0.2s ease-in-out;
+}
+
+.swiper-button-next:hover,
+.swiper-button-prev:hover {
+    background-color: rgba(30, 41, 59, 0.6);
+}
+
+.swiper-button-next::after,
+.swiper-button-prev::after {
+    color: white;
+    font-size: 1.5rem; /* 24px */
+    font-weight: 600;
+}
+
+.swiper-button-prev {
+    left: 1.5rem; /* 24px */
+}
+
+.swiper-button-next {
+    right: 1.5rem; /* 24px */
+}

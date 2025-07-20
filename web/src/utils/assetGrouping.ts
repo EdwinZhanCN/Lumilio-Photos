@@ -1,4 +1,4 @@
-import { GroupByType, SortOrderType } from '@/hooks/usePhotosPageState';
+import { GroupByType, SortOrderType } from '@/hooks/page-hooks/usePhotosPageState';
 
 /**
  * Groups assets by the specified criteria and applies sorting
@@ -50,7 +50,7 @@ const groupAssetsByDate = (assets: Asset[]): Record<string, Asset[]> => {
   const grouped: Record<string, Asset[]> = {};
 
   assets.forEach(asset => {
-    const date = asset.uploadTime ? new Date(asset.uploadTime) : new Date();
+    const date = asset.upload_time ? new Date(asset.upload_time) : new Date();
     const groupKey = formatDateGroupKey(date);
 
     if (!grouped[groupKey]) {
@@ -91,7 +91,7 @@ const groupAssetsByAlbum = (assets: Asset[]): Record<string, Asset[]> => {
     if (asset.albums && asset.albums.length > 0) {
       // Asset can be in multiple albums, add to each
       asset.albums.forEach(album => {
-        const groupKey = album.albumName || `Album ${album.albumId}`;
+        const groupKey = album.album_name || `Album ${album.album_id}`;
         if (!grouped[groupKey]) {
           grouped[groupKey] = [];
         }
@@ -116,15 +116,15 @@ const groupAssetsByAlbum = (assets: Asset[]): Record<string, Asset[]> => {
 const sortAssets = (assets: Asset[], sortOrder: SortOrderType): Asset[] => {
   return [...assets].sort((a, b) => {
     // Primary sort: upload time
-    const dateA = a.uploadTime ? new Date(a.uploadTime).getTime() : 0;
-    const dateB = b.uploadTime ? new Date(b.uploadTime).getTime() : 0;
+    const dateA = a.upload_time ? new Date(a.upload_time).getTime() : 0;
+    const dateB = b.upload_time ? new Date(b.upload_time).getTime() : 0;
 
     const dateDiff = sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
 
     // Secondary sort: filename if dates are equal
     if (dateDiff === 0) {
-      const nameA = a.originalFilename || '';
-      const nameB = b.originalFilename || '';
+      const nameA = a.original_filename || '';
+      const nameB = b.original_filename || '';
       return sortOrder === 'desc'
         ? nameB.localeCompare(nameA)
         : nameA.localeCompare(nameB);
@@ -255,7 +255,7 @@ export const getFlatAssetsFromGrouped = (groupedAssets: Record<string, Asset[]>)
  * Finds the index of an asset in the flat array
  */
 export const findAssetIndex = (assets: Asset[], assetId: string): number => {
-  return assets.findIndex(asset => asset.assetId === assetId);
+  return assets.findIndex(asset => asset.asset_id === assetId);
 };
 
 /**
@@ -263,7 +263,7 @@ export const findAssetIndex = (assets: Asset[], assetId: string): number => {
  */
 export const getAssetById = (groupedAssets: Record<string, Asset[]>, assetId: string): Asset | null => {
   for (const assets of Object.values(groupedAssets)) {
-    const asset = assets.find(a => a.assetId === assetId);
+    const asset = assets.find(a => a.asset_id === assetId);
     if (asset) return asset;
   }
   return null;

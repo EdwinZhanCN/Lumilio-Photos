@@ -3,12 +3,9 @@ import SortDropDown from "./SortDropDown";
 import {
   GroupByType,
   SortOrderType,
-  ViewModeType,
-} from "@/hooks/usePhotosPageState";
+} from "@/hooks/page-hooks/usePhotosPageState";
 import {
   MagnifyingGlassIcon,
-  Squares2X2Icon,
-  ViewColumnsIcon,
   FunnelIcon,
   InformationCircleIcon,
 } from "@heroicons/react/24/outline";
@@ -16,11 +13,9 @@ import {
 interface PhotosToolBarProps {
   groupBy: GroupByType;
   sortOrder: SortOrderType;
-  viewMode: ViewModeType;
   searchQuery: string;
   onGroupByChange: (groupBy: GroupByType) => void;
   onSortOrderChange: (sortOrder: SortOrderType) => void;
-  onViewModeChange: (viewMode: ViewModeType) => void;
   onSearchQueryChange: (query: string) => void;
   onShowExifData?: (assetId: string) => void; // For EXIF data extraction
 }
@@ -28,11 +23,9 @@ interface PhotosToolBarProps {
 const PhotosToolBar = ({
   groupBy,
   sortOrder,
-  viewMode,
   searchQuery,
   onGroupByChange,
   onSortOrderChange,
-  onViewModeChange,
   onSearchQueryChange,
   onShowExifData,
 }: PhotosToolBarProps) => {
@@ -99,24 +92,6 @@ const PhotosToolBar = ({
               className="input input-sm input-bordered w-48 pl-8"
             />
             <MagnifyingGlassIcon className="size-4 absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          </div>
-
-          {/* View Mode Toggle */}
-          <div className="join">
-            <button
-              className={`btn btn-sm join-item ${viewMode === "masonry" ? "btn-active" : "btn-ghost"}`}
-              onClick={() => onViewModeChange("masonry")}
-              title="Masonry View"
-            >
-              <ViewColumnsIcon className="size-4" />
-            </button>
-            <button
-              className={`btn btn-sm join-item ${viewMode === "grid" ? "btn-active" : "btn-ghost"}`}
-              onClick={() => onViewModeChange("grid")}
-              title="Grid View"
-            >
-              <Squares2X2Icon className="size-4" />
-            </button>
           </div>
 
           {/* Advanced Filters Toggle */}
