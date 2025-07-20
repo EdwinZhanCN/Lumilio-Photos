@@ -35,7 +35,10 @@ export const enSidebar: DefaultTheme.Sidebar = {
     },
     {
       text: "Business Diagram",
-      items: [{ text: "Upload", link: "/tech-stack/business-diagram/upload" }],
+      items: [
+        { text: "Upload[Frontend]", link: "/tech-stack/business-diagram/upload-frontend" },
+        { text: "Upload[Backend]", link: "/tech-stack/business-diagram/upload-backend" }
+      ],
     },
   ],
   "/docs/": [
