@@ -60,11 +60,10 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
         """Initialize all available services"""
         try:
             # Initialize CLIP service
-            model_filepath = os.path.join(MODEL_PATH, 'mobileclip_s1.pt')
-            clip_service = CLIPService(model_path=model_filepath)
+            clip_service = CLIPService(model_name='ViT-B-32', pretrained='laion2b_s34b_b79k')
             clip_service.initialize()
             self.model_registry.register_service('clip', clip_service)
-            logger.info(f"CLIP service initialized successfully using model at {model_filepath}")
+            logger.info("CLIP service initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize CLIP service: {e}")
 
@@ -124,7 +123,7 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
                         prediction_floats=prediction_floats,
                         confidence=1.0,
                         model_name=model_name,
-                        model_version=clip_service.clip_model.model_version,
+                        model_version=clip_service.clip_model.model_name,
                         prediction_time_ms=int(time.time() * 1000)
                     )
                 elif request.HasField('text_input'):
@@ -135,7 +134,7 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
                         prediction_floats=prediction_floats,
                         confidence=1.0,
                         model_name=model_name,
-                        model_version=clip_service.clip_model.model_version,
+                        model_version=clip_service.clip_model.model_name,
                         prediction_time_ms=int(time.time() * 1000)
                     )
 
@@ -278,7 +277,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     print("=" * 60)
-    print("🚀 CLIP gRPC Server")
+    print("🚀 Lumen gRPC Server")
     print("=" * 60)
 
     try:
