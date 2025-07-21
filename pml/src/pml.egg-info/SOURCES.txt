@@ -1,0 +1,16 @@
+README.md
+pyproject.toml
+src/image_classification/__init__.py
+src/image_classification/clip_model.py
+src/image_classification/clip_service.py
+src/image_classification/imagenet_class_index.json
+src/pml.egg-info/PKG-INFO
+src/pml.egg-info/SOURCES.txt
+src/pml.egg-info/dependency_links.txt
+src/pml.egg-info/requires.txt
+src/pml.egg-info/top_level.txt
+src/proto/__init__.py
+src/proto/ml_service_pb2.py
+src/proto/ml_service_pb2.pyi
+src/proto/ml_service_pb2_grpc.py
+src/utils/logging_config.py
