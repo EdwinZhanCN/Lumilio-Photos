@@ -16,6 +16,7 @@ dependencies = [
     "numpy",
     "python-dotenv",
     "importlib-resources",
+    "colorama",
 ]
 
 [project.optional-dependencies]

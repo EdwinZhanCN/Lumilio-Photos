@@ -1,7 +1,7 @@
 Metadata-Version: 2.4
 Name: pml
 Version: 0.1.0
-Summary: A machine learning project
+Summary: Lumen, Python Machine Learning (PML) for Lumilio Photos
 Requires-Dist: open-clip-torch
 Requires-Dist: timm
 Requires-Dist: pillow
@@ -11,6 +11,7 @@ Requires-Dist: protobuf
 Requires-Dist: numpy
 Requires-Dist: python-dotenv
 Requires-Dist: importlib-resources
+Requires-Dist: colorama
 Provides-Extra: cpu
 Requires-Dist: torch; extra == "cpu"
 Requires-Dist: torchvision; extra == "cpu"
