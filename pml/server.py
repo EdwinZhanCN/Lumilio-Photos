@@ -7,8 +7,13 @@ from concurrent import futures
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
-# Add current directory to path for imports
-sys.path.append(os.path.dirname(__file__))
+# Add 'src' directory to path for local module resolution. This allows finding modules
+# like 'image_classification' and 'proto' which are located in the 'src' folder.
+SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
+if SRC_DIR not in sys.path:
+    sys.path.insert(0, SRC_DIR)
+
+from utils.logging_config import setup_logging
 
 # Load environment variables
 load_dotenv()
@@ -20,7 +25,8 @@ from proto import ml_service_pb2, ml_service_pb2_grpc
 from image_classification.clip_service import CLIPService
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# The log level can be controlled via environment variable in a real app
+setup_logging(log_level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +40,7 @@ class ModelRegistry:
     def register_service(self, name: str, service: Any):
         """Register a service in the registry"""
         self.services[name] = service
-        logger.info(f"Registered service: {name}")
+        logger.info(f"✅ Service '{name}' registered successfully.")
 
     def get_service(self, name: str) -> Optional[Any]:
         """Get a service from the registry"""
@@ -63,9 +69,9 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
             clip_service = CLIPService(model_name='ViT-B-32', pretrained='laion2b_s34b_b79k')
             clip_service.initialize()
             self.model_registry.register_service('clip', clip_service)
-            logger.info("CLIP service initialized successfully")
+            logger.info("✅ CLIP service initialized successfully.")
         except Exception as e:
-            logger.error(f"Failed to initialize CLIP service: {e}")
+            logger.error(f"❌ Failed to initialize CLIP service: {e}", exc_info=True)
 
     def ProcessImageForCLIP(self, request, context):
         """Process image with CLIP model - delegates to CLIP service"""
@@ -79,7 +85,7 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
             return clip_service.process_image_for_clip(request, context)
 
         except Exception as e:
-            logger.error(f"Error in ProcessImageForCLIP: {e}")
+            logger.error(f"❌ Error in ProcessImageForCLIP: {e}", exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f'Internal error: {str(e)}')
             return ml_service_pb2.ImageProcessResponse()
@@ -96,7 +102,7 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
             return clip_service.get_text_embedding_for_clip(request, context)
 
         except Exception as e:
-            logger.error(f"Error in GetTextEmbeddingForCLIP: {e}")
+            logger.error(f"❌ Error in GetTextEmbeddingForCLIP: {e}", exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f'Internal error: {str(e)}')
             return ml_service_pb2.TextEmbeddingResponse()
@@ -143,7 +149,7 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
             return ml_service_pb2.PredictResponse()
 
         except Exception as e:
-            logger.error(f"Error in generic prediction: {e}")
+            logger.error(f"❌ Error in generic prediction: {e}", exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f'Internal error: {str(e)}')
             return ml_service_pb2.PredictResponse()
@@ -165,7 +171,7 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
                     responses.append(response)
                     success_count += 1
                 except Exception as e:
-                    logger.error(f"Failed to process batch request: {e}")
+                    logger.warning(f"⚠️ Failed to process a request in batch: {e}")
                     failed_count += 1
                     # Add empty response for failed request
                     responses.append(ml_service_pb2.PredictResponse())
@@ -177,7 +183,7 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
             )
 
         except Exception as e:
-            logger.error(f"Error in batch prediction: {e}")
+            logger.error(f"❌ Error in batch prediction: {e}", exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f'Internal error: {str(e)}')
             return ml_service_pb2.BatchPredictResponse()
@@ -227,7 +233,7 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
                 )
 
         except Exception as e:
-            logger.error(f"Error in health check: {e}")
+            logger.error(f"❌ Error in health check: {e}", exc_info=True)
             return ml_service_pb2.HealthCheckResponse(
                 status=ml_service_pb2.HealthCheckResponse.SERVICE_SPECIFIC_ERROR,
                 model_name=request.service_name,
@@ -252,18 +258,18 @@ def serve(port: int = 50051, max_workers: int = 10):
 
     # Start server
     server.start()
-    logger.info(f"gRPC ML Prediction Server started on {listen_addr}")
-    logger.info("Available services:")
-    logger.info("  - ProcessImageForCLIP: CLIP image processing")
-    logger.info("  - GetTextEmbeddingForCLIP: CLIP text embedding")
-    logger.info("  - Predict: Generic prediction interface")
-    logger.info("  - BatchPredict: Batch prediction interface")
-    logger.info("  - HealthCheck: Service health monitoring")
+    logger.info(f"🚀 gRPC ML Prediction Server started on {listen_addr}")
+    logger.info("📡 Available services:")
+    logger.info("  ➡️  ProcessImageForCLIP: CLIP image processing")
+    logger.info("  ➡️  GetTextEmbeddingForCLIP: CLIP text embedding")
+    logger.info("  ➡️  Predict: Generic prediction interface")
+    logger.info("  ➡️  BatchPredict: Batch prediction interface")
+    logger.info("  ➡️  HealthCheck: Service health monitoring")
 
     try:
         server.wait_for_termination()
     except KeyboardInterrupt:
-        logger.info("Shutting down server...")
+        logger.info("🌙 Shutting down server...")
         server.stop(0)
 
 
@@ -283,11 +289,12 @@ if __name__ == '__main__':
     try:
         serve(port=args.port, max_workers=args.workers)
     except ImportError as e:
-        logger.error(f"Import error: {e}")
-        logger.error("Please ensure all dependencies are installed:")
-        logger.error("  pip install -r requirements.txt")
-        logger.error("And that model files are in the correct location")
+        # Use basicConfig for logging here since our setup might have failed
+        logging.basicConfig()
+        logging.critical(f"❌ Import error: {e}. A required package might be missing.", exc_info=True)
+        logging.error("Please ensure all dependencies are installed (e.g., 'uv pip install .[cpu]').")
         sys.exit(1)
     except Exception as e:
-        logger.error(f"Failed to start server: {e}")
+        logging.basicConfig()
+        logging.critical(f"Failed to start server: {e}", exc_info=True)
         sys.exit(1)

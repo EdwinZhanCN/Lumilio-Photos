@@ -41,24 +41,24 @@ class CLIPService:
         self.start_time = time.time()
         self.is_initialized = False
 
-        logger.info(f"CLIPService created with model: {model_name}")
+        logger.info(f"🔧 CLIPService created for model: {model_name}")
 
     def initialize(self):
         """Initialize the OpenCLIP model"""
         try:
-            logger.info(f"Initializing OpenCLIP service with model: {self.model_name}")
+            logger.info(f"🚀 Initializing OpenCLIP service with model: {self.model_name}...")
             self.clip_model.initialize()
             self.is_initialized = True
 
             model_info = self.clip_model.get_model_info()
-            logger.info("OpenCLIP service initialized successfully:")
-            logger.info(f"  - Model: {model_info['model_name']}")
-            logger.info(f"  - Device: {model_info['device']}")
-            logger.info(f"  - Load time: {model_info['load_time']:.2f}s")
-            logger.info(f"  - ImageNet classes: {model_info['imagenet_classes_count']}")
+            logger.info("✅ OpenCLIP service initialized successfully:")
+            logger.info(f"  - 🏷️ Model: {model_info['model_name']}")
+            logger.info(f"  - 💻 Device: {model_info['device']}")
+            logger.info(f"  - ⏱️ Load time: {model_info['load_time']:.2f}s")
+            logger.info(f"  - 📚 ImageNet classes: {model_info['imagenet_classes_count']}")
 
         except Exception as e:
-            logger.error(f"Failed to initialize OpenCLIP service: {e}")
+            logger.error(f"❌ Failed to initialize OpenCLIP service: {e}", exc_info=True)
             raise
 
     def process_image_for_clip(self, request: ml_service_pb2.ImageProcessRequest, context) -> ml_service_pb2.ImageProcessResponse:
@@ -112,12 +112,12 @@ class CLIPService:
                 processing_time_ms=processing_time
             )
 
-            logger.info(f"Processed image {request.image_id} in {processing_time}ms with {len(label_scores)} predictions")
+            logger.info(f"🖼️ Processed image '{request.image_id}' in {processing_time}ms, found {len(label_scores)} predictions.")
 
             return response
 
         except Exception as e:
-            logger.error(f"Error processing image: {e}")
+            logger.error(f"❌ Error processing image: {e}", exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f'Internal error: {str(e)}')
             return ml_service_pb2.ImageProcessResponse()
@@ -148,12 +148,12 @@ class CLIPService:
                 processing_time_ms=processing_time
             )
 
-            logger.info(f"Processed text embedding in {processing_time}ms")
+            logger.info(f"✍️ Processed text embedding in {processing_time}ms.")
 
             return response
 
         except Exception as e:
-            logger.error(f"Error processing text: {e}")
+            logger.error(f"❌ Error processing text: {e}", exc_info=True)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f'Internal error: {str(e)}')
             return ml_service_pb2.TextEmbeddingResponse()
@@ -167,7 +167,7 @@ class CLIPService:
             return self.clip_model.compute_similarity(image_bytes, text)
 
         except Exception as e:
-            logger.error(f"Error computing similarity: {e}")
+            logger.error(f"❌ Error computing similarity: {e}", exc_info=True)
             raise
 
     def health_check(self, service_name: str = "openclip") -> ml_service_pb2.HealthCheckResponse:
@@ -175,11 +175,11 @@ class CLIPService:
         try:
             if self.is_initialized and self.clip_model.is_loaded:
                 status = ml_service_pb2.HealthCheckResponse.SERVING
-                message = f"OpenCLIP model ({self.model_name}) is healthy"
+                message = f"✅ OpenCLIP model ({self.model_name}) is healthy and serving."
                 model_version = self.clip_model.model_name
             else:
                 status = ml_service_pb2.HealthCheckResponse.NOT_SERVING
-                message = f"OpenCLIP model ({self.model_name}) not available"
+                message = f"⚠️ OpenCLIP model ({self.model_name}) is not available."
                 model_version = "unknown"
 
             return ml_service_pb2.HealthCheckResponse(
@@ -191,13 +191,13 @@ class CLIPService:
             )
 
         except Exception as e:
-            logger.error(f"Error in OpenCLIP health check: {e}")
+            logger.error(f"❌ Error in OpenCLIP health check: {e}", exc_info=True)
             return ml_service_pb2.HealthCheckResponse(
                 status=ml_service_pb2.HealthCheckResponse.SERVICE_SPECIFIC_ERROR,
                 model_name=f"openclip-{self.model_name}",
                 model_version="unknown",
                 uptime_seconds=int(time.time() - self.start_time),
-                message=f"Health check error: {str(e)}"
+                message=f"An internal error occurred during health check: {str(e)}"
             )
 
     def get_model_info(self):
@@ -221,7 +221,7 @@ class CLIPService:
         """
         old_model = self.clip_model
         try:
-            logger.info(f"Switching from {self.model_name} to {new_model_name}")
+            logger.info(f"🔄 Switching model from '{self.model_name}' to '{new_model_name}'...")
 
             # Create new model manager
             self.model_name = new_model_name
@@ -239,20 +239,20 @@ class CLIPService:
             # Initialize new model
             self.initialize()
 
-            logger.info(f"Successfully switched to model: {new_model_name}")
+            logger.info(f"✅ Successfully switched to model: {new_model_name}.")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to switch model to {new_model_name}: {e}")
+            logger.error(f"❌ Failed to switch model to '{new_model_name}': {e}", exc_info=True)
             # Try to restore old model if possible
             try:
                 if old_model:
                     self.clip_model = old_model
                     self.model_name = getattr(old_model, 'model_name', 'ViT-B-32')
                     self.pretrained = getattr(old_model, 'pretrained', 'laion2b_s34b_b79k')
-                    logger.info("Restored previous model after failed switch")
+                    logger.warning("↪️ Restored previous model after a failed switch attempt.")
             except:
-                logger.error("Failed to restore previous model")
+                logger.critical("🔥 Failed to restore previous model. Service may be unstable.")
                 self.is_initialized = False
             raise
 
@@ -272,5 +272,5 @@ class CLIPService:
             return stats
 
         except Exception as e:
-            logger.error(f"Error getting performance stats: {e}")
+            logger.error(f"❌ Error getting performance stats: {e}", exc_info=True)
             return {"error": str(e)}

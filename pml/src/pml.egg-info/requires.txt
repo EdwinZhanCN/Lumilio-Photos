@@ -7,6 +7,7 @@ protobuf
 numpy
 python-dotenv
 importlib-resources
+colorama
 
 [cpu]
 torch

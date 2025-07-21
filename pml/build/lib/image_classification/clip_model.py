@@ -41,9 +41,9 @@ class CLIPModelManager:
 
         # Debug: Log the actual path being used
         if self.imagenet_classes_path:
-            logger.info(f"CLIPModelManager initialized with custom imagenet_classes_path: {self.imagenet_classes_path}")
+            logger.info(f"📖 Initializing CLIPModelManager with custom ImageNet classes: {self.imagenet_classes_path}")
         else:
-            logger.info("CLIPModelManager initialized with default imagenet classes from package resources")
+            logger.info("📖 Initializing CLIPModelManager with default ImageNet classes from package resources.")
 
     def initialize(self):
         """Initialize the OpenCLIP model and ImageNet classes"""
@@ -51,16 +51,16 @@ class CLIPModelManager:
             self._load_model()
             self._load_imagenet_classes()
             self.is_loaded = True
-            logger.info(f"OpenCLIP model '{self.model_name}' initialized successfully")
+            logger.info(f"✅ OpenCLIP model '{self.model_name}' initialized successfully.")
         except Exception as e:
-            logger.error(f"Failed to initialize OpenCLIP model: {e}")
+            logger.error(f"❌ Failed to initialize OpenCLIP model: {e}", exc_info=True)
             raise
 
     def _load_model(self):
         """Load the OpenCLIP model and preprocessing functions"""
         try:
             start_time = time.time()
-            logger.info(f"Loading OpenCLIP model: {self.model_name}")
+            logger.info(f"⏳ Loading OpenCLIP model: {self.model_name}...")
 
             # Device selection
             self._setup_device()
@@ -82,12 +82,12 @@ class CLIPModelManager:
             self.model.eval()
 
             self.load_time = time.time() - start_time
-            logger.info(f"OpenCLIP model loaded successfully in {self.load_time:.2f} seconds")
+            logger.info(f"✅ OpenCLIP model loaded in {self.load_time:.2f} seconds.")
 
             self._log_model_info()
 
         except Exception as e:
-            logger.error(f"Failed to load OpenCLIP model: {e}")
+            logger.error(f"❌ Failed to load OpenCLIP model: {e}", exc_info=True)
             raise
 
     def _setup_device(self):
@@ -107,13 +107,13 @@ class CLIPModelManager:
 
         if cuda_available:
             self.device = torch.device("cuda")
-            logger.info("Using CUDA for model inference")
+            logger.info("🔌 Using CUDA for model inference.")
         elif mps_available:
             self.device = torch.device("mps")
-            logger.info("Using MPS for model inference on Apple Silicon")
+            logger.info("🍏 Using MPS for model inference on Apple Silicon.")
         else:
             self.device = torch.device("cpu")
-            logger.info("Using CPU for model inference")
+            logger.info("🧠 Using CPU for model inference.")
 
         logger.debug(f"Selected device: {self.device}")
         logger.debug("-----------------------------")
@@ -122,42 +122,42 @@ class CLIPModelManager:
         """Log detailed model information"""
         try:
             if self.model is None:
-                logger.warning("Model not loaded, cannot log model info")
+                logger.warning("⚠️ Model not loaded, cannot log detailed info.")
                 return
 
             total_params = sum(p.numel() for p in self.model.parameters())
             trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
 
-            logger.info(f"Model: {self.model_name}")
-            logger.info(f"Pretrained: {self.pretrained}")
-            logger.info(f"Device: {self.device}")
-            logger.info(f"Total parameters: {total_params:,}")
-            logger.info(f"Trainable parameters: {trainable_params:,}")
+            logger.info(f"  - 🏷️ Model: {self.model_name}")
+            logger.info(f"  - 📚 Pretrained: {self.pretrained}")
+            logger.info(f"  - 💻 Device: {self.device}")
+            logger.info(f"  - 🔢 Total parameters: {total_params:,}")
+            logger.info(f"  - ✍️ Trainable parameters: {trainable_params:,}")
         except Exception as e:
-            logger.debug(f"Could not log model info: {e}")
+            logger.debug(f"Could not log detailed model info: {e}")
 
     def _load_imagenet_classes(self):
         """Load ImageNet class mappings"""
         try:
             if self.imagenet_classes_path:
                 # Use custom path if provided
-                logger.info(f"Attempting to load ImageNet classes from custom path: {self.imagenet_classes_path}")
-                logger.info(f"File exists: {os.path.exists(self.imagenet_classes_path)}")
+                logger.info(f"📖 Attempting to load ImageNet classes from custom path: {self.imagenet_classes_path}")
+                logger.debug(f"Custom ImageNet file exists: {os.path.exists(self.imagenet_classes_path)}")
                 with open(self.imagenet_classes_path) as f:
                     imagenet_class_dict = json.load(f)
             else:
                 # Use importlib.resources to load from package
-                logger.info("Loading ImageNet classes from package resources")
+                logger.info("📖 Loading ImageNet classes from package resources.")
                 try:
                     package_files = files('image_classification')
                     json_file = package_files / 'imagenet_class_index.json'
                     with json_file.open('r') as f:
                         imagenet_class_dict = json.load(f)
                 except Exception as resource_error:
-                    logger.warning(f"Failed to load from package resources: {resource_error}")
+                    logger.warning(f"⚠️ Failed to load ImageNet classes from package resources: {resource_error}")
                     # Fallback to relative path for development
                     fallback_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'imagenet_class_index.json')
-                    logger.info(f"Falling back to relative path: {fallback_path}")
+                    logger.info(f"↪️ Falling back to relative path for ImageNet classes: {fallback_path}")
                     with open(fallback_path) as f:
                         imagenet_class_dict = json.load(f)
 
@@ -172,9 +172,9 @@ class CLIPModelManager:
                 int(idx): {"id": class_info[0], "en": class_info[1]}
                 for idx, class_info in imagenet_class_dict.items()
             }
-            logger.info(f"Loaded {len(self.imagenet_labels)} ImageNet classes")
+            logger.info(f"✅ Loaded {len(self.imagenet_labels)} ImageNet classes.")
         except Exception as e:
-            logger.warning(f"Failed to load ImageNet classes: {e}")
+            logger.warning(f"⚠️ Failed to load ImageNet classes: {e}", exc_info=True)
             self.imagenet_labels = {}
             self.text_descriptions = []
 
@@ -203,13 +203,13 @@ class CLIPModelManager:
                 image_features /= image_features.norm(dim=-1, keepdim=True)
 
             processing_time = time.time() - start_time
-            logger.debug(f"Image encoding took {processing_time*1000:.2f}ms")
+            logger.debug(f"🖼️ Image encoding finished in {processing_time*1000:.2f}ms.")
 
             result = image_features.cpu().numpy().flatten()
             return result
 
         except Exception as e:
-            logger.error(f"Error encoding image: {e}")
+            logger.error(f"❌ Error encoding image: {e}", exc_info=True)
             raise
 
     def encode_text(self, text: str) -> np.ndarray:
@@ -234,13 +234,13 @@ class CLIPModelManager:
                 text_features /= text_features.norm(dim=-1, keepdim=True)
 
             processing_time = time.time() - start_time
-            logger.debug(f"Text encoding took {processing_time*1000:.2f}ms")
+            logger.debug(f"✍️ Text encoding finished in {processing_time*1000:.2f}ms.")
 
             result = text_features.cpu().numpy().flatten()
             return result
 
         except Exception as e:
-            logger.error(f"Error encoding text: {e}")
+            logger.error(f"❌ Error encoding text: {e}", exc_info=True)
             raise
 
     def classify_image_with_labels(self, image_bytes: bytes, target_labels: Optional[List[str]] = None, top_k: Optional[int] = 3) -> List[Tuple[str, float]]:
@@ -320,12 +320,12 @@ class CLIPModelManager:
                     results.append((label, float(prob)))
 
                 processing_time = time.time() - start_time
-                logger.debug(f"Image classification took {processing_time*1000:.2f}ms")
+                logger.debug(f"🎨 Image classification finished in {processing_time*1000:.2f}ms.")
 
                 return results
 
         except Exception as e:
-            logger.error(f"Error in image classification: {e}")
+            logger.error(f"❌ Error in image classification: {e}", exc_info=True)
             raise
 
     def compute_similarity(self, image_bytes: bytes, text: str) -> float:
@@ -342,7 +342,7 @@ class CLIPModelManager:
             return float(similarity)
 
         except Exception as e:
-            logger.error(f"Error computing similarity: {e}")
+            logger.error(f"❌ Error computing similarity: {e}", exc_info=True)
             raise
 
     def get_model_info(self) -> Dict[str, Any]:

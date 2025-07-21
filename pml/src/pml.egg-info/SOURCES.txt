@@ -13,3 +13,4 @@ src/proto/__init__.py
 src/proto/ml_service_pb2.py
 src/proto/ml_service_pb2.pyi
 src/proto/ml_service_pb2_grpc.py
+src/utils/logging_config.py
