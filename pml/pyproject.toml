@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pml"
+version = "0.1.0"
+description = "Lumen, Python Machine Learning (PML) for Lumilio Photos"
+dependencies = [
+    "open-clip-torch",
+    "timm",
+    "pillow",
+    "grpcio",
+    "grpcio-tools",
+    "protobuf",
+    "numpy",
+    "python-dotenv",
+    "importlib-resources",
+    "colorama",
+]
+
+[project.optional-dependencies]
+cpu = ["torch", "torchvision", "torchaudio"]
+gpu = ["torch", "torchvision", "torchaudio"]
+osx = ["torch", "torchvision", "torchaudio"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+image_classification = ["*.json"]

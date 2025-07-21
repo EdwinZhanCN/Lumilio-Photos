@@ -1,6 +1,0 @@
--r requirements-base.txt
-
-# Install PyTorch compatible with mps
-torch
-torchvision
-torchaudio
