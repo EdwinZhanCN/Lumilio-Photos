@@ -1,18 +1,20 @@
 # Stage 1: Build stage with uv
-FROM python:3.10-slim as builder
+FROM nvidia/cuda:12.1.0-base-ubuntu22.04 as builder
 
-# Install uv
-RUN pip install uv
+# Install Python and uv
+RUN apt-get update && \
+    apt-get install -y python3.10 python3-pip && \
+    pip install uv
 
 # Copy project files
 WORKDIR /app
 COPY pyproject.toml pyproject.toml
 
-# Install dependencies for CPU
-RUN uv pip install --system --no-cache .[cpu]
+# Install dependencies for GPU
+RUN uv pip install --system --no-cache --index-url https://download.pytorch.org/whl/cu121 .[gpu]
 
 # Stage 2: Final stage
-FROM python:3.10-slim
+FROM nvidia/cuda:12.1.0-base-ubuntu22.04
 
 WORKDIR /app
 
