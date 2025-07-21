@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pml"
 version = "0.1.0"
-description = "Lumen, Python Machine Learning (PML) for Lumilio Photos"
+description = "Lumen, Python Machine Learning (PML) module for Lumilio Photos"
 dependencies = [
     "open-clip-torch",
     "timm",

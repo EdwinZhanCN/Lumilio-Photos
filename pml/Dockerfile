@@ -1,5 +1,5 @@
 # Stage 1: Build stage with uv
-FROM python:3.10-slim as builder
+FROM python:3.13.2-slim as builder
 
 # Install uv
 RUN pip install uv
@@ -12,12 +12,12 @@ COPY pyproject.toml pyproject.toml
 RUN uv pip install --system --no-cache .[cpu]
 
 # Stage 2: Final stage
-FROM python:3.10-slim
+FROM python:3.13.2-slim
 
 WORKDIR /app
 
 # Copy installed dependencies from builder
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
 
 # Copy application code
 COPY . .
