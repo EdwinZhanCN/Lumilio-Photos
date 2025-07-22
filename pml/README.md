@@ -28,7 +28,7 @@ uv pip install '.[cpu]'
 
 To be compatible with different platform, we use different Dockerfile for different of them, there are three files.
 
-- [Dockerfile](./Dockerfile), the Dockerfile for CPU and MacOS (mps/Metal Performance Shaders).
+- [Dockerfile](./Dockerfile), the Dockerfile for CPU and macOS (mps/Metal Performance Shaders).
 - [Dockerfile.cuda](./Dockerfile.cuda), the Dockerfile for CUDA GPUs (Nvidia), this project now use `CUDA12.6`, more information refers to [Nvidia Documentation](https://docs.nvidia.com/deeplearning/cudnn/backend/latest/reference/support-matrix.html)
 - [Dockerfile.rocm](./Dockerfile.rocm), the Dockerfile for ROCm GPUs (AMD Instinct, Radeon PRO, Radeon RX 6600XT+, Ryzen AI Max 300 “Strix Halo”, etc.), this project now use `ROCm6.3`, more information refer to [AMD documentation](https://rocm.docs.amd.com/en/latest/compatibility/compatibility-matrix.html)
 

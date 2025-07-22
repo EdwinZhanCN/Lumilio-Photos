@@ -20,7 +20,7 @@ services:
     api:
         build:
             context: .
-            dockerfile: server/Dockerfile.api
+            dockerfile: server/cmd/api/Dockerfile
         depends_on:
             db:
                 condition: service_healthy
@@ -51,7 +51,7 @@ services:
     worker:
         build:
             context: .
-            dockerfile: server/Dockerfile.worker
+            dockerfile: server/cmd/worker/Dockerfile
         depends_on:
             db:
                 condition: service_healthy
@@ -99,7 +99,7 @@ services:
     ml:
         build:
             context: .
-            dockerfile: pml/Dockerfile
+            dockerfile: pml/Dockerfiles/Dockerfile
         networks:
             - ml-network
         ports:
