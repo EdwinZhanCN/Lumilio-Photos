@@ -148,4 +148,16 @@ export const getAssetService = {
       responseType: "blob",
     });
   },
+
+  /**
+   * Fetches the thumbnail URL for an asset by its ID.
+   * This method returns a URL that can be used to fetch the thumbnail image.
+   * @param {string} id - The UUID of the asset.
+   * @param {string} [size="small"] - The size of the thumbnail. Can be "small", "medium", or "large".
+   * @returns {string} The URL to fetch the thumbnail image.
+   */
+  getThumbnailUrl: (id: string, size: string = "small"): string => {
+    const baseURL = api.defaults.baseURL || "http://localhost:8080";
+    return `${baseURL}/api/v1/assets/${id}/thumbnail?size=${size}`;
+  },
 };

@@ -495,8 +495,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Retrieve detailed information about a specific asset including
-        metadata, thumbnails, tags and albums
+      description: Retrieve detailed information about a specific asset with optional
+        relationships
       parameters:
       - description: Asset ID (UUID format)
         example: '"550e8400-e29b-41d4-a716-446655440000"'
@@ -504,11 +504,26 @@ paths:
         name: id
         required: true
         type: string
+      - default: true
+        description: Include thumbnails
+        in: query
+        name: include_thumbnails
+        type: boolean
+      - default: true
+        description: Include tags
+        in: query
+        name: include_tags
+        type: boolean
+      - default: true
+        description: Include albums
+        in: query
+        name: include_albums
+        type: boolean
       produces:
       - application/json
       responses:
         "200":
-          description: Asset found
+          description: Asset details with optional relationships
           schema:
             allOf:
             - $ref: '#/definitions/api.Result'
@@ -517,7 +532,7 @@ paths:
                   $ref: '#/definitions/models.Asset'
               type: object
         "400":
-          description: Invalid asset ID format
+          description: Invalid asset ID
           schema:
             $ref: '#/definitions/api.Result'
         "404":
@@ -607,6 +622,82 @@ paths:
           schema:
             $ref: '#/definitions/api.Result'
       summary: Add asset to album
+      tags:
+      - assets
+  /api/v1/assets/{id}/original:
+    get:
+      description: Serve the original file content for an asset
+      parameters:
+      - description: Asset ID (UUID format)
+        example: '"550e8400-e29b-41d4-a716-446655440000"'
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Original file content
+          schema:
+            type: file
+        "400":
+          description: Invalid asset ID
+          schema:
+            $ref: '#/definitions/api.Result'
+        "404":
+          description: Asset not found
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Get original file by asset ID
+      tags:
+      - assets
+  /api/v1/assets/{id}/thumbnail:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a specific thumbnail image for an asset by asset ID and
+        size parameter
+      parameters:
+      - description: Asset ID (UUID format)
+        example: '"550e8400-e29b-41d4-a716-446655440000"'
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: '"medium"'
+        description: Thumbnail size
+        enum:
+        - small
+        - medium
+        - large
+        in: query
+        name: size
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Thumbnail image file
+          schema:
+            type: file
+        "400":
+          description: Invalid asset ID or size parameter
+          schema:
+            $ref: '#/definitions/api.Result'
+        "404":
+          description: Asset or thumbnail not found
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Get asset thumbnail by ID and size
       tags:
       - assets
   /api/v1/assets/batch:

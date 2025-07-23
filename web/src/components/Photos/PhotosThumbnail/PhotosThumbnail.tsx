@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { getAssetService } from "@/services/getAssetsService";
 
 interface PhotosThumbnailProps {
   asset: Asset;
@@ -6,10 +6,9 @@ interface PhotosThumbnailProps {
 }
 
 const PhotosThumbnail = ({ asset, openCarousel }: PhotosThumbnailProps) => {
-  const thumbnailUrl = useMemo(() => {
-    const smallThumbnail = asset.thumbnails?.find((t) => t.size === "small");
-    return smallThumbnail?.url || "";
-  }, [asset.thumbnails]);
+  const thumbnailUrl = asset.asset_id
+    ? getAssetService.getThumbnailUrl(asset.asset_id, "small")
+    : undefined;
 
   const containerClasses = [
     "overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-all duration-200",

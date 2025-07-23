@@ -17,7 +17,7 @@ type AssetControllerInterface interface {
 	BatchUploadAssets(c *gin.Context)
 	AddAssetToAlbum(c *gin.Context)
 	GetAssetTypes(c *gin.Context)
-	GetThumbnailByID(c *gin.Context)
+	GetAssetThumbnail(c *gin.Context)
 }
 
 // AuthControllerInterface defines the interface for authentication controllers
@@ -73,15 +73,10 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			assets.POST("/batch", assetController.BatchUploadAssets)
 			assets.GET("/:id", assetController.GetAsset)
 			assets.GET("/:id/original", assetController.GetOriginalFile)
+			assets.GET("/:id/thumbnail", assetController.GetAssetThumbnail)
 			assets.PUT("/:id", assetController.UpdateAsset)
 			assets.DELETE("/:id", assetController.DeleteAsset)
 			assets.POST("/:id/albums/:albumId", assetController.AddAssetToAlbum)
-		}
-
-		thumbnails := v1.Group("/thumbnails")
-		thumbnails.Use(authController.OptionalAuthMiddleware())
-		{
-			thumbnails.GET("/:id", assetController.GetThumbnailByID)
 		}
 	}
 

@@ -183,13 +183,16 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 
 // GetAsset retrieves a single asset by ID
 // @Summary Get asset by ID
-// @Description Retrieve detailed information about a specific asset including metadata, thumbnails, tags and albums
+// @Description Retrieve detailed information about a specific asset with optional relationships
 // @Tags assets
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Success 200 {object} api.Result{data=models.Asset} "Asset found"
-// @Failure 400 {object} api.Result "Invalid asset ID format"
+// @Param include_thumbnails query bool false "Include thumbnails" default(true)
+// @Param include_tags query bool false "Include tags" default(true)
+// @Param include_albums query bool false "Include albums" default(true)
+// @Success 200 {object} api.Result{data=models.Asset} "Asset details with optional relationships"
+// @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 404 {object} api.Result "Asset not found"
 // @Router /api/v1/assets/{id} [get]
 func (h *AssetHandler) GetAsset(c *gin.Context) {
@@ -200,7 +203,12 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 		return
 	}
 
-	asset, err := h.assetService.GetAsset(c.Request.Context(), id)
+	// Parse include options with defaults
+	includeThumbnails := c.DefaultQuery("include_thumbnails", "true") == "true"
+	includeTags := c.DefaultQuery("include_tags", "true") == "true"
+	includeAlbums := c.DefaultQuery("include_albums", "true") == "true"
+
+	asset, err := h.assetService.GetAssetWithOptions(c.Request.Context(), id, includeThumbnails, includeTags, includeAlbums)
 	if err != nil {
 		api.Error(c.Writer, http.StatusNotFound, err, http.StatusNotFound, "Asset not found")
 		return
@@ -280,17 +288,6 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 		return
 	}
 
-	// Generate thumbnail URLs for all assets regardless of query type
-	for _, asset := range assets {
-		for i := range asset.Thumbnails {
-			asset.Thumbnails[i].URL = fmt.Sprintf(
-				"%s/api/v1/thumbnails/%d",
-				"http://localhost:8080",
-				asset.Thumbnails[i].ThumbnailID,
-			)
-		}
-	}
-
 	response := AssetListResponse{
 		Assets: assets,
 		Limit:  limit,
@@ -299,28 +296,51 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	api.Success(c.Writer, response)
 }
 
-// GetThumbnailByID retrieves a thumbnail by its ID
-// @Summary Get thumbnail by ID
-// @Description Retrieve a specific thumbnail image by its ID
-// @Tags thumbnails
+// GetAssetThumbnail retrieves a thumbnail for a specific asset by asset ID and size
+// @Summary Get asset thumbnail by ID and size
+// @Description Retrieve a specific thumbnail image for an asset by asset ID and size parameter
+// @Tags assets
 // @Accept json
 // @Produce json
-// @Param id path int true "Thumbnail ID" example(123)
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Param size query string false "Thumbnail size" default("medium") enums(small,medium,large)
 // @Success 200 {file} string "Thumbnail image file"
-// @Failure 400 {object} api.Result "Invalid thumbnail ID"
-// @Failure 404 {object} api.Result "Thumbnail not found"
+// @Failure 400 {object} api.Result "Invalid asset ID or size parameter"
+// @Failure 404 {object} api.Result "Asset or thumbnail not found"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/thumbnails/{id} [get]
-func (h *AssetHandler) GetThumbnailByID(c *gin.Context) {
-	thumbnailIDStr := c.Param("id")
-	thumbnailID, err := strconv.Atoi(thumbnailIDStr)
+// @Router /api/v1/assets/{id}/thumbnail [get]
+func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
+	// Parse asset ID from URL parameter
+	idStr := c.Param("id")
+	assetID, err := uuid.Parse(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid thumbnail ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID"})
 		return
 	}
 
-	thumbnail, err := h.assetService.GetThumbnailByID(c.Request.Context(), thumbnailID)
+	// Get size parameter from query (default to "medium")
+	size := c.DefaultQuery("size", "medium")
 
+	// Validate size parameter
+	if size != "small" && size != "medium" && size != "large" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid size parameter. Must be 'small', 'medium', or 'large'"})
+		return
+	}
+
+	// First verify asset exists without loading full data
+	_, err = h.assetService.GetAssetWithOptions(c.Request.Context(), assetID, false, false, false)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found"})
+			return
+		}
+		log.Printf("Failed to verify asset existence: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to access asset"})
+		return
+	}
+
+	// Get thumbnail from service
+	thumbnail, err := h.assetService.GetThumbnailByAssetIDAndSize(c.Request.Context(), assetID, size)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail not found"})
@@ -346,9 +366,9 @@ func (h *AssetHandler) GetThumbnailByID(c *gin.Context) {
 	}
 
 	// Content-based ETag for cache consistency
-	etag := fmt.Sprintf(`"%d-%s-%d"`,
-		thumbnail.ThumbnailID,
+	etag := fmt.Sprintf(`"%s-%s-%d"`,
 		thumbnail.AssetID.String()[:8], // Short asset ID for uniqueness
+		thumbnail.Size,
 		fileInfo.ModTime().Unix())
 
 	// Production-ready cache headers
@@ -358,17 +378,12 @@ func (h *AssetHandler) GetThumbnailByID(c *gin.Context) {
 
 	// Check conditional request
 	if match := c.GetHeader("If-None-Match"); match == etag {
-		log.Printf("Request for thumbnail ID %d - 304 Not Modified (ETag: %s)", thumbnailID, etag)
+		log.Printf("Request for asset %s thumbnail (%s) - 304 Not Modified (ETag: %s)", assetID.String(), size, etag)
 		c.Status(http.StatusNotModified)
 		return
 	}
 
-	// Debug headers (remove in production)
-	c.Header("X-Thumbnail-ID", fmt.Sprintf("%d", thumbnailID))
-	c.Header("X-File-Path", thumbnail.StoragePath)
-	c.Header("X-ETag-Debug", etag)
-
-	log.Printf("Request for thumbnail ID %d, serving file: %s (ETag: %s)", thumbnailID, fullPath, etag)
+	log.Printf("Request for asset %s thumbnail (%s), serving file: %s (ETag: %s)", assetID.String(), size, fullPath, etag)
 
 	c.File(fullPath)
 }

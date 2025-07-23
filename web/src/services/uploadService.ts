@@ -43,7 +43,6 @@ export const uploadService = {
     files: { file: File; hash: string }[],
     config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<ApiResult<BatchUploadData>>> => {
-    // <--- 关键类型修正
     const formData = new FormData();
 
     files.forEach((fileObj) => {

@@ -78,7 +78,7 @@ export function useFetchProcess(): FetchProcessValue {
 
   const handleFetchNextPage = useCallback(async () => {
     if (hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
+      await fetchNextPage();
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
@@ -98,7 +98,7 @@ export function useFetchProcess(): FetchProcessValue {
     isLoading: isFetching && !isFetchingNextPage,
     isLoadingNextPage: isFetchingNextPage,
     error: error ? error.message : null,
-    hasMore: !!hasNextPage,
+    hasMore: hasNextPage,
   };
 
   const actions: AssetsActions = {

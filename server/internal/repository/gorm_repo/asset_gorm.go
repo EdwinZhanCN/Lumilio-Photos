@@ -35,12 +35,30 @@ func (r *gormAssetRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Asse
 	return &asset, err
 }
 
+func (r *gormAssetRepo) GetByIDWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums bool) (*models.Asset, error) {
+	var asset models.Asset
+	query := r.db.WithContext(ctx)
+
+	if includeThumbnails {
+		query = query.Preload("Thumbnails", func(db *gorm.DB) *gorm.DB {
+			return db.Order("CASE size WHEN 'small' THEN 1 WHEN 'medium' THEN 2 WHEN 'large' THEN 3 END, thumbnail_id")
+		})
+	}
+	if includeTags {
+		query = query.Preload("Tags")
+	}
+	if includeAlbums {
+		query = query.Preload("Albums")
+	}
+
+	err := query.Where("asset_id = ? AND is_deleted = ?", id, false).
+		First(&asset).Error
+	return &asset, err
+}
+
 func (r *gormAssetRepo) GetByType(ctx context.Context, assetType models.AssetType, limit, offset int) ([]*models.Asset, error) {
 	var assets []*models.Asset
 	err := r.db.WithContext(ctx).
-		Preload("Thumbnails", func(db *gorm.DB) *gorm.DB {
-			return db.Order("CASE size WHEN 'small' THEN 1 WHEN 'medium' THEN 2 WHEN 'large' THEN 3 END, thumbnail_id")
-		}).
 		Preload("Tags", func(db *gorm.DB) *gorm.DB {
 			return db.Order("tag_name ASC")
 		}).
@@ -120,6 +138,19 @@ func (r *gormAssetRepo) GetThumbnailByID(ctx context.Context, thumbnailID int) (
 	// 找不到时会返回 gorm.ErrRecordNotFound 错误。
 	err := r.db.WithContext(ctx).
 		First(&thumbnail, thumbnailID).Error // 直接使用主键查询
+
+	if err != nil {
+		return nil, err
+	}
+	return &thumbnail, nil
+}
+
+// GetThumbnailByAssetIDAndSize retrieves a thumbnail by asset ID and size
+func (r *gormAssetRepo) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*models.Thumbnail, error) {
+	var thumbnail models.Thumbnail
+	err := r.db.WithContext(ctx).
+		Where("asset_id = ? AND size = ?", assetID, size).
+		First(&thumbnail).Error
 
 	if err != nil {
 		return nil, err

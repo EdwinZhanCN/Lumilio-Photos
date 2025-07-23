@@ -11,6 +11,7 @@ import (
 type AssetRepository interface {
 	CreateAsset(ctx context.Context, asset *models.Asset) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Asset, error)
+	GetByIDWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums bool) (*models.Asset, error)
 	GetByType(ctx context.Context, assetType models.AssetType, limit, offset int) ([]*models.Asset, error)
 	GetByOwner(ctx context.Context, ownerID int, limit, offset int) ([]*models.Asset, error)
 	UpdateAsset(ctx context.Context, asset *models.Asset) error
@@ -24,6 +25,7 @@ type AssetRepository interface {
 	SearchAssets(ctx context.Context, query string, assetType *models.AssetType, limit, offset int) ([]*models.Asset, error)
 	GetAssetsByHash(ctx context.Context, hash string) ([]*models.Asset, error)
 	GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error)
+	GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*models.Thumbnail, error)
 }
 
 type TagRepository interface {

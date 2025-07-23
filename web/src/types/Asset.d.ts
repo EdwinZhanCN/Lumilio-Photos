@@ -46,5 +46,4 @@ interface AssetThumbnail {
   size?: "small" | "medium" | "large";
   storage_path?: string;
   thumbnail_id?: number;
-  url?: string;
 }

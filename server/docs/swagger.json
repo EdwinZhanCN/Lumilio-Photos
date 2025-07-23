@@ -252,7 +252,7 @@
         },
         "/api/v1/assets/{id}": {
             "get": {
-                "description": "Retrieve detailed information about a specific asset including metadata, thumbnails, tags and albums",
+                "description": "Retrieve detailed information about a specific asset with optional relationships",
                 "consumes": [
                     "application/json"
                 ],
@@ -271,11 +271,32 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Include thumbnails",
+                        "name": "include_thumbnails",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Include tags",
+                        "name": "include_tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Include albums",
+                        "name": "include_albums",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Asset found",
+                        "description": "Asset details with optional relationships",
                         "schema": {
                             "allOf": [
                                 {
@@ -293,7 +314,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid asset ID format",
+                        "description": "Invalid asset ID",
                         "schema": {
                             "$ref": "#/definitions/api.Result"
                         }
@@ -478,6 +499,117 @@
                     },
                     "400": {
                         "description": "Invalid asset ID or album ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assets/{id}/original": {
+            "get": {
+                "description": "Serve the original file content for an asset",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Get original file by asset ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "description": "Asset ID (UUID format)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Original file content",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "404": {
+                        "description": "Asset not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assets/{id}/thumbnail": {
+            "get": {
+                "description": "Retrieve a specific thumbnail image for an asset by asset ID and size parameter",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Get asset thumbnail by ID and size",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "description": "Asset ID (UUID format)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "small",
+                            "medium",
+                            "large"
+                        ],
+                        "type": "string",
+                        "default": "\"medium\"",
+                        "description": "Thumbnail size",
+                        "name": "size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Thumbnail image file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID or size parameter",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "404": {
+                        "description": "Asset or thumbnail not found",
                         "schema": {
                             "$ref": "#/definitions/api.Result"
                         }
