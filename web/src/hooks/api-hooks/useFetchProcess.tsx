@@ -46,6 +46,7 @@ export function useFetchProcess(): FetchProcessValue {
       return response.data.data;
     },
     initialPageParam: 0,
+    refetchOnWindowFocus: false, // Prevent refetching on window focus
     // Determines the offset for the next page fetch
     getNextPageParam: (lastPage) => {
       if (!lastPage || lastPage.assets.length === 0) {

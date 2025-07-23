@@ -3,7 +3,7 @@ import SortDropDown from "./SortDropDown";
 import {
   GroupByType,
   SortOrderType,
-} from "@/hooks/page-hooks/usePhotosPageState";
+} from "@/hooks/page-hooks/useAssetsPageState";
 import {
   MagnifyingGlassIcon,
   FunnelIcon,

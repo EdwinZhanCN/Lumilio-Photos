@@ -2,7 +2,6 @@ import Home from "@/pages/Home";
 import Assets from "@/pages/Assets";
 import UploadAssets from "@/pages/UploadAssets.tsx";
 import { Studio } from "@/pages/Studio.tsx";
-import Photos from "@/pages/Photos.tsx";
 
 export const routes = [
   {
@@ -14,19 +13,31 @@ export const routes = [
     element: <div>Updates Page</div>,
   },
   {
-    path: "/photos",
-    element: <Photos />,
-  },
-  {
-    path: "/photos/:assetId",
-    element: <Photos />,
-  },
-  {
-    path: "/videos",
+    path: "/assets/photos",
     element: <Assets />,
   },
   {
-    path: "/audios",
+    path: "/assets/",
+    element: <Assets />,
+  },
+  {
+    path: "/assets/photos/:assetId",
+    element: <Assets />,
+  },
+  {
+    path: "/assets/videos",
+    element: <Assets />,
+  },
+  {
+    path: "/assets/videos/:assetId",
+    element: <Assets />,
+  },
+  {
+    path: "/assets/audios",
+    element: <Assets />,
+  },
+  {
+    path: "/assets/audios/:assetId",
     element: <Assets />,
   },
   {

@@ -1,13 +1,13 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useInView } from "react-intersection-observer";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import PhotosToolBar from "@/components/Photos/PhotosToolBar/PhotosToolBar";
 import PhotosMasonry from "@/components/Photos/PhotosMasonry/PhotosMasonry";
 import FullScreenCarousel from "@/components/Photos/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import PhotosLoadingSkeleton from "@/components/Photos/PhotosLoadingSkeleton";
 import ErrorFallBack from "@/pages/ErrorFallBack";
 import { useAssetsContext } from "@/contexts/FetchContext";
-import { usePhotosPageState } from "@/hooks/page-hooks/usePhotosPageState";
+import { useAssetsPageState } from "@/hooks/page-hooks/useAssetsPageState";
 import {
   groupAssets,
   getFlatAssetsFromGrouped,
@@ -17,6 +17,7 @@ import {
 function Photos() {
   const { assetId } = useParams<{ assetId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     assets: allAssets,
     error,
@@ -37,13 +38,19 @@ function Photos() {
     setGroupBy,
     setSortOrder,
     setSearchQuery,
-  } = usePhotosPageState();
+  } = useAssetsPageState();
 
   const { ref, inView } = useInView({
     threshold: 0.5,
   });
 
+  const isInitialMount = useRef(true);
+
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     const handler = setTimeout(() => setContextSearchQuery(searchQuery), 300);
     return () => clearTimeout(handler);
   }, [searchQuery, setContextSearchQuery]);
@@ -70,7 +77,16 @@ function Photos() {
   }, [flatAssets, assetId]);
 
   const handleCarouselNavigation = (newAssetId: string) => {
-    navigate(`/photos/${newAssetId}`);
+    // Determine current path base (photos, videos, or audios)
+    const path = location.pathname;
+    if (path.includes("/videos")) {
+      navigate(`/assets/videos/${newAssetId}`);
+    } else if (path.includes("/audios")) {
+      navigate(`/assets/audios/${newAssetId}`);
+    } else {
+      // Default to photos
+      navigate(`/assets/photos/${newAssetId}`);
+    }
   };
 
   if (error) {

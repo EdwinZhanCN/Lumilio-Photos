@@ -11,9 +11,10 @@ const PhotosThumbnail = ({ asset, openCarousel }: PhotosThumbnailProps) => {
     : undefined;
 
   const containerClasses = [
-    "overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-all duration-200",
+    "overflow-hidden shadow-md hover:shadow-xl transition-all duration-200",
     "hover:-translate-y-1",
-    "break-inside-avoid mb-4",
+    "break-inside-avoid mb-2",
+    "animate-fade-in",
   ]
     .filter(Boolean)
     .join(" ");
@@ -39,18 +40,6 @@ const PhotosThumbnail = ({ asset, openCarousel }: PhotosThumbnailProps) => {
           </div>
         </div>
       )}
-
-      {/* Asset Info Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-        <div className="absolute bottom-2 left-2 right-2 text-white text-xs">
-          <div className="font-medium truncate">{asset.original_filename}</div>
-          {asset.file_size && (
-            <div className="opacity-75">
-              {(asset.file_size / (1024 * 1024)).toFixed(1)} MB
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 };

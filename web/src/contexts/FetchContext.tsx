@@ -280,12 +280,10 @@ interface AssetsProviderProps {
  */
 export default function AssetsProvider({ children }: AssetsProviderProps) {
   const { state, actions } = useFetchProcess();
-  const actionsValue = useMemo(() => actions, [actions]);
-  const stateValue = useMemo(() => state, [state]);
 
   return (
-    <AssetsActionsContext.Provider value={actionsValue}>
-      <AssetsStateContext.Provider value={stateValue}>
+    <AssetsActionsContext.Provider value={actions}>
+      <AssetsStateContext.Provider value={state}>
         {children}
       </AssetsStateContext.Provider>
     </AssetsActionsContext.Provider>
@@ -313,5 +311,7 @@ export function useAssetsContext(): AssetsContextValue {
     throw new Error("useAssetsContext must be used within an AssetsProvider");
   }
 
-  return { ...state, ...actions };
+  const contextValue = useMemo(() => ({ ...state, ...actions }), [state, actions]);
+
+  return contextValue;
 }
