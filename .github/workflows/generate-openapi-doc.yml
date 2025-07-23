@@ -6,12 +6,14 @@ on:
         branches:
             - main
         # 也可以只在后端代码变更时触发
-        # paths:
-        #  - 'backend/**'
+        paths:
+            - "server/**"
 
 jobs:
     build-and-commit-docs:
         runs-on: ubuntu-latest
+        permissions:
+            contents: write
 
         steps:
             # 1. 检出当前代码库
@@ -49,8 +51,10 @@ jobs:
                   # 检查是否有文件变更
                   if [[ -n $(git status -s) ]]; then
                     git add .
-                    git commit -m "docs: auto-generate OpenAPI spec"
+                    git commit -m "[Docs] auto-generate OpenAPI spec"
                     git push
                   else
                     echo "No changes to commit."
                   fi
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
