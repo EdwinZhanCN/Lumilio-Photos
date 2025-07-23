@@ -357,7 +357,7 @@ info:
   title: Lumilio-Photos Manager API
   version: "1.0"
 paths:
-  /api/v1/assets:
+  /assets:
     get:
       consumes:
       - application/json
@@ -456,7 +456,7 @@ paths:
       summary: Upload a single asset
       tags:
       - assets
-  /api/v1/assets/{id}:
+  /assets/{id}:
     delete:
       consumes:
       - application/json
@@ -583,7 +583,7 @@ paths:
       summary: Update asset metadata
       tags:
       - assets
-  /api/v1/assets/{id}/albums/{albumId}:
+  /assets/{id}/albums/{albumId}:
     post:
       consumes:
       - application/json
@@ -624,7 +624,7 @@ paths:
       summary: Add asset to album
       tags:
       - assets
-  /api/v1/assets/{id}/original:
+  /assets/{id}/original:
     get:
       description: Serve the original file content for an asset
       parameters:
@@ -656,7 +656,7 @@ paths:
       summary: Get original file by asset ID
       tags:
       - assets
-  /api/v1/assets/{id}/thumbnail:
+  /assets/{id}/thumbnail:
     get:
       consumes:
       - application/json
@@ -700,7 +700,7 @@ paths:
       summary: Get asset thumbnail by ID and size
       tags:
       - assets
-  /api/v1/assets/batch:
+  /assets/batch:
     post:
       consumes:
       - multipart/form-data
@@ -729,7 +729,7 @@ paths:
       summary: Batch upload assets
       tags:
       - assets
-  /api/v1/assets/types:
+  /assets/types:
     get:
       consumes:
       - application/json

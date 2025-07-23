@@ -17,3 +17,33 @@
 .animate-fade-in {
     animation: fadeIn 0.3s ease-in-out;
 }
+
+@keyframes fadeOutY {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(100%);
+    }
+}
+
+.animate-fade-out-y {
+    animation: fadeOutY 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeInY {
+    from {
+        opacity: 0;
+        transform: translateY(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in-y {
+    animation: fadeInY 0.3s ease-in-out;
+}

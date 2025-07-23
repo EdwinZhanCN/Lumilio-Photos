@@ -105,7 +105,7 @@ const PhotosMasonry = ({
             </span>
           </div>
 
-          <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-2">
+          <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-2 select-none">
             {reorderForReadingOrder(groupedPhotos[groupKey], columnCount).map(
               (asset, index) => (
                 <PhotosThumbnail

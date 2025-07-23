@@ -1,19 +1,19 @@
 import { useState, useEffect } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import Photos from "./Photos";
 import Videos from "./Videos";
 import Audios from "./Audios";
 import AssetsProvider from "@/contexts/FetchContext";
 import ErrorBoundary from "@/ErrorBoundary";
-import {
-  PhotoIcon,
-  VideoCameraIcon,
-  MusicalNoteIcon,
-} from "@heroicons/react/24/solid";
+import AssetTabs from "@/components/Assets/AssetTabs";
+import { useAssetsPageState } from "@/hooks/page-hooks/useAssetsPageState";
 
 const Assets = () => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("photos");
+
+  // Get carousel state from the assets page state hook
+  const { isCarouselOpen } = useAssetsPageState();
 
   // Determine active tab based on URL path
   useEffect(() => {
@@ -38,37 +38,7 @@ const Assets = () => {
             {activeTab === "audios" && <Audios />}
           </div>
         </div>
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50">
-          <ul className="menu menu-horizontal bg-base-200 rounded-box shadow-lg">
-            <li>
-              <Link
-                to="/assets/photos"
-                className={activeTab === "photos" ? "active" : ""}
-              >
-                <PhotoIcon className="h-5 w-5" />
-                Photos
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/assets/videos"
-                className={activeTab === "videos" ? "active" : ""}
-              >
-                <VideoCameraIcon className="h-5 w-5" />
-                Videos
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/assets/audios"
-                className={activeTab === "audios" ? "active" : ""}
-              >
-                <MusicalNoteIcon className="h-5 w-5" />
-                Audios
-              </Link>
-            </li>
-          </ul>
-        </div>
+        <AssetTabs isCarouselOpen={isCarouselOpen} />
       </AssetsProvider>
     </ErrorBoundary>
   );

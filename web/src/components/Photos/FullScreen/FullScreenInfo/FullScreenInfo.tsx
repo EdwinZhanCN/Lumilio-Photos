@@ -77,6 +77,16 @@ const FullScreenInfo = ({ asset }: FullScreenInfoProps) => {
     }
   }, [exifData]);
 
+  // Cleanup worker when component unmounts
+  useEffect(() => {
+    return () => {
+      if (workerClientRef.current) {
+        workerClientRef.current.terminateExtractExifWorker();
+        workerClientRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <div className="absolute top-12 right-0 bottom-0 w-96 bg-base-100/80 p-4 overflow-y-auto z-10">
       <div className="flex justify-between items-center mb-4">

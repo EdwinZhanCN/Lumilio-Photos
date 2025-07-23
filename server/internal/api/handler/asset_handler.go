@@ -98,7 +98,7 @@ func NewAssetHandler(assetService service.AssetService, stagingPath string, task
 // @Success 200 {object} api.Result{data=UploadResponse} "Upload successful"
 // @Failure 400 {object} api.Result "Bad request - no file provided or parse error"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets [post]
+// @Router /assets [post]
 func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	// Parse multipart form
 	err := c.Request.ParseMultipartForm(32 << 20) // 32MB max
@@ -194,7 +194,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 // @Success 200 {object} api.Result{data=models.Asset} "Asset details with optional relationships"
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 404 {object} api.Result "Asset not found"
-// @Router /api/v1/assets/{id} [get]
+// @Router /assets/{id} [get]
 func (h *AssetHandler) GetAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -231,7 +231,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 // @Success 200 {object} api.Result{data=AssetListResponse} "Assets retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid parameters"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets [get]
+// @Router /assets [get]
 func (h *AssetHandler) ListAssets(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "20")
 	offsetStr := c.DefaultQuery("offset", "0")
@@ -308,7 +308,7 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 // @Failure 400 {object} api.Result "Invalid asset ID or size parameter"
 // @Failure 404 {object} api.Result "Asset or thumbnail not found"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets/{id}/thumbnail [get]
+// @Router /assets/{id}/thumbnail [get]
 func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	// Parse asset ID from URL parameter
 	idStr := c.Param("id")
@@ -398,7 +398,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 404 {object} api.Result "Asset not found"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets/{id}/original [get]
+// @Router /assets/{id}/original [get]
 func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	// Parse asset ID from URL parameter
 	idStr := c.Param("id")
@@ -450,7 +450,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 // @Success 200 {object} api.Result{data=MessageResponse} "Asset updated successfully"
 // @Failure 400 {object} api.Result "Invalid asset ID or request body"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets/{id} [put]
+// @Router /assets/{id} [put]
 func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -485,7 +485,7 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 // @Success 200 {object} api.Result{data=MessageResponse} "Asset deleted successfully"
 // @Failure 400 {object} api.Result "Invalid asset ID format"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets/{id} [delete]
+// @Router /assets/{id} [delete]
 func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -513,7 +513,7 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 // @Success 200 {object} api.Result{data=BatchUploadResponse} "Batch upload completed"
 // @Failure 400 {object} api.Result "Bad request - no files provided or parse error"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets/batch [post]
+// @Router /assets/batch [post]
 func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	err := c.Request.ParseMultipartForm(128 << 20) // 128MB max for batch
 	if err != nil {
@@ -654,7 +654,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 // @Success 200 {object} api.Result{data=MessageResponse} "Asset added to album successfully"
 // @Failure 400 {object} api.Result "Invalid asset ID or album ID"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets/{id}/albums/{albumId} [post]
+// @Router /assets/{id}/albums/{albumId} [post]
 func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 	assetID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -685,7 +685,7 @@ func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Success 200 {object} api.Result{data=AssetTypesResponse} "Asset types retrieved successfully"
-// @Router /api/v1/assets/types [get]
+// @Router /assets/types [get]
 func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 	types := []models.AssetType{
 		models.AssetTypePhoto,
