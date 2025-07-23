@@ -75,3 +75,5 @@ go.work
 web/docs/
 /docs/.vitepress/dist/
 /docs/.vitepress/cache/
+
+/share/

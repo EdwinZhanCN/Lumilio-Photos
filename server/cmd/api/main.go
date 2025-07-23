@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
@@ -17,7 +16,6 @@ import (
 	"server/internal/service"
 	"server/internal/storage"
 
-	"github.com/joho/godotenv"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -25,28 +23,10 @@ import (
 func init() {
 	log.SetOutput(os.Stdout)
 
-	// Check if we're in development mode
-	isDev := strings.ToLower(os.Getenv("ENV")) == "development" ||
-		strings.ToLower(os.Getenv("ENVIRONMENT")) == "development" ||
-		os.Getenv("DEV_MODE") == "true"
+	// Load environment variables using unified config function
+	config.LoadEnvironment()
 
-	// Try to load .env file but continue if it's not found
-	envFile := ".env"
-	if isDev {
-		// Try development-specific env file first
-		if _, err := os.Stat(".env.development"); err == nil {
-			envFile = ".env.development"
-		}
-	}
-
-	if err := godotenv.Load(envFile); err != nil {
-		log.Printf("Running without %s file, using environment variables", envFile)
-	} else {
-		log.Printf("Environment variables loaded from %s file", envFile)
-	}
-
-	if isDev {
-		log.Println("🔧 Running in DEVELOPMENT mode")
+	if config.IsDevelopmentMode() {
 		log.Println("📋 Development checklist:")
 		log.Println("   1. Database: Make sure PostgreSQL is running on localhost:5432")
 		log.Println("   2. Database: Use 'docker-compose up db' to start only the database")
@@ -76,7 +56,10 @@ func init() {
 // 该主程序启动API层，API层只且仅只处理认证，接受文件，任务入队
 // 只在除了文件上传之外的任务调用AssetsService及其方法
 func main() {
+	// Load configurations
 	dbConfig := config.LoadDBConfig()
+	appConfig := config.LoadAppConfig()
+
 	log.Println("🚀 Starting Lumilio Photos API...")
 	log.Printf("📊 Database configuration: %s:%s/%s", dbConfig.Host, dbConfig.Port, dbConfig.DBName)
 
@@ -122,33 +105,17 @@ func main() {
 	// Storage will be initialized through AssetService with configuration
 
 	// Initialize staging area for temporary file storage
-	stagingPath := os.Getenv("STAGING_PATH")
-	if stagingPath == "" {
-		if strings.ToLower(os.Getenv("ENV")) == "development" {
-			stagingPath = "./staging" // Local development path
-		} else {
-			stagingPath = "/app/staging" // Container path
-		}
-	}
-	log.Printf("📁 Using staging path: %s", stagingPath)
+	log.Printf("📁 Using staging path: %s", appConfig.StagingPath)
 
 	// Ensure staging directory exists
-	if err := os.MkdirAll(stagingPath, 0755); err != nil {
+	if err := os.MkdirAll(appConfig.StagingPath, 0755); err != nil {
 		log.Fatalf("Failed to create staging directory: %v", err)
 	}
 
 	// Initialize task queue
-	queueDir := os.Getenv("QUEUE_DIR")
-	if queueDir == "" {
-		if strings.ToLower(os.Getenv("ENV")) == "development" {
-			queueDir = "./queue" // Local development path
-		} else {
-			queueDir = "/app/queue" // Container path
-		}
-	}
-	log.Printf("📋 Using queue directory: %s", queueDir)
+	log.Printf("📋 Using queue directory: %s", appConfig.QueueDir)
 
-	taskQueue, err := queue.NewTaskQueue(queueDir, 100)
+	taskQueue, err := queue.NewTaskQueue(appConfig.QueueDir, 100)
 	if err != nil {
 		log.Fatalf("Failed to initialize task queue: %v", err)
 	}
@@ -176,20 +143,14 @@ func main() {
 	authService := service.NewAuthService(userRepo, refreshTokenRepo)
 
 	// Initialize controllers - pass the staging path and task queue to the handler
-	assetController := handler.NewAssetHandler(assetService, stagingPath, taskQueue)
+	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, taskQueue)
 	authController := handler.NewAuthHandler(authService)
-
-	// Start HTTP server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080" // Default port
-	}
 
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
 	docs.SwaggerInfo.Description = "Photo management system API with asset upload, processing, and organization features"
 	docs.SwaggerInfo.Version = "1.0"
-	docs.SwaggerInfo.Host = "localhost:" + port
+	docs.SwaggerInfo.Host = "localhost:" + appConfig.Port
 	docs.SwaggerInfo.BasePath = "/api/v1"
 
 	// Set up router with new asset and auth endpoints
@@ -198,10 +159,10 @@ func main() {
 	// Add Swagger documentation endpoint
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	log.Printf("🌐 Server starting on port %s...", port)
-	log.Printf("📖 API Documentation: http://localhost:%s/swagger/index.html", port)
-	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", port)
-	if err := http.ListenAndServe(":"+port, router); err != nil {
+	log.Printf("🌐 Server starting on port %s...", appConfig.Port)
+	log.Printf("📖 API Documentation: http://localhost:%s/swagger/index.html", appConfig.Port)
+	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", appConfig.Port)
+	if err := http.ListenAndServe(":"+appConfig.Port, router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

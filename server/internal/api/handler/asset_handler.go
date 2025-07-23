@@ -332,7 +332,44 @@ func (h *AssetHandler) GetThumbnailByID(c *gin.Context) {
 	}
 
 	fullPath := filepath.Join(h.StorageBasePath, thumbnail.StoragePath)
-	c.Header("Cache-Control", "public, max-age=86400")
+
+	// Get file info for proper cache control
+	fileInfo, err := os.Stat(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail file not found"})
+			return
+		}
+		log.Printf("Failed to get file info for %s: %v", fullPath, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to access thumbnail file"})
+		return
+	}
+
+	// Content-based ETag for cache consistency
+	etag := fmt.Sprintf(`"%d-%s-%d"`,
+		thumbnail.ThumbnailID,
+		thumbnail.AssetID.String()[:8], // Short asset ID for uniqueness
+		fileInfo.ModTime().Unix())
+
+	// Production-ready cache headers
+	c.Header("ETag", etag)
+	c.Header("Cache-Control", "public, max-age=86400, must-revalidate") // 24h cache with validation
+	c.Header("Vary", "Accept-Encoding")
+
+	// Check conditional request
+	if match := c.GetHeader("If-None-Match"); match == etag {
+		log.Printf("Request for thumbnail ID %d - 304 Not Modified (ETag: %s)", thumbnailID, etag)
+		c.Status(http.StatusNotModified)
+		return
+	}
+
+	// Debug headers (remove in production)
+	c.Header("X-Thumbnail-ID", fmt.Sprintf("%d", thumbnailID))
+	c.Header("X-File-Path", thumbnail.StoragePath)
+	c.Header("X-ETag-Debug", etag)
+
+	log.Printf("Request for thumbnail ID %d, serving file: %s (ETag: %s)", thumbnailID, fullPath, etag)
+
 	c.File(fullPath)
 }
 
