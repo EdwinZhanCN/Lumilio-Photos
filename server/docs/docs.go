@@ -22,7 +22,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/v1/assets": {
+        "/assets": {
             "get": {
                 "description": "Retrieve a paginated list of assets with optional filtering by type, owner, or search query",
                 "consumes": [
@@ -174,7 +174,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/assets/batch": {
+        "/assets/batch": {
             "post": {
                 "description": "Batch uploads multiple assets using a multipart/form-data request. The field name for each file part must be its BLAKE3 content hash.",
                 "consumes": [
@@ -221,7 +221,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/assets/types": {
+        "/assets/types": {
             "get": {
                 "description": "Retrieve a list of all supported asset types in the system",
                 "consumes": [
@@ -256,7 +256,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/assets/{id}": {
+        "/assets/{id}": {
             "get": {
                 "description": "Retrieve detailed information about a specific asset with optional relationships",
                 "consumes": [
@@ -453,7 +453,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/assets/{id}/albums/{albumId}": {
+        "/assets/{id}/albums/{albumId}": {
             "post": {
                 "description": "Associate an asset with a specific album",
                 "consumes": [
@@ -518,7 +518,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/assets/{id}/original": {
+        "/assets/{id}/original": {
             "get": {
                 "description": "Serve the original file content for an asset",
                 "produces": [
@@ -566,7 +566,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/assets/{id}/thumbnail": {
+        "/assets/{id}/thumbnail": {
             "get": {
                 "description": "Retrieve a specific thumbnail image for an asset by asset ID and size parameter",
                 "consumes": [

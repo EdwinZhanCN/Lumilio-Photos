@@ -13,6 +13,14 @@ export const routes = [
     element: <div>Updates Page</div>,
   },
   {
+    path: "/settings",
+    element: <div>Settings Page</div>,
+  },
+  {
+    path: "/collections",
+    element: <div>Collections Page</div>,
+  },
+  {
     path: "/assets/photos",
     element: <Assets />,
   },
@@ -47,5 +55,9 @@ export const routes = [
   {
     path: "/studio",
     element: <Studio />,
+  },
+  {
+    path: "/server-monitor",
+    element: <div>Server Monitor</div>,
   },
 ];

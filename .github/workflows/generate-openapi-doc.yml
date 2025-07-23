@@ -1,0 +1,56 @@
+name: Generate OpenAPI Docs for VitePress
+
+# 当主分支有新的推送时触发
+on:
+    push:
+        branches:
+            - main
+        # 也可以只在后端代码变更时触发
+        # paths:
+        #  - 'backend/**'
+
+jobs:
+    build-and-commit-docs:
+        runs-on: ubuntu-latest
+
+        steps:
+            # 1. 检出当前代码库
+            - name: Checkout Repository
+              uses: actions/checkout@v4
+
+            # 2. 设置你的后端环境 (以Go和swag为例)
+            - name: Setup Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version: "1.23"
+            - name: Install Swag CLI
+              run: go install github.com/swaggo/swag/cmd/swag@latest
+
+            # 3. 生成OpenAPI文档
+            #    -g: main.go的路径
+            #    -o: 输出目录，这里直接指向VitePress的公共文件目录
+            - name: Generate OpenAPI Spec
+              run: ~/go/bin/swag init -g server/cmd/api/main.go -o server/docs
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v5
+              with:
+                  node-version: "22.x"
+            - name: "Generate Red-doc Static Page"
+              run: npx @redocly/cli build-docs server/docs/swagger.yaml -o docs/public/redoc-static.html
+
+            # 4. 提交并推送变更
+            - name: Commit and Push changes
+              run: |
+                  # 配置git用户
+                  git config --global user.name "github-actions[bot]"
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+                  # 检查是否有文件变更
+                  if [[ -n $(git status -s) ]]; then
+                    git add .
+                    git commit -m "docs: auto-generate OpenAPI spec"
+                    git push
+                  else
+                    echo "No changes to commit."
+                  fi

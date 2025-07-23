@@ -380,9 +380,17 @@ export default function UploadProvider({ children }: UploadProviderProps) {
     };
     initWasm();
 
-    // Cleanup preview URLs on unmount
+    // Cleanup preview URLs and terminate workers on unmount
     return () => {
       previews.forEach((url) => url && URL.revokeObjectURL(url));
+      if (workerClientRef.current) {
+        workerClientRef.current.terminateGenerateThumbnailWorker();
+        workerClientRef.current.terminateGenerateHashWorker();
+        workerClientRef.current.terminateGenerateBorderWorker();
+        // If there's a worker for EXIF extraction, terminate it as well.
+        // Assuming the client has a method for it, e.g., terminateExtractExifWorker()
+        // workerClientRef.current.terminateExtractExifWorker();
+      }
     };
   }, [previews]); // previews as dependency to ensure latest preview list is used during cleanup
 

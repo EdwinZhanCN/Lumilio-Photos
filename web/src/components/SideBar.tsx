@@ -3,11 +3,12 @@ import { Link, useLocation } from "react-router-dom";
 import {
   AdjustmentsHorizontalIcon,
   ArrowUpTrayIcon,
-  HeartIcon,
+  ServerStackIcon,
   HomeIcon,
   InformationCircleIcon,
   PhotoIcon,
   PaintBrushIcon,
+  ArchiveBoxIcon,
 } from "@heroicons/react/24/outline/index.js";
 
 function SideBar() {
@@ -37,11 +38,29 @@ function SideBar() {
         </li>
         <li>
           <Link
-            to="/favorites"
+            to="/collections"
             className={location.pathname === "/favorites" ? "active" : ""}
           >
-            <HeartIcon className="size-5" />
-            Favorites
+            <ArchiveBoxIcon className="size-5" />
+            Collections
+          </Link>
+        </li>
+        <li>
+          <Link to={"/studio"}>
+            <PaintBrushIcon className="size-5" />
+            Studio
+          </Link>
+        </li>
+        <li>
+          <Link to="/upload-photos">
+            <ArrowUpTrayIcon className="size-5" />
+            Upload
+          </Link>
+        </li>
+        <li>
+          <Link to="/settings">
+            <AdjustmentsHorizontalIcon className="size-5" />
+            Settings
           </Link>
         </li>
         <li>
@@ -57,43 +76,27 @@ function SideBar() {
           </Link>
         </li>
         <li>
-          <Link to="/settings">
-            <AdjustmentsHorizontalIcon className="size-5" />
-            Settings
-          </Link>
-        </li>
-        <li>
-          <Link to="/upload-photos">
-            <ArrowUpTrayIcon className="size-5" />
-            Upload
-          </Link>
-        </li>
-        <li>
-          <Link to={"/studio"}>
-            <PaintBrushIcon className="size-5" />
-            Studio
-          </Link>
-        </li>
-        <li>
-          <a>
+          <Link to="/server-monitor">
             {isOnline ? (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center justify-center gap-2">
+                <ServerStackIcon className="size-5" />
+                Online
                 <div className="inline-grid *:[grid-area:1/1]">
                   <div className="status status-success animate-ping"></div>
                   <div className="status status-success"></div>
-                </div>{" "}
-                Server Online
+                </div>
               </div>
             ) : (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
+                <ServerStackIcon className="size-5" />
+                Offline
                 <div className="inline-grid *:[grid-area:1/1]">
                   <div className="status status-error animate-ping"></div>
                   <div className="status status-error"></div>
-                </div>{" "}
-                Server Offline
+                </div>
               </div>
             )}
-          </a>
+          </Link>
         </li>
       </ul>
     </div>
