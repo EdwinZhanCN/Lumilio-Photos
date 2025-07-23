@@ -60,7 +60,7 @@ const FullScreenCarousel = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center animate-fade-in">
       <FullScreenToolbar onToggleInfo={toggleInfo} />
       <button
         onClick={onClose}
@@ -78,6 +78,7 @@ const FullScreenCarousel = ({
         pagination={{ clickable: true }}
         onSlideChange={onSlideChange}
         initialSlide={initialSlide}
+        className="fullscreen-swiper"
       >
         {slides.map((slide, index) => (
           <SwiperSlide key={slide.assetId} virtualIndex={index}>

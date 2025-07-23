@@ -61,7 +61,7 @@ const PhotosMasonry = ({
         {[1, 2].map((groupIndex) => (
           <div key={groupIndex} className="my-6">
             <div className="skeleton h-6 w-32 mb-4"></div>
-            <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-4">
+            <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-2">
               {Array.from({ length: 8 }).map((_, index) => (
                 <div
                   key={index}
@@ -97,7 +97,7 @@ const PhotosMasonry = ({
     <>
       {Object.keys(groupedPhotos).map((groupKey) => (
         <div key={groupKey} className="my-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-bold text-left">{groupKey}</h2>
             <span className="text-sm text-gray-500">
               {groupedPhotos[groupKey].length} item
@@ -105,7 +105,7 @@ const PhotosMasonry = ({
             </span>
           </div>
 
-          <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-4">
+          <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-2">
             {reorderForReadingOrder(groupedPhotos[groupKey], columnCount).map(
               (asset, index) => (
                 <PhotosThumbnail

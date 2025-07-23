@@ -28,8 +28,8 @@ function SideBar() {
         </li>
         <li>
           <Link
-            to="/photos"
-            className={location.pathname === "/photos" ? "active" : ""}
+            to="/assets/"
+            className={location.pathname.startsWith("/assets") ? "active" : ""}
           >
             <PhotoIcon className="size-5" />
             Assets

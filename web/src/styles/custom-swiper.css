@@ -1,30 +1,53 @@
 /* Custom Swiper Navigation Styles */
 
-.swiper-button-next,
-.swiper-button-prev {
-    background-color: rgba(30, 41, 59, 0.3);
+.fullscreen-swiper .swiper-button-next,
+.fullscreen-swiper .swiper-button-prev {
+    background-color: rgba(30, 41, 59, 0.4);
     border-radius: 9999px; /* circle */
     width: 3rem; /* 48px */
     height: 3rem; /* 48px */
-    transition: background-color 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition:
+        background-color 0.2s,
+        box-shadow 0.2s;
+    outline: none;
+    border: none;
+    cursor: pointer;
 }
 
-.swiper-button-next:hover,
-.swiper-button-prev:hover {
-    background-color: rgba(30, 41, 59, 0.6);
+.fullscreen-swiper .swiper-button-next:hover,
+.fullscreen-swiper .swiper-button-prev:hover,
+.fullscreen-swiper .swiper-button-next:focus,
+.fullscreen-swiper .swiper-button-prev:focus {
+    background-color: rgba(30, 41, 59, 0.7);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 }
 
-.swiper-button-next::after,
-.swiper-button-prev::after {
+.fullscreen-swiper .swiper-button-next:active,
+.fullscreen-swiper .swiper-button-prev:active {
+    background-color: rgba(30, 41, 59, 0.9);
+}
+
+/* Hide Swiper pagination bullets for FullScreenCarousel */
+.fullscreen-swiper .swiper-pagination {
+    display: none !important;
+}
+
+.fullscreen-swiper .swiper-button-next::after,
+.fullscreen-swiper .swiper-button-prev::after {
     color: white;
     font-size: 1.5rem; /* 24px */
-    font-weight: 600;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
-.swiper-button-prev {
+.fullscreen-swiper .swiper-button-prev {
     left: 1.5rem; /* 24px */
 }
 
-.swiper-button-next {
+.fullscreen-swiper .swiper-button-next {
     right: 1.5rem; /* 24px */
 }
