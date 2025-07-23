@@ -33,7 +33,7 @@ jobs:
               run: ~/go/bin/swag init -g server/cmd/api/main.go -o server/docs
 
             - name: Setup Node.js
-              uses: actions/setup-node@v5
+              uses: actions/setup-node@v4
               with:
                   node-version: "22.x"
             - name: "Generate Red-doc Static Page"
