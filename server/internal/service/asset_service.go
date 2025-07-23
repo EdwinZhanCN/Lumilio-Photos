@@ -30,6 +30,7 @@ var (
 type AssetService interface {
 	UploadAsset(ctx context.Context, file io.Reader, filename string, fileSize int64, ownerID *int) (*models.Asset, error)
 	GetAsset(ctx context.Context, id uuid.UUID) (*models.Asset, error)
+	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums bool) (*models.Asset, error)
 	GetAssetsByType(ctx context.Context, assetType models.AssetType, limit, offset int) ([]*models.Asset, error)
 	GetAssetsByOwner(ctx context.Context, ownerID int, limit, offset int) ([]*models.Asset, error)
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
@@ -49,6 +50,7 @@ type AssetService interface {
 
 	GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*models.Tag, error)
 	GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error)
+	GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*models.Thumbnail, error)
 }
 
 type assetService struct {
@@ -149,6 +151,10 @@ func (s *assetService) UploadAsset(ctx context.Context, file io.Reader, filename
 // GetAsset retrieves an asset by its ID
 func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*models.Asset, error) {
 	return s.repo.GetByID(ctx, id)
+}
+
+func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums bool) (*models.Asset, error) {
+	return s.repo.GetByIDWithOptions(ctx, id, includeThumbnails, includeTags, includeAlbums)
 }
 
 // GetAssetsByType retrieves assets by type with pagination
@@ -370,4 +376,9 @@ func (s *assetService) CreateAssetRecord(ctx context.Context, asset *models.Asse
 // GetThumbnailByID retrieves thumbnails by their ID
 func (s *assetService) GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error) {
 	return s.repo.GetThumbnailByID(ctx, thumbnailID)
+}
+
+// GetThumbnailByAssetIDAndSize retrieves a thumbnail by asset ID and size
+func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*models.Thumbnail, error) {
+	return s.repo.GetThumbnailByAssetIDAndSize(ctx, assetID, size)
 }
