@@ -20,26 +20,22 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 )
 
 func init() {
 	log.SetOutput(os.Stdout)
 
-	// Try to load .env file but continue if it's not found
-	if err := godotenv.Load(); err != nil {
-		log.Println("Running without .env file, using environment variables")
-	} else {
-		log.Println("Environment variables loaded from .env file")
-	}
+	// Load environment variables using unified config function
+	config.LoadEnvironment()
 }
 
 // 该Worker主程序，只且仅只负责处理重负载任务，如图像处理，哈希算法，机器学习微服务调用, gRPC客户端
 func main() {
 	log.Println("Starting worker service...")
 
-	// Load configuration
+	// Load configurations
 	dbConfig := config.LoadDBConfig()
+	appConfig := config.LoadAppConfig()
 
 	// Connect to the database
 	// 数据库服务应该由API层启动，worker直接链接
@@ -76,14 +72,9 @@ func main() {
 	// Initialize asset service
 	assetService := service.NewAssetService(assetRepo, tagRepo, storageService)
 
-	// Get ML service address from environment or use default
-	mlServiceAddr := os.Getenv("ML_SERVICE_ADDR")
-	if mlServiceAddr == "" {
-		mlServiceAddr = "ml:50051" // Default Docker service name and port
-	}
-	log.Printf("Connecting to ML service at: %s", mlServiceAddr)
+	log.Printf("Connecting to ML service at: %s", appConfig.MLServiceAddr)
 
-	mlService, err := service.NewMLClient(mlServiceAddr)
+	mlService, err := service.NewMLClient(appConfig.MLServiceAddr)
 	if err != nil {
 		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
 	}
@@ -93,13 +84,9 @@ func main() {
 	assetProcessor := utils.NewAssetProcessor(assetService, storageService, storageConfig.BasePath, mlService)
 
 	// Initialize task queue
-	queueDir := os.Getenv("QUEUE_DIR")
-	if queueDir == "" {
-		queueDir = "/app/queue" // 持久化队列
-	}
-	log.Printf("Using queue directory: %s", queueDir)
+	log.Printf("Using queue directory: %s", appConfig.QueueDir)
 
-	taskQueue, err := queue.NewTaskQueue(queueDir, 100) // 缓冲区可以根据需要调整
+	taskQueue, err := queue.NewTaskQueue(appConfig.QueueDir, 100) // 缓冲区可以根据需要调整
 	if err != nil {
 		log.Fatalf("Failed to initialize task queue: %v", err)
 	}

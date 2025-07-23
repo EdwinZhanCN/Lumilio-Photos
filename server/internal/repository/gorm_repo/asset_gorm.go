@@ -41,6 +41,9 @@ func (r *gormAssetRepo) GetByType(ctx context.Context, assetType models.AssetTyp
 		Preload("Thumbnails", func(db *gorm.DB) *gorm.DB {
 			return db.Order("CASE size WHEN 'small' THEN 1 WHEN 'medium' THEN 2 WHEN 'large' THEN 3 END, thumbnail_id")
 		}).
+		Preload("Tags", func(db *gorm.DB) *gorm.DB {
+			return db.Order("tag_name ASC")
+		}).
 		Where("type = ? AND is_deleted = ?", assetType, false).
 		Limit(limit).
 		Offset(offset).
@@ -118,9 +121,10 @@ func (r *gormAssetRepo) GetThumbnailByID(ctx context.Context, thumbnailID int) (
 	err := r.db.WithContext(ctx).
 		First(&thumbnail, thumbnailID).Error // 直接使用主键查询
 
-	// 如果没有错误，返回找到的thumbnail对象的指针和nil error
-	// 如果有错误（包括没找到），直接返回nil和错误
-	return &thumbnail, err
+	if err != nil {
+		return nil, err
+	}
+	return &thumbnail, nil
 }
 
 func (r *gormAssetRepo) UpdateAssetMetadata(ctx context.Context, assetID uuid.UUID, metadata models.SpecificMetadata) error {

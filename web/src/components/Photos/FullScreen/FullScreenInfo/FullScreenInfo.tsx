@@ -206,6 +206,24 @@ const FullScreenInfo = ({ asset }: FullScreenInfoProps) => {
                 : "N/A"}
             </div>
           </div>
+          <div className="flex justify-between py-2 px-3 hover:bg-base-200/40 transition-colors">
+            <div className="font-medium text-xs text-base-content/80 w-2/5 mr-2">
+              Tags
+            </div>
+            <div className="text-xs flex-1 break-words text-right">
+              {Array.isArray(asset.tags) && asset.tags.length > 0
+                ? asset.tags.map((tag, idx) => (
+                    <span
+                      key={tag.tag_id || idx}
+                      className="inline-block bg-base-200 rounded px-2 py-1 mx-0.5"
+                    >
+                      {tag.tag_name}
+                      {tag.is_ai_generated ? " (AI)" : ""}
+                    </span>
+                  ))
+                : "N/A"}
+            </div>
+          </div>
           {asset.duration && (
             <div className="flex justify-between py-2 px-3 hover:bg-base-200/40 transition-colors">
               <div className="font-medium text-xs text-base-content/80 w-2/5 mr-2">
