@@ -283,7 +283,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     print("=" * 60)
-    print("🚀 Lumen gRPC Server")
+    print("🚀 Lumen(pml) gRPC Server")
     print("=" * 60)
 
     try:
