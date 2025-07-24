@@ -6,7 +6,7 @@ Fullscreen view is a detailed view for each photo, it includes serveral importan
 
 ### Download [⚠️ not implemented yet]
 
-- Download the original photo file
+- Download the original file
 - Export with designated format (WebP, PNG, JPEG (with different quality))
 
 ### Share [⚠️ not implemented yet]
