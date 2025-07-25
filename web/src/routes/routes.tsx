@@ -2,6 +2,7 @@ import Home from "@/pages/Home";
 import Assets from "@/pages/Assets";
 import UploadAssets from "@/pages/UploadAssets.tsx";
 import { Studio } from "@/pages/Studio.tsx";
+import { WorkerProvider } from "@/contexts/WorkerProvider";
 
 export const routes = [
   {
@@ -54,7 +55,11 @@ export const routes = [
   },
   {
     path: "/studio",
-    element: <Studio />,
+    element: (
+      <WorkerProvider>
+        <Studio />
+      </WorkerProvider>
+    ),
   },
   {
     path: "/server-monitor",
