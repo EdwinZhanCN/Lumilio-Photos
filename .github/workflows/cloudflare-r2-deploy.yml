@@ -1,0 +1,26 @@
+name: Deploy Codes to R2
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Upload specific folders to R2
+              uses: cloudflare/wrangler-action@v3
+              with:
+                  apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+                  command: |
+                      echo "Uploading files from pml, server, and web directories..."
+                      for file in $(find pml server web -type f); do
+                        echo "Putting ${file} to r2://${{ secrets.R2_BUCKET_NAME }}/${file}"
+                        npx wrangler r2 object put ${{ secrets.R2_BUCKET_NAME }}/${file} --file=${file}
+                      done
+                      echo "Upload complete."

@@ -56,7 +56,7 @@ export const routes = [
   {
     path: "/studio",
     element: (
-      <WorkerProvider>
+      <WorkerProvider preload={["exif", "border"]}>
         <Studio />
       </WorkerProvider>
     ),

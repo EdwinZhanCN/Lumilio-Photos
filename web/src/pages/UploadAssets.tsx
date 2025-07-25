@@ -7,7 +7,7 @@ import { WorkerProvider } from "@/contexts/WorkerProvider";
 
 const UploadPhotos = () => {
   return (
-    <WorkerProvider>
+    <WorkerProvider preload={["hash", "thumbnail"]}>
       <UploadProvider>
         <div className="min-h-screen px-2">
           <ErrorBoundary
