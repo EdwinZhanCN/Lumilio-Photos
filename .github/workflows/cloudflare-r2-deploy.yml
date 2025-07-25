@@ -16,7 +16,7 @@ jobs:
               run: |
                   sudo apt-get update && sudo apt-get install -y rclone
 
-                  rclone sync . r2:lumilio-photos-code/ \
+                  rclone sync . :s3,access_key_id=${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }},secret_access_key=${ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}:lumilio-photos-code/ \
                               --filter "+ /pml/**" \
                               --filter "+ /server/**" \
                               --filter "+ /web/**" \
@@ -24,12 +24,3 @@ jobs:
                               --fast-list \
                               --transfers 16 \
                               -v --progress
-
-              # Updated
-              env:
-                  RCLONE_CONFIG_R2_TYPE: s3
-                  RCLONE_CONFIG_R2_PROVIDER: Cloudflare
-                  RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
-                  RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
-                  RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
-                  RCLONE_CONFIG_R2_ACL: private
