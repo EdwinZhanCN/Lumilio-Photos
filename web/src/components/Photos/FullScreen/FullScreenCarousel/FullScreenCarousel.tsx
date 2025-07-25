@@ -61,7 +61,10 @@ const FullScreenCarousel = ({
 
   return (
     <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center animate-fade-in">
-      <FullScreenToolbar onToggleInfo={toggleInfo} />
+      <FullScreenToolbar
+        onToggleInfo={toggleInfo}
+        currentAsset={currentAsset}
+      />
       <button
         onClick={onClose}
         className="btn btn-ghost btn-sm absolute top-2 left-4 text-white z-20"

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useInView } from "react-intersection-observer";
 import PhotosLoadingSkeleton from "@/components/Photos/PhotosLoadingSkeleton";
-import ErrorFallBack from "@/pages/ErrorFallBack";
 import { useAssetsContext } from "@/contexts/FetchContext";
 import { useAssetsPageState } from "@/hooks/page-hooks/useAssetsPageState";
 import { groupAssets } from "@/utils/assetGrouping";
@@ -52,14 +51,7 @@ function Audios() {
   );
 
   if (error) {
-    return (
-      <ErrorFallBack
-        code="500"
-        title="Failed to Load Audio Files"
-        message={error}
-        reset={() => window.location.reload()}
-      />
-    );
+    throw new Error(`Failed to load audio files: ${error}`);
   }
 
   return (
