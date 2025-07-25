@@ -2,7 +2,7 @@
 
 # Interface: useExportImageReturn
 
-Defined in: hooks/util-hooks/useExportImage.tsx:20
+Defined in: [hooks/util-hooks/useExportImage.tsx:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useExportImage.tsx#L20)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: hooks/util-hooks/useExportImage.tsx:20
 
 > **cancelExport**: () => `void`
 
-Defined in: hooks/util-hooks/useExportImage.tsx:26
+Defined in: [hooks/util-hooks/useExportImage.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useExportImage.tsx#L26)
 
 #### Returns
 
@@ -22,7 +22,7 @@ Defined in: hooks/util-hooks/useExportImage.tsx:26
 
 > **downloadOriginal**: (`asset`) => `Promise`\<`void`\>
 
-Defined in: hooks/util-hooks/useExportImage.tsx:23
+Defined in: [hooks/util-hooks/useExportImage.tsx:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useExportImage.tsx#L23)
 
 #### Parameters
 
@@ -40,7 +40,7 @@ Defined in: hooks/util-hooks/useExportImage.tsx:23
 
 > **exportImage**: (`asset`, `options`) => `Promise`\<`void`\>
 
-Defined in: hooks/util-hooks/useExportImage.tsx:24
+Defined in: [hooks/util-hooks/useExportImage.tsx:24](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useExportImage.tsx#L24)
 
 #### Parameters
 
@@ -62,7 +62,7 @@ Defined in: hooks/util-hooks/useExportImage.tsx:24
 
 > **exportMultiple**: (`assets`, `options`) => `Promise`\<`void`\>
 
-Defined in: hooks/util-hooks/useExportImage.tsx:25
+Defined in: [hooks/util-hooks/useExportImage.tsx:25](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useExportImage.tsx#L25)
 
 #### Parameters
 
@@ -84,7 +84,7 @@ Defined in: hooks/util-hooks/useExportImage.tsx:25
 
 > **exportProgress**: `null` \| [`ExportProgress`](ExportProgress.md)
 
-Defined in: hooks/util-hooks/useExportImage.tsx:22
+Defined in: [hooks/util-hooks/useExportImage.tsx:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useExportImage.tsx#L22)
 
 ***
 
@@ -92,4 +92,4 @@ Defined in: hooks/util-hooks/useExportImage.tsx:22
 
 > **isExporting**: `boolean`
 
-Defined in: hooks/util-hooks/useExportImage.tsx:21
+Defined in: [hooks/util-hooks/useExportImage.tsx:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useExportImage.tsx#L21)

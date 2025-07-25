@@ -2,7 +2,7 @@
 
 # Interface: useGenerateHashcodeReturn
 
-Defined in: hooks/util-hooks/useGenerateHashcode.tsx:26
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L26)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: hooks/util-hooks/useGenerateHashcode.tsx:26
 
 > **cancelGeneration**: () => `void`
 
-Defined in: hooks/util-hooks/useGenerateHashcode.tsx:32
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L32)
 
 #### Returns
 
@@ -22,7 +22,7 @@ Defined in: hooks/util-hooks/useGenerateHashcode.tsx:32
 
 > **generateHashCodes**: (`files`) => `Promise`\<`undefined` \| `HashcodeResult`[]\>
 
-Defined in: hooks/util-hooks/useGenerateHashcode.tsx:29
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L29)
 
 #### Parameters
 
@@ -40,7 +40,7 @@ Defined in: hooks/util-hooks/useGenerateHashcode.tsx:29
 
 > **isGenerating**: `boolean`
 
-Defined in: hooks/util-hooks/useGenerateHashcode.tsx:27
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L27)
 
 ***
 
@@ -48,4 +48,4 @@ Defined in: hooks/util-hooks/useGenerateHashcode.tsx:27
 
 > **progress**: `null` \| [`HashcodeProgress`](HashcodeProgress.md)
 
-Defined in: hooks/util-hooks/useGenerateHashcode.tsx:28
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L28)
