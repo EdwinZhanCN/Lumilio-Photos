@@ -14,9 +14,9 @@ jobs:
 
             - name: Setup rclone and sync to R2
               run: |
-                  sudo apt-get update && sudo apt-get install -y rclone
+                  curl https://rclone.org/install.sh | sudo bash
 
-                  rclone sync . :s3,provider=Cloudflare,access_key_id=${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }},secret_access_key=${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }},endpoint=${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com/:lumilio-photos-code/ \
+                  rclone sync . :s3,provider=Cloudflare,access_key_id=${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }},secret_access_key=${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }},endpoint=1b7c97a6a0b3abf6e8c376b5db57a00a.r2.cloudflarestorage.com/:lumilio-photos-code/ \
                               --filter "+ /pml/**" \
                               --filter "+ /server/**" \
                               --filter "+ /web/**" \
