@@ -14,21 +14,9 @@ jobs:
 
             - name: Setup rclone and sync to R2
               run: |
-                  sudo apt-get install -y rclone
-                  mkdir -p ~/.config/rclone
-                  cat << EOF > ~/.config/rclone/rclone.conf
-                  [r2]
-                  type = s3
-                  provider = Cloudflare
-                  access_key_id = {{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
-                  secret_access_key = {{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
-                  endpoint = https://{{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
-                  acl = private
-                  EOF
+                  sudo apt-get update && sudo apt-get install -y rclone
 
-                  echo "rclone.conf 文件已成功创建。"
-
-                  rclone sync . r2:${{ secrets.R2_BUCKET_NAME }} \
+                  rclone sync . R2:${{ secrets.R2_BUCKET_NAME }} \
                               --filter "+ /pml/**" \
                               --filter "+ /server/**" \
                               --filter "+ /web/**" \
@@ -36,3 +24,11 @@ jobs:
                               --fast-list \
                               --transfers 16 \
                               -v --progress
+
+              env:
+                  RCLONE_CONFIG_R2_TYPE: s3
+                  RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+                  RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+                  RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+                  RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+                  RCLONE_CONFIG_R2_ACL: private
