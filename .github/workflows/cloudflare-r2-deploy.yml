@@ -25,6 +25,7 @@ jobs:
                               --transfers 16 \
                               -v --progress
 
+              # Updated
               env:
                   RCLONE_CONFIG_R2_TYPE: s3
                   RCLONE_CONFIG_R2_PROVIDER: Cloudflare
