@@ -4,7 +4,7 @@
 
 > **default**(`props`): `Element`
 
-Defined in: [contexts/FetchContext.tsx:281](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/contexts/FetchContext.tsx#L281)
+Defined in: [contexts/FetchContext.tsx:281](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/99610cb9c602f64ece6706d76967bc3cfa8eaab9/web/src/contexts/FetchContext.tsx#L281)
 
 **Assets Provider Component**
 

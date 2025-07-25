@@ -62,6 +62,7 @@ const processExifData = (
         // If parsing fails, use the parent object but exclude the problematic 'data' field
         const { data: _, ...rest } = rawExif;
         dataToProcess = rest;
+        throw new Error(`Failed to parse EXIF data: ${e}`);
       }
     } else {
       // It's a regular object without a 'data' property

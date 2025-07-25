@@ -4,28 +4,15 @@
 
 > **useUploadContext**(): `UploadContextValue`
 
-Defined in: [contexts/UploadContext.tsx:460](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/contexts/UploadContext.tsx#L460)
+Defined in: [contexts/UploadContext.tsx:321](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/99610cb9c602f64ece6706d76967bc3cfa8eaab9/web/src/contexts/UploadContext.tsx#L321)
 
-**Upload Context Hook**
-
-Custom hook for consuming the upload context. Provides type-safe access
-to upload state and operations with automatic error handling.
+Custom hook for consuming the upload context.
+Provides type-safe access to upload state and operations.
 
 ## Returns
 
 `UploadContextValue`
 
-Upload context value with all state and methods
-
 ## Throws
 
 Error if used outside of UploadProvider
-
-## Since
-
-1.0.0
-
-## See
-
- - [UploadProvider](default.md) for the context provider
- - UploadContextValue for the complete API reference

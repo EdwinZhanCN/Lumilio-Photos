@@ -3,7 +3,7 @@ import { RectangleGroupIcon } from "@heroicons/react/24/outline";
 import {
   BorderOptions,
   BorderParams,
-} from "@/hooks/wasm-hooks/useGenerateBorder";
+} from "@/hooks/util-hooks/useGenerateBorder";
 
 type FramesPanelProps = {
   isGenerating: boolean;
