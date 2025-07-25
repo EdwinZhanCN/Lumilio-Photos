@@ -1,0 +1,56 @@
+name: Generate OpenAPI&Type Docs for VitePress
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - "server/**"
+            - "web/**"
+
+jobs:
+    build-and-commit-docs:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v4
+
+            - name: Setup Go
+              uses: actions/setup-go@v5
+              with:
+                  go-version: "1.23"
+            - name: Install Swag CLI
+              run: go install github.com/swaggo/swag/cmd/swag@latest
+
+            - name: Generate OpenAPI Spec
+              run: ~/go/bin/swag init -g server/cmd/api/main.go -o server/docs
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22.x"
+            - name: "Generate Red-doc Static Page"
+              run: npx @redocly/cli build-docs server/docs/swagger.yaml -o docs/public/redoc-static.html
+
+            - name: "Generate TypeDoc"
+              run: cd web && npm run docs
+
+            - name: Commit and Push changes
+              run: |
+                  # 配置git用户
+                  git config --global user.name "github-actions[bot]"
+                  git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+                  # 检查是否有文件变更
+                  if [[ -n $(git status -s) ]]; then
+                    git add .
+                    git commit -m "[Docs] auto-generate OpenAPI spec"
+                    git push
+                  else
+                    echo "No changes to commit."
+                  fi
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

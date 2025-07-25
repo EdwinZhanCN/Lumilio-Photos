@@ -2,32 +2,22 @@
 
 # Function: useExtractExifdata()
 
-> **useExtractExifdata**(`__namedParameters`): `object`
+> **useExtractExifdata**(): [`useExtractExifdataReturn`](../interfaces/useExtractExifdataReturn.md)
 
-Defined in: [hooks/util-hooks/useExtractExifdata.tsx:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/hooks/util-hooks/useExtractExifdata.tsx#L17)
+Defined in: [hooks/util-hooks/useExtractExifdata.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/99610cb9c602f64ece6706d76967bc3cfa8eaab9/web/src/hooks/util-hooks/useExtractExifdata.tsx#L28)
 
-## Parameters
-
-### \_\_namedParameters
-
-`UseExtractExifdataProps`
+A hook to extract EXIF data from files using the shared web worker client.
+It encapsulates the state for the extraction process, progress, and results.
+This hook must be used within a component tree wrapped by `<WorkerProvider />`.
 
 ## Returns
 
-### extractExifData()
+[`useExtractExifdataReturn`](../interfaces/useExtractExifdataReturn.md)
 
-> **extractExifData**: (`files`) => `Promise`\<`void` \| `Error`\>
+## Author
 
-Extracts EXIF data from the given files.
+Edwin Zhan
 
-#### Parameters
+## Since
 
-##### files
-
-`File`[]
-
-The files from which to extract EXIF data.
-
-#### Returns
-
-`Promise`\<`void` \| `Error`\>
+1.1.0

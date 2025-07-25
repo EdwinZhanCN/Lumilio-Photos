@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { WasmWorkerClient, WorkerClient } from "@/workers/workerClient.ts";
 import { useExtractExifdata } from "@/hooks/util-hooks/useExtractExifdata.tsx";
 import {
   useGenerateBorders,
   BorderOptions,
   BorderParams,
-} from "@/hooks/wasm-hooks/useGenerateBorder";
+} from "@/hooks/util-hooks/useGenerateBorder";
 import { StudioHeader } from "@/components/Studio/StudioHeader";
 import { StudioSidebar } from "@/components/Studio/StudioSidebar";
 import { StudioViewport } from "@/components/Studio/StudioViewport";
@@ -17,15 +16,13 @@ export function Studio() {
   // Core State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState<boolean>(false);
+  const [isCancellingExif, setIsCancellingExif] = useState<boolean>(false);
 
   // UI State
   const [activePanel, setActivePanel] = useState<PanelType>("exif");
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
-  const [wasmReady, setWasmReady] = useState(false);
 
-  // Worker Refs
-  const wasmWorkerClientRef = useRef<WasmWorkerClient | null>(null);
-  const workerClientRef = useRef<WorkerClient | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Processed EXIF data for display
@@ -34,42 +31,23 @@ export function Studio() {
     any
   > | null>(null);
 
-  // Initialize WorkerClient and WASM modules
-  useEffect(() => {
-    wasmWorkerClientRef.current = new WasmWorkerClient();
-    wasmWorkerClientRef.current
-      .initBorderWASM()
-      .then(() => setWasmReady(true))
-      .catch(console.error);
-
-    workerClientRef.current = new WorkerClient();
-
-    return () => {
-      wasmWorkerClientRef.current?.terminateGenerateBorderWorker();
-      workerClientRef.current?.terminateExtractExifWorker();
-    };
-  }, []);
-
   // Instantiate Hooks
   const {
     isExtracting,
     exifData,
     progress: exifProgress,
     extractExifData,
-  } = useExtractExifdata({
-    workerClientRef,
-  });
+    cancelExtraction,
+  } = useExtractExifdata();
 
   const {
     isGenerating: isGenBorders,
-    progress: genBordersProgress,
     processedImages,
     setProcessedImages,
     generateBorders,
-  } = useGenerateBorders({
-    workerClientRef: wasmWorkerClientRef,
-    wasmReady,
-  });
+    progress: borderProgress,
+    cancelGeneration,
+  } = useGenerateBorders();
 
   // Process raw EXIF data when it changes
   useEffect(() => {
@@ -113,6 +91,24 @@ export function Studio() {
     },
     [selectedFile, generateBorders],
   );
+
+  const handleCancelGeneration = useCallback(() => {
+    setIsCancelling(true);
+    try {
+      cancelGeneration();
+    } finally {
+      setIsCancelling(false);
+    }
+  }, [cancelGeneration]);
+
+  const handleCancelExtraction = useCallback(() => {
+    setIsCancellingExif(true);
+    try {
+      cancelExtraction();
+    } finally {
+      setIsCancellingExif(false);
+    }
+  }, [cancelExtraction]);
   //#endregion
 
   const triggerFileInput = () => {
@@ -155,8 +151,12 @@ export function Studio() {
           exifToDisplay={exifToDisplay}
           onExtractExif={handleExtractExif}
           isGeneratingBorders={isGenBorders}
-          borderProgress={genBordersProgress}
+          borderProgress={borderProgress}
           onGenerateBorders={handleGenerateBorders}
+          onCancelGeneration={handleCancelGeneration}
+          isCancelling={isCancelling}
+          onCancelExtraction={handleCancelExtraction}
+          isCancellingExif={isCancellingExif}
         />
       </div>
     </div>

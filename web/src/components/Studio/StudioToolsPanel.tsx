@@ -5,21 +5,27 @@ import { FramesPanel } from "./panels/FramesPanel";
 import {
   BorderOptions,
   BorderParams,
-} from "@/hooks/wasm-hooks/useGenerateBorder";
+  BorderGenerationProgress,
+} from "@/hooks/util-hooks/useGenerateBorder";
+import { ExifExtractionProgress } from "@/hooks/util-hooks/useExtractExifdata";
 
 type StudioToolsPanelProps = {
   selectedFile: File | null;
   activePanel: PanelType;
   isExtracting: boolean;
-  exifProgress: { numberProcessed: number; total: number } | null;
+  exifProgress: ExifExtractionProgress;
   exifToDisplay: Record<string, any> | null;
   onExtractExif: () => void;
   isGeneratingBorders: boolean;
-  borderProgress: { numberProcessed: number; total: number } | null;
+  borderProgress: BorderGenerationProgress;
   onGenerateBorders: (
     option: BorderOptions,
     param: BorderParams[BorderOptions],
   ) => Promise<void>;
+  onCancelGeneration?: () => void;
+  isCancelling?: boolean;
+  onCancelExtraction?: () => void;
+  isCancellingExif?: boolean;
 };
 
 export function StudioToolsPanel({
@@ -32,6 +38,10 @@ export function StudioToolsPanel({
   isGeneratingBorders,
   borderProgress,
   onGenerateBorders,
+  onCancelGeneration,
+  isCancelling = false,
+  onCancelExtraction,
+  isCancellingExif = false,
 }: StudioToolsPanelProps) {
   const renderPanelContent = () => {
     switch (activePanel) {
@@ -54,7 +64,12 @@ export function StudioToolsPanel({
   };
 
   const isLoading = isExtracting || isGeneratingBorders;
-  const currentProgress = isExtracting ? exifProgress : borderProgress;
+  const currentProgress =
+    activePanel === "exif"
+      ? exifProgress
+      : activePanel === "frames"
+        ? borderProgress
+        : null;
 
   return (
     <div className="bg-base-200 border-l border-base-content/10 w-80 overflow-y-auto">
@@ -75,14 +90,38 @@ export function StudioToolsPanel({
           {isLoading && currentProgress && (
             <div className="mb-4 text-center">
               <p className="text-sm mb-1">
-                Processing: {currentProgress.numberProcessed} /{" "}
+                Processing: {currentProgress.processed} /{" "}
                 {currentProgress.total}
               </p>
               <progress
                 className="progress progress-primary w-full"
-                value={currentProgress.numberProcessed}
+                value={currentProgress.processed}
                 max={currentProgress.total}
               ></progress>
+              {currentProgress.error && (
+                <p className="text-xs text-error mt-1">
+                  {currentProgress.error}
+                </p>
+              )}
+              {/* Show appropriate cancel button based on current operation */}
+              {isExtracting && onCancelExtraction && (
+                <button
+                  onClick={onCancelExtraction}
+                  className="btn btn-xs btn-outline btn-error mt-2"
+                  disabled={isCancellingExif}
+                >
+                  {isCancellingExif ? "Cancelling..." : "Cancel Extraction"}
+                </button>
+              )}
+              {isGeneratingBorders && onCancelGeneration && (
+                <button
+                  onClick={onCancelGeneration}
+                  className="btn btn-xs btn-outline btn-error mt-2"
+                  disabled={isCancelling}
+                >
+                  {isCancelling ? "Cancelling..." : "Cancel Generation"}
+                </button>
+              )}
             </div>
           )}
 

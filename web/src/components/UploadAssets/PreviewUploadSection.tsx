@@ -1,41 +1,26 @@
-import React, { useRef, useState, useEffect, ChangeEvent } from "react";
+import React, { useRef, useEffect, ChangeEvent } from "react";
 import FileDropZone from "@/components/UploadAssets/FileDropZone.tsx";
 import ProgressIndicator from "@/components/UploadAssets/ProgressIndicator";
 import ImagePreviewGrid from "@/components/UploadAssets/ImagePreviewGrid";
 import { useUploadContext } from "@/contexts/UploadContext";
-import { useGenerateThumbnail } from "@/hooks/wasm-hooks/useGenerateThumbnail";
+import { useGenerateThumbnail } from "@/hooks/util-hooks/useGenerateThumbnail";
 import ValidateFile from "@/utils/validate-file";
 import { acceptFileExtensions } from "@/utils/accept-file-extensions";
-// import { useUploadProcess } from '@/hooks/api-hooks/useUploadProcess';
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 
-// For the thumbnail progress shape (or adapt it if your actual shape differs)
-interface ThumbnailProgress {
-  numberProcessed: number;
-  total: number;
-}
-
 function PreviewUploadSection(): React.JSX.Element {
-  // Values from your custom context
   const {
     state,
-    dispatch, // You need dispatch to send actions
-    workerClientRef,
-    uploadProgress, // You can get this too if needed
+    dispatch,
+    uploadProgress,
+    clearPreviewFiles,
+    uploadPreviewFiles,
   } = useUploadContext();
 
-  // Now, get all your state values from the 'state' object
-  const { files, previews, maxPreviewFiles, wasmReady } = state;
-
+  const { previewFiles, previewPreviews, maxPreviewFiles } = state;
   const showMessage = useMessage();
-  const [genThumbnailProgress, setGenThumbnailProgress] =
-    useState<ThumbnailProgress | null>(null);
-  const [isGenThumbnails, setIsGenThumbnails] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // from a custom hook
-  // const { processFiles } = useUploadProcess(workerClientRef, wasmReady);
 
   useEffect(() => {
     return () => {
@@ -45,12 +30,7 @@ function PreviewUploadSection(): React.JSX.Element {
     };
   }, []);
 
-  const { generatePreviews } = useGenerateThumbnail({
-    setGenThumbnailProgress,
-    setIsGenThumbnails,
-    workerClientRef,
-    wasmReady,
-  });
+  const { isGenerating, progress, generatePreviews } = useGenerateThumbnail();
 
   /**
    * Handle file selection and validation.
@@ -59,7 +39,7 @@ function PreviewUploadSection(): React.JSX.Element {
     const validFiles = Array.from(selectedFiles).filter((file) =>
       ValidateFile(file),
     );
-    const availableSlots = maxPreviewFiles - files.length;
+    const availableSlots = maxPreviewFiles - previewFiles.length;
 
     if (availableSlots <= 0) {
       showMessage(
@@ -78,10 +58,10 @@ function PreviewUploadSection(): React.JSX.Element {
     }
 
     dispatch({
-      type: "SET_FILES",
+      type: "SET_PREVIEW_FILES",
       payload: {
-        files: [...files, ...filteredFiles],
-        previews: [...previews, ...filteredFiles.map(() => null)],
+        files: [...previewFiles, ...filteredFiles],
+        previews: [...previewPreviews, ...filteredFiles.map(() => "")],
       },
     });
 
@@ -91,13 +71,13 @@ function PreviewUploadSection(): React.JSX.Element {
         if (result instanceof Error) {
           throw result;
         }
-        const newPreviewUrls = result.map((p) => p.url);
+        const newPreviewUrls = result?.map((p) => p.url);
 
         dispatch({
-          type: "SET_FILES",
+          type: "SET_PREVIEW_FILES",
           payload: {
-            files: [...state.files, ...filteredFiles],
-            previews: [...state.previews, ...newPreviewUrls],
+            files: [...previewFiles, ...filteredFiles],
+            previews: [...previewPreviews, ...(newPreviewUrls || [])],
           },
         });
       })
@@ -109,10 +89,7 @@ function PreviewUploadSection(): React.JSX.Element {
   };
 
   const handleClear = () => {
-    dispatch({ type: "CLEAR_FILES" });
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    clearPreviewFiles(fileInputRef);
   };
 
   return (
@@ -147,19 +124,19 @@ function PreviewUploadSection(): React.JSX.Element {
       />
 
       <div className="text-sm text-gray-500 mb-4">
-        {files.length} / {maxPreviewFiles} files
+        {previewFiles.length} / {maxPreviewFiles} files
         <progress
           className="ml-2 w-32 h-2 align-middle"
-          value={files.length}
+          value={previewFiles.length}
           max={maxPreviewFiles}
         />
       </div>
 
-      {isGenThumbnails && genThumbnailProgress && (
+      {isGenerating && progress && (
         <div className="flex gap-4">
           <ProgressIndicator
-            processed={genThumbnailProgress.numberProcessed}
-            total={genThumbnailProgress.total}
+            processed={progress.numberProcessed}
+            total={progress.total}
           />
           <div className="flex justify-center items-center mb-6">
             <span className="loading loading-dots loading-md" />
@@ -167,7 +144,7 @@ function PreviewUploadSection(): React.JSX.Element {
         </div>
       )}
 
-      <ImagePreviewGrid previews={previews} />
+      <ImagePreviewGrid previews={previewPreviews} />
 
       {uploadProgress > 0 && (
         <progress
@@ -182,15 +159,15 @@ function PreviewUploadSection(): React.JSX.Element {
       <div className="flex justify-end gap-4">
         <button
           onClick={handleClear}
-          disabled={files.length === 0 || uploadProgress > 0}
+          disabled={previewFiles.length === 0 || uploadProgress > 0}
           className="mb-2 mt-2 btn btn-ghost"
         >
           Clear
         </button>
         <button
-          onClick={() => {}}
+          onClick={uploadPreviewFiles}
           className="mb-2 mt-2 btn btn-primary"
-          disabled={files.length === 0 || uploadProgress > 0}
+          disabled={previewFiles.length === 0 || uploadProgress > 0}
         >
           {uploadProgress > 0 ? "Uploading..." : "Start Upload"}
         </button>

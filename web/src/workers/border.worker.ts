@@ -51,10 +51,10 @@ function initialize(): Promise<void> {
     return initializationPromise;
   }
 
-  initializationPromise = new Promise(async (resolve, reject) => {
+  initializationPromise = new Promise((resolve, reject) => {
     try {
       console.log("Initializing WebAssembly module...");
-      await init();
+      init();
       console.log("WebAssembly module initialized successfully.");
       self.postMessage({ type: "WASM_READY" });
       resolve();

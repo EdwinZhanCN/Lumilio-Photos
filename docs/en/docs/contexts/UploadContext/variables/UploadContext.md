@@ -4,16 +4,4 @@
 
 > `const` **UploadContext**: `Context`\<`undefined` \| `UploadContextValue`\>
 
-Defined in: [contexts/UploadContext.tsx:286](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/contexts/UploadContext.tsx#L286)
-
-**Upload Context**
-
-React context for sharing upload state and operations across components.
-
-## Since
-
-1.0.0
-
-## See
-
-[useUploadContext](../functions/useUploadContext.md) for consuming the context
+Defined in: [contexts/UploadContext.tsx:157](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/99610cb9c602f64ece6706d76967bc3cfa8eaab9/web/src/contexts/UploadContext.tsx#L157)
