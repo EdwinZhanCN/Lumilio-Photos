@@ -47,3 +47,45 @@
 .animate-fade-in-y {
     animation: fadeInY 0.3s ease-in-out;
 }
+
+@keyframes fadeOutX {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.animate-fade-out {
+    animation: fadeOut 0.3s ease-in-out forwards;
+}
+
+.animate-fade-out-x {
+    animation: fadeOutX 0.3s ease-in-out forwards;
+}
+
+@keyframes fadeInX {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.animate-fade-in-x {
+    animation: fadeInX 0.3s ease-in-out;
+}

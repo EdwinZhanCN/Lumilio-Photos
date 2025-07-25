@@ -69,7 +69,7 @@ const FullScreenInfo = ({ asset }: FullScreenInfoProps) => {
   }, [exifData]);
 
   return (
-    <div className="absolute top-12 right-0 bottom-0 w-96 bg-base-100/80 p-4 overflow-y-auto z-10">
+    <div className="absolute top-12 right-0 bottom-0 w-96 bg-base-100/80 p-4 overflow-y-auto z-10 animate-fade-in-x">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-bold">Metadata</h2>
         <button

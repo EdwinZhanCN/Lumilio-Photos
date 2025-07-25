@@ -4,12 +4,18 @@ import {
   TrashIcon,
   ArrowDownTrayIcon,
   Cog6ToothIcon,
+  ArrowTopRightOnSquareIcon,
+  GlobeAsiaAustraliaIcon,
+  HeartIcon,
+  ArchiveBoxArrowDownIcon,
 } from "@heroicons/react/24/outline";
 import { useState } from "react";
 import {
   useExportImage,
   ExportOptions,
 } from "@/hooks/util-hooks/useExportImage.tsx";
+import { getAssetService } from "@/services/getAssetsService";
+import { EllipsisHorizontalIcon } from "@heroicons/react/24/solid";
 
 interface FullScreenToolbarProps {
   onToggleInfo: () => void;
@@ -20,6 +26,7 @@ const FullScreenToolbar = ({
   onToggleInfo,
   currentAsset,
 }: FullScreenToolbarProps) => {
+  let wikiAvailable = true;
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
     format: "original",
@@ -66,6 +73,42 @@ const FullScreenToolbar = ({
     setShowExportModal(false);
   };
 
+  /**
+   * Handle open orginal image in new tab
+   * todo)) Support RAW
+   */
+  const handleOpenOriginalInNewTab = () => {
+    if (!currentAsset) return;
+
+    let url: string | undefined;
+    try {
+      if (!currentAsset?.asset_id) {
+        throw new Error("Asset ID is missing.");
+      }
+      url = getAssetService.getOriginalFileUrl(currentAsset.asset_id);
+      if (!url) {
+        throw new Error("Failed to get original file URL.");
+      }
+    } catch (error) {
+      console.error("Error opening original image in new tab:", error);
+      return;
+    }
+    window.open(url, "_blank");
+  };
+
+  // [TODO] Implement wiki
+  const ToggleWikiPanel = () => {
+    const modal = document.getElementById(
+      "wiki_modal",
+    ) as HTMLDialogElement | null;
+    if (modal) {
+      modal.showModal();
+      console.log("wiki panel toggled");
+    } else {
+      console.error("Wiki modal not found");
+    }
+  };
+
   return (
     <>
       <div className="absolute top-0 left-0 right-0 bg-base-100/50 p-2 flex justify-between items-center z-10">
@@ -85,20 +128,56 @@ const FullScreenToolbar = ({
           )}
         </div>
         <div className="flex items-center space-x-4">
-          <button className="btn btn-ghost btn-sm" onClick={onToggleInfo}>
-            <InformationCircleIcon className="h-6 w-6" />
-          </button>
-          <button className="btn btn-ghost btn-sm">
-            <ShareIcon className="h-6 w-6" />
-          </button>
-          <div className="dropdown dropdown-end">
+          {wikiAvailable && (
+            <div className="tooltip tooltip-bottom" data-tip="Wiki">
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={ToggleWikiPanel}
+              >
+                <GlobeAsiaAustraliaIcon className="h-6 w-6" />
+              </button>
+            </div>
+          )}
+
+          <div
+            className="tooltip tooltip-bottom"
+            data-tip="Open original in new tab"
+          >
             <button
               className="btn btn-ghost btn-sm"
-              tabIndex={0}
-              disabled={!currentAsset || isExporting}
+              onClick={handleOpenOriginalInNewTab}
             >
-              <ArrowDownTrayIcon className="h-6 w-6" />
+              <ArrowTopRightOnSquareIcon className="h-6 w-6" />
             </button>
+          </div>
+          <div className="tooltip tooltip-bottom" data-tip="Info">
+            <button className="btn btn-ghost btn-sm" onClick={onToggleInfo}>
+              <InformationCircleIcon className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="tooltip tooltip-bottom" data-tip="Add to Favorite">
+            <button className="btn btn-ghost btn-sm">
+              <HeartIcon className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="tooltip tooltip-bottom" data-tip="Share">
+            <button className="btn btn-ghost btn-sm">
+              <ShareIcon className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="dropdown dropdown-end">
+            <div
+              className="tooltip tooltip-bottom"
+              data-tip="Download / Export"
+            >
+              <button
+                className="btn btn-ghost btn-sm"
+                tabIndex={0}
+                disabled={!currentAsset || isExporting}
+              >
+                <ArrowDownTrayIcon className="h-6 w-6" />
+              </button>
+            </div>
             <ul className="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-52 z-20">
               <li>
                 <button onClick={handleDownloadOriginal}>
@@ -113,11 +192,52 @@ const FullScreenToolbar = ({
               </li>
             </ul>
           </div>
-          <button className="btn btn-ghost btn-sm text-error">
-            <TrashIcon className="h-6 w-6" />
-          </button>
+          <div className="dropdown dropdown-end">
+            <div
+              tabIndex={0}
+              role="button"
+              className="btn btn-ghost btn-sm m-1"
+            >
+              <EllipsisHorizontalIcon className="h-6 w-6" />
+            </div>
+            <ul
+              tabIndex={0}
+              className="dropdown-content menu bg-base-100 rounded-box z-1 w-52 p-2 shadow-sm"
+            >
+              <li>
+                <div>
+                  <button className="text-error">
+                    <TrashIcon className="h-6 w-6" />
+                  </button>
+                  Delete
+                </div>
+              </li>
+              <li>
+                <div>
+                  <button>
+                    <ArchiveBoxArrowDownIcon className="h-6 w-6" />
+                  </button>
+                  Add to Collections
+                </div>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
+
+      <dialog id="wiki_modal" className="modal">
+        <div className="modal-box">
+          <form method="dialog">
+            {/* if there is a button in form, it will close the modal */}
+            <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">
+              ✕
+            </button>
+          </form>
+          <h3 className="font-bold text-lg">Wiki</h3>
+          <p className="py-4">Press ESC key or click on ✕ button to close</p>
+          <span className="loading loading-bars loading-xs"></span>
+        </div>
+      </dialog>
 
       {/* Export Options Modal */}
       {showExportModal && (
