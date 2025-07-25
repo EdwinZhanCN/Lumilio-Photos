@@ -16,7 +16,7 @@ jobs:
               run: |
                   sudo apt-get update && sudo apt-get install -y rclone
 
-                  rclone sync . R2:${{ secrets.R2_BUCKET_NAME }} \
+                  rclone sync . r2:lumilio-photos-code \
                               --filter "+ /pml/**" \
                               --filter "+ /server/**" \
                               --filter "+ /web/**" \
