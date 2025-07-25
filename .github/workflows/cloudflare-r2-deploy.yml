@@ -1,10 +1,10 @@
+# .github/workflows/deploy.yml
 name: Deploy Specific Folders to R2
 
 on:
     push:
         branches:
             - main
-
 jobs:
     deploy:
         runs-on: ubuntu-latest
@@ -12,16 +12,27 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            - name: Upload specific folders to R2
+            - name: Setup rclone and sync to R2
               run: |
-                  echo "Uploading files from pml, server, and web directories..."
+                  sudo apt-get install -y rclone
+                  mkdir -p ~/.config/rclone
+                  cat << EOF > ~/.config/rclone/rclone.conf
+                  [r2]
+                  type = s3
+                  provider = Cloudflare
+                  access_key_id = {{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+                  secret_access_key = {{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+                  endpoint = https://{{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+                  acl = private
+                  EOF
 
-                  for file in $(find pml server web -type f); do
-                    echo "Putting ${file} to r2://${{ secrets.R2_BUCKET_NAME }}/${file}"
-                    npx wrangler r2 object put ${{ secrets.R2_BUCKET_NAME }}/${file} --file=${file}
-                  done
+                  echo "rclone.conf 文件已成功创建。"
 
-                  echo "Upload complete."
-              env:
-                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-                  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+                  rclone sync . r2:${{ secrets.R2_BUCKET_NAME }} \
+                              --filter "+ /pml/**" \
+                              --filter "+ /server/**" \
+                              --filter "+ /web/**" \
+                              --filter "- *" \
+                              --fast-list \
+                              --transfers 16 \
+                              -v --progress
