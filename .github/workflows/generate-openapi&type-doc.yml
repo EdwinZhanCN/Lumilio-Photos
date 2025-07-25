@@ -36,7 +36,7 @@ jobs:
               run: npx @redocly/cli build-docs server/docs/swagger.yaml -o docs/public/redoc-static.html
 
             - name: "Generate TypeDoc"
-              run: cd web && npm run docs
+              run: cd web && npm install && npm run docs
 
             - name: Commit and Push changes
               run: |

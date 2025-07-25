@@ -6,38 +6,86 @@
  * @author Edwin Zhan
  * @since 1.1.0
  */
+
+export type WorkerType = "thumbnail" | "hash" | "border" | "export" | "exif";
+
+export interface WorkerClientOptions {
+  preload?: WorkerType[];
+}
+
 export class AppWorkerClient {
-  private generateThumbnailworker: Worker;
-  private hashAssetsworker: Worker;
-  private generateBorderworker: Worker;
-  private exportWorker: Worker;
-  private extractExifWorker: Worker;
+  private generateThumbnailworker: Worker | null = null;
+  private hashAssetsworker: Worker | null = null;
+  private generateBorderworker: Worker | null = null;
+  private exportWorker: Worker | null = null;
+  private extractExifWorker: Worker | null = null;
 
   private eventTarget: EventTarget;
 
-  constructor() {
-    this.generateThumbnailworker = new Worker(
-      new URL("./thumbnail.worker.ts", import.meta.url),
-      { type: "module" },
-    );
-    this.hashAssetsworker = new Worker(
-      new URL("./hash.worker.ts", import.meta.url),
-      { type: "module" },
-    );
-    this.generateBorderworker = new Worker(
-      new URL("./border.worker.ts", import.meta.url),
-      { type: "module" },
-    );
-    this.exportWorker = new Worker(
-      new URL("./export.worker.ts", import.meta.url),
-      { type: "module" },
-    );
-    this.extractExifWorker = new Worker(
-      new URL("./exif.worker.ts", import.meta.url),
-      { type: "module" },
-    );
-
+  constructor(options: WorkerClientOptions = {}) {
     this.eventTarget = new EventTarget();
+
+    // Pre-load specified workers
+    if (options.preload) {
+      options.preload.forEach((workerType) => {
+        this.getOrInitializeWorker(workerType);
+      });
+    }
+  }
+
+  /**
+   * Get or initialize a worker on demand
+   */
+  private getOrInitializeWorker(type: WorkerType): Worker {
+    switch (type) {
+      case "thumbnail":
+        if (!this.generateThumbnailworker) {
+          this.generateThumbnailworker = new Worker(
+            new URL("./thumbnail.worker.ts", import.meta.url),
+            { type: "module" },
+          );
+        }
+        return this.generateThumbnailworker;
+
+      case "hash":
+        if (!this.hashAssetsworker) {
+          this.hashAssetsworker = new Worker(
+            new URL("./hash.worker.ts", import.meta.url),
+            { type: "module" },
+          );
+        }
+        return this.hashAssetsworker;
+
+      case "border":
+        if (!this.generateBorderworker) {
+          this.generateBorderworker = new Worker(
+            new URL("./border.worker.ts", import.meta.url),
+            { type: "module" },
+          );
+        }
+        return this.generateBorderworker;
+
+      case "export":
+        if (!this.exportWorker) {
+          this.exportWorker = new Worker(
+            new URL("./export.worker.ts", import.meta.url),
+            { type: "module" },
+          );
+        }
+        return this.exportWorker;
+
+      case "exif":
+        if (!this.extractExifWorker) {
+          this.extractExifWorker = new Worker(
+            new URL("./exif.worker.ts", import.meta.url),
+            { type: "module" },
+          );
+        }
+        return this.extractExifWorker;
+
+      default:
+        throw new Error(`Unknown worker type: ${type}`);
+    }
   }
 
   /**
@@ -61,6 +109,8 @@ export class AppWorkerClient {
     batchIndex: number;
     startIndex: number;
   }): Promise<{ batchIndex: number; results: any[]; status: string }> {
+    const worker = this.getOrInitializeWorker("thumbnail");
+
     return new Promise((resolve, reject) => {
       const handler = (e: MessageEvent) => {
         switch (e.data.type) {
@@ -70,19 +120,13 @@ export class AppWorkerClient {
               results: e.data.payload.results,
               status: "complete",
             });
-            this.generateThumbnailworker.removeEventListener(
-              "message",
-              handler,
-            );
+            worker.removeEventListener("message", handler);
             break;
           case "ERROR":
             const error = new Error(e.data.payload.error);
             error.name = e.data.payload.errorName;
             error.stack = e.data.payload.errorStack;
-            this.generateThumbnailworker.removeEventListener(
-              "message",
-              handler,
-            );
+            worker.removeEventListener("message", handler);
             reject(error);
             break;
           case "PROGRESS":
@@ -92,8 +136,8 @@ export class AppWorkerClient {
             break;
         }
       };
-      this.generateThumbnailworker.addEventListener("message", handler);
-      this.generateThumbnailworker.postMessage({
+      worker.addEventListener("message", handler);
+      worker.postMessage({
         type: "GENERATE_THUMBNAIL",
         data,
       });
@@ -101,7 +145,9 @@ export class AppWorkerClient {
   }
 
   abortGenerateThumbnail() {
-    this.generateThumbnailworker.postMessage({ type: "ABORT" });
+    if (this.generateThumbnailworker) {
+      this.generateThumbnailworker.postMessage({ type: "ABORT" });
+    }
   }
 
   // --- Hash Generation ---
@@ -109,6 +155,8 @@ export class AppWorkerClient {
     hashResults: Array<{ index: number; hash: string }>;
     status: string;
   }> {
+    const worker = this.getOrInitializeWorker("hash");
+
     return new Promise((resolve, reject) => {
       const handler = (e: MessageEvent) => {
         switch (e.data.type) {
@@ -117,10 +165,10 @@ export class AppWorkerClient {
               hashResults: e.data.hashResult,
               status: "complete",
             });
-            this.hashAssetsworker.removeEventListener("message", handler);
+            worker.removeEventListener("message", handler);
             break;
           case "ERROR":
-            this.hashAssetsworker.removeEventListener("message", handler);
+            worker.removeEventListener("message", handler);
             reject(
               new Error(e.data.payload?.error || "WASM initialization failed"),
             );
@@ -132,9 +180,9 @@ export class AppWorkerClient {
             break;
         }
       };
-      this.hashAssetsworker.addEventListener("message", handler);
+      worker.addEventListener("message", handler);
       const filesArray = Array.isArray(data) ? data : Array.from(data);
-      this.hashAssetsworker.postMessage({
+      worker.postMessage({
         type: "GENERATE_HASH",
         data: filesArray,
       });
@@ -142,7 +190,9 @@ export class AppWorkerClient {
   }
 
   abortGenerateHash() {
-    this.hashAssetsworker.postMessage({ type: "ABORT" });
+    if (this.hashAssetsworker) {
+      this.hashAssetsworker.postMessage({ type: "ABORT" });
+    }
   }
 
   // --- Border Generation ---
@@ -157,21 +207,23 @@ export class AppWorkerClient {
       error?: string;
     };
   }> {
+    const worker = this.getOrInitializeWorker("border");
+
     return new Promise((resolve, reject) => {
       const handler = (e: MessageEvent) => {
         switch (e.data.type) {
           case "GENERATE_BORDER_COMPLETE":
-            this.generateBorderworker.removeEventListener("message", handler);
+            worker.removeEventListener("message", handler);
             resolve(e.data.data);
             break;
           case "ERROR":
-            this.generateBorderworker.removeEventListener("message", handler);
+            worker.removeEventListener("message", handler);
             reject(new Error(e.data.payload.error));
             break;
         }
       };
-      this.generateBorderworker.addEventListener("message", handler);
-      this.generateBorderworker.postMessage({
+      worker.addEventListener("message", handler);
+      worker.postMessage({
         type: "GENERATE_BORDER",
         data: { files },
         option,
@@ -181,7 +233,9 @@ export class AppWorkerClient {
   }
 
   abortGenerateBorders() {
-    this.generateBorderworker.postMessage({ type: "ABORT" });
+    if (this.generateBorderworker) {
+      this.generateBorderworker.postMessage({ type: "ABORT" });
+    }
   }
 
   // --- Image Export ---
@@ -200,18 +254,20 @@ export class AppWorkerClient {
     filename?: string;
     error?: string;
   }> {
+    const worker = this.getOrInitializeWorker("export");
+
     return new Promise((resolve) => {
       const handleMessage = (event: MessageEvent) => {
         const { type, result, error, payload } = event.data;
         if (type === "EXPORT_COMPLETE") {
-          this.exportWorker.removeEventListener("message", handleMessage);
+          worker.removeEventListener("message", handleMessage);
           resolve({
             status: "complete",
             blob: result.blob,
             filename: result.filename,
           });
         } else if (type === "ERROR") {
-          this.exportWorker.removeEventListener("message", handleMessage);
+          worker.removeEventListener("message", handleMessage);
           resolve({ status: "error", error: error || "Export failed" });
         } else if (type === "PROGRESS") {
           this.eventTarget.dispatchEvent(
@@ -221,8 +277,8 @@ export class AppWorkerClient {
           );
         }
       };
-      this.exportWorker.addEventListener("message", handleMessage);
-      this.exportWorker.postMessage({
+      worker.addEventListener("message", handleMessage);
+      worker.postMessage({
         type: "EXPORT_IMAGE",
         data: { imageUrl, options },
       });
@@ -230,7 +286,9 @@ export class AppWorkerClient {
   }
 
   abortExportImage() {
-    this.exportWorker.postMessage({ type: "ABORT" });
+    if (this.exportWorker) {
+      this.exportWorker.postMessage({ type: "ABORT" });
+    }
   }
 
   // --- EXIF Extraction ---
@@ -238,18 +296,20 @@ export class AppWorkerClient {
     exifResults: Array<{ index: number; exifData: Record<string, any> }>;
     status: string;
   }> {
+    const worker = this.getOrInitializeWorker("exif");
+
     return new Promise((resolve, reject) => {
       const handler = (e: MessageEvent) => {
         switch (e.data.type) {
           case "EXIF_COMPLETE":
-            this.extractExifWorker.removeEventListener("message", handler);
+            worker.removeEventListener("message", handler);
             resolve({
               exifResults: e.data.payload.results,
               status: "complete",
             });
             break;
           case "ERROR":
-            this.extractExifWorker.removeEventListener("message", handler);
+            worker.removeEventListener("message", handler);
             reject(new Error(e.data.payload.error));
             break;
           case "PROGRESS":
@@ -259,9 +319,9 @@ export class AppWorkerClient {
             break;
         }
       };
-      this.extractExifWorker.addEventListener("message", handler);
+      worker.addEventListener("message", handler);
       const filesArray = Array.isArray(files) ? files : Array.from(files);
-      this.extractExifWorker.postMessage({
+      worker.postMessage({
         type: "EXTRACT_EXIF",
         data: { files: filesArray },
       });
@@ -269,7 +329,9 @@ export class AppWorkerClient {
   }
 
   abortExtractExif() {
-    this.extractExifWorker.postMessage({ type: "ABORT" });
+    if (this.extractExifWorker) {
+      this.extractExifWorker.postMessage({ type: "ABORT" });
+    }
   }
 
   // --- Lifecycle Management ---
@@ -278,11 +340,26 @@ export class AppWorkerClient {
    * This should be called when the application is unmounting.
    */
   terminateAllWorkers(): void {
-    this.generateThumbnailworker.terminate();
-    this.hashAssetsworker.terminate();
-    this.generateBorderworker.terminate();
-    this.exportWorker.terminate();
-    this.extractExifWorker.terminate();
+    if (this.generateThumbnailworker) {
+      this.generateThumbnailworker.terminate();
+      this.generateThumbnailworker = null;
+    }
+    if (this.hashAssetsworker) {
+      this.hashAssetsworker.terminate();
+      this.hashAssetsworker = null;
+    }
+    if (this.generateBorderworker) {
+      this.generateBorderworker.terminate();
+      this.generateBorderworker = null;
+    }
+    if (this.exportWorker) {
+      this.exportWorker.terminate();
+      this.exportWorker = null;
+    }
+    if (this.extractExifWorker) {
+      this.extractExifWorker.terminate();
+      this.extractExifWorker = null;
+    }
     console.log("All workers terminated.");
   }
 }

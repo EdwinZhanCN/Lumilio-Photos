@@ -1,5 +1,5 @@
 import { createContext, useContext, useRef, useEffect, ReactNode } from "react";
-import { AppWorkerClient } from "@/workers/workerClient";
+import { AppWorkerClient, WorkerType } from "@/workers/workerClient";
 
 const WorkerContext = createContext<AppWorkerClient | null>(null);
 
@@ -20,13 +20,26 @@ export const useWorker = (): AppWorkerClient => {
 
 interface WorkerProviderProps {
   children: ReactNode;
+  /**
+   * Array of worker types to pre-load immediately when the provider mounts.
+   * Workers not in this list will be lazy-loaded on first use.
+   *
+   * @example
+   * // Pre-load thumbnail and hash workers for immediate use
+   * <WorkerProvider preload={['thumbnail', 'hash']}>
+   *
+   * @example
+   * // No pre-loading - all workers lazy-loaded (good for Assets page)
+   * <WorkerProvider>
+   */
+  preload?: WorkerType[];
 }
 
-export const WorkerProvider = ({ children }: WorkerProviderProps) => {
+export const WorkerProvider = ({ children, preload }: WorkerProviderProps) => {
   const workerClientRef = useRef<AppWorkerClient | null>(null);
 
   if (workerClientRef.current === null) {
-    workerClientRef.current = new AppWorkerClient();
+    workerClientRef.current = new AppWorkerClient({ preload });
   }
 
   useEffect(() => {
