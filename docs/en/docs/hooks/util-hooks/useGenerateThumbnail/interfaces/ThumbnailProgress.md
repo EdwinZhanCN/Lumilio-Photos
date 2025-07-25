@@ -2,7 +2,7 @@
 
 # Interface: ThumbnailProgress
 
-Defined in: hooks/util-hooks/useGenerateThumbnail.tsx:7
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:7](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L7)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: hooks/util-hooks/useGenerateThumbnail.tsx:7
 
 > `optional` **error**: `string`
 
-Defined in: hooks/util-hooks/useGenerateThumbnail.tsx:10
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L10)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: hooks/util-hooks/useGenerateThumbnail.tsx:10
 
 > `optional` **failedAt**: `null` \| `number`
 
-Defined in: hooks/util-hooks/useGenerateThumbnail.tsx:11
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L11)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: hooks/util-hooks/useGenerateThumbnail.tsx:11
 
 > **numberProcessed**: `number`
 
-Defined in: hooks/util-hooks/useGenerateThumbnail.tsx:8
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:8](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L8)
 
 ***
 
@@ -34,4 +34,4 @@ Defined in: hooks/util-hooks/useGenerateThumbnail.tsx:8
 
 > **total**: `number`
 
-Defined in: hooks/util-hooks/useGenerateThumbnail.tsx:9
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:9](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L9)
