@@ -1,60 +1,56 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useMessage } from "@/hooks/util-hooks/useMessage.tsx";
-import { WorkerClient } from "@/workers/workerClient.ts";
+import { useWorker } from "@/contexts/WorkerProvider.tsx";
 
 // Define the shape of the progress state for better type safety
-type ExifExtractionProgress = {
-  numberProcessed: number;
+export type ExifExtractionProgress = {
+  processed: number;
   total: number;
   error?: string;
   failedAt?: number | null;
 } | null;
 
-// The hook only needs the worker reference
-type UseExtractExifdataProps = {
-  workerClientRef: React.RefObject<WorkerClient | null>;
-};
+export interface useExtractExifdataReturn {
+  isExtracting: boolean;
+  exifData: Record<number, any> | null;
+  progress: ExifExtractionProgress;
+  extractExifData: (files: File[]) => Promise<void>;
+  cancelExtraction: () => void;
+}
 
 /**
- * A hook to extract EXIF data from files using a web worker.
+ * A hook to extract EXIF data from files using the shared web worker client.
  * It encapsulates the state for the extraction process, progress, and results.
+ * This hook must be used within a component tree wrapped by `<WorkerProvider />`.
+ * @author Edwin Zhan
+ * @since 1.1.0
  */
-export const useExtractExifdata = ({
-  workerClientRef,
-}: UseExtractExifdataProps) => {
+export const useExtractExifdata = (): useExtractExifdataReturn => {
   const showMessage = useMessage();
+  const workerClient = useWorker(); // Get the shared worker client instance
 
-  // All state is now managed inside the hook
+  // All states are now managed inside the hook
   const [isExtracting, setIsExtracting] = useState(false);
   const [exifData, setExifData] = useState<Record<number, any> | null>(null);
   const [progress, setProgress] = useState<ExifExtractionProgress>(null);
 
   // Effect for listening to worker progress
   useEffect(() => {
-    if (!workerClientRef.current) {
-      return;
-    }
-
-    const progressListener = workerClientRef.current.addProgressListener(
-      (detail) => {
-        if (detail && typeof detail.processed === "number") {
-          setProgress((prev) => {
-            if (!prev) return prev; // Should not happen if progress is set before starting
-            return {
-              ...prev,
-              numberProcessed: detail.processed,
-              total: detail.total,
-            };
-          });
-        }
-      },
-    );
+    // The useWorker hook ensures workerClient is always available here
+    const progressListener = workerClient.addProgressListener((detail) => {
+      if (detail && typeof detail.processed === "number") {
+        setProgress({
+          processed: detail.processed,
+          total: detail.total,
+        });
+      }
+    });
 
     // Cleanup function to remove the listener
     return () => {
       progressListener();
     };
-  }, [workerClientRef]); // Dependency array is simpler now
+  }, [workerClient]); // Depend on the workerClient instance
 
   /**
    * Extracts EXIF data from the given files.
@@ -62,19 +58,13 @@ export const useExtractExifdata = ({
    * ensuring it's not recreated on every render unless its dependencies change.
    */
   const extractExifData = useCallback(
-    async (files: File[]): Promise<void | Error> => {
-      if (!workerClientRef.current) {
-        const error = new Error("Worker client is not initialized");
-        showMessage("error", error.message);
-        return error;
-      }
-
+    async (files: File[]): Promise<void> => {
       setIsExtracting(true);
       setExifData(null); // Reset previous data
-      setProgress({ numberProcessed: 0, total: files.length });
+      setProgress({ processed: 0, total: files.length });
 
       try {
-        const results = await workerClientRef.current.extractExif(files);
+        const results = await workerClient.extractExif(files);
 
         if (results && results.exifResults) {
           const formattedExifData = results.exifResults.reduce(
@@ -94,15 +84,22 @@ export const useExtractExifdata = ({
         setProgress((prev) => ({
           ...prev!,
           error: errorMessage,
-          failedAt: prev?.numberProcessed,
+          failedAt: prev?.processed,
         }));
-        return error as Error;
       } finally {
         setIsExtracting(false);
+        // Do not clear progress here to allow UI to show final state
       }
     },
-    [workerClientRef, showMessage],
-  ); // Dependencies for useCallback
+    [workerClient, showMessage], // Dependencies for useCallback
+  );
+
+  const cancelExtraction = () => {
+    workerClient.abortExtractExif();
+    setIsExtracting(false);
+    setProgress(null);
+    showMessage("info", "EXIF extraction cancelled.");
+  };
 
   // Return the state values and the function to trigger the process
   return {
@@ -110,5 +107,6 @@ export const useExtractExifdata = ({
     exifData,
     progress,
     extractExifData,
+    cancelExtraction,
   };
 };

@@ -2,6 +2,10 @@
 
 # hooks/api-hooks/useUploadProcess
 
+## Interfaces
+
+- [useUploadProcessReturn](interfaces/useUploadProcessReturn.md)
+
 ## Functions
 
 - [useUploadProcess](functions/useUploadProcess.md)

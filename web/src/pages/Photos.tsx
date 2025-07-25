@@ -5,7 +5,6 @@ import PhotosToolBar from "@/components/Photos/PhotosToolBar/PhotosToolBar";
 import PhotosMasonry from "@/components/Photos/PhotosMasonry/PhotosMasonry";
 import FullScreenCarousel from "@/components/Photos/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import PhotosLoadingSkeleton from "@/components/Photos/PhotosLoadingSkeleton";
-import ErrorFallBack from "@/pages/ErrorFallBack";
 import { useAssetsContext } from "@/contexts/FetchContext";
 import { useAssetsPageState } from "@/hooks/page-hooks/useAssetsPageState";
 import {
@@ -90,14 +89,7 @@ function Photos() {
   };
 
   if (error) {
-    return (
-      <ErrorFallBack
-        code="500"
-        title="Failed to Load Photos"
-        message={error}
-        reset={() => window.location.reload()}
-      />
-    );
+    throw new Error(error);
   }
 
   return (

@@ -6,7 +6,7 @@
         "src/utils/*.ts",
         "src/contexts/*.tsx"
     ],
-    "out": "docs",
+    "out": "../docs/en/docs",
     "sidebar": {
         "autoConfiguration": true,
         "format": "vitepress",

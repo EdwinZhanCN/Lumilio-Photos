@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useExtractExifdata } from "@/hooks/util-hooks/useExtractExifdata";
-import { WorkerClient } from "@/workers/workerClient";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { getAssetService } from "@/services/getAssetsService";
 import { AxiosError } from "axios";
@@ -14,17 +13,9 @@ const FullScreenInfo = ({ asset }: FullScreenInfoProps) => {
   const metadata = asset.specific_metadata as any;
   const [detailedExif, setDetailedExif] = useState<any>(null);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
-  const workerClientRef = useRef<WorkerClient | null>(null);
   const showMessage = useMessage();
 
-  // Initialize worker client if not already done
-  if (!workerClientRef.current) {
-    workerClientRef.current = new WorkerClient();
-  }
-
-  const { isExtracting, exifData, extractExifData } = useExtractExifdata({
-    workerClientRef,
-  });
+  const { isExtracting, exifData, extractExifData } = useExtractExifdata();
 
   const handleExtractExif = async () => {
     try {
@@ -77,18 +68,8 @@ const FullScreenInfo = ({ asset }: FullScreenInfoProps) => {
     }
   }, [exifData]);
 
-  // Cleanup worker when component unmounts
-  useEffect(() => {
-    return () => {
-      if (workerClientRef.current) {
-        workerClientRef.current.terminateExtractExifWorker();
-        workerClientRef.current = null;
-      }
-    };
-  }, []);
-
   return (
-    <div className="absolute top-12 right-0 bottom-0 w-96 bg-base-100/80 p-4 overflow-y-auto z-10">
+    <div className="absolute top-12 right-0 bottom-0 w-96 bg-base-100/80 p-4 overflow-y-auto z-10 animate-fade-in-x">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-bold">Metadata</h2>
         <button

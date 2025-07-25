@@ -2,48 +2,12 @@
 
 # Function: useUploadProcess()
 
-> **useUploadProcess**(`workerClientRef`, `wasmReady`): `object`
+> **useUploadProcess**(): [`useUploadProcessReturn`](../interfaces/useUploadProcessReturn.md)
 
-Defined in: [hooks/api-hooks/useUploadProcess.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87d62aab38919e216231c72a6e5a6bce24754b5d/web/src/hooks/api-hooks/useUploadProcess.tsx#L26)
+Defined in: [hooks/api-hooks/useUploadProcess.tsx:40](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/99610cb9c602f64ece6706d76967bc3cfa8eaab9/web/src/hooks/api-hooks/useUploadProcess.tsx#L40)
 
-## Parameters
-
-### workerClientRef
-
-`RefObject`\<`any`\>
-
-### wasmReady
-
-`boolean`
+Custom hook for handling file upload process.
 
 ## Returns
 
-`object`
-
-### hashcodeProgress
-
-> **hashcodeProgress**: `null` \| \{ `error?`: `string`; `failedAt?`: `number`; `numberProcessed?`: `number`; `total?`: `number`; \}
-
-### isGeneratingHashCodes
-
-> **isGeneratingHashCodes**: `boolean`
-
-### isUploading
-
-> **isUploading**: `boolean` = `uploadMutation.isPending`
-
-### processFiles
-
-> **processFiles**: `ProcessFilesFn`
-
-### resetStatus()
-
-> **resetStatus**: () => `void`
-
-#### Returns
-
-`void`
-
-### uploadProgress
-
-> **uploadProgress**: `number`
+[`useUploadProcessReturn`](../interfaces/useUploadProcessReturn.md)

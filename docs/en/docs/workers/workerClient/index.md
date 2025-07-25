@@ -4,5 +4,4 @@
 
 ## Classes
 
-- [WasmWorkerClient](classes/WasmWorkerClient.md)
-- [WorkerClient](classes/WorkerClient.md)
+- [AppWorkerClient](classes/AppWorkerClient.md)
