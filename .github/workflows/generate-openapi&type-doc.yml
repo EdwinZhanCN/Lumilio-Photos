@@ -38,6 +38,9 @@ jobs:
             - name: "Generate TypeDoc"
               run: cd web && npm install && npm run docs
 
+            - name: "Move TypeDoc Siderbar to Public"
+              run: mv docs/en/docs/typedoc-sidebar.json docs/.vitepress/sidebar/
+
             - name: Commit and Push changes
               run: |
                   # 配置git用户
