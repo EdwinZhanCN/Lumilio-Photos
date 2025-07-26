@@ -43,6 +43,9 @@ MANIFEST
 # Production
 *.env
 
+# Develpoment
+*.env.development
+
 # IDE specific files
 .idea/
 .vscode/
