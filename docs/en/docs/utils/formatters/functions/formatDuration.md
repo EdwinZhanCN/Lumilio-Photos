@@ -4,7 +4,7 @@
 
 > **formatDuration**(`ms`): `string`
 
-Defined in: [utils/formatters.ts:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/utils/formatters.ts#L23)
+Defined in: [utils/formatters.ts:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/utils/formatters.ts#L23)
 
 Formats a duration in milliseconds to a human-readable time string
 
