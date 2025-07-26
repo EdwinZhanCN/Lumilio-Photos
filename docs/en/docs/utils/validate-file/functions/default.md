@@ -4,7 +4,7 @@
 
 > **default**(`file`): `boolean`
 
-Defined in: [utils/validate-file.ts:6](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/5a9be158f2088be7556fada16832ccc8d88ac157/web/src/utils/validate-file.ts#L6)
+Defined in: [utils/validate-file.ts:6](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/130ee90cd12122a0d6ac1018d6d9ee450974d021/web/src/utils/validate-file.ts#L6)
 
 Validates if a file is of a supported type
 
