@@ -4,4 +4,4 @@
 
 > **GroupByType** = `"date"` \| `"type"` \| `"album"`
 
-Defined in: [hooks/page-hooks/useAssetsPageState.tsx:9](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/130ee90cd12122a0d6ac1018d6d9ee450974d021/web/src/hooks/page-hooks/useAssetsPageState.tsx#L9)
+Defined in: [hooks/page-hooks/useAssetsPageState.tsx:9](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/1644752835268dce152ae5a6ed8e77af6920f217/web/src/hooks/page-hooks/useAssetsPageState.tsx#L9)

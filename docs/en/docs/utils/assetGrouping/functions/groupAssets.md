@@ -4,7 +4,7 @@
 
 > **groupAssets**(`assets`, `groupBy`, `sortOrder`): `Record`\<`string`, `Asset`[]\>
 
-Defined in: [utils/assetGrouping.ts:9](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/130ee90cd12122a0d6ac1018d6d9ee450974d021/web/src/utils/assetGrouping.ts#L9)
+Defined in: [utils/assetGrouping.ts:9](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/1644752835268dce152ae5a6ed8e77af6920f217/web/src/utils/assetGrouping.ts#L9)
 
 Groups assets by the specified criteria and applies sorting
 
