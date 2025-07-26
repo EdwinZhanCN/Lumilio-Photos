@@ -13,7 +13,7 @@ const PhotosThumbnail = ({ asset, openCarousel }: PhotosThumbnailProps) => {
   const containerClasses = [
     "overflow-hidden shadow-md hover:shadow-xl transition-all duration-200",
     "hover:-translate-y-1",
-    "break-inside-avoid mb-2",
+    "break-inside-avoid mb-1",
     "animate-fade-in",
   ]
     .filter(Boolean)
