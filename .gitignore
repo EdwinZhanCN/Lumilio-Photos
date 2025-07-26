@@ -43,6 +43,9 @@ MANIFEST
 # Production
 *.env
 
+# Develpoment
+*.env.development
+
 # IDE specific files
 .idea/
 .vscode/
@@ -77,3 +80,4 @@ web/docs/
 /pml/build
 /pml/.venv
 /pml/uv.lock
+*.development

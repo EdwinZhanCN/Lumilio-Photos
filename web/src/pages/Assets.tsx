@@ -38,7 +38,7 @@ const Assets = () => {
     >
       <AssetsProvider>
         <WorkerProvider preload={["exif", "export"]}>
-          <div className="p-4 w-full max-w-screen-lg mx-auto mb-20">
+          <div className="p-4 w-full mx-auto mb-20">
             <div className="pt-4">
               {activeTab === "photos" && <Photos />}
               {activeTab === "videos" && <Videos />}

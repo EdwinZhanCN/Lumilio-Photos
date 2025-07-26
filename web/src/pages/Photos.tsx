@@ -93,7 +93,7 @@ function Photos() {
   }
 
   return (
-    <div className="p-4 w-full max-w-screen-lg mx-auto">
+    <div className="p-4 w-full mx-auto">
       <PhotosToolBar
         groupBy={groupBy}
         sortOrder={sortOrder}
