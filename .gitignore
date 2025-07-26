@@ -80,3 +80,7 @@ web/docs/
 /pml/build
 /pml/.venv
 /pml/uv.lock
+
+# Binarys
+/server/api
+/server/worker
