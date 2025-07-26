@@ -4,4 +4,4 @@
 
 > `const` **UploadContext**: `Context`\<`undefined` \| `UploadContextValue`\>
 
-Defined in: [contexts/UploadContext.tsx:157](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/contexts/UploadContext.tsx#L157)
+Defined in: [contexts/UploadContext.tsx:157](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/contexts/UploadContext.tsx#L157)

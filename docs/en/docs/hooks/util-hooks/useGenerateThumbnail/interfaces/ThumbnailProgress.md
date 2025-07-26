@@ -2,7 +2,7 @@
 
 # Interface: ThumbnailProgress
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:7](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L7)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:7](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L7)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:7](https://github.com/Edw
 
 > `optional` **error**: `string`
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L10)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L10)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:10](https://github.com/Ed
 
 > `optional` **failedAt**: `null` \| `number`
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L11)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L11)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:11](https://github.com/Ed
 
 > **numberProcessed**: `number`
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:8](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L8)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:8](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L8)
 
 ***
 
@@ -34,4 +34,4 @@ Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:8](https://github.com/Edw
 
 > **total**: `number`
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:9](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L9)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:9](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L9)

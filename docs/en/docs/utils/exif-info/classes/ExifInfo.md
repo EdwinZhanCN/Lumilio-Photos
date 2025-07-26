@@ -2,7 +2,7 @@
 
 # Class: ExifInfo
 
-Defined in: [utils/exif-info.ts:1](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/utils/exif-info.ts#L1)
+Defined in: [utils/exif-info.ts:1](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/utils/exif-info.ts#L1)
 
 ## Constructors
 
@@ -20,7 +20,7 @@ Defined in: [utils/exif-info.ts:1](https://github.com/EdwinZhanCN/Lumilio-Photos
 
 > `static` **getSample**(): `object`
 
-Defined in: [utils/exif-info.ts:2](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/utils/exif-info.ts#L2)
+Defined in: [utils/exif-info.ts:2](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/utils/exif-info.ts#L2)
 
 #### Returns
 
