@@ -80,3 +80,4 @@ web/docs/
 /pml/build
 /pml/.venv
 /pml/uv.lock
+*.development
