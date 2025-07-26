@@ -24,21 +24,34 @@ export const enSidebar: DefaultTheme.Sidebar = {
       ],
     },
   ],
-  "/tech-stack/": [
+  "/developer-documentation/": [
     {
       text: "Tech Stack",
       items: [
-        { text: "Overview", link: "/tech-stack/techstack-overview" },
-        { text: "Frontend", link: "/tech-stack/frontend" },
-        { text: "Backend", link: "/tech-stack/backend" },
+        {
+          text: "Overview",
+          link: "/developer-documentation/techstack-overview",
+        },
+        { text: "Frontend", link: "/developer-documentation/frontend" },
+        { text: "Backend", link: "/developer-documentation/backend" },
       ],
     },
     {
       text: "Business Diagram",
       items: [
-        { text: "Upload[Frontend]", link: "/tech-stack/business-diagram/upload-frontend" },
-        { text: "Upload[Backend]", link: "/tech-stack/business-diagram/upload-backend" }
+        {
+          text: "Upload[Frontend]",
+          link: "/developer-documentation/business-diagram/upload-frontend",
+        },
+        {
+          text: "Upload[Backend]",
+          link: "/developer-documentation/business-diagram/upload-backend",
+        },
       ],
+    },
+    {
+      text: "TypeDoc",
+      link: "/docs/",
     },
   ],
   "/docs/": [

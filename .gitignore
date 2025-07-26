@@ -44,7 +44,7 @@ MANIFEST
 *.env
 
 # Develpoment
-*.env.development
+*.development
 
 # IDE specific files
 .idea/
@@ -80,4 +80,3 @@ web/docs/
 /pml/build
 /pml/.venv
 /pml/uv.lock
-*.development
