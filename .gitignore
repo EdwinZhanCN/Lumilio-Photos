@@ -81,6 +81,6 @@ web/docs/
 /pml/.venv
 /pml/uv.lock
 
-# Binarys
+# Binaries
 /server/api
 /server/worker
