@@ -73,7 +73,7 @@ const PhotosMasonry = ({
       | { type: "header"; key: string; title: string; count: number }
       | { type: "photos"; key: string; photos: Asset[] }
     )[] = [];
-    const photosPerChunk = columnCount * 4; // Render 4 rows of photos per chunk
+    const photosPerChunk = columnCount * 2; // Render 4 rows of photos per chunk
 
     Object.keys(groupedPhotos).forEach((groupKey) => {
       // Add the header row
@@ -147,11 +147,10 @@ const PhotosMasonry = ({
 
   // 3. Render the virtualized list
   return (
-    <div ref={parentRef} style={{ height: `100%`, overflow: "auto" }}>
+    <div ref={parentRef}>
       <div
         style={{
           height: `${rowVirtualizer.getTotalSize()}px`,
-          width: "100%",
           position: "relative",
         }}
       >
@@ -171,6 +170,7 @@ const PhotosMasonry = ({
                 width: "100%",
                 transform: `translateY(${virtualItem.start}px)`,
               }}
+              className="no-scrollbar"
             >
               {item.type === "header" ? (
                 <div className="my-6 mx-2">
