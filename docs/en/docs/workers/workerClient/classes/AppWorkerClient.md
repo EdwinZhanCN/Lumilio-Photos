@@ -2,7 +2,7 @@
 
 # Class: AppWorkerClient
 
-Defined in: [workers/workerClient.ts:16](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L16)
+Defined in: [workers/workerClient.ts:16](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L16)
 
 ## Constructors
 
@@ -10,7 +10,7 @@ Defined in: [workers/workerClient.ts:16](https://github.com/EdwinZhanCN/Lumilio-
 
 > **new AppWorkerClient**(`options`): `AppWorkerClient`
 
-Defined in: [workers/workerClient.ts:25](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L25)
+Defined in: [workers/workerClient.ts:25](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L25)
 
 #### Parameters
 
@@ -28,7 +28,7 @@ Defined in: [workers/workerClient.ts:25](https://github.com/EdwinZhanCN/Lumilio-
 
 > **abortExportImage**(): `void`
 
-Defined in: [workers/workerClient.ts:288](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L288)
+Defined in: [workers/workerClient.ts:288](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L288)
 
 #### Returns
 
@@ -40,7 +40,7 @@ Defined in: [workers/workerClient.ts:288](https://github.com/EdwinZhanCN/Lumilio
 
 > **abortExtractExif**(): `void`
 
-Defined in: [workers/workerClient.ts:331](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L331)
+Defined in: [workers/workerClient.ts:331](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L331)
 
 #### Returns
 
@@ -52,7 +52,7 @@ Defined in: [workers/workerClient.ts:331](https://github.com/EdwinZhanCN/Lumilio
 
 > **abortGenerateBorders**(): `void`
 
-Defined in: [workers/workerClient.ts:235](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L235)
+Defined in: [workers/workerClient.ts:235](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L235)
 
 #### Returns
 
@@ -64,7 +64,7 @@ Defined in: [workers/workerClient.ts:235](https://github.com/EdwinZhanCN/Lumilio
 
 > **abortGenerateHash**(): `void`
 
-Defined in: [workers/workerClient.ts:192](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L192)
+Defined in: [workers/workerClient.ts:192](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L192)
 
 #### Returns
 
@@ -76,7 +76,7 @@ Defined in: [workers/workerClient.ts:192](https://github.com/EdwinZhanCN/Lumilio
 
 > **abortGenerateThumbnail**(): `void`
 
-Defined in: [workers/workerClient.ts:147](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L147)
+Defined in: [workers/workerClient.ts:147](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L147)
 
 #### Returns
 
@@ -88,7 +88,7 @@ Defined in: [workers/workerClient.ts:147](https://github.com/EdwinZhanCN/Lumilio
 
 > **addProgressListener**(`callback`): () => `void`
 
-Defined in: [workers/workerClient.ts:96](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L96)
+Defined in: [workers/workerClient.ts:96](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L96)
 
 Adds a progress listener that can be used by any worker task.
 
@@ -116,7 +116,7 @@ A function to remove the event listener.
 
 > **exportImage**(`imageUrl`, `options`): `Promise`\<\{ `blob?`: `Blob`; `error?`: `string`; `filename?`: `string`; `status`: `"error"` \| `"complete"`; \}\>
 
-Defined in: [workers/workerClient.ts:242](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L242)
+Defined in: [workers/workerClient.ts:242](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L242)
 
 #### Parameters
 
@@ -156,7 +156,7 @@ Defined in: [workers/workerClient.ts:242](https://github.com/EdwinZhanCN/Lumilio
 
 > **extractExif**(`files`): `Promise`\<\{ `exifResults`: `object`[]; `status`: `string`; \}\>
 
-Defined in: [workers/workerClient.ts:295](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L295)
+Defined in: [workers/workerClient.ts:295](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L295)
 
 #### Parameters
 
@@ -174,7 +174,7 @@ Defined in: [workers/workerClient.ts:295](https://github.com/EdwinZhanCN/Lumilio
 
 > **generateBorders**(`files`, `option`, `param`): `Promise`\<\{[`uuid`: `string`]: `object`; \}\>
 
-Defined in: [workers/workerClient.ts:199](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L199)
+Defined in: [workers/workerClient.ts:199](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L199)
 
 #### Parameters
 
@@ -200,7 +200,7 @@ Defined in: [workers/workerClient.ts:199](https://github.com/EdwinZhanCN/Lumilio
 
 > **generateHash**(`data`): `Promise`\<\{ `hashResults`: `object`[]; `status`: `string`; \}\>
 
-Defined in: [workers/workerClient.ts:154](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L154)
+Defined in: [workers/workerClient.ts:154](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L154)
 
 #### Parameters
 
@@ -218,7 +218,7 @@ Defined in: [workers/workerClient.ts:154](https://github.com/EdwinZhanCN/Lumilio
 
 > **generateThumbnail**(`data`): `Promise`\<\{ `batchIndex`: `number`; `results`: `any`[]; `status`: `string`; \}\>
 
-Defined in: [workers/workerClient.ts:107](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L107)
+Defined in: [workers/workerClient.ts:107](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L107)
 
 #### Parameters
 
@@ -246,7 +246,7 @@ Defined in: [workers/workerClient.ts:107](https://github.com/EdwinZhanCN/Lumilio
 
 > **terminateAllWorkers**(): `void`
 
-Defined in: [workers/workerClient.ts:342](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/workers/workerClient.ts#L342)
+Defined in: [workers/workerClient.ts:342](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/workers/workerClient.ts#L342)
 
 Terminates all active workers to clean up resources.
 This should be called when the application is unmounting.

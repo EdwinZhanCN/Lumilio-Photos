@@ -4,7 +4,7 @@
 
 > **useAssetsContext**(): `AssetsContextValue`
 
-Defined in: [contexts/FetchContext.tsx:306](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/33fe9d3b91b52951162b2ea4b3fdca9bdb6bd277/web/src/contexts/FetchContext.tsx#L306)
+Defined in: [contexts/FetchContext.tsx:306](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b3425e71774123fa6b07d528432324028816c356/web/src/contexts/FetchContext.tsx#L306)
 
 **Assets Context Hook**
 
