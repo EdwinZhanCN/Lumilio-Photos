@@ -50,6 +50,21 @@ export const enSidebar: DefaultTheme.Sidebar = {
       ],
     },
     {
+      text: "Backend",
+      items: [
+        {
+          text: "Processors",
+          collapsed: true,
+          items: [
+            {
+              text: "AssetProcessor",
+              link: "/developer-documentation/backend/processors/asset-processor",
+            },
+          ],
+        },
+      ],
+    },
+    {
       text: "TypeDoc",
       link: "/docs/",
     },
