@@ -4,7 +4,7 @@
 
 ## Introduction
 
-see `server/processors/asset_processor.go`
+see `server/internal/processors/asset_processor.go`
 
 `AssetProcessor` depends on multiple services and storage systems. It is the core component responsible for handling all `Assets` uploaded, scanned, or synced by users. Many *sub-processors* are implemented as member functions of the `AssetProcessor` struct. They're responsible for more specific asset processing depending on different types of assets.
 
