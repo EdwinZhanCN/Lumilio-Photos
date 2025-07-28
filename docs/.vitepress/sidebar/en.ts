@@ -60,6 +60,10 @@ export const enSidebar: DefaultTheme.Sidebar = {
               text: "AssetProcessor",
               link: "/developer-documentation/backend/processors/asset-processor",
             },
+            {
+              text: "ProcessPhoto",
+              link: "/developer-documentation/backend/processors/photo-processor",
+            },
           ],
         },
       ],
