@@ -81,6 +81,16 @@ export const enSidebar: DefaultTheme.Sidebar = {
             },
           ],
         },
+        {
+          text: "Servicer",
+          collapsed: true,
+          items: [
+            {
+              text: "Service Servicer",
+              link: "/developer-documentation/lumen/servicer/prediction_servicer",
+            },
+          ],
+        },
       ],
     },
     {
