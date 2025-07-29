@@ -1,276 +1,303 @@
+"""
+clip_service.py
+
+Provides gRPC service implementation for OpenCLIP operations, delegating
+requests to a CLIPModelManager to perform image encoding, text embedding,
+classification, similarity computation, health check, and model management.
+"""
+
 import grpc
 import time
 import logging
 import sys
 import os
-from typing import Optional
+from typing import Optional, Dict, Any
 
-# Add parent directory to path for proto imports
+# Ensure proto imports resolve correctly
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from proto import ml_service_pb2
 from .clip_model import CLIPModelManager
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
-# Default path will be handled by CLIPModelManager using importlib.resources
 
 class CLIPService:
-    """OpenCLIP-specific service implementation"""
+    """
+    gRPC service for OpenCLIP model operations.
+
+    Wraps a CLIPModelManager instance and exposes methods for:
+      - Initializing the model
+      - Image processing
+      - Text embedding
+      - Similarity computation
+      - Health checks
+      - Switching models at runtime
+      - Retrieving service and model metadata
+    """
 
     def __init__(
         self,
-        model_name: str = 'ViT-B-32',
-        pretrained: str = 'laion2b_s34b_b79k',
+        model_name: str = "ViT-B-32",
+        pretrained: str = "laion2b_s34b_b79k",
         model_path: Optional[str] = None,
         imagenet_classes_path: Optional[str] = None
-    ):
+    ) -> None:
         """
-        Initialize CLIP service with OpenCLIP model.
+        Initialize the CLIPService.
 
         Args:
-            model_name: Name of the model to use (e.g., 'ViT-B-32')
-            pretrained: Name of the pretrained weights to use (e.g., 'laion2b_s34b_b79k')
-            model_path: Optional path to custom model checkpoint
-            imagenet_classes_path: Path to ImageNet class definitions
+            model_name: Name of the OpenCLIP architecture to load.
+            pretrained: Identifier for pretrained weights.
+            model_path: Optional path to a custom model checkpoint.
+            imagenet_classes_path: Optional path to an ImageNet class index JSON.
         """
         self.model_name = model_name
         self.pretrained = pretrained
-        self.clip_model = CLIPModelManager(model_name, pretrained, model_path, imagenet_classes_path)
+        self.clip_model = CLIPModelManager(
+            model_name, pretrained, model_path, imagenet_classes_path
+        )
         self.start_time = time.time()
         self.is_initialized = False
 
-        logger.info(f"🔧 CLIPService created for model: {model_name}")
+        logger.info("CLIPService created for model: %s", model_name)
 
-    def initialize(self):
-        """Initialize the OpenCLIP model"""
-        try:
-            logger.info(f"🚀 Initializing OpenCLIP service with model: {self.model_name}...")
-            self.clip_model.initialize()
-            self.is_initialized = True
+    def initialize(self) -> None:
+        """
+        Load and initialize the OpenCLIP model and class data.
 
-            model_info = self.clip_model.get_model_info()
-            logger.info("✅ OpenCLIP service initialized successfully:")
-            logger.info(f"  - 🏷️ Model: {model_info['model_name']}")
-            logger.info(f"  - 💻 Device: {model_info['device']}")
-            logger.info(f"  - ⏱️ Load time: {model_info['load_time']:.2f}s")
-            logger.info(f"  - 📚 ImageNet classes: {model_info['imagenet_classes_count']}")
+        Raises:
+            RuntimeError: If model initialization fails.
+        """
+        logger.info("Initializing OpenCLIP model: %s", self.model_name)
+        self.clip_model.initialize()
+        self.is_initialized = True
+        info = self.clip_model.get_model_info()
+        logger.info("Model initialized: %s on device %s (load_time=%.2fs)",
+                    info["model_name"], info["device"], info["load_time"])
 
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize OpenCLIP service: {e}", exc_info=True)
-            raise
+    def process_image_for_clip(
+        self,
+        request: ml_service_pb2.ImageProcessRequest,
+        context
+    ) -> ml_service_pb2.ImageProcessResponse:
+        """
+        Handle an ImageProcessRequest via CLIPModelManager.
 
-    def process_image_for_clip(self, request: ml_service_pb2.ImageProcessRequest, context) -> ml_service_pb2.ImageProcessResponse:
-        """Process image with OpenCLIP model"""
-        start_time = time.time()
+        Args:
+            request: Protobuf request containing image bytes, image_id,
+                     optional target_labels and top_k.
+            context: gRPC context for setting status codes and details.
 
-        try:
-            if not self.is_initialized:
-                context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
-                context.set_details('OpenCLIP model not initialized')
-                return ml_service_pb2.ImageProcessResponse()
+        Returns:
+            An ImageProcessResponse with feature vector, label scores,
+            model_version, and processing_time_ms set. Status codes will
+            be set on context for invalid input or internal errors.
+        """
+        start = time.time()
 
-            # Validate input
-            if not request.image_data:
-                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                context.set_details('No image data provided')
-                return ml_service_pb2.ImageProcessResponse()
-
-            # Get image features
-            try:
-                image_features = self.clip_model.encode_image(request.image_data)
-            except ValueError as ve:
-                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                context.set_details(f'Invalid image: {str(ve)}')
-                return ml_service_pb2.ImageProcessResponse()
-
-            # Get predictions if target labels are provided or use ImageNet
-            target_labels = list(request.target_labels) if request.target_labels else None
-
-            # Determine top_k from request or use default
-            top_k = getattr(request, 'top_k', 3) or 3
-
-            # The model method now returns a list of (label, score) tuples for top_k
-            predicted_scores_list = self.clip_model.classify_image_with_labels(
-                request.image_data, target_labels, top_k=top_k
-            )
-
-            # Create LabelScore messages for the response
-            label_scores = [
-                ml_service_pb2.LabelScore(label=label, similarity_score=score)
-                for label, score in predicted_scores_list
-            ]
-
-            processing_time = int((time.time() - start_time) * 1000)
-
-            response = ml_service_pb2.ImageProcessResponse(
-                image_id=request.image_id,
-                image_feature_vector=image_features.tolist(),
-                predicted_scores=label_scores,
-                model_version=self.clip_model.model_name,
-                processing_time_ms=processing_time
-            )
-
-            logger.info(f"🖼️ Processed image '{request.image_id}' in {processing_time}ms, found {len(label_scores)} predictions.")
-
-            return response
-
-        except Exception as e:
-            logger.error(f"❌ Error processing image: {e}", exc_info=True)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(f'Internal error: {str(e)}')
+        if not self.is_initialized:
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details("Model not initialized")
             return ml_service_pb2.ImageProcessResponse()
 
-    def get_text_embedding_for_clip(self, request: ml_service_pb2.TextEmbeddingRequest, context) -> ml_service_pb2.TextEmbeddingResponse:
-        """Get text embedding with OpenCLIP model"""
-        start_time = time.time()
+        if not request.image_data:
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details("No image data provided")
+            return ml_service_pb2.ImageProcessResponse()
 
         try:
-            if not self.is_initialized:
-                context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
-                context.set_details('OpenCLIP model not initialized')
-                return ml_service_pb2.TextEmbeddingResponse()
-
-            # Validate input
-            if not request.text or not request.text.strip():
-                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                context.set_details('No text provided')
-                return ml_service_pb2.TextEmbeddingResponse()
-
-            # Encode text
-            text_features = self.clip_model.encode_text(request.text)
-            processing_time = int((time.time() - start_time) * 1000)
-
-            response = ml_service_pb2.TextEmbeddingResponse(
-                text_feature_vector=text_features.tolist(),
-                model_version=self.clip_model.model_name,
-                processing_time_ms=processing_time
-            )
-
-            logger.info(f"✍️ Processed text embedding in {processing_time}ms.")
-
-            return response
-
+            features = self.clip_model.encode_image(request.image_data)
         except Exception as e:
-            logger.error(f"❌ Error processing text: {e}", exc_info=True)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details(f'Internal error: {str(e)}')
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details(f"Invalid image data: {e}")
+            return ml_service_pb2.ImageProcessResponse()
+
+        labels = list(request.target_labels) if request.target_labels else None
+        top_k = getattr(request, "top_k", 3) or 3
+
+        scores = self.clip_model.classify_image_with_labels(
+            request.image_data, labels, top_k
+        )
+        label_scores = [
+            ml_service_pb2.LabelScore(label=lbl, similarity_score=score)
+            for lbl, score in scores
+        ]
+
+        elapsed_ms = int((time.time() - start) * 1000)
+        response = ml_service_pb2.ImageProcessResponse(
+            image_id=request.image_id,
+            image_feature_vector=features.tolist(),
+            predicted_scores=label_scores,
+            model_version=self.clip_model.model_name,
+            processing_time_ms=elapsed_ms
+        )
+
+        logger.info(
+            "Processed image '%s' in %dms, returned %d labels",
+            request.image_id, elapsed_ms, len(label_scores)
+        )
+        return response
+
+    def get_text_embedding_for_clip(
+        self,
+        request: ml_service_pb2.TextEmbeddingRequest,
+        context
+    ) -> ml_service_pb2.TextEmbeddingResponse:
+        """
+        Handle a TextEmbeddingRequest via CLIPModelManager.
+
+        Args:
+            request: Protobuf request containing a non-empty text field.
+            context: gRPC context for status codes.
+
+        Returns:
+            A TextEmbeddingResponse with text_feature_vector, model_version,
+            and processing_time_ms. Status codes set for invalid input.
+        """
+        start = time.time()
+
+        if not self.is_initialized:
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details("Model not initialized")
             return ml_service_pb2.TextEmbeddingResponse()
 
-    def compute_similarity_for_clip(self, image_bytes: bytes, text: str) -> float:
-        """Compute similarity between image and text using OpenCLIP"""
-        try:
-            if not self.is_initialized:
-                raise RuntimeError("OpenCLIP model not initialized")
+        text = request.text or ""
+        if not text.strip():
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details("No text provided")
+            return ml_service_pb2.TextEmbeddingResponse()
 
-            return self.clip_model.compute_similarity(image_bytes, text)
+        features = self.clip_model.encode_text(text)
+        elapsed_ms = int((time.time() - start) * 1000)
 
-        except Exception as e:
-            logger.error(f"❌ Error computing similarity: {e}", exc_info=True)
-            raise
+        response = ml_service_pb2.TextEmbeddingResponse(
+            text_feature_vector=features.tolist(),
+            model_version=self.clip_model.model_name,
+            processing_time_ms=elapsed_ms
+        )
+        logger.info("Processed text embedding in %dms", elapsed_ms)
+        return response
 
-    def health_check(self, service_name: str = "openclip") -> ml_service_pb2.HealthCheckResponse:
-        """Health check for OpenCLIP service"""
-        try:
-            if self.is_initialized and self.clip_model.is_loaded:
-                status = ml_service_pb2.HealthCheckResponse.SERVING
-                message = f"✅ OpenCLIP model ({self.model_name}) is healthy and serving."
-                model_version = self.clip_model.model_name
-            else:
-                status = ml_service_pb2.HealthCheckResponse.NOT_SERVING
-                message = f"⚠️ OpenCLIP model ({self.model_name}) is not available."
-                model_version = "unknown"
+    def compute_similarity_for_clip(
+        self,
+        image_bytes: bytes,
+        text: str
+    ) -> float:
+        """
+        Compute cosine similarity between image and text embeddings.
 
-            return ml_service_pb2.HealthCheckResponse(
-                status=status,
-                model_name=f"openclip-{self.model_name}",
-                model_version=model_version,
-                uptime_seconds=int(time.time() - self.start_time),
-                message=message
-            )
+        Args:
+            image_bytes: Raw image bytes.
+            text: Input text string.
 
-        except Exception as e:
-            logger.error(f"❌ Error in OpenCLIP health check: {e}", exc_info=True)
-            return ml_service_pb2.HealthCheckResponse(
-                status=ml_service_pb2.HealthCheckResponse.SERVICE_SPECIFIC_ERROR,
-                model_name=f"openclip-{self.model_name}",
-                model_version="unknown",
-                uptime_seconds=int(time.time() - self.start_time),
-                message=f"An internal error occurred during health check: {str(e)}"
-            )
+        Returns:
+            Cosine similarity score as a float.
 
-    def get_model_info(self):
-        """Get comprehensive OpenCLIP model information"""
-        base_info = self.clip_model.get_model_info()
+        Raises:
+            RuntimeError: If the model is not initialized.
+        """
+        if not self.is_initialized:
+            raise RuntimeError("Model not initialized")
+        return self.clip_model.compute_similarity(image_bytes, text)
 
-        # Add service-specific information
-        service_info = {
-            "service_type": "OpenCLIP",
-            "current_model": self.model_name,
+    def health_check(
+        self,
+        service_name: str = "openclip"
+    ) -> ml_service_pb2.HealthCheckResponse:
+        """
+        Perform a health check of the CLIPService.
+
+        Args:
+            service_name: Identifier returned in the response.
+
+        Returns:
+            A HealthCheckResponse with status, model_name, model_version,
+            uptime_seconds, and a descriptive message.
+        """
+        uptime = int(time.time() - self.start_time)
+        if self.is_initialized and self.clip_model.is_loaded:
+            status = ml_service_pb2.HealthCheckResponse.SERVING
+            message = f"Model '{self.model_name}' is initialized and serving."
+            version = self.clip_model.model_name
+        else:
+            status = ml_service_pb2.HealthCheckResponse.NOT_SERVING
+            message = f"Model '{self.model_name}' not available."
+            version = "unknown"
+
+        return ml_service_pb2.HealthCheckResponse(
+            status=status,
+            model_name=service_name,
+            model_version=version,
+            uptime_seconds=uptime,
+            message=message
+        )
+
+    def get_model_info(self) -> Dict[str, Any]:
+        """
+        Retrieve metadata about the current model and service.
+
+        Returns:
+            A dictionary containing model_name, pretrained weights,
+            device, is_loaded, load_time, and service uptime.
+        """
+        info = self.clip_model.get_model_info()
+        return {
+            **info,
             "service_uptime": time.time() - self.start_time,
-            "initialization_status": self.is_initialized
+            "initialized": self.is_initialized
         }
 
-        return {**base_info, **service_info}
+    def switch_model(
+        self,
+        new_model_name: str,
+        new_pretrained: str,
+        model_path: Optional[str] = None
+    ) -> bool:
+        """
+        Replace the current CLIP model with a new one at runtime.
 
-    def switch_model(self, new_model_name: str, new_pretrained: str, model_path: Optional[str] = None):
+        Args:
+            new_model_name: Name of the new model architecture.
+            new_pretrained: Identifier for the new pretrained weights.
+            model_path: Optional checkpoint path for the new model.
+
+        Returns:
+            True if the switch succeeds; raises on failure.
         """
-        Switch to a different OpenCLIP model.
-        Note: This will reinitialize the service and may take time.
-        """
-        old_model = self.clip_model
+        old = self.clip_model
         try:
-            logger.info(f"🔄 Switching model from '{self.model_name}' to '{new_model_name}'...")
-
-            # Create new model manager
+            logger.info("Switching model '%s' -> '%s'", self.model_name, new_model_name)
             self.model_name = new_model_name
             self.pretrained = new_pretrained
             self.clip_model = CLIPModelManager(
-                new_model_name,
-                new_pretrained,
-                model_path,
-                old_model.imagenet_classes_path if old_model else self.clip_model.imagenet_classes_path
+                new_model_name, new_pretrained, model_path,
+                getattr(old, "imagenet_classes_path", None)
             )
-
-            # Mark as uninitialized
             self.is_initialized = False
-
-            # Initialize new model
             self.initialize()
-
-            logger.info(f"✅ Successfully switched to model: {new_model_name}.")
+            logger.info("Model switch to '%s' completed", new_model_name)
             return True
-
         except Exception as e:
-            logger.error(f"❌ Failed to switch model to '{new_model_name}': {e}", exc_info=True)
-            # Try to restore old model if possible
-            try:
-                if old_model:
-                    self.clip_model = old_model
-                    self.model_name = getattr(old_model, 'model_name', 'ViT-B-32')
-                    self.pretrained = getattr(old_model, 'pretrained', 'laion2b_s34b_b79k')
-                    logger.warning("↪️ Restored previous model after a failed switch attempt.")
-            except:
-                logger.critical("🔥 Failed to restore previous model. Service may be unstable.")
-                self.is_initialized = False
+            logger.error("Model switch failed: %s", e)
+            # revert on failure
+            self.clip_model = old
+            self.model_name = old.model_name
+            self.pretrained = old.pretrained
             raise
 
-    def get_performance_stats(self):
-        """Get performance statistics for the service"""
-        try:
-            model_info = self.get_model_info()
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """
+        Gather runtime performance statistics for the service.
 
-            stats = {
-                "model": self.model_name,
-                "uptime_seconds": time.time() - self.start_time,
-                "initialization_time": model_info.get('load_time', 0),
-                "device": model_info.get('device', 'unknown'),
-                "is_healthy": self.is_initialized and self.clip_model.is_loaded,
-            }
-
-            return stats
-
-        except Exception as e:
-            logger.error(f"❌ Error getting performance stats: {e}", exc_info=True)
-            return {"error": str(e)}
+        Returns:
+            A dictionary with model, device, uptime, load_time, and health status.
+        """
+        info = self.get_model_info()
+        return {
+            "model": self.model_name,
+            "device": info.get("device"),
+            "service_uptime": info.get("service_uptime"),
+            "model_load_time": info.get("load_time"),
+            "is_healthy": self.is_initialized and self.clip_model.is_loaded
+        }
