@@ -72,22 +72,22 @@ export const enSidebar: DefaultTheme.Sidebar = {
       text: "Lumen",
       items: [
         {
-          text: "Registry",
+          text: "gRPC Server",
           collapsed: true,
           items: [
             {
-              text: "Model Registry",
-              link: "/developer-documentation/lumen/registry/model-registry",
+              text: "Server",
+              link: "/developer-documentation/lumen/server/server",
             },
           ],
         },
         {
-          text: "Servicer",
+          text: "Module",
           collapsed: true,
           items: [
             {
-              text: "Service Servicer",
-              link: "/developer-documentation/lumen/servicer/prediction_servicer",
+              text: "Image Classification",
+              link: "/developer-documentation/lumen/module/image-classification",
             },
           ],
         },

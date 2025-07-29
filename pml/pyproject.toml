@@ -33,7 +33,7 @@ image_classification = ["*.json"]
 
 [[tool.pydoc-markdown.loaders]]
 type = "python"
-search_path = ["./"]
+search_path = ["./src"]
 
 [tool.pydoc-markdown.renderer]
 type = "mkdocs"
@@ -41,4 +41,4 @@ type = "mkdocs"
 [[tool.pydoc-markdown.renderer.pages]]
 title = "API 文档"
 name = "index"
-contents = ["*"]
+contents = ["proto.*"]
