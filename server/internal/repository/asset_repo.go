@@ -27,8 +27,3 @@ type AssetRepository interface {
 	GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error)
 	GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*models.Thumbnail, error)
 }
-
-type TagRepository interface {
-	GetByName(ctx context.Context, name string) (*models.Tag, error)
-	Create(ctx context.Context, tag *models.Tag) error
-}

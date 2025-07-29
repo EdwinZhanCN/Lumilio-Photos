@@ -17,5 +17,5 @@ services:
 
 volumes:
     postgres_data:
-# docker run -d --name db -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=lumiliophotos -p 5432:5432 -v postgres_data:/var/lib/postgresql/data postgres:15-alpine
+# docker run -d --name db -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=lumiliophotos -p 5432:5432 -v postgres_data:/var/lib/postgresql/data lumilio-db
 # container run -d --name db -e POSTGRES_PASSWORD=postgres -e POSTGRES_USER=postgres -e POSTGRES_DB=lumiliophotos -v postgres_data:/var/lib/postgresql/data postgres:15-alpine

@@ -14,16 +14,15 @@ import (
 type AssetType string
 
 const (
-	AssetTypePhoto    AssetType = "PHOTO"
-	AssetTypeVideo    AssetType = "VIDEO"
-	AssetTypeAudio    AssetType = "AUDIO"
-	AssetTypeDocument AssetType = "DOCUMENT"
+	AssetTypePhoto AssetType = "PHOTO"
+	AssetTypeVideo AssetType = "VIDEO"
+	AssetTypeAudio AssetType = "AUDIO"
 )
 
 // Valid returns true if the AssetType is valid
 func (at AssetType) Valid() bool {
 	switch at {
-	case AssetTypePhoto, AssetTypeVideo, AssetTypeAudio, AssetTypeDocument:
+	case AssetTypePhoto, AssetTypeVideo, AssetTypeAudio:
 		return true
 	}
 	return false
@@ -81,6 +80,7 @@ type Asset struct {
 	Thumbnails []Thumbnail `gorm:"foreignKey:AssetID" json:"thumbnails,omitempty"`
 	Tags       []Tag       `gorm:"many2many:asset_tags;joinForeignKey:AssetID;joinReferences:TagID" json:"tags,omitempty"`
 	Albums     []Album     `gorm:"many2many:album_assets;foreignKey:AssetID;joinForeignKey:AssetID;References:AlbumID;joinReferences:AlbumID" json:"albums,omitempty"`
+	Embedding  []float32   `gorm:"type:vector(512)" json:"embedding,omitempty"`
 }
 
 // TableName specifies the table name for the Asset model
