@@ -153,6 +153,10 @@ definitions:
         description: For video/audio assets in seconds
         example: 120.5
         type: number
+      embedding:
+        items:
+          type: number
+        type: array
       file_size:
         example: 1048576
         type: integer
@@ -207,13 +211,11 @@ definitions:
     - PHOTO
     - VIDEO
     - AUDIO
-    - DOCUMENT
     type: string
     x-enum-varnames:
     - AssetTypePhoto
     - AssetTypeVideo
     - AssetTypeAudio
-    - AssetTypeDocument
   models.AuthResponse:
     description: Authentication response containing tokens and user info
     properties:

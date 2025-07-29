@@ -4,4 +4,4 @@
 
 > **SortOrderType** = `"asc"` \| `"desc"`
 
-Defined in: [hooks/page-hooks/useAssetsPageState.tsx:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/hooks/page-hooks/useAssetsPageState.tsx#L10)
+Defined in: [hooks/page-hooks/useAssetsPageState.tsx:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/0cb9b6c9a2e1869ca5ea4411f957d39edc719928/web/src/hooks/page-hooks/useAssetsPageState.tsx#L10)

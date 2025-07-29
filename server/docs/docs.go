@@ -1142,6 +1142,12 @@ const docTemplate = `{
                     "type": "number",
                     "example": 120.5
                 },
+                "embedding": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
                 "file_size": {
                     "type": "integer",
                     "example": 1048576
@@ -1219,14 +1225,12 @@ const docTemplate = `{
             "enum": [
                 "PHOTO",
                 "VIDEO",
-                "AUDIO",
-                "DOCUMENT"
+                "AUDIO"
             ],
             "x-enum-varnames": [
                 "AssetTypePhoto",
                 "AssetTypeVideo",
-                "AssetTypeAudio",
-                "AssetTypeDocument"
+                "AssetTypeAudio"
             ]
         },
         "models.AuthResponse": {
