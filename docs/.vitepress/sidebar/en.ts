@@ -69,6 +69,21 @@ export const enSidebar: DefaultTheme.Sidebar = {
       ],
     },
     {
+      text: "Lumen",
+      items: [
+        {
+          text: "Registry",
+          collapsed: true,
+          items: [
+            {
+              text: "Model Registry",
+              link: "/developer-documentation/lumen/registry/model-registry",
+            },
+          ],
+        },
+      ],
+    },
+    {
       text: "TypeDoc",
       link: "/docs/",
     },

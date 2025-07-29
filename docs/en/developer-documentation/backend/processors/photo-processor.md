@@ -1,4 +1,4 @@
-# Processor -  `ProcessPhoto`
+# Processors -  `ProcessPhoto`
 
 *Author: Edwin Zhan, proofread by AI*
 
