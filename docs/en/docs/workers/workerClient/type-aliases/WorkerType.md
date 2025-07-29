@@ -4,7 +4,7 @@
 
 > **WorkerType** = `"thumbnail"` \| `"hash"` \| `"border"` \| `"export"` \| `"exif"`
 
-Defined in: [workers/workerClient.ts:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e7623428749fd7c1a769297382642ed42ea75beb/web/src/workers/workerClient.ts#L10)
+Defined in: [workers/workerClient.ts:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/0cb9b6c9a2e1869ca5ea4411f957d39edc719928/web/src/workers/workerClient.ts#L10)
 
 A unified client to manage and interact with all web workers in the application.
 This class provides a clean, promise-based API for computationally expensive tasks,
