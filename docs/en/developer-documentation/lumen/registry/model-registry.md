@@ -1,0 +1,3 @@
+# `ModelRegistry`
+
+The model registry
