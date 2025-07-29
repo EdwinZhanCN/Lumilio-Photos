@@ -50,6 +50,50 @@ export const enSidebar: DefaultTheme.Sidebar = {
       ],
     },
     {
+      text: "Backend",
+      items: [
+        {
+          text: "Processors",
+          collapsed: true,
+          items: [
+            {
+              text: "AssetProcessor",
+              link: "/developer-documentation/backend/processors/asset-processor",
+            },
+            {
+              text: "ProcessPhoto",
+              link: "/developer-documentation/backend/processors/photo-processor",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      text: "Lumen",
+      items: [
+        {
+          text: "gRPC Server",
+          collapsed: true,
+          items: [
+            {
+              text: "Server",
+              link: "/developer-documentation/lumen/server/server",
+            },
+          ],
+        },
+        {
+          text: "Module",
+          collapsed: true,
+          items: [
+            {
+              text: "Image Classification",
+              link: "/developer-documentation/lumen/module/image-classification",
+            },
+          ],
+        },
+      ],
+    },
+    {
       text: "TypeDoc",
       link: "/docs/",
     },
