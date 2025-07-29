@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"server/config"
 	"server/internal/models"
+	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/repository/gorm_repo"
 	"server/internal/service"
@@ -57,6 +58,7 @@ func main() {
 	// 构建数据库通道
 	assetRepo := gorm_repo.NewAssetRepository(database)
 	tagRepo := gorm_repo.NewTagRepository(database)
+	embedRepo := gorm_repo.NewEmbedRepository(database)
 
 	// Load storage configuration
 	storageConfig := storage.LoadStorageConfigFromEnv()
@@ -70,7 +72,10 @@ func main() {
 	}
 
 	// Initialize asset service
-	assetService := service.NewAssetService(assetRepo, tagRepo, storageService)
+	assetService, err := service.NewAssetService(assetRepo, tagRepo, embedRepo, storageService)
+	if err != nil {
+		log.Fatalf("Failed to initialize asset service: %v", err)
+	}
 
 	log.Printf("Connecting to ML service at: %s", appConfig.MLServiceAddr)
 
@@ -81,7 +86,7 @@ func main() {
 
 	// Initialize asset processor
 	// 该实例只能，也只应该在worker端创建
-	assetProcessor := utils.NewAssetProcessor(assetService, storageService, storageConfig.BasePath, mlService)
+	assetProcessor := processors.NewAssetProcessor(assetService, mlService)
 
 	// Initialize task queue
 	log.Printf("Using queue directory: %s", appConfig.QueueDir)
@@ -130,7 +135,7 @@ func main() {
 // processTasksLoop continuously processes tasks from the queue
 // processTasksLoop 接收一个 workerID 用于日志记录
 func processTasksLoop(workerID int, taskQueue *queue.TaskQueue, assetService service.AssetService,
-	assetProcessor *utils.AssetProcessor, storagePath string, stopChan chan struct{}) {
+	assetProcessor *processors.AssetProcessor, storagePath string, stopChan chan struct{}) {
 
 	log.Printf("[Worker %d] Started, waiting for tasks...", workerID)
 
@@ -184,19 +189,29 @@ func processTasksLoop(workerID int, taskQueue *queue.TaskQueue, assetService ser
 				var asset *models.Asset
 				var err error
 
+				// 1. 先处理资源
+				ctx := context.Background() // 或者从外部传入的 ctx
+				asset, err = assetProcessor.ProcessAsset(ctx, task)
+
+				// 2. 处理完成后，无论成功或失败都尝试删除 staging 文件
 				if strings.Contains(task.StagedPath, "staging") || strings.Contains(task.StagedPath, "temp") {
-					asset, err = assetProcessor.ProcessNewAsset(task.StagedPath, task.UserID, task.FileName)
-				} else {
-					asset, err = assetProcessor.ProcessExistingAsset(task.StagedPath, task.UserID, task.FileName)
+					if rmErr := os.Remove(task.StagedPath); rmErr != nil {
+						log.Printf("[Worker %d][%s] warning: failed to remove staged file %s: %v",
+							workerID, task.TaskID, task.StagedPath, rmErr)
+					} else {
+						log.Printf("[Worker %d][%s] staging file removed: %s",
+							workerID, task.TaskID, task.StagedPath)
+					}
 				}
 
+				// 3. 根据 ProcessAsset 的结果继续后续流程
 				if err != nil {
 					log.Printf("[Worker %d][%s] PROCESS failed: %v", workerID, task.TaskID, err)
-					// 即使失败也要标记为完成，防止无限重试
+					// 标记失败也要完成，避免无限重试
 					if errMark := taskQueue.MarkTaskComplete(task.TaskID); errMark != nil {
 						log.Printf("[Worker %d][%s] Mark FAILED PROCESS complete failed: %v", workerID, task.TaskID, errMark)
 					}
-					break // 结束当前任务的处理
+					break
 				}
 
 				idxTask := task
