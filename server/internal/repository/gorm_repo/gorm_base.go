@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 	"log"
 	"server/config"
+	"server/internal/models"
 	"time"
 )
 
@@ -30,7 +31,6 @@ func InitDB(cfg config.DatabaseConfig) *gorm.DB {
 		if err == nil {
 			var sqlDB *sql.DB
 			sqlDB, err = db.DB() // Try to get the underlying sql.DB object
-
 			if err == nil {
 				err = sqlDB.Ping() // Try to ping the database
 			}
@@ -40,6 +40,28 @@ func InitDB(cfg config.DatabaseConfig) *gorm.DB {
 		if err == nil {
 			log.Printf("✅ Successfully connected to database '%s'", cfg.DBName)
 			db.Exec("SET search_path TO public")
+
+			// AutoMigrate all models
+			err = db.AutoMigrate(
+				&models.Asset{},
+				&models.RefreshToken{},
+				&models.User{},
+				&models.Tag{},
+				&models.AssetTag{},
+				&models.Thumbnail{},
+				&models.Album{},
+				&models.AlbumAsset{},
+			)
+			if err != nil {
+				log.Fatalf("❌ Failed to auto migrate database: %v", err)
+			}
+
+			// Create necessary extensions and indexes
+			db.Exec("CREATE EXTENSION IF NOT EXISTS vector;")
+			db.Exec(`CREATE INDEX IF NOT EXISTS assets_hnsw_idx
+             ON assets USING hnsw (embedding vector_l2_ops)
+             WITH (m = 16, ef_construction = 200)`)
+
 			return db // Success! Return the connection.
 		}
 

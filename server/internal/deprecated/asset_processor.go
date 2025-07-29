@@ -1,4 +1,4 @@
-package utils
+package deprecated
 
 import (
 	"bytes"
@@ -65,8 +65,6 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, asset *models.Asset)
 		return ap.processVideo(ctx, asset)
 	case models.AssetTypeAudio:
 		return ap.processAudio(ctx, asset)
-	case models.AssetTypeDocument:
-		return ap.processDocument(ctx, asset)
 	default:
 		return fmt.Errorf("unsupported asset type: %s", asset.Type)
 	}
@@ -171,7 +169,7 @@ func (ap *AssetProcessor) ProcessExistingAsset(filePath string, userID string, f
 	}
 
 	// Save to database
-	if err := ap.assetService.CreateAssetRecord(ctx, asset); err != nil {
+	if _, err := ap.assetService.CreateAssetRecord(ctx, asset); err != nil {
 		return nil, fmt.Errorf("failed to create asset record: %w", err)
 	}
 
@@ -210,8 +208,6 @@ func determineAssetType(fileName string) models.AssetType {
 		return models.AssetTypeVideo
 	case ".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a":
 		return models.AssetTypeAudio
-	case ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv":
-		return models.AssetTypeDocument
 	default:
 		return models.AssetTypePhoto // Default to photo if unknown
 	}
@@ -224,6 +220,7 @@ func (ap *AssetProcessor) processPhoto(ctx context.Context, asset *models.Asset)
 	if err != nil {
 		return fmt.Errorf("failed to extract asset metadata: %w", err)
 	}
+
 	if err := asset.SetPhotoMetadata(&metadata); err != nil {
 		return fmt.Errorf("failed to set photo metadata: %w", err)
 	}
@@ -547,7 +544,7 @@ func (ap *AssetProcessor) generateAndSaveThumbnails(ctx context.Context, asset *
 
 	// Defensive check to prevent panic if storage is not initialized
 	if ap.storage == nil {
-		return fmt.Errorf("storage service is not initialized in AssetProcessor")
+		return fmt.Errorf(`storage service is not initialized in AssetProcessor`)
 	}
 
 	// Get full path to original image

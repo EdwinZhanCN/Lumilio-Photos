@@ -46,41 +46,36 @@ type AssetService interface {
 	// SaveAssetIndex completes the INDEX step for a processed asset
 	SaveAssetIndex(ctx context.Context, taskID string, hash string) error
 	// CreateAssetRecord creates a new asset record in the database without file upload
-	CreateAssetRecord(ctx context.Context, asset *models.Asset) error
+	CreateAssetRecord(ctx context.Context, asset *models.Asset) (*models.Asset, error)
 
 	GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*models.Tag, error)
 	GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error)
 	GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*models.Thumbnail, error)
+	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, contentType string) (string, error)
+	SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *models.Asset, size string) error
+	SaveNewEmbedding(ctx context.Context, assetID uuid.UUID, embedding []float32) error
 }
 
 type assetService struct {
-	repo    repository.AssetRepository
-	tagRepo repository.TagRepository
-	storage storage.Storage
+	repo      repository.AssetRepository
+	tagRepo   repository.TagRepository
+	embedRepo repository.EmbeddingRepository
+	storage   storage.Storage
 }
 
-// NewAssetService creates a new instance of AssetService
-func NewAssetService(r repository.AssetRepository, tagR repository.TagRepository, s storage.Storage) AssetService {
+// NewAssetService creates a new instance of AssetService with storage configuration
+func NewAssetService(r repository.AssetRepository, tagR repository.TagRepository, e repository.EmbeddingRepository, s storage.Storage) (AssetService, error) {
 	return &assetService{
-		repo:    r,
-		tagRepo: tagR,
-		storage: s,
-	}
-}
-
-// NewAssetServiceWithConfig creates a new instance of AssetService with storage configuration
-func NewAssetServiceWithConfig(r repository.AssetRepository, tagR repository.TagRepository, storageConfig storage.StorageConfig) (AssetService, error) {
-	s, err := storage.NewStorageWithConfig(storageConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage: %w", err)
-	}
-
-	return &assetService{
-		repo:    r,
-		tagRepo: tagR,
-		storage: s,
+		repo:      r,
+		tagRepo:   tagR,
+		storage:   s,
+		embedRepo: e,
 	}, nil
 }
+
+// ================================
+// Asset CRUD Operations
+// ================================
 
 // UploadAsset handles the asset upload process with automatic type detection
 func (s *assetService) UploadAsset(ctx context.Context, file io.Reader, filename string, fileSize int64, ownerID *int) (*models.Asset, error) {
@@ -148,6 +143,25 @@ func (s *assetService) UploadAsset(ctx context.Context, file io.Reader, filename
 	return asset, nil
 }
 
+// BatchUploadAssets handles multiple asset uploads
+func (s *assetService) BatchUploadAssets(ctx context.Context, files []io.Reader, filenames []string, fileSizes []int64, ownerID *int) ([]*models.Asset, []error) {
+	assets := make([]*models.Asset, len(files))
+	errors := make([]error, len(files))
+
+	for i := range files {
+		asset, err := s.UploadAsset(ctx, files[i], filenames[i], fileSizes[i], ownerID)
+		assets[i] = asset
+		errors[i] = err
+	}
+
+	return assets, errors
+}
+
+// CreateAssetRecord creates a new asset record in the database
+func (s *assetService) CreateAssetRecord(ctx context.Context, asset *models.Asset) (*models.Asset, error) {
+	return asset, s.repo.CreateAsset(ctx, asset)
+}
+
 // GetAsset retrieves an asset by its ID
 func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*models.Asset, error) {
 	return s.repo.GetByID(ctx, id)
@@ -167,6 +181,21 @@ func (s *assetService) GetAssetsByOwner(ctx context.Context, ownerID int, limit,
 	return s.repo.GetByOwner(ctx, ownerID, limit, offset)
 }
 
+// SearchAssets searches for assets by query and type
+func (s *assetService) SearchAssets(ctx context.Context, query string, assetType *models.AssetType, limit, offset int) ([]*models.Asset, error) {
+	return s.repo.SearchAssets(ctx, query, assetType, limit, offset)
+}
+
+// DetectDuplicates finds assets with the same hash
+func (s *assetService) DetectDuplicates(ctx context.Context, hash string) ([]*models.Asset, error) {
+	return s.repo.GetAssetsByHash(ctx, hash)
+}
+
+// UpdateAssetMetadata updates the specific metadata of an asset
+func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata models.SpecificMetadata) error {
+	return s.repo.UpdateAssetMetadata(ctx, id, metadata)
+}
+
 // DeleteAsset marks an asset as deleted
 func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 	asset, err := s.repo.GetByID(ctx, id)
@@ -175,11 +204,6 @@ func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 	}
 
 	return s.repo.DeleteAsset(ctx, asset.AssetID)
-}
-
-// UpdateAssetMetadata updates the specific metadata of an asset
-func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata models.SpecificMetadata) error {
-	return s.repo.UpdateAssetMetadata(ctx, id, metadata)
 }
 
 // AddAssetToAlbum adds an asset to an album
@@ -202,13 +226,60 @@ func (s *assetService) RemoveTagFromAsset(ctx context.Context, assetID uuid.UUID
 	return s.repo.RemoveTagFromAsset(ctx, assetID, tagID)
 }
 
+// SaveAssetIndex implements the INDEX step: verify asset exists by hash and complete indexing
+func (s *assetService) SaveAssetIndex(ctx context.Context, taskID string, hash string) error {
+	assets, err := s.repo.GetAssetsByHash(ctx, hash)
+	if err != nil {
+		return fmt.Errorf("failed to query asset by hash: %w", err)
+	}
+	if len(assets) == 0 {
+		return fmt.Errorf("no asset found for hash %s", hash)
+	}
+
+	// Get the asset for indexing
+	asset := assets[0]
+
+	// Update asset metadata to mark it as indexed
+	if asset.SpecificMetadata == nil {
+		asset.SpecificMetadata = make(models.SpecificMetadata)
+	}
+
+	// Add indexing completion metadata
+	asset.SpecificMetadata["indexed"] = true
+	asset.SpecificMetadata["index_task_id"] = taskID
+	asset.SpecificMetadata["index_completed_at"] = time.Now().Format(time.RFC3339)
+
+	// Update the asset in the database
+	if err := s.repo.UpdateAsset(ctx, asset); err != nil {
+		return fmt.Errorf("failed to update asset indexing status: %w", err)
+	}
+
+	log.Printf("Asset indexing completed for hash %s, task %s", hash, taskID)
+	return nil
+}
+
+// SaveNewAsset save the asset to storage, returns asset's storage path and error
+func (s *assetService) SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, contentType string) (string, error) {
+	storagePath, err := s.storage.UploadWithMetadata(ctx, fileReader, filename, contentType)
+
+	if err != nil {
+		return "", err
+	}
+
+	return storagePath, nil
+}
+
+// ================================
+// Thumbnail CRUD Operations
+// ================================
+
 // CreateThumbnail creates a new thumbnail for an asset
 func (s *assetService) CreateThumbnail(ctx context.Context, assetID uuid.UUID, size string, thumbnailPath string) (*models.Thumbnail, error) {
 	thumbnail := &models.Thumbnail{
 		AssetID:     assetID,
 		Size:        size,
 		StoragePath: thumbnailPath,
-		MimeType:    "image/jpeg", // Thumbnails are typically JPEG
+		MimeType:    "image/webp", // Thumbnails are typically JPEG
 		CreatedAt:   time.Now(),
 	}
 
@@ -216,32 +287,63 @@ func (s *assetService) CreateThumbnail(ctx context.Context, assetID uuid.UUID, s
 	return thumbnail, err
 }
 
-// BatchUploadAssets handles multiple asset uploads
-func (s *assetService) BatchUploadAssets(ctx context.Context, files []io.Reader, filenames []string, fileSizes []int64, ownerID *int) ([]*models.Asset, []error) {
-	assets := make([]*models.Asset, len(files))
-	errors := make([]error, len(files))
+// GetThumbnailByID retrieves thumbnails by their ID
+func (s *assetService) GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error) {
+	return s.repo.GetThumbnailByID(ctx, thumbnailID)
+}
 
-	for i := range files {
-		asset, err := s.UploadAsset(ctx, files[i], filenames[i], fileSizes[i], ownerID)
-		assets[i] = asset
-		errors[i] = err
+// GetThumbnailByAssetIDAndSize retrieves a thumbnail by asset ID and size
+func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*models.Thumbnail, error) {
+	return s.repo.GetThumbnailByAssetIDAndSize(ctx, assetID, size)
+}
+
+// SaveNewThumbnail TODO: Refine this
+func (s *assetService) SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *models.Asset, size string) error {
+	storagePath, err := s.storage.UploadWithMetadata(ctx, buffers, asset.OriginalFilename, "image/webp")
+	if err != nil {
+		return err
 	}
-
-	return assets, errors
+	if _, err := s.CreateThumbnail(ctx, asset.AssetID, size, storagePath); err != nil {
+		s.storage.Delete(ctx, storagePath)
+		return err
+	}
+	return nil
 }
 
-// SearchAssets searches for assets by query and type
-func (s *assetService) SearchAssets(ctx context.Context, query string, assetType *models.AssetType, limit, offset int) ([]*models.Asset, error) {
-	return s.repo.SearchAssets(ctx, query, assetType, limit, offset)
+// ================================
+// Embedding CRUD Operations
+// ================================
+
+func (s *assetService) SaveNewEmbedding(ctx context.Context, assetID uuid.UUID, embedding []float32) error {
+	if err := s.embedRepo.UpsertEmbedding(ctx, assetID, embedding); err != nil {
+		return err
+	}
+	return nil
 }
 
-// DetectDuplicates finds assets with the same hash
-func (s *assetService) DetectDuplicates(ctx context.Context, hash string) ([]*models.Asset, error) {
-	return s.repo.GetAssetsByHash(ctx, hash)
+// ================================
+// Helper Functions
+// ================================
+
+func (s *assetService) GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*models.Tag, error) {
+	tag, err := s.tagRepo.GetByName(ctx, name)
+	if err == nil {
+		return tag, nil
+	}
+	// Assuming gorm.ErrRecordNotFound is imported or handled at repo layer
+	tag = &models.Tag{
+		TagName:       name,
+		Category:      category,
+		IsAIGenerated: isAIGenerated,
+		Assets:        []models.Asset{},
+	}
+	if err := s.tagRepo.Create(ctx, tag); err != nil {
+		return nil, err
+	}
+	return tag, nil
 }
 
-// Private helper methods
-
+// detectAssetType detects asset type based on file extension and MIME type
 func (s *assetService) detectAssetType(filename string) (models.AssetType, error) {
 	ext := strings.ToLower(filepath.Ext(filename))
 	mimeType := s.getContentType(filename)
@@ -254,8 +356,6 @@ func (s *assetService) detectAssetType(filename string) (models.AssetType, error
 		return models.AssetTypeVideo, nil
 	case strings.HasPrefix(mimeType, "audio/"):
 		return models.AssetTypeAudio, nil
-	case strings.Contains(mimeType, "pdf") || strings.Contains(mimeType, "document"):
-		return models.AssetTypeDocument, nil
 	}
 
 	// Fallback to extension-based detection
@@ -266,8 +366,6 @@ func (s *assetService) detectAssetType(filename string) (models.AssetType, error
 		return models.AssetTypeVideo, nil
 	case ".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma":
 		return models.AssetTypeAudio, nil
-	case ".pdf", ".doc", ".docx", ".txt", ".rtf":
-		return models.AssetTypeDocument, nil
 	}
 
 	return "", ErrUnsupportedAssetType
@@ -316,69 +414,4 @@ func (s *assetService) queueProcessingTasks(ctx context.Context, asset *models.A
 	default:
 		log.Printf("No specific processing tasks for asset type %s", asset.Type)
 	}
-}
-
-func (s *assetService) GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*models.Tag, error) {
-	tag, err := s.tagRepo.GetByName(ctx, name)
-	if err == nil {
-		return tag, nil
-	}
-	// Assuming gorm.ErrRecordNotFound is imported or handled at repo layer
-	tag = &models.Tag{
-		TagName:       name,
-		Category:      category,
-		IsAIGenerated: isAIGenerated,
-		Assets:        []models.Asset{},
-	}
-	if err := s.tagRepo.Create(ctx, tag); err != nil {
-		return nil, err
-	}
-	return tag, nil
-}
-
-// SaveAssetIndex implements the INDEX step: verify asset exists by hash and complete indexing
-func (s *assetService) SaveAssetIndex(ctx context.Context, taskID string, hash string) error {
-	assets, err := s.repo.GetAssetsByHash(ctx, hash)
-	if err != nil {
-		return fmt.Errorf("failed to query asset by hash: %w", err)
-	}
-	if len(assets) == 0 {
-		return fmt.Errorf("no asset found for hash %s", hash)
-	}
-
-	// Get the asset for indexing
-	asset := assets[0]
-
-	// Update asset metadata to mark it as indexed
-	if asset.SpecificMetadata == nil {
-		asset.SpecificMetadata = make(models.SpecificMetadata)
-	}
-
-	// Add indexing completion metadata
-	asset.SpecificMetadata["indexed"] = true
-	asset.SpecificMetadata["index_task_id"] = taskID
-	asset.SpecificMetadata["index_completed_at"] = time.Now().Format(time.RFC3339)
-
-	// Update the asset in the database
-	if err := s.repo.UpdateAsset(ctx, asset); err != nil {
-		return fmt.Errorf("failed to update asset indexing status: %w", err)
-	}
-
-	log.Printf("Asset indexing completed for hash %s, task %s", hash, taskID)
-	return nil
-}
-
-// CreateAssetRecord creates a new asset record in the database
-func (s *assetService) CreateAssetRecord(ctx context.Context, asset *models.Asset) error {
-	return s.repo.CreateAsset(ctx, asset)
-}
-
-// GetThumbnailByID retrieves thumbnails by their ID
-func (s *assetService) GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error) {
-	return s.repo.GetThumbnailByID(ctx, thumbnailID)
-}
-
-// GetThumbnailByAssetIDAndSize retrieves a thumbnail by asset ID and size
-func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*models.Thumbnail, error) {
-	return s.repo.GetThumbnailByAssetIDAndSize(ctx, assetID, size)
 }

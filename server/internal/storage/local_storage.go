@@ -68,6 +68,7 @@ func (s *LocalStorage) UploadWithMetadata(ctx context.Context, file io.Reader, f
 }
 
 // saveFile is a helper method used by both Upload methods
+// TODO: Remove content type
 func (s *LocalStorage) saveFile(ctx context.Context, file io.Reader, filename string, contentType string) (string, error) {
 	var relativePath string
 	var finalFilename string

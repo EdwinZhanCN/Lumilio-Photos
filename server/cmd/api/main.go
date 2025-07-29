@@ -10,7 +10,6 @@ import (
 	"server/docs" // Import docs for swaggo
 	"server/internal/api"
 	"server/internal/api/handler"
-	"server/internal/models"
 	"server/internal/queue"
 	"server/internal/repository/gorm_repo"
 	"server/internal/service"
@@ -66,23 +65,6 @@ func main() {
 	// Connect to the database
 	database := gorm_repo.InitDB(dbConfig)
 
-	// Auto-migrate database models
-	log.Println("Running database migrations...")
-	err := database.AutoMigrate(
-		&models.RefreshToken{}, // Refresh token model
-		&models.User{},         // User model for authentication
-		&models.Asset{},        // New unified asset model
-		&models.Thumbnail{},    // Updated thumbnail model
-		&models.Tag{},
-		&models.Album{},
-		&models.AssetTag{}, // Join table for assets and tags with metadata
-	)
-
-	if err != nil {
-		log.Fatalf("Failed to run database migrations: %v", err)
-	}
-	log.Println("Database migrations completed successfully")
-
 	// Defer closing the database connection
 	sqlDB, err := database.DB()
 	if err != nil {
@@ -100,6 +82,7 @@ func main() {
 	assetRepo := gorm_repo.NewAssetRepository(database)
 	tagRepo := gorm_repo.NewTagRepository(database)
 	userRepo := gorm_repo.NewUserRepository(database)
+	embedRepo := gorm_repo.NewEmbedRepository(database)
 	refreshTokenRepo := gorm_repo.NewRefreshTokenRepository(database)
 
 	// Storage will be initialized through AssetService with configuration
@@ -132,9 +115,13 @@ func main() {
 	log.Printf("💾 Storage path: %s", storageConfig.BasePath)
 	log.Printf("💾 Preserve filenames: %t", storageConfig.Options.PreserveOriginalFilename)
 	log.Printf("💾 Duplicate handling: %s", storageConfig.Options.HandleDuplicateFilenames)
+	s, err := storage.NewStorageWithConfig(storageConfig)
+	if err != nil {
+		log.Fatalf("Failed to initialize storage: %v", err)
+	}
 
 	// Initialize services, service layer inside the api layer only responsible for non-upload logic
-	assetService, err := service.NewAssetServiceWithConfig(assetRepo, tagRepo, storageConfig)
+	assetService, err := service.NewAssetService(assetRepo, tagRepo, embedRepo, s)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}

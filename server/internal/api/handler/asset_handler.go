@@ -181,6 +181,145 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	api.Success(c.Writer, response)
 }
 
+// BatchUploadAssets handles multiple asset uploads
+// @Summary Batch upload assets
+// @Description Batch uploads multiple assets using a multipart/form-data request. The field name for each file part must be its BLAKE3 content hash.
+// @Tags assets
+// @Accept multipart/form-data
+// @Produce json
+// @Success 200 {object} api.Result{data=BatchUploadResponse} "Batch upload completed"
+// @Failure 400 {object} api.Result "Bad request - no files provided or parse error"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/batch [post]
+func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
+	err := c.Request.ParseMultipartForm(128 << 20) // 128MB max for batch
+	if err != nil {
+		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Failed to parse form")
+		return
+	}
+
+	form := c.Request.MultipartForm
+	if form == nil || len(form.File) == 0 {
+		api.Error(c.Writer, http.StatusBadRequest, errors.New("no files provided"), http.StatusBadRequest, "No files provided")
+		return
+	}
+
+	userID := c.GetString("user_id")
+	if userID == "" {
+		userID = "anonymous"
+	}
+
+	var results []BatchUploadResult
+
+	for clientHash, headers := range form.File {
+		if len(headers) == 0 {
+			continue
+		}
+		header := headers[0]
+
+		file, err := header.Open()
+		if err != nil {
+			errMsg := "Failed to open file: " + err.Error()
+			results = append(results, BatchUploadResult{
+				Success:     false,
+				FileName:    header.Filename,
+				ContentHash: clientHash,
+				Error:       &errMsg,
+			})
+			continue
+		}
+
+		stagingFileName := uuid.New().String()
+		fileExt := filepath.Ext(header.Filename)
+		stagingFilePath := filepath.Join(h.stagingPath, stagingFileName+fileExt)
+
+		if err := os.MkdirAll(h.stagingPath, 0755); err != nil {
+			log.Printf("Failed to create staging directory: %v", err)
+			errMsg := "Failed to create staging directory: " + err.Error()
+			results = append(results, BatchUploadResult{
+				Success:     false,
+				FileName:    header.Filename,
+				ContentHash: clientHash,
+				Error:       &errMsg,
+			})
+			file.Close()
+			continue
+		}
+
+		stagingFile, err := os.Create(stagingFilePath)
+		if err != nil {
+			log.Printf("Failed to create staging file: %v", err)
+			errMsg := "Failed to create staging file: " + err.Error()
+			results = append(results, BatchUploadResult{
+				Success:     false,
+				FileName:    header.Filename,
+				ContentHash: clientHash,
+				Error:       &errMsg,
+			})
+			file.Close()
+			continue
+		}
+
+		_, err = io.Copy(stagingFile, file)
+		stagingFile.Close()
+		file.Close()
+		if err != nil {
+			log.Printf("Failed to copy file to staging: %v", err)
+			errMsg := "Failed to copy file to staging: " + err.Error()
+			results = append(results, BatchUploadResult{
+				Success:     false,
+				FileName:    header.Filename,
+				ContentHash: clientHash,
+				Error:       &errMsg,
+			})
+			continue
+		}
+
+		task := queue.Task{
+			TaskID:      uuid.New().String(),
+			Type:        string(queue.TaskTypeUpload),
+			ClientHash:  clientHash,
+			StagedPath:  stagingFilePath,
+			UserID:      userID,
+			Timestamp:   time.Now(),
+			ContentType: header.Header.Get("Content-Type"),
+			FileName:    header.Filename,
+		}
+
+		err = h.taskQueue.EnqueueTask(task)
+		if err != nil {
+			log.Printf("Failed to enqueue task: %v", err)
+			errMsg := "Failed to enqueue task: " + err.Error()
+			results = append(results, BatchUploadResult{
+				Success:     false,
+				FileName:    header.Filename,
+				ContentHash: clientHash,
+				Error:       &errMsg,
+			})
+			continue
+		}
+
+		log.Printf("Task %s enqueued for processing file %s", task.TaskID, header.Filename)
+
+		taskID := task.TaskID
+		status := "processing"
+		size := header.Size
+		message := "File received and queued for processing"
+
+		results = append(results, BatchUploadResult{
+			Success:     true,
+			FileName:    header.Filename,
+			ContentHash: clientHash,
+			TaskID:      &taskID,
+			Status:      &status,
+			Size:        &size,
+			Message:     &message,
+		})
+	}
+
+	api.Success(c.Writer, BatchUploadResponse{Results: results})
+}
+
 // GetAsset retrieves a single asset by ID
 // @Summary Get asset by ID
 // @Description Retrieve detailed information about a specific asset with optional relationships
@@ -504,145 +643,6 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 	api.Success(c.Writer, MessageResponse{Message: "Asset deleted successfully"})
 }
 
-// BatchUploadAssets handles multiple asset uploads
-// @Summary Batch upload assets
-// @Description Batch uploads multiple assets using a multipart/form-data request. The field name for each file part must be its BLAKE3 content hash.
-// @Tags assets
-// @Accept multipart/form-data
-// @Produce json
-// @Success 200 {object} api.Result{data=BatchUploadResponse} "Batch upload completed"
-// @Failure 400 {object} api.Result "Bad request - no files provided or parse error"
-// @Failure 500 {object} api.Result "Internal server error"
-// @Router /assets/batch [post]
-func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
-	err := c.Request.ParseMultipartForm(128 << 20) // 128MB max for batch
-	if err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Failed to parse form")
-		return
-	}
-
-	form := c.Request.MultipartForm
-	if form == nil || len(form.File) == 0 {
-		api.Error(c.Writer, http.StatusBadRequest, errors.New("no files provided"), http.StatusBadRequest, "No files provided")
-		return
-	}
-
-	userID := c.GetString("user_id")
-	if userID == "" {
-		userID = "anonymous"
-	}
-
-	var results []BatchUploadResult
-
-	for clientHash, headers := range form.File {
-		if len(headers) == 0 {
-			continue
-		}
-		header := headers[0]
-
-		file, err := header.Open()
-		if err != nil {
-			errMsg := "Failed to open file: " + err.Error()
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: clientHash,
-				Error:       &errMsg,
-			})
-			continue
-		}
-
-		stagingFileName := uuid.New().String()
-		fileExt := filepath.Ext(header.Filename)
-		stagingFilePath := filepath.Join(h.stagingPath, stagingFileName+fileExt)
-
-		if err := os.MkdirAll(h.stagingPath, 0755); err != nil {
-			log.Printf("Failed to create staging directory: %v", err)
-			errMsg := "Failed to create staging directory: " + err.Error()
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: clientHash,
-				Error:       &errMsg,
-			})
-			file.Close()
-			continue
-		}
-
-		stagingFile, err := os.Create(stagingFilePath)
-		if err != nil {
-			log.Printf("Failed to create staging file: %v", err)
-			errMsg := "Failed to create staging file: " + err.Error()
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: clientHash,
-				Error:       &errMsg,
-			})
-			file.Close()
-			continue
-		}
-
-		_, err = io.Copy(stagingFile, file)
-		stagingFile.Close()
-		file.Close()
-		if err != nil {
-			log.Printf("Failed to copy file to staging: %v", err)
-			errMsg := "Failed to copy file to staging: " + err.Error()
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: clientHash,
-				Error:       &errMsg,
-			})
-			continue
-		}
-
-		task := queue.Task{
-			TaskID:      uuid.New().String(),
-			Type:        string(queue.TaskTypeUpload),
-			ClientHash:  clientHash,
-			StagedPath:  stagingFilePath,
-			UserID:      userID,
-			Timestamp:   time.Now(),
-			ContentType: header.Header.Get("Content-Type"),
-			FileName:    header.Filename,
-		}
-
-		err = h.taskQueue.EnqueueTask(task)
-		if err != nil {
-			log.Printf("Failed to enqueue task: %v", err)
-			errMsg := "Failed to enqueue task: " + err.Error()
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: clientHash,
-				Error:       &errMsg,
-			})
-			continue
-		}
-
-		log.Printf("Task %s enqueued for processing file %s", task.TaskID, header.Filename)
-
-		taskID := task.TaskID
-		status := "processing"
-		size := header.Size
-		message := "File received and queued for processing"
-
-		results = append(results, BatchUploadResult{
-			Success:     true,
-			FileName:    header.Filename,
-			ContentHash: clientHash,
-			TaskID:      &taskID,
-			Status:      &status,
-			Size:        &size,
-			Message:     &message,
-		})
-	}
-
-	api.Success(c.Writer, BatchUploadResponse{Results: results})
-}
-
 // AddAssetToAlbum adds an asset to an album
 // @Summary Add asset to album
 // @Description Associate an asset with a specific album
@@ -691,7 +691,6 @@ func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 		models.AssetTypePhoto,
 		models.AssetTypeVideo,
 		models.AssetTypeAudio,
-		models.AssetTypeDocument,
 	}
 
 	api.Success(c.Writer, AssetTypesResponse{Types: types})
