@@ -4,4 +4,4 @@
 
 > `const` **acceptFileExtensions**: `string`[]
 
-Defined in: [utils/accept-file-extensions.ts:1](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/0cb9b6c9a2e1869ca5ea4411f957d39edc719928/web/src/utils/accept-file-extensions.ts#L1)
+Defined in: [utils/accept-file-extensions.ts:1](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/729730fd5cb8fff79935f1e81b8a78010586bf64/web/src/utils/accept-file-extensions.ts#L1)
