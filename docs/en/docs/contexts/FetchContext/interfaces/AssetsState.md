@@ -2,7 +2,7 @@
 
 # Interface: AssetsState
 
-Defined in: [contexts/FetchContext.tsx:71](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/729730fd5cb8fff79935f1e81b8a78010586bf64/web/src/contexts/FetchContext.tsx#L71)
+Defined in: [contexts/FetchContext.tsx:71](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/contexts/FetchContext.tsx#L71)
 
 **Assets State Interface**
 
@@ -37,7 +37,7 @@ function AssetCounter() {
 
 > **assets**: `Asset`[]
 
-Defined in: [contexts/FetchContext.tsx:76](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/729730fd5cb8fff79935f1e81b8a78010586bf64/web/src/contexts/FetchContext.tsx#L76)
+Defined in: [contexts/FetchContext.tsx:76](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/contexts/FetchContext.tsx#L76)
 
 Array of currently loaded assets.
 This list grows as more pages are fetched via infinite scrolling.
@@ -48,7 +48,7 @@ This list grows as more pages are fetched via infinite scrolling.
 
 > **error**: `null` \| `string`
 
-Defined in: [contexts/FetchContext.tsx:86](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/729730fd5cb8fff79935f1e81b8a78010586bf64/web/src/contexts/FetchContext.tsx#L86)
+Defined in: [contexts/FetchContext.tsx:86](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/contexts/FetchContext.tsx#L86)
 
 ***
 
@@ -56,7 +56,7 @@ Defined in: [contexts/FetchContext.tsx:86](https://github.com/EdwinZhanCN/Lumili
 
 > **filters**: `ListAssetsParams`
 
-Defined in: [contexts/FetchContext.tsx:83](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/729730fd5cb8fff79935f1e81b8a78010586bf64/web/src/contexts/FetchContext.tsx#L83)
+Defined in: [contexts/FetchContext.tsx:83](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/contexts/FetchContext.tsx#L83)
 
 Current filter and search parameters applied to the asset list.
 
@@ -70,7 +70,7 @@ ListAssetsParams for available filter options
 
 > **hasMore**: `boolean`
 
-Defined in: [contexts/FetchContext.tsx:87](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/729730fd5cb8fff79935f1e81b8a78010586bf64/web/src/contexts/FetchContext.tsx#L87)
+Defined in: [contexts/FetchContext.tsx:87](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/contexts/FetchContext.tsx#L87)
 
 ***
 
@@ -78,7 +78,7 @@ Defined in: [contexts/FetchContext.tsx:87](https://github.com/EdwinZhanCN/Lumili
 
 > **isLoading**: `boolean`
 
-Defined in: [contexts/FetchContext.tsx:84](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/729730fd5cb8fff79935f1e81b8a78010586bf64/web/src/contexts/FetchContext.tsx#L84)
+Defined in: [contexts/FetchContext.tsx:84](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/contexts/FetchContext.tsx#L84)
 
 ***
 
@@ -86,4 +86,4 @@ Defined in: [contexts/FetchContext.tsx:84](https://github.com/EdwinZhanCN/Lumili
 
 > **isLoadingNextPage**: `boolean`
 
-Defined in: [contexts/FetchContext.tsx:85](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/729730fd5cb8fff79935f1e81b8a78010586bf64/web/src/contexts/FetchContext.tsx#L85)
+Defined in: [contexts/FetchContext.tsx:85](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/contexts/FetchContext.tsx#L85)
