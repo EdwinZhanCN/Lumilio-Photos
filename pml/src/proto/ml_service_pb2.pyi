@@ -2,7 +2,8 @@ from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -147,3 +148,29 @@ class HealthCheckResponse(_message.Message):
     uptime_seconds: int
     message: str
     def __init__(self, status: _Optional[_Union[HealthCheckResponse.ServingStatus, str]] = ..., model_name: _Optional[str] = ..., model_version: _Optional[str] = ..., uptime_seconds: _Optional[int] = ..., message: _Optional[str] = ...) -> None: ...
+
+class BioAtlasResponse(_message.Message):
+    __slots__ = ("image_id", "predicted_result", "model_version", "processing_time_ms", "status", "message")
+    class Status(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        OK: _ClassVar[BioAtlasResponse.Status]
+        NOT_ANIMAL: _ClassVar[BioAtlasResponse.Status]
+        MODEL_ERROR: _ClassVar[BioAtlasResponse.Status]
+        INVALID_REQUEST: _ClassVar[BioAtlasResponse.Status]
+    OK: BioAtlasResponse.Status
+    NOT_ANIMAL: BioAtlasResponse.Status
+    MODEL_ERROR: BioAtlasResponse.Status
+    INVALID_REQUEST: BioAtlasResponse.Status
+    IMAGE_ID_FIELD_NUMBER: _ClassVar[int]
+    PREDICTED_RESULT_FIELD_NUMBER: _ClassVar[int]
+    MODEL_VERSION_FIELD_NUMBER: _ClassVar[int]
+    PROCESSING_TIME_MS_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    image_id: str
+    predicted_result: _containers.RepeatedCompositeFieldContainer[LabelScore]
+    model_version: str
+    processing_time_ms: int
+    status: BioAtlasResponse.Status
+    message: str
+    def __init__(self, image_id: _Optional[str] = ..., predicted_result: _Optional[_Iterable[_Union[LabelScore, _Mapping]]] = ..., model_version: _Optional[str] = ..., processing_time_ms: _Optional[int] = ..., status: _Optional[_Union[BioAtlasResponse.Status, str]] = ..., message: _Optional[str] = ...) -> None: ...

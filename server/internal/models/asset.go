@@ -156,15 +156,27 @@ func (a *Asset) GetVideoMetadata() (*VideoSpecificMetadata, error) {
 // PhotoSpecificMetadata represents metadata specific to photo assets
 // @Description EXIF and photo-specific metadata
 type PhotoSpecificMetadata struct {
-	TakenTime    *time.Time `json:"taken_time,omitempty" example:"2024-01-15T10:30:00Z"`
-	CameraModel  string     `json:"camera_model,omitempty" example:"Canon EOS R5"`
-	LensModel    string     `json:"lens_model,omitempty" example:"RF 24-70mm F2.8 L IS USM"`
-	ExposureTime string     `json:"exposure_time,omitempty" example:"1/250"`
-	FNumber      float32    `json:"f_number,omitempty" example:"2.8"`
-	IsoSpeed     int        `json:"iso_speed,omitempty" example:"400"`
-	GPSLatitude  float64    `json:"gps_latitude,omitempty" example:"37.7749"`
-	GPSLongitude float64    `json:"gps_longitude,omitempty" example:"-122.4194"`
-	Description  string     `json:"description,omitempty" example:"Beautiful sunset at Golden Gate Bridge"`
+	TakenTime         *time.Time          `json:"taken_time,omitempty" example:"2024-01-15T10:30:00Z"`
+	CameraModel       string              `json:"camera_model,omitempty" example:"Canon EOS R5"`
+	LensModel         string              `json:"lens_model,omitempty" example:"RF 24-70mm F2.8 L IS USM"`
+	ExposureTime      string              `json:"exposure_time,omitempty" example:"1/250"`
+	FNumber           float32             `json:"f_number,omitempty" example:"2.8"`
+	IsoSpeed          int                 `json:"iso_speed,omitempty" example:"400"`
+	GPSLatitude       float64             `json:"gps_latitude,omitempty" example:"37.7749"`
+	GPSLongitude      float64             `json:"gps_longitude,omitempty" example:"-122.4194"`
+	Description       string              `json:"description,omitempty" example:"Beautiful sunset at Golden Gate Bridge"`
+	SpeciesPrediction []SpeciesPrediction `json:"species_prediction,omitempty" example:"{\"species_id\": \"12345\", \"label\": \"bird\", \"score\": 0.95}"`
+}
+
+type SpeciesPrediction struct {
+	AssetID   uuid.UUID `gorm:"type:uuid;not null;index" json:"asset_id"`
+	SpeciesID string    `gorm:"type:varchar(64);not null" json:"species_id"`
+	Label     string    `gorm:"type:varchar(255);not null" json:"label"`
+	Score     float32   `gorm:"not null" json:"score"`
+}
+
+func (SpeciesPrediction) TableName() string {
+	return "species_predictions"
 }
 
 // VideoSpecificMetadata represents metadata specific to video assets

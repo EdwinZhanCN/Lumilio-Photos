@@ -116,15 +116,18 @@ class CLIPService:
         labels = list(request.target_labels) if request.target_labels else None
         top_k = getattr(request, "top_k", 3) or 3
 
-        scores = self.clip_model.classify_image_with_labels(
-            request.image_data, labels, top_k
-        )
-        label_scores = [
-            ml_service_pb2.LabelScore(label=lbl, similarity_score=score)
-            for lbl, score in scores
-        ]
+        label_scores = []
 
-        elapsed_ms = int((time.time() - start) * 1000)
+        if labels is not None:
+            scores = self.clip_model.classify_image_with_labels(
+                request.image_data, labels, top_k
+            )
+            label_scores = [
+                ml_service_pb2.LabelScore(label=lbl, similarity_score=score)
+                for lbl, score in scores
+            ]
+
+        elapsed_ms = int((time.time() - start))
         response = ml_service_pb2.ImageProcessResponse(
             image_id=request.image_id,
             image_feature_vector=features.tolist(),
@@ -285,6 +288,28 @@ class CLIPService:
             self.model_name = old.model_name
             self.pretrained = old.pretrained
             raise
+
+    def is_animal_like(self, image_bytes: bytes) -> bool:
+        """
+        Check if an image contains animal/bird/insect content using binary filter.
+
+        Args:
+            image_bytes: Raw image data in bytes.
+
+        Returns:
+            True if the image is classified as animal, bird, or insect; False otherwise.
+
+        Raises:
+            RuntimeError: If model is not initialized.
+        """
+        if not self.is_initialized:
+            raise RuntimeError("Model not initialized")
+
+        try:
+            return self.clip_model.is_animal_like(image_bytes)
+        except Exception as e:
+            logger.error("Animal detection error: %s", e)
+            return False
 
     def get_performance_stats(self) -> Dict[str, Any]:
         """
