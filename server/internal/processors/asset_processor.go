@@ -3,14 +3,24 @@ package processors
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"io"
 	"os"
 	"server/internal/models"
-	"server/internal/queue"
 	"server/internal/service"
 	"server/internal/utils/file"
+	"time"
+
+	"github.com/google/uuid"
 )
+
+type AssetPayload struct {
+	ClientHash  string    `json:"clientHash"`
+	StagedPath  string    `json:"stagedPath"`
+	UserID      string    `json:"userId"`
+	Timestamp   time.Time `json:"timestamp"`
+	ContentType string    `json:"contentType,omitempty"`
+	FileName    string    `json:"fileName,omitempty"`
+}
 
 // AssetProcessor handles processing tasks for different asset types
 type AssetProcessor struct {
@@ -25,8 +35,36 @@ func NewAssetProcessor(assetService service.AssetService, mlService service.MLSe
 	}
 }
 
+type Job struct {
+	AssetID   uuid.UUID
+	AssetType models.AssetType
+
+	State   JobState
+	Payload io.Reader
+
+	ErrorHistory []error
+	CurrentStep  string
+}
+
+type JobState string
+
+const (
+	StatePendingExif          JobState = "pending_exif"
+	StateProcessingExif       JobState = "processing_exif"
+	StatePendingThumb         JobState = "pending_thumbnail"
+	StateProcessingThumb      JobState = "processing_thumbnail"
+	StatePendingML            JobState = "pending_ml"
+	StateProcessingML         JobState = "processing_ml"
+	StatePendingStorage       JobState = "pending_storage"
+	StateProcessingStorage    JobState = "processing_storage"
+	StatePendingDB            JobState = "pending_db"
+	StateProcessingDBJobState JobState = "processing_db"
+	StateCompleted            JobState = "completed"
+	StateFailed               JobState = "failed"
+)
+
 // ProcessAsset processes an asset based on its type
-func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task queue.Task) (*models.Asset, error) {
+func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (*models.Asset, error) {
 	assetFile, err := os.Open(task.StagedPath)
 	info, _ := assetFile.Stat()
 	fileSize := info.Size()
