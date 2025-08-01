@@ -19,9 +19,11 @@ SRC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src")
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
+
 from utils.logging_config import setup_logging
 from proto import ml_service_pb2, ml_service_pb2_grpc
 from image_classification.clip_service import CLIPService
+from biological_atlas import BioCLIPService
 
 # Load and configure environment
 load_dotenv()
@@ -103,7 +105,9 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
         """
         Initialize and register available model services.
 
-        Currently registers a CLIPService instance.
+        Currently registers
+        - CLIPService instance.
+        - BioCLIPService instance.
         """
         try:
             clip = CLIPService(model_name="ViT-B-32", pretrained="laion2b_s34b_b79k")
@@ -112,6 +116,15 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
             logger.info("CLIP service initialized.")
         except Exception:
             logger.exception("Failed to initialize CLIP service.")
+
+        try:
+            # Default with no specific model name needed
+            bioclip = BioCLIPService()
+            bioclip.initialize()
+            self.model_registry.register_service("bioclip", bioclip)
+            logger.info("BioCLIP service initialized.")
+        except Exception:
+            logger.exception("Failed to initialize BioCLIP service.")
 
     def ProcessImageForCLIP(self, request, context):
         """
@@ -160,6 +173,88 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details("Internal server error")
             return ml_service_pb2.TextEmbeddingResponse()
+
+    def ProcessImageForBioCLIP(self, request, context):
+        """
+        Handle image processing requests for BioCLIP.
+
+        Args:
+            request: Protobuf request containing raw image bytes.
+            context: gRPC context for status and metadata.
+
+        Returns:
+            ImageProcessResponse with processed image features.
+        """
+        service = self.model_registry.get_service("bioclip")
+        if not service:
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details("BioCLIP service not available")
+            return ml_service_pb2.ImageProcessResponse()
+        try:
+            return service.process_image(request, context)
+        except Exception:
+            logger.exception("Error in ProcessImageForBioCLIP")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Internal server error")
+            return ml_service_pb2.ImageProcessResponse()
+
+    def GetTextEmbeddingForBioCLIP(self, request, context):
+        """
+        Handle text embedding requests for BioCLIP.
+
+        Args:
+            request: Protobuf request containing text input.
+            context: gRPC context for status and metadata.
+
+        Returns:
+            TextEmbeddingResponse with embedding vector.
+        """
+        service = self.model_registry.get_service("bioclip")
+        if not service:
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details("BioCLIP service not available")
+            return ml_service_pb2.TextEmbeddingResponse()
+        try:
+            return service.get_text_embedding(request, context)
+        except Exception:
+            logger.exception("Error in GetTextEmbeddingForBioCLIP")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Internal server error")
+            return ml_service_pb2.TextEmbeddingResponse()
+
+    def GetSpeciesForBioAtlas(self, request, context):
+        clip_service = self.model_registry.get_service("clip")
+        bioclip_service = self.model_registry.get_service("bioclip")
+        logger.debug("GetSpeciesForBioAtlas called (image_id=%s)",getattr(request, "image_id", "<no-id>"))
+        if not clip_service or not bioclip_service:
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details("BioCLIP service not available")
+            # return emprty response
+            return ml_service_pb2.BioAtlasResponse()
+        try:
+            # First try use binary tag instruction on CLIP
+            is_animal:bool = clip_service.is_animal_like(request.image_data)
+            logger.debug("is_animal_like=%s", is_animal)
+            if not is_animal:
+                logger.info("Image NOT_ANIMAL, skip BioAtlas")
+                return ml_service_pb2.BioAtlasResponse(
+                    status=ml_service_pb2.BioAtlasResponse.NOT_ANIMAL,
+                    message="Not an animal-like image"
+                )
+            resp = bioclip_service.process_image_bioatlas(request, context)
+            if resp is None:
+                logger.error("process_image_bioatlas returned None")
+                return ml_service_pb2.BioAtlasResponse(
+                    status=ml_service_pb2.BioAtlasResponse.MODEL_ERROR,
+                    message="BioAtlas service failed internally"
+                )
+            return resp
+        except Exception:
+            logger.exception("Error in GetSpeciesForBioAtlas")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("Internal server error")
+            return ml_service_pb2.BioAtlasResponse()
+
 
     def Predict(self, request, context):
         """
@@ -281,6 +376,17 @@ class PredictionServiceServicer(ml_service_pb2_grpc.PredictionServiceServicer):
                     model_version="unknown",
                     uptime_seconds=self.model_registry.get_uptime(),
                     message="CLIP service not available",
+                )
+            if name == "bioclip":
+                service = self.model_registry.get_service("bioclip")
+                if service:
+                    return service.health_check()
+                return ml_service_pb2.HealthCheckResponse(
+                    status=ml_service_pb2.HealthCheckResponse.NOT_SERVING,
+                    model_name="bioclip",
+                    model_version="unknown",
+                    uptime_seconds=self.model_registry.get_uptime(),
+                    message="BioCLIP service not available",
                 )
             return ml_service_pb2.HealthCheckResponse(
                 status=ml_service_pb2.HealthCheckResponse.UNKNOWN,

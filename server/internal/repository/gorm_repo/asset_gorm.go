@@ -2,6 +2,7 @@ package gorm_repo
 
 import (
 	"context"
+	"fmt"
 	"server/internal/models"
 	"server/internal/repository"
 
@@ -195,4 +196,23 @@ func (r *gormAssetRepo) GetAssetsByHash(ctx context.Context, hash string) ([]*mo
 		Where("hash = ? AND is_deleted = ?", hash, false).
 		Find(&assets).Error
 	return assets, err
+}
+
+func (r *gormAssetRepo) SaveBioAtlas(ctx context.Context, assetID uuid.UUID, predictions []*models.SpeciesPrediction) error {
+	if len(predictions) == 0 {
+		return fmt.Errorf("cannot save bio atlas, no predictions provided")
+	}
+
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("asset_id = ?", assetID).
+			Delete(&models.SpeciesPrediction{}).Error; err != nil {
+			return err
+		}
+
+		for i := range predictions {
+			predictions[i].AssetID = assetID
+		}
+
+		return tx.Create(&predictions).Error
+	})
 }

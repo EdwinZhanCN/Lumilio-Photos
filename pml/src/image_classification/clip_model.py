@@ -64,6 +64,17 @@ class CLIPModelManager:
         self.imagenet_labels: Optional[Dict[int, Dict[str, str]]] = None
         self.text_descriptions: Optional[List[str]] = None
 
+        # Scene classification prompts and embeddings
+        self.scene_prompts = [
+            "a photo of an animal",      # all fauna
+            "a photo of a bird",         # Aves
+            "a photo of an insect",      # Insecta / Arthropoda
+            "a photo of a human-made object",
+            "a photo of a landscape",
+            "an abstract painting"
+        ]
+        self.scene_prompt_embeddings: Optional[torch.Tensor] = None
+
         self.model_name = model_name
         self.pretrained = pretrained
         self.imagenet_classes_path = imagenet_classes_path
@@ -106,6 +117,9 @@ class CLIPModelManager:
         self.preprocess = preprocess
         self.tokenizer = tokenizer
 
+        # Initialize scene classification embeddings
+        self._initialize_scene_embeddings()
+
         self._log_model_info()
 
     def _setup_device(self) -> None:
@@ -133,34 +147,72 @@ class CLIPModelManager:
         logger.info("Model %s: total_params=%d, trainable_params=%d",
                     self.model_name, total_params, trainable)
 
-    def _load_imagenet_classes(self) -> None:
+    def _initialize_scene_embeddings(self) -> None:
+        """
+        Internal: Initialize embeddings for scene classification prompts.
+        """
+        if self.model is None or self.tokenizer is None or self.device is None:
+            logger.warning("Cannot initialize scene embeddings: model components not ready")
+            return
+
+        try:
+            with torch.no_grad():
+                tokens = self.tokenizer(self.scene_prompts).to(self.device)
+                embeddings = self.model.encode_text(tokens)
+                # Normalize embeddings
+                embeddings = embeddings / embeddings.norm(dim=-1, keepdim=True)
+                self.scene_prompt_embeddings = embeddings.cpu()
+            logger.info("Initialized scene classification embeddings for %d prompts", len(self.scene_prompts))
+        except Exception as e:
+            logger.error("Failed to initialize scene embeddings: %s", e)
+            self.scene_prompt_embeddings = None
+
+
+    def _load_imagenet_classes(self):
         """
         Internal: Load ImageNet class index and build text descriptions.
 
         Looks first at a custom path, then package resources, then a fallback file.
         """
         try:
-            if self.imagenet_classes_path and os.path.exists(self.imagenet_classes_path):
-                with open(self.imagenet_classes_path, "r") as f:
-                    class_index = json.load(f)
+            if self.imagenet_classes_path:
+                # Use custom path if provided
+                logger.info(f"📖 Attempting to load ImageNet classes from custom path: {self.imagenet_classes_path}")
+                logger.debug(f"Custom ImageNet file exists: {os.path.exists(self.imagenet_classes_path)}")
+                with open(self.imagenet_classes_path) as f:
+                    imagenet_class_dict = json.load(f)
             else:
-                res = files("image_classification") / "imagenet_class_index.json"
-                with res.open("r") as f:
-                    class_index = json.load(f)
+                # Use importlib.resources to load from package
+                logger.info("📖 Loading ImageNet classes from package resources.")
+                try:
+                    package_files = files('image_classification')
+                    json_file = package_files / 'imagenet_class_index.json'
+                    with json_file.open('r') as f:
+                        imagenet_class_dict = json.load(f)
+                except Exception as resource_error:
+                    logger.warning(f"⚠️ Failed to load ImageNet classes from package resources: {resource_error}")
+                    # Fallback to relative path for development
+                    fallback_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'imagenet_class_index.json')
+                    logger.info(f"↪️ Falling back to relative path for ImageNet classes: {fallback_path}")
+                    with open(fallback_path) as f:
+                        imagenet_class_dict = json.load(f)
+
+            # Create text descriptions
+            template = 'a photo of a {}'
+            self.text_descriptions = [
+                template.format(class_info[1])
+                for class_info in imagenet_class_dict.values()
+            ]
+
+            self.imagenet_labels = {
+                int(idx): {"id": class_info[0], "en": class_info[1]}
+                for idx, class_info in imagenet_class_dict.items()
+            }
+            logger.info(f"✅ Loaded {len(self.imagenet_labels)} ImageNet classes.")
         except Exception as e:
-            logger.warning("Failed to load ImageNet classes: %s", e)
-            class_index = {}
-
-        # Build label mapping and text prompts
-        self.imagenet_labels = {
-            int(idx): {"id": info[0], "en": info[1]}
-            for idx, info in class_index.items()
-        }
-        self.text_descriptions = [
-            f"a photo of a {info[1]}" for info in self.imagenet_labels.values()
-        ]
-
-        logger.info("Loaded %d ImageNet classes", len(self.imagenet_labels))
+            logger.warning(f"⚠️ Failed to load ImageNet classes: {e}", exc_info=True)
+            self.imagenet_labels = {}
+            self.text_descriptions = []
 
     def encode_image(self, image_bytes: bytes) -> np.ndarray:
         """
@@ -207,12 +259,7 @@ class CLIPModelManager:
             features = features / features.norm(dim=-1, keepdim=True)
         return features.cpu().numpy().flatten()
 
-    def classify_image_with_labels(
-        self,
-        image_bytes: bytes,
-        target_labels: Optional[List[str]] = None,
-        top_k: int = 3
-    ) -> List[Tuple[str, float]]:
+    def classify_image_with_labels(self, image_bytes: bytes, target_labels: Optional[List[str]] = None, top_k: Optional[int] = 3) -> List[Tuple[str, float]]:
         """
         Classify an image against specified or default labels.
 
@@ -227,47 +274,85 @@ class CLIPModelManager:
         Raises:
             RuntimeError: If model is not initialized.
         """
-        if not self.is_loaded or self.model is None or self.preprocess is None:
-            raise RuntimeError("Model not initialized")
+        if not self.is_loaded:
+            raise RuntimeError("Model not initialized. Call initialize() first.")
 
-        # Prepare image feature
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        tensor = self.preprocess(image).unsqueeze(0).to(self.device)
-        with torch.no_grad():
-            img_feat = self.model.encode_image(tensor)
-            img_feat = img_feat / img_feat.norm(dim=-1, keepdim=True)
+        if not isinstance(top_k, int) or top_k <= 0:
+            top_k = 3
 
-            # Build text feature set
-            if target_labels:
-                descriptions = [f"a photo of a {lbl}" for lbl in target_labels]
-                label_map = {i: lbl for i, lbl in enumerate(target_labels)}
-            else:
-                descriptions = self.text_descriptions or []
-                label_map = {i: info["en"] for i, info in self.imagenet_labels.items()}
+        try:
+            start_time = time.time()
 
-            if not descriptions:
-                return []
+            # Get image features
+            image = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+            if self.preprocess is None or self.device is None:
+                raise RuntimeError("Model preprocessing or device not properly initialized")
+            image_tensor = self.preprocess(image).unsqueeze(0).to(self.device)
 
-            all_feats = []
-            batch_size = 100
-            for i in range(0, len(descriptions), batch_size):
-                batch = self.tokenizer(descriptions[i:i + batch_size]).to(self.device)
-                feats = self.model.encode_text(batch)
-                feats = feats / feats.norm(dim=-1, keepdim=True)
-                all_feats.append(feats)
-            text_feats = torch.cat(all_feats, dim=0)
+            with torch.no_grad():
+                # Encode image
+                if self.model is None:
+                    raise RuntimeError("Model not properly initialized")
 
-            # Compute similarity and select top_k
-            sims = (img_feat @ text_feats.T).softmax(dim=-1)
-            probs, indices = torch.topk(sims, min(top_k, sims.size(-1)), dim=-1)
-            probs = probs.cpu().numpy()[0]
-            indices = indices.cpu().numpy()[0]
+                image_features = self.model.encode_image(image_tensor)
+                image_features /= image_features.norm(dim=-1, keepdim=True)
 
-        results = []
-        for idx, p in zip(indices, probs):
-            label = label_map.get(idx, "unknown")
-            results.append((label, float(p)))
-        return results
+                # Prepare text descriptions
+                if target_labels:
+                    template = 'a photo of a {}'
+                    text_descriptions = [template.format(label) for label in target_labels]
+                    label_mapping = {i: label for i, label in enumerate(target_labels)}
+                else:
+                    text_descriptions = self.text_descriptions or []
+                    label_mapping = self.imagenet_labels or {}
+
+                if not text_descriptions:
+                    return []
+
+                # Process text in batches to avoid memory issues
+                batch_size = 100
+                all_text_features = []
+
+                for i in range(0, len(text_descriptions), batch_size):
+                    if self.tokenizer is None or self.device is None or self.model is None:
+                        raise RuntimeError("Model components not properly initialized")
+                    batch_text = self.tokenizer(text_descriptions[i:i+batch_size]).to(self.device)
+
+                    text_features = self.model.encode_text(batch_text)
+                    text_features /= text_features.norm(dim=-1, keepdim=True)
+                    all_text_features.append(text_features)
+
+                # Combine all text features
+                text_features = torch.cat(all_text_features, dim=0)
+
+                # Calculate similarities
+                similarities = (100.0 * image_features @ text_features.T).softmax(dim=-1)
+                top_probs, top_indices = torch.topk(similarities, min(top_k, len(text_descriptions)), dim=-1)
+
+                top_probs = top_probs.cpu().numpy()[0]
+                top_indices = top_indices.cpu().numpy()[0]
+
+                # Format results
+                results = []
+                for idx, prob in zip(top_indices, top_probs):
+                    if target_labels:
+                        label = label_mapping.get(idx, "unknown")
+                    else:
+                        label_info = label_mapping.get(idx, {"en": "unknown"})
+                        if isinstance(label_info, dict):
+                            label = label_info.get("en", "unknown")
+                        else:
+                            label = str(label_info)
+                    results.append((label, float(prob)))
+
+                processing_time = time.time() - start_time
+                logger.debug(f"🎨 Image classification finished in {processing_time*1000:.2f}ms.")
+
+                return results
+
+        except Exception as e:
+            logger.error(f"❌ Error in image classification: {e}", exc_info=True)
+            raise
 
     def compute_similarity(self, image_bytes: bytes, text: str) -> float:
         """
@@ -303,3 +388,63 @@ class CLIPModelManager:
             "load_time": self.load_time,
             "imagenet_class_count": len(self.imagenet_labels or {}),
         }
+
+    def classify_scene(self, img_vec: torch.Tensor) -> Tuple[str, float]:
+        """
+        Classify the scene type of an image using predefined prompts.
+
+        Args:
+            img_vec: Normalized image feature vector as a torch tensor.
+
+        Returns:
+            Tuple of (scene_label, confidence_score)
+
+        Raises:
+            RuntimeError: If scene embeddings are not initialized.
+        """
+        if self.scene_prompt_embeddings is None:
+            raise RuntimeError("Scene embeddings not initialized")
+
+        # Ensure img_vec is on CPU and has correct shape
+        if img_vec.device != torch.device('cpu'):
+            img_vec = img_vec.cpu()
+        if img_vec.dim() == 1:
+            img_vec = img_vec.unsqueeze(0)  # Add batch dimension
+
+        # Compute similarities
+        sims = (img_vec @ self.scene_prompt_embeddings.T).softmax(-1).squeeze(0)
+        idx = int(sims.argmax().item())
+
+        return self.scene_prompts[idx], float(sims[idx])
+
+    def is_animal_like(self, image_bytes: bytes) -> bool:
+        """
+        Binary filter to determine if an image contains animal/bird/insect.
+
+        Args:
+            image_bytes: Raw image data in bytes.
+
+        Returns:
+            True if the image is classified as animal, bird, or insect; False otherwise.
+
+        Raises:
+            RuntimeError: If model is not initialized.
+        """
+        if not self.is_loaded:
+            raise RuntimeError("Model not initialized")
+
+        # Get image features
+        img_features = self.encode_image(image_bytes)
+        img_tensor = torch.from_numpy(img_features).unsqueeze(0)
+
+        # Classify scene
+        scene_label, confidence = self.classify_scene(img_tensor)
+
+        # Check if it's animal-like (first 3 prompts are animal, bird, insect)
+        animal_like_scenes = self.scene_prompts[:3]
+        is_animal = scene_label in animal_like_scenes
+
+        logger.debug("Scene classification: %s (%.3f) -> Animal-like: %s",
+                    scene_label, confidence, is_animal)
+
+        return is_animal

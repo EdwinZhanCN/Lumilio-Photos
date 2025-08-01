@@ -54,6 +54,7 @@ type AssetService interface {
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, contentType string) (string, error)
 	SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *models.Asset, size string) error
 	SaveNewEmbedding(ctx context.Context, assetID uuid.UUID, embedding []float32) error
+	SaveNewBioAtlas(ctx context.Context, assetID uuid.UUID, predictions []*models.SpeciesPrediction) error
 }
 
 type assetService struct {
@@ -414,4 +415,16 @@ func (s *assetService) queueProcessingTasks(ctx context.Context, asset *models.A
 	default:
 		log.Printf("No specific processing tasks for asset type %s", asset.Type)
 	}
+}
+
+// SaveNewBioAtlas saves the species information for an asset
+func (s *assetService) SaveNewBioAtlas(ctx context.Context, assetID uuid.UUID, predictions []*models.SpeciesPrediction) error {
+	if len(predictions) == 0 {
+		return fmt.Errorf("Bad Usage: no species predictions provided")
+	}
+
+	if err := s.repo.SaveBioAtlas(ctx, assetID, predictions); err != nil {
+		return fmt.Errorf("failed to save bio atlas: %w", err)
+	}
+	return nil
 }

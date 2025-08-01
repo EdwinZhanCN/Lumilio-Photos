@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"golang.org/x/sync/errgroup"
 	"io"
 	"log"
 	"server/internal/models"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
 	pb "server/proto"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/h2non/bimg"
 )
@@ -91,21 +92,26 @@ func (ap *AssetProcessor) processPhotoAsset(
 			return fmt.Errorf("process CLIP thumbnail: %w", err)
 		}
 
-		response, err := ap.mlService.ProcessImageForCLIP(&pb.ImageProcessRequest{
+		// CLIP Request
+		embedResponse, err := ap.mlService.ProcessImageForCLIP(&pb.ImageProcessRequest{
 			ImageId:   asset.AssetID.String(),
 			ImageData: tiny,
 		})
 
 		if err != nil {
-			return err
+			return fmt.Errorf("ProcessImageForCLIP: %w", err)
 		}
 
-		if response == nil || response.ImageFeatureVector == nil {
-			return fmt.Errorf("CLIP response is nil or empty")
+		if embedResponse == nil {
+			return fmt.Errorf("CLIP response is nil")
 		}
 
-		// 保存 CLIP embedding, ImageFeatureVector []float32
-		if err := ap.assetService.SaveNewEmbedding(ctx, asset.AssetID, response.ImageFeatureVector); err != nil {
+		if embedResponse.ImageFeatureVector == nil || len(embedResponse.ImageFeatureVector) == 0 {
+			return fmt.Errorf("CLIP image feature vector is empty")
+		}
+
+		// 只有当上面的错误检查都通过后，才保存 CLIP embedding
+		if err := ap.assetService.SaveNewEmbedding(ctx, asset.AssetID, embedResponse.ImageFeatureVector); err != nil {
 			return fmt.Errorf("save CLIP embedding: %w", err)
 		}
 

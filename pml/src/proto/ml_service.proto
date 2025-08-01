@@ -5,11 +5,16 @@ package prediction;
 option go_package = "rkphoto-manager/server/proto";
 // PredictionService: 通用机器学习预测服务接口
 service PredictionService {
-    // ProcessImageForCLIP: 专为CLIP模型设计，处理图像并返回特征向量和可选标签
+    // General CLIP proto
     rpc ProcessImageForCLIP (ImageProcessRequest) returns (ImageProcessResponse);
-
-    // GetTextEmbeddingForCLIP: 专为CLIP模型设计，处理文本并返回特征向量
     rpc GetTextEmbeddingForCLIP (TextEmbeddingRequest) returns (TextEmbeddingResponse);
+
+    // BioCLIP proto
+    rpc ProcessImageForBioCLIP (ImageProcessRequest) returns (ImageProcessResponse);
+    rpc GetTextEmbeddingForBioCLIP (TextEmbeddingRequest) returns (TextEmbeddingResponse);
+
+    // Bio Atlas
+    rpc GetSpeciesForBioAtlas (ImageProcessRequest) returns (BioAtlasResponse);
 
     // Predict: 通用预测接口，可用于未来其他模型的推理（如分类、回归等）
     // 注意：这里的PredictRequest/Response可能需要根据具体模型调整
@@ -133,4 +138,24 @@ message HealthCheckResponse {
     string model_version = 3;     // 返回模型版本
     int64 uptime_seconds = 4;     // 服务运行时间
     string message = 5;           // 可选，提供更详细的状态信息
+}
+
+message BioAtlasResponse {
+  // ---- 正常成功时用到的字段 ----
+  string image_id = 1;
+  repeated LabelScore predicted_result = 3;   // Top-3 {label, prob}
+  string model_version = 4;
+  int64 processing_time_ms = 6;
+
+  // ---- 新增：结果状态 ----
+  enum Status {
+    OK              = 0;  // 成功返回物种
+    NOT_ANIMAL      = 1;  // 不是动物，BioAtlas 不适用
+    MODEL_ERROR     = 2;  // BioCLIP 内部错误
+    INVALID_REQUEST = 3;  // 图像为空、分辨率过低等
+  }
+  Status status = 7;
+
+  // （可选）供调试或前端展示的文本
+  string message = 8;
 }
