@@ -19,10 +19,6 @@ type LocalStorage struct {
 	options  StorageOptions
 }
 
-func NewLocalStorage(basePath string) (Storage, error) {
-	return NewLocalStorageWithStrategy(basePath, StorageStrategyDate)
-}
-
 func NewLocalStorageWithStrategy(basePath string, strategy StorageStrategy) (Storage, error) {
 	return NewLocalStorageWithConfig(StorageConfig{
 		BasePath: basePath,
@@ -67,8 +63,6 @@ func (s *LocalStorage) UploadWithMetadata(ctx context.Context, file io.Reader, f
 }
 
 // saveFile is a helper method used by both Upload methods
-// TODO: Remove content type
-// TODO: Remove Hash
 func (s *LocalStorage) saveFile(ctx context.Context, file io.Reader, filename string, hash string) (string, error) {
 	var relativePath string
 	var finalFilename string
@@ -191,6 +185,59 @@ func (s *LocalStorage) getUniqueFilename(relativePath, filename string) string {
 		timestamp := time.Now().Format("20060102_150405")
 		return fmt.Sprintf("%s_%s%s", base, timestamp, ext)
 	}
+}
+
+func (s *LocalStorage) CommitStagedFile(ctx context.Context, stagingPath string, originalFilename string, hash string) (string, error) {
+	var relativePath string
+	var finalFilename string
+	var err error
+
+	if s.strategy == StorageStrategyCAS {
+		relativePath, finalFilename, err = s.getCASBasedPathAndFilename(originalFilename, hash)
+		if err != nil {
+			return "", fmt.Errorf("failed to determine CAS path: %w", err)
+		}
+	} else {
+		if s.options.PreserveOriginalFilename {
+			finalFilename = originalFilename
+		} else {
+			ext := filepath.Ext(originalFilename)
+			base := strings.TrimSuffix(originalFilename, ext)
+			finalFilename = fmt.Sprintf("%s_%s%s", base, uuid.New().String()[:8], ext)
+		}
+
+		switch s.strategy {
+		case StorageStrategyDate:
+			relativePath, err = s.getDateBasedPath()
+			if err != nil {
+				return "", err
+			}
+			finalFilename = s.getUniqueFilename(relativePath, finalFilename)
+		case StorageStrategyFlat:
+			relativePath = ""
+			finalFilename = s.getUniqueFilename(relativePath, finalFilename)
+		default:
+			relativePath, err = s.getDateBasedPath()
+			if err != nil {
+				return "", err
+			}
+			finalFilename = s.getUniqueFilename(relativePath, finalFilename)
+		}
+	}
+
+	finalDirPath := filepath.Join(s.basePath, relativePath)
+
+	if err := os.MkdirAll(finalDirPath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create final directory: %w", err)
+	}
+
+	finalFullPath := filepath.Join(finalDirPath, finalFilename)
+
+	if err := os.Rename(stagingPath, finalFullPath); err != nil {
+		return "", fmt.Errorf("failed to move staged file to final destination: %w", err)
+	}
+
+	return filepath.Join(relativePath, finalFilename), nil
 }
 
 func (s *LocalStorage) Delete(ctx context.Context, path string) error {

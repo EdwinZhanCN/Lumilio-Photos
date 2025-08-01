@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"runtime"
 	"strconv"
 
 	"server/config"
@@ -153,31 +152,17 @@ func main() {
 	}
 
 	// Initialize asset processor
-	assetProcessor := processors.NewAssetProcessor(assetService, mlService)
+	assetProcessor := processors.NewAssetProcessor(assetService, mlService, s)
 
-	// Initialize task queue
-	rq := queue.NewRiverQueue[processors.AssetPayload](pgxPool)
-	var q queue.Queue[processors.AssetPayload]
-	q = rq
+	assetQueue := queue.SetupAssetQueue(ctx, pgxPool, assetProcessor)
+	clipQueue := queue.SetupCLIPQueue(ctx, pgxPool, mlService, assetService)
 
-	// Initialize worker
-	processAssetHandler := func(ctx context.Context, job queue.Job[processors.AssetPayload]) error {
-		payload := job.Payload()
-		_, err := assetProcessor.ProcessAsset(ctx, payload)
-		return err
-	}
-
-	q.RegisterWorker(queue.JobTypeProcessAsset, queue.WorkerOptions{Concurrency: runtime.NumCPU()}, processAssetHandler)
-
-	go func() {
-		log.Println("Starting queue workers...")
-		if err := q.Start(ctx); err != nil {
-			log.Printf("Queue workers stopped with error: %v", err)
-		}
-	}()
+	// 2. 启动消费者
+	go runQueue(ctx, assetQueue)
+	go runQueue(ctx, clipQueue)
 
 	// Initialize controllers - pass the staging path and task queue to the handler
-	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, q)
+	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, assetQueue)
 	authController := handler.NewAuthHandler(authService)
 
 	// Initialize Swagger docs
@@ -198,5 +183,12 @@ func main() {
 	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", appConfig.Port)
 	if err := http.ListenAndServe(":"+appConfig.Port, router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
+	}
+}
+
+func runQueue[T any](ctx context.Context, q queue.Queue[T]) {
+	log.Println("Starting queue workers...")
+	if err := q.Start(ctx); err != nil {
+		log.Printf("Queue workers stopped with error: %v", err)
 	}
 }
