@@ -29,7 +29,7 @@ type StorageFile struct {
 // Storage defines the interface for file storage services
 type Storage interface {
 	// Upload saves a file and returns its relative path
-	Upload(ctx context.Context, file io.Reader) (string, error)
+	Upload(ctx context.Context, file io.Reader, hash string) (string, error)
 
 	// UploadWithMetadata saves a file with additional metadata and returns its relative path
 	UploadWithMetadata(ctx context.Context, file io.Reader, filename string, contentType string) (string, error)

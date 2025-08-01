@@ -169,7 +169,6 @@ func main() {
 
 	q.RegisterWorker(queue.JobTypeProcessAsset, queue.WorkerOptions{Concurrency: runtime.NumCPU()}, processAssetHandler)
 
-	// --- Worker Pool 启动部分 ---
 	go func() {
 		log.Println("Starting queue workers...")
 		if err := q.Start(ctx); err != nil {

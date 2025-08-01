@@ -39,31 +39,13 @@ type Job struct {
 	AssetID   uuid.UUID
 	AssetType models.AssetType
 
-	State   JobState
+	State   string
 	Payload io.Reader
 
 	ErrorHistory []error
 	CurrentStep  string
 }
 
-type JobState string
-
-const (
-	StatePendingExif          JobState = "pending_exif"
-	StateProcessingExif       JobState = "processing_exif"
-	StatePendingThumb         JobState = "pending_thumbnail"
-	StateProcessingThumb      JobState = "processing_thumbnail"
-	StatePendingML            JobState = "pending_ml"
-	StateProcessingML         JobState = "processing_ml"
-	StatePendingStorage       JobState = "pending_storage"
-	StateProcessingStorage    JobState = "processing_storage"
-	StatePendingDB            JobState = "pending_db"
-	StateProcessingDBJobState JobState = "processing_db"
-	StateCompleted            JobState = "completed"
-	StateFailed               JobState = "failed"
-)
-
-// ProcessAsset processes an asset based on its type
 func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (*models.Asset, error) {
 	assetFile, err := os.Open(task.StagedPath)
 	info, _ := assetFile.Stat()
@@ -82,7 +64,6 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 
 	storagePath, err := ap.assetService.SaveNewAsset(ctx, assetFile, task.FileName, task.ContentType)
 
-	// 重置文件指针到开头
 	if _, err := assetFile.Seek(0, io.SeekStart); err != nil {
 		return nil, fmt.Errorf("reset file pointer: %w", err)
 	}
