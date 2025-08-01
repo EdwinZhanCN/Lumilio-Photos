@@ -32,6 +32,9 @@ const (
 
 	// JobTypeCleanup 是一个周期性任务，用于清理临时文件等维护工作。
 	JobTypeCleanup JobType = "cleanup_tasks"
+
+	// JobCLIPProcess 是一个通过gRPC与ML微服务通信并获取图片Embedding的工作。
+	JobCLIPProcess JobType = "process_clip"
 )
 
 type RetryPolicy struct {

@@ -23,7 +23,7 @@ type RiverQueue[T any] struct {
 func NewRiverQueue[T any](dbPool *pgxpool.Pool) *RiverQueue[T] {
 	return &RiverQueue[T]{
 		dbPool:       dbPool,
-		workers:      river.NewWorkers(), // 注册 Worker 时使用
+		workers:      river.NewWorkers(),
 		queueConfigs: make(map[string]river.QueueConfig),
 	}
 }
@@ -34,7 +34,7 @@ func (r *RiverQueue[T]) Enqueue(ctx context.Context, jobType string, payload T) 
 	result, err := r.client.Insert(ctx,
 		PayloadArgs[T]{Data: payload, kind: jobType},
 		nil,
-	) //  [oai_citation:5‡Go Packages](https://pkg.go.dev/github.com/riverqueue/river)
+	)
 	if err != nil {
 		return "", err
 	}
@@ -47,7 +47,7 @@ func (r *RiverQueue[T]) EnqueueIn(ctx context.Context, jobType string, payload T
 	result, err := r.client.Insert(ctx,
 		PayloadArgs[T]{Data: payload, kind: jobType},
 		opts,
-	) //  [oai_citation:6‡Go Packages](https://pkg.go.dev/github.com/riverqueue/river)
+	)
 	if err != nil {
 		return "", err
 	}
@@ -60,7 +60,7 @@ func (r *RiverQueue[T]) EnqueueTx(ctx context.Context, tx any, jobType string, p
 		tx.(pgx.Tx),
 		PayloadArgs[T]{Data: payload, kind: jobType},
 		nil,
-	) //  [oai_citation:7‡Go Packages](https://pkg.go.dev/github.com/riverqueue/river)
+	)
 	if err != nil {
 		return "", err
 	}

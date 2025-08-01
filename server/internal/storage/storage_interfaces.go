@@ -48,4 +48,6 @@ type Storage interface {
 
 	// GetURL returns a URL (or local path) for accessing the file
 	GetURL(path string) string
+
+	CommitStagedFile(ctx context.Context, stagingPath string, originalFilename string, hash string) (string, error)
 }
