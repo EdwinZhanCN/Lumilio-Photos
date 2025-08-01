@@ -84,3 +84,5 @@ web/docs/
 # Binaries
 /server/api
 /server/worker
+pml/data/bioclip/txt_emb_species.json
+*.npz

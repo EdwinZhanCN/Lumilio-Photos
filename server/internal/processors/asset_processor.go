@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"server/internal/models"
+	"server/internal/queue"
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/utils/file"
@@ -28,13 +29,15 @@ type AssetProcessor struct {
 	assetService   service.AssetService
 	mlService      service.MLService
 	storageService storage.Storage
+	clipQueue      queue.Queue[CLIPPayload]
 }
 
-func NewAssetProcessor(assetService service.AssetService, mlService service.MLService, storageService storage.Storage) *AssetProcessor {
+func NewAssetProcessor(assetService service.AssetService, mlService service.MLService, storageService storage.Storage, clipQueue queue.Queue[CLIPPayload]) *AssetProcessor {
 	return &AssetProcessor{
 		assetService:   assetService,
 		mlService:      mlService,
 		storageService: storageService,
+		clipQueue:      clipQueue,
 	}
 }
 

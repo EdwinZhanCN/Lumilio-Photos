@@ -5,18 +5,17 @@ go 1.23.0
 toolchain go1.23.3
 
 require (
-	github.com/barasher/go-exiftool v1.10.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/h2non/bimg v1.1.9
 	github.com/joho/godotenv v1.5.1
-	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/pgvector/pgvector-go v0.3.0
+	github.com/riverqueue/river v0.23.1
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.23.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.4
-	github.com/zeebo/blake3 v0.2.4
 	golang.org/x/crypto v0.39.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
@@ -27,9 +26,7 @@ require (
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/riverqueue/river v0.23.1 // indirect
 	github.com/riverqueue/river/riverdriver v0.23.1 // indirect
-	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.23.1 // indirect
 	github.com/riverqueue/river/rivershared v0.23.1 // indirect
 	github.com/riverqueue/river/rivertype v0.23.1 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
@@ -59,7 +56,7 @@ require (
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.7.5 // indirect
+	github.com/jackc/pgx/v5 v5.7.5
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
@@ -77,7 +74,6 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	golang.org/x/arch v0.8.0 // indirect
-	golang.org/x/image v0.28.0
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sync v0.15.0
 	golang.org/x/sys v0.33.0 // indirect

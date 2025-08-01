@@ -1,9 +1,10 @@
-package queue
+package queuesetup
 
 import (
 	"context"
 	"runtime"
 	"server/internal/processors"
+	"server/internal/queue"
 	"server/internal/service"
 
 	pb "server/proto"
@@ -16,14 +17,14 @@ func SetupAssetQueue(
 	ctx context.Context,
 	dbPool *pgxpool.Pool,
 	assetProcessor *processors.AssetProcessor,
-) Queue[processors.AssetPayload] {
-	q := NewRiverQueue[processors.AssetPayload](dbPool)
+) queue.Queue[processors.AssetPayload] {
+	q := queue.NewRiverQueue[processors.AssetPayload](dbPool)
 
 	// 注册 ProcessAsset handler
 	q.RegisterWorker(
-		JobTypeProcessAsset,
-		WorkerOptions{Concurrency: runtime.NumCPU()},
-		func(ctx context.Context, job Job[processors.AssetPayload]) error {
+		queue.JobTypeProcessAsset,
+		queue.WorkerOptions{Concurrency: runtime.NumCPU()},
+		func(ctx context.Context, job queue.Job[processors.AssetPayload]) error {
 			_, err := assetProcessor.ProcessAsset(ctx, job.Payload())
 			return err
 		},
@@ -38,13 +39,13 @@ func SetupCLIPQueue(
 	dbPool *pgxpool.Pool,
 	mlService service.MLService,
 	assetService service.AssetService,
-) Queue[processors.CLIPPayload] {
-	q := NewRiverQueue[processors.CLIPPayload](dbPool)
+) queue.Queue[processors.CLIPPayload] {
+	q := queue.NewRiverQueue[processors.CLIPPayload](dbPool)
 
 	q.RegisterWorker(
-		JobTypeCalcPHash,
-		WorkerOptions{Concurrency: 1},
-		func(ctx context.Context, job Job[processors.CLIPPayload]) error {
+		queue.JobCLIPProcess,
+		queue.WorkerOptions{Concurrency: 1},
+		func(ctx context.Context, job queue.Job[processors.CLIPPayload]) error {
 			payload := job.Payload()
 			resp, err := mlService.ProcessImageForCLIP(&pb.ImageProcessRequest{
 				ImageId:   payload.AssetID.String(),
@@ -53,7 +54,8 @@ func SetupCLIPQueue(
 			if err != nil {
 				return err
 			}
-			return assetService.SaveNewEmbedding(ctx, payload.AssetID, resp.ImageFeatureVector)
+			err = assetService.SaveNewEmbedding(ctx, payload.AssetID, resp.ImageFeatureVector)
+			return err
 		},
 	)
 

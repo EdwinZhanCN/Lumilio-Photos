@@ -15,6 +15,7 @@ import (
 	"server/internal/api/handler"
 	"server/internal/processors"
 	"server/internal/queue"
+	queuesetup "server/internal/queue/queue_setup"
 	"server/internal/repository/gorm_repo"
 	"server/internal/service"
 	"server/internal/storage"
@@ -132,18 +133,15 @@ func main() {
 	log.Printf("💾 Storage path: %s", storageConfig.BasePath)
 	log.Printf("💾 Preserve filenames: %t", storageConfig.Options.PreserveOriginalFilename)
 	log.Printf("💾 Duplicate handling: %s", storageConfig.Options.HandleDuplicateFilenames)
-	s, err := storage.NewStorageWithConfig(storageConfig)
+	storageService, err := storage.NewStorageWithConfig(storageConfig)
 	if err != nil {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
 
-	// Initialize services, service layer inside the api layer only responsible for non-upload logic
-	assetService, err := service.NewAssetService(assetRepo, tagRepo, embedRepo, s)
+	assetService, err := service.NewAssetService(assetRepo, tagRepo, embedRepo, storageService)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
-
-	// Initialize authentication service
 	authService := service.NewAuthService(userRepo, refreshTokenRepo)
 
 	mlService, err := service.NewMLClient(appConfig.MLServiceAddr)
@@ -151,13 +149,10 @@ func main() {
 		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
 	}
 
-	// Initialize asset processor
-	assetProcessor := processors.NewAssetProcessor(assetService, mlService, s)
+	clipQueue := queuesetup.SetupCLIPQueue(ctx, pgxPool, mlService, assetService)
+	assetProcessor := processors.NewAssetProcessor(assetService, mlService, storageService, clipQueue)
+	assetQueue := queuesetup.SetupAssetQueue(ctx, pgxPool, assetProcessor)
 
-	assetQueue := queue.SetupAssetQueue(ctx, pgxPool, assetProcessor)
-	clipQueue := queue.SetupCLIPQueue(ctx, pgxPool, mlService, assetService)
-
-	// 2. 启动消费者
 	go runQueue(ctx, assetQueue, "assetQueue")
 	go runQueue(ctx, clipQueue, "clipQueue")
 

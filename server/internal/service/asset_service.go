@@ -48,7 +48,6 @@ type AssetService interface {
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, contentType string) (string, error)
 	SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *models.Asset, size string) error
 	SaveNewEmbedding(ctx context.Context, assetID uuid.UUID, embedding []float32) error
-	SaveNewBioAtlas(ctx context.Context, assetID uuid.UUID, predictions []*models.SpeciesPrediction) error
 }
 
 type assetService struct {

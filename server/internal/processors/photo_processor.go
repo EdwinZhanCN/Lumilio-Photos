@@ -7,12 +7,13 @@ import (
 	"io"
 	"log"
 	"server/internal/models"
+	"server/internal/queue"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
-	pb "server/proto"
 
-	"golang.org/x/sync/errgroup"
+	"github.com/google/uuid"
 	"github.com/h2non/bimg"
+	"golang.org/x/sync/errgroup"
 )
 
 var thumbnailSizes = map[string][2]int{
@@ -110,29 +111,11 @@ func (ap *AssetProcessor) processPhotoAsset(
 			return fmt.Errorf("process CLIP thumbnail: %w", err)
 		}
 
-		// TODO: enqueue CLIP queue to let another CLIP woker to call CLIP Process Accrodingly
-		response, err := ap.mlService.ProcessImageForCLIP(&pb.ImageProcessRequest{
-			ImageId:   asset.AssetID.String(),
-			ImageData: tiny,
-		})
-
-		if err != nil {
-			return fmt.Errorf("ProcessImageForCLIP: %w", err)
+		payload := CLIPPayload{
+			asset.AssetID,
+			tiny,
 		}
-
-		if embedResponse == nil {
-			return fmt.Errorf("CLIP response is nil")
-		}
-
-		if embedResponse.ImageFeatureVector == nil || len(embedResponse.ImageFeatureVector) == 0 {
-			return fmt.Errorf("CLIP image feature vector is empty")
-		}
-
-		// 只有当上面的错误检查都通过后，才保存 CLIP embedding
-		if err := ap.assetService.SaveNewEmbedding(ctx, asset.AssetID, embedResponse.ImageFeatureVector); err != nil {
-			return fmt.Errorf("save CLIP embedding: %w", err)
-		}
-
+		ap.clipQueue.Enqueue(ctx, string(queue.JobCLIPProcess), payload)
 		return nil
 	})
 

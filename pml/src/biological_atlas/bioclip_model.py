@@ -23,17 +23,24 @@ class BioCLIPModelManager:
         self,
         model: str = "hf-hub:imageomics/bioclip-2",
         text_repo_id: str = "imageomics/TreeOfLife-10M",
-        names_filename: str = "embeddings/txt_emb_species.json",
-        vectors_filename: str = "text_vectors.npz",
+        remote_names_path: str = "embeddings/txt_emb_species.json",  # Path in the HF repo
         batch_size: int = 512,
     ) -> None:
         # Fixed BioCLIP2 model version
         self.model_version = "bioclip2"
         self.model_id = model
         self.text_repo_id = text_repo_id
-        self.names_filename = names_filename
-        self.vectors_filename = vectors_filename
+        self.remote_names_path = remote_names_path  # Keep track of the remote path
         self.batch_size = batch_size
+
+        # Use absolute paths based on the location of this script
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+        data_dir = os.path.join(base_dir, "data", "bioclip")
+        os.makedirs(data_dir, exist_ok=True)
+
+        # Local filenames for storing data
+        self.names_filename = os.path.join(data_dir, "txt_emb_species.json")
+        self.vectors_filename = os.path.join(data_dir, "text_vectors.npz")
 
         self.device = self._choose_device()
         self._model: torch.nn.Module | None = None
@@ -71,12 +78,30 @@ class BioCLIPModelManager:
         self._load_or_compute_text_embeddings()
 
     def _load_label_names(self) -> None:
+        """
+        Download and cache TreeOfLife-10M label names as a JSON list.
+        Ensures the local directory for the JSON exists before moving.
+        """
+        # Create parent dir if needed
+        dirpath = os.path.dirname(self.names_filename)
+        if not os.path.exists(dirpath):
+            os.makedirs(dirpath, exist_ok=True)
+
+        # Download if missing
         if not os.path.exists(self.names_filename):
-            path = hf_hub_download(
-                repo_id=self.text_repo_id,
-                filename=self.names_filename,
-            )
-            os.replace(path, self.names_filename)
+            try:
+                path = hf_hub_download(
+                    repo_id=self.text_repo_id,
+                    repo_type="dataset",
+                    filename=self.remote_names_path,  # Use the remote path for download
+                )
+                # Copy the downloaded file to our target location
+                import shutil
+                shutil.copy(path, self.names_filename)
+            except Exception as e:
+                raise RuntimeError(f"Failed to download label names: {e}")
+
+        # Load label names
         with open(self.names_filename, 'r') as f:
             self.labels = json.load(f)
 
@@ -117,6 +142,26 @@ class BioCLIPModelManager:
             feat = self._unit_normalize(self._model.encode_image(tensor))  # type: ignore[attr-defined]
         return feat.squeeze(0).cpu().numpy()
 
+    @staticmethod
+    def extract_scientific_name(label_data: Any) -> str:
+        """
+        Extract the scientific name from the complex label structure.
+
+        Args:
+            label_data: The label data from the model
+
+        Returns:
+            The scientific name as a string
+        """
+        if isinstance(label_data, list) and len(label_data) == 2 and isinstance(label_data[0], list):
+            # Format: [['Animalia', ..., 'Genus', 'species'], 'Common Name']
+            taxonomy = label_data[0]
+            if len(taxonomy) >= 2:
+                # Scientific name is genus + species (last two elements)
+                return f"{taxonomy[-2]} {taxonomy[-1]}"
+        # Fallback to string representation if we can't extract properly
+        return str(label_data)
+
     def classify_image(
         self,
         image_bytes: bytes,
@@ -129,8 +174,10 @@ class BioCLIPModelManager:
         with torch.no_grad():
             sims = (img_vec @ text_emb.T).softmax(dim=-1).squeeze(0)
             probs, idxs = sims.topk(min(top_k, sims.numel()))
-        return [(self.labels[idx], float(probs[i])) for i, idx in enumerate(idxs)]
 
+        # Extract scientific names from the label data
+        return [(self.extract_scientific_name(self.labels[idx]), float(probs[i]))
+                for i, idx in enumerate(idxs)]
     def info(self) -> Dict[str, Any]:
         """
         Return model information including fixed version, device, and load time.
