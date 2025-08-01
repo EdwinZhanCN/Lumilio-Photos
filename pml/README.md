@@ -34,6 +34,23 @@ To be compatible with different platform, we use different Dockerfile for differ
 
 ### Models Author Information
 - **open-clip-torch**: This project uses the `open-clip-torch` library for image classification.
+- **bioclip2**: This project uses the `bioclip2` library for biological_atlas.
+```
+@article{gu2025bioclip,
+      title = {{B}io{CLIP} 2: Emergent Properties from Scaling Hierarchical Contrastive Learning}, 
+      author = {Jianyang Gu and Samuel Stevens and Elizabeth G Campolongo and Matthew J Thompson and Net Zhang and Jiaman Wu and Andrei Kopanev and Zheda Mai and Alexander E. White and James Balhoff and Wasila M Dahdul and Daniel Rubenstein and Hilmar Lapp and Tanya Berger-Wolf and Wei-Lun Chao and Yu Su},
+      year = {2025},
+      eprint={2505.23883},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2505.23883},
+}
+```
+
+
+
+
+
 
 ### License
 This Project is licensed under the GPL-3.0 license. See the [LICENSE](../LICENSE) file for details.

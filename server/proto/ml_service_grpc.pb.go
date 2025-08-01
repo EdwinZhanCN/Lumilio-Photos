@@ -19,11 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PredictionService_ProcessImageForCLIP_FullMethodName     = "/prediction.PredictionService/ProcessImageForCLIP"
-	PredictionService_GetTextEmbeddingForCLIP_FullMethodName = "/prediction.PredictionService/GetTextEmbeddingForCLIP"
-	PredictionService_Predict_FullMethodName                 = "/prediction.PredictionService/Predict"
-	PredictionService_BatchPredict_FullMethodName            = "/prediction.PredictionService/BatchPredict"
-	PredictionService_HealthCheck_FullMethodName             = "/prediction.PredictionService/HealthCheck"
+	PredictionService_ProcessImageForCLIP_FullMethodName        = "/prediction.PredictionService/ProcessImageForCLIP"
+	PredictionService_GetTextEmbeddingForCLIP_FullMethodName    = "/prediction.PredictionService/GetTextEmbeddingForCLIP"
+	PredictionService_ProcessImageForBioCLIP_FullMethodName     = "/prediction.PredictionService/ProcessImageForBioCLIP"
+	PredictionService_GetTextEmbeddingForBioCLIP_FullMethodName = "/prediction.PredictionService/GetTextEmbeddingForBioCLIP"
+	PredictionService_GetSpeciesForBioAtlas_FullMethodName      = "/prediction.PredictionService/GetSpeciesForBioAtlas"
+	PredictionService_Predict_FullMethodName                    = "/prediction.PredictionService/Predict"
+	PredictionService_BatchPredict_FullMethodName               = "/prediction.PredictionService/BatchPredict"
+	PredictionService_HealthCheck_FullMethodName                = "/prediction.PredictionService/HealthCheck"
 )
 
 // PredictionServiceClient is the client API for PredictionService service.
@@ -32,10 +35,14 @@ const (
 //
 // PredictionService: 通用机器学习预测服务接口
 type PredictionServiceClient interface {
-	// ProcessImageForCLIP: 专为CLIP模型设计，处理图像并返回特征向量和可选标签
+	// General CLIP proto
 	ProcessImageForCLIP(ctx context.Context, in *ImageProcessRequest, opts ...grpc.CallOption) (*ImageProcessResponse, error)
-	// GetTextEmbeddingForCLIP: 专为CLIP模型设计，处理文本并返回特征向量
 	GetTextEmbeddingForCLIP(ctx context.Context, in *TextEmbeddingRequest, opts ...grpc.CallOption) (*TextEmbeddingResponse, error)
+	// BioCLIP proto
+	ProcessImageForBioCLIP(ctx context.Context, in *ImageProcessRequest, opts ...grpc.CallOption) (*ImageProcessResponse, error)
+	GetTextEmbeddingForBioCLIP(ctx context.Context, in *TextEmbeddingRequest, opts ...grpc.CallOption) (*TextEmbeddingResponse, error)
+	// Bio Atlas
+	GetSpeciesForBioAtlas(ctx context.Context, in *ImageProcessRequest, opts ...grpc.CallOption) (*BioAtlasResponse, error)
 	// Predict: 通用预测接口，可用于未来其他模型的推理（如分类、回归等）
 	// 注意：这里的PredictRequest/Response可能需要根据具体模型调整
 	Predict(ctx context.Context, in *PredictRequest, opts ...grpc.CallOption) (*PredictResponse, error)
@@ -67,6 +74,36 @@ func (c *predictionServiceClient) GetTextEmbeddingForCLIP(ctx context.Context, i
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(TextEmbeddingResponse)
 	err := c.cc.Invoke(ctx, PredictionService_GetTextEmbeddingForCLIP_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *predictionServiceClient) ProcessImageForBioCLIP(ctx context.Context, in *ImageProcessRequest, opts ...grpc.CallOption) (*ImageProcessResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ImageProcessResponse)
+	err := c.cc.Invoke(ctx, PredictionService_ProcessImageForBioCLIP_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *predictionServiceClient) GetTextEmbeddingForBioCLIP(ctx context.Context, in *TextEmbeddingRequest, opts ...grpc.CallOption) (*TextEmbeddingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TextEmbeddingResponse)
+	err := c.cc.Invoke(ctx, PredictionService_GetTextEmbeddingForBioCLIP_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *predictionServiceClient) GetSpeciesForBioAtlas(ctx context.Context, in *ImageProcessRequest, opts ...grpc.CallOption) (*BioAtlasResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BioAtlasResponse)
+	err := c.cc.Invoke(ctx, PredictionService_GetSpeciesForBioAtlas_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -109,10 +146,14 @@ func (c *predictionServiceClient) HealthCheck(ctx context.Context, in *HealthChe
 //
 // PredictionService: 通用机器学习预测服务接口
 type PredictionServiceServer interface {
-	// ProcessImageForCLIP: 专为CLIP模型设计，处理图像并返回特征向量和可选标签
+	// General CLIP proto
 	ProcessImageForCLIP(context.Context, *ImageProcessRequest) (*ImageProcessResponse, error)
-	// GetTextEmbeddingForCLIP: 专为CLIP模型设计，处理文本并返回特征向量
 	GetTextEmbeddingForCLIP(context.Context, *TextEmbeddingRequest) (*TextEmbeddingResponse, error)
+	// BioCLIP proto
+	ProcessImageForBioCLIP(context.Context, *ImageProcessRequest) (*ImageProcessResponse, error)
+	GetTextEmbeddingForBioCLIP(context.Context, *TextEmbeddingRequest) (*TextEmbeddingResponse, error)
+	// Bio Atlas
+	GetSpeciesForBioAtlas(context.Context, *ImageProcessRequest) (*BioAtlasResponse, error)
 	// Predict: 通用预测接口，可用于未来其他模型的推理（如分类、回归等）
 	// 注意：这里的PredictRequest/Response可能需要根据具体模型调整
 	Predict(context.Context, *PredictRequest) (*PredictResponse, error)
@@ -135,6 +176,15 @@ func (UnimplementedPredictionServiceServer) ProcessImageForCLIP(context.Context,
 }
 func (UnimplementedPredictionServiceServer) GetTextEmbeddingForCLIP(context.Context, *TextEmbeddingRequest) (*TextEmbeddingResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTextEmbeddingForCLIP not implemented")
+}
+func (UnimplementedPredictionServiceServer) ProcessImageForBioCLIP(context.Context, *ImageProcessRequest) (*ImageProcessResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ProcessImageForBioCLIP not implemented")
+}
+func (UnimplementedPredictionServiceServer) GetTextEmbeddingForBioCLIP(context.Context, *TextEmbeddingRequest) (*TextEmbeddingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTextEmbeddingForBioCLIP not implemented")
+}
+func (UnimplementedPredictionServiceServer) GetSpeciesForBioAtlas(context.Context, *ImageProcessRequest) (*BioAtlasResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSpeciesForBioAtlas not implemented")
 }
 func (UnimplementedPredictionServiceServer) Predict(context.Context, *PredictRequest) (*PredictResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Predict not implemented")
@@ -198,6 +248,60 @@ func _PredictionService_GetTextEmbeddingForCLIP_Handler(srv interface{}, ctx con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(PredictionServiceServer).GetTextEmbeddingForCLIP(ctx, req.(*TextEmbeddingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PredictionService_ProcessImageForBioCLIP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImageProcessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PredictionServiceServer).ProcessImageForBioCLIP(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PredictionService_ProcessImageForBioCLIP_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PredictionServiceServer).ProcessImageForBioCLIP(ctx, req.(*ImageProcessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PredictionService_GetTextEmbeddingForBioCLIP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TextEmbeddingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PredictionServiceServer).GetTextEmbeddingForBioCLIP(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PredictionService_GetTextEmbeddingForBioCLIP_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PredictionServiceServer).GetTextEmbeddingForBioCLIP(ctx, req.(*TextEmbeddingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PredictionService_GetSpeciesForBioAtlas_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImageProcessRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PredictionServiceServer).GetSpeciesForBioAtlas(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PredictionService_GetSpeciesForBioAtlas_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PredictionServiceServer).GetSpeciesForBioAtlas(ctx, req.(*ImageProcessRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -270,6 +374,18 @@ var PredictionService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTextEmbeddingForCLIP",
 			Handler:    _PredictionService_GetTextEmbeddingForCLIP_Handler,
+		},
+		{
+			MethodName: "ProcessImageForBioCLIP",
+			Handler:    _PredictionService_ProcessImageForBioCLIP_Handler,
+		},
+		{
+			MethodName: "GetTextEmbeddingForBioCLIP",
+			Handler:    _PredictionService_GetTextEmbeddingForBioCLIP_Handler,
+		},
+		{
+			MethodName: "GetSpeciesForBioAtlas",
+			Handler:    _PredictionService_GetSpeciesForBioAtlas_Handler,
 		},
 		{
 			MethodName: "Predict",

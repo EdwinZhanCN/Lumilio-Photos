@@ -17,6 +17,7 @@ var (
 	ErrCLIPServiceUnavailable = errors.New("CLIP service not available")
 	ErrUnknownService         = errors.New("Unknown service")
 	ErrInternal               = errors.New("Internal server error, please check PML service error log")
+	ErrNotAnimalLike          = errors.New("Not an animal‑like image (BioAtlas skipped)")
 )
 
 // handleGRPCError handles gRPC errors and returns the appropriate error message.
@@ -43,6 +44,7 @@ type MLService interface {
 	Predict(req *pb.PredictRequest) (*pb.PredictResponse, error)
 	BatchPredict(req *pb.BatchPredictRequest) (*pb.BatchPredictResponse, error)
 	HealthCheck(req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error)
+	GetSpeciesForBioAtlas(req *pb.ImageProcessRequest) (*pb.BioAtlasResponse, error)
 }
 
 type mlService struct {
@@ -50,7 +52,7 @@ type mlService struct {
 	client pb.PredictionServiceClient
 }
 
-// TODO: Change WithInsecure into WithTransportCredential()
+// NewMLClient TODO: Change WithInsecure into WithTransportCredential()
 func NewMLClient(addr string) (MLService, error) {
 	// 	creds, err := credentials.NewClientTLSFromFile("ca.pem", "")
 	// if err != nil {
@@ -71,6 +73,26 @@ func (m *mlService) ProcessImageForCLIP(req *pb.ImageProcessRequest) (*pb.ImageP
 		return nil, handleGRPCError(err)
 	}
 	return resp, nil
+}
+
+func (m *mlService) GetSpeciesForBioAtlas(req *pb.ImageProcessRequest) (*pb.BioAtlasResponse, error) {
+	resp, err := m.client.GetSpeciesForBioAtlas(context.Background(), req)
+	if err != nil {
+		return nil, handleGRPCError(err)
+	}
+
+	switch resp.GetStatus() {
+	case pb.BioAtlasResponse_OK:
+		return resp, nil
+	case pb.BioAtlasResponse_NOT_ANIMAL:
+		// No species found – still return a valid (empty) response, no error
+		return resp, nil
+	case pb.BioAtlasResponse_MODEL_ERROR:
+		return nil, ErrInternal
+	default:
+		// Any unrecognised status – treat as internal for safety
+		return nil, ErrInternal
+	}
 }
 
 func (m *mlService) GetTextEmbeddingForCLIP(req *pb.TextEmbeddingRequest) (*pb.TextEmbeddingResponse, error) {

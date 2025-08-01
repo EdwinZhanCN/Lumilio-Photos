@@ -73,6 +73,59 @@ func (HealthCheckResponse_ServingStatus) EnumDescriptor() ([]byte, []int) {
 	return file_ml_service_proto_rawDescGZIP(), []int{12, 0}
 }
 
+// ---- 新增：结果状态 ----
+type BioAtlasResponse_Status int32
+
+const (
+	BioAtlasResponse_OK              BioAtlasResponse_Status = 0 // 成功返回物种
+	BioAtlasResponse_NOT_ANIMAL      BioAtlasResponse_Status = 1 // 不是动物，BioAtlas 不适用
+	BioAtlasResponse_MODEL_ERROR     BioAtlasResponse_Status = 2 // BioCLIP 内部错误
+	BioAtlasResponse_INVALID_REQUEST BioAtlasResponse_Status = 3 // 图像为空、分辨率过低等
+)
+
+// Enum value maps for BioAtlasResponse_Status.
+var (
+	BioAtlasResponse_Status_name = map[int32]string{
+		0: "OK",
+		1: "NOT_ANIMAL",
+		2: "MODEL_ERROR",
+		3: "INVALID_REQUEST",
+	}
+	BioAtlasResponse_Status_value = map[string]int32{
+		"OK":              0,
+		"NOT_ANIMAL":      1,
+		"MODEL_ERROR":     2,
+		"INVALID_REQUEST": 3,
+	}
+)
+
+func (x BioAtlasResponse_Status) Enum() *BioAtlasResponse_Status {
+	p := new(BioAtlasResponse_Status)
+	*p = x
+	return p
+}
+
+func (x BioAtlasResponse_Status) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (BioAtlasResponse_Status) Descriptor() protoreflect.EnumDescriptor {
+	return file_ml_service_proto_enumTypes[1].Descriptor()
+}
+
+func (BioAtlasResponse_Status) Type() protoreflect.EnumType {
+	return &file_ml_service_proto_enumTypes[1]
+}
+
+func (x BioAtlasResponse_Status) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use BioAtlasResponse_Status.Descriptor instead.
+func (BioAtlasResponse_Status) EnumDescriptor() ([]byte, []int) {
+	return file_ml_service_proto_rawDescGZIP(), []int{13, 0}
+}
+
 type LabelScore struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Label           string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`                                              // 预测的标签
@@ -947,6 +1000,92 @@ func (x *HealthCheckResponse) GetMessage() string {
 	return ""
 }
 
+type BioAtlasResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// ---- 正常成功时用到的字段 ----
+	ImageId          string                  `protobuf:"bytes,1,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
+	PredictedResult  []*LabelScore           `protobuf:"bytes,3,rep,name=predicted_result,json=predictedResult,proto3" json:"predicted_result,omitempty"` // Top-3 {label, prob}
+	ModelVersion     string                  `protobuf:"bytes,4,opt,name=model_version,json=modelVersion,proto3" json:"model_version,omitempty"`
+	ProcessingTimeMs int64                   `protobuf:"varint,6,opt,name=processing_time_ms,json=processingTimeMs,proto3" json:"processing_time_ms,omitempty"`
+	Status           BioAtlasResponse_Status `protobuf:"varint,7,opt,name=status,proto3,enum=prediction.BioAtlasResponse_Status" json:"status,omitempty"`
+	// （可选）供调试或前端展示的文本
+	Message       string `protobuf:"bytes,8,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BioAtlasResponse) Reset() {
+	*x = BioAtlasResponse{}
+	mi := &file_ml_service_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BioAtlasResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BioAtlasResponse) ProtoMessage() {}
+
+func (x *BioAtlasResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ml_service_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BioAtlasResponse.ProtoReflect.Descriptor instead.
+func (*BioAtlasResponse) Descriptor() ([]byte, []int) {
+	return file_ml_service_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *BioAtlasResponse) GetImageId() string {
+	if x != nil {
+		return x.ImageId
+	}
+	return ""
+}
+
+func (x *BioAtlasResponse) GetPredictedResult() []*LabelScore {
+	if x != nil {
+		return x.PredictedResult
+	}
+	return nil
+}
+
+func (x *BioAtlasResponse) GetModelVersion() string {
+	if x != nil {
+		return x.ModelVersion
+	}
+	return ""
+}
+
+func (x *BioAtlasResponse) GetProcessingTimeMs() int64 {
+	if x != nil {
+		return x.ProcessingTimeMs
+	}
+	return 0
+}
+
+func (x *BioAtlasResponse) GetStatus() BioAtlasResponse_Status {
+	if x != nil {
+		return x.Status
+	}
+	return BioAtlasResponse_OK
+}
+
+func (x *BioAtlasResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_ml_service_proto protoreflect.FileDescriptor
 
 const file_ml_service_proto_rawDesc = "" +
@@ -1022,10 +1161,26 @@ const file_ml_service_proto_rawDesc = "" +
 	"\aUNKNOWN\x10\x00\x12\v\n" +
 	"\aSERVING\x10\x01\x12\x0f\n" +
 	"\vNOT_SERVING\x10\x02\x12\x1a\n" +
-	"\x16SERVICE_SPECIFIC_ERROR\x10\x032\xba\x03\n" +
+	"\x16SERVICE_SPECIFIC_ERROR\x10\x03\"\xe2\x02\n" +
+	"\x10BioAtlasResponse\x12\x19\n" +
+	"\bimage_id\x18\x01 \x01(\tR\aimageId\x12A\n" +
+	"\x10predicted_result\x18\x03 \x03(\v2\x16.prediction.LabelScoreR\x0fpredictedResult\x12#\n" +
+	"\rmodel_version\x18\x04 \x01(\tR\fmodelVersion\x12,\n" +
+	"\x12processing_time_ms\x18\x06 \x01(\x03R\x10processingTimeMs\x12;\n" +
+	"\x06status\x18\a \x01(\x0e2#.prediction.BioAtlasResponse.StatusR\x06status\x12\x18\n" +
+	"\amessage\x18\b \x01(\tR\amessage\"F\n" +
+	"\x06Status\x12\x06\n" +
+	"\x02OK\x10\x00\x12\x0e\n" +
+	"\n" +
+	"NOT_ANIMAL\x10\x01\x12\x0f\n" +
+	"\vMODEL_ERROR\x10\x02\x12\x13\n" +
+	"\x0fINVALID_REQUEST\x10\x032\xd2\x05\n" +
 	"\x11PredictionService\x12X\n" +
 	"\x13ProcessImageForCLIP\x12\x1f.prediction.ImageProcessRequest\x1a .prediction.ImageProcessResponse\x12^\n" +
-	"\x17GetTextEmbeddingForCLIP\x12 .prediction.TextEmbeddingRequest\x1a!.prediction.TextEmbeddingResponse\x12D\n" +
+	"\x17GetTextEmbeddingForCLIP\x12 .prediction.TextEmbeddingRequest\x1a!.prediction.TextEmbeddingResponse\x12[\n" +
+	"\x16ProcessImageForBioCLIP\x12\x1f.prediction.ImageProcessRequest\x1a .prediction.ImageProcessResponse\x12a\n" +
+	"\x1aGetTextEmbeddingForBioCLIP\x12 .prediction.TextEmbeddingRequest\x1a!.prediction.TextEmbeddingResponse\x12V\n" +
+	"\x15GetSpeciesForBioAtlas\x12\x1f.prediction.ImageProcessRequest\x1a\x1c.prediction.BioAtlasResponse\x12D\n" +
 	"\aPredict\x12\x1a.prediction.PredictRequest\x1a\x1b.prediction.PredictResponse\"\x00\x12S\n" +
 	"\fBatchPredict\x12\x1f.prediction.BatchPredictRequest\x1a .prediction.BatchPredictResponse\"\x00\x12P\n" +
 	"\vHealthCheck\x12\x1e.prediction.HealthCheckRequest\x1a\x1f.prediction.HealthCheckResponse\"\x00B\x1eZ\x1crkphoto-manager/server/protob\x06proto3"
@@ -1042,46 +1197,56 @@ func file_ml_service_proto_rawDescGZIP() []byte {
 	return file_ml_service_proto_rawDescData
 }
 
-var file_ml_service_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_ml_service_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_ml_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_ml_service_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_ml_service_proto_goTypes = []any{
 	(HealthCheckResponse_ServingStatus)(0), // 0: prediction.HealthCheckResponse.ServingStatus
-	(*LabelScore)(nil),                     // 1: prediction.LabelScore
-	(*ImageProcessRequest)(nil),            // 2: prediction.ImageProcessRequest
-	(*ImageProcessResponse)(nil),           // 3: prediction.ImageProcessResponse
-	(*TextEmbeddingRequest)(nil),           // 4: prediction.TextEmbeddingRequest
-	(*TextEmbeddingResponse)(nil),          // 5: prediction.TextEmbeddingResponse
-	(*PredictRequest)(nil),                 // 6: prediction.PredictRequest
-	(*PredictResponse)(nil),                // 7: prediction.PredictResponse
-	(*BatchPredictRequest)(nil),            // 8: prediction.BatchPredictRequest
-	(*BatchPredictResponse)(nil),           // 9: prediction.BatchPredictResponse
-	(*FloatFeatures)(nil),                  // 10: prediction.FloatFeatures
-	(*PredictionFloats)(nil),               // 11: prediction.PredictionFloats
-	(*HealthCheckRequest)(nil),             // 12: prediction.HealthCheckRequest
-	(*HealthCheckResponse)(nil),            // 13: prediction.HealthCheckResponse
+	(BioAtlasResponse_Status)(0),           // 1: prediction.BioAtlasResponse.Status
+	(*LabelScore)(nil),                     // 2: prediction.LabelScore
+	(*ImageProcessRequest)(nil),            // 3: prediction.ImageProcessRequest
+	(*ImageProcessResponse)(nil),           // 4: prediction.ImageProcessResponse
+	(*TextEmbeddingRequest)(nil),           // 5: prediction.TextEmbeddingRequest
+	(*TextEmbeddingResponse)(nil),          // 6: prediction.TextEmbeddingResponse
+	(*PredictRequest)(nil),                 // 7: prediction.PredictRequest
+	(*PredictResponse)(nil),                // 8: prediction.PredictResponse
+	(*BatchPredictRequest)(nil),            // 9: prediction.BatchPredictRequest
+	(*BatchPredictResponse)(nil),           // 10: prediction.BatchPredictResponse
+	(*FloatFeatures)(nil),                  // 11: prediction.FloatFeatures
+	(*PredictionFloats)(nil),               // 12: prediction.PredictionFloats
+	(*HealthCheckRequest)(nil),             // 13: prediction.HealthCheckRequest
+	(*HealthCheckResponse)(nil),            // 14: prediction.HealthCheckResponse
+	(*BioAtlasResponse)(nil),               // 15: prediction.BioAtlasResponse
 }
 var file_ml_service_proto_depIdxs = []int32{
-	1,  // 0: prediction.ImageProcessResponse.predicted_scores:type_name -> prediction.LabelScore
-	10, // 1: prediction.PredictRequest.float_features:type_name -> prediction.FloatFeatures
-	11, // 2: prediction.PredictResponse.prediction_floats:type_name -> prediction.PredictionFloats
-	6,  // 3: prediction.BatchPredictRequest.requests:type_name -> prediction.PredictRequest
-	7,  // 4: prediction.BatchPredictResponse.responses:type_name -> prediction.PredictResponse
+	2,  // 0: prediction.ImageProcessResponse.predicted_scores:type_name -> prediction.LabelScore
+	11, // 1: prediction.PredictRequest.float_features:type_name -> prediction.FloatFeatures
+	12, // 2: prediction.PredictResponse.prediction_floats:type_name -> prediction.PredictionFloats
+	7,  // 3: prediction.BatchPredictRequest.requests:type_name -> prediction.PredictRequest
+	8,  // 4: prediction.BatchPredictResponse.responses:type_name -> prediction.PredictResponse
 	0,  // 5: prediction.HealthCheckResponse.status:type_name -> prediction.HealthCheckResponse.ServingStatus
-	2,  // 6: prediction.PredictionService.ProcessImageForCLIP:input_type -> prediction.ImageProcessRequest
-	4,  // 7: prediction.PredictionService.GetTextEmbeddingForCLIP:input_type -> prediction.TextEmbeddingRequest
-	6,  // 8: prediction.PredictionService.Predict:input_type -> prediction.PredictRequest
-	8,  // 9: prediction.PredictionService.BatchPredict:input_type -> prediction.BatchPredictRequest
-	12, // 10: prediction.PredictionService.HealthCheck:input_type -> prediction.HealthCheckRequest
-	3,  // 11: prediction.PredictionService.ProcessImageForCLIP:output_type -> prediction.ImageProcessResponse
-	5,  // 12: prediction.PredictionService.GetTextEmbeddingForCLIP:output_type -> prediction.TextEmbeddingResponse
-	7,  // 13: prediction.PredictionService.Predict:output_type -> prediction.PredictResponse
-	9,  // 14: prediction.PredictionService.BatchPredict:output_type -> prediction.BatchPredictResponse
-	13, // 15: prediction.PredictionService.HealthCheck:output_type -> prediction.HealthCheckResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	2,  // 6: prediction.BioAtlasResponse.predicted_result:type_name -> prediction.LabelScore
+	1,  // 7: prediction.BioAtlasResponse.status:type_name -> prediction.BioAtlasResponse.Status
+	3,  // 8: prediction.PredictionService.ProcessImageForCLIP:input_type -> prediction.ImageProcessRequest
+	5,  // 9: prediction.PredictionService.GetTextEmbeddingForCLIP:input_type -> prediction.TextEmbeddingRequest
+	3,  // 10: prediction.PredictionService.ProcessImageForBioCLIP:input_type -> prediction.ImageProcessRequest
+	5,  // 11: prediction.PredictionService.GetTextEmbeddingForBioCLIP:input_type -> prediction.TextEmbeddingRequest
+	3,  // 12: prediction.PredictionService.GetSpeciesForBioAtlas:input_type -> prediction.ImageProcessRequest
+	7,  // 13: prediction.PredictionService.Predict:input_type -> prediction.PredictRequest
+	9,  // 14: prediction.PredictionService.BatchPredict:input_type -> prediction.BatchPredictRequest
+	13, // 15: prediction.PredictionService.HealthCheck:input_type -> prediction.HealthCheckRequest
+	4,  // 16: prediction.PredictionService.ProcessImageForCLIP:output_type -> prediction.ImageProcessResponse
+	6,  // 17: prediction.PredictionService.GetTextEmbeddingForCLIP:output_type -> prediction.TextEmbeddingResponse
+	4,  // 18: prediction.PredictionService.ProcessImageForBioCLIP:output_type -> prediction.ImageProcessResponse
+	6,  // 19: prediction.PredictionService.GetTextEmbeddingForBioCLIP:output_type -> prediction.TextEmbeddingResponse
+	15, // 20: prediction.PredictionService.GetSpeciesForBioAtlas:output_type -> prediction.BioAtlasResponse
+	8,  // 21: prediction.PredictionService.Predict:output_type -> prediction.PredictResponse
+	10, // 22: prediction.PredictionService.BatchPredict:output_type -> prediction.BatchPredictResponse
+	14, // 23: prediction.PredictionService.HealthCheck:output_type -> prediction.HealthCheckResponse
+	16, // [16:24] is the sub-list for method output_type
+	8,  // [8:16] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_ml_service_proto_init() }
@@ -1103,8 +1268,8 @@ func file_ml_service_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ml_service_proto_rawDesc), len(file_ml_service_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   13,
+			NumEnums:      2,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -41,6 +41,10 @@ func InitDB(cfg config.DatabaseConfig) *gorm.DB {
 			log.Printf("✅ Successfully connected to database '%s'", cfg.DBName)
 			db.Exec("SET search_path TO public")
 
+			// Create necessary extensions and indexes
+			if err := db.Exec(`CREATE EXTENSION IF NOT EXISTS vector`).Error; err != nil {
+				log.Fatalf("❌ enable pgvector: %v", err)
+			}
 			// AutoMigrate all models
 			err = db.AutoMigrate(
 				&models.Asset{},
@@ -56,8 +60,6 @@ func InitDB(cfg config.DatabaseConfig) *gorm.DB {
 				log.Fatalf("❌ Failed to auto migrate database: %v", err)
 			}
 
-			// Create necessary extensions and indexes
-			db.Exec("CREATE EXTENSION IF NOT EXISTS vector;")
 			db.Exec(`CREATE INDEX IF NOT EXISTS assets_hnsw_idx
              ON assets USING hnsw (embedding vector_l2_ops)
              WITH (m = 16, ef_construction = 200)`)

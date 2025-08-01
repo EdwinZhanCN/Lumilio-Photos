@@ -26,4 +26,5 @@ type AssetRepository interface {
 	GetAssetsByHash(ctx context.Context, hash string) ([]*models.Asset, error)
 	GetThumbnailByID(ctx context.Context, thumbnailID int) (*models.Thumbnail, error)
 	GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*models.Thumbnail, error)
+	SaveBioAtlas(ctx context.Context, assetID uuid.UUID, predictions []*models.SpeciesPrediction) error
 }
