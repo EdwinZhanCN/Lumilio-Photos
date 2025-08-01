@@ -158,8 +158,8 @@ func main() {
 	clipQueue := queue.SetupCLIPQueue(ctx, pgxPool, mlService, assetService)
 
 	// 2. 启动消费者
-	go runQueue(ctx, assetQueue)
-	go runQueue(ctx, clipQueue)
+	go runQueue(ctx, assetQueue, "assetQueue")
+	go runQueue(ctx, clipQueue, "clipQueue")
 
 	// Initialize controllers - pass the staging path and task queue to the handler
 	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, assetQueue)
@@ -186,9 +186,9 @@ func main() {
 	}
 }
 
-func runQueue[T any](ctx context.Context, q queue.Queue[T]) {
-	log.Println("Starting queue workers...")
+func runQueue[T any](ctx context.Context, q queue.Queue[T], name string) {
+	log.Printf("[%s] Starting queue workers...", name)
 	if err := q.Start(ctx); err != nil {
-		log.Printf("Queue workers stopped with error: %v", err)
+		log.Printf("[%s] Queue workers stopped with error: %v", name, err)
 	}
 }
