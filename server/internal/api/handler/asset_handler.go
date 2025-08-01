@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"server/internal/api"
 	"server/internal/models"
+	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/service"
 	"strconv"
@@ -73,16 +74,16 @@ type AssetTypesResponse struct {
 type AssetHandler struct {
 	assetService    service.AssetService
 	stagingPath     string
-	taskQueue       *queue.TaskQueue
+	processQueue    queue.Queue[processors.AssetPayload]
 	StorageBasePath string // Path where assets are stored
 }
 
 // NewAssetHandler creates a new AssetHandler instance
-func NewAssetHandler(assetService service.AssetService, stagingPath string, taskQueue *queue.TaskQueue) *AssetHandler {
+func NewAssetHandler(assetService service.AssetService, stagingPath string, processQueue queue.Queue[processors.AssetPayload]) *AssetHandler {
 	return &AssetHandler{
 		assetService:    assetService,
 		stagingPath:     stagingPath,
-		taskQueue:       taskQueue,
+		processQueue:    processQueue,
 		StorageBasePath: os.Getenv("STORAGE_PATH"),
 	}
 }
@@ -150,9 +151,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		userID = "anonymous"
 	}
 
-	task := queue.Task{
-		TaskID:      uuid.New().String(),
-		Type:        string(queue.TaskTypeUpload),
+	payload := processors.AssetPayload{
 		ClientHash:  clientHash,
 		StagedPath:  stagingFilePath,
 		UserID:      userID,
@@ -161,17 +160,12 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		FileName:    header.Filename,
 	}
 
-	err = h.taskQueue.EnqueueTask(task)
-	if err != nil {
-		log.Printf("Failed to enqueue task: %v", err)
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
-		return
-	}
+	jobId, err := h.processQueue.Enqueue(c.Request.Context(), string(queue.JobTypeProcessAsset), payload)
 
-	log.Printf("Task %s enqueued for processing file %s", task.TaskID, header.Filename)
+	log.Printf("Task %s enqueued for processing file %s", jobId, header.Filename)
 
 	response := UploadResponse{
-		TaskID:      task.TaskID,
+		TaskID:      jobId,
 		Status:      "processing",
 		FileName:    header.Filename,
 		Size:        header.Size,
@@ -275,9 +269,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			continue
 		}
 
-		task := queue.Task{
-			TaskID:      uuid.New().String(),
-			Type:        string(queue.TaskTypeUpload),
+		payload := processors.AssetPayload{
 			ClientHash:  clientHash,
 			StagedPath:  stagingFilePath,
 			UserID:      userID,
@@ -286,7 +278,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			FileName:    header.Filename,
 		}
 
-		err = h.taskQueue.EnqueueTask(task)
+		jobId, err := h.processQueue.Enqueue(c.Request.Context(), string(queue.JobTypeProcessAsset), payload)
 		if err != nil {
 			log.Printf("Failed to enqueue task: %v", err)
 			errMsg := "Failed to enqueue task: " + err.Error()
@@ -299,9 +291,9 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			continue
 		}
 
-		log.Printf("Task %s enqueued for processing file %s", task.TaskID, header.Filename)
+		log.Printf("Task %s enqueued for processing file %s", jobId, header.Filename)
 
-		taskID := task.TaskID
+		taskID := jobId
 		status := "processing"
 		size := header.Size
 		message := "File received and queued for processing"

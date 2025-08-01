@@ -11,17 +11,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/zeebo/blake3"
 )
 
 type LocalStorage struct {
 	basePath string
 	strategy StorageStrategy
 	options  StorageOptions
-}
-
-func NewLocalStorage(basePath string) (Storage, error) {
-	return NewLocalStorageWithStrategy(basePath, StorageStrategyDate)
 }
 
 func NewLocalStorageWithStrategy(basePath string, strategy StorageStrategy) (Storage, error) {
@@ -45,13 +40,13 @@ func NewLocalStorageWithConfig(config StorageConfig) (Storage, error) {
 	}, nil
 }
 
-func (s *LocalStorage) Upload(ctx context.Context, file io.Reader) (string, error) {
+func (s *LocalStorage) Upload(ctx context.Context, file io.Reader, hash string) (string, error) {
 	// Generate a unique filename using UUID and current timestamp
 	filename := fmt.Sprintf("%s_%d", uuid.New().String(), time.Now().Unix())
-	return s.saveFile(ctx, file, filename, "")
+	return s.saveFile(ctx, file, filename, hash)
 }
 
-func (s *LocalStorage) UploadWithMetadata(ctx context.Context, file io.Reader, filename string, contentType string) (string, error) {
+func (s *LocalStorage) UploadWithMetadata(ctx context.Context, file io.Reader, filename string, hash string) (string, error) {
 	var finalFilename string
 
 	if s.options.PreserveOriginalFilename {
@@ -64,25 +59,18 @@ func (s *LocalStorage) UploadWithMetadata(ctx context.Context, file io.Reader, f
 		finalFilename = fmt.Sprintf("%s_%s%s", base, uuid.New().String()[:8], ext)
 	}
 
-	return s.saveFile(ctx, file, finalFilename, contentType)
+	return s.saveFile(ctx, file, finalFilename, hash)
 }
 
 // saveFile is a helper method used by both Upload methods
-// TODO: Remove content type
-func (s *LocalStorage) saveFile(ctx context.Context, file io.Reader, filename string, contentType string) (string, error) {
+func (s *LocalStorage) saveFile(ctx context.Context, file io.Reader, filename string, hash string) (string, error) {
 	var relativePath string
 	var finalFilename string
-	var fileData []byte
 	var err error
 
 	// For CAS strategy, we need to read the file first to calculate hash
 	if s.strategy == StorageStrategyCAS {
-		fileData, err = io.ReadAll(file)
-		if err != nil {
-			return "", fmt.Errorf("failed to read file for CAS: %w", err)
-		}
-
-		relativePath, finalFilename, err = s.getCASBasedPathAndFilename(fileData, filename)
+		relativePath, finalFilename, err = s.getCASBasedPathAndFilename(hash, filename)
 		if err != nil {
 			return "", err
 		}
@@ -125,7 +113,7 @@ func (s *LocalStorage) saveFile(ctx context.Context, file io.Reader, filename st
 	// Copy the file content
 	if s.strategy == StorageStrategyCAS {
 		// Write the data we already read
-		if _, err := dst.Write(fileData); err != nil {
+		if _, err := io.Copy(dst, file); err != nil {
 			os.Remove(filePath)
 			return "", fmt.Errorf("failed to write file: %w", err)
 		}
@@ -148,16 +136,7 @@ func (s *LocalStorage) getDateBasedPath() (string, error) {
 }
 
 // getCASBasedPathAndFilename returns both directory path and filename for CAS storage
-func (s *LocalStorage) getCASBasedPathAndFilename(data []byte, originalFilename string) (string, string, error) {
-	// Calculate BLAKE3 hash
-	hasher := blake3.New()
-	hasher.Write(data)
-	hashBytes := hasher.Sum(nil)
-	hash := fmt.Sprintf("%x", hashBytes)
-
-	if len(hash) < 6 {
-		return "", "", fmt.Errorf("hash too short")
-	}
+func (s *LocalStorage) getCASBasedPathAndFilename(originalFilename string, hash string) (string, string, error) {
 
 	// Create hash-based directory structure: hash[0:2]/hash[2:4]/hash[4:6]
 	dirPath := filepath.Join(hash[0:2], hash[2:4], hash[4:6])
@@ -208,15 +187,57 @@ func (s *LocalStorage) getUniqueFilename(relativePath, filename string) string {
 	}
 }
 
-// getCASBasedPath returns a content-addressable path based on file hash (deprecated)
-func (s *LocalStorage) getCASBasedPath(file io.Reader, filename string) (string, error) {
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file for hashing: %w", err)
+func (s *LocalStorage) CommitStagedFile(ctx context.Context, stagingPath string, originalFilename string, hash string) (string, error) {
+	var relativePath string
+	var finalFilename string
+	var err error
+
+	if s.strategy == StorageStrategyCAS {
+		relativePath, finalFilename, err = s.getCASBasedPathAndFilename(originalFilename, hash)
+		if err != nil {
+			return "", fmt.Errorf("failed to determine CAS path: %w", err)
+		}
+	} else {
+		if s.options.PreserveOriginalFilename {
+			finalFilename = originalFilename
+		} else {
+			ext := filepath.Ext(originalFilename)
+			base := strings.TrimSuffix(originalFilename, ext)
+			finalFilename = fmt.Sprintf("%s_%s%s", base, uuid.New().String()[:8], ext)
+		}
+
+		switch s.strategy {
+		case StorageStrategyDate:
+			relativePath, err = s.getDateBasedPath()
+			if err != nil {
+				return "", err
+			}
+			finalFilename = s.getUniqueFilename(relativePath, finalFilename)
+		case StorageStrategyFlat:
+			relativePath = ""
+			finalFilename = s.getUniqueFilename(relativePath, finalFilename)
+		default:
+			relativePath, err = s.getDateBasedPath()
+			if err != nil {
+				return "", err
+			}
+			finalFilename = s.getUniqueFilename(relativePath, finalFilename)
+		}
 	}
 
-	dirPath, _, err := s.getCASBasedPathAndFilename(data, filename)
-	return dirPath, err
+	finalDirPath := filepath.Join(s.basePath, relativePath)
+
+	if err := os.MkdirAll(finalDirPath, 0755); err != nil {
+		return "", fmt.Errorf("failed to create final directory: %w", err)
+	}
+
+	finalFullPath := filepath.Join(finalDirPath, finalFilename)
+
+	if err := os.Rename(stagingPath, finalFullPath); err != nil {
+		return "", fmt.Errorf("failed to move staged file to final destination: %w", err)
+	}
+
+	return filepath.Join(relativePath, finalFilename), nil
 }
 
 func (s *LocalStorage) Delete(ctx context.Context, path string) error {

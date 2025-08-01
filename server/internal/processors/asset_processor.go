@@ -3,30 +3,42 @@ package processors
 import (
 	"context"
 	"fmt"
-	"github.com/google/uuid"
 	"io"
 	"os"
 	"server/internal/models"
-	"server/internal/queue"
 	"server/internal/service"
+	"server/internal/storage"
 	"server/internal/utils/file"
+	"time"
+
+	"github.com/google/uuid"
 )
+
+type AssetPayload struct {
+	ClientHash  string    `json:"clientHash"`
+	StagedPath  string    `json:"stagedPath"`
+	UserID      string    `json:"userId"`
+	Timestamp   time.Time `json:"timestamp"`
+	ContentType string    `json:"contentType,omitempty"`
+	FileName    string    `json:"fileName,omitempty"`
+}
 
 // AssetProcessor handles processing tasks for different asset types
 type AssetProcessor struct {
-	assetService service.AssetService
-	mlService    service.MLService
+	assetService   service.AssetService
+	mlService      service.MLService
+	storageService storage.Storage
 }
 
-func NewAssetProcessor(assetService service.AssetService, mlService service.MLService) *AssetProcessor {
+func NewAssetProcessor(assetService service.AssetService, mlService service.MLService, storageService storage.Storage) *AssetProcessor {
 	return &AssetProcessor{
-		assetService: assetService,
-		mlService:    mlService,
+		assetService:   assetService,
+		mlService:      mlService,
+		storageService: storageService,
 	}
 }
 
-// ProcessAsset processes an asset based on its type
-func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task queue.Task) (*models.Asset, error) {
+func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (*models.Asset, error) {
 	assetFile, err := os.Open(task.StagedPath)
 	info, _ := assetFile.Stat()
 	fileSize := info.Size()
@@ -42,9 +54,8 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task queue.Task) (*m
 
 	contentType := file.DetermineAssetType(task.ContentType)
 
-	storagePath, err := ap.assetService.SaveNewAsset(ctx, assetFile, task.FileName, task.ContentType)
+	storagePath, err := ap.storageService.CommitStagedFile(ctx, task.StagedPath, task.FileName, task.ClientHash)
 
-	// 重置文件指针到开头
 	if _, err := assetFile.Seek(0, io.SeekStart); err != nil {
 		return nil, fmt.Errorf("reset file pointer: %w", err)
 	}
@@ -78,7 +89,6 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task queue.Task) (*m
 
 	switch asset.Type {
 	case models.AssetTypePhoto:
-		// TODO: Remove Staged file
 		return asset, ap.processPhotoAsset(ctx, asset, assetFile)
 	case models.AssetTypeVideo:
 		//TODO: implement

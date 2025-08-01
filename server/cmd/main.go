@@ -1,20 +1,25 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
 	"server/internal/api"
 	"server/internal/api/handler"
+	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/repository/gorm_repo"
 	"server/internal/service"
 	"server/internal/storage"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -52,8 +57,6 @@ func init() {
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token.
 
-// 该主程序启动API层，API层只且仅只处理认证，接受文件，任务入队
-// 只在除了文件上传之外的任务调用AssetsService及其方法
 func main() {
 	// Load configurations
 	dbConfig := config.LoadDBConfig()
@@ -61,6 +64,8 @@ func main() {
 
 	log.Println("🚀 Starting Lumilio Photos API...")
 	log.Printf("📊 Database configuration: %s:%s/%s", dbConfig.Host, dbConfig.Port, dbConfig.DBName)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Connect to the database
 	database := gorm_repo.InitDB(dbConfig)
@@ -78,6 +83,32 @@ func main() {
 		}
 	}(sqlDB)
 
+	log.Println("GORM database connection successful.")
+
+	Port, err := strconv.Atoi(dbConfig.Port)
+	if err != nil {
+		log.Fatalf("GORM database Port Interal Erro.")
+	}
+
+	pgxDSN := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
+		dbConfig.User,
+		dbConfig.Password,
+		dbConfig.Host,
+		Port,
+		dbConfig.DBName,
+	)
+
+	pgxPool, err := pgxpool.New(context.Background(), pgxDSN)
+	if err != nil {
+		log.Fatalf("Unable to create pgx connection pool: %v\n", err)
+	}
+	defer func() {
+		log.Println("Closing pgx connection pool...")
+		pgxPool.Close()
+	}()
+
+	log.Println("PGX connection pool for queue created successfully.")
+
 	// Initialize repositories
 	assetRepo := gorm_repo.NewAssetRepository(database)
 	tagRepo := gorm_repo.NewTagRepository(database)
@@ -94,20 +125,6 @@ func main() {
 	if err := os.MkdirAll(appConfig.StagingPath, 0755); err != nil {
 		log.Fatalf("Failed to create staging directory: %v", err)
 	}
-
-	// Initialize task queue
-	log.Printf("📋 Using queue directory: %s", appConfig.QueueDir)
-
-	taskQueue, err := queue.NewTaskQueue(appConfig.QueueDir, 100)
-	if err != nil {
-		log.Fatalf("Failed to initialize task queue: %v", err)
-	}
-
-	// Initialize the queue
-	if err := taskQueue.Initialize(); err != nil {
-		log.Fatalf("Failed to initialize task queue: %v", err)
-	}
-	defer taskQueue.Close()
 
 	// Load storage configuration
 	storageConfig := storage.LoadStorageConfigFromEnv()
@@ -129,8 +146,23 @@ func main() {
 	// Initialize authentication service
 	authService := service.NewAuthService(userRepo, refreshTokenRepo)
 
+	mlService, err := service.NewMLClient(appConfig.MLServiceAddr)
+	if err != nil {
+		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
+	}
+
+	// Initialize asset processor
+	assetProcessor := processors.NewAssetProcessor(assetService, mlService, s)
+
+	assetQueue := queue.SetupAssetQueue(ctx, pgxPool, assetProcessor)
+	clipQueue := queue.SetupCLIPQueue(ctx, pgxPool, mlService, assetService)
+
+	// 2. 启动消费者
+	go runQueue(ctx, assetQueue, "assetQueue")
+	go runQueue(ctx, clipQueue, "clipQueue")
+
 	// Initialize controllers - pass the staging path and task queue to the handler
-	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, taskQueue)
+	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, assetQueue)
 	authController := handler.NewAuthHandler(authService)
 
 	// Initialize Swagger docs
@@ -151,5 +183,12 @@ func main() {
 	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", appConfig.Port)
 	if err := http.ListenAndServe(":"+appConfig.Port, router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
+	}
+}
+
+func runQueue[T any](ctx context.Context, q queue.Queue[T], name string) {
+	log.Printf("[%s] Starting queue workers...", name)
+	if err := q.Start(ctx); err != nil {
+		log.Printf("[%s] Queue workers stopped with error: %v", name, err)
 	}
 }
