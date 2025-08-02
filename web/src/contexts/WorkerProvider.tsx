@@ -1,5 +1,6 @@
 import { createContext, useContext, useRef, useEffect, ReactNode } from "react";
 import { AppWorkerClient, WorkerType } from "@/workers/workerClient";
+import { ModelRecord } from "@mlc-ai/web-llm";
 
 const WorkerContext = createContext<AppWorkerClient | null>(null);
 
@@ -33,13 +34,22 @@ interface WorkerProviderProps {
    * <WorkerProvider>
    */
   preload?: WorkerType[];
+  webllmConfig?: {
+    modelRecords?: ModelRecord[];
+    useIndexedDBCache?: boolean;
+    modelId: string;
+  };
 }
 
-export const WorkerProvider = ({ children, preload }: WorkerProviderProps) => {
+export const WorkerProvider = ({
+  children,
+  preload,
+  webllmConfig,
+}: WorkerProviderProps) => {
   const workerClientRef = useRef<AppWorkerClient | null>(null);
 
   if (workerClientRef.current === null) {
-    workerClientRef.current = new AppWorkerClient({ preload });
+    workerClientRef.current = new AppWorkerClient({ preload, webllmConfig });
   }
 
   useEffect(() => {

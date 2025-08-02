@@ -78,7 +78,7 @@ function SideBar() {
         <li>
           <Link to="/server-monitor">
             {isOnline ? (
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-2 text-success">
                 <ServerStackIcon className="size-5" />
                 Online
                 <div className="inline-grid *:[grid-area:1/1]">
@@ -87,7 +87,7 @@ function SideBar() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center gap-2 text-error">
                 <ServerStackIcon className="size-5" />
                 Offline
                 <div className="inline-grid *:[grid-area:1/1]">

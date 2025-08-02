@@ -6,6 +6,7 @@ import { routes } from "@/routes/routes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import GlobalProvider from "@/contexts/GlobalContext";
 import "./App.css";
+import "katex/dist/katex.min.css";
 import Notifications from "@/components/Notifications";
 
 const queryClient = new QueryClient();
