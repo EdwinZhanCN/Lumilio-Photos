@@ -3,6 +3,8 @@ import Assets from "@/pages/Assets";
 import UploadAssets from "@/pages/UploadAssets.tsx";
 import { Studio } from "@/pages/Studio.tsx";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
+import { Lumen } from "@/pages/Lumen";
+import { LumenWikiExample } from "@/components/Lumen/LumenWiki/LumenWikiExample";
 
 export const routes = [
   {
@@ -64,5 +66,21 @@ export const routes = [
   {
     path: "/server-monitor",
     element: <div>Server Monitor</div>,
+  },
+  {
+    path: "/lumen",
+    element: (
+      <WorkerProvider preload={["llm"]}>
+        <Lumen />
+      </WorkerProvider>
+    ),
+  },
+  {
+    path: "/test",
+    element: (
+      <WorkerProvider preload={["llm"]}>
+        <LumenWikiExample />
+      </WorkerProvider>
+    ),
   },
 ];

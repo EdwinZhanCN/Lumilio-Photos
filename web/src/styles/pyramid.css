@@ -1,0 +1,160 @@
+.lumen-avatar {
+    margin: 0;
+    position: relative;
+    width: 20em;
+    height: 20em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lumen-avatar *,
+.lumen-avatar *:before,
+.lumen-avatar *:after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+@-webkit-keyframes lumen-spin {
+    from {
+        -webkit-transform: rotateY(0);
+    }
+    to {
+        -webkit-transform: rotateY(360deg);
+    }
+}
+
+@keyframes lumen-spin {
+    from {
+        transform: rotateY(0);
+    }
+    to {
+        transform: rotateY(360deg);
+    }
+}
+
+.lumen-avatar .pyramid {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lumen-avatar .pyramid-gyro {
+    position: relative;
+    perspective: 50em;
+    perspective-origin: 50% 5em;
+    -webkit-perspective: 50em;
+    -webkit-perspective-origin: 50% 5em;
+}
+
+.lumen-avatar .pyramid-axis {
+    position: relative;
+    width: 10em;
+    transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
+}
+
+.lumen-avatar .pyramid-axis {
+    /* Default state - no animation */
+    animation: none;
+    -webkit-animation: none;
+}
+
+.lumen-avatar .pyramid-axis.spinning {
+    animation: lumen-spin 2s infinite ease-in-out;
+    -webkit-animation: lumen-spin 2s infinite ease-in-out;
+}
+
+/* Support for smooth transitions when stopping */
+.lumen-avatar .pyramid-axis:not(.spinning) {
+    transition-property: transform;
+    -webkit-transition-property: transform;
+}
+
+.lumen-avatar .pyramid-wall {
+    position: absolute;
+    border: 5em solid transparent;
+}
+
+.lumen-avatar .front {
+    bottom: -1em;
+    border-bottom: 10em solid rgba(173, 216, 230, 0.5); /* 浅蓝 */
+    transform: translateZ(1.25em) rotateX(30deg);
+    -webkit-transform: translateZ(1.25em) rotateX(30deg);
+}
+
+.lumen-avatar .back {
+    bottom: -1em;
+    border-bottom: 10em solid rgba(173, 216, 230, 0.5); /* 浅蓝 */
+    transform: translateZ(-1.25em) rotateY(180deg) rotateX(30deg);
+    -webkit-transform: translateZ(-1.25em) rotateY(180deg) rotateX(30deg);
+}
+
+.lumen-avatar .left {
+    bottom: -1em;
+    left: 3.75em;
+    border-bottom: 10em solid rgba(135, 206, 235, 0.5); /* 天蓝 */
+    transform: rotateY(270deg) translateX(-5em) rotateX(30deg);
+    -webkit-transform: rotateY(270deg) translateX(-5em) rotateX(30deg);
+    transform-origin: center left;
+    -webkit-transform-origin: center left;
+}
+
+.lumen-avatar .right {
+    bottom: -2em;
+    right: 7.5em;
+    border-bottom: 10em solid rgba(135, 206, 235, 0.5); /* 天蓝 */
+    transform: rotateY(-270deg) translateX(5em) rotateX(30deg);
+    -webkit-transform: rotateY(-270deg) translateX(5em) rotateX(30deg);
+    transform-origin: top right;
+    -webkit-transform-origin: top right;
+}
+
+.lumen-avatar .bottom {
+    width: 10em;
+    height: 10em;
+    background: rgba(173, 216, 230, 0.7); /* 半透明浅蓝底面 */
+    transform: rotateX(90deg) translateY(5em);
+    -webkit-transform: rotateX(90deg) translateY(5em);
+    transform-origin: bottom center;
+    -webkit-transform-origin: bottom center;
+}
+
+.lumen-avatar .shadow {
+    width: 10em;
+    height: 10em;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    position: absolute;
+    bottom: -8em;
+    left: 0;
+    transform: rotateX(90deg);
+    -webkit-transform: rotateX(90deg);
+}
+
+.lumen-avatar h1 {
+    margin: 0 0.75em;
+    font-family: "Palatino", "Georgia", serif;
+    color: #72acfb;
+    text-shadow: 0 0 0.2em #fff;
+}
+
+.lumen-avatar .fyi {
+    position: absolute;
+    top: 1.25em;
+    right: 1.25em;
+    width: 12.5em;
+    color: #fff;
+}
+
+.lumen-avatar ul {
+    padding: 1em 0 0 2em;
+}
+
+.lumen-avatar li {
+    line-height: 1.5em;
+}
