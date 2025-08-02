@@ -2,7 +2,7 @@
 
 # Interface: LLMMessage
 
-Defined in: [hooks/util-hooks/useLLM.tsx:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useLLM.tsx#L20)
+Defined in: [hooks/util-hooks/useLLM.tsx:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/hooks/util-hooks/useLLM.tsx#L20)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useLLM.tsx:20](https://github.com/EdwinZhanCN/Lumi
 
 > **content**: `string`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useLLM.tsx#L22)
+Defined in: [hooks/util-hooks/useLLM.tsx:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/hooks/util-hooks/useLLM.tsx#L22)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [hooks/util-hooks/useLLM.tsx:22](https://github.com/EdwinZhanCN/Lumi
 
 > **role**: `"user"` \| `"assistant"` \| `"system"`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useLLM.tsx#L21)
+Defined in: [hooks/util-hooks/useLLM.tsx:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/hooks/util-hooks/useLLM.tsx#L21)
 
 ***
 
@@ -26,4 +26,4 @@ Defined in: [hooks/util-hooks/useLLM.tsx:21](https://github.com/EdwinZhanCN/Lumi
 
 > **timestamp**: `number`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useLLM.tsx#L23)
+Defined in: [hooks/util-hooks/useLLM.tsx:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/hooks/util-hooks/useLLM.tsx#L23)

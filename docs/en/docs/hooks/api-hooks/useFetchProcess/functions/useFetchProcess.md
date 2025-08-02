@@ -4,7 +4,7 @@
 
 > **useFetchProcess**(): `FetchProcessValue`
 
-Defined in: [hooks/api-hooks/useFetchProcess.tsx:24](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/api-hooks/useFetchProcess.tsx#L24)
+Defined in: [hooks/api-hooks/useFetchProcess.tsx:24](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/hooks/api-hooks/useFetchProcess.tsx#L24)
 
 ## Returns
 

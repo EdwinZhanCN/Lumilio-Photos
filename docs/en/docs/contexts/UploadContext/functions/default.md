@@ -4,7 +4,7 @@
 
 > **default**(`__namedParameters`): `Element`
 
-Defined in: [contexts/UploadContext.tsx:170](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/contexts/UploadContext.tsx#L170)
+Defined in: [contexts/UploadContext.tsx:170](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/contexts/UploadContext.tsx#L170)
 
 Main provider that manages upload UI state and coordinates the upload process.
 
