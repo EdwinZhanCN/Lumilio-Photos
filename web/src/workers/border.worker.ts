@@ -51,21 +51,19 @@ function initialize(): Promise<void> {
     return initializationPromise;
   }
 
-  initializationPromise = new Promise((resolve, reject) => {
-    try {
-      console.log("Initializing WebAssembly module...");
-      init();
+  console.log("Initializing WebAssembly module...");
+  initializationPromise = init()
+    .then(() => {
       console.log("WebAssembly module initialized successfully.");
       self.postMessage({ type: "WASM_READY" });
-      resolve();
-    } catch (error: any) {
+    })
+    .catch((error: any) => {
       const errorMessage =
         error.message ?? "Unknown worker initialization error";
       console.error("Error initializing WebAssembly module:", error);
       self.postMessage({ type: "ERROR", payload: { error: errorMessage } });
-      reject(new Error(errorMessage));
-    }
-  });
+      throw new Error(errorMessage);
+    });
 
   return initializationPromise;
 }

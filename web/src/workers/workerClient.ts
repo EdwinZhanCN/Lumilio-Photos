@@ -287,6 +287,7 @@ export class AppWorkerClient {
     };
   }> {
     const worker = this.getOrInitializeWorker("border");
+    console.log(files);
 
     return new Promise((resolve, reject) => {
       const handler = (e: MessageEvent) => {
@@ -294,6 +295,7 @@ export class AppWorkerClient {
           case "GENERATE_BORDER_COMPLETE":
             worker.removeEventListener("message", handler);
             resolve(e.data.data);
+            console.log(e.data.data);
             break;
           case "ERROR":
             worker.removeEventListener("message", handler);
