@@ -14,6 +14,7 @@
 - [hooks/util-hooks/useGenerateBorder](hooks/util-hooks/useGenerateBorder/index.md)
 - [hooks/util-hooks/useGenerateHashcode](hooks/util-hooks/useGenerateHashcode/index.md)
 - [hooks/util-hooks/useGenerateThumbnail](hooks/util-hooks/useGenerateThumbnail/index.md)
+- [hooks/util-hooks/useLLM](hooks/util-hooks/useLLM/index.md)
 - [hooks/util-hooks/useMessage](hooks/util-hooks/useMessage/index.md)
 - [utils/accept-file-extensions](utils/accept-file-extensions/index.md)
 - [utils/assetGrouping](utils/assetGrouping/index.md)
@@ -25,4 +26,5 @@
 - [workers/export.worker](workers/export.worker/index.md)
 - [workers/hash.worker](workers/hash.worker/index.md)
 - [workers/thumbnail.worker](workers/thumbnail.worker/index.md)
+- [workers/webllm.worker](workers/webllm.worker/index.md)
 - [workers/workerClient](workers/workerClient/index.md)

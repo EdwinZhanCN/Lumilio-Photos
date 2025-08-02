@@ -2,7 +2,7 @@
 
 # Interface: UseGenerateBordersReturn
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:45](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/hooks/util-hooks/useGenerateBorder.tsx#L45)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:45](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useGenerateBorder.tsx#L45)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useGenerateBorder.tsx:45](https://github.com/Edwin
 
 > **cancelGeneration**: () => `void`
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:55](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/hooks/util-hooks/useGenerateBorder.tsx#L55)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:55](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useGenerateBorder.tsx#L55)
 
 #### Returns
 
@@ -22,7 +22,7 @@ Defined in: [hooks/util-hooks/useGenerateBorder.tsx:55](https://github.com/Edwin
 
 > **generateBorders**: (`files`, `option`, `param`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:50](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/hooks/util-hooks/useGenerateBorder.tsx#L50)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:50](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useGenerateBorder.tsx#L50)
 
 #### Parameters
 
@@ -48,7 +48,7 @@ Defined in: [hooks/util-hooks/useGenerateBorder.tsx:50](https://github.com/Edwin
 
 > **isGenerating**: `boolean`
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:46](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/hooks/util-hooks/useGenerateBorder.tsx#L46)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:46](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useGenerateBorder.tsx#L46)
 
 ***
 
@@ -56,7 +56,7 @@ Defined in: [hooks/util-hooks/useGenerateBorder.tsx:46](https://github.com/Edwin
 
 > **processedImages**: [`ProcessedImageMap`](../type-aliases/ProcessedImageMap.md)
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:47](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/hooks/util-hooks/useGenerateBorder.tsx#L47)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:47](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useGenerateBorder.tsx#L47)
 
 ***
 
@@ -64,7 +64,7 @@ Defined in: [hooks/util-hooks/useGenerateBorder.tsx:47](https://github.com/Edwin
 
 > **progress**: [`BorderGenerationProgress`](../type-aliases/BorderGenerationProgress.md)
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:48](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/hooks/util-hooks/useGenerateBorder.tsx#L48)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:48](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useGenerateBorder.tsx#L48)
 
 ***
 
@@ -72,4 +72,4 @@ Defined in: [hooks/util-hooks/useGenerateBorder.tsx:48](https://github.com/Edwin
 
 > **setProcessedImages**: `Dispatch`\<`SetStateAction`\<[`ProcessedImageMap`](../type-aliases/ProcessedImageMap.md)\>\>
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:49](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/hooks/util-hooks/useGenerateBorder.tsx#L49)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:49](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/util-hooks/useGenerateBorder.tsx#L49)
