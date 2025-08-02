@@ -4,7 +4,7 @@
 
 > **getSupportedFileExtensionsString**(): `string`
 
-Defined in: [utils/validate-file.ts:47](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/utils/validate-file.ts#L47)
+Defined in: [utils/validate-file.ts:47](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/utils/validate-file.ts#L47)
 
 Returns a string of all supported file extensions for accept attribute
 

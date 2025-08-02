@@ -4,7 +4,7 @@
 
 > **getFlatAssetsFromGrouped**(`groupedAssets`): `Asset`[]
 
-Defined in: [utils/assetGrouping.ts:263](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d7ee437668dbf25a0ccb307a371076d5d13f8e8d/web/src/utils/assetGrouping.ts#L263)
+Defined in: [utils/assetGrouping.ts:263](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/utils/assetGrouping.ts#L263)
 
 Gets the flat array of assets from grouped assets in the correct order
 
