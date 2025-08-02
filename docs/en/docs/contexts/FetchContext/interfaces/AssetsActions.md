@@ -2,7 +2,7 @@
 
 # Interface: AssetsActions
 
-Defined in: [contexts/FetchContext.tsx:100](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/contexts/FetchContext.tsx#L100)
+Defined in: [contexts/FetchContext.tsx:100](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/contexts/FetchContext.tsx#L100)
 
 **Assets Actions Interface**
 
@@ -21,7 +21,7 @@ These functions are stable and won't cause re-renders for components that only u
 
 > **applyFilter**: (`key`, `value`) => `void`
 
-Defined in: [contexts/FetchContext.tsx:169](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/contexts/FetchContext.tsx#L169)
+Defined in: [contexts/FetchContext.tsx:169](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/contexts/FetchContext.tsx#L169)
 
 **Apply Filter Function**
 
@@ -62,7 +62,7 @@ applyFilter('dateRange', { start: '2024-01-01', end: '2024-01-31' });
 
 > **fetchAssets**: (`params`) => `Promise`\<`void`\>
 
-Defined in: [contexts/FetchContext.tsx:121](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/contexts/FetchContext.tsx#L121)
+Defined in: [contexts/FetchContext.tsx:121](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/contexts/FetchContext.tsx#L121)
 
 **Fetch Assets Function**
 
@@ -100,7 +100,7 @@ await fetchAssets({
 
 > **fetchNextPage**: () => `Promise`\<`void`\>
 
-Defined in: [contexts/FetchContext.tsx:149](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/contexts/FetchContext.tsx#L149)
+Defined in: [contexts/FetchContext.tsx:149](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/contexts/FetchContext.tsx#L149)
 
 **Fetch Next Page Function**
 
@@ -138,7 +138,7 @@ function InfiniteScroll() {
 
 > **resetFilters**: () => `void`
 
-Defined in: [contexts/FetchContext.tsx:221](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/contexts/FetchContext.tsx#L221)
+Defined in: [contexts/FetchContext.tsx:221](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/contexts/FetchContext.tsx#L221)
 
 **Reset Filters Function**
 
@@ -163,7 +163,7 @@ Useful for "Clear All" functionality.
 
 > **setSearchQuery**: (`query`) => `void`
 
-Defined in: [contexts/FetchContext.tsx:206](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/contexts/FetchContext.tsx#L206)
+Defined in: [contexts/FetchContext.tsx:206](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/contexts/FetchContext.tsx#L206)
 
 **Set Search Query Function**
 

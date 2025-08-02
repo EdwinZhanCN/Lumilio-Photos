@@ -4,7 +4,7 @@
 
 > **useAssetsPageState**(): `AssetsPageState` & `AssetsPageActions`
 
-Defined in: [hooks/page-hooks/useAssetsPageState.tsx:33](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/50447139bbcd8646ed06f83c6f5775c49db37354/web/src/hooks/page-hooks/useAssetsPageState.tsx#L33)
+Defined in: [hooks/page-hooks/useAssetsPageState.tsx:33](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/03970823ed92f529d8017eeae43ca1cadd7110c3/web/src/hooks/page-hooks/useAssetsPageState.tsx#L33)
 
 ## Returns
 
