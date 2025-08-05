@@ -233,7 +233,7 @@ const generateSampleHeatmapData = () => {
   const startDate = new Date('2024-01-01');
   const endDate = new Date('2024-12-31');
   const data = [];
-  let currentDate = new Date(startDate);
+  const currentDate = new Date(startDate);
 
   while (currentDate <= endDate) {
     const count = Math.floor(Math.random() * 5);

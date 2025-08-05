@@ -5,6 +5,7 @@ import {
   ChatCompletionMessageParam,
   InitProgressReport,
 } from "@mlc-ai/web-llm";
+import { useSettings } from "@/contexts/SettingsContext";
 
 export interface LLMProgress {
   isInitializing: boolean;
@@ -26,6 +27,7 @@ export interface LLMMessage {
 export interface LLMOptions {
   modelId?: string;
   temperature?: number;
+  top_p?: number;
   systemPrompt?: string;
   stream?: boolean;
 }
@@ -56,6 +58,7 @@ export interface UseLLMReturn {
 export const useLLM = (): UseLLMReturn => {
   const showMessage = useMessage();
   const workerClient = useWorker();
+  const { settings } = useSettings();
 
   const [isInitializing, setIsInitializing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -66,16 +69,23 @@ export const useLLM = (): UseLLMReturn => {
 
   // Kick off model initialization on mount so progress shows immediately
   useEffect(() => {
-    setIsInitializing(true);
-    workerClient
-      .initializeWebLLMEngine()
-      .catch((err) => {
-        showMessage("error", `Model initialization failed: ${err.message}`);
-      })
-      .finally(() => {
-        setIsInitializing(false);
-      });
-  }, [workerClient, showMessage]);
+    if (settings.lumen?.enabled) {
+      setIsInitializing(true);
+      workerClient
+        .initializeWebLLMEngine(settings.lumen.model)
+        .catch((err) => {
+          showMessage("error", `Model initialization failed: ${err.message}`);
+        })
+        .finally(() => {
+          setIsInitializing(false);
+        });
+    }
+  }, [
+    workerClient,
+    showMessage,
+    settings.lumen?.model,
+    settings.lumen?.enabled,
+  ]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -106,15 +116,21 @@ export const useLLM = (): UseLLMReturn => {
         return undefined;
       }
 
-      // Require modelId to be specified
-      if (!options.modelId) {
-        showMessage("error", "Please specify a modelId in options");
+      if (!settings.lumen?.enabled) {
+        showMessage("error", "Lumen is disabled in settings");
+        return undefined;
+      }
+
+      const modelId = options.modelId || settings.lumen?.model;
+
+      if (!modelId) {
+        showMessage("error", "Please specify a modelId in options or settings");
         return undefined;
       }
 
       // Update current model if different
-      if (currentModelId !== options.modelId) {
-        setCurrentModelId(options.modelId);
+      if (currentModelId !== modelId) {
+        setCurrentModelId(modelId);
         setIsInitializing(true);
       }
 
@@ -168,11 +184,11 @@ export const useLLM = (): UseLLMReturn => {
           content: userInput,
         });
 
-        let fullResponse = "";
+        const fullResponse = "";
         let tokenCount = 0;
 
         const response = await workerClient.askLLM(messages, {
-          temperature: options.temperature ?? 0.7,
+          temperature: options.temperature ?? settings.lumen?.temperature,
           stream: options.stream ?? true,
           onChunk: (chunk: string) => {
             tokenCount++;
@@ -223,7 +239,14 @@ export const useLLM = (): UseLLMReturn => {
         }, 3000);
       }
     },
-    [workerClient, showMessage, systemPrompt, currentModelId],
+    [
+      workerClient,
+      showMessage,
+      systemPrompt,
+      currentModelId,
+      settings.lumen,
+      conversation,
+    ],
   );
 
   const clearConversation = useCallback(() => {

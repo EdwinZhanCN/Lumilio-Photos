@@ -12,7 +12,7 @@ export function LumenStatus({ isInitializing, progress }: LumenStatusProps) {
 
   return (
     <div className="p-2 bg-info text-info-content">
-      <span className="loading loading-spinner loading-sm" />
+      <span className="loading loading-spinner loading-sm my-2" />
       Loading {progress.initStatus}
     </div>
   );

@@ -1,5 +1,5 @@
 /* tslint:disable */
-/* eslint-disable */
+ 
 export const memory: WebAssembly.Memory;
 export const __wbg_hashresult_free: (a: number, b: number) => void;
 export const hashresult_hash: (a: number) => [number, number];

@@ -9,6 +9,7 @@ import {
   PhotoIcon,
   PaintBrushIcon,
   ArchiveBoxIcon,
+  BookmarkSquareIcon,
 } from "@heroicons/react/24/outline/index.js";
 
 function SideBar() {
@@ -19,7 +20,7 @@ function SideBar() {
 
   return (
     <div className="select-none">
-      <ul className="menu bg-base-200 rounded-box mx-2 my-2 gap-2">
+      <ul className="menu rounded-box mx-2 my-2 gap-2">
         <li>
           <Link to="/" className={location.pathname === "/" ? "active" : ""}>
             <HomeIcon className="size-5" />
@@ -52,10 +53,16 @@ function SideBar() {
           </Link>
         </li>
         <li>
-          <Link to="/upload-photos">
-            <ArrowUpTrayIcon className="size-5" />
-            Upload
+          <Link to={"/portfolio"}>
+            <BookmarkSquareIcon className="size-5" />
+            Portfolio
           </Link>
+        </li>
+        <li>
+          <div className="bg-linear-50 from-ctp-maroon-300 text-ctp-base">
+            <ArrowUpTrayIcon className="size-5" />
+            <Link to="/upload-photos">Upload</Link>
+          </div>
         </li>
         <li>
           <Link to="/settings">

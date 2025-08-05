@@ -66,17 +66,9 @@ export function LumenMessages({
 
   if (conversation.length === 0 && !isGenerating && !isInitializing) {
     return (
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex flex-1 overflow-y-auto p-4 space-y-4">
         <div className="text-center text-base-content/60 py-8">
-          <p>
-            Start a conversation with the Lumen!
-            <div className="me-auto">
-              <LumenAvatar start={false} size={0.2} />
-            </div>
-          </p>
-          <p className="text-sm mt-2">
-            Select a model above and start chatting
-          </p>
+          <div>Start a conversation with the Lumen!</div>
         </div>
         <div ref={messagesEndRef} />
       </div>

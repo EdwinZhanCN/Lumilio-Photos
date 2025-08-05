@@ -26,7 +26,7 @@ const FullScreenToolbar = ({
   onToggleInfo,
   currentAsset,
 }: FullScreenToolbarProps) => {
-  let wikiAvailable = true;
+  const wikiAvailable = true;
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportOptions, setExportOptions] = useState<ExportOptions>({
     format: "original",

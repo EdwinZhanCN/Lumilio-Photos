@@ -3,7 +3,7 @@
 import init, { ImageProcessor } from "@/wasm/export_wasm";
 import type { ExportOptions } from "@/types/Export.d.ts";
 
-let initializationPromise: Promise<void> | null = null;
+const initializationPromise: Promise<void> | null = null;
 let abortController = new AbortController();
 
 interface WorkerMessage {
