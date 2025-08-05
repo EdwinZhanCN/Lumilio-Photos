@@ -5,6 +5,8 @@ import { Studio } from "@/pages/Studio.tsx";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { Lumen } from "@/pages/Lumen";
 import { LumenWikiExample } from "@/components/Lumen/LumenWiki/LumenWikiExample";
+import Settings from "@/pages/Settings";
+import Monitor from "@/pages/Monitor";
 
 export const routes = [
   {
@@ -17,7 +19,7 @@ export const routes = [
   },
   {
     path: "/settings",
-    element: <div>Settings Page</div>,
+    element: <Settings />,
   },
   {
     path: "/collections",
@@ -65,7 +67,7 @@ export const routes = [
   },
   {
     path: "/server-monitor",
-    element: <div>Server Monitor</div>,
+    element: <Monitor />,
   },
   {
     path: "/lumen",
@@ -76,7 +78,7 @@ export const routes = [
     ),
   },
   {
-    path: "/test",
+    path: "/test-lumen",
     element: (
       <WorkerProvider preload={["llm"]}>
         <LumenWikiExample />

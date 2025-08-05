@@ -34,7 +34,7 @@ const AssetTabs = ({ isCarouselOpen }: AssetTabsProps) => {
           : "animate-fade-in-y opacity-100 pointer-events-auto"
       }`}
     >
-      <ul className="menu menu-horizontal backdrop-blur-sm bg-base-200/70 rounded-box shadow-lg">
+      <ul className="menu menu-horizontal glass rounded-box shadow-lg">
         <li>
           <Link
             to="/assets/photos"

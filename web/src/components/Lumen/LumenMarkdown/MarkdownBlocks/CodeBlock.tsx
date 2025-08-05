@@ -30,8 +30,9 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
       const html = document.documentElement;
       const theme = html.getAttribute("data-theme");
       const isDarkTheme =
-        theme === "dark" ||
-        (!theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        theme === "macchiato" ||
+        (!theme &&
+          window.matchMedia("(prefers-color-scheme: macchiato)").matches);
       setIsDark(isDarkTheme);
     };
 

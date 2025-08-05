@@ -1,12 +1,9 @@
 interface LumenHeaderProps {
   currentModelId: string | null;
-  selectedModel: string;
-  availableModels: Array<{ id: string; name: string }>;
   isInitializing: boolean;
   isGenerating: boolean;
   conversationLength: number;
   isNoThink: boolean;
-  onModelChange: (modelId: string) => void;
   onClearConversation: () => void;
   onCancelGeneration: () => void;
   onToggleThink: (enabled: boolean) => void;
@@ -14,13 +11,10 @@ interface LumenHeaderProps {
 
 export function LumenHeader({
   currentModelId,
-  selectedModel,
-  availableModels,
   isInitializing,
   isGenerating,
   conversationLength,
   isNoThink,
-  onModelChange,
   onClearConversation,
   onCancelGeneration,
   onToggleThink,
@@ -31,9 +25,7 @@ export function LumenHeader({
         <h2 className="text-xl font-semibold">Lumen</h2>
         {currentModelId && (
           <p className="text-sm text-base-content/60">
-            Using:{" "}
-            {availableModels.find((m) => m.id === currentModelId)?.name ||
-              currentModelId}
+            Using: {currentModelId}
           </p>
         )}
       </div>
@@ -50,18 +42,6 @@ export function LumenHeader({
             />
           </label>
         </div>
-        <select
-          className="select select-sm select-bordered"
-          value={selectedModel}
-          onChange={(e) => onModelChange(e.target.value)}
-          disabled={isInitializing || isGenerating}
-        >
-          {availableModels.map((model) => (
-            <option key={model.id} value={model.id}>
-              {model.name}
-            </option>
-          ))}
-        </select>
         <button
           className="btn btn-sm btn-outline"
           onClick={onClearConversation}

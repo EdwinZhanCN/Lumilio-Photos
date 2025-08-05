@@ -1,5 +1,5 @@
 /* tslint:disable */
-/* eslint-disable */
+ 
 export const memory: WebAssembly.Memory;
 export const add_colored_border: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => [number, number, number, number];
 export const add_vignette_border: (a: number, b: number, c: number, d: number) => [number, number, number, number];

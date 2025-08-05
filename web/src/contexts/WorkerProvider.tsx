@@ -1,6 +1,7 @@
 import { createContext, useContext, useRef, useEffect, ReactNode } from "react";
 import { AppWorkerClient, WorkerType } from "@/workers/workerClient";
 import { ModelRecord } from "@mlc-ai/web-llm";
+import { useSettings } from "@/contexts/SettingsContext";
 
 const WorkerContext = createContext<AppWorkerClient | null>(null);
 
@@ -46,10 +47,36 @@ export const WorkerProvider = ({
   preload,
   webllmConfig,
 }: WorkerProviderProps) => {
+  const { settings } = useSettings();
   const workerClientRef = useRef<AppWorkerClient | null>(null);
 
   if (workerClientRef.current === null) {
-    workerClientRef.current = new AppWorkerClient({ preload, webllmConfig });
+    // Use settings if available and no explicit webllmConfig provided
+    const finalWebllmConfig =
+      webllmConfig ||
+      (settings.lumen && settings.lumen.enabled
+        ? {
+            modelRecords: settings.lumen.modelRecords || [],
+            useIndexedDBCache: true,
+            modelId: settings.lumen.model,
+          }
+        : undefined);
+
+    // Only create worker client if we have valid configuration
+    if (
+      finalWebllmConfig &&
+      (!finalWebllmConfig.modelRecords ||
+        finalWebllmConfig.modelRecords.length === 0)
+    ) {
+      console.warn(
+        "WorkerProvider: No model records available, WebLLM functionality may not work",
+      );
+    }
+
+    workerClientRef.current = new AppWorkerClient({
+      preload,
+      webllmConfig: finalWebllmConfig,
+    });
   }
 
   useEffect(() => {
