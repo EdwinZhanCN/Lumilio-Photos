@@ -1,12 +1,12 @@
 import Home from "@/pages/Home";
-import Assets from "@/pages/Assets";
-import UploadAssets from "@/pages/UploadAssets.tsx";
-import { Studio } from "@/pages/Studio.tsx";
+import Assets from "@/features/assets/routes/Assets";
+import { Studio } from "@/pages/Studio";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { Lumen } from "@/pages/Lumen";
 import { LumenWikiExample } from "@/components/Lumen/LumenWiki/LumenWikiExample";
-import Settings from "@/pages/Settings";
+import Settings from "@/features/settings/routes/Settings";
 import Monitor from "@/pages/Monitor";
+import UploadAssets from "@/features/upload/routes/UploadAssets";
 
 export const routes = [
   {
@@ -71,11 +71,7 @@ export const routes = [
   },
   {
     path: "/lumen",
-    element: (
-      <WorkerProvider preload={["llm"]}>
-        <Lumen />
-      </WorkerProvider>
-    ),
+    element: <Lumen />,
   },
   {
     path: "/test-lumen",

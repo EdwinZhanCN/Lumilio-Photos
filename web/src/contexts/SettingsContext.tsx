@@ -36,6 +36,11 @@ type Settings = {
     systemPrompt?: string;
     enabled?: boolean;
   };
+  ui?: {
+    asset_page?: {
+      layout: "shrink" | "wide" | "full";
+    };
+  };
 };
 
 type SettingsContextType = {

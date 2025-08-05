@@ -8,9 +8,10 @@ import {
   InformationCircleIcon,
   PhotoIcon,
   PaintBrushIcon,
-  ArchiveBoxIcon,
-  BookmarkSquareIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/outline/index.js";
+
+import { Album } from "lucide-react";
 
 function SideBar() {
   const [messageCount] = useState<number>(0);
@@ -42,7 +43,7 @@ function SideBar() {
             to="/collections"
             className={location.pathname === "/favorites" ? "active" : ""}
           >
-            <ArchiveBoxIcon className="size-5" />
+            <Album size={20} strokeWidth={2} />
             Collections
           </Link>
         </li>
@@ -54,7 +55,7 @@ function SideBar() {
         </li>
         <li>
           <Link to={"/portfolio"}>
-            <BookmarkSquareIcon className="size-5" />
+            <BookOpenIcon className="size-5" />
             Portfolio
           </Link>
         </li>
