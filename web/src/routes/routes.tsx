@@ -67,7 +67,7 @@ export const routes = [
     ),
   },
   {
-    path: "/monitor",
+    path: "/server-monitor",
     element: <Monitor />,
   },
   {

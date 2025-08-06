@@ -43,7 +43,7 @@ function SideBar() {
             to="/collections"
             className={location.pathname === "/favorites" ? "active" : ""}
           >
-            <Album size={20} strokeWidth={2} />
+            <Album size={20} strokeWidth={1.5} />
             Collections
           </Link>
         </li>
