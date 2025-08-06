@@ -1,5 +1,5 @@
 /* tslint:disable */
-/* eslint-disable */
+ 
 export function generate_thumbnail(buffer: Uint8Array, max_size: number): Uint8Array;
 export class ThumbnailResult {
   private constructor();

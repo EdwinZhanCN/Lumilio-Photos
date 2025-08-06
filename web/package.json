@@ -12,10 +12,10 @@
         "test:coverage": "vitest run --coverage",
         "test:watch": "vitest --watch",
         "docs": "typedoc",
-        "type-check": "tsc --noEmit",
-        "type-check:watch": "tsc --noEmit --watch"
+        "ui": "vitest --ui"
     },
     "dependencies": {
+        "@happy-dom/global-registrator": "^18.0.1",
         "@heroicons/react": "^2.2.0",
         "@mlc-ai/web-llm": "^0.2.79",
         "@reduxjs/toolkit": "^2.6.1",
@@ -31,6 +31,7 @@
         "langchain": "^0.3.30",
         "leaflet": "^1.9.4",
         "lodash-es": "^4.17.21",
+        "lucide-react": "^0.536.0",
         "react": "^19.0.0",
         "react-calendar-heatmap": "^1.10.0",
         "react-dom": "^19.0.0",
@@ -53,15 +54,20 @@
         "tailwindcss": "^4.0.8"
     },
     "devDependencies": {
+        "@catppuccin/daisyui": "^2.1.1",
+        "@catppuccin/tailwindcss": "^1.0.0",
         "@eslint/js": "^9.19.0",
         "@tailwindcss/vite": "^4.1.4",
+        "@testing-library/jest-dom": "^6.6.4",
         "@types/node": "^22.14.1",
         "@types/react": "^19.1.2",
         "@types/react-calendar-heatmap": "^1.9.0",
         "@types/react-dom": "^19.1.2",
         "@types/swiper": "^5.4.3",
         "@vitejs/plugin-react": "^4.3.4",
-        "@vitest/coverage-istanbul": "^3.1.1",
+        "@vitest/coverage-istanbul": "^3.2.4",
+        "@vitest/ui": "^3.2.4",
+        "@vitest/web-worker": "^3.2.4",
         "@wasm-tool/wasm-pack-plugin": "^1.7.0",
         "daisyui": "^5.0.9",
         "eslint": "^9.19.0",
@@ -69,15 +75,18 @@
         "eslint-plugin-react-hooks": "^5.0.0",
         "eslint-plugin-react-refresh": "^0.4.18",
         "globals": "^15.14.0",
+        "happy-dom": "^18.0.1",
         "jsdom": "^26.1.0",
+        "rolldown-vite": "^7.0.12",
         "typedoc": "^0.28.7",
         "typedoc-plugin-markdown": "^4.7.0",
         "typedoc-vitepress-theme": "^1.1.2",
         "typescript": "^5.8.3",
+        "typescript-eslint": "^8.39.0",
         "vite": "^6.1.0",
         "vite-plugin-top-level-await": "^1.5.0",
         "vite-plugin-wasm": "^3.4.1",
         "vite-plugin-wasm-pack": "^0.1.12",
-        "vitest": "^3.1.1"
+        "vitest": "^3.2.4"
     }
 }

@@ -1,10 +1,13 @@
-import Home from "@/pages/Home";
-import Assets from "@/pages/Assets";
-import UploadAssets from "@/pages/UploadAssets.tsx";
-import { Studio } from "@/pages/Studio.tsx";
+import Home from "@/features/home/routes/Home";
+import Assets from "@/features/assets/routes/Assets";
+import { Studio } from "@/features/studio/routes/Studio";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { Lumen } from "@/pages/Lumen";
-import { LumenWikiExample } from "@/components/Lumen/LumenWiki/LumenWikiExample";
+import { Lumen } from "@/features/lumen/routes/Lumen";
+import { LumenWikiExample } from "@/features/lumen/components/LumenWiki/LumenWikiExample";
+import Settings from "@/features/settings/routes/Settings";
+import Monitor from "@/features/monitor/routes/Monitor";
+import UploadAssets from "@/features/upload/routes/UploadAssets";
+import {Portfolio} from "@/features/portfolio";
 
 export const routes = [
   {
@@ -17,7 +20,7 @@ export const routes = [
   },
   {
     path: "/settings",
-    element: <div>Settings Page</div>,
+    element: <Settings />,
   },
   {
     path: "/collections",
@@ -58,25 +61,25 @@ export const routes = [
   {
     path: "/studio",
     element: (
-      <WorkerProvider preload={["exif", "border"]}>
-        <Studio />
-      </WorkerProvider>
+        <WorkerProvider preload={["exif", "border"]}>
+          <Studio />
+        </WorkerProvider>
     ),
   },
   {
     path: "/server-monitor",
-    element: <div>Server Monitor</div>,
+    element: <Monitor />,
   },
   {
     path: "/lumen",
-    element: (
-      <WorkerProvider preload={["llm"]}>
-        <Lumen />
-      </WorkerProvider>
-    ),
+    element: <Lumen />,
   },
   {
-    path: "/test",
+    path: "/portfolio",
+    element: <Portfolio/>,
+  },
+  {
+    path: "/test-lumen",
     element: (
       <WorkerProvider preload={["llm"]}>
         <LumenWikiExample />

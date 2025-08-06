@@ -1,6 +1,6 @@
 // src/services/getAssetService.ts
 
-import api from "@/https-common/";
+import api from "@/lib/api";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { ApiResult } from "./uploadService";
 

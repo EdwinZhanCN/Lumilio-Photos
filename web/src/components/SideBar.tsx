@@ -8,8 +8,10 @@ import {
   InformationCircleIcon,
   PhotoIcon,
   PaintBrushIcon,
-  ArchiveBoxIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/outline/index.js";
+
+import { Album } from "lucide-react";
 
 function SideBar() {
   const [messageCount] = useState<number>(0);
@@ -19,7 +21,7 @@ function SideBar() {
 
   return (
     <div className="select-none">
-      <ul className="menu bg-base-200 rounded-box mx-2 my-2 gap-2">
+      <ul className="menu rounded-box mx-2 my-2 gap-2">
         <li>
           <Link to="/" className={location.pathname === "/" ? "active" : ""}>
             <HomeIcon className="size-5" />
@@ -41,7 +43,7 @@ function SideBar() {
             to="/collections"
             className={location.pathname === "/favorites" ? "active" : ""}
           >
-            <ArchiveBoxIcon className="size-5" />
+            <Album size={20} strokeWidth={1.5} />
             Collections
           </Link>
         </li>
@@ -52,10 +54,16 @@ function SideBar() {
           </Link>
         </li>
         <li>
-          <Link to="/upload-photos">
-            <ArrowUpTrayIcon className="size-5" />
-            Upload
+          <Link to={"/portfolio"}>
+            <BookOpenIcon className="size-5" />
+            Portfolio
           </Link>
+        </li>
+        <li>
+          <div className="bg-linear-50 from-ctp-maroon-300 text-ctp-base">
+            <ArrowUpTrayIcon className="size-5" />
+            <Link to="/upload-photos">Upload</Link>
+          </div>
         </li>
         <li>
           <Link to="/settings">

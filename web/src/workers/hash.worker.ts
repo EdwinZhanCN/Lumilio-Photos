@@ -3,19 +3,19 @@
 import init, { hash_asset, HashResult } from "@/wasm/blake3_wasm";
 
 // --- Type Definitions ---
-interface WorkerMessage {
+export interface WorkerMessage {
   type: "ABORT" | "GENERATE_HASH";
   data?: File[];
 }
 
-interface WorkerHashResult {
+export interface WorkerHashResult {
   index: number;
   hash: string;
   error?: string;
 }
 
 // --- Initialization Control ---
-let initializationPromise: Promise<void> | null = null;
+const initializationPromise: Promise<void> | null = null;
 
 function initialize(): Promise<void> {
   if (initializationPromise) {
@@ -138,5 +138,3 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       break;
   }
 };
-
-export {}; // Ensures this file is treated as a module.

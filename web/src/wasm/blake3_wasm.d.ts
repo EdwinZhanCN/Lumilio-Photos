@@ -1,5 +1,5 @@
 /* tslint:disable */
-/* eslint-disable */
+ 
 /**
  * Generates a BLAKE3 hash from any media asset buffer
  *
