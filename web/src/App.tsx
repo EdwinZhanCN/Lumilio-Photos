@@ -8,7 +8,7 @@ import GlobalProvider from "@/contexts/GlobalContext";
 import "@/styles/App.css";
 import "katex/dist/katex.min.css";
 import Notifications from "@/components/Notifications";
-import { SettingsProvider } from "@/contexts/SettingsContext";
+import { SettingsProvider } from "./features/settings";
 
 const queryClient = new QueryClient();
 

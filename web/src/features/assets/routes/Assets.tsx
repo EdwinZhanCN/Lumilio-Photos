@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import Photos from "../components/Photos";
-import Audios from "../components/Audios";
-import Videos from "../components/Videos";
+import Photos from "./Photos";
+import Audios from "./Audios";
+import Videos from "./Videos";
 import { AssetsProvider } from "../AssetsProvider";
 import { ErrorBoundary } from "react-error-boundary";
 import AssetTabs from "@/features/assets/components/AssetTabs";
 import { useAssetsPageState } from "@/features/assets/hooks/useAssetsPageState";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import ErrorFallBack from "@/pages/ErrorFallBack";
+import ErrorFallBack from "@/components/ErrorFallBack";
 
 const Assets = () => {
   const location = useLocation();

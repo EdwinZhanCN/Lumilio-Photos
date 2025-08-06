@@ -1,4 +1,4 @@
-import { PanelType } from "@/pages/Studio";
+import { PanelType } from "../routes/Studio";
 import { ExifDataDisplay } from "./panels/ExifDataDisplay";
 import { DevelopPanel } from "./panels/DevelopPanel";
 import { FramesPanel } from "./panels/FramesPanel";

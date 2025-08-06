@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import ProgressIndicator from "./ProgressIndicator";
-import { acceptFileExtensions } from "@/utils/accept-file-extensions.ts";
+import { acceptFileExtensions } from "@/lib/accept-file-extensions";
 import { useUploadContext } from "@/features/upload";
 
 function BatchUploadSection() {

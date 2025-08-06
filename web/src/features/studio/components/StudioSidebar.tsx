@@ -5,7 +5,7 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
-import { PanelType } from "@/pages/Studio"; // Assuming Studio.tsx is at root or adjust path
+import { PanelType } from "../routes/Studio";
 
 type StudioSidebarProps = {
   activePanel: PanelType;

@@ -6,7 +6,7 @@ import {
   LanguageIcon,
   TagIcon,
 } from "@heroicons/react/24/outline/index.js";
-import { LumenAvatar } from "./Lumen/LumenAvatar/LumenAvatar";
+import { LumenAvatar } from "@/features/lumen";
 
 function NavBar() {
   const [searchText, setSearchText] = useState("");

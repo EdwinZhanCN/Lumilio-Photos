@@ -3,7 +3,7 @@ import { useExtractExifdata } from "@/hooks/util-hooks/useExtractExifdata";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { getAssetService } from "@/services/getAssetsService";
 import { AxiosError } from "axios";
-import { ExifDataDisplay } from "@/components/Studio/panels/ExifDataDisplay";
+import {ExifDataDisplay} from "@/features/studio/components/panels/ExifDataDisplay.tsx";
 
 interface FullScreenInfoProps {
   asset: Asset;

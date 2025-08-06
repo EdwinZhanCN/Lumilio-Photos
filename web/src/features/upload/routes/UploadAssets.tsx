@@ -2,7 +2,7 @@ import PreviewUploadSection from "../components/PreviewUploadSection";
 import BatchUploadSection from "../components/BatchUploadSection";
 import { UploadProvider } from "../UploadProvider";
 import { ErrorBoundary } from "react-error-boundary";
-import ErrorFallBack from "@/pages/ErrorFallBack.tsx";
+import ErrorFallBack from "@/components/ErrorFallBack";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 
 const UploadAssets = () => {

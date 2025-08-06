@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { getAssetService, ListAssetsParams } from "@/services/getAssetsService";
-import { AssetsState, AssetsActions } from "@/contexts/FetchContext";
+import { AssetsState, AssetsActions } from "@/features/assets";
 
 // Defines the shape of the object returned by our custom hook.
 interface FetchProcessValue {
