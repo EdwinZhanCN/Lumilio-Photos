@@ -1,6 +1,6 @@
 import { parseMetadata } from '@uswriting/exiftool';
 
-let abortController = new AbortController();
+const abortController = new AbortController();
 
 interface WorkerMessage {
     type: 'ABORT' | 'EXTRACT_EXIF';

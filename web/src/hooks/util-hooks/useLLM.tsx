@@ -1,10 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useMessage } from "@/hooks/util-hooks/useMessage.tsx";
-import { useWorker } from "@/contexts/WorkerProvider.tsx";
-import {
-  ChatCompletionMessageParam,
-  InitProgressReport,
-} from "@mlc-ai/web-llm";
+import {useCallback, useEffect, useRef, useState} from "react";
+import {useMessage} from "@/hooks/util-hooks/useMessage.tsx";
+import {useWorker} from "@/contexts/WorkerProvider.tsx";
+import {ChatCompletionMessageParam, InitProgressReport,} from "@mlc-ai/web-llm";
+import {useSettingsContext} from "@/features/settings";
 
 export interface LLMProgress {
   isInitializing: boolean;
@@ -26,6 +24,7 @@ export interface LLMMessage {
 export interface LLMOptions {
   modelId?: string;
   temperature?: number;
+  top_p?: number;
   systemPrompt?: string;
   stream?: boolean;
 }
@@ -56,6 +55,7 @@ export interface UseLLMReturn {
 export const useLLM = (): UseLLMReturn => {
   const showMessage = useMessage();
   const workerClient = useWorker();
+  const { state} = useSettingsContext();
 
   const [isInitializing, setIsInitializing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -66,34 +66,40 @@ export const useLLM = (): UseLLMReturn => {
 
   // Kick off model initialization on mount so progress shows immediately
   useEffect(() => {
-    setIsInitializing(true);
-    workerClient
-      .initializeWebLLMEngine()
-      .catch((err) => {
-        showMessage("error", `Model initialization failed: ${err.message}`);
-      })
-      .finally(() => {
-        setIsInitializing(false);
-      });
-  }, [workerClient, showMessage]);
+    if (state.lumen?.enabled) {
+      setIsInitializing(true);
+      workerClient
+        .initializeWebLLMEngine(state.lumen.model)
+        .catch((err) => {
+          showMessage("error", `Model initialization failed: ${err.message}`);
+        })
+        .finally(() => {
+          setIsInitializing(false);
+        });
+    }
+  }, [
+    workerClient,
+    showMessage,
+    state.lumen?.model,
+    state.lumen?.enabled,
+  ]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Effect to listen for progress updates from the worker
   useEffect(() => {
-    const remove = workerClient.addProgressListener(
-      (report: InitProgressReport) => {
-        const initializing = report.progress < 1;
-        setProgress((prev) => ({
-          ...prev!,
-          isInitializing: initializing,
-          initStatus: report.text,
-          initTime: report.timeElapsed,
-          initProgress: report.progress,
-        }));
-      },
+    return workerClient.addProgressListener(
+        (report: InitProgressReport) => {
+          const initializing = report.progress < 1;
+          setProgress((prev) => ({
+            ...prev!,
+            isInitializing: initializing,
+            initStatus: report.text,
+            initTime: report.timeElapsed,
+            initProgress: report.progress,
+          }));
+        },
     );
-    return remove;
   }, [workerClient]);
 
   const generateAnswer = useCallback(
@@ -106,15 +112,21 @@ export const useLLM = (): UseLLMReturn => {
         return undefined;
       }
 
-      // Require modelId to be specified
-      if (!options.modelId) {
-        showMessage("error", "Please specify a modelId in options");
+      if (!state.lumen?.enabled) {
+        showMessage("error", "Lumen is disabled in settings");
+        return undefined;
+      }
+
+      const modelId = options.modelId || state.lumen?.model;
+
+      if (!modelId) {
+        showMessage("error", "Please specify a modelId in options or settings");
         return undefined;
       }
 
       // Update current model if different
-      if (currentModelId !== options.modelId) {
-        setCurrentModelId(options.modelId);
+      if (currentModelId !== modelId) {
+        setCurrentModelId(modelId);
         setIsInitializing(true);
       }
 
@@ -168,11 +180,11 @@ export const useLLM = (): UseLLMReturn => {
           content: userInput,
         });
 
-        let fullResponse = "";
+        const fullResponse = "";
         let tokenCount = 0;
 
         const response = await workerClient.askLLM(messages, {
-          temperature: options.temperature ?? 0.7,
+          temperature: options.temperature ?? state.lumen?.temperature,
           stream: options.stream ?? true,
           onChunk: (chunk: string) => {
             tokenCount++;
@@ -223,7 +235,14 @@ export const useLLM = (): UseLLMReturn => {
         }, 3000);
       }
     },
-    [workerClient, showMessage, systemPrompt, currentModelId],
+    [
+      workerClient,
+      showMessage,
+      systemPrompt,
+      currentModelId,
+      state.lumen,
+      conversation,
+    ],
   );
 
   const clearConversation = useCallback(() => {

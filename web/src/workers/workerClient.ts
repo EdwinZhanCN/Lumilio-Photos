@@ -14,8 +14,6 @@ import {
   AppConfig,
   MLCEngineConfig,
   prebuiltAppConfig,
-  modelLibURLPrefix,
-  modelVersion,
   InitProgressReport,
 } from "@mlc-ai/web-llm";
 
@@ -36,36 +34,6 @@ export interface WorkerClientOptions {
   };
 }
 
-// TODO: Make this Configurable
-const qwen3Custom: ModelRecord[] = [
-  {
-    model: "https://huggingface.co/mlc-ai/Qwen3-4B-q4f16_1-MLC",
-    model_id: "Qwen3-4B-q4f16_1-MLC",
-    model_lib:
-      modelLibURLPrefix +
-      modelVersion +
-      "/Qwen3-4B-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-    vram_required_MB: 3431.59,
-    low_resource_required: true,
-    overrides: {
-      context_window_size: 4096,
-    },
-  },
-  {
-    model: "https://huggingface.co/mlc-ai/Qwen3-1.7B-q4f16_1-MLC",
-    model_id: "Qwen3-1.7B-q4f16_1-MLC",
-    model_lib:
-      modelLibURLPrefix +
-      modelVersion +
-      "/Qwen3-1.7B-q4f16_1-ctx4k_cs1k-webgpu.wasm",
-    vram_required_MB: 2036.66,
-    low_resource_required: true,
-    overrides: {
-      context_window_size: 4096,
-    },
-  },
-];
-
 export class AppWorkerClient {
   private generateThumbnailworker: Worker | null = null;
   private hashAssetsworker: Worker | null = null;
@@ -76,7 +44,7 @@ export class AppWorkerClient {
   private webLLMEngine: any = null;
   private webllmAppConfig: AppConfig = {
     useIndexedDBCache: true,
-    model_list: qwen3Custom,
+    model_list: [],
   };
   private currentModelId: string | null = null;
   private targetModelId: string = "Qwen3-1.7B-q4f16_1-MLC";
@@ -88,8 +56,18 @@ export class AppWorkerClient {
 
     // Set up WebLLM configuration if provided
     if (options.webllmConfig) {
+      // Validate that modelRecords exist and are not empty
+      if (
+        !options.webllmConfig.modelRecords ||
+        options.webllmConfig.modelRecords.length === 0
+      ) {
+        console.warn(
+          "WebLLM config provided but modelRecords is empty or undefined",
+        );
+      }
+
       this.webllmAppConfig = {
-        model_list: options.webllmConfig.modelRecords || qwen3Custom,
+        model_list: options.webllmConfig.modelRecords || [],
         useIndexedDBCache: options.webllmConfig.useIndexedDBCache ?? true,
       };
       this.targetModelId = options.webllmConfig.modelId;
@@ -201,13 +179,14 @@ export class AppWorkerClient {
             });
             worker.removeEventListener("message", handler);
             break;
-          case "ERROR":
+          case "ERROR": {
             const error = new Error(e.data.payload.error);
             error.name = e.data.payload.errorName;
             error.stack = e.data.payload.errorStack;
             worker.removeEventListener("message", handler);
             reject(error);
             break;
+          }
           case "PROGRESS":
             this.eventTarget.dispatchEvent(
               new CustomEvent("progress", { detail: e.data.payload }),
@@ -421,7 +400,27 @@ export class AppWorkerClient {
   public async initializeWebLLMEngine(
     modelId: string = this.targetModelId,
   ): Promise<void> {
-    if (!this.WebLLMWorker) return;
+    if (!this.WebLLMWorker) {
+      throw new Error("WebLLM worker is not available");
+    }
+
+    // Validate that we have models available
+    if (
+      !this.webllmAppConfig.model_list ||
+      this.webllmAppConfig.model_list.length === 0
+    ) {
+      throw new Error("No models configured in webllmAppConfig.model_list");
+    }
+
+    // Validate that the requested model exists in our model list
+    const modelExists = this.webllmAppConfig.model_list.some(
+      (model) => model.model_id === modelId,
+    );
+    if (!modelExists) {
+      throw new Error(
+        `Model '${modelId}' not found in configured model list. Available models: ${this.webllmAppConfig.model_list.map((m) => m.model_id).join(", ")}`,
+      );
+    }
 
     // Reset engine if model changes
     if (this.webLLMEngine && this.currentModelId !== modelId) {
@@ -445,13 +444,20 @@ export class AppWorkerClient {
       engineConfig.appConfig = this.webllmAppConfig;
     }
 
-    this.webLLMEngine = await CreateWebWorkerMLCEngine(
-      this.WebLLMWorker,
-      modelId,
-      engineConfig,
-    );
+    try {
+      this.webLLMEngine = await CreateWebWorkerMLCEngine(
+        this.WebLLMWorker,
+        modelId,
+        engineConfig,
+      );
 
-    this.currentModelId = modelId;
+      this.currentModelId = modelId;
+    } catch (error) {
+      console.error("Failed to initialize WebLLM engine:", error);
+      throw new Error(
+        `WebLLM engine initialization failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**
