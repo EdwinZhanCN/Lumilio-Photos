@@ -4,8 +4,8 @@ import ProgressIndicator from "./ProgressIndicator";
 import ImagePreviewGrid from "./ImagePreviewGrid";
 import { useUploadContext } from "@/features/upload";
 import { useGenerateThumbnail } from "@/hooks/util-hooks/useGenerateThumbnail";
-import ValidateFile from "@/utils/validate-file";
-import { acceptFileExtensions } from "@/utils/accept-file-extensions";
+import ValidateFile from "@/lib/validate-file";
+import { acceptFileExtensions } from "@/lib/accept-file-extensions";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 
 function PreviewUploadSection(): React.JSX.Element {

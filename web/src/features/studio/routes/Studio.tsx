@@ -5,10 +5,12 @@ import {
   BorderOptions,
   BorderParams,
 } from "@/hooks/util-hooks/useGenerateBorder";
-import { StudioHeader } from "@/components/Studio/StudioHeader";
-import { StudioSidebar } from "@/components/Studio/StudioSidebar";
-import { StudioViewport } from "@/components/Studio/StudioViewport";
-import { StudioToolsPanel } from "@/components/Studio/StudioToolsPanel";
+import {
+  StudioHeader,
+  StudioSidebar,
+  StudioToolsPanel,
+  StudioViewport,
+} from "@/features/studio/components";
 
 export type PanelType = "exif" | "develop" | "frames";
 
@@ -121,44 +123,44 @@ export function Studio() {
       ?.borderedFileURL || imageUrl;
 
   return (
-    <div className="flex flex-col h-[calc(85vh)] bg-base-100 overflow-hidden">
-      <StudioHeader
-        onOpenFile={triggerFileInput}
-        fileInputRef={fileInputRef}
-        onFileChange={handleFileChange}
-      />
-
-      <div className="flex-1 flex overflow-hidden">
-        <StudioSidebar
-          activePanel={activePanel}
-          setActivePanel={setActivePanel}
-          isCollapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-        />
-
-        <StudioViewport
-          key={displayUrl} // Force re-render when URL changes
-          imageUrl={displayUrl}
-          selectedFile={selectedFile}
+      <div className="flex flex-col h-[calc(85vh)] bg-base-100 overflow-hidden">
+        <StudioHeader
           onOpenFile={triggerFileInput}
+          fileInputRef={fileInputRef}
+          onFileChange={handleFileChange}
         />
 
-        <StudioToolsPanel
-          selectedFile={selectedFile}
-          activePanel={activePanel}
-          isExtracting={isExtracting}
-          exifProgress={exifProgress}
-          exifToDisplay={exifToDisplay}
-          onExtractExif={handleExtractExif}
-          isGeneratingBorders={isGenBorders}
-          borderProgress={borderProgress}
-          onGenerateBorders={handleGenerateBorders}
-          onCancelGeneration={handleCancelGeneration}
-          isCancelling={isCancelling}
-          onCancelExtraction={handleCancelExtraction}
-          isCancellingExif={isCancellingExif}
-        />
+        <div className="flex-1 flex overflow-hidden">
+          <StudioSidebar
+            activePanel={activePanel}
+            setActivePanel={setActivePanel}
+            isCollapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          />
+
+          <StudioViewport
+            key={displayUrl} // Force re-render when URL changes
+            imageUrl={displayUrl}
+            selectedFile={selectedFile}
+            onOpenFile={triggerFileInput}
+          />
+
+          <StudioToolsPanel
+            selectedFile={selectedFile}
+            activePanel={activePanel}
+            isExtracting={isExtracting}
+            exifProgress={exifProgress}
+            exifToDisplay={exifToDisplay}
+            onExtractExif={handleExtractExif}
+            isGeneratingBorders={isGenBorders}
+            borderProgress={borderProgress}
+            onGenerateBorders={handleGenerateBorders}
+            onCancelGeneration={handleCancelGeneration}
+            isCancelling={isCancelling}
+            onCancelExtraction={handleCancelExtraction}
+            isCancellingExif={isCancellingExif}
+          />
+        </div>
       </div>
-    </div>
   );
 }

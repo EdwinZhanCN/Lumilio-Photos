@@ -1,58 +1,47 @@
-import { useSettings } from "@/contexts/SettingsContext";
-import React, { useState } from "react";
+import { useSettingsContext } from "@/features/settings";
+import { ModelRecord } from "@mlc-ai/web-llm";
+import React, { useEffect, useState } from "react";
 
 export default function LumenSettings() {
-  const { settings, setSettings, isMobile } = useSettings();
+  const { state, dispatch } = useSettingsContext();
+  const { lumen: lumenSettings } = state;
 
-  // Local state for all settings
-  const [localSettings, setLocalSettings] = useState({
-    enabled: settings.lumen?.enabled ?? true,
-    model: settings.lumen?.model || "Qwen3-1.7B-q4f16_1-MLC",
-    systemPrompt: settings.lumen?.systemPrompt || "",
-    temperature: settings.lumen?.temperature ?? 0.7,
-    top_p: settings.lumen?.top_p ?? 0.9,
-  });
+  // A simple isMobile detection. In a real-world app, this might be a more robust custom hook.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkIsMobile = () => window.innerWidth < 768;
+    setIsMobile(checkIsMobile());
+    window.addEventListener("resize", checkIsMobile);
+    return () => window.removeEventListener("resize", checkIsMobile);
+  }, []);
 
+  // Local state for form elements to allow for "Save" and "Cancel" functionality
+  const [localSettings, setLocalSettings] = useState(lumenSettings);
   const [customModelList, setCustomModelList] = useState(
-    JSON.stringify(settings.lumen?.modelRecords || [], null, 2),
+    JSON.stringify(lumenSettings.modelRecords || [], null, 2),
   );
 
-  // Update local state and textarea when settings change
-  React.useEffect(() => {
-    setLocalSettings({
-      enabled: settings.lumen?.enabled ?? true,
-      model: settings.lumen?.model || "Qwen3-1.7B-q4f16_1-MLC",
-      systemPrompt: settings.lumen?.systemPrompt || "",
-      temperature: settings.lumen?.temperature ?? 0.7,
-      top_p: settings.lumen?.top_p ?? 0.9,
-    });
+  // When the settings from the context change, update the local state
+  useEffect(() => {
+    setLocalSettings(lumenSettings);
     setCustomModelList(
-      JSON.stringify(settings.lumen?.modelRecords || [], null, 2),
+      JSON.stringify(lumenSettings.modelRecords || [], null, 2),
     );
-  }, [settings.lumen]);
+  }, [lumenSettings]);
 
   const handleEnabledChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (isMobile) return; // Prevent enabling on mobile
-    setLocalSettings({
-      ...localSettings,
-      enabled: event.target.checked,
-    });
+    if (isMobile) return;
+    setLocalSettings({ ...localSettings, enabled: event.target.checked });
   };
 
   const handleModelChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setLocalSettings({
-      ...localSettings,
-      model: event.target.value,
-    });
+    setLocalSettings({ ...localSettings, model: event.target.value });
   };
 
   const handleSystemPromptChange = (
     event: React.ChangeEvent<HTMLTextAreaElement>,
   ) => {
-    setLocalSettings({
-      ...localSettings,
-      systemPrompt: event.target.value,
-    });
+    setLocalSettings({ ...localSettings, systemPrompt: event.target.value });
   };
 
   const handleTemperatureChange = (
@@ -73,17 +62,22 @@ export default function LumenSettings() {
 
   const handleSave = () => {
     try {
-      const modelRecords = JSON.parse(customModelList);
-      if (settings.lumen) {
-        setSettings({
-          ...settings,
-          lumen: {
-            ...settings.lumen,
-            ...localSettings,
-            modelRecords,
-          },
-        });
-      }
+      const modelRecords: ModelRecord[] = JSON.parse(customModelList);
+      dispatch({
+        type: "SET_LUMEN_ENABLED",
+        payload: localSettings.enabled ?? true,
+      });
+      dispatch({ type: "SET_LUMEN_MODEL", payload: localSettings.model });
+      dispatch({
+        type: "SET_LUMEN_SYSTEM_PROMPT",
+        payload: localSettings.systemPrompt ?? "",
+      });
+      dispatch({
+        type: "SET_LUMEN_TEMPERATURE",
+        payload: localSettings.temperature,
+      });
+      dispatch({ type: "SET_LUMEN_TOP_P", payload: localSettings.top_p });
+      dispatch({ type: "SET_LUMEN_MODELRECORDS", payload: modelRecords });
     } catch (error) {
       console.error("Invalid JSON format for model list:", error);
       alert("Invalid JSON format for model list. Please check your syntax.");
@@ -91,14 +85,25 @@ export default function LumenSettings() {
   };
 
   const hasUnsavedChanges = () => {
-    if (!settings.lumen) return false;
+    let modelsChanged = false;
+    try {
+      const customModels = JSON.parse(customModelList);
+      modelsChanged =
+        JSON.stringify(customModels) !==
+        JSON.stringify(lumenSettings.modelRecords ?? []);
+    } catch (e) {
+      console.log("Invalid JSON format", e);
+      return true; // Invalid JSON is an unsaved change
+    }
+
     return (
-      localSettings.enabled !== (settings.lumen.enabled ?? true) ||
-      localSettings.model !==
-        (settings.lumen.model || "Qwen3-1.7B-q4f16_1-MLC") ||
-      localSettings.systemPrompt !== (settings.lumen.systemPrompt || "") ||
-      localSettings.temperature !== (settings.lumen.temperature ?? 0.7) ||
-      localSettings.top_p !== (settings.lumen.top_p ?? 0.9)
+      (localSettings.enabled ?? true) !== (lumenSettings.enabled ?? true) ||
+      localSettings.model !== lumenSettings.model ||
+      (localSettings.systemPrompt ?? "") !==
+        (lumenSettings.systemPrompt ?? "") ||
+      localSettings.temperature !== lumenSettings.temperature ||
+      localSettings.top_p !== lumenSettings.top_p ||
+      modelsChanged
     );
   };
 
@@ -119,16 +124,14 @@ export default function LumenSettings() {
       )}
       <div>
         <h1 className="text-2xl font-bold my-2">Enable</h1>
-        {/*Enable Lumen? */}
         <input
           type="checkbox"
-          checked={localSettings.enabled}
+          checked={localSettings.enabled ?? true}
           onChange={handleEnabledChange}
           disabled={isMobile}
           className={`toggle toggle-primary ${isMobile ? "opacity-50" : ""}`}
         />
       </div>
-      {/*Choose Which Model is Enabled? */}
       <div className="flex items-center gap-2">
         <h1 className="text-2xl font-bold my-2">Choose your Model</h1>
       </div>
@@ -139,7 +142,7 @@ export default function LumenSettings() {
         use WebLLM as our backbone.
       </p>
       <div className="flex flex-wrap md:flex-nowrap gap-4 py-3 overflow-x-auto">
-        {settings.lumen?.modelRecords?.map((modelRecord) => (
+        {lumenSettings.modelRecords?.map((modelRecord) => (
           <div
             key={modelRecord.model_id}
             className="card bg-base-100 shadow-sm flex-1 max-w-[500px]"
@@ -174,13 +177,12 @@ export default function LumenSettings() {
           </div>
         ))}
       </div>
-      {/*System Prompt */}
       <div>
         <h1 className="text-2xl font-bold my-2">System Prompt (Chat Only)</h1>
         <textarea
           placeholder="Enter your system prompt here..."
           className="textarea textarea-primary w-full h-32"
-          value={localSettings.systemPrompt}
+          value={localSettings.systemPrompt ?? ""}
           onChange={handleSystemPromptChange}
           disabled={isMobile}
         ></textarea>

@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useLLM, type LLMProgress } from "@/hooks/util-hooks/useLLM.tsx";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettingsContext } from "@/features/settings";
 import { LumenHeader } from "./LumenHeader";
 import { LumenStatus } from "./LumenStatus";
 import { LumenMessages } from "./LumenMessages";
 import { LumenInput } from "./LumenInput";
 
 export function LumenChat() {
-  const { settings } = useSettings();
+  const { state } = useSettingsContext();
   const {
     isInitializing,
     isGenerating,
@@ -25,8 +25,8 @@ export function LumenChat() {
 
   // Set system prompt from settings on component mount
   useEffect(() => {
-    setSystemPrompt(settings.lumen?.systemPrompt || "");
-  }, [setSystemPrompt, settings.lumen?.systemPrompt]);
+    setSystemPrompt(state.lumen?.systemPrompt || "");
+  }, [setSystemPrompt, state.lumen?.systemPrompt]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isGenerating) return;

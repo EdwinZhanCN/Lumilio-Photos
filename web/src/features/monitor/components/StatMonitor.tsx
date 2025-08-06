@@ -1,4 +1,4 @@
-export default function StatMonitor() {
+export function StatMonitor() {
   return (
     <div className="stats stats-vertical lg:stats-horizontal shadow">
       <div className="stat">

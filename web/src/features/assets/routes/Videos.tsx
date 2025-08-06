@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useInView } from "react-intersection-observer";
-import PhotosLoadingSkeleton from "./Photos/PhotosLoadingSkeleton";
+import PhotosLoadingSkeleton from "@/features/assets/components/Photos/PhotosLoadingSkeleton";
 import { useAssetsContext } from "../hooks/useAssetsContext";
-import { useAssetsPageState } from "../hooks/useAssetsPageState";
-import { groupAssets } from "@/utils/assetGrouping";
+import { useAssetsPageState } from "@/features/assets/hooks/useAssetsPageState";
+import { groupAssets } from "@/lib/assetGrouping";
 
-function Audios() {
+function Videos() {
   const {
     assets: allAssets,
     error,
@@ -39,30 +39,30 @@ function Audios() {
     }
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Filter only audio assets
-  const audioAssets = useMemo(
-    () => allAssets.filter((asset: Asset) => asset.type === "AUDIO"),
+  // Filter only video assets
+  const videoAssets = useMemo(
+    () => allAssets.filter((asset: Asset) => asset.type === "VIDEO"),
     [allAssets],
   );
 
-  const groupedAudios = useMemo(
-    () => groupAssets(audioAssets, groupBy, sortOrder),
-    [audioAssets, groupBy, sortOrder],
+  const groupedVideos = useMemo(
+    () => groupAssets(videoAssets, groupBy, sortOrder),
+    [videoAssets, groupBy, sortOrder],
   );
 
   if (error) {
-    throw new Error(`Failed to load audio files: ${error}`);
+    throw new Error(`Failed to load videos: ${error}`);
   }
 
   return (
     <div className="p-4 w-full max-w-screen-lg mx-auto">
       <div className="text-center py-12">
-        <div className="text-gray-400 text-lg mb-2">Audio Files</div>
+        <div className="text-gray-400 text-lg mb-2">Videos Page</div>
         <div className="text-gray-500 text-sm">
-          Audio functionality is not yet implemented
+          Video functionality is not yet implemented
         </div>
         <div className="text-gray-500 text-xs mt-2">
-          Found {audioAssets.length} audio assets
+          Found {videoAssets.length} video assets
         </div>
       </div>
 
@@ -70,11 +70,11 @@ function Audios() {
         <PhotosLoadingSkeleton count={12} />
       ) : (
         <div className="space-y-4">
-          {Object.keys(groupedAudios).map((groupKey) => (
+          {Object.keys(groupedVideos).map((groupKey) => (
             <div key={groupKey} className="border rounded-lg p-4">
               <h3 className="font-semibold mb-2">{groupKey}</h3>
               <div className="text-sm text-gray-600">
-                {groupedAudios[groupKey].length} audio file(s)
+                {groupedVideos[groupKey].length} video(s)
               </div>
             </div>
           ))}
@@ -96,4 +96,4 @@ function Audios() {
   );
 }
 
-export default Audios;
+export default Videos;

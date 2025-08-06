@@ -1,5 +1,5 @@
-import { LumenChat } from "@/components/Lumen/LumenChat";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
+import { LumenChat } from "../components/LumenChat";
 
 export function Lumen() {
   return (

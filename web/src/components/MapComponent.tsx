@@ -4,7 +4,8 @@ import L, { LatLngExpression, LatLngTuple } from 'leaflet';
 
 // 修复 Leaflet 默认图标问题
 // 这里要先删除 _getIconUrl，再为 Icon.Default 添加 mergeOptions
-// @ts-ignore
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-errorå
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',

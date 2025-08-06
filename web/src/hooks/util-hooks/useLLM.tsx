@@ -1,11 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useMessage } from "@/hooks/util-hooks/useMessage.tsx";
-import { useWorker } from "@/contexts/WorkerProvider.tsx";
-import {
-  ChatCompletionMessageParam,
-  InitProgressReport,
-} from "@mlc-ai/web-llm";
-import { useSettings } from "@/contexts/SettingsContext";
+import {useCallback, useEffect, useRef, useState} from "react";
+import {useMessage} from "@/hooks/util-hooks/useMessage.tsx";
+import {useWorker} from "@/contexts/WorkerProvider.tsx";
+import {ChatCompletionMessageParam, InitProgressReport,} from "@mlc-ai/web-llm";
+import {useSettingsContext} from "@/features/settings";
 
 export interface LLMProgress {
   isInitializing: boolean;
@@ -58,7 +55,7 @@ export interface UseLLMReturn {
 export const useLLM = (): UseLLMReturn => {
   const showMessage = useMessage();
   const workerClient = useWorker();
-  const { settings } = useSettings();
+  const { state} = useSettingsContext();
 
   const [isInitializing, setIsInitializing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -69,10 +66,10 @@ export const useLLM = (): UseLLMReturn => {
 
   // Kick off model initialization on mount so progress shows immediately
   useEffect(() => {
-    if (settings.lumen?.enabled) {
+    if (state.lumen?.enabled) {
       setIsInitializing(true);
       workerClient
-        .initializeWebLLMEngine(settings.lumen.model)
+        .initializeWebLLMEngine(state.lumen.model)
         .catch((err) => {
           showMessage("error", `Model initialization failed: ${err.message}`);
         })
@@ -83,27 +80,26 @@ export const useLLM = (): UseLLMReturn => {
   }, [
     workerClient,
     showMessage,
-    settings.lumen?.model,
-    settings.lumen?.enabled,
+    state.lumen?.model,
+    state.lumen?.enabled,
   ]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Effect to listen for progress updates from the worker
   useEffect(() => {
-    const remove = workerClient.addProgressListener(
-      (report: InitProgressReport) => {
-        const initializing = report.progress < 1;
-        setProgress((prev) => ({
-          ...prev!,
-          isInitializing: initializing,
-          initStatus: report.text,
-          initTime: report.timeElapsed,
-          initProgress: report.progress,
-        }));
-      },
+    return workerClient.addProgressListener(
+        (report: InitProgressReport) => {
+          const initializing = report.progress < 1;
+          setProgress((prev) => ({
+            ...prev!,
+            isInitializing: initializing,
+            initStatus: report.text,
+            initTime: report.timeElapsed,
+            initProgress: report.progress,
+          }));
+        },
     );
-    return remove;
   }, [workerClient]);
 
   const generateAnswer = useCallback(
@@ -116,12 +112,12 @@ export const useLLM = (): UseLLMReturn => {
         return undefined;
       }
 
-      if (!settings.lumen?.enabled) {
+      if (!state.lumen?.enabled) {
         showMessage("error", "Lumen is disabled in settings");
         return undefined;
       }
 
-      const modelId = options.modelId || settings.lumen?.model;
+      const modelId = options.modelId || state.lumen?.model;
 
       if (!modelId) {
         showMessage("error", "Please specify a modelId in options or settings");
@@ -188,7 +184,7 @@ export const useLLM = (): UseLLMReturn => {
         let tokenCount = 0;
 
         const response = await workerClient.askLLM(messages, {
-          temperature: options.temperature ?? settings.lumen?.temperature,
+          temperature: options.temperature ?? state.lumen?.temperature,
           stream: options.stream ?? true,
           onChunk: (chunk: string) => {
             tokenCount++;
@@ -244,7 +240,7 @@ export const useLLM = (): UseLLMReturn => {
       showMessage,
       systemPrompt,
       currentModelId,
-      settings.lumen,
+      state.lumen,
       conversation,
     ],
   );

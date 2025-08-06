@@ -1,8 +1,7 @@
 import { createContext, useContext, useRef, useEffect, ReactNode } from "react";
 import { AppWorkerClient, WorkerType } from "@/workers/workerClient";
 import { ModelRecord } from "@mlc-ai/web-llm";
-import { useSettings } from "@/contexts/SettingsContext";
-
+import { useSettingsContext } from "@/features/settings";
 const WorkerContext = createContext<AppWorkerClient | null>(null);
 
 /**
@@ -47,18 +46,18 @@ export const WorkerProvider = ({
   preload,
   webllmConfig,
 }: WorkerProviderProps) => {
-  const { settings } = useSettings();
+  const { state } = useSettingsContext();
   const workerClientRef = useRef<AppWorkerClient | null>(null);
 
   if (workerClientRef.current === null) {
     // Use settings if available and no explicit webllmConfig provided
     const finalWebllmConfig =
       webllmConfig ||
-      (settings.lumen && settings.lumen.enabled
+      (state.lumen && state.lumen.enabled
         ? {
-            modelRecords: settings.lumen.modelRecords || [],
+            modelRecords: state.lumen.modelRecords || [],
             useIndexedDBCache: true,
-            modelId: settings.lumen.model,
+            modelId: state.lumen.model,
           }
         : undefined);
 
