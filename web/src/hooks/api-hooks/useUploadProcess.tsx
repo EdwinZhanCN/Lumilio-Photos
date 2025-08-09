@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { formatBytes } from "@/lib/formatters";
+import { formatBytes } from "@/lib/utils/formatters.ts";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import {
   HashcodeProgress,

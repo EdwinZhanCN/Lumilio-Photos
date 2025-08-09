@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
-import { Markdown } from "../LumenMarkdown/Markdown";
+import {Markdown, StaggeredMarkdown} from "../LumenMarkdown/Markdown";
 import { LumenAvatar } from "../LumenAvatar/LumenAvatar";
+import {useStreamingSplit} from "@/lib/utils/useStreamingSplit.ts";
 
 // Function to process think tags based on whether thinking is in progress
 function processThinkTags(
@@ -117,20 +118,32 @@ export function LumenMessages({
                     : "bg-base-200"
                 }`}
               >
-                {message.role === "user" ? (
-                  <div className="whitespace-pre-wrap">{message.content}</div>
+                {message.role === "assistant" ? (
+                    (() => {
+                      const { prefix, suffix } = useStreamingSplit(message.content, isStreamingHere);
+
+                      return (
+                          <>
+                            {/* 旧前缀：正常渲染，完全不加动画，保留已渲染的结构 */}
+                            {prefix && <Markdown content={processThinkTags(prefix, false)} />}
+
+                            {/* 新增尾巴：逐词淡入（不走 Markdown 解析，避免半截 token 把树搞坏） */}
+                            {suffix && (
+                                <div className="text-base leading-relaxed text-base-content">
+                                  <StaggeredMarkdown content={suffix} />
+                                  <span className="lm-caret" />
+                                </div>
+                            )}
+
+                            {/* 生成完毕：把整段换回正常 Markdown，收尾 */}
+                            {!isStreamingHere && (
+                                <Markdown content={processThinkTags(message.content, false)} />
+                            )}
+                          </>
+                      );
+                    })()
                 ) : (
-                  <>
-                    <Markdown
-                      content={processThinkTags(
-                        message.content,
-                        isStreamingHere,
-                      )}
-                    />
-                    {isStreamingHere && (
-                      <div className="text-xs opacity-70 mt-1">Typing...</div>
-                    )}
-                  </>
+                    <div className="whitespace-pre-wrap">{message.content}</div>
                 )}
               </div>
             </div>
