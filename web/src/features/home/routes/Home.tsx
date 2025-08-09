@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExifInfo } from "@/lib/exif-info";
+import { ExifInfo } from "@/lib/utils/exif-info.ts";
 import {
   SparklesIcon,
   MapIcon,

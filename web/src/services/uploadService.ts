@@ -1,4 +1,4 @@
-import api from "@/lib/api";
+import api from "@/lib/http-commons/api.ts";
 import { AxiosRequestConfig, AxiosResponse } from "axios";
 // Response interfaces based on swagger.yaml
 export interface UploadResponse {
