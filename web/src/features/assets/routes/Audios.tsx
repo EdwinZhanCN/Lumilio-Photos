@@ -3,7 +3,7 @@ import { useInView } from "react-intersection-observer";
 import PhotosLoadingSkeleton from "../components/Photos/PhotosLoadingSkeleton";
 import { useAssetsContext } from "../hooks/useAssetsContext";
 import { useAssetsPageState } from "../hooks/useAssetsPageState";
-import { groupAssets } from "@/lib/assetGrouping";
+import { groupAssets } from "@/lib/utils/assetGrouping.ts";
 
 function Audios() {
   const {

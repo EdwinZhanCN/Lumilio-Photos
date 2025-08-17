@@ -11,7 +11,7 @@ import {
   groupAssets,
   getFlatAssetsFromGrouped,
   findAssetIndex,
-} from "@/lib/assetGrouping";
+} from "@/lib/utils/assetGrouping.ts";
 
 function Photos() {
   const { assetId } = useParams<{ assetId: string }>();
