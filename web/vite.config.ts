@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -16,4 +17,25 @@ export default defineConfig({
     port: 3000,
   },
   plugins: [react(), tailwindcss(), wasm(), topLevelAwait()],
+
+  test: {
+    projects: [
+      {
+        test: {
+          name: 'happy-dom',
+          environment: 'happy-dom',
+          setupFiles: ['./setup.happy-dom.ts', '@vitest/web-worker'],
+        },
+      },
+      {
+        test: {
+          include: ['**/*.worker.{ts,js}', '**/*.test.{ts,js}'],
+          name: 'node',
+          environment: 'node',
+          setupFiles: ['./setup.node.ts', '@vitest/web-worker'],
+        },
+      },
+    ],
+  },
+
 });

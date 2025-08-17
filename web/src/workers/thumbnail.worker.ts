@@ -72,6 +72,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessageEvent>) => {
         const results = await generatePreview(
           files,
           startIndex,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
           (_processedInBatch) => {
             // Progress callback
             numberOfFilesProcessed++;
