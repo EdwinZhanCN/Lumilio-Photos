@@ -1,0 +1,38 @@
+version: "2"
+sql:
+    - engine: "postgresql"
+      queries: "internal/db/repo/queries"
+      schema: "schema"
+      gen:
+          go:
+              package: "repo"
+              out: "internal/db/repo"
+              sql_package: "pgx/v5"
+              emit_interface: true
+              emit_json_tags: true
+              emit_db_tags: true
+              emit_prepared_queries: false
+              emit_pointers_for_null_types: true
+              overrides:
+                  - column: "assets.embedding"
+                    go_type:
+                        import: "github.com/pgvector/pgvector-go"
+                        type: "Vector"
+                  - column: "SearchNearestAssets.distance"
+                    go_type: "float64"
+                  - column: "GetAssetEmbedding.embedding"
+                    go_type:
+                        import: "github.com/pgvector/pgvector-go"
+                        type: "Vector"
+                  - db_type: "vector"
+                    go_type:
+                        import: "github.com/pgvector/pgvector-go"
+                        type: "Vector"
+                  - column: "GetAssetWithThumbnails.thumbnails"
+                    go_type: "json.RawMessage"
+                  - column: "GetAssetWithTags.tags"
+                    go_type: "json.RawMessage"
+                  - column: "GetAssetWithRelations.thumbnails"
+                    go_type: "json.RawMessage"
+                  - column: "GetAssetWithRelations.tags"
+                    go_type: "json.RawMessage"
