@@ -9,6 +9,7 @@ import (
 
 	pb "server/proto"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -22,7 +23,7 @@ func SetupAssetQueue(
 
 	// 注册 ProcessAsset handler
 	q.RegisterWorker(
-		queue.JobTypeProcessAsset,
+		string(queue.JobTypeProcessAsset),
 		queue.WorkerOptions{Concurrency: runtime.NumCPU()},
 		func(ctx context.Context, job queue.Job[processors.AssetPayload]) error {
 			_, err := assetProcessor.ProcessAsset(ctx, job.Payload())
@@ -43,7 +44,7 @@ func SetupCLIPQueue(
 	q := queue.NewRiverQueue[processors.CLIPPayload](dbPool)
 
 	q.RegisterWorker(
-		queue.JobCLIPProcess,
+		string(queue.JobCLIPProcess),
 		queue.WorkerOptions{Concurrency: 1},
 		func(ctx context.Context, job queue.Job[processors.CLIPPayload]) error {
 			payload := job.Payload()
@@ -54,7 +55,11 @@ func SetupCLIPQueue(
 			if err != nil {
 				return err
 			}
-			err = assetService.SaveNewEmbedding(ctx, payload.AssetID, resp.ImageFeatureVector)
+			guuid, err := uuid.FromBytes(payload.AssetID.Bytes[:])
+			if err != nil {
+				return err
+			}
+			err = assetService.SaveNewEmbedding(ctx, guuid, resp.ImageFeatureVector)
 			return err
 		},
 	)

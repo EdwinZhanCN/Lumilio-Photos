@@ -9,7 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"server/internal/api"
-	"server/internal/models"
+	"server/internal/db/dbtypes"
+	"server/internal/db/repo"
 	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/service"
@@ -50,14 +51,14 @@ type BatchUploadResult struct {
 
 // AssetListResponse represents the response structure for asset listing
 type AssetListResponse struct {
-	Assets []*models.Asset `json:"assets"`
-	Limit  int             `json:"limit" example:"20"`
-	Offset int             `json:"offset" example:"0"`
+	Assets []repo.Asset `json:"assets"`
+	Limit  int          `json:"limit" example:"20"`
+	Offset int          `json:"offset" example:"0"`
 }
 
 // UpdateAssetRequest represents the request structure for updating asset metadata
 type UpdateAssetRequest struct {
-	Metadata models.SpecificMetadata `json:"metadata"`
+	Metadata dbtypes.SpecificMetadata `json:"metadata"`
 }
 
 // MessageResponse represents a simple message response
@@ -67,7 +68,7 @@ type MessageResponse struct {
 
 // AssetTypesResponse represents the response structure for asset types
 type AssetTypesResponse struct {
-	Types []models.AssetType `json:"types"`
+	Types []dbtypes.AssetType `json:"types"`
 }
 
 // AssetHandler handles HTTP requests for asset management
@@ -378,19 +379,19 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	var assets []*models.Asset
+	var assets []repo.Asset
 	var err error
 
 	switch {
 	case searchQuery != "":
-		var assetType *models.AssetType
+		var assetType *dbtypes.AssetType
 		if typeStr != "" {
-			at := models.AssetType(typeStr)
+			at := dbtypes.AssetType(typeStr)
 			if at.Valid() {
 				assetType = &at
 			}
 		}
-		assets, err = h.assetService.SearchAssets(ctx, searchQuery, assetType, limit, offset)
+		assets, err = h.assetService.SearchAssets(ctx, searchQuery, assetType.String(), limit, offset)
 
 	case ownerIDStr != "":
 		ownerID, parseErr := strconv.Atoi(ownerIDStr)
@@ -401,12 +402,12 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 		assets, err = h.assetService.GetAssetsByOwner(ctx, ownerID, limit, offset)
 
 	case typeStr != "":
-		assetType := models.AssetType(typeStr)
+		assetType := dbtypes.AssetType(typeStr)
 		if !assetType.Valid() {
 			api.Error(c.Writer, http.StatusBadRequest, errors.New("invalid asset type"), http.StatusBadRequest, "Invalid asset type")
 			return
 		}
-		assets, err = h.assetService.GetAssetsByType(ctx, assetType, limit, offset)
+		assets, err = h.assetService.GetAssetsByType(ctx, *assetType.String(), limit, offset)
 
 	default:
 		api.Error(c.Writer, http.StatusBadRequest, errors.New("missing query parameters"), http.StatusBadRequest, "Please specify type, owner_id, or search query")
@@ -679,10 +680,10 @@ func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 // @Success 200 {object} api.Result{data=AssetTypesResponse} "Asset types retrieved successfully"
 // @Router /assets/types [get]
 func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
-	types := []models.AssetType{
-		models.AssetTypePhoto,
-		models.AssetTypeVideo,
-		models.AssetTypeAudio,
+	types := []dbtypes.AssetType{
+		dbtypes.AssetTypePhoto,
+		dbtypes.AssetTypeVideo,
+		dbtypes.AssetTypeAudio,
 	}
 
 	api.Success(c.Writer, AssetTypesResponse{Types: types})

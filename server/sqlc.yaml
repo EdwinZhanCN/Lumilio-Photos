@@ -36,3 +36,7 @@ sql:
                     go_type: "json.RawMessage"
                   - column: "GetAssetWithRelations.tags"
                     go_type: "json.RawMessage"
+                  - column: "assets.specific_metadata"
+                    go_type:
+                        import: "server/internal/db/dbtypes"
+                        type: "SpecificMetadata"

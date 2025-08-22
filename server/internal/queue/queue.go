@@ -60,7 +60,7 @@ type Queue[T any] interface {
 
 	// RegisterWorker 注册消费者处理函数
 	RegisterWorker(
-		jobType JobType,
+		jobType string,
 		opts WorkerOptions,
 		handler func(ctx context.Context, job Job[T]) error,
 	)
