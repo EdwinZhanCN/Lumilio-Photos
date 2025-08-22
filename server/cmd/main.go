@@ -2,25 +2,21 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
 	"server/internal/api"
 	"server/internal/api/handler"
+	"server/internal/db"
 	"server/internal/processors"
 	"server/internal/queue"
 	queuesetup "server/internal/queue/queue_setup"
-	"server/internal/repository/gorm_repo"
 	"server/internal/service"
 	"server/internal/storage"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -30,14 +26,6 @@ func init() {
 
 	// Load environment variables using unified config function
 	config.LoadEnvironment()
-
-	if config.IsDevelopmentMode() {
-		log.Println("📋 Development checklist:")
-		log.Println("   1. Database: Make sure PostgreSQL is running on localhost:5432")
-		log.Println("   2. Database: Use 'docker-compose up db' to start only the database")
-		log.Println("   3. Storage: Local directories will be created automatically")
-		log.Println("   4. Access: API will be available at http://localhost:8080")
-	}
 }
 
 // @title Lumilio-Photos Manager API
@@ -68,54 +56,24 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Run database migrations
+	if err := db.AutoMigrate(ctx, dbConfig); err != nil {
+		log.Printf("Warning: Failed to run migrations automatically: %v", err)
+		log.Println("Please run migrations manually using: atlas migrate apply")
+	}
+
 	// Connect to the database
-	database := gorm_repo.InitDB(dbConfig)
-
-	// Defer closing the database connection
-	sqlDB, err := database.DB()
+	database, err := db.New(dbConfig)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	defer database.Close()
 
-	defer func(sqlDB *sql.DB) {
-		err := sqlDB.Close()
-		if err != nil {
-			panic(err)
-		}
-	}(sqlDB)
+	// Use the same pool for both SQLC queries and pgx operations
+	pgxPool := database.Pool
 
-	log.Println("GORM database connection successful.")
-
-	Port, err := strconv.Atoi(dbConfig.Port)
-	if err != nil {
-		log.Fatalf("GORM database Port Interal Erro.")
-	}
-
-	pgxDSN := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
-		dbConfig.User,
-		dbConfig.Password,
-		dbConfig.Host,
-		Port,
-		dbConfig.DBName,
-	)
-
-	pgxPool, err := pgxpool.New(context.Background(), pgxDSN)
-	if err != nil {
-		log.Fatalf("Unable to create pgx connection pool: %v\n", err)
-	}
-	defer func() {
-		log.Println("Closing pgx connection pool...")
-		pgxPool.Close()
-	}()
-
-	log.Println("PGX connection pool for queue created successfully.")
-
-	// Initialize repositories
-	assetRepo := gorm_repo.NewAssetRepository(database)
-	tagRepo := gorm_repo.NewTagRepository(database)
-	userRepo := gorm_repo.NewUserRepository(database)
-	embedRepo := gorm_repo.NewEmbedRepository(database)
-	refreshTokenRepo := gorm_repo.NewRefreshTokenRepository(database)
+	// Initialize repositories using SQLC queries directly
+	queries := database.Queries
 
 	// Storage will be initialized through AssetService with configuration
 
@@ -138,11 +96,11 @@ func main() {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
 
-	assetService, err := service.NewAssetService(assetRepo, tagRepo, embedRepo, storageService)
+	assetService, err := service.NewAssetService(queries, storageService)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
-	authService := service.NewAuthService(userRepo, refreshTokenRepo)
+	authService := service.NewAuthService(queries)
 
 	mlService, err := service.NewMLClient(appConfig.MLServiceAddr)
 	if err != nil {

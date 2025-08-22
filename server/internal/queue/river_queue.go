@@ -32,7 +32,7 @@ func NewRiverQueue[T any](dbPool *pgxpool.Pool) *RiverQueue[T] {
 func (r *RiverQueue[T]) Enqueue(ctx context.Context, jobType string, payload T) (string, error) {
 	// 使用默认 Insert，不在事务中
 	result, err := r.client.Insert(ctx,
-		PayloadArgs[T]{Data: payload, kind: jobType},
+		PayloadArgs[T]{Data: payload, JobKind: jobType},
 		nil,
 	)
 	if err != nil {
@@ -45,7 +45,7 @@ func (r *RiverQueue[T]) Enqueue(ctx context.Context, jobType string, payload T) 
 func (r *RiverQueue[T]) EnqueueIn(ctx context.Context, jobType string, payload T, delay time.Duration) (string, error) {
 	opts := &river.InsertOpts{ScheduledAt: time.Now().Add(delay)}
 	result, err := r.client.Insert(ctx,
-		PayloadArgs[T]{Data: payload, kind: jobType},
+		PayloadArgs[T]{Data: payload, JobKind: jobType},
 		opts,
 	)
 	if err != nil {
@@ -58,7 +58,7 @@ func (r *RiverQueue[T]) EnqueueIn(ctx context.Context, jobType string, payload T
 func (r *RiverQueue[T]) EnqueueTx(ctx context.Context, tx any, jobType string, payload T) (string, error) {
 	result, err := r.client.InsertTx(ctx,
 		tx.(pgx.Tx),
-		PayloadArgs[T]{Data: payload, kind: jobType},
+		PayloadArgs[T]{Data: payload, JobKind: jobType},
 		nil,
 	)
 	if err != nil {
@@ -69,11 +69,11 @@ func (r *RiverQueue[T]) EnqueueTx(ctx context.Context, tx any, jobType string, p
 
 // RegisterWorker
 func (r *RiverQueue[T]) RegisterWorker(
-	jobType JobType,
+	jobType string,
 	opts WorkerOptions,
 	handler func(ctx context.Context, job Job[T]) error,
 ) {
-	r.queueConfigs[string(jobType)] = river.QueueConfig{MaxWorkers: opts.Concurrency}
+	r.queueConfigs[jobType] = river.QueueConfig{MaxWorkers: opts.Concurrency}
 	w := &genericWorker[T]{handler: handler}
 	river.AddWorker(r.workers, w)
 }

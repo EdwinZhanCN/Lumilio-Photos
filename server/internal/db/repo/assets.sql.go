@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"server/internal/db/dbtypes"
 )
 
 const addAssetToAlbum = `-- name: AddAssetToAlbum :exec
@@ -61,17 +62,17 @@ RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, 
 `
 
 type CreateAssetParams struct {
-	OwnerID          *int32   `db:"owner_id" json:"owner_id"`
-	Type             string   `db:"type" json:"type"`
-	OriginalFilename string   `db:"original_filename" json:"original_filename"`
-	StoragePath      string   `db:"storage_path" json:"storage_path"`
-	MimeType         string   `db:"mime_type" json:"mime_type"`
-	FileSize         int64    `db:"file_size" json:"file_size"`
-	Hash             *string  `db:"hash" json:"hash"`
-	Width            *int32   `db:"width" json:"width"`
-	Height           *int32   `db:"height" json:"height"`
-	Duration         *float64 `db:"duration" json:"duration"`
-	SpecificMetadata []byte   `db:"specific_metadata" json:"specific_metadata"`
+	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
+	Type             string                   `db:"type" json:"type"`
+	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
+	StoragePath      string                   `db:"storage_path" json:"storage_path"`
+	MimeType         string                   `db:"mime_type" json:"mime_type"`
+	FileSize         int64                    `db:"file_size" json:"file_size"`
+	Hash             *string                  `db:"hash" json:"hash"`
+	Width            *int32                   `db:"width" json:"width"`
+	Height           *int32                   `db:"height" json:"height"`
+	Duration         *float64                 `db:"duration" json:"duration"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 }
 
 func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error) {
@@ -499,9 +500,9 @@ RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, 
 `
 
 type UpdateAssetParams struct {
-	AssetID          pgtype.UUID `db:"asset_id" json:"asset_id"`
-	OriginalFilename string      `db:"original_filename" json:"original_filename"`
-	SpecificMetadata []byte      `db:"specific_metadata" json:"specific_metadata"`
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 }
 
 func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error) {
@@ -535,8 +536,8 @@ WHERE asset_id = $1
 `
 
 type UpdateAssetMetadataParams struct {
-	AssetID          pgtype.UUID `db:"asset_id" json:"asset_id"`
-	SpecificMetadata []byte      `db:"specific_metadata" json:"specific_metadata"`
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 }
 
 func (q *Queries) UpdateAssetMetadata(ctx context.Context, arg UpdateAssetMetadataParams) error {

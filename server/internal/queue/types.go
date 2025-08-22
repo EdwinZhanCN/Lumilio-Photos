@@ -8,12 +8,12 @@ import (
 )
 
 type PayloadArgs[T any] struct {
-	Data T
-	kind string
+	Data    T
+	JobKind string
 }
 
 func (a PayloadArgs[T]) Kind() string {
-	return a.kind
+	return a.JobKind
 }
 
 type jobWrapper[T any] struct {
@@ -25,7 +25,7 @@ func (j *jobWrapper[T]) ID() string {
 }
 
 func (j *jobWrapper[T]) Type() JobType {
-	return JobType(j.rjob.Args.kind)
+	return JobType(j.rjob.Args.JobKind)
 }
 
 func (j *jobWrapper[T]) Payload() T {

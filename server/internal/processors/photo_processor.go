@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"server/internal/models"
+	"server/internal/db/dbtypes"
+	"server/internal/db/repo"
 	"server/internal/queue"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
 
-	"github.com/google/uuid"
 	"github.com/h2non/bimg"
+	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -23,13 +24,13 @@ var thumbnailSizes = map[string][2]int{
 }
 
 type CLIPPayload struct {
-	AssetID   uuid.UUID
+	AssetID   pgtype.UUID
 	ImageData []byte
 }
 
 func (ap *AssetProcessor) processPhotoAsset(
 	ctx context.Context,
-	asset *models.Asset,
+	asset *repo.Asset,
 	fileReader io.Reader,
 ) error {
 	extractor := exif.NewExtractor(nil)
@@ -57,7 +58,7 @@ func (ap *AssetProcessor) processPhotoAsset(
 	g.Go(func() error {
 		req := &exif.StreamingExtractRequest{
 			Reader:    exifR,
-			AssetType: asset.Type,
+			AssetType: dbtypes.AssetType(asset.Type),
 			Filename:  asset.OriginalFilename,
 			Size:      asset.FileSize,
 		}
@@ -65,7 +66,7 @@ func (ap *AssetProcessor) processPhotoAsset(
 		if err != nil {
 			return fmt.Errorf("extract exif: %w", err)
 		}
-		if meta, ok := exifResult.Metadata.(*models.PhotoSpecificMetadata); ok {
+		if meta, ok := exifResult.Metadata.(*dbtypes.PhotoSpecificMetadata); ok {
 			if err := asset.SetPhotoMetadata(meta); err != nil {
 				return fmt.Errorf("save exif meta: %w", err)
 			}
