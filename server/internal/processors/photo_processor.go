@@ -8,11 +8,10 @@ import (
 	"log"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/queue"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
+	"time"
 
-	"github.com/h2non/bimg"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/sync/errgroup"
 )
@@ -35,6 +34,9 @@ func (ap *AssetProcessor) processPhotoAsset(
 ) error {
 	extractor := exif.NewExtractor(nil)
 
+	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
 	exifR, exifW := io.Pipe()
 	clipR, clipW := io.Pipe()
 	thumbR, thumbW := io.Pipe()
@@ -42,18 +44,40 @@ func (ap *AssetProcessor) processPhotoAsset(
 	defer clipR.Close()
 	defer thumbR.Close()
 
+	clipEnabled := false
+	if !clipEnabled {
+		_ = clipW.Close()
+	}
+
 	go func() {
 		defer exifW.Close()
-		defer clipW.Close()
+		if clipEnabled {
+			defer clipW.Close()
+		}
 		defer thumbW.Close()
 
-		mw := io.MultiWriter(exifW, clipW, thumbW)
-		if _, err := io.Copy(mw, fileReader); err != nil {
-			log.Printf("broadcast error: %v", err)
+		writers := []io.Writer{exifW, thumbW}
+		if clipEnabled {
+			writers = append(writers, clipW)
+		}
+		mw := io.MultiWriter(writers...)
+		n, err := io.Copy(mw, fileReader)
+		if err != nil {
+			log.Printf("❌ Broadcast error: %v", err)
+		} else {
+			log.Printf("✅ Successfully broadcast %d bytes to all pipes", n)
 		}
 	}()
 
-	g, ctx := errgroup.WithContext(ctx)
+	g, ctx := errgroup.WithContext(timeoutCtx)
+
+	go func() {
+		<-timeoutCtx.Done()
+		// Closing writers will unblock io.Copy and downstream readers
+		exifW.Close()
+		thumbW.Close()
+		clipW.Close()
+	}()
 
 	g.Go(func() error {
 		req := &exif.StreamingExtractRequest{
@@ -89,6 +113,8 @@ func (ap *AssetProcessor) processPhotoAsset(
 		}
 
 		for name, buf := range buffers {
+			if buf.Len() == 0 {
+			}
 			if err := ap.assetService.SaveNewThumbnail(ctx, buf, asset, name); err != nil {
 				return fmt.Errorf("save thumb %s: %w", name, err)
 			}
@@ -96,29 +122,32 @@ func (ap *AssetProcessor) processPhotoAsset(
 		return nil
 	})
 
-	g.Go(func() error {
-		tinyOpts := bimg.Options{
-			Width:     224,
-			Height:    224,
-			Crop:      true,
-			Gravity:   bimg.GravitySmart,
-			Quality:   90,
-			Type:      bimg.WEBP,
-			NoProfile: true,
-		}
-		tiny, err := imaging.ProcessImageStream(clipR, tinyOpts)
+	if clipEnabled {
+		g.Go(func() error {
+			// tinyOpts := bimg.Options{
+			// 	Width:     224,
+			// 	Height:    224,
+			// 	Crop:      true,
+			// 	Gravity:   bimg.GravitySmart,
+			// 	Quality:   90,
+			// 	Type:      bimg.WEBP,
+			// 	NoProfile: true,
+			// }
+			// tiny, err := imaging.ProcessImageStream(clipR, tinyOpts)
 
-		if err != nil {
-			return fmt.Errorf("process CLIP thumbnail: %w", err)
-		}
+			// if err != nil {
+			// 	return fmt.Errorf("process CLIP thumbnail: %w", err)
+			// }
 
-		payload := CLIPPayload{
-			asset.AssetID,
-			tiny,
-		}
-		ap.clipQueue.Enqueue(ctx, string(queue.JobCLIPProcess), payload)
-		return nil
-	})
+			// payload := CLIPPayload{
+			// 	asset.AssetID,
+			// 	tiny,
+			// }
+			// ap.clipQueue.Enqueue(ctx, string(queue.JobCLIPProcess), payload)
+			_, _ = io.Copy(io.Discard, clipR)
+			return nil
+		})
+	}
 
 	if err := g.Wait(); err != nil {
 		return err

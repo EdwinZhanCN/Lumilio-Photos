@@ -49,11 +49,14 @@ export function useFetchProcess(): FetchProcessValue {
     refetchOnWindowFocus: false, // Prevent refetching on window focus
     // Determines the offset for the next page fetch
     getNextPageParam: (lastPage) => {
-      if (!lastPage || lastPage.assets.length === 0) {
+      const assets = Array.isArray(lastPage?.assets) ? lastPage.assets : [];
+      if (!lastPage || assets.length === 0) {
         return undefined; // No more pages
       }
       // The next page's offset is the current offset plus the number of items fetched
-      return lastPage.offset + lastPage.assets.length;
+      const currentOffset =
+        typeof lastPage?.offset === "number" ? lastPage.offset : 0;
+      return currentOffset + assets.length;
     },
   });
 
@@ -87,7 +90,10 @@ export function useFetchProcess(): FetchProcessValue {
 
   // Flattens the paginated data from React Query into a single array for UI rendering
   const allAssets = useMemo(
-    () => data?.pages.flatMap((page) => page.assets) ?? [],
+    () =>
+      data?.pages.flatMap((page) =>
+        Array.isArray(page.assets) ? page.assets : [],
+      ) ?? [],
     [data],
   );
 

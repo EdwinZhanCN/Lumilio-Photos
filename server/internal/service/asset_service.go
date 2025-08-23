@@ -77,12 +77,12 @@ func NewAssetService(q *repo.Queries, s storage.Storage) (AssetService, error) {
 // CreateAssetRecord creates a new asset record in the database
 func (s *assetService) CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error) {
 
-	dbAsset, err := s.queries.CreateAsset(ctx, params)
+	asset, err := s.queries.CreateAsset(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create asset: %w", err)
 	}
 
-	return &dbAsset, nil
+	return &asset, nil
 }
 
 // GetAsset retrieves an asset by its ID
@@ -414,7 +414,7 @@ func (s *assetService) SaveNewEmbedding(ctx context.Context, assetID uuid.UUID, 
 
 	params := repo.UpsertEmbeddingParams{
 		AssetID:   pgUUID,
-		Embedding: vector,
+		Embedding: &vector,
 	}
 
 	return s.queries.UpsertEmbedding(ctx, params)

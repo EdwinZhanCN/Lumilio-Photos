@@ -13,10 +13,10 @@ import (
 	"server/internal/db"
 	"server/internal/processors"
 	"server/internal/queue"
-	queuesetup "server/internal/queue/queue_setup"
 	"server/internal/service"
 	"server/internal/storage"
 
+	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -68,24 +68,15 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer database.Close()
-
-	// Use the same pool for both SQLC queries and pgx operations
 	pgxPool := database.Pool
-
-	// Initialize repositories using SQLC queries directly
 	queries := database.Queries
 
-	// Storage will be initialized through AssetService with configuration
-
-	// Initialize staging area for temporary file storage
+	// Load storage configuration
 	log.Printf("📁 Using staging path: %s", appConfig.StagingPath)
-
-	// Ensure staging directory exists
 	if err := os.MkdirAll(appConfig.StagingPath, 0755); err != nil {
 		log.Fatalf("Failed to create staging directory: %v", err)
 	}
 
-	// Load storage configuration
 	storageConfig := storage.LoadStorageConfigFromEnv()
 	log.Printf("💾 Storage strategy: %s (%s)", storageConfig.Strategy, storageConfig.Strategy.GetDescription())
 	log.Printf("💾 Storage path: %s", storageConfig.BasePath)
@@ -96,26 +87,40 @@ func main() {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
 
+	// Initialize Service
 	assetService, err := service.NewAssetService(queries, storageService)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
 	authService := service.NewAuthService(queries)
-
 	mlService, err := service.NewMLClient(appConfig.MLServiceAddr)
 	if err != nil {
 		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
 	}
 
-	clipQueue := queuesetup.SetupCLIPQueue(ctx, pgxPool, mlService, assetService)
-	assetProcessor := processors.NewAssetProcessor(assetService, mlService, storageService, clipQueue)
-	assetQueue := queuesetup.SetupAssetQueue(ctx, pgxPool, assetProcessor)
+	// Initialize Queue and run migrations
+	workers := river.NewWorkers()
 
-	go runQueue(ctx, assetQueue, "assetQueue")
-	go runQueue(ctx, clipQueue, "clipQueue")
+	// Add Workers
+	assetProcessor := processors.NewAssetProcessor(assetService, mlService, storageService)
+	river.AddWorker(workers, &queue.ProcessAssetWorker{Processor: assetProcessor})
+
+	// Create River client
+	queueClient, err := queue.New(pgxPool, workers)
+	if err != nil {
+		log.Fatalf("Failed to Initialize Queue: %v", err)
+	}
+
+	go func() {
+		if err := queueClient.Start(context.Background()); err != nil {
+			panic(err)
+		}
+	}()
+
+	log.Println("✅ Queues initialized successfully")
 
 	// Initialize controllers - pass the staging path and task queue to the handler
-	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, assetQueue)
+	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, queueClient)
 	authController := handler.NewAuthHandler(authService)
 
 	// Initialize Swagger docs
@@ -136,12 +141,5 @@ func main() {
 	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", appConfig.Port)
 	if err := http.ListenAndServe(":"+appConfig.Port, router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
-	}
-}
-
-func runQueue[T any](ctx context.Context, q queue.Queue[T], name string) {
-	log.Printf("[%s] Starting queue workers...", name)
-	if err := q.Start(ctx); err != nil {
-		log.Printf("[%s] Queue workers stopped with error: %v", name, err)
 	}
 }

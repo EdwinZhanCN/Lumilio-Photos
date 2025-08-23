@@ -19,8 +19,8 @@ WHERE asset_id = $1 AND embedding IS NOT NULL
 `
 
 type GetAssetEmbeddingRow struct {
-	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	Embedding pgvector_go.Vector `db:"embedding" json:"embedding"`
+	AssetID   pgtype.UUID         `db:"asset_id" json:"asset_id"`
+	Embedding *pgvector_go.Vector `db:"embedding" json:"embedding"`
 }
 
 func (q *Queries) GetAssetEmbedding(ctx context.Context, assetID pgtype.UUID) (GetAssetEmbeddingRow, error) {
@@ -45,8 +45,8 @@ type GetAssetsWithEmbeddingsParams struct {
 }
 
 type GetAssetsWithEmbeddingsRow struct {
-	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	Embedding pgvector_go.Vector `db:"embedding" json:"embedding"`
+	AssetID   pgtype.UUID         `db:"asset_id" json:"asset_id"`
+	Embedding *pgvector_go.Vector `db:"embedding" json:"embedding"`
 }
 
 func (q *Queries) GetAssetsWithEmbeddings(ctx context.Context, arg GetAssetsWithEmbeddingsParams) ([]GetAssetsWithEmbeddingsRow, error) {
@@ -115,8 +115,8 @@ WHERE asset_id = $1
 `
 
 type UpsertEmbeddingParams struct {
-	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	Embedding pgvector_go.Vector `db:"embedding" json:"embedding"`
+	AssetID   pgtype.UUID         `db:"asset_id" json:"asset_id"`
+	Embedding *pgvector_go.Vector `db:"embedding" json:"embedding"`
 }
 
 func (q *Queries) UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error {

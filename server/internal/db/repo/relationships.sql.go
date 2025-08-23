@@ -61,7 +61,7 @@ type GetAssetWithRelationsRow struct {
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Embedding        pgvector_go.Vector       `db:"embedding" json:"embedding"`
+	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
 	Thumbnails       interface{}              `db:"thumbnails" json:"thumbnails"`
 	Tags             interface{}              `db:"tags" json:"tags"`
 }
@@ -130,7 +130,7 @@ type GetAssetWithTagsRow struct {
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Embedding        pgvector_go.Vector       `db:"embedding" json:"embedding"`
+	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
 	Tags             interface{}              `db:"tags" json:"tags"`
 }
 
@@ -201,7 +201,7 @@ type GetAssetWithThumbnailsRow struct {
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Embedding        pgvector_go.Vector       `db:"embedding" json:"embedding"`
+	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
 	Thumbnails       interface{}              `db:"thumbnails" json:"thumbnails"`
 }
 
