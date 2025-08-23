@@ -21,11 +21,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 )
 
 // UploadResponse represents the response structure for file upload
 type UploadResponse struct {
-	TaskID      string `json:"task_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	TaskID      int64  `json:"task_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Status      string `json:"status" example:"processing"`
 	FileName    string `json:"file_name" example:"photo.jpg"`
 	Size        int64  `json:"size" example:"1048576"`
@@ -42,7 +44,7 @@ type BatchUploadResult struct {
 	Success     bool    `json:"success"`             // Whether the file was successfully queued
 	FileName    string  `json:"file_name,omitempty"` // Original filename
 	ContentHash string  `json:"content_hash"`        // Client-provided content hash
-	TaskID      *string `json:"task_id,omitempty"`   // Only present for successful uploads
+	TaskID      *int64  `json:"task_id,omitempty"`   // Only present for successful uploads
 	Status      *string `json:"status,omitempty"`    // Only present for successful uploads
 	Size        *int64  `json:"size,omitempty"`      // Only present for successful uploads
 	Message     *string `json:"message,omitempty"`   // Status message
@@ -75,16 +77,16 @@ type AssetTypesResponse struct {
 type AssetHandler struct {
 	assetService    service.AssetService
 	stagingPath     string
-	processQueue    queue.Queue[processors.AssetPayload]
+	queueClient     *river.Client[pgx.Tx]
 	StorageBasePath string // Path where assets are stored
 }
 
 // NewAssetHandler creates a new AssetHandler instance
-func NewAssetHandler(assetService service.AssetService, stagingPath string, processQueue queue.Queue[processors.AssetPayload]) *AssetHandler {
+func NewAssetHandler(assetService service.AssetService, stagingPath string, queueClient *river.Client[pgx.Tx]) *AssetHandler {
 	return &AssetHandler{
 		assetService:    assetService,
 		stagingPath:     stagingPath,
-		processQueue:    processQueue,
+		queueClient:     queueClient,
 		StorageBasePath: os.Getenv("STORAGE_PATH"),
 	}
 }
@@ -161,9 +163,11 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		FileName:    header.Filename,
 	}
 
-	jobId, err := h.processQueue.Enqueue(c.Request.Context(), string(queue.JobTypeProcessAsset), payload)
+	jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), queue.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
 
-	log.Printf("Task %s enqueued for processing file %s", jobId, header.Filename)
+	jobId := jobInsetResult.Job.ID
+
+	log.Printf("Task %d enqueued for processing file %s", jobId, header.Filename)
 
 	response := UploadResponse{
 		TaskID:      jobId,
@@ -279,7 +283,9 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			FileName:    header.Filename,
 		}
 
-		jobId, err := h.processQueue.Enqueue(c.Request.Context(), string(queue.JobTypeProcessAsset), payload)
+		jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), queue.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
+
+		jobId := jobInsetResult.Job.ID
 		if err != nil {
 			log.Printf("Failed to enqueue task: %v", err)
 			errMsg := "Failed to enqueue task: " + err.Error()
@@ -292,7 +298,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			continue
 		}
 
-		log.Printf("Task %s enqueued for processing file %s", jobId, header.Filename)
+		log.Printf("Task %d enqueued for processing file %s", jobId, header.Filename)
 
 		taskID := jobId
 		status := "processing"

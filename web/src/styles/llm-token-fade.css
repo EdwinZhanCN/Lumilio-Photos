@@ -1,6 +1,0 @@
-.lm-fade-word { opacity: 0; display: inline-block; animation: lmFade .12s ease forwards; }
-@keyframes lmFade { to { opacity: 1; } }
-
-.lm-caret { display:inline-block; width:.55ch; height:1em; vertical-align:-0.15em;
-    background: currentColor; animation: lmBlink 1s steps(1,end) infinite; opacity:.7; }
-@keyframes lmBlink { 50% { opacity: 0; } }

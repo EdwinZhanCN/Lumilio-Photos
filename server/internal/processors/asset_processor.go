@@ -3,11 +3,9 @@ package processors
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
-	"server/internal/queue"
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/utils/file"
@@ -15,9 +13,9 @@ import (
 )
 
 type AssetPayload struct {
-	ClientHash  string    `json:"clientHash"`
+	ClientHash  string    `json:"clientHash" river:"unique"`
 	StagedPath  string    `json:"stagedPath"`
-	UserID      string    `json:"userId"`
+	UserID      string    `json:"userId" river:"unique"`
 	Timestamp   time.Time `json:"timestamp"`
 	ContentType string    `json:"contentType,omitempty"`
 	FileName    string    `json:"fileName,omitempty"`
@@ -28,21 +26,27 @@ type AssetProcessor struct {
 	assetService   service.AssetService
 	mlService      service.MLService
 	storageService storage.Storage
-	clipQueue      queue.Queue[CLIPPayload]
 }
 
-func NewAssetProcessor(assetService service.AssetService, mlService service.MLService, storageService storage.Storage, clipQueue queue.Queue[CLIPPayload]) *AssetProcessor {
+func NewAssetProcessor(assetService service.AssetService, mlService service.MLService, storageService storage.Storage) *AssetProcessor {
 	return &AssetProcessor{
 		assetService:   assetService,
 		mlService:      mlService,
 		storageService: storageService,
-		clipQueue:      clipQueue,
 	}
 }
 
 func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (*repo.Asset, error) {
 	assetFile, err := os.Open(task.StagedPath)
-	info, _ := assetFile.Stat()
+	if err != nil {
+		return nil, err
+	}
+	defer assetFile.Close() // Close the staged file
+
+	info, err := assetFile.Stat()
+	if err != nil {
+		return nil, err
+	}
 	fileSize := info.Size()
 
 	var ownerIDPtr *int32
@@ -50,27 +54,16 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 		ownerID := int32(1)
 		ownerIDPtr = &ownerID
 	}
-	if err != nil {
-		return nil, err
-	}
 
 	contentType := file.DetermineAssetType(task.ContentType)
 
+	// Commit the staged file FIRST
 	storagePath, err := ap.storageService.CommitStagedFile(ctx, task.StagedPath, task.FileName, task.ClientHash)
-
-	if _, err := assetFile.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("reset file pointer: %w", err)
-	}
-
 	if err != nil {
 		return nil, err
 	}
 
-	// What we left here?
-	// Width
-	// Height
-	// Duration
-	// those field will update later
+	// Create asset record
 	params := repo.CreateAssetParams{
 		OwnerID:          ownerIDPtr,
 		Type:             string(contentType),
@@ -92,7 +85,8 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 
 	switch asset.Type {
 	case string(dbtypes.AssetTypePhoto):
-		return asset, ap.processPhotoAsset(ctx, asset, assetFile)
+		err := ap.processPhotoAsset(ctx, asset, assetFile)
+		return asset, err
 	case string(dbtypes.AssetTypeVideo):
 		//TODO: implement
 		return asset, ap.processVideoAsset(asset)

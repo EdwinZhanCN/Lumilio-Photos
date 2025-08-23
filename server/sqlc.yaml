@@ -18,6 +18,7 @@ sql:
                     go_type:
                         import: "github.com/pgvector/pgvector-go"
                         type: "Vector"
+                        pointer: true
                   - column: "SearchNearestAssets.distance"
                     go_type: "float64"
                   - column: "GetAssetEmbedding.embedding"

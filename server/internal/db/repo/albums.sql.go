@@ -93,7 +93,7 @@ type GetAlbumAssetsRow struct {
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Embedding        pgvector_go.Vector       `db:"embedding" json:"embedding"`
+	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
 	Position         *int32                   `db:"position" json:"position"`
 	AddedTime        pgtype.Timestamptz       `db:"added_time" json:"added_time"`
 }

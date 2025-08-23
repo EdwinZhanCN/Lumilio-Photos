@@ -106,10 +106,42 @@ func (m *MigrationConfig) apply(ctx context.Context, workDir string) error {
 	return nil
 }
 
+func (m *MigrationConfig) runRiverMigrations(ctx context.Context) error {
+	databaseURL := m.buildURL()
+	cmd := exec.CommandContext(ctx, "river", "migrate-up", "--database-url", databaseURL)
+
+	var out, errb bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errb
+
+	log.Printf("🌊 Running River migrations...")
+	err := cmd.Run()
+
+	stdout := strings.TrimSpace(out.String())
+	stderr := strings.TrimSpace(errb.String())
+	if stdout != "" {
+		log.Println(stdout)
+	}
+	if err != nil {
+		if stderr != "" {
+			return fmt.Errorf("river migrate-up failed: %w\n%s", err, stderr)
+		}
+		return fmt.Errorf("river migrate-up failed: %w", err)
+	}
+	if stderr != "" {
+		log.Println(stderr)
+	}
+	return nil
+}
+
 func (m *MigrationConfig) RunMigrations(ctx context.Context) error {
 
 	if err := checkAtlasAvailable(ctx); err != nil {
 		return fmt.Errorf("Atlas CLI not available: %w", err)
+	}
+
+	if err := checkRiverAvailable(ctx); err != nil {
+		return fmt.Errorf("River CLI not available: %w", err)
 	}
 
 	workDir := resolveWorkDir()
@@ -126,6 +158,10 @@ func (m *MigrationConfig) RunMigrations(ctx context.Context) error {
 		return err
 	}
 
+	if err := m.runRiverMigrations(ctx); err != nil {
+		return err
+	}
+
 	log.Printf("✅ Migrations applied successfully.")
 	return nil
 }
@@ -139,6 +175,14 @@ func checkAtlasAvailable(ctx context.Context) error {
 	cmd := exec.CommandContext(ctx, "atlas", "version")
 	if err := cmd.Run(); err != nil {
 		return errors.New("atlas not found in PATH")
+	}
+	return nil
+}
+
+func checkRiverAvailable(ctx context.Context) error {
+	cmd := exec.CommandContext(ctx, "river", "--version")
+	if err := cmd.Run(); err != nil {
+		return errors.New("river not found in PATH")
 	}
 	return nil
 }
