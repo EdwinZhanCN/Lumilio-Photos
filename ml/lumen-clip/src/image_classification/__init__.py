@@ -12,4 +12,4 @@ Modules:
 from .clip_model import CLIPModelManager
 from .clip_service import CLIPService
 
-__all__ = ['CLIPModelManager', 'CLIPService']
+__all__ = ["CLIPModelManager", "CLIPService"]

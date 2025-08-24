@@ -12,7 +12,7 @@ interface FetchProcessValue {
 const DEFAULT_FILTERS: ListAssetsParams = {
   limit: 20,
   offset: 0,
-  type: "PHOTO", // Default filter example
+  type: "PHOTO",
 };
 
 /**
@@ -46,14 +46,12 @@ export function useFetchProcess(): FetchProcessValue {
       return response.data.data;
     },
     initialPageParam: 0,
-    refetchOnWindowFocus: false, // Prevent refetching on window focus
-    // Determines the offset for the next page fetch
+    refetchOnWindowFocus: false,
     getNextPageParam: (lastPage) => {
       const assets = Array.isArray(lastPage?.assets) ? lastPage.assets : [];
       if (!lastPage || assets.length === 0) {
         return undefined; // No more pages
       }
-      // The next page's offset is the current offset plus the number of items fetched
       const currentOffset =
         typeof lastPage?.offset === "number" ? lastPage.offset : 0;
       return currentOffset + assets.length;
