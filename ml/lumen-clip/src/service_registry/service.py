@@ -209,6 +209,38 @@ class UnifiedMLService(rpc.InferenceServicer):
             vec = self.bioclip_model.encode_text(req.payload.decode("utf-8")).tolist()
             yield self._build_embed_response(req.correlation_id, vec, self.bioclip_model.info())
 
+    def _handle_clip_image_embed(self, requests: List[pb.InferRequest]) -> Iterable[pb.InferResponse]:
+        # Batch preprocess all images
+        image_bytes = [req.payload for req in requests]
+        batch = preprocess_image_batch(image_bytes, self.device)
+
+        # Single forward pass for the batch
+        assert self.clip_model._model is not None
+        with torch.no_grad():
+            feats = self.clip_model._model.encode_image(batch)  # type: ignore[attr-defined]
+            feats = feats / feats.norm(dim=-1, keepdim=True)
+
+        # Yield one response per request
+        for i, req in enumerate(requests):
+            vec = feats[i].detach().cpu().numpy().tolist()
+            yield self._build_embed_response(req.correlation_id, vec, self.clip_model.info())
+
+    def _handle_bioclip_image_embed(self, requests: List[pb.InferRequest]) -> Iterable[pb.InferResponse]:
+        # Batch preprocess all images
+        image_bytes = [req.payload for req in requests]
+        batch = preprocess_image_batch(image_bytes, self.device)
+
+        # Single forward pass for the batch
+        assert self.bioclip_model._model is not None
+        with torch.no_grad():
+            feats = self.bioclip_model._model.encode_image(batch)  # type: ignore[attr-defined]
+            feats = feats / feats.norm(dim=-1, keepdim=True)
+
+        # Yield one response per request
+        for i, req in enumerate(requests):
+            vec = feats[i].detach().cpu().numpy().tolist()
+            yield self._build_embed_response(req.correlation_id, vec, self.bioclip_model.info())
+
     # --- Response Builders ---
 
     def _build_label_response(self, cid: str, scores: List[Tuple[str, float]], model_info: dict,
@@ -258,6 +290,10 @@ class UnifiedMLService(rpc.InferenceServicer):
                       output_mimes=["application/json;schema=embedding_v1"]),
             pb.IOTask(name="smart_classify", input_mimes=["image/jpeg", "image/png", "image/webp"],
                       output_mimes=["application/json;schema=labels_v1"]),
+            pb.IOTask(name="clip_image_embed", input_mimes=["image/jpeg", "image/png", "image/webp"],
+                      output_mimes=["application/json;schema=embedding_v1"]),
+            pb.IOTask(name="bioclip_image_embed", input_mimes=["image/jpeg", "image/png", "image/webp"],
+                      output_mimes=["application/json;schema=embedding_v1"]),
         ]
         return pb.Capability(
             service_name=self.SERVICE_NAME,
