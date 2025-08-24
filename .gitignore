@@ -90,3 +90,4 @@ pml/data/bioclip/txt_emb_species.json
 *.npz
 /data
 server/main
+/ml/lumen-clip/data

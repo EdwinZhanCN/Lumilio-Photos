@@ -313,6 +313,66 @@ wheels = [
 ]
 
 [[package]]
+name = "lumen-clip"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "colorama" },
+    { name = "grpcio" },
+    { name = "grpcio-tools" },
+    { name = "importlib-resources" },
+    { name = "numpy" },
+    { name = "open-clip-torch" },
+    { name = "pillow" },
+    { name = "protobuf" },
+    { name = "pygbif" },
+    { name = "python-dotenv" },
+    { name = "timm" },
+]
+
+[package.optional-dependencies]
+cpu = [
+    { name = "torch" },
+    { name = "torchaudio" },
+    { name = "torchvision" },
+]
+gpu = [
+    { name = "torch" },
+    { name = "torchaudio" },
+    { name = "torchvision" },
+]
+osx = [
+    { name = "torch" },
+    { name = "torchaudio" },
+    { name = "torchvision" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "colorama" },
+    { name = "grpcio" },
+    { name = "grpcio-tools" },
+    { name = "importlib-resources" },
+    { name = "numpy" },
+    { name = "open-clip-torch" },
+    { name = "pillow" },
+    { name = "protobuf" },
+    { name = "pygbif" },
+    { name = "python-dotenv" },
+    { name = "timm" },
+    { name = "torch", marker = "extra == 'cpu'" },
+    { name = "torch", marker = "extra == 'gpu'" },
+    { name = "torch", marker = "extra == 'osx'" },
+    { name = "torchaudio", marker = "extra == 'cpu'" },
+    { name = "torchaudio", marker = "extra == 'gpu'" },
+    { name = "torchaudio", marker = "extra == 'osx'" },
+    { name = "torchvision", marker = "extra == 'cpu'" },
+    { name = "torchvision", marker = "extra == 'gpu'" },
+    { name = "torchvision", marker = "extra == 'osx'" },
+]
+provides-extras = ["cpu", "gpu", "osx"]
+
+[[package]]
 name = "markupsafe"
 version = "3.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -580,66 +640,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/fe/8b/3c73abc9c759ecd3f
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fe/39/979e8e21520d4e47a0bbe349e2713c0aac6f3d853d0e5b34d76206c439aa/platformdirs-4.3.8-py3-none-any.whl", hash = "sha256:ff7059bb7eb1179e2685604f4aaf157cfd9535242bd23742eadc3c13542139b4", size = 18567, upload-time = "2025-05-07T22:47:40.376Z" },
 ]
-
-[[package]]
-name = "pml"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "colorama" },
-    { name = "grpcio" },
-    { name = "grpcio-tools" },
-    { name = "importlib-resources" },
-    { name = "numpy" },
-    { name = "open-clip-torch" },
-    { name = "pillow" },
-    { name = "protobuf" },
-    { name = "pygbif" },
-    { name = "python-dotenv" },
-    { name = "timm" },
-]
-
-[package.optional-dependencies]
-cpu = [
-    { name = "torch" },
-    { name = "torchaudio" },
-    { name = "torchvision" },
-]
-gpu = [
-    { name = "torch" },
-    { name = "torchaudio" },
-    { name = "torchvision" },
-]
-osx = [
-    { name = "torch" },
-    { name = "torchaudio" },
-    { name = "torchvision" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "colorama" },
-    { name = "grpcio" },
-    { name = "grpcio-tools" },
-    { name = "importlib-resources" },
-    { name = "numpy" },
-    { name = "open-clip-torch" },
-    { name = "pillow" },
-    { name = "protobuf" },
-    { name = "pygbif" },
-    { name = "python-dotenv" },
-    { name = "timm" },
-    { name = "torch", marker = "extra == 'cpu'" },
-    { name = "torch", marker = "extra == 'gpu'" },
-    { name = "torch", marker = "extra == 'osx'" },
-    { name = "torchaudio", marker = "extra == 'cpu'" },
-    { name = "torchaudio", marker = "extra == 'gpu'" },
-    { name = "torchaudio", marker = "extra == 'osx'" },
-    { name = "torchvision", marker = "extra == 'cpu'" },
-    { name = "torchvision", marker = "extra == 'gpu'" },
-    { name = "torchvision", marker = "extra == 'osx'" },
-]
-provides-extras = ["cpu", "gpu", "osx"]
 
 [[package]]
 name = "protobuf"

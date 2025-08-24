@@ -93,9 +93,8 @@ class BioCLIPModelManager:
                 path = hf_hub_download(
                     repo_id=self.text_repo_id,
                     repo_type="dataset",
-                    filename=self.remote_names_path,  # Use the remote path for download
+                    filename=self.remote_names_path,
                 )
-                # Copy the downloaded file to our target location
                 import shutil
                 shutil.copy(path, self.names_filename)
             except Exception as e:
@@ -104,16 +103,6 @@ class BioCLIPModelManager:
         # Load label names
         with open(self.names_filename, 'r') as f:
             self.labels = json.load(f)
-
-    def _load_or_compute_text_embeddings(self) -> None:
-        if os.path.exists(self.vectors_filename):
-            data = np.load(self.vectors_filename, allow_pickle=True)
-            names = data['names'].tolist()
-            vecs = data['vecs']
-            if names == self.labels:
-                self.text_embeddings = torch.tensor(vecs)
-                return
-        self._compute_and_cache_text_embeddings()
 
     def _compute_and_cache_text_embeddings(self) -> None:
         assert self._model and self._tokenizer
@@ -129,6 +118,18 @@ class BioCLIPModelManager:
         np.savez(self.vectors_filename,
                  names=np.array(self.labels, dtype=object), vecs=vecs)
         self.text_embeddings = torch.tensor(vecs)
+
+    def _load_or_compute_text_embeddings(self) -> None:
+        if os.path.exists(self.vectors_filename):
+            data = np.load(self.vectors_filename, allow_pickle=True)
+            names = data['names'].tolist()
+            vecs = data['vecs']
+            if names == self.labels:
+                self.text_embeddings = torch.tensor(vecs)
+                return
+        self._compute_and_cache_text_embeddings()
+
+
 
     @staticmethod
     def _unit_normalize(t: torch.Tensor) -> torch.Tensor:
@@ -178,6 +179,23 @@ class BioCLIPModelManager:
         # Extract scientific names from the label data
         return [(self.extract_scientific_name(self.labels[idx]), float(probs[i]))
                 for i, idx in enumerate(idxs)]
+
+    def encode_text(self, text: str) -> np.ndarray:
+        """Encodes a single string of text into a unit-normalized embedding vector."""
+        self._ensure_initialized()
+        tokenizer = self._tokenizer
+        model = self._model
+        assert tokenizer is not None
+        assert model is not None
+
+        # BioCLIP often uses a specific prompt format, but a simple one works for general embedding
+        prompt = f"a photo of a {text}"
+        tokens = tokenizer([prompt]).to(self.device)
+        with torch.no_grad():
+            feat = model.encode_text(tokens)  # type: ignore[attr-defined]
+            feat = feat / feat.norm(dim=-1, keepdim=True)
+        return feat.squeeze(0).cpu().numpy()
+
     def info(self) -> Dict[str, Any]:
         """
         Return model information including fixed version, device, and load time.

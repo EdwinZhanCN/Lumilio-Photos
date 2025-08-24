@@ -10,6 +10,6 @@ Modules:
 """
 
 from .bioclip_model import BioCLIPModelManager
-from .bioclip_service import BioCLIPService
+from .bioclip_service import BioClipService
 
-__all__ = ['BioCLIPModelManager', 'BioCLIPService']
+__all__ = ["BioCLIPModelManager", "BioClipService"]
