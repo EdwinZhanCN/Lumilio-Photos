@@ -48,9 +48,8 @@ type PhotoSpecificMetadata struct {
 }
 
 type SpeciesPredictionMeta struct {
-	SpeciesID string  `json:"species_id"`
-	Label     string  `json:"label"`
-	Score     float32 `json:"score"`
+	Label string  `json:"label"`
+	Score float32 `json:"score"`
 }
 
 type VideoSpecificMetadata struct {

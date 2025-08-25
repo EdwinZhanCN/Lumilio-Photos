@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
 	"time"
@@ -54,7 +55,8 @@ type AssetService interface {
 	GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*repo.Thumbnail, error)
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, hash string) (string, error)
 	SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *repo.Asset, size string) error
-	SaveNewEmbedding(ctx context.Context, assetID uuid.UUID, embedding []float32) error
+	SaveNewEmbedding(ctx context.Context, pgUUID pgtype.UUID, embedding []float32) error
+	SaveNewSpeciesPredictions(ctx context.Context, pgUUID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
 }
 
 type assetService struct {
@@ -400,15 +402,10 @@ func (s *assetService) SaveNewThumbnail(ctx context.Context, buffers io.Reader, 
 }
 
 // ================================
-// Embedding CRUD Operations
+// ML CRUD Operations
 // ================================
 
-func (s *assetService) SaveNewEmbedding(ctx context.Context, assetID uuid.UUID, embedding []float32) error {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return fmt.Errorf("invalid UUID: %w", err)
-	}
-
+func (s *assetService) SaveNewEmbedding(ctx context.Context, pgUUID pgtype.UUID, embedding []float32) error {
 	// Convert []float32 to pgvector.Vector
 	vector := pgvector_go.NewVector(embedding)
 
@@ -418,6 +415,28 @@ func (s *assetService) SaveNewEmbedding(ctx context.Context, assetID uuid.UUID, 
 	}
 
 	return s.queries.UpsertEmbedding(ctx, params)
+}
+
+func (s *assetService) SaveNewSpeciesPredictions(ctx context.Context, pgUUID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error {
+	// First, delete existing predictions for the asset
+	if err := s.queries.DeleteSpeciesPredictionsByAsset(ctx, pgUUID); err != nil {
+		return fmt.Errorf("failed to delete existing species predictions: %w", err)
+	}
+
+	// Insert new predictions
+	for _, pred := range predictions {
+		params := repo.CreateSpeciesPredictionParams{
+			AssetID: pgUUID,
+			Label:   pred.Label,
+			Score:   pred.Score,
+		}
+		if _, err := s.queries.CreateSpeciesPrediction(ctx, params); err != nil {
+			return fmt.Errorf("failed to create species prediction: %w", err)
+		}
+	}
+
+	return nil
+
 }
 
 // ================================

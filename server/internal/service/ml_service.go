@@ -2,127 +2,295 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-
-	pb "server/proto"
+	"fmt"
+	"io"
+	"strconv"
+	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
+
+	// Adjust this import path to where your generated code lives.
+	// For example, if your package is "server/proto", change to:
+	//   server/proto
+	"server/proto"
 )
 
-// Error constants
-var (
-	ErrCLIPServiceUnavailable = errors.New("CLIP service not available")
-	ErrUnknownService         = errors.New("Unknown service")
-	ErrInternal               = errors.New("Internal server error, please check PML service error log")
-	ErrNotAnimalLike          = errors.New("Not an animal‑like image (BioAtlas skipped)")
-)
-
-// handleGRPCError handles gRPC errors and returns the appropriate error message.
-func handleGRPCError(err error) error {
-	st, ok := status.FromError(err)
-	if !ok {
-		return err
-	}
-	switch st.Code() {
-	case codes.FailedPrecondition:
-		return ErrCLIPServiceUnavailable
-	case codes.Unimplemented:
-		return ErrUnknownService
-	case codes.Internal:
-		return ErrInternal
-	default:
-		return err
-	}
+// MLService is a thin convenience wrapper over the generated gRPC client.
+// It provides helpers for all tasks exposed by the Unified ML Service:
+//
+// - clip_classify
+// - bioclip_classify
+// - smart_classify
+// - clip_embed
+// - bioclip_embed
+// - clip_image_embed
+// - bioclip_image_embed
+type MLService struct {
+	conn *grpc.ClientConn
+	rpc  proto.InferenceClient
 }
 
-type MLService interface {
-	ProcessImageForCLIP(req *pb.ImageProcessRequest) (*pb.ImageProcessResponse, error)
-	GetTextEmbeddingForCLIP(req *pb.TextEmbeddingRequest) (*pb.TextEmbeddingResponse, error)
-	Predict(req *pb.PredictRequest) (*pb.PredictResponse, error)
-	BatchPredict(req *pb.BatchPredictRequest) (*pb.BatchPredictResponse, error)
-	HealthCheck(req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error)
-	GetSpeciesForBioAtlas(req *pb.ImageProcessRequest) (*pb.BioAtlasResponse, error)
-}
-
-type mlService struct {
-	conn   *grpc.ClientConn
-	client pb.PredictionServiceClient
-}
-
-// NewMLClient TODO: Change WithInsecure into WithTransportCredential()
-func NewMLClient(addr string) (MLService, error) {
-	// 	creds, err := credentials.NewClientTLSFromFile("ca.pem", "")
-	// if err != nil {
-	//     log.Fatalf("Failed to load TLS credentials: %v", err)
-	// }
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+// NewMLService creates a client using the new gRPC dialing API.
+// Example (insecure/local):
+//
+//	c, err := mlclient.New("localhost:50051", grpc.WithInsecure()) // or insecure.NewCredentials()
+//
+// For TLS, pass grpc.WithTransportCredentials(credentials).
+func NewMLService(address string, opts ...grpc.DialOption) (*MLService, error) {
+	conn, err := grpc.NewClient(address, opts...)
 	if err != nil {
 		return nil, err
 	}
-
-	client := pb.NewPredictionServiceClient(conn)
-	return &mlService{conn: conn, client: client}, nil
+	return NewFromConn(conn), nil
 }
 
-func (m *mlService) ProcessImageForCLIP(req *pb.ImageProcessRequest) (*pb.ImageProcessResponse, error) {
-	resp, err := m.client.ProcessImageForCLIP(context.Background(), req)
-	if err != nil {
-		return nil, handleGRPCError(err)
-	}
-	return resp, nil
-}
-
-func (m *mlService) GetSpeciesForBioAtlas(req *pb.ImageProcessRequest) (*pb.BioAtlasResponse, error) {
-	resp, err := m.client.GetSpeciesForBioAtlas(context.Background(), req)
-	if err != nil {
-		return nil, handleGRPCError(err)
-	}
-
-	switch resp.GetStatus() {
-	case pb.BioAtlasResponse_OK:
-		return resp, nil
-	case pb.BioAtlasResponse_NOT_ANIMAL:
-		// No species found – still return a valid (empty) response, no error
-		return resp, nil
-	case pb.BioAtlasResponse_MODEL_ERROR:
-		return nil, ErrInternal
-	default:
-		// Any unrecognised status – treat as internal for safety
-		return nil, ErrInternal
+// NewFromConn wraps an existing ClientConn.
+func NewFromConn(conn *grpc.ClientConn) *MLService {
+	return &MLService{
+		conn: conn,
+		rpc:  proto.NewInferenceClient(conn),
 	}
 }
 
-func (m *mlService) GetTextEmbeddingForCLIP(req *pb.TextEmbeddingRequest) (*pb.TextEmbeddingResponse, error) {
-	resp, err := m.client.GetTextEmbeddingForCLIP(context.Background(), req)
-	if err != nil {
-		return nil, handleGRPCError(err)
+// Close closes the underlying connection.
+func (c *MLService) Close() error {
+	if c.conn != nil {
+		return c.conn.Close()
 	}
-	return resp, nil
+	return nil
 }
 
-func (m *mlService) Predict(req *pb.PredictRequest) (*pb.PredictResponse, error) {
-	resp, err := m.client.Predict(context.Background(), req)
-	if err != nil {
-		return nil, handleGRPCError(err)
-	}
-	return resp, nil
+// Health pings the server.
+func (c *MLService) Health(ctx context.Context) error {
+	_, err := c.rpc.Health(ctx, &emptypb.Empty{})
+	return err
 }
 
-func (m *mlService) BatchPredict(req *pb.BatchPredictRequest) (*pb.BatchPredictResponse, error) {
-	resp, err := m.client.BatchPredict(context.Background(), req)
-	if err != nil {
-		return nil, handleGRPCError(err)
-	}
-	return resp, nil
+// Capability is returned by GetCapabilities/StreamCapabilities.
+type Capability = proto.Capability
+
+// GetCapabilities fetches the (single) capability snapshot.
+func (c *MLService) GetCapabilities(ctx context.Context) (*Capability, error) {
+	return c.rpc.GetCapabilities(ctx, &emptypb.Empty{})
 }
 
-func (m *mlService) HealthCheck(req *pb.HealthCheckRequest) (*pb.HealthCheckResponse, error) {
-	resp, err := m.client.HealthCheck(context.Background(), req)
+// StreamCapabilities streams capability updates (recommended).
+// The provided handler is called for every received Capability until the stream ends or context is done.
+func (c *MLService) StreamCapabilities(ctx context.Context, handler func(*Capability) error) error {
+	stream, err := c.rpc.StreamCapabilities(ctx, &emptypb.Empty{})
 	if err != nil {
-		return nil, handleGRPCError(err)
+		return err
 	}
-	return resp, nil
+	for {
+		cap, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if handler != nil {
+			if herr := handler(cap); herr != nil {
+				return herr
+			}
+		}
+	}
+}
+
+// JSON result types the server returns for embeddings and labels.
+
+type EmbeddingResult struct {
+	Vector  []float64 `json:"vector"`
+	Dim     int       `json:"dim"`
+	ModelID string    `json:"model_id"`
+}
+
+type Label struct {
+	Label string  `json:"label"`
+	Score float64 `json:"score"`
+}
+
+type LabelsResult struct {
+	Labels  []Label `json:"labels"`
+	ModelID string  `json:"model_id"`
+}
+
+// --------------- Public helpers for each task ---------------
+
+// ClipEmbed text -> vector
+func (c *MLService) ClipEmbed(ctx context.Context, text string) (*EmbeddingResult, error) {
+	return c.doEmbed(ctx, "clip_embed", []byte(text), "text/plain;charset=utf-8", nil)
+}
+
+// BioClipEmbed text -> vector
+func (c *MLService) BioClipEmbed(ctx context.Context, text string) (*EmbeddingResult, error) {
+	return c.doEmbed(ctx, "bioclip_embed", []byte(text), "text/plain;charset=utf-8", nil)
+}
+
+// ClipImageEmbed image bytes -> vector
+// payloadMime can be "", in which case "image/jpeg" is used by default.
+func (c *MLService) ClipImageEmbed(ctx context.Context, image []byte, payloadMime string) (*EmbeddingResult, error) {
+	if payloadMime == "" {
+		payloadMime = "image/jpeg"
+	}
+	return c.doEmbed(ctx, "clip_image_embed", image, payloadMime, nil)
+}
+
+// BioClipImageEmbed image bytes -> vector
+func (c *MLService) BioClipImageEmbed(ctx context.Context, image []byte, payloadMime string) (*EmbeddingResult, error) {
+	if payloadMime == "" {
+		payloadMime = "image/jpeg"
+	}
+	return c.doEmbed(ctx, "bioclip_image_embed", image, payloadMime, nil)
+}
+
+// ClipClassify image bytes -> labels
+func (c *MLService) ClipClassify(ctx context.Context, image []byte, topk int, payloadMime string) (*LabelsResult, error) {
+	if payloadMime == "" {
+		payloadMime = "image/jpeg"
+	}
+	meta := map[string]string{"topk": strconv.Itoa(topk)}
+	return c.doLabels(ctx, "clip_classify", image, payloadMime, meta)
+}
+
+// BioClipClassify image bytes -> species labels
+func (c *MLService) BioClipClassify(ctx context.Context, image []byte, topk int, payloadMime string) (*LabelsResult, error) {
+	if payloadMime == "" {
+		payloadMime = "image/jpeg"
+	}
+	meta := map[string]string{"topk": strconv.Itoa(topk)}
+	return c.doLabels(ctx, "bioclip_classify", image, payloadMime, meta)
+}
+
+// SmartClassify image bytes -> if scene is animal-like, uses BioCLIP; else scene label from CLIP.
+// Returns labels + response meta (includes "source": scene_classification|bioclip_classification).
+func (c *MLService) SmartClassify(ctx context.Context, image []byte, topk int, payloadMime string) (*LabelsResult, map[string]string, error) {
+	if payloadMime == "" {
+		payloadMime = "image/jpeg"
+	}
+	meta := map[string]string{"topk": strconv.Itoa(topk)}
+	resp, raw, err := c.singleInfer(ctx, "smart_classify", image, payloadMime, meta)
+	if err != nil {
+		return nil, nil, err
+	}
+	if resp.Error != nil && resp.Error.Code != proto.ErrorCode_ERROR_CODE_UNSPECIFIED {
+		return nil, resp.Meta, fmt.Errorf("server error: %s", resp.Error.Message)
+	}
+	var out LabelsResult
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, resp.Meta, err
+	}
+	return &out, resp.Meta, nil
+}
+
+// --------------- Internal helpers ---------------
+
+const chunkSize = 512 * 1024 // 512KB chunks for large payloads
+
+func (c *MLService) doEmbed(ctx context.Context, task string, payload []byte, payloadMime string, meta map[string]string) (*EmbeddingResult, error) {
+	resp, raw, err := c.singleInfer(ctx, task, payload, payloadMime, meta)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Error != nil && resp.Error.Code != proto.ErrorCode_ERROR_CODE_UNSPECIFIED {
+		return nil, fmt.Errorf("server error: %s", resp.Error.Message)
+	}
+	var out EmbeddingResult
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *MLService) doLabels(ctx context.Context, task string, payload []byte, payloadMime string, meta map[string]string) (*LabelsResult, error) {
+	resp, raw, err := c.singleInfer(ctx, task, payload, payloadMime, meta)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Error != nil && resp.Error.Code != proto.ErrorCode_ERROR_CODE_UNSPECIFIED {
+		return nil, fmt.Errorf("server error: %s", resp.Error.Message)
+	}
+	var out LabelsResult
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// singleInfer sends exactly one logical request (with optional chunking) and waits for the final response.
+// It returns the final InferResponse and the raw result bytes.
+func (c *MLService) singleInfer(ctx context.Context, task string, payload []byte, payloadMime string, meta map[string]string) (*proto.InferResponse, []byte, error) {
+	stream, err := c.rpc.Infer(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	cid := fmt.Sprintf("go-%d", time.Now().UnixNano())
+
+	// Prepare chunking
+	total := len(payload)/chunkSize + 1
+	if len(payload)%chunkSize == 0 {
+		total = len(payload) / chunkSize
+	}
+	if total == 0 {
+		total = 1
+	}
+
+	offset := 0
+	for i := 0; i < total; i++ {
+		start := i * chunkSize
+		end := start + chunkSize
+		if end > len(payload) {
+			end = len(payload)
+		}
+		chunk := payload[start:end]
+
+		req := &proto.InferRequest{
+			CorrelationId: cid,
+			Task:          task,
+			Payload:       chunk,
+			Meta:          nil,
+			PayloadMime:   payloadMime,
+			Seq:           uint64(i),
+			Total:         uint64(total),
+			Offset:        uint64(offset),
+		}
+		if meta != nil && i == 0 {
+			// Send meta once; server does not require meta per chunk.
+			req.Meta = meta
+		}
+
+		if err := stream.SendMsg(req); err != nil {
+			_ = stream.CloseSend()
+			return nil, nil, err
+		}
+		offset += len(chunk)
+	}
+
+	// Close sending side and read responses
+	if err := stream.CloseSend(); err != nil {
+		return nil, nil, err
+	}
+
+	var last *proto.InferResponse
+	for {
+		resp, rerr := stream.Recv()
+		if errors.Is(rerr, io.EOF) {
+			break
+		}
+		if rerr != nil {
+			return nil, nil, rerr
+		}
+		last = resp
+		if resp.IsFinal {
+			break
+		}
+	}
+
+	if last == nil {
+		return nil, nil, errors.New("no response received")
+	}
+	return last, last.GetResult(), nil
 }

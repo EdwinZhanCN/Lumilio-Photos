@@ -3,6 +3,8 @@ package processors
 import (
 	"context"
 	"fmt"
+	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 	"os"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -24,15 +26,15 @@ type AssetPayload struct {
 // AssetProcessor handles processing tasks for different asset types
 type AssetProcessor struct {
 	assetService   service.AssetService
-	mlService      service.MLService
 	storageService storage.Storage
+	queueClient    *river.Client[pgx.Tx]
 }
 
-func NewAssetProcessor(assetService service.AssetService, mlService service.MLService, storageService storage.Storage) *AssetProcessor {
+func NewAssetProcessor(assetService service.AssetService, storageService storage.Storage, queueClient *river.Client[pgx.Tx]) *AssetProcessor {
 	return &AssetProcessor{
 		assetService:   assetService,
-		mlService:      mlService,
 		storageService: storageService,
+		queueClient:    queueClient,
 	}
 }
 
@@ -41,7 +43,12 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 	if err != nil {
 		return nil, err
 	}
-	defer assetFile.Close() // Close the staged file
+	defer func(assetFile *os.File) {
+		err := assetFile.Close()
+		if err != nil {
+			fmt.Printf("failed to close staged file: %v\n", err)
+		}
+	}(assetFile) // Close the staged file
 
 	info, err := assetFile.Stat()
 	if err != nil {
