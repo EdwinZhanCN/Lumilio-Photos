@@ -1,7 +1,7 @@
 import {
   GroupByType,
   SortOrderType,
-} from "@/hooks/page-hooks/useAssetsPageState";
+} from "@/features/assets/hooks/useAssetsPageState";
 
 /**
  * Groups assets by the specified criteria and applies sorting
@@ -202,14 +202,15 @@ const parseDateGroupKey = (key: string): Date => {
   switch (key) {
     case "Today":
       return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    case "Yesterday":
+    case "Yesterday": {
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       return new Date(
         yesterday.getFullYear(),
         yesterday.getMonth(),
         yesterday.getDate(),
       );
-    case "This Week":
+    }
+    case "This Week": {
       const thisWeek = new Date(
         now.getTime() - now.getDay() * 24 * 60 * 60 * 1000,
       );
@@ -218,9 +219,10 @@ const parseDateGroupKey = (key: string): Date => {
         thisWeek.getMonth(),
         thisWeek.getDate(),
       );
+    }
     case "This Month":
       return new Date(now.getFullYear(), now.getMonth(), 1);
-    default:
+    default: {
       // Try to parse month/year or year
       const yearMatch = key.match(/^(\d{4})$/);
       if (yearMatch) {
@@ -236,6 +238,7 @@ const parseDateGroupKey = (key: string): Date => {
       }
 
       return new Date(0); // Fallback
+    }
   }
 };
 
