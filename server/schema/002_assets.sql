@@ -18,7 +18,7 @@ CREATE TABLE assets (
     is_deleted BOOLEAN DEFAULT false,
     deleted_at TIMESTAMPTZ,
     specific_metadata JSONB,
-    embedding VECTOR(768)
+    embedding VECTOR(512)
 );
 
 -- Thumbnails table

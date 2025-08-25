@@ -12,7 +12,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/processors"
-	"server/internal/queue"
+	"server/internal/queue/jobs"
 	"server/internal/service"
 	"strconv"
 	"time"
@@ -43,7 +43,7 @@ type BatchUploadResponse struct {
 type BatchUploadResult struct {
 	Success     bool    `json:"success"`             // Whether the file was successfully queued
 	FileName    string  `json:"file_name,omitempty"` // Original filename
-	ContentHash string  `json:"content_hash"`        // Client-provided content hash
+	ContentHash string  `json:"content_hash"`        // MLService-provided content hash
 	TaskID      *int64  `json:"task_id,omitempty"`   // Only present for successful uploads
 	Status      *string `json:"status,omitempty"`    // Only present for successful uploads
 	Size        *int64  `json:"size,omitempty"`      // Only present for successful uploads
@@ -98,7 +98,7 @@ func NewAssetHandler(assetService service.AssetService, stagingPath string, queu
 // @Accept multipart/form-data
 // @Produce json
 // @Param file formData file true "Asset file to upload"
-// @Param X-Content-Hash header string false "Client-calculated BLAKE3 hash of the file"
+// @Param X-Content-Hash header string false "MLService-calculated BLAKE3 hash of the file"
 // @Success 200 {object} api.Result{data=UploadResponse} "Upload successful"
 // @Failure 400 {object} api.Result "Bad request - no file provided or parse error"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -163,10 +163,18 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		FileName:    header.Filename,
 	}
 
-	jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), queue.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
-
+	jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), jobs.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
+	if err != nil {
+		log.Printf("Failed to enqueue task: %v", err)
+		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
+		return
+	}
+	if jobInsetResult == nil || jobInsetResult.Job == nil {
+		log.Printf("Failed to enqueue task: empty result")
+		api.Error(c.Writer, http.StatusInternalServerError, fmt.Errorf("enqueue failed"), http.StatusInternalServerError, "Upload failed")
+		return
+	}
 	jobId := jobInsetResult.Job.ID
-
 	log.Printf("Task %d enqueued for processing file %s", jobId, header.Filename)
 
 	response := UploadResponse{
@@ -283,9 +291,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			FileName:    header.Filename,
 		}
 
-		jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), queue.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
-
-		jobId := jobInsetResult.Job.ID
+		jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), jobs.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
 		if err != nil {
 			log.Printf("Failed to enqueue task: %v", err)
 			errMsg := "Failed to enqueue task: " + err.Error()
@@ -297,6 +303,17 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			})
 			continue
 		}
+		if jobInsetResult == nil || jobInsetResult.Job == nil {
+			errMsg := "Failed to enqueue task: empty result"
+			results = append(results, BatchUploadResult{
+				Success:     false,
+				FileName:    header.Filename,
+				ContentHash: clientHash,
+				Error:       &errMsg,
+			})
+			continue
+		}
+		jobId := jobInsetResult.Job.ID
 
 		log.Printf("Task %d enqueued for processing file %s", jobId, header.Filename)
 

@@ -12,7 +12,7 @@ Export Your PostgreSQL Database Connection String
 export DATABASE_URL="connstring"
 ```
 
-Migrate Up
+Migrate Up (Include in internal/db/migration.go)
 
 ```shell
 river migrate-up --line main --database-url "$DATABASE_URL"

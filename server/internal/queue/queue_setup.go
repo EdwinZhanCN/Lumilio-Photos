@@ -11,8 +11,11 @@ import (
 func New(dbpool *pgxpool.Pool, workers *river.Workers) (*river.Client[pgx.Tx], error) {
 	// TODO: Config MaxWorkers Dynamically
 	client, err := river.NewClient(riverpgxv5.New(dbpool), &river.Config{
-		Schema:  "public",
-		Queues:  map[string]river.QueueConfig{"process_asset": {MaxWorkers: 5}},
+		Schema: "public",
+		Queues: map[string]river.QueueConfig{
+			"process_asset": {MaxWorkers: 5},
+			"process_clip":  {MaxWorkers: 1},
+		},
 		Workers: workers,
 	})
 	return client, err

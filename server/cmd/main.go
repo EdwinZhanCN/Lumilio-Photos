@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
@@ -15,10 +16,13 @@ import (
 	"server/internal/queue"
 	"server/internal/service"
 	"server/internal/storage"
+	"server/proto"
 
 	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func init() {
@@ -59,7 +63,7 @@ func main() {
 	// Run database migrations
 	if err := db.AutoMigrate(ctx, dbConfig); err != nil {
 		log.Printf("Warning: Failed to run migrations automatically: %v", err)
-		log.Println("Please run migrations manually using: atlas migrate apply")
+		log.Println("Please run migrations manually using: migrate -path server/migrations -database \"$DATABASE_URL\" up")
 	}
 
 	// Connect to the database
@@ -93,20 +97,34 @@ func main() {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
 	authService := service.NewAuthService(queries)
-	mlService, err := service.NewMLClient(appConfig.MLServiceAddr)
-	if err != nil {
-		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
-	}
 
 	// Initialize Queue and run migrations
 	workers := river.NewWorkers()
 
-	// Add Workers
-	assetProcessor := processors.NewAssetProcessor(assetService, mlService, storageService)
-	river.AddWorker(workers, &queue.ProcessAssetWorker{Processor: assetProcessor})
-
 	// Create River client
 	queueClient, err := queue.New(pgxPool, workers)
+	// Add Workers
+	assetProcessor := processors.NewAssetProcessor(assetService, storageService, queueClient)
+	river.AddWorker[queue.ProcessAssetArgs](workers, &queue.ProcessAssetWorker{Processor: assetProcessor})
+
+	// Initialize ML gRPC connection and CLIP dispatcher
+	// TODO: Using mDNS
+	mlConn, err := grpc.NewClient(appConfig.MLServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	if err != nil {
+		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
+	}
+	defer mlConn.Close()
+
+	clipClient := proto.NewInferenceClient(mlConn)
+	clipDispatcher := queue.NewClipBatchDispatcher(clipClient, 8, 1500*time.Millisecond)
+	clipDispatcher.Start(ctx)
+
+	// Register CLIP batch worker
+	river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
+		Dispatcher:   clipDispatcher,
+		AssetService: assetService,
+	})
 	if err != nil {
 		log.Fatalf("Failed to Initialize Queue: %v", err)
 	}

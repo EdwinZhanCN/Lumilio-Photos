@@ -5,14 +5,20 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"os"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/queue/jobs"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
 	"time"
 
+	"github.com/h2non/bimg"
+
+	"strings"
+
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/riverqueue/river"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -44,7 +50,8 @@ func (ap *AssetProcessor) processPhotoAsset(
 	defer clipR.Close()
 	defer thumbR.Close()
 
-	clipEnabled := false
+	clipEnv := strings.ToLower(os.Getenv("CLIP_ENABLED"))
+	clipEnabled := clipEnv == "" || clipEnv == "1" || clipEnv == "true" || clipEnv == "yes" || clipEnv == "on"
 	if !clipEnabled {
 		_ = clipW.Close()
 	}
@@ -61,12 +68,7 @@ func (ap *AssetProcessor) processPhotoAsset(
 			writers = append(writers, clipW)
 		}
 		mw := io.MultiWriter(writers...)
-		n, err := io.Copy(mw, fileReader)
-		if err != nil {
-			log.Printf("❌ Broadcast error: %v", err)
-		} else {
-			log.Printf("✅ Successfully broadcast %d bytes to all pipes", n)
-		}
+		_, _ = io.Copy(mw, fileReader)
 	}()
 
 	g, ctx := errgroup.WithContext(timeoutCtx)
@@ -76,7 +78,9 @@ func (ap *AssetProcessor) processPhotoAsset(
 		// Closing writers will unblock io.Copy and downstream readers
 		exifW.Close()
 		thumbW.Close()
-		clipW.Close()
+		if clipEnabled {
+			clipW.Close()
+		}
 	}()
 
 	g.Go(func() error {
@@ -124,26 +128,29 @@ func (ap *AssetProcessor) processPhotoAsset(
 
 	if clipEnabled {
 		g.Go(func() error {
-			// tinyOpts := bimg.Options{
-			// 	Width:     224,
-			// 	Height:    224,
-			// 	Crop:      true,
-			// 	Gravity:   bimg.GravitySmart,
-			// 	Quality:   90,
-			// 	Type:      bimg.WEBP,
-			// 	NoProfile: true,
-			// }
-			// tiny, err := imaging.ProcessImageStream(clipR, tinyOpts)
+			tinyOpts := bimg.Options{
+				Width:     224,
+				Height:    224,
+				Crop:      true,
+				Gravity:   bimg.GravitySmart,
+				Quality:   90,
+				Type:      bimg.WEBP,
+				NoProfile: true,
+			}
+			tiny, err := imaging.ProcessImageStream(clipR, tinyOpts)
 
-			// if err != nil {
-			// 	return fmt.Errorf("process CLIP thumbnail: %w", err)
-			// }
+			if err != nil {
+				return fmt.Errorf("process CLIP thumbnail: %w", err)
+			}
 
-			// payload := CLIPPayload{
-			// 	asset.AssetID,
-			// 	tiny,
-			// }
-			// ap.clipQueue.Enqueue(ctx, string(queue.JobCLIPProcess), payload)
+			payload := CLIPPayload{
+				asset.AssetID,
+				tiny,
+			}
+			_, err = ap.queueClient.Insert(ctx, jobs.ProcessClipArgs(payload), &river.InsertOpts{Queue: "process_clip"})
+			if err != nil {
+				return fmt.Errorf("enqueue CLIP job: %w", err)
+			}
 			_, _ = io.Copy(io.Discard, clipR)
 			return nil
 		})
