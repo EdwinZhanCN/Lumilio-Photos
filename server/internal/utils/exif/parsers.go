@@ -1,13 +1,13 @@
 package exif
 
 import (
-	"server/internal/models"
+	"server/internal/db/dbtypes"
 	"strconv"
 )
 
 // parsePhotoMetadata parses raw EXIF data into PhotoSpecificMetadata
-func parsePhotoMetadata(rawData map[string]string) *models.PhotoSpecificMetadata {
-	metadata := &models.PhotoSpecificMetadata{}
+func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadata {
+	metadata := &dbtypes.PhotoSpecificMetadata{}
 
 	// Parse TakenTime from various datetime fields
 	for _, field := range []string{"DateTimeOriginal", "CreateDate", "DateTime"} {
@@ -101,8 +101,8 @@ func parsePhotoMetadata(rawData map[string]string) *models.PhotoSpecificMetadata
 }
 
 // parseVideoMetadata parses raw EXIF data into VideoSpecificMetadata
-func parseVideoMetadata(rawData map[string]string) *models.VideoSpecificMetadata {
-	metadata := &models.VideoSpecificMetadata{}
+func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadata {
+	metadata := &dbtypes.VideoSpecificMetadata{}
 
 	// Parse Codec from various fields
 	for _, field := range []string{"VideoCodec", "CompressorID", "AudioCodec", "VideoFormat"} {
@@ -185,8 +185,8 @@ func parseVideoMetadata(rawData map[string]string) *models.VideoSpecificMetadata
 }
 
 // parseAudioMetadata parses raw EXIF data into AudioSpecificMetadata
-func parseAudioMetadata(rawData map[string]string) *models.AudioSpecificMetadata {
-	metadata := &models.AudioSpecificMetadata{}
+func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadata {
+	metadata := &dbtypes.AudioSpecificMetadata{}
 
 	// Parse Codec
 	for _, field := range []string{"AudioCodec", "AudioFormat", "FileTypeExtension", "AudioEncoding"} {

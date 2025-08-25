@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lumen-clip"
+version = "0.1.0"
+description = "Lumen, Python Machine Learning (PML) module for Lumilio Photos"
+requires-python = ">=3.12, <3.13"
+dependencies = [
+    "open-clip-torch",
+    "timm",
+    "pillow",
+    "grpcio",
+    "grpcio-tools",
+    "protobuf",
+    "numpy",
+    "python-dotenv",
+    "importlib-resources",
+    "colorama",
+    "pygbif",
+]
+
+[project.optional-dependencies]
+cpu = ["torch", "torchvision", "torchaudio"]
+gpu = ["torch", "torchvision", "torchaudio"]
+osx = ["torch", "torchvision", "torchaudio"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+image_classification = ["*.json"]
+
+[[tool.pydoc-markdown.loaders]]
+type = "python"
+search_path = ["./src"]
+
+[tool.pydoc-markdown.renderer]
+type = "mkdocs"
+
+[[tool.pydoc-markdown.renderer.pages]]
+title = "API 文档"
+name = "index"
+contents = ["proto.*"]

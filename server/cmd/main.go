@@ -2,27 +2,27 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
+	"time"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
 	"server/internal/api"
 	"server/internal/api/handler"
+	"server/internal/db"
 	"server/internal/processors"
 	"server/internal/queue"
-	queuesetup "server/internal/queue/queue_setup"
-	"server/internal/repository/gorm_repo"
 	"server/internal/service"
 	"server/internal/storage"
+	"server/proto"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func init() {
@@ -30,14 +30,6 @@ func init() {
 
 	// Load environment variables using unified config function
 	config.LoadEnvironment()
-
-	if config.IsDevelopmentMode() {
-		log.Println("📋 Development checklist:")
-		log.Println("   1. Database: Make sure PostgreSQL is running on localhost:5432")
-		log.Println("   2. Database: Use 'docker-compose up db' to start only the database")
-		log.Println("   3. Storage: Local directories will be created automatically")
-		log.Println("   4. Access: API will be available at http://localhost:8080")
-	}
 }
 
 // @title Lumilio-Photos Manager API
@@ -68,66 +60,27 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Run database migrations
+	if err := db.AutoMigrate(ctx, dbConfig); err != nil {
+		log.Printf("Warning: Failed to run migrations automatically: %v", err)
+		log.Println("Please run migrations manually using: migrate -path server/migrations -database \"$DATABASE_URL\" up")
+	}
+
 	// Connect to the database
-	database := gorm_repo.InitDB(dbConfig)
-
-	// Defer closing the database connection
-	sqlDB, err := database.DB()
+	database, err := db.New(dbConfig)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
+	defer database.Close()
+	pgxPool := database.Pool
+	queries := database.Queries
 
-	defer func(sqlDB *sql.DB) {
-		err := sqlDB.Close()
-		if err != nil {
-			panic(err)
-		}
-	}(sqlDB)
-
-	log.Println("GORM database connection successful.")
-
-	Port, err := strconv.Atoi(dbConfig.Port)
-	if err != nil {
-		log.Fatalf("GORM database Port Interal Erro.")
-	}
-
-	pgxDSN := fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
-		dbConfig.User,
-		dbConfig.Password,
-		dbConfig.Host,
-		Port,
-		dbConfig.DBName,
-	)
-
-	pgxPool, err := pgxpool.New(context.Background(), pgxDSN)
-	if err != nil {
-		log.Fatalf("Unable to create pgx connection pool: %v\n", err)
-	}
-	defer func() {
-		log.Println("Closing pgx connection pool...")
-		pgxPool.Close()
-	}()
-
-	log.Println("PGX connection pool for queue created successfully.")
-
-	// Initialize repositories
-	assetRepo := gorm_repo.NewAssetRepository(database)
-	tagRepo := gorm_repo.NewTagRepository(database)
-	userRepo := gorm_repo.NewUserRepository(database)
-	embedRepo := gorm_repo.NewEmbedRepository(database)
-	refreshTokenRepo := gorm_repo.NewRefreshTokenRepository(database)
-
-	// Storage will be initialized through AssetService with configuration
-
-	// Initialize staging area for temporary file storage
+	// Load storage configuration
 	log.Printf("📁 Using staging path: %s", appConfig.StagingPath)
-
-	// Ensure staging directory exists
 	if err := os.MkdirAll(appConfig.StagingPath, 0755); err != nil {
 		log.Fatalf("Failed to create staging directory: %v", err)
 	}
 
-	// Load storage configuration
 	storageConfig := storage.LoadStorageConfigFromEnv()
 	log.Printf("💾 Storage strategy: %s (%s)", storageConfig.Strategy, storageConfig.Strategy.GetDescription())
 	log.Printf("💾 Storage path: %s", storageConfig.BasePath)
@@ -138,26 +91,54 @@ func main() {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
 
-	assetService, err := service.NewAssetService(assetRepo, tagRepo, embedRepo, storageService)
+	// Initialize Service
+	assetService, err := service.NewAssetService(queries, storageService)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
-	authService := service.NewAuthService(userRepo, refreshTokenRepo)
+	authService := service.NewAuthService(queries)
 
-	mlService, err := service.NewMLClient(appConfig.MLServiceAddr)
+	// Initialize Queue and run migrations
+	workers := river.NewWorkers()
+
+	// Create River client
+	queueClient, err := queue.New(pgxPool, workers)
+	// Add Workers
+	assetProcessor := processors.NewAssetProcessor(assetService, storageService, queueClient)
+	river.AddWorker[queue.ProcessAssetArgs](workers, &queue.ProcessAssetWorker{Processor: assetProcessor})
+
+	// Initialize ML gRPC connection and CLIP dispatcher
+	// TODO: Using mDNS
+	mlConn, err := grpc.NewClient(appConfig.MLServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
 	if err != nil {
 		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
 	}
+	defer mlConn.Close()
 
-	clipQueue := queuesetup.SetupCLIPQueue(ctx, pgxPool, mlService, assetService)
-	assetProcessor := processors.NewAssetProcessor(assetService, mlService, storageService, clipQueue)
-	assetQueue := queuesetup.SetupAssetQueue(ctx, pgxPool, assetProcessor)
+	clipClient := proto.NewInferenceClient(mlConn)
+	clipDispatcher := queue.NewClipBatchDispatcher(clipClient, 8, 1500*time.Millisecond)
+	clipDispatcher.Start(ctx)
 
-	go runQueue(ctx, assetQueue, "assetQueue")
-	go runQueue(ctx, clipQueue, "clipQueue")
+	// Register CLIP batch worker
+	river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
+		Dispatcher:   clipDispatcher,
+		AssetService: assetService,
+	})
+	if err != nil {
+		log.Fatalf("Failed to Initialize Queue: %v", err)
+	}
+
+	go func() {
+		if err := queueClient.Start(context.Background()); err != nil {
+			panic(err)
+		}
+	}()
+
+	log.Println("✅ Queues initialized successfully")
 
 	// Initialize controllers - pass the staging path and task queue to the handler
-	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, assetQueue)
+	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, queueClient)
 	authController := handler.NewAuthHandler(authService)
 
 	// Initialize Swagger docs
@@ -178,12 +159,5 @@ func main() {
 	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", appConfig.Port)
 	if err := http.ListenAndServe(":"+appConfig.Port, router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
-	}
-}
-
-func runQueue[T any](ctx context.Context, q queue.Queue[T], name string) {
-	log.Printf("[%s] Starting queue workers...", name)
-	if err := q.Start(ctx); err != nil {
-		log.Printf("[%s] Queue workers stopped with error: %v", name, err)
 	}
 }

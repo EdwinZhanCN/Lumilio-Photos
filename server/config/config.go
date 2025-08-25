@@ -14,11 +14,13 @@ import (
 
 // DatabaseConfig holds all the configuration for the database connection.
 type DatabaseConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
-	DBName   string
+	Host           string
+	Port           string
+	User           string
+	Password       string
+	DBName         string
+	SSL            string
+	ChannelBinding string
 }
 
 // AppConfig holds general application configuration
@@ -76,20 +78,24 @@ func LoadDBConfig() DatabaseConfig {
 	if isDev {
 		// Development defaults - connect to localhost
 		cfg = DatabaseConfig{
-			Host:     "localhost", // For development, connect to localhost
-			Port:     "5432",
-			User:     "postgres",
-			Password: "postgres",
-			DBName:   "lumiliophotos", // Match docker-compose database name
+			Host:           "localhost", // For development, connect to localhost
+			Port:           "5432",
+			User:           "postgres",
+			Password:       "postgres",
+			DBName:         "lumiliophotos", // Match docker-compose database name
+			SSL:            "disable",
+			ChannelBinding: "disable",
 		}
 	} else {
 		// Production/Docker defaults
 		cfg = DatabaseConfig{
-			Host:     "db", // In Docker Compose, the hostname is the service name
-			Port:     "5432",
-			User:     "postgres",
-			Password: "postgres",
-			DBName:   "lumiliophotos", // Match docker-compose database name
+			Host:           "db", // In Docker Compose, the hostname is the service name
+			Port:           "5432",
+			User:           "postgres",
+			Password:       "postgres",
+			DBName:         "lumiliophotos", // Match docker-compose database name
+			SSL:            "disable",
+			ChannelBinding: "disable",
 		}
 	}
 
@@ -108,6 +114,12 @@ func LoadDBConfig() DatabaseConfig {
 	}
 	if dbname := os.Getenv("DB_NAME"); dbname != "" {
 		cfg.DBName = dbname
+	}
+	if ssl := os.Getenv("SSL"); ssl != "" {
+		cfg.SSL = ssl
+	}
+	if cb := os.Getenv("CHANNEL_BINDING"); cb != "" {
+		cfg.ChannelBinding = cb
 	}
 
 	return cfg

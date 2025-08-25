@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	pgvector_go "github.com/pgvector/pgvector-go"
+	"server/internal/db/dbtypes"
 )
 
 const createAlbum = `-- name: CreateAlbum :one
@@ -77,24 +78,24 @@ ORDER BY aa.position ASC, aa.added_time ASC
 `
 
 type GetAlbumAssetsRow struct {
-	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
-	Type             string             `db:"type" json:"type"`
-	OriginalFilename string             `db:"original_filename" json:"original_filename"`
-	StoragePath      string             `db:"storage_path" json:"storage_path"`
-	MimeType         string             `db:"mime_type" json:"mime_type"`
-	FileSize         int64              `db:"file_size" json:"file_size"`
-	Hash             *string            `db:"hash" json:"hash"`
-	Width            *int32             `db:"width" json:"width"`
-	Height           *int32             `db:"height" json:"height"`
-	Duration         *float64           `db:"duration" json:"duration"`
-	UploadTime       pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
-	IsDeleted        *bool              `db:"is_deleted" json:"is_deleted"`
-	DeletedAt        pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata []byte             `db:"specific_metadata" json:"specific_metadata"`
-	Embedding        pgvector_go.Vector `db:"embedding" json:"embedding"`
-	Position         *int32             `db:"position" json:"position"`
-	AddedTime        pgtype.Timestamptz `db:"added_time" json:"added_time"`
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
+	Type             string                   `db:"type" json:"type"`
+	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
+	StoragePath      string                   `db:"storage_path" json:"storage_path"`
+	MimeType         string                   `db:"mime_type" json:"mime_type"`
+	FileSize         int64                    `db:"file_size" json:"file_size"`
+	Hash             *string                  `db:"hash" json:"hash"`
+	Width            *int32                   `db:"width" json:"width"`
+	Height           *int32                   `db:"height" json:"height"`
+	Duration         *float64                 `db:"duration" json:"duration"`
+	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
+	Position         *int32                   `db:"position" json:"position"`
+	AddedTime        pgtype.Timestamptz       `db:"added_time" json:"added_time"`
 }
 
 func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error) {

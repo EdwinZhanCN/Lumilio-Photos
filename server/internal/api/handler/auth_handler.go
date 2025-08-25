@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"server/internal/api"
-	"server/internal/models"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +36,7 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
-	var req models.RegisterRequest
+	var req service.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.Error(c.Writer, 400, err, http.StatusBadRequest, "Invalid request data")
 		return
@@ -69,7 +68,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
-	var req models.LoginRequest
+	var req service.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.Error(c.Writer, 400, err, http.StatusBadRequest, "Invalid request data")
 		return
@@ -101,7 +100,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
-	var req models.RefreshTokenRequest
+	var req service.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.Error(c.Writer, 400, err, http.StatusBadRequest, "Invalid request data")
 		return
@@ -135,7 +134,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
-	var req models.RefreshTokenRequest
+	var req service.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.Error(c.Writer, 400, err, http.StatusBadRequest, "Invalid request data")
 		return
@@ -175,7 +174,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 
 	// Get user information
 	// This would typically come from a user service
-	user := models.UserResponse{
+	user := service.UserResponse{
 		UserID:   userID.(int),
 		Username: c.GetString("username"),
 		// Other fields would be fetched from database

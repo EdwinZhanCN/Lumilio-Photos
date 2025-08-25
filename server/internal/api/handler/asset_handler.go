@@ -9,9 +9,10 @@ import (
 	"os"
 	"path/filepath"
 	"server/internal/api"
-	"server/internal/models"
+	"server/internal/db/dbtypes"
+	"server/internal/db/repo"
 	"server/internal/processors"
-	"server/internal/queue"
+	"server/internal/queue/jobs"
 	"server/internal/service"
 	"strconv"
 	"time"
@@ -20,11 +21,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 )
 
 // UploadResponse represents the response structure for file upload
 type UploadResponse struct {
-	TaskID      string `json:"task_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	TaskID      int64  `json:"task_id" example:"550e8400-e29b-41d4-a716-446655440000"`
 	Status      string `json:"status" example:"processing"`
 	FileName    string `json:"file_name" example:"photo.jpg"`
 	Size        int64  `json:"size" example:"1048576"`
@@ -40,8 +43,8 @@ type BatchUploadResponse struct {
 type BatchUploadResult struct {
 	Success     bool    `json:"success"`             // Whether the file was successfully queued
 	FileName    string  `json:"file_name,omitempty"` // Original filename
-	ContentHash string  `json:"content_hash"`        // Client-provided content hash
-	TaskID      *string `json:"task_id,omitempty"`   // Only present for successful uploads
+	ContentHash string  `json:"content_hash"`        // MLService-provided content hash
+	TaskID      *int64  `json:"task_id,omitempty"`   // Only present for successful uploads
 	Status      *string `json:"status,omitempty"`    // Only present for successful uploads
 	Size        *int64  `json:"size,omitempty"`      // Only present for successful uploads
 	Message     *string `json:"message,omitempty"`   // Status message
@@ -50,14 +53,14 @@ type BatchUploadResult struct {
 
 // AssetListResponse represents the response structure for asset listing
 type AssetListResponse struct {
-	Assets []*models.Asset `json:"assets"`
-	Limit  int             `json:"limit" example:"20"`
-	Offset int             `json:"offset" example:"0"`
+	Assets []repo.Asset `json:"assets"`
+	Limit  int          `json:"limit" example:"20"`
+	Offset int          `json:"offset" example:"0"`
 }
 
 // UpdateAssetRequest represents the request structure for updating asset metadata
 type UpdateAssetRequest struct {
-	Metadata models.SpecificMetadata `json:"metadata"`
+	Metadata dbtypes.SpecificMetadata `json:"metadata"`
 }
 
 // MessageResponse represents a simple message response
@@ -67,23 +70,23 @@ type MessageResponse struct {
 
 // AssetTypesResponse represents the response structure for asset types
 type AssetTypesResponse struct {
-	Types []models.AssetType `json:"types"`
+	Types []dbtypes.AssetType `json:"types"`
 }
 
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
 	assetService    service.AssetService
 	stagingPath     string
-	processQueue    queue.Queue[processors.AssetPayload]
+	queueClient     *river.Client[pgx.Tx]
 	StorageBasePath string // Path where assets are stored
 }
 
 // NewAssetHandler creates a new AssetHandler instance
-func NewAssetHandler(assetService service.AssetService, stagingPath string, processQueue queue.Queue[processors.AssetPayload]) *AssetHandler {
+func NewAssetHandler(assetService service.AssetService, stagingPath string, queueClient *river.Client[pgx.Tx]) *AssetHandler {
 	return &AssetHandler{
 		assetService:    assetService,
 		stagingPath:     stagingPath,
-		processQueue:    processQueue,
+		queueClient:     queueClient,
 		StorageBasePath: os.Getenv("STORAGE_PATH"),
 	}
 }
@@ -95,7 +98,7 @@ func NewAssetHandler(assetService service.AssetService, stagingPath string, proc
 // @Accept multipart/form-data
 // @Produce json
 // @Param file formData file true "Asset file to upload"
-// @Param X-Content-Hash header string false "Client-calculated BLAKE3 hash of the file"
+// @Param X-Content-Hash header string false "MLService-calculated BLAKE3 hash of the file"
 // @Success 200 {object} api.Result{data=UploadResponse} "Upload successful"
 // @Failure 400 {object} api.Result "Bad request - no file provided or parse error"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -160,9 +163,19 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		FileName:    header.Filename,
 	}
 
-	jobId, err := h.processQueue.Enqueue(c.Request.Context(), string(queue.JobTypeProcessAsset), payload)
-
-	log.Printf("Task %s enqueued for processing file %s", jobId, header.Filename)
+	jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), jobs.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
+	if err != nil {
+		log.Printf("Failed to enqueue task: %v", err)
+		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
+		return
+	}
+	if jobInsetResult == nil || jobInsetResult.Job == nil {
+		log.Printf("Failed to enqueue task: empty result")
+		api.Error(c.Writer, http.StatusInternalServerError, fmt.Errorf("enqueue failed"), http.StatusInternalServerError, "Upload failed")
+		return
+	}
+	jobId := jobInsetResult.Job.ID
+	log.Printf("Task %d enqueued for processing file %s", jobId, header.Filename)
 
 	response := UploadResponse{
 		TaskID:      jobId,
@@ -278,7 +291,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			FileName:    header.Filename,
 		}
 
-		jobId, err := h.processQueue.Enqueue(c.Request.Context(), string(queue.JobTypeProcessAsset), payload)
+		jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), jobs.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
 		if err != nil {
 			log.Printf("Failed to enqueue task: %v", err)
 			errMsg := "Failed to enqueue task: " + err.Error()
@@ -290,8 +303,19 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			})
 			continue
 		}
+		if jobInsetResult == nil || jobInsetResult.Job == nil {
+			errMsg := "Failed to enqueue task: empty result"
+			results = append(results, BatchUploadResult{
+				Success:     false,
+				FileName:    header.Filename,
+				ContentHash: clientHash,
+				Error:       &errMsg,
+			})
+			continue
+		}
+		jobId := jobInsetResult.Job.ID
 
-		log.Printf("Task %s enqueued for processing file %s", jobId, header.Filename)
+		log.Printf("Task %d enqueued for processing file %s", jobId, header.Filename)
 
 		taskID := jobId
 		status := "processing"
@@ -378,19 +402,19 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	var assets []*models.Asset
+	var assets []repo.Asset
 	var err error
 
 	switch {
 	case searchQuery != "":
-		var assetType *models.AssetType
+		var assetType *dbtypes.AssetType
 		if typeStr != "" {
-			at := models.AssetType(typeStr)
+			at := dbtypes.AssetType(typeStr)
 			if at.Valid() {
 				assetType = &at
 			}
 		}
-		assets, err = h.assetService.SearchAssets(ctx, searchQuery, assetType, limit, offset)
+		assets, err = h.assetService.SearchAssets(ctx, searchQuery, assetType.String(), limit, offset)
 
 	case ownerIDStr != "":
 		ownerID, parseErr := strconv.Atoi(ownerIDStr)
@@ -401,12 +425,12 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 		assets, err = h.assetService.GetAssetsByOwner(ctx, ownerID, limit, offset)
 
 	case typeStr != "":
-		assetType := models.AssetType(typeStr)
+		assetType := dbtypes.AssetType(typeStr)
 		if !assetType.Valid() {
 			api.Error(c.Writer, http.StatusBadRequest, errors.New("invalid asset type"), http.StatusBadRequest, "Invalid asset type")
 			return
 		}
-		assets, err = h.assetService.GetAssetsByType(ctx, assetType, limit, offset)
+		assets, err = h.assetService.GetAssetsByType(ctx, *assetType.String(), limit, offset)
 
 	default:
 		api.Error(c.Writer, http.StatusBadRequest, errors.New("missing query parameters"), http.StatusBadRequest, "Please specify type, owner_id, or search query")
@@ -679,10 +703,10 @@ func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 // @Success 200 {object} api.Result{data=AssetTypesResponse} "Asset types retrieved successfully"
 // @Router /assets/types [get]
 func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
-	types := []models.AssetType{
-		models.AssetTypePhoto,
-		models.AssetTypeVideo,
-		models.AssetTypeAudio,
+	types := []dbtypes.AssetType{
+		dbtypes.AssetTypePhoto,
+		dbtypes.AssetTypeVideo,
+		dbtypes.AssetTypeAudio,
 	}
 
 	api.Success(c.Writer, AssetTypesResponse{Types: types})

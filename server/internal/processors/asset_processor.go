@@ -3,22 +3,21 @@ package processors
 import (
 	"context"
 	"fmt"
-	"io"
+	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 	"os"
-	"server/internal/models"
-	"server/internal/queue"
+	"server/internal/db/dbtypes"
+	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/utils/file"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type AssetPayload struct {
-	ClientHash  string    `json:"clientHash"`
+	ClientHash  string    `json:"clientHash" river:"unique"`
 	StagedPath  string    `json:"stagedPath"`
-	UserID      string    `json:"userId"`
+	UserID      string    `json:"userId" river:"unique"`
 	Timestamp   time.Time `json:"timestamp"`
 	ContentType string    `json:"contentType,omitempty"`
 	FileName    string    `json:"fileName,omitempty"`
@@ -27,76 +26,78 @@ type AssetPayload struct {
 // AssetProcessor handles processing tasks for different asset types
 type AssetProcessor struct {
 	assetService   service.AssetService
-	mlService      service.MLService
 	storageService storage.Storage
-	clipQueue      queue.Queue[CLIPPayload]
+	queueClient    *river.Client[pgx.Tx]
 }
 
-func NewAssetProcessor(assetService service.AssetService, mlService service.MLService, storageService storage.Storage, clipQueue queue.Queue[CLIPPayload]) *AssetProcessor {
+func NewAssetProcessor(assetService service.AssetService, storageService storage.Storage, queueClient *river.Client[pgx.Tx]) *AssetProcessor {
 	return &AssetProcessor{
 		assetService:   assetService,
-		mlService:      mlService,
 		storageService: storageService,
-		clipQueue:      clipQueue,
+		queueClient:    queueClient,
 	}
 }
 
-func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (*models.Asset, error) {
+func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (*repo.Asset, error) {
 	assetFile, err := os.Open(task.StagedPath)
-	info, _ := assetFile.Stat()
-	fileSize := info.Size()
-
-	var ownerIDPtr *int
-	if task.UserID != "anonymous" {
-		ownerID := 1
-		ownerIDPtr = &ownerID
-	}
 	if err != nil {
 		return nil, err
+	}
+	defer func(assetFile *os.File) {
+		err := assetFile.Close()
+		if err != nil {
+			fmt.Printf("failed to close staged file: %v\n", err)
+		}
+	}(assetFile) // Close the staged file
+
+	info, err := assetFile.Stat()
+	if err != nil {
+		return nil, err
+	}
+	fileSize := info.Size()
+
+	var ownerIDPtr *int32
+	if task.UserID != "anonymous" {
+		ownerID := int32(1)
+		ownerIDPtr = &ownerID
 	}
 
 	contentType := file.DetermineAssetType(task.ContentType)
 
+	// Commit the staged file FIRST
 	storagePath, err := ap.storageService.CommitStagedFile(ctx, task.StagedPath, task.FileName, task.ClientHash)
-
-	if _, err := assetFile.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("reset file pointer: %w", err)
-	}
-
 	if err != nil {
 		return nil, err
 	}
 
-	// What we left here?
-	// Width
-	// Height
-	// Duration
-	// those field will update later
-	newAsset := &models.Asset{
-		AssetID:          uuid.New(),
+	// Create asset record
+	params := repo.CreateAssetParams{
 		OwnerID:          ownerIDPtr,
-		Type:             contentType,
+		Type:             string(contentType),
 		OriginalFilename: task.FileName,
 		StoragePath:      storagePath,
 		MimeType:         task.ContentType,
 		FileSize:         fileSize,
-		Hash:             task.ClientHash,
-		UploadTime:       task.Timestamp,
+		Hash:             &task.ClientHash,
+		Width:            nil,
+		Height:           nil,
+		Duration:         nil,
+		SpecificMetadata: nil,
 	}
 
-	asset, err := ap.assetService.CreateAssetRecord(ctx, newAsset)
-
+	asset, err := ap.assetService.CreateAssetRecord(ctx, params)
 	if err != nil {
 		return nil, err
 	}
 
 	switch asset.Type {
-	case models.AssetTypePhoto:
-		return asset, ap.processPhotoAsset(ctx, asset, assetFile)
-	case models.AssetTypeVideo:
+	case string(dbtypes.AssetTypePhoto):
+		err := ap.processPhotoAsset(ctx, asset, assetFile)
+		return asset, err
+	case string(dbtypes.AssetTypeVideo):
 		//TODO: implement
 		return asset, ap.processVideoAsset(asset)
-	case models.AssetTypeAudio:
+	case string(dbtypes.AssetTypeAudio):
 		//TODO: implement
 		return asset, ap.processAudioAsset(asset)
 	default:

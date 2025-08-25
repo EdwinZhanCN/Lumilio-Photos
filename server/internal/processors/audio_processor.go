@@ -1,8 +1,8 @@
 package processors
 
-import "server/internal/models"
+import "server/internal/db/repo"
 
-func (ap *AssetProcessor) processAudioAsset(asset *models.Asset) error {
+func (ap *AssetProcessor) processAudioAsset(asset *repo.Asset) error {
 	// Process the photo
 	return nil
 }

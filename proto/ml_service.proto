@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package home_native.v1;
+
+option go_package = "server/proto";
+
+import "google/protobuf/empty.proto";
+
+// ---- 统一的错误码（精简）----
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_INVALID_ARGUMENT = 1;
+  ERROR_CODE_UNAVAILABLE = 2;      // 下游/硬件/资源不可用
+  ERROR_CODE_DEADLINE_EXCEEDED = 3;
+  ERROR_CODE_INTERNAL = 4;
+}
+
+// ---- 标准错误载体（与 gRPC status 一起用：致命错误可直接结束流）----
+message Error {
+  ErrorCode code = 1;
+  string    message = 2;
+  string    detail = 3;             // 便于日志/排障（栈、节点ID等）
+}
+
+// ---- 结构化的任务 I/O 描述（便于中心路由与前端协商）----
+message IOTask {
+  string name = 1;                           // "embed","detect","ocr","asr","generate","tts",...
+  repeated string input_mimes = 2;           // 允许多种输入："image/jpeg","audio/pcm;rate=16000","application/json"
+  repeated string output_mimes = 3;          // 典型输出："application/json;schema=bbox_v1","audio/wav"
+  map<string, string> limits = 4;            // 如 max_hw=1024,max_batch=8,max_length=4096 等
+}
+
+// ---- 能力宣告（服务上线时或按需获取）----
+message Capability {
+  string service_name = 1;                   // "clip-embedder","ocr","llm","tts",...
+  repeated string model_ids = 2;             // 支持的模型/版本
+  string runtime = 3;                        // "onnxrt-cuda","tensorrt","coreml","rknn","qnn","cpu"
+  uint32 max_concurrency = 4;                // 建议并发
+  repeated string precisions = 5;            // ["fp32","fp16","int8"]
+  map<string, string> extra = 6;             // 分辨率上/下限、ANE/NPU 等特性
+  repeated IOTask tasks = 7;                 // 结构化的 task 能力（推荐使用）
+}
+
+// ---- 推理请求（双向流的入向消息）----
+message InferRequest {
+  string correlation_id = 1;                 // 追踪/对账
+  string task = 2;                           // "embed","classify","detect","ocr","asr","generate","tts",...
+  bytes  payload = 3;                        // 原始片段（二进制/UTF-8 文本均可）
+  map<string, string> meta = 4;              // 任务自定义参数：model_id, conf_thres, stop 等
+
+  // --- 新增：输入内容类型与分片控制 ---
+  string payload_mime = 5;                   // e.g. "image/jpeg","audio/pcm;rate=16000","application/json"
+  uint64 seq = 6;                            // 分片序号（0 起）
+  uint64 total = 7;                          // 可选：总分片数（未知则不填）
+  uint64 offset = 8;                         // 可选：payload 在整体流中的字节偏移
+}
+
+// ---- 推理响应（双向流的出向消息）----
+message InferResponse {
+  string correlation_id = 1;
+  bool   is_final = 2;                       // 流式增量 or 最终结果
+  bytes  result = 3;                         // 结果二进制；若为 JSON，请用 result_mime 标明
+  map<string, string> meta = 4;              // 例如 lat_ms, tokens, bboxes_count
+  Error  error = 5;                          // 仅在失败时填（致命错误也可直接结束流）
+
+  // --- 新增：输出内容类型与分片控制 ---
+  uint64 seq = 6;                            // 分片序号（0 起），用于增量/音频/视频分片
+  uint64 total = 7;                          // 可选：总分片数
+  uint64 offset = 8;                         // 可选：result 在整体输出中的字节偏移
+  string result_mime = 9;                    // e.g. "application/json;schema=embedding_v1","audio/wav","image/png"
+  string result_schema = 10;                 // 可选：显式 schema 名（如 "bbox_v1","mask_rle_v1"）
+}
+
+// ---- 服务契约 ----
+service Inference {
+  // 双向流：客户端推片段，服务端回增量/最终结果；顺序保证但互不阻塞
+  rpc Infer(stream InferRequest) returns (stream InferResponse);
+
+  // 能力宣告（向后兼容：返回单条能力；多能力请使用 StreamCapabilities）
+  rpc GetCapabilities(google.protobuf.Empty) returns (Capability);
+
+  // 推荐：服务器流返回全部能力（启动/热更后调用）
+  rpc StreamCapabilities(google.protobuf.Empty) returns (stream Capability);
+
+  // 健康探针
+  rpc Health(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

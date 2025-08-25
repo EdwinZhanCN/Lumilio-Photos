@@ -8,9 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"server/internal/db/dbtypes"
 	"sync"
-
-	"server/internal/models"
 )
 
 // Extractor handles EXIF metadata extraction using streaming and concurrency
@@ -40,13 +39,13 @@ func NewExtractor(config *Config) *Extractor {
 type MetadataResult struct {
 	Metadata interface{}
 	Error    error
-	Type     models.AssetType
+	Type     dbtypes.AssetType
 }
 
 // StreamingExtractRequest represents a request for streaming metadata extraction
 type StreamingExtractRequest struct {
 	Reader    io.Reader
-	AssetType models.AssetType
+	AssetType dbtypes.AssetType
 	Filename  string
 	Size      int64
 }
@@ -154,15 +153,15 @@ func (e *Extractor) streamToBuffer(reader io.Reader, size int64) (*bytes.Buffer,
 }
 
 // extractMetadataFromBuffer extracts metadata from buffer based on asset type
-func (e *Extractor) extractMetadataFromBuffer(ctx context.Context, buffer *bytes.Buffer, assetType models.AssetType) (interface{}, error) {
+func (e *Extractor) extractMetadataFromBuffer(ctx context.Context, buffer *bytes.Buffer, assetType dbtypes.AssetType) (interface{}, error) {
 	var tags []string
 
 	switch assetType {
-	case models.AssetTypePhoto:
+	case dbtypes.AssetTypePhoto:
 		tags = e.tagConfig.PhotoTags
-	case models.AssetTypeVideo:
+	case dbtypes.AssetTypeVideo:
 		tags = e.tagConfig.VideoTags
-	case models.AssetTypeAudio:
+	case dbtypes.AssetTypeAudio:
 		tags = e.tagConfig.AudioTags
 	default:
 		return nil, fmt.Errorf("unsupported asset type: %s", assetType)
@@ -177,13 +176,13 @@ func (e *Extractor) extractMetadataFromBuffer(ctx context.Context, buffer *bytes
 }
 
 // parseMetadata parses raw metadata based on asset type
-func (e *Extractor) parseMetadata(rawData map[string]string, assetType models.AssetType) interface{} {
+func (e *Extractor) parseMetadata(rawData map[string]string, assetType dbtypes.AssetType) interface{} {
 	switch assetType {
-	case models.AssetTypePhoto:
+	case dbtypes.AssetTypePhoto:
 		return parsePhotoMetadata(rawData)
-	case models.AssetTypeVideo:
+	case dbtypes.AssetTypeVideo:
 		return parseVideoMetadata(rawData)
-	case models.AssetTypeAudio:
+	case dbtypes.AssetTypeAudio:
 		return parseAudioMetadata(rawData)
 	default:
 		return nil
