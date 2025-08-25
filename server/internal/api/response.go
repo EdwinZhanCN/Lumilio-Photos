@@ -44,3 +44,31 @@ func Error(w http.ResponseWriter, code int, err error, statusCode int, messages 
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(result)
 }
+
+// ErrorResponse represents a standardized error response
+type ErrorResponse struct {
+	Code    int    `json:"code" example:"400"`
+	Message string `json:"message" example:"Bad request"`
+	Error   string `json:"error,omitempty" example:"validation failed"`
+}
+
+// SuccessResponse represents a simple success response
+type SuccessResponse struct {
+	Message string `json:"message" example:"Operation completed successfully"`
+}
+
+// HandleError is a helper function for consistent error handling
+func HandleError(c interface{}, statusCode int, message string, err error) {
+	// This is a placeholder - in a real implementation, you'd use the gin.Context
+	// For now, we'll just use the existing Error function approach
+	response := ErrorResponse{
+		Code:    statusCode,
+		Message: message,
+	}
+	if err != nil {
+		response.Error = err.Error()
+	}
+
+	// Note: This would need to be implemented properly with gin.Context
+	// c.JSON(statusCode, response)
+}

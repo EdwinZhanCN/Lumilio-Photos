@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	pgvector_go "github.com/pgvector/pgvector-go"
+	"server/internal/db/dbtypes"
 )
 
 const getAssetWithRelations = `-- name: GetAssetWithRelations :one
@@ -45,24 +46,24 @@ GROUP BY a.asset_id
 `
 
 type GetAssetWithRelationsRow struct {
-	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
-	Type             string             `db:"type" json:"type"`
-	OriginalFilename string             `db:"original_filename" json:"original_filename"`
-	StoragePath      string             `db:"storage_path" json:"storage_path"`
-	MimeType         string             `db:"mime_type" json:"mime_type"`
-	FileSize         int64              `db:"file_size" json:"file_size"`
-	Hash             *string            `db:"hash" json:"hash"`
-	Width            *int32             `db:"width" json:"width"`
-	Height           *int32             `db:"height" json:"height"`
-	Duration         *float64           `db:"duration" json:"duration"`
-	UploadTime       pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
-	IsDeleted        *bool              `db:"is_deleted" json:"is_deleted"`
-	DeletedAt        pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata []byte             `db:"specific_metadata" json:"specific_metadata"`
-	Embedding        pgvector_go.Vector `db:"embedding" json:"embedding"`
-	Thumbnails       interface{}        `db:"thumbnails" json:"thumbnails"`
-	Tags             interface{}        `db:"tags" json:"tags"`
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
+	Type             string                   `db:"type" json:"type"`
+	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
+	StoragePath      string                   `db:"storage_path" json:"storage_path"`
+	MimeType         string                   `db:"mime_type" json:"mime_type"`
+	FileSize         int64                    `db:"file_size" json:"file_size"`
+	Hash             *string                  `db:"hash" json:"hash"`
+	Width            *int32                   `db:"width" json:"width"`
+	Height           *int32                   `db:"height" json:"height"`
+	Duration         *float64                 `db:"duration" json:"duration"`
+	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
+	Thumbnails       interface{}              `db:"thumbnails" json:"thumbnails"`
+	Tags             interface{}              `db:"tags" json:"tags"`
 }
 
 func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error) {
@@ -114,23 +115,23 @@ GROUP BY a.asset_id
 `
 
 type GetAssetWithTagsRow struct {
-	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
-	Type             string             `db:"type" json:"type"`
-	OriginalFilename string             `db:"original_filename" json:"original_filename"`
-	StoragePath      string             `db:"storage_path" json:"storage_path"`
-	MimeType         string             `db:"mime_type" json:"mime_type"`
-	FileSize         int64              `db:"file_size" json:"file_size"`
-	Hash             *string            `db:"hash" json:"hash"`
-	Width            *int32             `db:"width" json:"width"`
-	Height           *int32             `db:"height" json:"height"`
-	Duration         *float64           `db:"duration" json:"duration"`
-	UploadTime       pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
-	IsDeleted        *bool              `db:"is_deleted" json:"is_deleted"`
-	DeletedAt        pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata []byte             `db:"specific_metadata" json:"specific_metadata"`
-	Embedding        pgvector_go.Vector `db:"embedding" json:"embedding"`
-	Tags             interface{}        `db:"tags" json:"tags"`
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
+	Type             string                   `db:"type" json:"type"`
+	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
+	StoragePath      string                   `db:"storage_path" json:"storage_path"`
+	MimeType         string                   `db:"mime_type" json:"mime_type"`
+	FileSize         int64                    `db:"file_size" json:"file_size"`
+	Hash             *string                  `db:"hash" json:"hash"`
+	Width            *int32                   `db:"width" json:"width"`
+	Height           *int32                   `db:"height" json:"height"`
+	Duration         *float64                 `db:"duration" json:"duration"`
+	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
+	Tags             interface{}              `db:"tags" json:"tags"`
 }
 
 func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error) {
@@ -185,23 +186,23 @@ GROUP BY a.asset_id
 `
 
 type GetAssetWithThumbnailsRow struct {
-	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
-	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
-	Type             string             `db:"type" json:"type"`
-	OriginalFilename string             `db:"original_filename" json:"original_filename"`
-	StoragePath      string             `db:"storage_path" json:"storage_path"`
-	MimeType         string             `db:"mime_type" json:"mime_type"`
-	FileSize         int64              `db:"file_size" json:"file_size"`
-	Hash             *string            `db:"hash" json:"hash"`
-	Width            *int32             `db:"width" json:"width"`
-	Height           *int32             `db:"height" json:"height"`
-	Duration         *float64           `db:"duration" json:"duration"`
-	UploadTime       pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
-	IsDeleted        *bool              `db:"is_deleted" json:"is_deleted"`
-	DeletedAt        pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata []byte             `db:"specific_metadata" json:"specific_metadata"`
-	Embedding        pgvector_go.Vector `db:"embedding" json:"embedding"`
-	Thumbnails       interface{}        `db:"thumbnails" json:"thumbnails"`
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
+	Type             string                   `db:"type" json:"type"`
+	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
+	StoragePath      string                   `db:"storage_path" json:"storage_path"`
+	MimeType         string                   `db:"mime_type" json:"mime_type"`
+	FileSize         int64                    `db:"file_size" json:"file_size"`
+	Hash             *string                  `db:"hash" json:"hash"`
+	Width            *int32                   `db:"width" json:"width"`
+	Height           *int32                   `db:"height" json:"height"`
+	Duration         *float64                 `db:"duration" json:"duration"`
+	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
+	Thumbnails       interface{}              `db:"thumbnails" json:"thumbnails"`
 }
 
 func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUID) (GetAssetWithThumbnailsRow, error) {

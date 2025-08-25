@@ -56,6 +56,7 @@ func StreamThumbnails(
 				Height:  height,
 				Crop:    true,
 				Quality: 80,
+				Type:    bimg.WEBP,
 			}
 			thumb, err := bimg.NewImage(srcBuf).Process(opts)
 			if err != nil {
