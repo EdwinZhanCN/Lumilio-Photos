@@ -97,6 +97,7 @@ func main() {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
 	authService := service.NewAuthService(queries)
+	albumService := service.NewAlbumService(queries)
 
 	// Initialize Queue and run migrations
 	workers := river.NewWorkers()
@@ -140,6 +141,7 @@ func main() {
 	// Initialize controllers - pass the staging path and task queue to the handler
 	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, queueClient)
 	authController := handler.NewAuthHandler(authService)
+	albumController := handler.NewAlbumHandler(&albumService, queries)
 
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
@@ -148,8 +150,8 @@ func main() {
 	docs.SwaggerInfo.Host = "localhost:" + appConfig.Port
 	docs.SwaggerInfo.BasePath = "/api/v1"
 
-	// Set up router with new asset and auth endpoints
-	router := api.NewRouter(assetController, authController)
+	// Set up router with new asset, album and auth endpoints
+	router := api.NewRouter(assetController, authController, albumController)
 
 	// Add Swagger documentation endpoint
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
