@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Result represents the standard API response format
@@ -57,18 +59,88 @@ type SuccessResponse struct {
 	Message string `json:"message" example:"Operation completed successfully"`
 }
 
-// HandleError is a helper function for consistent error handling
-func HandleError(c interface{}, statusCode int, message string, err error) {
-	// This is a placeholder - in a real implementation, you'd use the gin.Context
-	// For now, we'll just use the existing Error function approach
-	response := ErrorResponse{
+// Gin-specific helper functions
+
+// GinSuccess sends a standardized success response using gin.Context
+func GinSuccess(c *gin.Context, data interface{}) {
+	result := &Result{
+		Code:    0,
+		Message: "success",
+		Data:    data,
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// GinError sends a standardized error response using gin.Context
+func GinError(c *gin.Context, code int, err error, statusCode int, messages ...string) {
+	msg := "operation failed"
+	if len(messages) > 0 {
+		msg = messages[0]
+	}
+
+	result := &Result{
+		Code:    code,
+		Message: msg,
+		Error:   err.Error(),
+	}
+	c.JSON(statusCode, result)
+}
+
+// HandleError is a helper function for consistent error handling with gin.Context
+func HandleError(c *gin.Context, statusCode int, message string, err error) {
+	result := &Result{
 		Code:    statusCode,
 		Message: message,
 	}
 	if err != nil {
-		response.Error = err.Error()
+		result.Error = err.Error()
 	}
+	c.JSON(statusCode, result)
+}
 
-	// Note: This would need to be implemented properly with gin.Context
-	// c.JSON(statusCode, response)
+// Common response helpers
+
+// GinBadRequest sends a 400 Bad Request response
+func GinBadRequest(c *gin.Context, err error, message ...string) {
+	msg := "Bad request"
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	GinError(c, http.StatusBadRequest, err, http.StatusBadRequest, msg)
+}
+
+// GinUnauthorized sends a 401 Unauthorized response
+func GinUnauthorized(c *gin.Context, err error, message ...string) {
+	msg := "Unauthorized"
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	GinError(c, http.StatusUnauthorized, err, http.StatusUnauthorized, msg)
+}
+
+// GinForbidden sends a 403 Forbidden response
+func GinForbidden(c *gin.Context, err error, message ...string) {
+	msg := "Access denied"
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	GinError(c, http.StatusForbidden, err, http.StatusForbidden, msg)
+}
+
+// GinNotFound sends a 404 Not Found response
+func GinNotFound(c *gin.Context, err error, message ...string) {
+	msg := "Resource not found"
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	GinError(c, http.StatusNotFound, err, http.StatusNotFound, msg)
+}
+
+// GinInternalError sends a 500 Internal Server Error response
+func GinInternalError(c *gin.Context, err error, message ...string) {
+	msg := "Internal server error"
+	if len(message) > 0 {
+		msg = message[0]
+	}
+	GinError(c, http.StatusInternalServerError, err, http.StatusInternalServerError, msg)
 }

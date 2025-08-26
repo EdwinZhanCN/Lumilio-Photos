@@ -27,7 +27,7 @@ import (
 
 // UploadResponse represents the response structure for file upload
 type UploadResponse struct {
-	TaskID      int64  `json:"task_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	TaskID      int64  `json:"task_id" example:"12345"`
 	Status      string `json:"status" example:"processing"`
 	FileName    string `json:"file_name" example:"photo.jpg"`
 	Size        int64  `json:"size" example:"1048576"`
@@ -53,9 +53,62 @@ type BatchUploadResult struct {
 
 // AssetListResponse represents the response structure for asset listing
 type AssetListResponse struct {
-	Assets []repo.Asset `json:"assets"`
-	Limit  int          `json:"limit" example:"20"`
-	Offset int          `json:"offset" example:"0"`
+	Assets []AssetDTO `json:"assets"`
+	Limit  int        `json:"limit" example:"20"`
+	Offset int        `json:"offset" example:"0"`
+}
+
+// AssetDTO represents a simplified asset payload for APIs and docs
+type AssetDTO struct {
+	AssetID          string                   `json:"asset_id"`
+	OwnerID          *int32                   `json:"owner_id"`
+	Type             string                   `json:"type"`
+	OriginalFilename string                   `json:"original_filename"`
+	StoragePath      string                   `json:"storage_path"`
+	MimeType         string                   `json:"mime_type"`
+	FileSize         int64                    `json:"file_size"`
+	Hash             *string                  `json:"hash"`
+	Width            *int32                   `json:"width"`
+	Height           *int32                   `json:"height"`
+	Duration         *float64                 `json:"duration"`
+	UploadTime       time.Time                `json:"upload_time"`
+	IsDeleted        *bool                    `json:"is_deleted"`
+	DeletedAt        *time.Time               `json:"deleted_at,omitempty"`
+	Metadata         dbtypes.SpecificMetadata `json:"specific_metadata"`
+}
+
+// toAssetDTO maps repo.Asset to AssetDTO
+func toAssetDTO(a repo.Asset) AssetDTO {
+	var id string
+	if a.AssetID.Valid {
+		id = uuid.UUID(a.AssetID.Bytes).String()
+	}
+	var uploadTime time.Time
+	if a.UploadTime.Valid {
+		uploadTime = a.UploadTime.Time
+	}
+	var deletedAt *time.Time
+	if a.DeletedAt.Valid {
+		t := a.DeletedAt.Time
+		deletedAt = &t
+	}
+	return AssetDTO{
+		AssetID:          id,
+		OwnerID:          a.OwnerID,
+		Type:             a.Type,
+		OriginalFilename: a.OriginalFilename,
+		StoragePath:      a.StoragePath,
+		MimeType:         a.MimeType,
+		FileSize:         a.FileSize,
+		Hash:             a.Hash,
+		Width:            a.Width,
+		Height:           a.Height,
+		Duration:         a.Duration,
+		UploadTime:       uploadTime,
+		IsDeleted:        a.IsDeleted,
+		DeletedAt:        deletedAt,
+		Metadata:         a.SpecificMetadata,
+	}
 }
 
 // UpdateAssetRequest represents the request structure for updating asset metadata
@@ -93,7 +146,7 @@ func NewAssetHandler(assetService service.AssetService, stagingPath string, queu
 
 // UploadAsset handles asset upload requests
 // @Summary Upload a single asset
-// @Description Upload a single photo, video, audio file or document to the system
+// @Description Upload a single photo, video, audio file, or document to the system. The file is staged and queued for processing.
 // @Tags assets
 // @Accept multipart/form-data
 // @Produce json
@@ -107,13 +160,13 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	// Parse multipart form
 	err := c.Request.ParseMultipartForm(32 << 20) // 32MB max
 	if err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Failed to parse form")
+		api.GinBadRequest(c, err, "Failed to parse form")
 		return
 	}
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, errors.New("no file provided"), http.StatusBadRequest)
+		api.GinBadRequest(c, errors.New("no file provided"))
 		return
 	}
 	defer file.Close()
@@ -130,14 +183,14 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 
 	if err := os.MkdirAll(h.stagingPath, 0755); err != nil {
 		log.Printf("Failed to create staging directory: %v", err)
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
+		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
 
 	stagingFile, err := os.Create(stagingFilePath)
 	if err != nil {
 		log.Printf("Failed to create staging file: %v", err)
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
+		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
 	defer stagingFile.Close()
@@ -145,7 +198,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	_, err = io.Copy(stagingFile, file)
 	if err != nil {
 		log.Printf("Failed to copy file to staging: %v", err)
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
+		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
 
@@ -166,12 +219,12 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), jobs.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
 	if err != nil {
 		log.Printf("Failed to enqueue task: %v", err)
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Upload failed")
+		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
 	if jobInsetResult == nil || jobInsetResult.Job == nil {
 		log.Printf("Failed to enqueue task: empty result")
-		api.Error(c.Writer, http.StatusInternalServerError, fmt.Errorf("enqueue failed"), http.StatusInternalServerError, "Upload failed")
+		api.GinInternalError(c, fmt.Errorf("enqueue failed"), "Upload failed")
 		return
 	}
 	jobId := jobInsetResult.Job.ID
@@ -185,12 +238,12 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		ContentHash: clientHash,
 		Message:     "File received and queued for processing",
 	}
-	api.Success(c.Writer, response)
+	api.GinSuccess(c, response)
 }
 
 // BatchUploadAssets handles multiple asset uploads
 // @Summary Batch upload assets
-// @Description Batch uploads multiple assets using a multipart/form-data request. The field name for each file part must be its BLAKE3 content hash.
+// @Description Batch upload multiple assets using a multipart/form-data request. Each file part's field name must be its BLAKE3 content hash. All files are staged and queued for processing.
 // @Tags assets
 // @Accept multipart/form-data
 // @Produce json
@@ -201,13 +254,13 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	err := c.Request.ParseMultipartForm(128 << 20) // 128MB max for batch
 	if err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Failed to parse form")
+		api.GinBadRequest(c, err, "Failed to parse form")
 		return
 	}
 
 	form := c.Request.MultipartForm
 	if form == nil || len(form.File) == 0 {
-		api.Error(c.Writer, http.StatusBadRequest, errors.New("no files provided"), http.StatusBadRequest, "No files provided")
+		api.GinBadRequest(c, errors.New("no files provided"), "No files provided")
 		return
 	}
 
@@ -333,12 +386,12 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		})
 	}
 
-	api.Success(c.Writer, BatchUploadResponse{Results: results})
+	api.GinSuccess(c, BatchUploadResponse{Results: results})
 }
 
 // GetAsset retrieves a single asset by ID
 // @Summary Get asset by ID
-// @Description Retrieve detailed information about a specific asset with optional relationships
+// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, and albums.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -346,7 +399,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 // @Param include_thumbnails query bool false "Include thumbnails" default(true)
 // @Param include_tags query bool false "Include tags" default(true)
 // @Param include_albums query bool false "Include albums" default(true)
-// @Success 200 {object} api.Result{data=models.Asset} "Asset details with optional relationships"
+// @Success 200 {object} api.Result{data=AssetDTO} "Asset details with optional relationships"
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 404 {object} api.Result "Asset not found"
 // @Router /assets/{id} [get]
@@ -354,7 +407,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Invalid asset ID")
+		api.GinBadRequest(c, err, "Invalid asset ID")
 		return
 	}
 
@@ -365,20 +418,20 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 
 	asset, err := h.assetService.GetAssetWithOptions(c.Request.Context(), id, includeThumbnails, includeTags, includeAlbums)
 	if err != nil {
-		api.Error(c.Writer, http.StatusNotFound, err, http.StatusNotFound, "Asset not found")
+		api.GinNotFound(c, err, "Asset not found")
 		return
 	}
 
-	api.Success(c.Writer, asset)
+	api.GinSuccess(c, asset)
 }
 
 // ListAssets retrieves assets with optional filtering
-// @Summary List assets with filtering
-// @Description Retrieve a paginated list of assets with optional filtering by type, owner, or search query
+// @Summary List assets
+// @Description Retrieve a paginated list of assets. Filter by type, owner, or search query. At least one filter parameter is required.
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Param type query string false "Asset type filter" Enums(PHOTO, VIDEO, AUDIO, DOCUMENT) example("PHOTO")
+// @Param type query string false "Asset type filter" Enums(PHOTO,VIDEO,AUDIO,DOCUMENT) example("PHOTO")
 // @Param owner_id query int false "Filter by owner ID" example(123)
 // @Param q query string false "Search query for filename" example("vacation")
 // @Param limit query int false "Maximum number of results (max 100)" default(20) example(20)
@@ -419,7 +472,7 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	case ownerIDStr != "":
 		ownerID, parseErr := strconv.Atoi(ownerIDStr)
 		if parseErr != nil {
-			api.Error(c.Writer, http.StatusBadRequest, parseErr, http.StatusBadRequest, "Invalid owner_id")
+			api.GinBadRequest(c, parseErr, "Invalid owner_id")
 			return
 		}
 		assets, err = h.assetService.GetAssetsByOwner(ctx, ownerID, limit, offset)
@@ -427,38 +480,41 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	case typeStr != "":
 		assetType := dbtypes.AssetType(typeStr)
 		if !assetType.Valid() {
-			api.Error(c.Writer, http.StatusBadRequest, errors.New("invalid asset type"), http.StatusBadRequest, "Invalid asset type")
+			api.GinBadRequest(c, errors.New("invalid asset type"), "Invalid asset type")
 			return
 		}
 		assets, err = h.assetService.GetAssetsByType(ctx, *assetType.String(), limit, offset)
 
 	default:
-		api.Error(c.Writer, http.StatusBadRequest, errors.New("missing query parameters"), http.StatusBadRequest, "Please specify type, owner_id, or search query")
+		api.GinBadRequest(c, errors.New("missing query parameters"), "Please specify type, owner_id, or search query")
 		return
 	}
 
 	if err != nil {
 		log.Printf("Failed to retrieve assets: %v", err)
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to retrieve assets")
+		api.GinInternalError(c, err, "Failed to retrieve assets")
 		return
 	}
 
+	dtos := make([]AssetDTO, len(assets))
+	for i, a := range assets {
+		dtos[i] = toAssetDTO(a)
+	}
 	response := AssetListResponse{
-		Assets: assets,
+		Assets: dtos,
 		Limit:  limit,
 		Offset: offset,
 	}
-	api.Success(c.Writer, response)
+	api.GinSuccess(c, response)
 }
 
 // GetAssetThumbnail retrieves a thumbnail for a specific asset by asset ID and size
-// @Summary Get asset thumbnail by ID and size
-// @Description Retrieve a specific thumbnail image for an asset by asset ID and size parameter
+// @Summary Get asset thumbnail
+// @Description Retrieve a specific thumbnail image for an asset by asset ID and size parameter. Returns the image file directly.
 // @Tags assets
-// @Accept json
-// @Produce json
+// @Produce image/jpeg
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Param size query string false "Thumbnail size" default("medium") enums(small,medium,large)
+// @Param size query string false "Thumbnail size" default(medium) Enums(small,medium,large)
 // @Success 200 {file} string "Thumbnail image file"
 // @Failure 400 {object} api.Result "Invalid asset ID or size parameter"
 // @Failure 404 {object} api.Result "Asset or thumbnail not found"
@@ -544,8 +600,8 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 }
 
 // GetOriginalFile serves the original file content by asset ID
-// @Summary Get original file by asset ID
-// @Description Serve the original file content for an asset
+// @Summary Get original file
+// @Description Serve the original file content for an asset by asset ID. Returns the file as an octet-stream.
 // @Tags assets
 // @Produce application/octet-stream
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
@@ -559,7 +615,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Invalid asset ID")
+		api.GinBadRequest(c, err, "Invalid asset ID")
 		return
 	}
 
@@ -567,11 +623,11 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	asset, err := h.assetService.GetAsset(c.Request.Context(), id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			api.Error(c.Writer, http.StatusNotFound, err, http.StatusNotFound, "Asset not found")
+			api.GinNotFound(c, err, "Asset not found")
 			return
 		}
 		log.Printf("Failed to retrieve asset metadata: %v", err)
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to retrieve asset")
+		api.GinInternalError(c, err, "Failed to retrieve asset")
 		return
 	}
 
@@ -581,7 +637,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	// Check if file exists
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		log.Printf("Original file not found at path: %s", fullPath)
-		api.Error(c.Writer, http.StatusNotFound, err, http.StatusNotFound, "Original file not found")
+		api.GinNotFound(c, err, "Original file not found")
 		return
 	}
 
@@ -596,7 +652,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 
 // UpdateAsset updates asset metadata
 // @Summary Update asset metadata
-// @Description Update the specific metadata of an asset (e.g., photo EXIF data, video metadata)
+// @Description Update the specific metadata of an asset (e.g., photo EXIF data, video metadata).
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -610,29 +666,29 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Invalid asset ID")
+		api.GinBadRequest(c, err, "Invalid asset ID")
 		return
 	}
 
 	var updateData UpdateAssetRequest
 	if err := c.ShouldBindJSON(&updateData); err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Invalid request body")
+		api.GinBadRequest(c, err, "Invalid request body")
 		return
 	}
 
 	err = h.assetService.UpdateAssetMetadata(c.Request.Context(), id, updateData.Metadata)
 	if err != nil {
 		log.Printf("Failed to update asset metadata: %v", err)
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to update asset")
+		api.GinInternalError(c, err, "Failed to update asset")
 		return
 	}
 
-	api.Success(c.Writer, MessageResponse{Message: "Asset updated successfully"})
+	api.GinSuccess(c, MessageResponse{Message: "Asset updated successfully"})
 }
 
 // DeleteAsset deletes an asset
-// @Summary Delete an asset
-// @Description Soft delete an asset by marking it as deleted (does not remove the physical file)
+// @Summary Delete asset
+// @Description Soft delete an asset by marking it as deleted. The physical file is not removed.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -645,23 +701,23 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Invalid asset ID")
+		api.GinBadRequest(c, err, "Invalid asset ID")
 		return
 	}
 
 	err = h.assetService.DeleteAsset(c.Request.Context(), id)
 	if err != nil {
 		log.Printf("Failed to delete asset: %v", err)
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to delete asset")
+		api.GinInternalError(c, err, "Failed to delete asset")
 		return
 	}
 
-	api.Success(c.Writer, MessageResponse{Message: "Asset deleted successfully"})
+	api.GinSuccess(c, MessageResponse{Message: "Asset deleted successfully"})
 }
 
 // AddAssetToAlbum adds an asset to an album
 // @Summary Add asset to album
-// @Description Associate an asset with a specific album
+// @Description Associate an asset with a specific album by asset ID and album ID.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -674,29 +730,29 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 	assetID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Invalid asset ID")
+		api.GinBadRequest(c, err, "Invalid asset ID")
 		return
 	}
 
 	albumID, err := strconv.Atoi(c.Param("albumId"))
 	if err != nil {
-		api.Error(c.Writer, http.StatusBadRequest, err, http.StatusBadRequest, "Invalid album ID")
+		api.GinBadRequest(c, err, "Invalid album ID")
 		return
 	}
 
 	err = h.assetService.AddAssetToAlbum(c.Request.Context(), assetID, albumID)
 	if err != nil {
 		log.Printf("Failed to add asset to album: %v", err)
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to add asset to album")
+		api.GinInternalError(c, err, "Failed to add asset to album")
 		return
 	}
 
-	api.Success(c.Writer, MessageResponse{Message: "Asset added to album successfully"})
+	api.GinSuccess(c, MessageResponse{Message: "Asset added to album successfully"})
 }
 
 // GetAssetTypes returns available asset types
 // @Summary Get supported asset types
-// @Description Retrieve a list of all supported asset types in the system
+// @Description Retrieve a list of all supported asset types in the system.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -709,5 +765,5 @@ func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 		dbtypes.AssetTypeAudio,
 	}
 
-	api.Success(c.Writer, AssetTypesResponse{Types: types})
+	api.GinSuccess(c, AssetTypesResponse{Types: types})
 }

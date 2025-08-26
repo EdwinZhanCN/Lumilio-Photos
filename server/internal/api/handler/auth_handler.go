@@ -29,8 +29,8 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body models.RegisterRequest true "Registration data"
-// @Success 201 {object} api.Result{data=models.AuthResponse} "User registered successfully"
+// @Param request body service.RegisterRequest true "Registration data"
+// @Success 201 {object} api.Result{data=service.AuthResponse} "User registered successfully"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 409 {object} api.Result "User already exists"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -38,21 +38,21 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req service.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.Error(c.Writer, 400, err, http.StatusBadRequest, "Invalid request data")
+		api.GinBadRequest(c, err, "Invalid request data")
 		return
 	}
 
 	authResponse, err := h.authService.Register(req)
 	if err != nil {
 		if errors.Is(err, service.ErrUserAlreadyExists) {
-			api.Error(c.Writer, 409, err, http.StatusConflict, "User already exists")
+			api.GinError(c, 409, err, http.StatusConflict, "User already exists")
 			return
 		}
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to register user")
+		api.GinInternalError(c, err, "Failed to register user")
 		return
 	}
 
-	api.Success(c.Writer, authResponse)
+	api.GinSuccess(c, authResponse)
 }
 
 // Login handles user authentication
@@ -61,8 +61,8 @@ func (h *AuthHandler) Register(c *gin.Context) {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body models.LoginRequest true "Login credentials"
-// @Success 200 {object} api.Result{data=models.AuthResponse} "Login successful"
+// @Param request body service.LoginRequest true "Login credentials"
+// @Success 200 {object} api.Result{data=service.AuthResponse} "Login successful"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Invalid credentials"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -70,21 +70,21 @@ func (h *AuthHandler) Register(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req service.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.Error(c.Writer, 400, err, http.StatusBadRequest, "Invalid request data")
+		api.GinBadRequest(c, err, "Invalid request data")
 		return
 	}
 
 	authResponse, err := h.authService.Login(req)
 	if err != nil {
 		if errors.Is(err, service.ErrUserNotFound) || errors.Is(err, service.ErrInvalidPassword) {
-			api.Error(c.Writer, 401, errors.New("Username or password is incorrect"), http.StatusUnauthorized, "Invalid credentials")
+			api.GinUnauthorized(c, errors.New("Username or password is incorrect"), "Invalid credentials")
 			return
 		}
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to login")
+		api.GinInternalError(c, err, "Failed to login")
 		return
 	}
 
-	api.Success(c.Writer, authResponse)
+	api.GinSuccess(c, authResponse)
 }
 
 // RefreshToken handles JWT token refresh
@@ -93,8 +93,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body models.RefreshTokenRequest true "Refresh token"
-// @Success 200 {object} api.Result{data=models.AuthResponse} "Token refreshed successfully"
+// @Param request body service.RefreshTokenRequest true "Refresh token"
+// @Success 200 {object} api.Result{data=service.AuthResponse} "Token refreshed successfully"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Invalid or expired refresh token"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -102,7 +102,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req service.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.Error(c.Writer, 400, err, http.StatusBadRequest, "Invalid request data")
+		api.GinBadRequest(c, err, "Invalid request data")
 		return
 	}
 
@@ -111,14 +111,14 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		if errors.Is(err, service.ErrTokenNotFound) ||
 			errors.Is(err, service.ErrInvalidToken) ||
 			errors.Is(err, service.ErrExpiredToken) {
-			api.Error(c.Writer, 401, err, http.StatusUnauthorized, "Invalid or expired refresh token")
+			api.GinUnauthorized(c, err, "Invalid or expired refresh token")
 			return
 		}
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to refresh token")
+		api.GinInternalError(c, err, "Failed to refresh token")
 		return
 	}
 
-	api.Success(c.Writer, authResponse)
+	api.GinSuccess(c, authResponse)
 }
 
 // Logout handles user logout
@@ -127,7 +127,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body models.RefreshTokenRequest true "Refresh token to revoke"
+// @Param request body service.RefreshTokenRequest true "Refresh token to revoke"
 // @Success 200 {object} api.Result "Logout successful"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Invalid refresh token"
@@ -136,21 +136,21 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	var req service.RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		api.Error(c.Writer, 400, err, http.StatusBadRequest, "Invalid request data")
+		api.GinBadRequest(c, err, "Invalid request data")
 		return
 	}
 
 	err := h.authService.RevokeRefreshToken(req.RefreshToken)
 	if err != nil {
 		if errors.Is(err, service.ErrTokenNotFound) {
-			api.Error(c.Writer, 401, err, http.StatusUnauthorized, "Invalid refresh token")
+			api.GinUnauthorized(c, err, "Invalid refresh token")
 			return
 		}
-		api.Error(c.Writer, http.StatusInternalServerError, err, http.StatusInternalServerError, "Failed to logout")
+		api.GinInternalError(c, err, "Failed to logout")
 		return
 	}
 
-	api.Success(c.Writer, nil)
+	api.GinSuccess(c, nil)
 }
 
 // Me returns the current authenticated user's information
@@ -160,7 +160,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=models.UserResponse} "User information retrieved successfully"
+// @Success 200 {object} api.Result{data=service.UserResponse} "User information retrieved successfully"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /auth/me [get]
@@ -168,7 +168,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	// Get user ID from JWT claims (set by auth middleware)
 	userID, exists := c.Get("user_id")
 	if !exists {
-		api.Error(c.Writer, 401, errors.New("User ID not found in token"), http.StatusUnauthorized, "Unauthorized")
+		api.GinUnauthorized(c, errors.New("User ID not found in token"), "Unauthorized")
 		return
 	}
 
@@ -180,7 +180,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		// Other fields would be fetched from database
 	}
 
-	api.Success(c.Writer, user)
+	api.GinSuccess(c, user)
 }
 
 // AuthMiddleware validates JWT tokens and sets user context
@@ -188,7 +188,7 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			api.Error(c.Writer, 401, errors.New("Authorization header is required"), http.StatusUnauthorized, "Unauthorized")
+			api.GinUnauthorized(c, errors.New("Authorization header is required"), "Unauthorized")
 			c.Abort()
 			return
 		}
@@ -196,7 +196,7 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 		// Extract token from "Bearer <token>" format
 		tokenParts := strings.Split(authHeader, " ")
 		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			api.Error(c.Writer, 401, errors.New("Invalid authorization header format"), http.StatusUnauthorized, "Unauthorized")
+			api.GinUnauthorized(c, errors.New("Invalid authorization header format"), "Unauthorized")
 			c.Abort()
 			return
 		}
@@ -204,7 +204,7 @@ func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 		token := tokenParts[1]
 		claims, err := h.authService.ValidateToken(token)
 		if err != nil {
-			api.Error(c.Writer, 401, errors.New("Invalid or expired token"), http.StatusUnauthorized, "Unauthorized")
+			api.GinUnauthorized(c, errors.New("Invalid or expired token"), "Unauthorized")
 			c.Abort()
 			return
 		}
