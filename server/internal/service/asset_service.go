@@ -39,11 +39,15 @@ type AssetService interface {
 	GetAssetsByType(ctx context.Context, assetType string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwner(ctx context.Context, ownerID int, limit, offset int) ([]repo.Asset, error)
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
+
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata []byte) error
+
 	AddAssetToAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error
 	RemoveAssetFromAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error
+	
 	AddTagToAsset(ctx context.Context, assetID uuid.UUID, tagID int, confidence float32, source string) error
 	RemoveTagFromAsset(ctx context.Context, assetID uuid.UUID, tagID int) error
+
 	CreateThumbnail(ctx context.Context, assetID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
 	SearchAssets(ctx context.Context, query string, assetType *string, limit, offset int) ([]repo.Asset, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error)
@@ -53,6 +57,7 @@ type AssetService interface {
 	GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*repo.Tag, error)
 	GetThumbnailByID(ctx context.Context, thumbnailID int) (*repo.Thumbnail, error)
 	GetThumbnailByAssetIDAndSize(ctx context.Context, assetID uuid.UUID, size string) (*repo.Thumbnail, error)
+
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, hash string) (string, error)
 	SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *repo.Asset, size string) error
 	SaveNewEmbedding(ctx context.Context, pgUUID pgtype.UUID, embedding []float32) error

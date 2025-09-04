@@ -7,7 +7,8 @@ import { LumenWikiExample } from "@/features/lumen/components/LumenWiki/LumenWik
 import Settings from "@/features/settings/routes/Settings";
 import Monitor from "@/features/monitor/routes/Monitor";
 import UploadAssets from "@/features/upload/routes/UploadAssets";
-import {Portfolio} from "@/features/portfolio";
+import { Portfolio } from "@/features/portfolio";
+import Collections from "@/features/collections/routes/Collections";
 
 export const routes = [
   {
@@ -24,7 +25,7 @@ export const routes = [
   },
   {
     path: "/collections",
-    element: <div>Collections Page</div>,
+    element: <Collections />,
   },
   {
     path: "/assets/photos",
@@ -61,9 +62,9 @@ export const routes = [
   {
     path: "/studio",
     element: (
-        <WorkerProvider preload={["exif", "border"]}>
-          <Studio />
-        </WorkerProvider>
+      <WorkerProvider preload={["exif", "border"]}>
+        <Studio />
+      </WorkerProvider>
     ),
   },
   {
@@ -76,7 +77,7 @@ export const routes = [
   },
   {
     path: "/portfolio",
-    element: <Portfolio/>,
+    element: <Portfolio />,
   },
   {
     path: "/test-lumen",

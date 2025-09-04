@@ -31,13 +31,27 @@ type AuthControllerInterface interface {
 	OptionalAuthMiddleware() gin.HandlerFunc
 }
 
-// NewRouter creates and configures a new router with asset and auth endpoints
+// AlbumControllerInterface defines the interface for album controllers
+type AlbumControllerInterface interface {
+	NewAlbum(c *gin.Context)
+	GetAlbum(c *gin.Context)
+	ListAlbums(c *gin.Context)
+	UpdateAlbum(c *gin.Context)
+	DeleteAlbum(c *gin.Context)
+	GetAlbumAssets(c *gin.Context)
+	AddAssetToAlbum(c *gin.Context)
+	RemoveAssetFromAlbum(c *gin.Context)
+	UpdateAssetPositionInAlbum(c *gin.Context)
+	GetAssetAlbums(c *gin.Context)
+}
+
+// NewRouter creates and configures a new router with asset, album and auth endpoints
 // @title RKPhoto Manager API
 // @version 1.0
 // @description Photo management system API with asset upload, processing, and organization features
 // @host localhost:3001
 // @BasePath /api/v1
-func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface) *gin.Engine {
+func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface) *gin.Engine {
 	r := gin.Default()
 
 	// Add CORS middleware
@@ -77,6 +91,22 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			assets.PUT("/:id", assetController.UpdateAsset)
 			assets.DELETE("/:id", assetController.DeleteAsset)
 			assets.POST("/:id/albums/:albumId", assetController.AddAssetToAlbum)
+			assets.GET("/:assetId/albums", albumController.GetAssetAlbums)
+		}
+
+		// Album routes - with authentication required
+		albums := v1.Group("/albums")
+		albums.Use(authController.AuthMiddleware())
+		{
+			albums.POST("", albumController.NewAlbum)
+			albums.GET("", albumController.ListAlbums)
+			albums.GET("/:id", albumController.GetAlbum)
+			albums.PUT("/:id", albumController.UpdateAlbum)
+			albums.DELETE("/:id", albumController.DeleteAlbum)
+			albums.GET("/:id/assets", albumController.GetAlbumAssets)
+			albums.POST("/:id/assets/:assetId", albumController.AddAssetToAlbum)
+			albums.DELETE("/:id/assets/:assetId", albumController.RemoveAssetFromAlbum)
+			albums.PUT("/:id/assets/:assetId/position", albumController.UpdateAssetPositionInAlbum)
 		}
 	}
 
