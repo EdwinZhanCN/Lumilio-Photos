@@ -4,8 +4,10 @@ import { ErrorBoundary } from "react-error-boundary";
 import { Album } from "lucide-react";
 import { Album as AlbumType } from "../components/ImgStackGrid";
 import { ImgStackGrid } from "../components/ImgStackGrid";
+import { useI18n } from "@/lib/i18n.tsx";
 
 function Collections() {
+  const { t } = useI18n();
   const albums: AlbumType[] = [
     {
       id: "1",
@@ -37,7 +39,7 @@ function Collections() {
       )}
     >
       <PageHeader
-        title="Collections"
+        title={t("routes.collections")}
         icon={<Album className="w-6 h-6 text-primary" strokeWidth={1.5} />}
       />
 
@@ -45,7 +47,9 @@ function Collections() {
         albums={albums}
         onAlbumClick={(album) => console.log("Selected album:", album)}
         loading={false}
-        emptyMessage="Create your first album to get started"
+        emptyMessage={t("collections.emptyMessage", {
+          defaultValue: "Create your first album to get started",
+        })}
       />
     </ErrorBoundary>
   );

@@ -4,6 +4,7 @@ import {
   VideoCameraIcon,
   MusicalNoteIcon,
 } from "@heroicons/react/24/solid";
+import { useI18n } from "@/lib/i18n.tsx";
 
 interface AssetTabsProps {
   isCarouselOpen: boolean;
@@ -11,6 +12,7 @@ interface AssetTabsProps {
 
 const AssetTabs = ({ isCarouselOpen }: AssetTabsProps) => {
   const location = useLocation();
+  const { t } = useI18n();
 
   // Determine active tab based on URL path
   const getActiveTab = () => {
@@ -41,7 +43,7 @@ const AssetTabs = ({ isCarouselOpen }: AssetTabsProps) => {
             className={activeTab === "photos" ? "active" : ""}
           >
             <PhotoIcon className="h-5 w-5" />
-            Photos
+            {t("assets.photos")}
           </Link>
         </li>
         <li>
@@ -50,7 +52,7 @@ const AssetTabs = ({ isCarouselOpen }: AssetTabsProps) => {
             className={activeTab === "videos" ? "active" : ""}
           >
             <VideoCameraIcon className="h-5 w-5" />
-            Videos
+            {t("assets.videos")}
           </Link>
         </li>
         <li>
@@ -59,7 +61,7 @@ const AssetTabs = ({ isCarouselOpen }: AssetTabsProps) => {
             className={activeTab === "audios" ? "active" : ""}
           >
             <MusicalNoteIcon className="h-5 w-5" />
-            Audios
+            {t("assets.audios")}
           </Link>
         </li>
       </ul>

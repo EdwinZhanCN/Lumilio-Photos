@@ -9,6 +9,7 @@ import Monitor from "@/features/monitor/routes/Monitor";
 import UploadAssets from "@/features/upload/routes/UploadAssets";
 import { Portfolio } from "@/features/portfolio";
 import Collections from "@/features/collections/routes/Collections";
+import Updates from "@/features/updates/routes/Updates";
 
 export const routes = [
   {
@@ -17,7 +18,7 @@ export const routes = [
   },
   {
     path: "/updates",
-    element: <div>Updates Page</div>,
+    element: <Updates />,
   },
   {
     path: "/settings",

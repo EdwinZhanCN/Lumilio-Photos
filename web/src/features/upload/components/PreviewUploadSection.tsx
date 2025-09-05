@@ -136,7 +136,7 @@ function PreviewUploadSection(): React.JSX.Element {
 
   return (
     <section id="preview-upload-assets" className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Preview Upload Assets</h1>
+      <h2 className="text-2xl font-semibold mb-8">Preview Upload Assets</h2>
       <small className="text-sm text-base-content/70">
         This Section is for previewing the photos you want to upload. <br />
         The maximum number of files you can upload is {maxPreviewFiles}. <br />

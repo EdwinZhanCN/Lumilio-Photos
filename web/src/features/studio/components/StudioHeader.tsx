@@ -1,6 +1,7 @@
 import React from "react";
 import { PaintBrushIcon, ArrowUpTrayIcon } from "@heroicons/react/24/outline";
 import { PageHeader } from "@/components/PageHeader";
+import { useI18n } from "@/lib/i18n.tsx";
 
 type StudioHeaderProps = {
   onOpenFile: () => void;
@@ -13,9 +14,10 @@ export function StudioHeader({
   fileInputRef,
   onFileChange,
 }: StudioHeaderProps) {
+  const { t } = useI18n();
   return (
     <PageHeader
-      title="Studio"
+      title={t("studio.title")}
       icon={<PaintBrushIcon className="w-6 h-6 text-primary" />}
     >
       <input
@@ -27,7 +29,7 @@ export function StudioHeader({
       />
       <button onClick={onOpenFile} className="ml-5 btn btn-sm btn-primary">
         <ArrowUpTrayIcon className="w-4 h-4 mr-1" />
-        Open Image
+        {t("studio.imgOpen")}
       </button>
     </PageHeader>
   );

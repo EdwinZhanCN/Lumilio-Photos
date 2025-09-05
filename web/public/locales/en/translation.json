@@ -1,0 +1,155 @@
+{
+  "app": {
+    "name": "Lumilio",
+    "tagline": "Photos"
+  },
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "retry": "Retry",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm"
+  },
+  "navbar": {
+    "search": {
+      "placeholder": "Search",
+      "option": {
+        "name": "Name",
+        "tag": "Tag",
+        "date": "Date",
+        "type": "File Type"
+      }
+    },
+    "theme": {
+      "light": "Light",
+      "dark": "Dark"
+    }
+  },
+  "sidebar": {
+    "home": "Home",
+    "assets": "Assets",
+    "collections": "Collections",
+    "studio": "Studio",
+    "portfolio": "Portfolio",
+    "upload": "Upload",
+    "settings": "Settings",
+    "updates": "Updates",
+    "serverMonitor": "Server Monitor",
+    "status": {
+      "online": "Online",
+      "offline": "Offline"
+    },
+    "badges": {
+      "new": "NEW"
+    }
+  },
+  "routes": {
+    "home": "Home",
+    "assets": "Assets",
+    "collections": "Collections",
+    "studio": "Studio",
+    "portfolio": "Portfolio",
+    "upload": "Upload Photos",
+    "settings": "Settings",
+    "updates": "Updates",
+    "serverMonitor": "Server Monitor",
+    "lumen": "Lumen"
+  },
+  "footer": {
+    "copyright": "© {{year}} Lumilio Photos, Brought to you by EdwinZhan"
+  },
+  "home": {
+    "tabs": {
+      "gallery": "Gallery",
+      "stats": "Stats"
+    }
+  },
+  "collections": {
+    "emptyMessage": "Create your first album to get started"
+  },
+  "assets": {
+    "photos": "Photos",
+    "videos": "Videos",
+    "audios": "Audios",
+    "empty": "No assets yet"
+  },
+  "upload": {
+    "title": "Upload Photos",
+    "button": "Upload",
+    "dragDrop": "Drag and drop files here"
+  },
+  "updates": {
+    "title": "Updates",
+    "hasUpdate": "NEW"
+  },
+  "studio": {
+    "title": "Studio",
+    "imgOpen": "Open Image",
+    "previewAlt": "Preview",
+    "emptyHint": "Select an image to begin.",
+    "cancelling": "Cancelling...",
+    "processing": "Processing: {{processed}} / {{total}}",
+    "nav": {
+      "exif": "EXIF",
+      "develop": "Develop",
+      "frames": "Frames"
+    },
+    "develop": {
+      "title": "Development Tools",
+      "desc": "Color adjustments, cropping, and other tools will be available here soon."
+    },
+    "exif": {
+      "title": "EXIF Metadata",
+      "extract": "Extract Metadata",
+      "extracting": "Extracting data...",
+      "empty": "No metadata to display.",
+      "properties": "Image Properties",
+      "fieldsCount": "({{count}} fields)",
+      "cancel": "Cancel Extraction"
+    },
+    "frames": {
+      "title": "Photo Frames",
+      "tabs": {
+        "color": "Color",
+        "frosted": "Frosted",
+        "vignette": "Vignette"
+      },
+      "colored": {
+        "borderWidth": "Border Width",
+        "borderColor": "Border Color"
+      },
+      "frosted": {
+        "blur": "Blur",
+        "brightness": "Brightness",
+        "cornerRadius": "Corner Radius"
+      },
+      "vignette": {
+        "strength": "Strength"
+      },
+      "apply": "Apply Border",
+      "cancel": "Cancel Generation"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "ui": "UI",
+    "lumen": "Lumen",
+    "language": "Language"
+  },
+  "monitor": {
+    "title": "Server Monitor",
+    "status": {
+      "online": "Online",
+      "offline": "Offline"
+    }
+  },
+  "lumen": {
+    "title": "Lumen"
+  }
+}

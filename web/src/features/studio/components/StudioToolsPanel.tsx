@@ -8,6 +8,7 @@ import {
   BorderGenerationProgress,
 } from "@/hooks/util-hooks/useGenerateBorder";
 import { ExifExtractionProgress } from "@/hooks/util-hooks/useExtractExifdata";
+import { useI18n } from "@/lib/i18n.tsx";
 
 type StudioToolsPanelProps = {
   selectedFile: File | null;
@@ -43,6 +44,7 @@ export function StudioToolsPanel({
   onCancelExtraction,
   isCancellingExif = false,
 }: StudioToolsPanelProps) {
+  const { t } = useI18n();
   const renderPanelContent = () => {
     switch (activePanel) {
       case "exif":
@@ -82,7 +84,7 @@ export function StudioToolsPanel({
                 className="btn btn-secondary w-full"
                 disabled={isExtracting}
               >
-                Extract Metadata
+                {t("studio.exif.extract")}
               </button>
             </div>
           )}
@@ -90,8 +92,10 @@ export function StudioToolsPanel({
           {isLoading && currentProgress && (
             <div className="mb-4 text-center">
               <p className="text-sm mb-1">
-                Processing: {currentProgress.processed} /{" "}
-                {currentProgress.total}
+                {t("studio.processing", {
+                  processed: currentProgress.processed,
+                  total: currentProgress.total,
+                })}
               </p>
               <progress
                 className="progress progress-primary w-full"
@@ -110,7 +114,9 @@ export function StudioToolsPanel({
                   className="btn btn-xs btn-outline btn-error mt-2"
                   disabled={isCancellingExif}
                 >
-                  {isCancellingExif ? "Cancelling..." : "Cancel Extraction"}
+                  {isCancellingExif
+                    ? t("studio.cancelling")
+                    : t("studio.exif.cancel")}
                 </button>
               )}
               {isGeneratingBorders && onCancelGeneration && (
@@ -119,7 +125,9 @@ export function StudioToolsPanel({
                   className="btn btn-xs btn-outline btn-error mt-2"
                   disabled={isCancelling}
                 >
-                  {isCancelling ? "Cancelling..." : "Cancel Generation"}
+                  {isCancelling
+                    ? t("studio.cancelling")
+                    : t("studio.frames.cancel")}
                 </button>
               )}
             </div>
@@ -129,7 +137,7 @@ export function StudioToolsPanel({
         </div>
       ) : (
         <div className="p-4 text-center text-base-content/70 h-full flex items-center justify-center">
-          <p>Select an image to begin.</p>
+          <p>{t("studio.emptyHint")}</p>
         </div>
       )}
     </div>

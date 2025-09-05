@@ -10,6 +10,7 @@ export interface LumenSettings {
 }
 
 export interface UISettings {
+  language?: "en" | "zh";
   asset_page?: {
     layout: "compact" | "wide" | "full";
   };
@@ -29,7 +30,8 @@ export type SettingsAction =
   | { type: "SET_LUMEN_SYSTEM_PROMPT"; payload: string }
   | { type: "SET_LUMEN_ENABLED"; payload: boolean }
   // UI Actions
-  | { type: "SET_ASSETS_LAYOUT"; payload: "compact" | "wide" | "full" };
+  | { type: "SET_ASSETS_LAYOUT"; payload: "compact" | "wide" | "full" }
+  | { type: "SET_LANGUAGE"; payload: "en" | "zh" };
 
 export interface SettingsContextValue {
   state: SettingsState;

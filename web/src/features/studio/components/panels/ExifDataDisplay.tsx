@@ -1,4 +1,5 @@
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
+import { useI18n } from "@/lib/i18n.tsx";
 
 type ExifDataDisplayProps = {
   exifData: Record<string, any> | null;
@@ -60,7 +61,8 @@ const processExifData = (
           Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : parsed;
       } catch (e) {
         // If parsing fails, use the parent object but exclude the problematic 'data' field
-        const { data: _, ...rest } = rawExif;
+        const rest = { ...(rawExif as Record<string, any>) };
+        delete rest.data;
         dataToProcess = rest;
         throw new Error(`Failed to parse EXIF data: ${e}`);
       }
@@ -92,13 +94,14 @@ const processExifData = (
 };
 
 export function ExifDataDisplay({ exifData, isLoading }: ExifDataDisplayProps) {
+  const { t } = useI18n();
   const entries = processExifData(exifData);
 
   if (isLoading && !exifData) {
     return (
       <div className="text-center py-8">
         <span className="loading loading-lg loading-spinner text-primary"></span>
-        <p className="mt-2">Extracting data...</p>
+        <p className="mt-2">{t("studio.exif.extracting")}</p>
       </div>
     );
   }
@@ -107,21 +110,21 @@ export function ExifDataDisplay({ exifData, isLoading }: ExifDataDisplayProps) {
     <div>
       <div className="flex items-center mb-4">
         <InformationCircleIcon className="w-5 h-5 mr-2" />
-        <h2 className="text-lg font-semibold">EXIF Metadata</h2>
+        <h2 className="text-lg font-semibold">{t("studio.exif.title")}</h2>
       </div>
 
       {entries.length === 0 ? (
         <div className="text-center py-4 text-gray-500">
-          No metadata to display.
+          {t("studio.exif.empty")}
         </div>
       ) : (
         <div className="rounded-lg bg-base-100 shadow-sm max-h-[calc(70vh)] overflow-y-auto">
           <div className="bg-base-300 p-2 rounded-t-lg flex items-center sticky top-0 z-10">
             <h3 className="text-sm font-bold text-base-content">
-              Image Properties
+              {t("studio.exif.properties")}
             </h3>
             <span className="ml-2 text-xs opacity-60">
-              ({entries.length} fields)
+              {t("studio.exif.fieldsCount", { count: entries.length })}
             </span>
           </div>
           <div className="divide-y divide-base-300/20">
