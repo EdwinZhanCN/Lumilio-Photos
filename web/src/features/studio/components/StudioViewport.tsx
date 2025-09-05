@@ -1,4 +1,5 @@
 import { PhotoIcon } from "@heroicons/react/24/outline";
+import { useI18n } from "@/lib/i18n.tsx";
 
 type StudioViewportProps = {
   imageUrl: string | null;
@@ -11,6 +12,7 @@ export function StudioViewport({
   selectedFile,
   onOpenFile,
 }: StudioViewportProps) {
+  const { t } = useI18n();
   return (
     <div className="flex-1 overflow-hidden bg-base-300 relative">
       {imageUrl ? (
@@ -19,7 +21,7 @@ export function StudioViewport({
           <div className="absolute inset-0 flex items-center justify-center p-4">
             <img
               src={imageUrl}
-              alt={selectedFile?.name || "Preview"}
+              alt={selectedFile?.name || t("studio.previewAlt")}
               className="object-contain max-h-full max-w-full shadow-lg"
             />
           </div>
@@ -39,9 +41,9 @@ export function StudioViewport({
         <div className="flex-1 flex items-center justify-center h-full">
           <div className="text-center p-8">
             <PhotoIcon className="w-16 h-16 mx-auto text-base-content/30" />
-            <p className="mt-4">No image selected</p>
+            <p className="mt-4">{t("studio.emptyHint")}</p>
             <button onClick={onOpenFile} className="btn btn-primary mt-4">
-              Open an Image
+              {t("studio.imgOpen")}
             </button>
           </div>
         </div>

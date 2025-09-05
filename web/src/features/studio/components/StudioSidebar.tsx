@@ -6,6 +6,7 @@ import {
   ArrowRightIcon,
 } from "@heroicons/react/24/outline";
 import { PanelType } from "../routes/Studio";
+import { useI18n } from "@/lib/i18n.tsx";
 
 type StudioSidebarProps = {
   activePanel: PanelType;
@@ -20,10 +21,15 @@ export function StudioSidebar({
   isCollapsed,
   onToggle,
 }: StudioSidebarProps) {
+  const { t } = useI18n();
   const navItems = [
-    { id: "exif", label: "EXIF", icon: DocumentTextIcon },
-    { id: "develop", label: "Develop", icon: AdjustmentsHorizontalIcon },
-    { id: "frames", label: "Frames", icon: RectangleGroupIcon },
+    { id: "exif", label: t("studio.nav.exif"), icon: DocumentTextIcon },
+    {
+      id: "develop",
+      label: t("studio.nav.develop"),
+      icon: AdjustmentsHorizontalIcon,
+    },
+    { id: "frames", label: t("studio.nav.frames"), icon: RectangleGroupIcon },
   ];
 
   return (

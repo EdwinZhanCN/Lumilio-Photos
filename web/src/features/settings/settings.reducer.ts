@@ -2,6 +2,7 @@ import { ModelRecord } from "@mlc-ai/web-llm";
 import { SettingsAction, SettingsState } from "./types";
 import { lumenReducer } from "./reducers/lumen.reducer";
 import { uiReducer } from "./reducers/ui.reducer";
+import { getCurrentLanguage } from "@/lib/i18n.tsx";
 
 export const defaultModelRecords: ModelRecord[] = [
   {
@@ -28,6 +29,8 @@ export const defaultModelRecords: ModelRecord[] = [
   },
 ];
 
+const defaultLanguage = getCurrentLanguage();
+
 export const initialState: SettingsState = {
   lumen: {
     model: "Qwen3-1.7B-q4f16_1-MLC",
@@ -39,6 +42,7 @@ export const initialState: SettingsState = {
     enabled: true,
   },
   ui: {
+    language: defaultLanguage,
     asset_page: {
       layout: "full",
     },

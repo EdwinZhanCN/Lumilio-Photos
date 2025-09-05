@@ -32,7 +32,7 @@ function BatchUploadSection() {
 
   return (
     <section id="batch-upload-assets" className="max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold">Batch Upload Assets</h1>
+      <h2 className="text-2xl font-semibold">Batch Upload Assets</h2>
       <small className="text-sm">
         This Section is for large files like RAW, Video to upload. <br />
         Selected files: {batchFilesCount} / {maxBatchFiles} <br />
@@ -63,6 +63,7 @@ function BatchUploadSection() {
         onChange={(event) => {
           if (event.target.files) {
             handleFileChange(event.target.files);
+            event.target.value = "";
           }
         }}
       />

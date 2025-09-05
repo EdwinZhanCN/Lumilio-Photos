@@ -1,13 +1,7 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-    themes: false;
+    themes: all;
 }
-
-@plugin "./catppuccinTheme.latte.ts";
-@plugin "./catppuccinTheme.frappe.ts";
-@plugin "./catppuccinTheme.macchiato.ts";
-@plugin "./catppuccinTheme.mocha.ts";
-@import "@catppuccin/tailwindcss/mocha.css";
 
 /* Hide scrollbar for Chrome, Safari and Opera */
 .no-scrollbar::-webkit-scrollbar {

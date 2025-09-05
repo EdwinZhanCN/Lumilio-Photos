@@ -1,5 +1,14 @@
 import React from "react";
 import { FallbackProps } from "react-error-boundary";
+import { Link } from "react-router-dom";
+import {
+  AlertTriangle,
+  Home,
+  RefreshCw,
+  Bug,
+  ExternalLink,
+  Copy,
+} from "lucide-react";
 
 type ErrorFallBackProps = {
   code: string | number;
@@ -9,16 +18,6 @@ type ErrorFallBackProps = {
   resetErrorBoundary?: () => void;
 };
 
-/**
- * ErrorFallBack component
- * @param code - Error code to display e.g. 404, 500
- * @param title - Error title to display, short
- * @param message - Error message to display, long
- * @param error - Error object
- * @param resetErrorBoundary - Reset Button Function
- * @returns {React.ReactElement}
- * @constructor
- */
 export default function ErrorFallBack({
   code,
   title,
@@ -26,37 +25,148 @@ export default function ErrorFallBack({
   error,
   resetErrorBoundary,
 }: ErrorFallBackProps & FallbackProps): React.ReactElement {
+  const [copied, setCopied] = React.useState(false);
+
+  const details = React.useMemo(() => {
+    const href =
+      typeof window !== "undefined" ? window.location.href : "(unknown)";
+    const ua =
+      typeof navigator !== "undefined" ? navigator.userAgent : "(unknown)";
+    const time = new Date().toISOString();
+
+    return [
+      "Lumilio-Photos Web - Error Report",
+      "",
+      `Code: ${code ?? "(n/a)"}`,
+      `Title: ${title ?? "(n/a)"}`,
+      `Message: ${message || error?.message || "(none)"}`,
+      `URL: ${href}`,
+      `UserAgent: ${ua}`,
+      `Time: ${time}`,
+      "",
+      "Stack:",
+      error?.stack || "(none)",
+    ].join("\n");
+  }, [code, title, message, error]);
+
+  const issueUrl = React.useMemo(() => {
+    const base = "https://github.com/EdwinZhanCN/Lumilio-Photos/issues/new";
+    const titleParam =
+      `[Bug] ${code ?? ""} ${title ?? "Unhandled error"}`.trim();
+    const params = new URLSearchParams({
+      title: titleParam,
+      body: details,
+      labels: "bug",
+    });
+    return `${base}?${params.toString()}`;
+  }, [code, title, details]);
+
+  const onCopyDetails = async () => {
+    try {
+      await navigator.clipboard.writeText(details);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const displayMessage =
+    message || error?.message || "Something went wrong. Please try again.";
+
   return (
-    <main className="grid min-h-full place-items-center bg-white px-6 py-24 sm:py-32 lg:px-8">
-      <div className="text-center">
-        <p className="text-base font-semibold text-indigo-600">{code}</p>
-        <h1 className="mt-4 text-5xl font-semibold tracking-tight text-balance text-gray-900 sm:text-7xl">
-          {title}
-        </h1>
-        <p className="mt-6 text-lg font-medium text-pretty text-gray-500 sm:text-xl/8">
-          {message || error?.message}
-        </p>
-        <div className="mt-10 flex items-center justify-center gap-x-6">
-          <a
-            href="/"
-            className="rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+    <main
+      className="min-h-screen bg-base-200 flex items-center justify-center p-4"
+      role="main"
+      aria-labelledby="error-title"
+    >
+      <div className="card w-full max-w-3xl bg-base-100 shadow-xl max-h-[85vh] overflow-hidden">
+        <div className="card-body items-center text-center overflow-auto">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="size-6 text-error" aria-hidden="true" />
+            <span className="sr-only">Error code</span>
+            <div className="badge badge-error badge-lg font-mono">{code}</div>
+          </div>
+
+          <h1
+            id="error-title"
+            className="card-title text-3xl sm:text-4xl mt-2 text-balance"
           >
-            Go back home
-          </a>
-          <a
-            onClick={resetErrorBoundary}
-            className="rounded-md bg-transparent px-3.5 py-2.5 text-sm font-semibold text-red shadow-xs hover:bg-gray-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-300"
+            {title}
+          </h1>
+
+          <p
+            className="text-base-content/70 mt-2 text-pretty"
+            aria-live="polite"
           >
-            Try again
-          </a>
-          <a
-            href="https://github.com/EdwinZhanCN/Lumilio-Photos"
-            className="text-sm font-semibold text-gray-900"
-          >
-            Report an Issue <span aria-hidden="true">&rarr;</span>
-          </a>
+            {displayMessage}
+          </p>
+
+          <div className="w-full mt-4">
+            <div className="collapse collapse-arrow border border-base-300 bg-base-100">
+              <input type="checkbox" aria-label="Toggle error details" />
+              <div className="collapse-title text-left font-medium flex items-center justify-between gap-2">
+                <span>View technical details</span>
+              </div>
+              <div className="collapse-content max-h-64 md:max-h-80 overflow-auto">
+                <div className="mockup-code w-full">
+                  <pre>
+                    <code>{details}</code>
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card-actions justify-center mt-4 flex-wrap gap-2">
+            <Link to="/" className="btn btn-primary">
+              <Home className="size-4" aria-hidden="true" />
+              <span className="ml-1">Go home</span>
+            </Link>
+
+            {resetErrorBoundary && (
+              <button
+                type="button"
+                onClick={resetErrorBoundary}
+                className="btn btn-secondary"
+              >
+                <RefreshCw className="size-4" aria-hidden="true" />
+                <span className="ml-1">Try again</span>
+              </button>
+            )}
+
+            <a
+              href={issueUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-outline"
+            >
+              <Bug className="size-4" aria-hidden="true" />
+              <span className="ml-1">Report issue</span>
+              <ExternalLink className="size-4 ml-1" aria-hidden="true" />
+            </a>
+
+            <button
+              type="button"
+              onClick={onCopyDetails}
+              className="btn btn-ghost"
+            >
+              <Copy className="size-4" aria-hidden="true" />
+              <span className="ml-1">
+                {copied ? "Copied!" : "Copy details"}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {copied && (
+        <div className="toast toast-end">
+          <div className="alert alert-success">
+            <span>Copied error details to clipboard.</span>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

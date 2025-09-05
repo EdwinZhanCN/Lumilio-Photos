@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { RectangleGroupIcon } from "@heroicons/react/24/outline";
+import { useI18n } from "@/lib/i18n.tsx";
 import {
   BorderOptions,
   BorderParams,
@@ -14,6 +15,7 @@ type FramesPanelProps = {
 };
 
 export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
+  const { t } = useI18n();
   const [activeFrame, setActiveFrame] = useState<BorderOptions>("COLORED");
 
   const [coloredParams, setColoredParams] = useState<BorderParams["COLORED"]>({
@@ -56,7 +58,7 @@ export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
     <div>
       <div className="flex items-center mb-4">
         <RectangleGroupIcon className="w-5 h-5 mr-2" />
-        <h2 className="text-lg font-semibold">Photo Frames</h2>
+        <h2 className="text-lg font-semibold">{t("studio.frames.title")}</h2>
       </div>
 
       <div className="tabs tabs-boxed mb-4">
@@ -64,19 +66,19 @@ export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
           className={`tab ${activeFrame === "COLORED" ? "tab-active" : ""}`}
           onClick={() => setActiveFrame("COLORED")}
         >
-          Color
+          {t("studio.frames.tabs.color")}
         </a>
         <a
           className={`tab ${activeFrame === "FROSTED" ? "tab-active" : ""}`}
           onClick={() => setActiveFrame("FROSTED")}
         >
-          Frosted
+          {t("studio.frames.tabs.frosted")}
         </a>
         <a
           className={`tab ${activeFrame === "VIGNETTE" ? "tab-active" : ""}`}
           onClick={() => setActiveFrame("VIGNETTE")}
         >
-          Vignette
+          {t("studio.frames.tabs.vignette")}
         </a>
       </div>
 
@@ -84,7 +86,8 @@ export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
         {activeFrame === "COLORED" && (
           <div>
             <label className="label">
-              Border Width: {coloredParams.border_width}
+              {t("studio.frames.colored.borderWidth")}:{" "}
+              {coloredParams.border_width}
             </label>
             <input
               type="range"
@@ -99,7 +102,9 @@ export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
                 }))
               }
             />
-            <label className="label mt-2">Border Color</label>
+            <label className="label mt-2">
+              {t("studio.frames.colored.borderColor")}
+            </label>
             <input
               type="color"
               value={`#${coloredParams.r.toString(16).padStart(2, "0")}${coloredParams.g.toString(16).padStart(2, "0")}${coloredParams.b.toString(16).padStart(2, "0")}`}
@@ -119,7 +124,8 @@ export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
         {activeFrame === "FROSTED" && (
           <div>
             <label className="label">
-              Blur: {frostedParams.blur_sigma.toFixed(1)}
+              {t("studio.frames.frosted.blur")}:{" "}
+              {frostedParams.blur_sigma.toFixed(1)}
             </label>
             <input
               type="range"
@@ -136,7 +142,8 @@ export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
               }
             />
             <label className="label">
-              Brightness: {frostedParams.brightness_adjustment}
+              {t("studio.frames.frosted.brightness")}:{" "}
+              {frostedParams.brightness_adjustment}
             </label>
             <input
               type="range"
@@ -152,7 +159,8 @@ export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
               }
             />
             <label className="label">
-              Corner Radius: {frostedParams.corner_radius}
+              {t("studio.frames.frosted.cornerRadius")}:{" "}
+              {frostedParams.corner_radius}
             </label>
             <input
               type="range"
@@ -172,7 +180,8 @@ export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
         {activeFrame === "VIGNETTE" && (
           <div>
             <label className="label">
-              Strength: {vignetteParams.strength.toFixed(2)}
+              {t("studio.frames.vignette.strength")}:{" "}
+              {vignetteParams.strength.toFixed(2)}
             </label>
             <input
               type="range"
@@ -201,7 +210,7 @@ export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
           {isGenerating ? (
             <span className="loading loading-spinner"></span>
           ) : (
-            "Apply Border"
+            t("studio.frames.apply")
           )}
         </button>
       </div>

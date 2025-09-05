@@ -9,11 +9,13 @@ import "@/styles/App.css";
 import "katex/dist/katex.min.css";
 import Notifications from "@/components/Notifications";
 import { SettingsProvider } from "./features/settings";
+import { useI18n } from "@/lib/i18n.tsx";
 
 const queryClient = new QueryClient();
 
 function App(): React.ReactNode {
   const theme: string = localStorage.getItem("theme") || "light";
+  const { t } = useI18n();
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -47,7 +49,7 @@ function App(): React.ReactNode {
               <footer className="bg-base-100 text-base-content text-xs">
                 <div className="container mx-auto py-0.5">
                   <p className="text-center">
-                    © 2025 Lumilio Photos, Brought to you by EdwinZhan
+                    {t("footer.copyright", { year: new Date().getFullYear() })}
                   </p>
                 </div>
               </footer>

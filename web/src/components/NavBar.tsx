@@ -7,11 +7,13 @@ import {
   TagIcon,
 } from "@heroicons/react/24/outline/index.js";
 import { LumenAvatar } from "@/features/lumen";
+import { useI18n } from "@/lib/i18n.tsx";
 
 function NavBar() {
   const [searchText, setSearchText] = useState("");
   const [searchOption, setSearchOption] = useState<string>("");
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const { t } = useI18n();
 
   const handleOptionSelect = (option: string) => {
     setSearchOption(option);
@@ -47,9 +49,9 @@ function NavBar() {
           <img
             src={"/logo.png"}
             className="size-6 bg-contain object-contain "
-            alt="Lumilio Logo"
+            alt={t("app.name") + " Logo"}
           />
-          Lumilio
+          {t("app.name")}
         </Link>
       </div>
       {/* Center search bar */}
@@ -72,7 +74,7 @@ function NavBar() {
             </svg>
             <input
               type="text"
-              placeholder={"Search"}
+              placeholder={t("navbar.search.placeholder")}
               value={searchText ? searchText : ""}
               className="input input-bordered"
               onChange={handleInputChange}
@@ -101,25 +103,25 @@ function NavBar() {
                 <li>
                   <a onClick={() => handleOptionSelect("name")}>
                     <LanguageIcon className="size-4" />
-                    Name
+                    {t("navbar.search.option.name")}
                   </a>
                 </li>
                 <li>
                   <a onClick={() => handleOptionSelect("tag")}>
                     <TagIcon className="size-4" />
-                    Tag
+                    {t("navbar.search.option.tag")}
                   </a>
                 </li>
                 <li>
                   <a onClick={() => handleOptionSelect("date")}>
                     <CalendarIcon className="size-4" />
-                    Date
+                    {t("navbar.search.option.date")}
                   </a>
                 </li>
                 <li>
                   <a onClick={() => handleOptionSelect("type")}>
                     <DocumentIcon className="size-4" />
-                    File Type
+                    {t("navbar.search.option.type")}
                   </a>
                 </li>
               </ul>
@@ -146,6 +148,7 @@ function NavBar() {
           </div>
         </div>
       </div>
+
       {/* Theme Controller */}
       <label className="swap swap-rotate">
         {/* this hidden checkbox controls the state */}
