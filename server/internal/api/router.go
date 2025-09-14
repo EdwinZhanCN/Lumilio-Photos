@@ -67,6 +67,10 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 	// V1 API routes
 	v1 := api.Group("/v1")
 	{
+		// Health check
+		v1.GET("/health", func(c *gin.Context) {
+			GinSuccess(c, gin.H{"status": "ok"})
+		})
 		// Authentication routes
 		auth := v1.Group("/auth")
 		{
@@ -91,7 +95,7 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			assets.PUT("/:id", assetController.UpdateAsset)
 			assets.DELETE("/:id", assetController.DeleteAsset)
 			assets.POST("/:id/albums/:albumId", assetController.AddAssetToAlbum)
-			assets.GET("/:assetId/albums", albumController.GetAssetAlbums)
+			assets.GET("/:id/albums", albumController.GetAssetAlbums)
 		}
 
 		// Album routes - with authentication required

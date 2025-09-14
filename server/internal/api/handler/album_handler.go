@@ -613,14 +613,14 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 // @Tags albums
 // @Accept json
 // @Produce json
-// @Param assetId path string true "Asset ID (UUID format)"
+// @Param id path string true "Asset ID (UUID format)"
 // @Success 200 {object} api.Result "Albums retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 500 {object} api.Result "Failed to retrieve asset albums"
-// @Router /assets/{assetId}/albums [get]
+// @Router /assets/{id}/albums [get]
 // @Security BearerAuth
 func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
-	assetIDStr := c.Param("assetId")
+	assetIDStr := c.Param("id")
 	assetID, err := uuid.Parse(assetIDStr)
 	if err != nil {
 		api.GinBadRequest(c, err, "Invalid asset ID")

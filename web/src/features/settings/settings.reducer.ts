@@ -2,6 +2,7 @@ import { ModelRecord } from "@mlc-ai/web-llm";
 import { SettingsAction, SettingsState } from "./types";
 import { lumenReducer } from "./reducers/lumen.reducer";
 import { uiReducer } from "./reducers/ui.reducer";
+import { serverReducer } from "./reducers/server.reducer";
 import { getCurrentLanguage } from "@/lib/i18n.tsx";
 
 export const defaultModelRecords: ModelRecord[] = [
@@ -47,6 +48,9 @@ export const initialState: SettingsState = {
       layout: "full",
     },
   },
+  server: {
+    update_timespan: 5,
+  },
 };
 
 export const SettingsReducer = (
@@ -56,5 +60,6 @@ export const SettingsReducer = (
   return {
     lumen: lumenReducer(state.lumen, action),
     ui: uiReducer(state.ui, action),
+    server: serverReducer(state.server, action),
   };
 };

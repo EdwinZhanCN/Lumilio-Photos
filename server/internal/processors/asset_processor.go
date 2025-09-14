@@ -3,15 +3,17 @@ package processors
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v5"
-	"github.com/riverqueue/river"
 	"os"
+	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/utils/file"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 )
 
 type AssetPayload struct {
@@ -28,13 +30,15 @@ type AssetProcessor struct {
 	assetService   service.AssetService
 	storageService storage.Storage
 	queueClient    *river.Client[pgx.Tx]
+	appConfig      config.AppConfig
 }
 
-func NewAssetProcessor(assetService service.AssetService, storageService storage.Storage, queueClient *river.Client[pgx.Tx]) *AssetProcessor {
+func NewAssetProcessor(assetService service.AssetService, storageService storage.Storage, queueClient *river.Client[pgx.Tx], appConfig config.AppConfig) *AssetProcessor {
 	return &AssetProcessor{
 		assetService:   assetService,
 		storageService: storageService,
 		queueClient:    queueClient,
+		appConfig:      appConfig,
 	}
 }
 

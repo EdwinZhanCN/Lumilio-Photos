@@ -13,11 +13,12 @@ import {
 
 import { Album } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
+import { useGlobal } from "@/contexts/GlobalContext";
 
 function SideBar() {
   const [messageCount] = useState<number>(0);
   const [isUpdate] = useState<boolean>(false);
-  const [isOnline] = useState<boolean>(false);
+  const { online: isOnline } = useGlobal();
   const location = useLocation();
   const { t } = useI18n();
 

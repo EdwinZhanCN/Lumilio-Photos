@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
@@ -14,8 +13,6 @@ import (
 	"time"
 
 	"github.com/h2non/bimg"
-
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
@@ -50,8 +47,7 @@ func (ap *AssetProcessor) processPhotoAsset(
 	defer clipR.Close()
 	defer thumbR.Close()
 
-	clipEnv := strings.ToLower(os.Getenv("CLIP_ENABLED"))
-	clipEnabled := clipEnv == "" || clipEnv == "1" || clipEnv == "true" || clipEnv == "yes" || clipEnv == "on"
+	clipEnabled := ap.appConfig.CLIPEnabled
 	if !clipEnabled {
 		_ = clipW.Close()
 	}
@@ -95,7 +91,12 @@ func (ap *AssetProcessor) processPhotoAsset(
 			return fmt.Errorf("extract exif: %w", err)
 		}
 		if meta, ok := exifResult.Metadata.(*dbtypes.PhotoSpecificMetadata); ok {
-			if err := asset.SetPhotoMetadata(meta); err != nil {
+			sm, err := dbtypes.MarshalMeta(meta)
+			if err != nil {
+				return fmt.Errorf("metadata unmarshal: %w", err)
+			}
+
+			if err := ap.assetService.UpdateAssetMetadata(ctx, asset.AssetID.Bytes, sm); err != nil {
 				return fmt.Errorf("save exif meta: %w", err)
 			}
 		}

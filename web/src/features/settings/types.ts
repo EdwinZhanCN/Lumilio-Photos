@@ -16,9 +16,14 @@ export interface UISettings {
   };
 }
 
+export interface ServerSettings {
+  update_timespan: number;
+}
+
 export interface SettingsState {
   lumen: LumenSettings;
   ui: UISettings;
+  server: ServerSettings;
 }
 
 export type SettingsAction =
@@ -31,7 +36,9 @@ export type SettingsAction =
   | { type: "SET_LUMEN_ENABLED"; payload: boolean }
   // UI Actions
   | { type: "SET_ASSETS_LAYOUT"; payload: "compact" | "wide" | "full" }
-  | { type: "SET_LANGUAGE"; payload: "en" | "zh" };
+  | { type: "SET_LANGUAGE"; payload: "en" | "zh" }
+  // Server Actions
+  | { type: "SET_SERVER_UPDATE_TIMESPAN"; payload: number };
 
 export interface SettingsContextValue {
   state: SettingsState;

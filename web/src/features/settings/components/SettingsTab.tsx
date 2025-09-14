@@ -5,6 +5,7 @@ import {
 } from "@heroicons/react/24/solid";
 import LumenSettings from "./Tabs/LumenSettings";
 import UISettings from "./Tabs/UISettings";
+import ServerSettings from "./Tabs/ServerSettings";
 
 export default function SettingsTab() {
   return (
@@ -26,7 +27,7 @@ export default function SettingsTab() {
           Server
         </label>
         <div className="tab-content bg-base-100 border-base-300 p-6">
-          Tab content 2
+          <ServerSettings />
         </div>
 
         <label className="tab gap-1 cursor-pointer">
