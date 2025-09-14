@@ -43,7 +43,7 @@ const AssetTabs = ({ isCarouselOpen }: AssetTabsProps) => {
             className={activeTab === "photos" ? "active" : ""}
           >
             <PhotoIcon className="h-5 w-5" />
-            {t("assets.photos")}
+            {t("assets.photos.title")}
           </Link>
         </li>
         <li>
@@ -52,7 +52,7 @@ const AssetTabs = ({ isCarouselOpen }: AssetTabsProps) => {
             className={activeTab === "videos" ? "active" : ""}
           >
             <VideoCameraIcon className="h-5 w-5" />
-            {t("assets.videos")}
+            {t("assets.videos.title")}
           </Link>
         </li>
         <li>
@@ -61,7 +61,7 @@ const AssetTabs = ({ isCarouselOpen }: AssetTabsProps) => {
             className={activeTab === "audios" ? "active" : ""}
           >
             <MusicalNoteIcon className="h-5 w-5" />
-            {t("assets.audios")}
+            {t("assets.audios.title")}
           </Link>
         </li>
       </ul>

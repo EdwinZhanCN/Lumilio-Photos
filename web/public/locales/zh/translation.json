@@ -1,155 +1,194 @@
 {
-  "app": {
-    "name": "Lumilio",
-    "tagline": "照片"
-  },
-  "common": {
-    "ok": "确定",
-    "cancel": "取消",
-    "save": "保存",
-    "close": "关闭",
-    "loading": "加载中…",
-    "error": "错误",
-    "success": "成功",
-    "retry": "重试",
-    "edit": "编辑",
-    "delete": "删除",
-    "confirm": "确认"
-  },
-  "navbar": {
-    "search": {
-      "placeholder": "搜索",
-      "option": {
-        "name": "名称",
-        "tag": "标签",
-        "date": "日期",
-        "type": "文件类型"
-      }
+    "app": {
+        "name": "流明集",
+        "tagline": "照片"
     },
-    "theme": {
-      "light": "浅色",
-      "dark": "深色"
-    }
-  },
-  "sidebar": {
-    "home": "首页",
-    "assets": "素材",
-    "collections": "合集",
-    "studio": "工作室",
-    "portfolio": "作品集",
-    "upload": "上传",
-    "settings": "设置",
-    "updates": "更新",
-    "serverMonitor": "服务器监控",
-    "status": {
-      "online": "在线",
-      "offline": "离线"
+    "common": {
+        "ok": "确定",
+        "cancel": "取消",
+        "save": "保存",
+        "close": "关闭",
+        "loading": "加载中…",
+        "error": "错误",
+        "success": "成功",
+        "retry": "重试",
+        "edit": "编辑",
+        "delete": "删除",
+        "confirm": "确认",
+        "na": "无"
     },
-    "badges": {
-      "new": "新"
-    }
-  },
-  "routes": {
-    "home": "首页",
-    "assets": "资产",
-    "collections": "合集",
-    "studio": "工作室",
-    "portfolio": "作品集",
-    "upload": "上传照片",
-    "settings": "设置",
-    "updates": "更新",
-    "serverMonitor": "服务器监控",
-    "lumen": "Lumen"
-  },
-  "footer": {
-    "copyright": "© {{year}} Lumilio Photos，由 EdwinZhan 打造"
-  },
-  "home": {
-    "tabs": {
-      "gallery": "画廊",
-      "stats": "数据统计"
-    }
-  },
-  "collections": {
-    "emptyMessage": "创建你的第一个相册以开始使用"
-  },
-  "assets": {
-    "photos": "照片",
-    "videos": "视频",
-    "audios": "音频",
-    "empty": "暂无资产"
-  },
-  "upload": {
-    "title": "上传照片",
-    "button": "上传",
-    "dragDrop": "将文件拖放到此处"
-  },
-  "updates": {
-    "title": "更新",
-    "hasUpdate": "新"
-  },
-  "studio": {
-    "title": "工作室",
-    "imgOpen": "打开图片",
-    "previewAlt": "预览",
-    "emptyHint": "选择一张图片开始。",
-    "cancelling": "正在取消…",
-    "processing": "处理中：{{processed}} / {{total}}",
-    "nav": {
-      "exif": "EXIF",
-      "develop": "显影",
-      "frames": "边框"
+    "navbar": {
+        "search": {
+            "placeholder": "搜索",
+            "option": {
+                "name": "名称",
+                "tag": "标签",
+                "date": "日期",
+                "type": "文件类型"
+            }
+        },
+        "theme": {
+            "light": "浅色",
+            "dark": "深色"
+        }
     },
-    "develop": {
-      "title": "显影工具",
-      "desc": "颜色调整、裁剪等工具即将上线。"
+    "sidebar": {
+        "home": "首页",
+        "assets": "素材",
+        "collections": "合集",
+        "studio": "工作室",
+        "portfolio": "作品集",
+        "upload": "上传",
+        "settings": "设置",
+        "updates": "更新",
+        "serverMonitor": "服务器监控",
+        "status": {
+            "online": "在线",
+            "offline": "离线"
+        },
+        "badges": {
+            "new": "新"
+        }
     },
-    "exif": {
-      "title": "EXIF 元数据",
-      "extract": "提取元数据",
-      "extracting": "正在提取数据…",
-      "empty": "暂无元数据可显示。",
-      "properties": "图像属性",
-      "fieldsCount": "（{{count}} 个字段）",
-      "cancel": "取消提取"
+    "routes": {
+        "home": "首页",
+        "assets": "资产",
+        "collections": "合集",
+        "studio": "工作室",
+        "portfolio": "作品集",
+        "upload": "上传照片",
+        "settings": "设置",
+        "updates": "更新",
+        "serverMonitor": "服务器监控",
+        "lumen": "Lumen"
     },
-    "frames": {
-      "title": "照片边框",
-      "tabs": {
-        "color": "纯色",
-        "frosted": "毛玻璃",
-        "vignette": "暗角"
-      },
-      "colored": {
-        "borderWidth": "边框宽度",
-        "borderColor": "边框颜色"
-      },
-      "frosted": {
-        "blur": "模糊",
-        "brightness": "亮度",
-        "cornerRadius": "圆角半径"
-      },
-      "vignette": {
-        "strength": "强度"
-      },
-      "apply": "应用边框",
-      "cancel": "取消生成"
+    "footer": {
+        "copyright": "© {{year}} Lumilio Photos，由 EdwinZhan 打造"
+    },
+    "home": {
+        "tabs": {
+            "gallery": "画廊",
+            "stats": "数据统计"
+        }
+    },
+    "collections": {
+        "emptyMessage": "创建你的第一个相册以开始使用"
+    },
+    "assets": {
+        "photos": {
+            "title": "照片",
+            "fullscreen": {
+                "info": {
+                    "title": "元数据",
+                    "extractComplete": "提取完整 EXIF",
+                    "basic": "基本信息",
+                    "filename": "文件名",
+                    "camera": "相机",
+                    "lens": "镜头",
+                    "exposure": "曝光",
+                    "fNumber": "光圈值",
+                    "iso": "ISO",
+                    "taken": "拍摄时间",
+                    "type": "类型",
+                    "fileSize": "文件大小",
+                    "dimensions": "尺寸",
+                    "mimeType": "MIME 类型",
+                    "uploadTime": "上传时间",
+                    "tags": "标签",
+                    "aiTagSuffix": " （AI）",
+                    "duration": "时长",
+                    "copied": "已复制到剪贴板",
+                    "copyFailed": "复制失败",
+                    "errors": {
+                        "noAssetId": "资源 ID 不可用",
+                        "notFound": "服务器上未找到原始文件",
+                        "unauthorized": "访问原始文件需要身份验证",
+                        "forbidden": "无权访问原始文件",
+                        "extractFailed": "提取 EXIF 失败：{{message}}"
+                    }
+                }
+            }
+        },
+        "videos": {
+            "title": "视频"
+        },
+        "audios": {
+            "title": "音频"
+        },
+        "empty": "暂无资产"
+    },
+    "upload": {
+        "title": "上传照片",
+        "button": "上传",
+        "dragDrop": "将文件拖放到此处"
+    },
+    "updates": {
+        "title": "更新",
+        "hasUpdate": "新"
+    },
+    "studio": {
+        "title": "工作室",
+        "imgOpen": "打开图片",
+        "previewAlt": "预览",
+        "emptyHint": "选择一张图片开始。",
+        "cancelling": "正在取消…",
+        "processing": "处理中：{{processed}} / {{total}}",
+        "nav": {
+            "exif": "EXIF",
+            "develop": "显影",
+            "frames": "边框"
+        },
+        "develop": {
+            "title": "显影工具",
+            "desc": "颜色调整、裁剪等工具即将上线。"
+        },
+        "exif": {
+            "title": "EXIF 元数据",
+            "extract": "提取元数据",
+            "extracting": "正在提取数据…",
+            "empty": "暂无元数据可显示。",
+            "properties": "图像属性",
+            "fieldsCount": "（{{count}} 个字段）",
+            "cancel": "取消提取",
+            "download": "下载 JSON"
+        },
+        "frames": {
+            "title": "照片边框",
+            "tabs": {
+                "color": "纯色",
+                "frosted": "毛玻璃",
+                "vignette": "暗角"
+            },
+            "colored": {
+                "borderWidth": "边框宽度",
+                "borderColor": "边框颜色"
+            },
+            "frosted": {
+                "blur": "模糊",
+                "brightness": "亮度",
+                "cornerRadius": "圆角半径"
+            },
+            "vignette": {
+                "strength": "强度"
+            },
+            "apply": "应用边框",
+            "cancel": "取消生成"
+        }
+    },
+    "settings": {
+        "title": "设置",
+        "ui": "界面",
+        "lumen": "Lumen",
+        "language": "语言"
+    },
+    "monitor": {
+        "title": "服务器监控",
+        "status": {
+            "online": "在线",
+            "offline": "离线"
+        }
+    },
+    "lumen": {
+        "title": "Lumen"
     }
-  },
-  "settings": {
-    "title": "设置",
-    "ui": "界面",
-    "lumen": "Lumen",
-    "language": "语言"
-  },
-  "monitor": {
-    "title": "服务器监控",
-    "status": {
-      "online": "在线",
-      "offline": "离线"
-    }
-  },
-  "lumen": {
-    "title": "Lumen"
-  }
 }

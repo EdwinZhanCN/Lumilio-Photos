@@ -92,8 +92,20 @@ func main() {
 		log.Fatalf("Failed to initialize storage: %v", err)
 	}
 
-	// Initialize Service
-	assetService, err := service.NewAssetService(queries, storageService)
+	// Initialize optional ML connection/services based on config
+	var mlConn *grpc.ClientConn
+	var mlSvc *service.MLService
+	if appConfig.CLIPEnabled {
+		var mlErr error
+		mlConn, mlErr = grpc.NewClient(appConfig.MLServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if mlErr != nil {
+			log.Fatalf("Failed to connect to ML gRPC server: %v", mlErr)
+		}
+		mlSvc = service.NewFromConn(mlConn)
+	}
+
+	// Initialize Service (AssetService optionally ML-enabled)
+	assetService, err := service.NewAssetServiceWithML(queries, storageService, mlSvc)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
@@ -113,24 +125,24 @@ func main() {
 	assetProcessor := processors.NewAssetProcessor(assetService, storageService, queueClient, appConfig)
 	river.AddWorker[queue.ProcessAssetArgs](workers, &queue.ProcessAssetWorker{Processor: assetProcessor})
 
-	// Initialize ML gRPC connection and CLIP dispatcher
-	// TODO: Using mDNS
-	mlConn, err := grpc.NewClient(appConfig.MLServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	// Initialize CLIP dispatcher and worker if enabled
+	if appConfig.CLIPEnabled {
+		defer func() {
+			if mlConn != nil {
+				mlConn.Close()
+			}
+		}()
 
-	if err != nil {
-		log.Fatalf("Failed to connect to ML gRPC server: %v", err)
+		clipClient := proto.NewInferenceClient(mlConn)
+		clipDispatcher := queue.NewClipBatchDispatcher(clipClient, 8, 1500*time.Millisecond)
+		clipDispatcher.Start(ctx)
+
+		// Register CLIP batch worker
+		river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
+			Dispatcher:   clipDispatcher,
+			AssetService: assetService,
+		})
 	}
-	defer mlConn.Close()
-
-	clipClient := proto.NewInferenceClient(mlConn)
-	clipDispatcher := queue.NewClipBatchDispatcher(clipClient, 8, 1500*time.Millisecond)
-	clipDispatcher.Start(ctx)
-
-	// Register CLIP batch worker
-	river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
-		Dispatcher:   clipDispatcher,
-		AssetService: assetService,
-	})
 	if err != nil {
 		log.Fatalf("Failed to Initialize Queue: %v", err)
 	}

@@ -427,13 +427,14 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 
 // ListAssets retrieves assets with optional filtering
 // @Summary List assets
-// @Description Retrieve a paginated list of assets. Filter by type, owner, or search query. At least one filter parameter is required.
+// @Description Retrieve a paginated list of assets. Filter by type, owner, or search query. Use 'vector=true|false' to control semantic vector search when 'q' is provided (feature must be enabled). At least one filter parameter is required.
 // @Tags assets
 // @Accept json
 // @Produce json
 // @Param type query string false "Asset type filter" Enums(PHOTO,VIDEO,AUDIO,DOCUMENT) example("PHOTO")
 // @Param owner_id query int false "Filter by owner ID" example(123)
-// @Param q query string false "Search query for filename" example("vacation")
+// @Param q query string false "Search query (semantic vector search when enabled) and filename match" example("red bird on a branch")
+// @Param vector query bool false "When q is set: true to use semantic vector search, false to use filename search" default(true)
 // @Param limit query int false "Maximum number of results (max 100)" default(20) example(20)
 // @Param offset query int false "Number of results to skip for pagination" default(0) example(0)
 // @Success 200 {object} api.Result{data=AssetListResponse} "Assets retrieved successfully"
@@ -446,6 +447,8 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	typeStr := c.Query("type")
 	ownerIDStr := c.Query("owner_id")
 	searchQuery := c.Query("q")
+	vectorFlag := c.DefaultQuery("vector", "true")
+	useVector := vectorFlag == "true"
 
 	limit, _ := strconv.Atoi(limitStr)
 	offset, _ := strconv.Atoi(offsetStr)
@@ -460,14 +463,14 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 
 	switch {
 	case searchQuery != "":
-		var assetType *dbtypes.AssetType
+		var typePtr *string
 		if typeStr != "" {
 			at := dbtypes.AssetType(typeStr)
 			if at.Valid() {
-				assetType = &at
+				typePtr = at.String()
 			}
 		}
-		assets, err = h.assetService.SearchAssets(ctx, searchQuery, assetType.String(), limit, offset)
+		assets, err = h.assetService.SearchAssets(ctx, searchQuery, typePtr, useVector, limit, offset)
 
 	case ownerIDStr != "":
 		ownerID, parseErr := strconv.Atoi(ownerIDStr)

@@ -61,13 +61,6 @@ export default function ServerSettings() {
           </button>
         </div>
       </section>
-
-      <div className="alert alert-info">
-        <span>
-          The health check interval determines how frequently the server status
-          (online/offline) is refreshed throughout the app.
-        </span>
-      </div>
     </div>
   );
 }
