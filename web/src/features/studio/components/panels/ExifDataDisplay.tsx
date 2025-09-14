@@ -1,4 +1,7 @@
-import { InformationCircleIcon } from "@heroicons/react/24/outline";
+import {
+  InformationCircleIcon,
+  ArrowDownTrayIcon,
+} from "@heroicons/react/24/outline";
 import { useI18n } from "@/lib/i18n.tsx";
 
 type ExifDataDisplayProps = {
@@ -97,6 +100,25 @@ export function ExifDataDisplay({ exifData, isLoading }: ExifDataDisplayProps) {
   const { t } = useI18n();
   const entries = processExifData(exifData);
 
+  const handleDownload = () => {
+    try {
+      const data = exifData ?? {};
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "exif.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Non-fatal: ignore download errors
+    }
+  };
+
   if (isLoading && !exifData) {
     return (
       <div className="text-center py-8">
@@ -108,9 +130,21 @@ export function ExifDataDisplay({ exifData, isLoading }: ExifDataDisplayProps) {
 
   return (
     <div>
-      <div className="flex items-center mb-4">
-        <InformationCircleIcon className="w-5 h-5 mr-2" />
-        <h2 className="text-lg font-semibold">{t("studio.exif.title")}</h2>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          <InformationCircleIcon className="w-5 h-5 mr-2" />
+          <h2 className="text-lg font-semibold">{t("studio.exif.title")}</h2>
+        </div>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={handleDownload}
+          disabled={isLoading || !exifData}
+          title="Download JSON"
+          aria-label="Download JSON"
+        >
+          <ArrowDownTrayIcon className="w-5 h-5" />
+        </button>
       </div>
 
       {entries.length === 0 ? (

@@ -49,7 +49,7 @@ type AssetService interface {
 	RemoveTagFromAsset(ctx context.Context, assetID uuid.UUID, tagID int) error
 
 	CreateThumbnail(ctx context.Context, assetID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
-	SearchAssets(ctx context.Context, query string, assetType *string, limit, offset int) ([]repo.Asset, error)
+	SearchAssets(ctx context.Context, query string, assetType *string, useVector bool, limit, offset int) ([]repo.Asset, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error)
 	SaveAssetIndex(ctx context.Context, taskID string, hash string) error
 	CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error)
@@ -67,13 +67,19 @@ type AssetService interface {
 type assetService struct {
 	queries *repo.Queries
 	storage storage.Storage
+	ml      *MLService
 }
 
 // NewAssetService creates a new instance of AssetService with storage configuration
 func NewAssetService(q *repo.Queries, s storage.Storage) (AssetService, error) {
+	return NewAssetServiceWithML(q, s, nil)
+}
+
+func NewAssetServiceWithML(q *repo.Queries, s storage.Storage, ml *MLService) (AssetService, error) {
 	return &assetService{
 		queries: q,
 		storage: s,
+		ml:      ml,
 	}, nil
 }
 
@@ -159,17 +165,122 @@ func (s *assetService) GetAssetsByOwner(ctx context.Context, ownerID int, limit,
 }
 
 // SearchAssets searches for assets by query and type
-func (s *assetService) SearchAssets(ctx context.Context, query string, assetType *string, limit, offset int) ([]repo.Asset, error) {
+func (s *assetService) SearchAssets(ctx context.Context, query string, assetType *string, useVector bool, limit, offset int) ([]repo.Asset, error) {
+	log.Printf("SearchAssets: query=%q type=%v useVector=%t limit=%d offset=%d", query, func() interface{} {
+		if assetType != nil {
+			return *assetType
+		}
+		return nil
+	}(), useVector, limit, offset)
+	// Try smart vector search first when we have an ML client and a non-empty query.
+	if useVector && s.ml != nil && query != "" {
+		if emb, err := s.ml.ClipEmbed(ctx, query); err == nil && emb != nil && len(emb.Vector) > 0 {
+			// Convert []float64 -> []float32 to fit pgvector-go.
+			fv := make([]float32, len(emb.Vector))
+			for i, v := range emb.Vector {
+				fv[i] = float32(v)
+			}
+			vec := pgvector_go.NewVector(fv)
+
+			// We fetch limit+offset items from ANN, then apply optional type filter and offset locally.
+			fetch := limit + offset
+			if fetch <= 0 {
+				fetch = limit
+			}
+			if fetch <= 0 {
+				fetch = 50
+			}
+
+			rows, vErr := s.queries.SearchNearestAssets(ctx, repo.SearchNearestAssetsParams{
+				Column1: vec,
+				Limit:   int32(fetch),
+			})
+			if vErr != nil {
+				log.Printf("Vector search: ANN error: %v", vErr)
+			} else {
+				log.Printf("Vector search: ANN returned %d candidates", len(rows))
+			}
+			if vErr == nil && len(rows) > 0 {
+				// Concurrently fetch assets to reduce latency, then filter in original ANN order.
+				type fetchRes struct {
+					idx   int
+					asset *repo.Asset
+				}
+				total := len(rows)
+				fetched := make([]*repo.Asset, total)
+				sem := make(chan struct{}, 8) // limit concurrent DB fetches
+				out := make(chan fetchRes, total)
+
+				for i, r := range rows {
+					sem <- struct{}{}
+					go func(i int, id pgtype.UUID) {
+						defer func() { <-sem }()
+						a, err := s.queries.GetAssetByID(ctx, id)
+						if err == nil {
+							out <- fetchRes{idx: i, asset: &a}
+						} else {
+							out <- fetchRes{idx: i, asset: nil}
+						}
+					}(i, r.AssetID)
+				}
+
+				// Collect all fetch results
+				for i := 0; i < total; i++ {
+					res := <-out
+					if res.asset != nil {
+						fetched[res.idx] = res.asset
+					}
+				}
+
+				// Log how many assets were successfully fetched from DB
+				countFetched := 0
+				for _, fa := range fetched {
+					if fa != nil {
+						countFetched++
+					}
+				}
+				log.Printf("Vector search: fetched %d/%d assets from DB", countFetched, total)
+				results := make([]repo.Asset, 0, limit)
+				skipped := 0
+				for i := 0; i < total && len(results) < limit; i++ {
+					a := fetched[i]
+					if a == nil {
+						continue
+					}
+					// Optional type filter
+					if assetType != nil && *assetType != "" && a.Type != *assetType {
+						continue
+					}
+					// Apply offset after filtering
+					if skipped < offset {
+						skipped++
+						continue
+					}
+					results = append(results, *a)
+				}
+
+				log.Printf("Vector search: after filtering (type=%v) and offset=%d -> skipped=%d returned=%d", func() interface{} {
+					if assetType != nil {
+						return *assetType
+					}
+					return nil
+				}(), offset, skipped, len(results))
+				if len(results) > 0 {
+					return results, nil
+				}
+			}
+		}
+	}
+	log.Printf("Vector search: no usable vector results; falling back to filename search")
+	// Fallback to filename search.
 	params := repo.SearchAssetsParams{
 		Column1: query,
 		Limit:   int32(limit),
 		Offset:  int32(offset),
 	}
-
 	if assetType != nil {
 		params.Column2 = *assetType
 	}
-
 	return s.queries.SearchAssets(ctx, params)
 }
 
