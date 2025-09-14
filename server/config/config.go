@@ -31,6 +31,13 @@ type AppConfig struct {
 	MLServiceAddr string
 	Debug         bool
 	LogLevel      string
+	CLIPEnabled   bool
+}
+
+type LLMConfig struct {
+	Provider  string
+	APIKey    string
+	ModelName string
 }
 
 // IsDevelopmentMode checks if the application is running in development mode
@@ -142,6 +149,7 @@ func LoadAppConfig() AppConfig {
 			MLServiceAddr: "localhost:50051",
 			Debug:         true,
 			LogLevel:      "debug",
+			CLIPEnabled:   true,
 		}
 	} else {
 		cfg = AppConfig{
@@ -151,6 +159,7 @@ func LoadAppConfig() AppConfig {
 			MLServiceAddr: "ml:50051",
 			Debug:         false,
 			LogLevel:      "info",
+			CLIPEnabled:   false,
 		}
 	}
 
@@ -174,6 +183,30 @@ func LoadAppConfig() AppConfig {
 	}
 	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
 		cfg.LogLevel = logLevel
+	}
+	if clipEnabled := os.Getenv("CLIP_ENABLED"); clipEnabled == "true" {
+		cfg.CLIPEnabled = true
+	} else if clipEnabled == "false" {
+		cfg.CLIPEnabled = false
+	}
+
+	return cfg
+}
+
+// LoadLLMConfig loads LLM settings such as API key and model name from environment variables
+func LoadLLMConfig() LLMConfig {
+	var cfg LLMConfig
+
+	if apiKey := os.Getenv("LLM_API_KEY"); apiKey != "" {
+		cfg.APIKey = apiKey
+	}
+	if model := os.Getenv("LLM_MODEL_NAME"); model != "" {
+		cfg.ModelName = model
+	}
+	//providers accroding to eino framework:
+	//ark, deepseek, openai, claude, qwen, qianfan, gemini
+	if provider := os.Getenv("LLM_PROVIDER"); provider != "" {
+		cfg.Provider = provider
 	}
 
 	return cfg

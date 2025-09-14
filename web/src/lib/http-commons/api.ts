@@ -67,6 +67,7 @@ instance.interceptors.response.use(
         }
       } catch (error) {
         // If refresh fails, remove tokens and redirect to log in
+        console.log(error);
         removeToken();
       }
     }

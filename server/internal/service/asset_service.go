@@ -44,7 +44,7 @@ type AssetService interface {
 
 	AddAssetToAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error
 	RemoveAssetFromAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error
-	
+
 	AddTagToAsset(ctx context.Context, assetID uuid.UUID, tagID int, confidence float32, source string) error
 	RemoveTagFromAsset(ctx context.Context, assetID uuid.UUID, tagID int) error
 
@@ -340,7 +340,7 @@ func (s *assetService) CreateThumbnail(ctx context.Context, assetID uuid.UUID, s
 		AssetID:     pgUUID,
 		Size:        size,
 		StoragePath: thumbnailPath,
-		MimeType:    "image/webp", // Thumbnails are typically WebP
+		MimeType:    "image/webp",
 	}
 
 	dbThumbnail, err := s.queries.CreateThumbnail(ctx, params)
@@ -384,7 +384,7 @@ func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID
 // SaveNewThumbnail TODO: Refine this
 func (s *assetService) SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *repo.Asset, size string) error {
 	// TODO: Upload Thumbnail to different folder
-	storagePath, err := s.storage.UploadWithMetadata(ctx, buffers, "thumbnail", "")
+	storagePath, err := s.storage.UploadWithMetadata(ctx, buffers, asset.OriginalFilename+"_"+size, "")
 	if err != nil {
 		return err
 	}

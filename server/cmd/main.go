@@ -54,6 +54,7 @@ func main() {
 	// Load configurations
 	dbConfig := config.LoadDBConfig()
 	appConfig := config.LoadAppConfig()
+	// llmConfig := config.LoadLLMConfig()
 
 	log.Println("🚀 Starting Lumilio Photos API...")
 	log.Printf("📊 Database configuration: %s:%s/%s", dbConfig.Host, dbConfig.Port, dbConfig.DBName)
@@ -96,6 +97,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
+	// llmService, err := service.NewLLMService(llmConfig)
+	// if err != nil {
+	// 	log.Fatalf("Failed to initialize llm service: %v", err)
+	// }
 	authService := service.NewAuthService(queries)
 	albumService := service.NewAlbumService(queries)
 
@@ -105,7 +110,7 @@ func main() {
 	// Create River client
 	queueClient, err := queue.New(pgxPool, workers)
 	// Add Workers
-	assetProcessor := processors.NewAssetProcessor(assetService, storageService, queueClient)
+	assetProcessor := processors.NewAssetProcessor(assetService, storageService, queueClient, appConfig)
 	river.AddWorker[queue.ProcessAssetArgs](workers, &queue.ProcessAssetWorker{Processor: assetProcessor})
 
 	// Initialize ML gRPC connection and CLIP dispatcher

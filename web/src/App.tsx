@@ -4,14 +4,30 @@ import SideBar from "@/components/SideBar";
 import NavBar from "@/components/NavBar";
 import { routes } from "@/routes/routes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import GlobalProvider from "@/contexts/GlobalContext";
+import GlobalProvider, { useGlobal } from "@/contexts/GlobalContext";
 import "@/styles/App.css";
 import "katex/dist/katex.min.css";
 import Notifications from "@/components/Notifications";
-import { SettingsProvider } from "./features/settings";
+import { SettingsProvider, useSettingsContext } from "./features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
+import { pollHealth } from "@/services/healthService";
 
 const queryClient = new QueryClient();
+
+function HealthPoller(): React.ReactNode {
+  const { state } = useSettingsContext();
+  const { setOnline } = useGlobal();
+
+  useEffect(() => {
+    const intervalSec = state.server?.update_timespan ?? 5;
+    const stop = pollHealth(intervalSec, ({ online }) => setOnline(online));
+    return () => {
+      stop();
+    };
+  }, [state.server?.update_timespan, setOnline]);
+
+  return null;
+}
 
 function App(): React.ReactNode {
   const theme: string = localStorage.getItem("theme") || "light";
@@ -56,6 +72,7 @@ function App(): React.ReactNode {
             </div>
           </BrowserRouter>
         </QueryClientProvider>
+        <HealthPoller />
         <Notifications />
       </GlobalProvider>
     </SettingsProvider>
