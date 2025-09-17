@@ -3,6 +3,7 @@ package imaging
 import (
 	"fmt"
 	"io"
+	"math"
 	"sync"
 
 	"github.com/h2non/bimg"
@@ -37,6 +38,13 @@ func StreamThumbnails(
 	if err != nil {
 		return fmt.Errorf("read source image: %w", err)
 	}
+	size, err := bimg.NewImage(srcBuf).Size()
+	if err != nil {
+		return fmt.Errorf("get source image size: %w", err)
+	}
+	if size.Width == 0 || size.Height == 0 {
+		return fmt.Errorf("invalid source image size")
+	}
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(sizes))
@@ -51,12 +59,24 @@ func StreamThumbnails(
 		go func(name string, w io.Writer, width, height int) {
 			defer wg.Done()
 
+			// Calculate scale to fit within max dimensions while preserving aspect ratio
+			scaleW := float64(width) / float64(size.Width)
+			scaleH := float64(height) / float64(size.Height)
+			scale := math.Min(scaleW, scaleH)
+			if scale > 1 {
+				scale = 1
+			}
+			targetWidth := int(float64(size.Width) * scale)
+			if targetWidth < 1 {
+				targetWidth = 1
+			}
+
 			opts := bimg.Options{
-				Width:   width,
-				Height:  height,
-				Crop:    true,
+				Width:   targetWidth,
+				Crop:    false,
 				Quality: 80,
 				Type:    bimg.WEBP,
+				Enlarge: false,
 			}
 			thumb, err := bimg.NewImage(srcBuf).Process(opts)
 			if err != nil {

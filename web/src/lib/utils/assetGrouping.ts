@@ -1,15 +1,11 @@
-import {
-  GroupByType,
-  SortOrderType,
-} from "@/features/assets/hooks/useAssetsPageState";
+import { GroupByType } from "@/features/assets";
 
 /**
- * Groups assets by the specified criteria and applies sorting
+ * Groups assets by the specified criteria
  */
 export const groupAssets = (
   assets: Asset[],
   groupBy: GroupByType,
-  sortOrder: SortOrderType = "desc",
 ): Record<string, Asset[]> => {
   if (!assets || assets.length === 0) {
     return {};
@@ -31,19 +27,7 @@ export const groupAssets = (
       grouped = { "All Assets": assets };
   }
 
-  // Sort assets within each group
-  Object.keys(grouped).forEach((key) => {
-    grouped[key] = sortAssets(grouped[key], sortOrder);
-  });
-
-  // Sort group keys
-  const sortedKeys = sortGroupKeys(Object.keys(grouped), groupBy, sortOrder);
-  const sortedGrouped: Record<string, Asset[]> = {};
-  sortedKeys.forEach((key) => {
-    sortedGrouped[key] = grouped[key];
-  });
-
-  return sortedGrouped;
+  return grouped;
 };
 
 /**
@@ -66,14 +50,16 @@ const groupAssetsByDate = (assets: Asset[]): Record<string, Asset[]> => {
 };
 
 /**
- * Groups assets by type (PHOTO, VIDEO, AUDIO, DOCUMENT)
+ * Groups assets by MIME type (e.g., image/jpeg, image/png).
+ * Falls back to legacy asset.type buckets when MIME is missing.
  */
 const groupAssetsByType = (assets: Asset[]): Record<string, Asset[]> => {
   const grouped: Record<string, Asset[]> = {};
 
   assets.forEach((asset) => {
-    const type = asset.type || "Unknown";
-    const groupKey = formatTypeGroupKey(type);
+    const mime = asset.mime_type?.trim();
+    const groupKey =
+      mime && mime.length > 0 ? mime : formatTypeGroupKey(asset.type || "");
 
     if (!grouped[groupKey]) {
       grouped[groupKey] = [];
@@ -114,52 +100,6 @@ const groupAssetsByAlbum = (assets: Asset[]): Record<string, Asset[]> => {
 };
 
 /**
- * Sorts assets within a group
- */
-const sortAssets = (assets: Asset[], sortOrder: SortOrderType): Asset[] => {
-  return [...assets].sort((a, b) => {
-    // Primary sort: upload time
-    const dateA = a.upload_time ? new Date(a.upload_time).getTime() : 0;
-    const dateB = b.upload_time ? new Date(b.upload_time).getTime() : 0;
-
-    const dateDiff = sortOrder === "desc" ? dateB - dateA : dateA - dateB;
-
-    // Secondary sort: filename if dates are equal
-    if (dateDiff === 0) {
-      const nameA = a.original_filename || "";
-      const nameB = b.original_filename || "";
-      return sortOrder === "desc"
-        ? nameB.localeCompare(nameA)
-        : nameA.localeCompare(nameB);
-    }
-
-    return dateDiff;
-  });
-};
-
-/**
- * Sorts group keys based on grouping type
- */
-const sortGroupKeys = (
-  keys: string[],
-  groupBy: GroupByType,
-  sortOrder: SortOrderType,
-): string[] => {
-  return [...keys].sort((a, b) => {
-    if (groupBy === "date") {
-      // For date groups, sort by the date value
-      const dateA = parseDateGroupKey(a);
-      const dateB = parseDateGroupKey(b);
-      const diff = dateB.getTime() - dateA.getTime();
-      return sortOrder === "desc" ? diff : -diff;
-    } else {
-      // For other groups, sort alphabetically
-      return sortOrder === "desc" ? b.localeCompare(a) : a.localeCompare(b);
-    }
-  });
-};
-
-/**
  * Formats a date into a group key
  */
 const formatDateGroupKey = (date: Date): string => {
@@ -194,69 +134,25 @@ const formatDateGroupKey = (date: Date): string => {
 };
 
 /**
- * Parses a date group key back to a Date object for sorting
+ * Formats MIME or legacy type into a readable group key.
+ * - If it looks like a MIME (contains "/"), return as-is
+ * - Otherwise, map legacy types to wildcard MIME families
  */
-const parseDateGroupKey = (key: string): Date => {
-  const now = new Date();
+const formatTypeGroupKey = (mimeOrLegacyType: string): string => {
+  const val = (mimeOrLegacyType || "").trim();
+  if (val.includes("/")) return val;
 
-  switch (key) {
-    case "Today":
-      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    case "Yesterday": {
-      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      return new Date(
-        yesterday.getFullYear(),
-        yesterday.getMonth(),
-        yesterday.getDate(),
-      );
-    }
-    case "This Week": {
-      const thisWeek = new Date(
-        now.getTime() - now.getDay() * 24 * 60 * 60 * 1000,
-      );
-      return new Date(
-        thisWeek.getFullYear(),
-        thisWeek.getMonth(),
-        thisWeek.getDate(),
-      );
-    }
-    case "This Month":
-      return new Date(now.getFullYear(), now.getMonth(), 1);
-    default: {
-      // Try to parse month/year or year
-      const yearMatch = key.match(/^(\d{4})$/);
-      if (yearMatch) {
-        return new Date(parseInt(yearMatch[1]), 0, 1);
-      }
-
-      const monthYearMatch = key.match(/^(\w+)\s+(\d{4})$/);
-      if (monthYearMatch) {
-        const monthName = monthYearMatch[1];
-        const year = parseInt(monthYearMatch[2]);
-        const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
-        return new Date(year, monthIndex, 1);
-      }
-
-      return new Date(0); // Fallback
-    }
-  }
-};
-
-/**
- * Formats asset type into a readable group key
- */
-const formatTypeGroupKey = (type: string): string => {
-  switch (type.toUpperCase()) {
+  switch (val.toUpperCase()) {
     case "PHOTO":
-      return "Photos";
+      return "image/*";
     case "VIDEO":
-      return "Videos";
+      return "video/*";
     case "AUDIO":
-      return "Audio";
+      return "audio/*";
     case "DOCUMENT":
-      return "Documents";
+      return "application/*";
     default:
-      return "Other";
+      return "Unknown MIME";
   }
 };
 

@@ -15,7 +15,2267 @@
     },
     "host": "localhost:3001",
     "basePath": "/api/v1",
-    "paths": {},
+    "paths": {
+        "/albums": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve a paginated list of albums for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "albums"
+                ],
+                "summary": "List albums",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Maximum number of results (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Number of results to skip for pagination",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Albums retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.ListAlbumsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve albums",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new album for the authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "albums"
+                ],
+                "summary": "Create a new album",
+                "parameters": [
+                    {
+                        "description": "Album creation data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.CreateAlbumRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Album created successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.GetAlbumResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to create album",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/albums/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve a specific album by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "albums"
+                ],
+                "summary": "Get album by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Album ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Album retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.GetAlbumResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid album ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "404": {
+                        "description": "Album not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update an existing album's information",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "albums"
+                ],
+                "summary": "Update album",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Album ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Album update data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateAlbumRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Album updated successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.GetAlbumResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid album ID or request data",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "404": {
+                        "description": "Album not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update album",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete an album by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "albums"
+                ],
+                "summary": "Delete album",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Album ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Album deleted successfully",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid album ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "404": {
+                        "description": "Album not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to delete album",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/albums/{id}/assets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve all assets in a specific album",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "albums"
+                ],
+                "summary": "Get assets in album",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Album ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Assets retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid album ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "404": {
+                        "description": "Album not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve album assets",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/albums/{id}/assets/{assetId}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Add an asset to a specific album",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "albums"
+                ],
+                "summary": "Add asset to album",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Album ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Asset ID (UUID format)",
+                        "name": "assetId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Asset position in album",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/handler.AddAssetToAlbumRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Asset added to album successfully",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid album ID or asset ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "404": {
+                        "description": "Album not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to add asset to album",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Remove an asset from a specific album",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "albums"
+                ],
+                "summary": "Remove asset from album",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Album ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Asset ID (UUID format)",
+                        "name": "assetId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Asset removed from album successfully",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid album ID or asset ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to remove asset from album",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/albums/{id}/assets/{assetId}/position": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the position of an asset within a specific album",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "albums"
+                ],
+                "summary": "Update asset position in album",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Album ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Asset ID (UUID format)",
+                        "name": "assetId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New position for the asset",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateAssetPositionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Asset position updated successfully",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid album ID or asset ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to update asset position",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets": {
+            "get": {
+                "description": "Retrieve a paginated list of assets. Filter by type, owner, or search query. Use 'vector=true|false' to control semantic vector search when 'q' is provided (feature must be enabled). At least one filter parameter is required.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "List assets",
+                "parameters": [
+                    {
+                        "enum": [
+                            "PHOTO",
+                            "VIDEO",
+                            "AUDIO",
+                            "DOCUMENT"
+                        ],
+                        "type": "string",
+                        "example": "\"PHOTO\"",
+                        "description": "Asset type filter",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "example": 123,
+                        "description": "Filter by owner ID",
+                        "name": "owner_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"red bird on a branch\"",
+                        "description": "Search query (semantic vector search when enabled) and filename match",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "When q is set: true to use semantic vector search, false to use filename search",
+                        "name": "vector",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "example": 20,
+                        "description": "Maximum number of results (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "example": 0,
+                        "description": "Number of results to skip for pagination",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Assets retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AssetListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Upload a single photo, video, audio file, or document to the system. The file is staged and queued for processing.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Upload a single asset",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Asset file to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "MLService-calculated BLAKE3 hash of the file",
+                        "name": "X-Content-Hash",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Upload successful",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.UploadResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - no file provided or parse error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/batch": {
+            "post": {
+                "description": "Batch upload multiple assets using a multipart/form-data request. Each file part's field name must be its BLAKE3 content hash. All files are staged and queued for processing.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Batch upload assets",
+                "responses": {
+                    "200": {
+                        "description": "Batch upload completed",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.BatchUploadResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - no files provided or parse error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/filter": {
+            "post": {
+                "description": "Filter assets using comprehensive filtering options including RAW, rating, liked status, filename patterns, date ranges, camera make, and lens",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Filter assets",
+                "parameters": [
+                    {
+                        "description": "Filter criteria",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.FilterAssetsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Assets filtered successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AssetListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/filter-options": {
+            "get": {
+                "description": "Get available camera makes and lenses for filter dropdowns",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Get filter options",
+                "responses": {
+                    "200": {
+                        "description": "Filter options retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.OptionsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/search": {
+            "post": {
+                "description": "Search assets using either filename matching or semantic vector search. Can be combined with comprehensive filters.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Search assets",
+                "parameters": [
+                    {
+                        "description": "Search criteria",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.SearchAssetsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Assets found successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AssetListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/types": {
+            "get": {
+                "description": "Retrieve a list of all supported asset types in the system.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Get supported asset types",
+                "responses": {
+                    "200": {
+                        "description": "Asset types retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AssetTypesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/{id}": {
+            "get": {
+                "description": "Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, and albums.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Get asset by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "description": "Asset ID (UUID format)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Include thumbnails",
+                        "name": "include_thumbnails",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Include tags",
+                        "name": "include_tags",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Include albums",
+                        "name": "include_albums",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Asset details with optional relationships",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.AssetDTO"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "404": {
+                        "description": "Asset not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "description": "Update the specific metadata of an asset (e.g., photo EXIF data, video metadata).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Update asset metadata",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "description": "Asset ID (UUID format)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated metadata",
+                        "name": "metadata",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handler.UpdateAssetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Asset updated successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.MessageResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID or request body",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Soft delete an asset by marking it as deleted. The physical file is not removed.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Delete asset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "description": "Asset ID (UUID format)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Asset deleted successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.MessageResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID format",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/{id}/albums": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve all albums that contain a specific asset",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "albums"
+                ],
+                "summary": "Get albums containing asset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset ID (UUID format)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Albums retrieved successfully",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve asset albums",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/{id}/albums/{albumId}": {
+            "post": {
+                "description": "Associate an asset with a specific album by asset ID and album ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Add asset to album",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "description": "Asset ID (UUID format)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "example": 123,
+                        "description": "Album ID",
+                        "name": "albumId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Asset added to album successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.MessageResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID or album ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/{id}/original": {
+            "get": {
+                "description": "Serve the original file content for an asset by asset ID. Returns the file as an octet-stream.",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Get original file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "description": "Asset ID (UUID format)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Original file content",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "404": {
+                        "description": "Asset not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/assets/{id}/thumbnail": {
+            "get": {
+                "description": "Retrieve a specific thumbnail image for an asset by asset ID and size parameter. Returns the image file directly.",
+                "produces": [
+                    "image/jpeg"
+                ],
+                "tags": [
+                    "assets"
+                ],
+                "summary": "Get asset thumbnail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "description": "Asset ID (UUID format)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "small",
+                            "medium",
+                            "large"
+                        ],
+                        "type": "string",
+                        "default": "medium",
+                        "description": "Thumbnail size",
+                        "name": "size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Thumbnail image file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid asset ID or size parameter",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "404": {
+                        "description": "Asset or thumbnail not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "description": "Authenticate user with username and password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login user",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Login successful",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.AuthResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "description": "Revoke the user's refresh token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Logout user",
+                "parameters": [
+                    {
+                        "description": "Refresh token to revoke",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.RefreshTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Logout successful",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid refresh token",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get information about the currently authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get current user",
+                "responses": {
+                    "200": {
+                        "description": "User information retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.UserResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/refresh": {
+            "post": {
+                "description": "Generate a new access token using a valid refresh token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Refresh access token",
+                "parameters": [
+                    {
+                        "description": "Refresh token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.RefreshTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Token refreshed successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.AuthResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or expired refresh token",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "description": "Create a new user account with username, email, and password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "description": "Registration data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/service.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "User registered successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/api.Result"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.AuthResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request data",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "409": {
+                        "description": "User already exists",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.Result"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "api.Result": {
+            "description": "Standard API response wrapper",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "Business status code (0 for success, non-zero for errors)",
+                    "type": "integer",
+                    "example": 0
+                },
+                "data": {
+                    "description": "Business data, ignore empty values",
+                    "type": "object"
+                },
+                "error": {
+                    "description": "Debug error message, ignore empty values",
+                    "type": "string",
+                    "example": "error details"
+                },
+                "message": {
+                    "description": "User readable message",
+                    "type": "string",
+                    "example": "success"
+                }
+            }
+        },
+        "dbtypes.AssetType": {
+            "type": "string",
+            "enum": [
+                "PHOTO",
+                "VIDEO",
+                "AUDIO"
+            ],
+            "x-enum-varnames": [
+                "AssetTypePhoto",
+                "AssetTypeVideo",
+                "AssetTypeAudio"
+            ]
+        },
+        "handler.AddAssetToAlbumRequest": {
+            "type": "object",
+            "properties": {
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.AssetDTO": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
+                "duration": {
+                    "type": "number"
+                },
+                "file_size": {
+                    "type": "integer"
+                },
+                "hash": {
+                    "type": "string"
+                },
+                "height": {
+                    "type": "integer"
+                },
+                "is_deleted": {
+                    "type": "boolean"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "original_filename": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "integer"
+                },
+                "specific_metadata": {
+                    "type": "object"
+                },
+                "storage_path": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "upload_time": {
+                    "type": "string"
+                },
+                "width": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.AssetFilter": {
+            "type": "object",
+            "properties": {
+                "camera_make": {
+                    "type": "string",
+                    "example": "Canon"
+                },
+                "date": {
+                    "$ref": "#/definitions/handler.DateRange"
+                },
+                "filename": {
+                    "$ref": "#/definitions/handler.FilenameFilter"
+                },
+                "lens": {
+                    "type": "string",
+                    "example": "EF 50mm f/1.8"
+                },
+                "liked": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "owner_id": {
+                    "type": "integer",
+                    "example": 123
+                },
+                "rating": {
+                    "type": "integer",
+                    "maximum": 5,
+                    "minimum": 0,
+                    "example": 5
+                },
+                "raw": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "PHOTO",
+                        "VIDEO",
+                        "AUDIO"
+                    ],
+                    "example": "PHOTO"
+                }
+            }
+        },
+        "handler.AssetListResponse": {
+            "type": "object",
+            "properties": {
+                "assets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.AssetDTO"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "offset": {
+                    "type": "integer",
+                    "example": 0
+                }
+            }
+        },
+        "handler.AssetTypesResponse": {
+            "type": "object",
+            "properties": {
+                "types": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dbtypes.AssetType"
+                    }
+                }
+            }
+        },
+        "handler.BatchUploadResponse": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.BatchUploadResult"
+                    }
+                }
+            }
+        },
+        "handler.BatchUploadResult": {
+            "type": "object",
+            "properties": {
+                "content_hash": {
+                    "description": "MLService-provided content hash",
+                    "type": "string"
+                },
+                "error": {
+                    "description": "Only present for failed uploads",
+                    "type": "string"
+                },
+                "file_name": {
+                    "description": "Original filename",
+                    "type": "string"
+                },
+                "message": {
+                    "description": "Status message",
+                    "type": "string"
+                },
+                "size": {
+                    "description": "Only present for successful uploads",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "Only present for successful uploads",
+                    "type": "string"
+                },
+                "success": {
+                    "description": "Whether the file was successfully queued",
+                    "type": "boolean"
+                },
+                "task_id": {
+                    "description": "Only present for successful uploads",
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.CreateAlbumRequest": {
+            "type": "object",
+            "required": [
+                "album_name",
+                "cover_asset_id"
+            ],
+            "properties": {
+                "album_name": {
+                    "type": "string"
+                },
+                "cover_asset_id": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.DateRange": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "type": "string"
+                },
+                "to": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.FilenameFilter": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "contains",
+                        "matches",
+                        "startswith",
+                        "endswith"
+                    ],
+                    "example": "startswith"
+                },
+                "value": {
+                    "type": "string",
+                    "example": "IMG_"
+                }
+            }
+        },
+        "handler.FilterAssetsRequest": {
+            "type": "object",
+            "properties": {
+                "filter": {
+                    "$ref": "#/definitions/handler.AssetFilter"
+                },
+                "limit": {
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": 1,
+                    "example": 20
+                },
+                "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 0
+                }
+            }
+        },
+        "handler.GetAlbumResponse": {
+            "type": "object",
+            "properties": {
+                "album_id": {
+                    "type": "integer"
+                },
+                "album_name": {
+                    "type": "string"
+                },
+                "asset_count": {
+                    "type": "integer"
+                },
+                "cover_asset_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.ListAlbumsResponse": {
+            "type": "object",
+            "properties": {
+                "albums": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handler.GetAlbumResponse"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.MessageResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Operation completed successfully"
+                }
+            }
+        },
+        "handler.OptionsResponse": {
+            "type": "object",
+            "properties": {
+                "camera_makes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "lenses": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "handler.SearchAssetsRequest": {
+            "type": "object",
+            "required": [
+                "query",
+                "search_type"
+            ],
+            "properties": {
+                "filter": {
+                    "$ref": "#/definitions/handler.AssetFilter"
+                },
+                "limit": {
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": 1,
+                    "example": 20
+                },
+                "offset": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 0
+                },
+                "query": {
+                    "type": "string",
+                    "example": "red bird on branch"
+                },
+                "search_type": {
+                    "type": "string",
+                    "enum": [
+                        "filename",
+                        "semantic"
+                    ],
+                    "example": "filename"
+                }
+            }
+        },
+        "handler.UpdateAlbumRequest": {
+            "type": "object",
+            "properties": {
+                "album_name": {
+                    "type": "string"
+                },
+                "cover_asset_id": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.UpdateAssetPositionRequest": {
+            "type": "object",
+            "required": [
+                "position"
+            ],
+            "properties": {
+                "position": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.UpdateAssetRequest": {
+            "type": "object",
+            "properties": {
+                "specific_metadata": {
+                    "type": "object"
+                }
+            }
+        },
+        "handler.UploadResponse": {
+            "type": "object",
+            "properties": {
+                "content_hash": {
+                    "type": "string",
+                    "example": "abcd1234567890"
+                },
+                "file_name": {
+                    "type": "string",
+                    "example": "photo.jpg"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "File received and queued for processing"
+                },
+                "size": {
+                    "type": "integer",
+                    "example": 1048576
+                },
+                "status": {
+                    "type": "string",
+                    "example": "processing"
+                },
+                "task_id": {
+                    "type": "integer",
+                    "example": 12345
+                }
+            }
+        },
+        "service.AuthResponse": {
+            "type": "object",
+            "properties": {
+                "expiresAt": {
+                    "type": "string"
+                },
+                "refreshToken": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/service.UserResponse"
+                }
+            }
+        },
+        "service.LoginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.RefreshTokenRequest": {
+            "type": "object",
+            "required": [
+                "refreshToken"
+            ],
+            "properties": {
+                "refreshToken": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 6
+                },
+                "username": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 3
+                }
+            }
+        },
+        "service.UserResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_login": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        }
+    },
     "securityDefinitions": {
         "BearerAuth": {
             "description": "Type \"Bearer\" followed by a space and JWT token.",

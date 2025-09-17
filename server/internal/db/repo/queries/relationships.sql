@@ -49,7 +49,7 @@ SELECT
     a.*,
     COALESCE(
         json_agg(DISTINCT
-            json_build_object(
+            jsonb_build_object(
                 'thumbnail_id', t.thumbnail_id,
                 'size', t.size,
                 'storage_path', t.storage_path,
@@ -60,17 +60,30 @@ SELECT
     ) as thumbnails,
     COALESCE(
         json_agg(DISTINCT
-            json_build_object(
+            jsonb_build_object(
                 'tag_id', tg.tag_id,
                 'tag_name', tg.tag_name,
                 'confidence', at.confidence
             )
         ) FILTER (WHERE tg.tag_id IS NOT NULL),
         '[]'
-    ) as tags
+    ) as tags,
+    COALESCE(
+        json_agg(DISTINCT
+            jsonb_build_object(
+                'album_id', al.album_id,
+                'album_name', al.album_name,
+                'position', aa.position,
+                'added_time', aa.added_time
+            )
+        ) FILTER (WHERE al.album_id IS NOT NULL),
+        '[]'
+    ) as albums
 FROM assets a
 LEFT JOIN thumbnails t ON a.asset_id = t.asset_id
 LEFT JOIN asset_tags at ON a.asset_id = at.asset_id
 LEFT JOIN tags tg ON at.tag_id = tg.tag_id
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
+LEFT JOIN albums al ON aa.album_id = al.album_id
 WHERE a.asset_id = $1 AND a.is_deleted = false
 GROUP BY a.asset_id;

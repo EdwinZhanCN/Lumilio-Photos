@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
-import SearchBar from "./SearchBar";
-
+import { LumenAvatar } from "@/features/lumen";
 function NavBar() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { t } = useI18n();
@@ -25,7 +24,7 @@ function NavBar() {
   }, []);
 
   return (
-    <div className="navbar bg-base-100 px-4 py-2">
+    <div className="navbar bg-base-100 px-4 py-2 justify-between">
       {/* Branding */}
       <div className="flex-none">
         <Link className="btn btn-ghost text-xl" to="/">
@@ -37,8 +36,26 @@ function NavBar() {
           {t("app.name")}
         </Link>
       </div>
-      {/* Center search bar */}
-      <SearchBar />
+
+      <div>
+        {(() => {
+          const [start, setStart] = useState(false);
+          return (
+            <Link to={"/lumen"}>
+              <div
+                onMouseEnter={() => setStart(true)}
+                onMouseLeave={() => setStart(false)}
+              >
+                <LumenAvatar
+                  className="mb-2 pointer-cursor"
+                  size={0.2}
+                  start={start}
+                />
+              </div>
+            </Link>
+          );
+        })()}
+      </div>
 
       {/* Theme Controller */}
       <label className="swap swap-rotate">

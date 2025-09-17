@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	pgvector_go "github.com/pgvector/pgvector-go"
 	"server/internal/db/dbtypes"
 )
 
@@ -152,6 +153,109 @@ WHERE asset_id = $1
 func (q *Queries) DeleteAsset(ctx context.Context, assetID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, deleteAsset, assetID)
 	return err
+}
+
+const filterAssets = `-- name: FilterAssets :many
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding FROM assets a
+WHERE a.is_deleted = false
+  AND ($1::text IS NULL OR a.type = $1)
+  AND ($2::integer IS NULL OR a.owner_id = $2)
+  AND ($3::text IS NULL OR
+    CASE $4::text
+      WHEN 'contains' THEN a.original_filename ILIKE '%' || $3 || '%'
+      WHEN 'matches' THEN a.original_filename ILIKE $3
+      WHEN 'startswith' THEN a.original_filename ILIKE $3 || '%'
+      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $3
+      ELSE true
+    END
+  )
+  AND ($5::timestamptz IS NULL OR a.upload_time >= $5)
+  AND ($6::timestamptz IS NULL OR a.upload_time <= $6)
+  AND ($7::boolean IS NULL OR
+    CASE
+      WHEN $7 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      WHEN $7 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+      ELSE true
+    END
+  )
+  AND ($8::integer IS NULL OR
+    CASE
+      WHEN $8 = 0 THEN a.specific_metadata->>'rating' IS NULL
+      ELSE (a.specific_metadata->>'rating')::integer = $8
+    END
+  )
+  AND ($9::boolean IS NULL OR (a.specific_metadata->>'liked')::boolean = $9)
+  AND ($10::text IS NULL OR a.specific_metadata->>'camera_model' = $10)
+  AND ($11::text IS NULL OR a.specific_metadata->>'lens_model' = $11)
+ORDER BY a.upload_time DESC
+LIMIT $13 OFFSET $12
+`
+
+type FilterAssetsParams struct {
+	AssetType    *string            `db:"asset_type" json:"asset_type"`
+	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
+	FilenameVal  *string            `db:"filename_val" json:"filename_val"`
+	FilenameMode *string            `db:"filename_mode" json:"filename_mode"`
+	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw        *bool              `db:"is_raw" json:"is_raw"`
+	Rating       *int32             `db:"rating" json:"rating"`
+	Liked        *bool              `db:"liked" json:"liked"`
+	CameraModel  *string            `db:"camera_model" json:"camera_model"`
+	LensModel    *string            `db:"lens_model" json:"lens_model"`
+	Offset       int32              `db:"offset" json:"offset"`
+	Limit        int32              `db:"limit" json:"limit"`
+}
+
+func (q *Queries) FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, filterAssets,
+		arg.AssetType,
+		arg.OwnerID,
+		arg.FilenameVal,
+		arg.FilenameMode,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getAssetByID = `-- name: GetAssetByID :one
@@ -325,6 +429,64 @@ func (q *Queries) GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams
 	return items, nil
 }
 
+const getDistinctCameraMakes = `-- name: GetDistinctCameraMakes :many
+SELECT DISTINCT a.specific_metadata->>'camera_model' as camera_model
+FROM assets a
+WHERE a.is_deleted = false
+  AND a.specific_metadata->>'camera_model' IS NOT NULL
+  AND a.specific_metadata->>'camera_model' != ''
+ORDER BY camera_model
+`
+
+func (q *Queries) GetDistinctCameraMakes(ctx context.Context) ([]interface{}, error) {
+	rows, err := q.db.Query(ctx, getDistinctCameraMakes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []interface{}
+	for rows.Next() {
+		var camera_model interface{}
+		if err := rows.Scan(&camera_model); err != nil {
+			return nil, err
+		}
+		items = append(items, camera_model)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getDistinctLenses = `-- name: GetDistinctLenses :many
+SELECT DISTINCT a.specific_metadata->>'lens_model' as lens_model
+FROM assets a
+WHERE a.is_deleted = false
+  AND a.specific_metadata->>'lens_model' IS NOT NULL
+  AND a.specific_metadata->>'lens_model' != ''
+ORDER BY lens_model
+`
+
+func (q *Queries) GetDistinctLenses(ctx context.Context) ([]interface{}, error) {
+	rows, err := q.db.Query(ctx, getDistinctLenses)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []interface{}
+	for rows.Next() {
+		var lens_model interface{}
+		if err := rows.Scan(&lens_model); err != nil {
+			return nil, err
+		}
+		items = append(items, lens_model)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getThumbnailByAssetAndSize = `-- name: GetThumbnailByAssetAndSize :one
 SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at FROM thumbnails
 WHERE asset_id = $1 AND size = $2
@@ -481,6 +643,239 @@ func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]A
 			&i.DeletedAt,
 			&i.SpecificMetadata,
 			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchAssetsFilename = `-- name: SearchAssetsFilename :many
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding FROM assets a
+WHERE a.is_deleted = false
+  AND a.original_filename ILIKE '%' || $1 || '%'
+  AND ($2::text IS NULL OR a.type = $2)
+  AND ($3::integer IS NULL OR a.owner_id = $3)
+  AND ($4::text IS NULL OR
+    CASE $5::text
+      WHEN 'contains' THEN a.original_filename ILIKE '%' || $4 || '%'
+      WHEN 'matches' THEN a.original_filename ILIKE $4
+      WHEN 'startswith' THEN a.original_filename ILIKE $4 || '%'
+      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $4
+      ELSE true
+    END
+  )
+  AND ($6::timestamptz IS NULL OR a.upload_time >= $6)
+  AND ($7::timestamptz IS NULL OR a.upload_time <= $7)
+  AND ($8::boolean IS NULL OR
+    CASE
+      WHEN $8 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      WHEN $8 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+      ELSE true
+    END
+  )
+  AND ($9::integer IS NULL OR
+    CASE
+      WHEN $9 = 0 THEN a.specific_metadata->>'rating' IS NULL
+      ELSE (a.specific_metadata->>'rating')::integer = $9
+    END
+  )
+  AND ($10::boolean IS NULL OR (a.specific_metadata->>'liked')::boolean = $10)
+  AND ($11::text IS NULL OR a.specific_metadata->>'camera_model' = $11)
+  AND ($12::text IS NULL OR a.specific_metadata->>'lens_model' = $12)
+ORDER BY a.upload_time DESC
+LIMIT $14 OFFSET $13
+`
+
+type SearchAssetsFilenameParams struct {
+	Query        *string            `db:"query" json:"query"`
+	AssetType    *string            `db:"asset_type" json:"asset_type"`
+	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
+	FilenameVal  *string            `db:"filename_val" json:"filename_val"`
+	FilenameMode *string            `db:"filename_mode" json:"filename_mode"`
+	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw        *bool              `db:"is_raw" json:"is_raw"`
+	Rating       *int32             `db:"rating" json:"rating"`
+	Liked        *bool              `db:"liked" json:"liked"`
+	CameraModel  *string            `db:"camera_model" json:"camera_model"`
+	LensModel    *string            `db:"lens_model" json:"lens_model"`
+	Offset       int32              `db:"offset" json:"offset"`
+	Limit        int32              `db:"limit" json:"limit"`
+}
+
+func (q *Queries) SearchAssetsFilename(ctx context.Context, arg SearchAssetsFilenameParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, searchAssetsFilename,
+		arg.Query,
+		arg.AssetType,
+		arg.OwnerID,
+		arg.FilenameVal,
+		arg.FilenameMode,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchAssetsVector = `-- name: SearchAssetsVector :many
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding, (a.embedding <-> $1::vector) AS distance FROM assets a
+WHERE a.is_deleted = false
+  AND a.embedding IS NOT NULL
+  AND ($2::text IS NULL OR a.type = $2)
+  AND ($3::integer IS NULL OR a.owner_id = $3)
+  AND ($4::text IS NULL OR
+    CASE $5::text
+      WHEN 'contains' THEN a.original_filename ILIKE '%' || $4 || '%'
+      WHEN 'matches' THEN a.original_filename ILIKE $4
+      WHEN 'startswith' THEN a.original_filename ILIKE $4 || '%'
+      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $4
+      ELSE true
+    END
+  )
+  AND ($6::timestamptz IS NULL OR a.upload_time >= $6)
+  AND ($7::timestamptz IS NULL OR a.upload_time <= $7)
+  AND ($8::boolean IS NULL OR
+    CASE
+      WHEN $8 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      WHEN $8 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+      ELSE true
+    END
+  )
+  AND ($9::integer IS NULL OR
+    CASE
+      WHEN $9 = 0 THEN a.specific_metadata->>'rating' IS NULL
+      ELSE (a.specific_metadata->>'rating')::integer = $9
+    END
+  )
+  AND ($10::boolean IS NULL OR (a.specific_metadata->>'liked')::boolean = $10)
+  AND ($11::text IS NULL OR a.specific_metadata->>'camera_model' = $11)
+  AND ($12::text IS NULL OR a.specific_metadata->>'lens_model' = $12)
+ORDER BY (a.embedding <-> $1::vector)
+LIMIT $14 OFFSET $13
+`
+
+type SearchAssetsVectorParams struct {
+	Embedding    pgvector_go.Vector `db:"embedding" json:"embedding"`
+	AssetType    *string            `db:"asset_type" json:"asset_type"`
+	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
+	FilenameVal  *string            `db:"filename_val" json:"filename_val"`
+	FilenameMode *string            `db:"filename_mode" json:"filename_mode"`
+	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw        *bool              `db:"is_raw" json:"is_raw"`
+	Rating       *int32             `db:"rating" json:"rating"`
+	Liked        *bool              `db:"liked" json:"liked"`
+	CameraModel  *string            `db:"camera_model" json:"camera_model"`
+	LensModel    *string            `db:"lens_model" json:"lens_model"`
+	Offset       int32              `db:"offset" json:"offset"`
+	Limit        int32              `db:"limit" json:"limit"`
+}
+
+type SearchAssetsVectorRow struct {
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
+	Type             string                   `db:"type" json:"type"`
+	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
+	StoragePath      string                   `db:"storage_path" json:"storage_path"`
+	MimeType         string                   `db:"mime_type" json:"mime_type"`
+	FileSize         int64                    `db:"file_size" json:"file_size"`
+	Hash             *string                  `db:"hash" json:"hash"`
+	Width            *int32                   `db:"width" json:"width"`
+	Height           *int32                   `db:"height" json:"height"`
+	Duration         *float64                 `db:"duration" json:"duration"`
+	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
+	Distance         interface{}              `db:"distance" json:"distance"`
+}
+
+func (q *Queries) SearchAssetsVector(ctx context.Context, arg SearchAssetsVectorParams) ([]SearchAssetsVectorRow, error) {
+	rows, err := q.db.Query(ctx, searchAssetsVector,
+		arg.Embedding,
+		arg.AssetType,
+		arg.OwnerID,
+		arg.FilenameVal,
+		arg.FilenameMode,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchAssetsVectorRow
+	for rows.Next() {
+		var i SearchAssetsVectorRow
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+			&i.Distance,
 		); err != nil {
 			return nil, err
 		}

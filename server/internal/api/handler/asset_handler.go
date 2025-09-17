@@ -74,7 +74,7 @@ type AssetDTO struct {
 	UploadTime       time.Time                `json:"upload_time"`
 	IsDeleted        *bool                    `json:"is_deleted"`
 	DeletedAt        *time.Time               `json:"deleted_at,omitempty"`
-	Metadata         dbtypes.SpecificMetadata `json:"specific_metadata"`
+	Metadata         dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object"`
 }
 
 // toAssetDTO maps repo.Asset to AssetDTO
@@ -113,7 +113,7 @@ func toAssetDTO(a repo.Asset) AssetDTO {
 
 // UpdateAssetRequest represents the request structure for updating asset metadata
 type UpdateAssetRequest struct {
-	Metadata dbtypes.SpecificMetadata `json:"metadata"`
+	Metadata dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object"`
 }
 
 // MessageResponse represents a simple message response
@@ -124,6 +124,53 @@ type MessageResponse struct {
 // AssetTypesResponse represents the response structure for asset types
 type AssetTypesResponse struct {
 	Types []dbtypes.AssetType `json:"types"`
+}
+
+// FilenameFilter represents filename filtering options
+type FilenameFilter struct {
+	Value string `json:"value" example:"IMG_"`
+	Mode  string `json:"mode" example:"startswith" enums:"contains,matches,startswith,endswith"`
+}
+
+// DateRange represents a date range filter
+type DateRange struct {
+	From *time.Time `json:"from,omitempty"`
+	To   *time.Time `json:"to,omitempty"`
+}
+
+// AssetFilter represents comprehensive filtering options
+type AssetFilter struct {
+	Type       *string         `json:"type,omitempty" example:"PHOTO" enums:"PHOTO,VIDEO,AUDIO"`
+	OwnerID    *int32          `json:"owner_id,omitempty" example:"123"`
+	RAW        *bool           `json:"raw,omitempty" example:"true"`
+	Rating     *int            `json:"rating,omitempty" example:"5" minimum:"0" maximum:"5"`
+	Liked      *bool           `json:"liked,omitempty" example:"true"`
+	Filename   *FilenameFilter `json:"filename,omitempty"`
+	Date       *DateRange      `json:"date,omitempty"`
+	CameraMake *string         `json:"camera_make,omitempty" example:"Canon"`
+	Lens       *string         `json:"lens,omitempty" example:"EF 50mm f/1.8"`
+}
+
+// FilterAssetsRequest represents the request structure for filtering assets
+type FilterAssetsRequest struct {
+	Filter AssetFilter `json:"filter"`
+	Limit  int         `json:"limit" example:"20" minimum:"1" maximum:"100"`
+	Offset int         `json:"offset" example:"0" minimum:"0"`
+}
+
+// SearchAssetsRequest represents the request structure for searching assets
+type SearchAssetsRequest struct {
+	Query      string      `json:"query" binding:"required" example:"red bird on branch"`
+	SearchType string      `json:"search_type" binding:"required" example:"filename" enums:"filename,semantic"`
+	Filter     AssetFilter `json:"filter,omitempty"`
+	Limit      int         `json:"limit" example:"20" minimum:"1" maximum:"100"`
+	Offset     int         `json:"offset" example:"0" minimum:"0"`
+}
+
+// OptionsResponse represents the response for filter options
+type OptionsResponse struct {
+	CameraMakes []string `json:"camera_makes"`
+	Lenses      []string `json:"lenses"`
 }
 
 // AssetHandler handles HTTP requests for asset management
@@ -434,7 +481,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 // @Param type query string false "Asset type filter" Enums(PHOTO,VIDEO,AUDIO,DOCUMENT) example("PHOTO")
 // @Param owner_id query int false "Filter by owner ID" example(123)
 // @Param q query string false "Search query (semantic vector search when enabled) and filename match" example("red bird on a branch")
-// @Param vector query bool false "When q is set: true to use semantic vector search, false to use filename search" default(true)
+// @Param vector query bool false "When q is set: true to use semantic vector search, false to use filename search" default(false)
 // @Param limit query int false "Maximum number of results (max 100)" default(20) example(20)
 // @Param offset query int false "Number of results to skip for pagination" default(0) example(0)
 // @Success 200 {object} api.Result{data=AssetListResponse} "Assets retrieved successfully"
@@ -447,7 +494,7 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	typeStr := c.Query("type")
 	ownerIDStr := c.Query("owner_id")
 	searchQuery := c.Query("q")
-	vectorFlag := c.DefaultQuery("vector", "true")
+	vectorFlag := c.DefaultQuery("vector", "false")
 	useVector := vectorFlag == "true"
 
 	limit, _ := strconv.Atoi(limitStr)
@@ -769,4 +816,195 @@ func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 	}
 
 	api.GinSuccess(c, AssetTypesResponse{Types: types})
+}
+
+// FilterAssets handles asset filtering with complex filters
+// @Summary Filter assets
+// @Description Filter assets using comprehensive filtering options including RAW, rating, liked status, filename patterns, date ranges, camera make, and lens
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param request body FilterAssetsRequest true "Filter criteria"
+// @Success 200 {object} api.Result{data=AssetListResponse} "Assets filtered successfully"
+// @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/filter [post]
+func (h *AssetHandler) FilterAssets(c *gin.Context) {
+	var req FilterAssetsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	// Validate and set defaults
+	if req.Limit <= 0 || req.Limit > 100 {
+		req.Limit = 20
+	}
+	if req.Offset < 0 {
+		req.Offset = 0
+	}
+
+	ctx := c.Request.Context()
+	filter := req.Filter
+
+	// Convert filter parameters for SQL query
+	var typePtr *string
+	if filter.Type != nil {
+		typePtr = filter.Type
+	}
+
+	var filenameVal, filenameMode *string
+	if filter.Filename != nil {
+		filenameVal = &filter.Filename.Value
+		filenameMode = &filter.Filename.Mode
+	}
+
+	var dateFrom, dateTo *time.Time
+	if filter.Date != nil {
+		dateFrom = filter.Date.From
+		dateTo = filter.Date.To
+	}
+
+	assets, err := h.assetService.FilterAssets(ctx,
+		typePtr, filter.OwnerID, filenameVal, filenameMode,
+		dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
+		filter.CameraMake, filter.Lens, req.Limit, req.Offset)
+
+	if err != nil {
+		log.Printf("Failed to filter assets: %v", err)
+		api.GinInternalError(c, err, "Failed to filter assets")
+		return
+	}
+
+	dtos := make([]AssetDTO, len(assets))
+	for i, a := range assets {
+		dtos[i] = toAssetDTO(a)
+	}
+
+	response := AssetListResponse{
+		Assets: dtos,
+		Limit:  req.Limit,
+		Offset: req.Offset,
+	}
+	api.GinSuccess(c, response)
+}
+
+// SearchAssets handles both filename and semantic search with optional filtering
+// @Summary Search assets
+// @Description Search assets using either filename matching or semantic vector search. Can be combined with comprehensive filters.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param request body SearchAssetsRequest true "Search criteria"
+// @Success 200 {object} api.Result{data=AssetListResponse} "Assets found successfully"
+// @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/search [post]
+func (h *AssetHandler) SearchAssets(c *gin.Context) {
+	var req SearchAssetsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	// Validate search type
+	if req.SearchType != "filename" && req.SearchType != "semantic" {
+		api.GinBadRequest(c, errors.New("invalid search type"), "Search type must be 'filename' or 'semantic'")
+		return
+	}
+
+	// Validate and set defaults
+	if req.Limit <= 0 || req.Limit > 100 {
+		req.Limit = 20
+	}
+	if req.Offset < 0 {
+		req.Offset = 0
+	}
+
+	ctx := c.Request.Context()
+	filter := req.Filter
+
+	// Convert filter parameters for SQL query
+	var typePtr *string
+	if filter.Type != nil {
+		typePtr = filter.Type
+	}
+
+	var filenameVal, filenameMode *string
+	if filter.Filename != nil {
+		filenameVal = &filter.Filename.Value
+		filenameMode = &filter.Filename.Mode
+	}
+
+	var dateFrom, dateTo *time.Time
+	if filter.Date != nil {
+		dateFrom = filter.Date.From
+		dateTo = filter.Date.To
+	}
+
+	var assets []repo.Asset
+	var err error
+
+	if req.SearchType == "filename" {
+		assets, err = h.assetService.SearchAssetsFilename(ctx, req.Query,
+			typePtr, filter.OwnerID, filenameVal, filenameMode,
+			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
+			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
+	} else {
+		assets, err = h.assetService.SearchAssetsVector(ctx, req.Query,
+			typePtr, filter.OwnerID, filenameVal, filenameMode,
+			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
+			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
+	}
+
+	if err != nil {
+		log.Printf("Failed to search assets: %v", err)
+		api.GinInternalError(c, err, "Failed to search assets")
+		return
+	}
+
+	dtos := make([]AssetDTO, len(assets))
+	for i, a := range assets {
+		dtos[i] = toAssetDTO(a)
+	}
+
+	response := AssetListResponse{
+		Assets: dtos,
+		Limit:  req.Limit,
+		Offset: req.Offset,
+	}
+	api.GinSuccess(c, response)
+}
+
+// GetFilterOptions returns available options for filters
+// @Summary Get filter options
+// @Description Get available camera makes and lenses for filter dropdowns
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.Result{data=OptionsResponse} "Filter options retrieved successfully"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/filter-options [get]
+func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	cameraMakes, err := h.assetService.GetDistinctCameraMakes(ctx)
+	if err != nil {
+		log.Printf("Failed to get camera makes: %v", err)
+		api.GinInternalError(c, err, "Failed to get filter options")
+		return
+	}
+
+	lenses, err := h.assetService.GetDistinctLenses(ctx)
+	if err != nil {
+		log.Printf("Failed to get lenses: %v", err)
+		api.GinInternalError(c, err, "Failed to get filter options")
+		return
+	}
+
+	response := OptionsResponse{
+		CameraMakes: cameraMakes,
+		Lenses:      lenses,
+	}
+	api.GinSuccess(c, response)
 }
