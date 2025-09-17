@@ -40,11 +40,15 @@ type PhotoSpecificMetadata struct {
 	LensModel         string                  `json:"lens_model,omitempty"`
 	ExposureTime      string                  `json:"exposure_time,omitempty"`
 	FNumber           float32                 `json:"f_number,omitempty"`
+	FocalLength       float32                 `json:"focal_length,omitempty"`
 	IsoSpeed          int                     `json:"iso_speed,omitempty"`
 	GPSLatitude       float64                 `json:"gps_latitude,omitempty"`
 	GPSLongitude      float64                 `json:"gps_longitude,omitempty"`
 	Description       string                  `json:"description,omitempty"`
 	SpeciesPrediction []SpeciesPredictionMeta `json:"species_prediction,omitempty"`
+	IsRAW             bool                    `json:"is_raw,omitempty"`
+	Rating            int                     `json:"rating,omitempty"`
+	Like              bool                    `json:"liked,omitempty"`
 }
 
 type SpeciesPredictionMeta struct {

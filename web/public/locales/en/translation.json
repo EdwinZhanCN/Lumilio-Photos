@@ -18,18 +18,19 @@
         "na": "N/A"
     },
     "navbar": {
-        "search": {
-            "placeholder": "Search",
-            "option": {
-                "name": "Name",
-                "tag": "Tag",
-                "date": "Date",
-                "type": "File Type"
-            }
-        },
         "theme": {
             "light": "Light",
             "dark": "Dark"
+        }
+    },
+    "search": {
+        "open": "Search Open",
+        "close": "Search Close",
+        "placeholder": "Search",
+        "placeholderai": "Try Search: cat",
+        "option": {
+            "semantic": "AI Search",
+            "filename": "Filname Search"
         }
     },
     "sidebar": {

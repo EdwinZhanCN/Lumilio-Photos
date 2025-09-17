@@ -7,6 +7,8 @@ toolchain go1.24.5
 require (
 	github.com/cloudwego/eino v0.4.7
 	github.com/cloudwego/eino-ext/components/model/ark v0.1.27
+	github.com/cloudwego/eino-ext/components/model/deepseek v0.0.0-20250905035413-86dbae6351d5
+	github.com/cloudwego/eino-ext/components/model/openai v0.0.0-20250905035413-86dbae6351d5
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.17.1
@@ -28,8 +30,6 @@ require (
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/cloudwego/eino-ext/components/model/deepseek v0.0.0-20250905035413-86dbae6351d5 // indirect
-	github.com/cloudwego/eino-ext/components/model/openai v0.0.0-20250905035413-86dbae6351d5 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.0.0-20250826113018-8c6f6358d4bb // indirect
 	github.com/cohesion-org/deepseek-go v1.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

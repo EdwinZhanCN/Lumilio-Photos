@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useExtractExifdata } from "@/hooks/util-hooks/useExtractExifdata";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { getAssetService } from "@/services/getAssetsService";
+import { assetService } from "@/services/assetsService";
 import { AxiosError } from "axios";
 import { ExifDataDisplay } from "@/features/studio/components/panels/ExifDataDisplay.tsx";
 import {
@@ -90,7 +90,7 @@ const FullScreenInfo = ({ asset }: FullScreenInfoProps) => {
       }
 
       // Fetch the file using the service method for proper auth handling
-      const response = await getAssetService.getOriginalFile(asset.asset_id);
+      const response = await assetService.getOriginalFile(asset.asset_id);
       const blob = response.data;
       const file = new File([blob], asset.original_filename || "image", {
         type: asset.mime_type || "image/jpeg",
@@ -147,14 +147,14 @@ const FullScreenInfo = ({ asset }: FullScreenInfoProps) => {
   }, [exifData]);
 
   return (
-    <div className="absolute top-12 right-0 bottom-0 w-96 bg-base-100/80 p-4 overflow-y-auto z-10 animate-fade-in-x">
+    <div className="absolute top-14 right-0 bottom-0 w-96 bg-base-100/80 p-4 overflow-y-auto z-10 animate-fade-in-x">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-bold">
           {t("assets.photos.fullscreen.info.title", {
             defaultValue: "Metadata",
           })}
           <span className="badge badge-ghost badge-sm ml-2 align-middle">
-            {asset.type || t("common.na", { defaultValue: "N/A" })}
+            {asset.mime_type || t("common.na", { defaultValue: "N/A" })}
           </span>
         </h2>
         <button
@@ -379,7 +379,7 @@ const FullScreenInfo = ({ asset }: FullScreenInfoProps) => {
               })}
             </div>
             <div className="text-xs flex-1 break-words whitespace-normal text-right">
-              {asset.type || t("common.na", { defaultValue: "N/A" })}
+              {asset.mime_type || t("common.na", { defaultValue: "N/A" })}
             </div>
           </div>
           <div className="flex justify-between py-2 px-3 hover:bg-base-200/40 transition-colors">

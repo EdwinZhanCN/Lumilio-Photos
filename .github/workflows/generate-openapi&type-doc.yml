@@ -26,7 +26,7 @@ jobs:
               run: go install github.com/swaggo/swag/cmd/swag@latest
 
             - name: Generate OpenAPI Spec
-              run: ~/go/bin/swag init -g server/cmd/main.go -o server/docs
+              run: ~/go/bin/swag init -g server/cmd/main.go -o server/docs/
 
             - name: Setup Node.js
               uses: actions/setup-node@v4

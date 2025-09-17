@@ -1,0 +1,447 @@
+{
+  "filter_examples": {
+    "basic_photo_filter": {
+      "description": "基础照片过滤 - 获取所有5星评分的照片",
+      "endpoint": "POST /api/v1/assets/filter",
+      "request": {
+        "filter": {
+          "type": "PHOTO",
+          "rating": 5
+        },
+        "limit": 20,
+        "offset": 0
+      }
+    },
+    "raw_photos_filter": {
+      "description": "RAW格式过滤 - 获取Canon拍摄的RAW格式照片",
+      "endpoint": "POST /api/v1/assets/filter",
+      "request": {
+        "filter": {
+          "type": "PHOTO",
+          "raw": true,
+          "camera_make": "Canon"
+        },
+        "limit": 50,
+        "offset": 0
+      }
+    },
+    "liked_videos_filter": {
+      "description": "喜欢的视频过滤 - 获取所有已点赞的高评分视频",
+      "endpoint": "POST /api/v1/assets/filter",
+      "request": {
+        "filter": {
+          "type": "VIDEO",
+          "liked": true,
+          "rating": 4
+        },
+        "limit": 30,
+        "offset": 0
+      }
+    },
+    "filename_pattern_filter": {
+      "description": "文件名模式过滤 - 获取以DSC开头的照片",
+      "endpoint": "POST /api/v1/assets/filter",
+      "request": {
+        "filter": {
+          "type": "PHOTO",
+          "filename": {
+            "value": "DSC",
+            "mode": "startswith"
+          }
+        },
+        "limit": 20,
+        "offset": 0
+      }
+    },
+    "date_range_filter": {
+      "description": "日期范围过滤 - 获取2024年夏季的照片",
+      "endpoint": "POST /api/v1/assets/filter",
+      "request": {
+        "filter": {
+          "type": "PHOTO",
+          "date": {
+            "from": "2024-06-01T00:00:00Z",
+            "to": "2024-08-31T23:59:59Z"
+          }
+        },
+        "limit": 100,
+        "offset": 0
+      }
+    },
+    "complex_filter": {
+      "description": "复杂组合过滤 - 获取Canon 50mm镜头拍摄的5星RAW照片",
+      "endpoint": "POST /api/v1/assets/filter",
+      "request": {
+        "filter": {
+          "type": "PHOTO",
+          "rating": 5,
+          "raw": true,
+          "camera_make": "Canon",
+          "lens": "EF 50mm f/1.8",
+          "date": {
+            "from": "2024-01-01T00:00:00Z"
+          }
+        },
+        "limit": 20,
+        "offset": 0
+      }
+    },
+    "unrated_filter": {
+      "description": "未评分过滤 - 获取所有未评分的照片",
+      "endpoint": "POST /api/v1/assets/filter",
+      "request": {
+        "filter": {
+          "type": "PHOTO",
+          "rating": 0
+        },
+        "limit": 50,
+        "offset": 0
+      }
+    }
+  },
+  "search_examples": {
+    "filename_search_basic": {
+      "description": "基础文件名搜索 - 在文件名中搜索'sunset'",
+      "endpoint": "POST /api/v1/assets/search",
+      "request": {
+        "query": "sunset",
+        "search_type": "filename",
+        "limit": 20,
+        "offset": 0
+      }
+    },
+    "filename_search_with_filter": {
+      "description": "文件名搜索 + 过滤 - 搜索包含'vacation'的5星照片",
+      "endpoint": "POST /api/v1/assets/search",
+      "request": {
+        "query": "vacation",
+        "search_type": "filename",
+        "filter": {
+          "type": "PHOTO",
+          "rating": 5,
+          "liked": true
+        },
+        "limit": 15,
+        "offset": 0
+      }
+    },
+    "semantic_search_basic": {
+      "description": "基础语义搜索 - 搜索'红色鸟儿在树枝上'",
+      "endpoint": "POST /api/v1/assets/search",
+      "request": {
+        "query": "red bird on a branch",
+        "search_type": "semantic",
+        "limit": 10,
+        "offset": 0
+      }
+    },
+    "semantic_search_nature": {
+      "description": "自然场景语义搜索 - 搜索自然风光照片",
+      "endpoint": "POST /api/v1/assets/search",
+      "request": {
+        "query": "beautiful landscape with mountains and lake",
+        "search_type": "semantic",
+        "filter": {
+          "type": "PHOTO",
+          "rating": 4
+        },
+        "limit": 25,
+        "offset": 0
+      }
+    },
+    "semantic_search_animals": {
+      "description": "动物语义搜索 - 搜索野生动物照片",
+      "endpoint": "POST /api/v1/assets/search",
+      "request": {
+        "query": "wildlife animals in nature safari",
+        "search_type": "semantic",
+        "filter": {
+          "type": "PHOTO",
+          "liked": true,
+          "camera_make": "Canon"
+        },
+        "limit": 30,
+        "offset": 0
+      }
+    },
+    "semantic_search_portrait": {
+      "description": "人像语义搜索 - 搜索人像摄影作品",
+      "endpoint": "POST /api/v1/assets/search",
+      "request": {
+        "query": "portrait photography person face",
+        "search_type": "semantic",
+        "filter": {
+          "type": "PHOTO",
+          "rating": 5,
+          "lens": "EF 85mm f/1.8"
+        },
+        "limit": 20,
+        "offset": 0
+      }
+    },
+    "semantic_search_architecture": {
+      "description": "建筑语义搜索 - 搜索建筑摄影",
+      "endpoint": "POST /api/v1/assets/search",
+      "request": {
+        "query": "architecture building urban city skyline",
+        "search_type": "semantic",
+        "filter": {
+          "type": "PHOTO",
+          "date": {
+            "from": "2024-01-01T00:00:00Z",
+            "to": "2024-12-31T23:59:59Z"
+          }
+        },
+        "limit": 40,
+        "offset": 0
+      }
+    },
+    "filename_search_complex": {
+      "description": "复杂文件名搜索 - 搜索包含'wedding'的JPEG照片",
+      "endpoint": "POST /api/v1/assets/search",
+      "request": {
+        "query": "wedding",
+        "search_type": "filename",
+        "filter": {
+          "type": "PHOTO",
+          "filename": {
+            "value": ".jpg",
+            "mode": "endswith"
+          },
+          "date": {
+            "from": "2024-05-01T00:00:00Z",
+            "to": "2024-10-31T23:59:59Z"
+          }
+        },
+        "limit": 50,
+        "offset": 0
+      }
+    }
+  },
+  "filter_options_example": {
+    "get_options": {
+      "description": "获取过滤选项 - 获取所有可用的相机品牌和镜头",
+      "endpoint": "GET /api/v1/assets/filter-options",
+      "request": {},
+      "expected_response": {
+        "code": 0,
+        "message": "success",
+        "data": {
+          "camera_makes": [
+            "Canon",
+            "Nikon",
+            "Sony",
+            "Fujifilm",
+            "Olympus",
+            "Panasonic",
+            "Pentax"
+          ],
+          "lenses": [
+            "EF 50mm f/1.8",
+            "AF-S DX 18-55mm f/3.5-5.6G",
+            "FE 24-70mm F2.8 GM",
+            "XF 56mm f/1.2 R",
+            "M.Zuiko 25mm f/1.8"
+          ]
+        }
+      }
+    }
+  },
+  "pagination_examples": {
+    "first_page": {
+      "description": "第一页数据",
+      "request": {
+        "filter": {
+          "type": "PHOTO"
+        },
+        "limit": 20,
+        "offset": 0
+      }
+    },
+    "second_page": {
+      "description": "第二页数据",
+      "request": {
+        "filter": {
+          "type": "PHOTO"
+        },
+        "limit": 20,
+        "offset": 20
+      }
+    },
+    "large_page": {
+      "description": "大页面（最大限制）",
+      "request": {
+        "filter": {
+          "type": "PHOTO"
+        },
+        "limit": 100,
+        "offset": 0
+      }
+    }
+  },
+  "error_examples": {
+    "invalid_search_type": {
+      "description": "错误示例 - 无效的搜索类型",
+      "endpoint": "POST /api/v1/assets/search",
+      "request": {
+        "query": "test",
+        "search_type": "invalid_type",
+        "limit": 10
+      },
+      "expected_error": {
+        "code": 400,
+        "message": "Invalid request parameters",
+        "error": "search_type must be 'filename' or 'semantic'"
+      }
+    },
+    "missing_query": {
+      "description": "错误示例 - 缺少查询参数",
+      "endpoint": "POST /api/v1/assets/search",
+      "request": {
+        "search_type": "filename",
+        "limit": 10
+      },
+      "expected_error": {
+        "code": 400,
+        "message": "Invalid request data",
+        "error": "Key: 'SearchAssetsRequest.Query' Error:Field validation for 'Query' failed on the 'required' tag"
+      }
+    },
+    "invalid_rating": {
+      "description": "错误示例 - 无效的评分值",
+      "endpoint": "POST /api/v1/assets/filter",
+      "request": {
+        "filter": {
+          "rating": 10
+        },
+        "limit": 20
+      },
+      "expected_error": {
+        "code": 400,
+        "message": "Invalid request data",
+        "error": "rating must be between 0 and 5"
+      }
+    },
+    "exceeds_limit": {
+      "description": "错误示例 - 超过限制的页面大小",
+      "endpoint": "POST /api/v1/assets/filter",
+      "request": {
+        "filter": {
+          "type": "PHOTO"
+        },
+        "limit": 200
+      },
+      "note": "系统会自动调整为最大允许值100"
+    }
+  },
+  "use_cases": {
+    "photographer_workflow": {
+      "description": "摄影师工作流程 - 查找需要后期处理的RAW文件",
+      "steps": [
+        {
+          "step": 1,
+          "action": "获取所有未评分的RAW文件",
+          "endpoint": "POST /api/v1/assets/filter",
+          "request": {
+            "filter": {
+              "type": "PHOTO",
+              "raw": true,
+              "rating": 0
+            },
+            "limit": 50
+          }
+        },
+        {
+          "step": 2,
+          "action": "在特定日期范围内搜索风景照片",
+          "endpoint": "POST /api/v1/assets/search",
+          "request": {
+            "query": "landscape nature mountains",
+            "search_type": "semantic",
+            "filter": {
+              "type": "PHOTO",
+              "raw": true,
+              "date": {
+                "from": "2024-09-01T00:00:00Z",
+                "to": "2024-09-30T23:59:59Z"
+              }
+            },
+            "limit": 30
+          }
+        }
+      ]
+    },
+    "client_portfolio_selection": {
+      "description": "客户作品集选择 - 为客户筛选最佳照片",
+      "steps": [
+        {
+          "step": 1,
+          "action": "获取所有5星评分的已点赞照片",
+          "endpoint": "POST /api/v1/assets/filter",
+          "request": {
+            "filter": {
+              "type": "PHOTO",
+              "rating": 5,
+              "liked": true
+            },
+            "limit": 100
+          }
+        },
+        {
+          "step": 2,
+          "action": "在高质量照片中搜索人像作品",
+          "endpoint": "POST /api/v1/assets/search",
+          "request": {
+            "query": "portrait people face wedding",
+            "search_type": "semantic",
+            "filter": {
+              "rating": 5,
+              "liked": true
+            },
+            "limit": 50
+          }
+        }
+      ]
+    },
+    "equipment_analysis": {
+      "description": "器材分析 - 分析不同设备的拍摄效果",
+      "steps": [
+        {
+          "step": 1,
+          "action": "获取所有可用的相机品牌和镜头",
+          "endpoint": "GET /api/v1/assets/filter-options"
+        },
+        {
+          "step": 2,
+          "action": "比较Canon和Nikon的高评分作品",
+          "endpoints": [
+            {
+              "camera": "Canon",
+              "endpoint": "POST /api/v1/assets/filter",
+              "request": {
+                "filter": {
+                  "type": "PHOTO",
+                  "camera_make": "Canon",
+                  "rating": 5
+                },
+                "limit": 50
+              }
+            },
+            {
+              "camera": "Nikon",
+              "endpoint": "POST /api/v1/assets/filter",
+              "request": {
+                "filter": {
+                  "type": "PHOTO",
+                  "camera_make": "Nikon",
+                  "rating": 5
+                },
+                "limit": 50
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

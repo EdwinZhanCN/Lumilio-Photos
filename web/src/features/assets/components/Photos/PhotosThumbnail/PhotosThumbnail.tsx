@@ -1,4 +1,4 @@
-import { getAssetService } from "@/services/getAssetsService";
+import { assetService } from "@/services/assetsService";
 
 interface PhotosThumbnailProps {
   asset: Asset;
@@ -7,7 +7,7 @@ interface PhotosThumbnailProps {
 
 const PhotosThumbnail = ({ asset, openCarousel }: PhotosThumbnailProps) => {
   const thumbnailUrl = asset.asset_id
-    ? getAssetService.getThumbnailUrl(asset.asset_id, "small")
+    ? assetService.getThumbnailUrl(asset.asset_id, "small")
     : undefined;
 
   const containerClasses = [
@@ -36,7 +36,9 @@ const PhotosThumbnail = ({ asset, openCarousel }: PhotosThumbnailProps) => {
         <div className="bg-base-300 flex items-center justify-center text-base-content/50 h-40">
           <div className="text-center">
             <div className="text-xs">No Preview</div>
-            <div className="text-xs opacity-60">{asset.type}</div>
+            <div className="text-xs opacity-60">
+              {asset.mime_type || "Unknown MIME"}
+            </div>
           </div>
         </div>
       )}
