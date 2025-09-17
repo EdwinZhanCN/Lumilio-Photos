@@ -25,6 +25,7 @@ type Querier interface {
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteTag(ctx context.Context, tagID int32) error
 	DeleteUser(ctx context.Context, userID int32) error
+	FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]Asset, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error)
 	GetAlbumByID(ctx context.Context, albumID int32) (Album, error)
@@ -39,6 +40,8 @@ type Querier interface {
 	GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerParams) ([]Asset, error)
 	GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams) ([]Asset, error)
 	GetAssetsWithEmbeddings(ctx context.Context, arg GetAssetsWithEmbeddingsParams) ([]GetAssetsWithEmbeddingsRow, error)
+	GetDistinctCameraMakes(ctx context.Context) ([]interface{}, error)
+	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]SpeciesPrediction, error)
 	GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeciesPredictionsByLabelParams) ([]SpeciesPrediction, error)
@@ -58,6 +61,8 @@ type Querier interface {
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
+	SearchAssetsFilename(ctx context.Context, arg SearchAssetsFilenameParams) ([]Asset, error)
+	SearchAssetsVector(ctx context.Context, arg SearchAssetsVectorParams) ([]SearchAssetsVectorRow, error)
 	SearchNearestAssets(ctx context.Context, arg SearchNearestAssetsParams) ([]SearchNearestAssetsRow, error)
 	UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)

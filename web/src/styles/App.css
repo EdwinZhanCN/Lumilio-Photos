@@ -98,3 +98,81 @@
 .animate-fade-in-x {
     animation: fadeInX 0.3s ease-in-out;
 }
+
+/* Search button active / animation styles */
+.search-btn {
+    transition:
+        transform 0.16s ease,
+        background-color 0.16s ease,
+        box-shadow 0.16s ease;
+    will-change: transform;
+}
+
+.search-btn.btn-active {
+    transform: scale(0.96);
+}
+
+/* Container that wraps the toggle + input — animation only, do not override component sizing */
+.search-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    opacity: 0;
+    transform: translateX(-6px);
+    transition:
+        opacity 0.24s ease,
+        transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Visible state fades and slides in */
+.search-controls.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Hidden state */
+.search-controls.hidden {
+    opacity: 0;
+    transform: translateX(-6px);
+}
+
+/* Input: animation only. Do not set widths or layout that conflict with component classes */
+.search-input {
+    opacity: 0;
+    transform: translateX(-4px);
+    transition:
+        opacity 0.24s ease,
+        transform 0.28s ease;
+}
+
+/* When visible, reveal input without forcing size */
+.search-controls.visible .search-input {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Styling for the toggle SVGs: only transition and subtle scale on checked (no color overrides) */
+label.toggle svg {
+    transition: transform 0.22s ease;
+}
+label.toggle input:checked + svg,
+label.toggle input:checked ~ svg {
+    transform: scale(1.06);
+}
+
+/* Toggle's shape and layout are provided by the existing component classes; no layout overrides here */
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-fade-in-x,
+    .animate-fade-in-y,
+    .animate-fade-out,
+    .animate-fade-out-x,
+    .search-controls,
+    .search-input,
+    .search-btn {
+        transition: none !important;
+        animation: none !important;
+    }
+}
