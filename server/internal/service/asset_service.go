@@ -62,6 +62,13 @@ type AssetService interface {
 	SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *repo.Asset, size string) error
 	SaveNewEmbedding(ctx context.Context, pgUUID pgtype.UUID, embedding []float32) error
 	SaveNewSpeciesPredictions(ctx context.Context, pgUUID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
+
+	// New filtering and search methods
+	FilterAssets(ctx context.Context, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
+	SearchAssetsFilename(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
+	SearchAssetsVector(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
+	GetDistinctCameraMakes(ctx context.Context) ([]string, error)
+	GetDistinctLenses(ctx context.Context) ([]string, error)
 }
 
 type assetService struct {
@@ -556,7 +563,7 @@ func (s *assetService) SaveNewSpeciesPredictions(ctx context.Context, pgUUID pgt
 }
 
 // ================================
-// Helper Functions
+// Helper functions
 // ================================
 
 func (s *assetService) GetOrCreateTagByName(ctx context.Context, name, category string, isAIGenerated bool) (*repo.Tag, error) {
@@ -615,4 +622,189 @@ func intPtrFromInt32Ptr(i32 *int32) *int {
 	}
 	i := int(*i32)
 	return &i
+}
+
+// ================================
+// New filtering and search methods
+// ================================
+
+func (s *assetService) FilterAssets(ctx context.Context, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
+	// Convert rating pointer for SQL
+	var ratingPtr *int32
+	if rating != nil {
+		r := int32(*rating)
+		ratingPtr = &r
+	}
+
+	// Convert dates to pgtype.Timestamptz
+	var fromTime, toTime pgtype.Timestamptz
+	if dateFrom != nil {
+		fromTime = pgtype.Timestamptz{Time: *dateFrom, Valid: true}
+	}
+	if dateTo != nil {
+		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
+	}
+
+	return s.queries.FilterAssets(ctx, repo.FilterAssetsParams{
+		AssetType:    assetType,
+		OwnerID:      ownerID,
+		FilenameVal:  filenameVal,
+		FilenameMode: filenameMode,
+		DateFrom:     fromTime,
+		DateTo:       toTime,
+		IsRaw:        isRaw,
+		Rating:       ratingPtr,
+		Liked:        liked,
+		CameraModel:  cameraMake,
+		LensModel:    lens,
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+	})
+}
+
+func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
+	// Convert rating pointer for SQL
+	var ratingPtr *int32
+	if rating != nil {
+		r := int32(*rating)
+		ratingPtr = &r
+	}
+
+	// Convert dates to pgtype.Timestamptz
+	var fromTime, toTime pgtype.Timestamptz
+	if dateFrom != nil {
+		fromTime = pgtype.Timestamptz{Time: *dateFrom, Valid: true}
+	}
+	if dateTo != nil {
+		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
+	}
+
+	return s.queries.SearchAssetsFilename(ctx, repo.SearchAssetsFilenameParams{
+		Query:        &query,
+		AssetType:    assetType,
+		OwnerID:      ownerID,
+		FilenameVal:  filenameVal,
+		FilenameMode: filenameMode,
+		DateFrom:     fromTime,
+		DateTo:       toTime,
+		IsRaw:        isRaw,
+		Rating:       ratingPtr,
+		Liked:        liked,
+		CameraModel:  cameraMake,
+		LensModel:    lens,
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+	})
+}
+
+func (s *assetService) SearchAssetsVector(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
+	if s.ml == nil {
+		return nil, fmt.Errorf("ML service not available for semantic search")
+	}
+
+	// Get query embedding
+	embeddingResult, err := s.ml.ClipEmbed(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get query embedding: %w", err)
+	}
+
+	// Convert rating pointer for SQL
+	var ratingPtr *int32
+	if rating != nil {
+		r := int32(*rating)
+		ratingPtr = &r
+	}
+
+	// Convert dates to pgtype.Timestamptz
+	var fromTime, toTime pgtype.Timestamptz
+	if dateFrom != nil {
+		fromTime = pgtype.Timestamptz{Time: *dateFrom, Valid: true}
+	}
+	if dateTo != nil {
+		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
+	}
+
+	// Convert embedding to pgvector format
+	pgEmbeddingFloat32 := make([]float32, len(embeddingResult.Vector))
+	for i, v := range embeddingResult.Vector {
+		pgEmbeddingFloat32[i] = float32(v)
+	}
+	pgEmbedding := pgvector_go.NewVector(pgEmbeddingFloat32)
+
+	results, err := s.queries.SearchAssetsVector(ctx, repo.SearchAssetsVectorParams{
+		Embedding:    pgEmbedding,
+		AssetType:    assetType,
+		OwnerID:      ownerID,
+		FilenameVal:  filenameVal,
+		FilenameMode: filenameMode,
+		DateFrom:     fromTime,
+		DateTo:       toTime,
+		IsRaw:        isRaw,
+		Rating:       ratingPtr,
+		Liked:        liked,
+		CameraModel:  cameraMake,
+		LensModel:    lens,
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to search assets with vector: %w", err)
+	}
+
+	// Extract assets from results (ignore distance for now)
+	assets := make([]repo.Asset, len(results))
+	for i, result := range results {
+		assets[i] = repo.Asset{
+			AssetID:          result.AssetID,
+			OwnerID:          result.OwnerID,
+			Type:             result.Type,
+			OriginalFilename: result.OriginalFilename,
+			StoragePath:      result.StoragePath,
+			MimeType:         result.MimeType,
+			FileSize:         result.FileSize,
+			Hash:             result.Hash,
+			Width:            result.Width,
+			Height:           result.Height,
+			Duration:         result.Duration,
+			UploadTime:       result.UploadTime,
+			IsDeleted:        result.IsDeleted,
+			DeletedAt:        result.DeletedAt,
+			SpecificMetadata: result.SpecificMetadata,
+			Embedding:        result.Embedding,
+		}
+	}
+
+	return assets, nil
+}
+
+func (s *assetService) GetDistinctCameraMakes(ctx context.Context) ([]string, error) {
+	rows, err := s.queries.GetDistinctCameraMakes(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get distinct camera makes: %w", err)
+	}
+
+	makes := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if str, ok := row.(string); ok && str != "" {
+			makes = append(makes, str)
+		}
+	}
+
+	return makes, nil
+}
+
+func (s *assetService) GetDistinctLenses(ctx context.Context) ([]string, error) {
+	rows, err := s.queries.GetDistinctLenses(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get distinct lenses: %w", err)
+	}
+
+	lenses := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if str, ok := row.(string); ok && str != "" {
+			lenses = append(lenses, str)
+		}
+	}
+
+	return lenses, nil
 }

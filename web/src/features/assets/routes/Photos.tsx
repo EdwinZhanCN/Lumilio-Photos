@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import { useInView } from "react-intersection-observer";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import PhotosToolBar from "@/features/assets/components/Photos/PhotosToolBar/PhotosToolBar";
 import PhotosMasonry from "@/features/assets/components/Photos/PhotosMasonry/PhotosMasonry";
 import FullScreenCarousel from "@/features/assets/components/Photos/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import PhotosLoadingSkeleton from "@/features/assets/components/Photos/PhotosLoadingSkeleton";
 import { useAssetsContext } from "../hooks/useAssetsContext";
-import { useAssetsPageState } from "@/features/assets/hooks/useAssetsPageState";
+import {
+  useAssetsPageContext,
+  useAssetsPageNavigation,
+} from "@/features/assets";
 import {
   groupAssets,
   getFlatAssetsFromGrouped,
@@ -15,8 +18,6 @@ import {
 
 function Photos() {
   const { assetId } = useParams<{ assetId: string }>();
-  const navigate = useNavigate();
-  const location = useLocation();
   const {
     assets: allAssets,
     error,
@@ -24,35 +25,15 @@ function Photos() {
     isLoadingNextPage: isFetchingNextPage,
     fetchNextPage,
     hasMore: hasNextPage,
-    setSearchQuery: setContextSearchQuery,
   } = useAssetsContext();
 
-  const {
-    isCarouselOpen,
-    groupBy,
-    sortOrder,
-    searchQuery,
-    openCarousel,
-    closeCarousel,
-    setGroupBy,
-    setSortOrder,
-    setSearchQuery,
-  } = useAssetsPageState();
+  const { state, dispatch } = useAssetsPageContext();
+  const { openCarousel, closeCarousel } = useAssetsPageNavigation();
+  const { isCarouselOpen, groupBy, searchQuery } = state;
 
   const { ref, inView } = useInView({
     threshold: 0.5,
   });
-
-  const isInitialMount = useRef(true);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    const handler = setTimeout(() => setContextSearchQuery(searchQuery), 300);
-    return () => clearTimeout(handler);
-  }, [searchQuery, setContextSearchQuery]);
 
   useEffect(() => {
     if (inView && hasNextPage && !isFetchingNextPage) {
@@ -61,8 +42,8 @@ function Photos() {
   }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const groupedPhotos = useMemo(
-    () => groupAssets(allAssets, groupBy, sortOrder),
-    [allAssets, groupBy, sortOrder],
+    () => groupAssets(allAssets, groupBy),
+    [allAssets, groupBy],
   );
 
   const flatAssets = useMemo(
@@ -75,32 +56,19 @@ function Photos() {
     return findAssetIndex(flatAssets, assetId);
   }, [flatAssets, assetId]);
 
-  const handleCarouselNavigation = (newAssetId: string) => {
-    // Determine current path base (photos, videos, or audios)
-    const path = location.pathname;
-    if (path.includes("/videos")) {
-      navigate(`/assets/videos/${newAssetId}`);
-    } else if (path.includes("/audios")) {
-      navigate(`/assets/audios/${newAssetId}`);
-    } else {
-      // Default to photos
-      navigate(`/assets/photos/${newAssetId}`);
-    }
-  };
-
   if (error) {
     throw new Error(error);
   }
 
   return (
-    <div className="p-4 w-full mx-auto">
+    <div>
       <PhotosToolBar
         groupBy={groupBy}
-        sortOrder={sortOrder}
         searchQuery={searchQuery}
-        onGroupByChange={setGroupBy}
-        onSortOrderChange={setSortOrder}
-        onSearchQueryChange={setSearchQuery}
+        onGroupByChange={(v) => dispatch({ type: "SET_GROUP_BY", payload: v })}
+        onSearchQueryChange={(q) =>
+          dispatch({ type: "SET_SEARCH_QUERY", payload: q })
+        }
         onShowExifData={() => {}}
       />
 
@@ -130,7 +98,7 @@ function Photos() {
           photos={flatAssets}
           initialSlide={currentAssetIndex}
           onClose={closeCarousel}
-          onNavigate={handleCarouselNavigation}
+          onNavigate={openCarousel}
         />
       )}
     </div>

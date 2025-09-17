@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import { useInView } from "react-intersection-observer";
 import PhotosLoadingSkeleton from "@/features/assets/components/Photos/PhotosLoadingSkeleton";
 import { useAssetsContext } from "../hooks/useAssetsContext";
-import { useAssetsPageState } from "@/features/assets/hooks/useAssetsPageState";
+import { useAssetsPageContext } from "@/features/assets";
 import { groupAssets } from "@/lib/utils/assetGrouping.ts";
 
 function Videos() {
@@ -13,25 +13,14 @@ function Videos() {
     isLoadingNextPage: isFetchingNextPage,
     fetchNextPage,
     hasMore: hasNextPage,
-    setSearchQuery: setContextSearchQuery,
   } = useAssetsContext();
 
-  const { groupBy, sortOrder, searchQuery } = useAssetsPageState();
+  const { state } = useAssetsPageContext();
+  const { groupBy } = state;
 
   const { ref, inView } = useInView({
     threshold: 0.5,
   });
-
-  const isInitialMount = useRef(true);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    const handler = setTimeout(() => setContextSearchQuery(searchQuery), 300);
-    return () => clearTimeout(handler);
-  }, [searchQuery, setContextSearchQuery]);
 
   useEffect(() => {
     if (inView && hasNextPage && !isFetchingNextPage) {
@@ -41,13 +30,16 @@ function Videos() {
 
   // Filter only video assets
   const videoAssets = useMemo(
-    () => allAssets.filter((asset: Asset) => asset.type === "VIDEO"),
+    () =>
+      allAssets.filter((asset: Asset) =>
+        (asset.mime_type || "").startsWith("video/"),
+      ),
     [allAssets],
   );
 
   const groupedVideos = useMemo(
-    () => groupAssets(videoAssets, groupBy, sortOrder),
-    [videoAssets, groupBy, sortOrder],
+    () => groupAssets(videoAssets, groupBy),
+    [videoAssets, groupBy],
   );
 
   if (error) {

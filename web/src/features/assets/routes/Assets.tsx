@@ -6,16 +6,27 @@ import Videos from "./Videos";
 import { AssetsProvider } from "../AssetsProvider";
 import { ErrorBoundary } from "react-error-boundary";
 import AssetTabs from "@/features/assets/components/AssetTabs";
-import { useAssetsPageState } from "@/features/assets/hooks/useAssetsPageState";
+import { AssetsPageProvider, useAssetsPageContext } from "@/features/assets";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import ErrorFallBack from "@/components/ErrorFallBack";
+
+const AssetsContent = ({ activeTab }: { activeTab: string }) => {
+  const { state } = useAssetsPageContext();
+  const { isCarouselOpen } = state;
+
+  return (
+    <WorkerProvider preload={["exif", "export"]}>
+      {activeTab === "photos" && <Photos />}
+      {activeTab === "videos" && <Videos />}
+      {activeTab === "audios" && <Audios />}
+      <AssetTabs isCarouselOpen={isCarouselOpen} />
+    </WorkerProvider>
+  );
+};
 
 const Assets = () => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("photos");
-
-  // Get carousel state from the assets page state hook
-  const { isCarouselOpen } = useAssetsPageState();
 
   // Determine active tab based on URL path
   useEffect(() => {
@@ -37,16 +48,9 @@ const Assets = () => {
       )}
     >
       <AssetsProvider>
-        <WorkerProvider preload={["exif", "export"]}>
-          <div className="p-4 w-full mx-auto mb-20">
-            <div className="pt-4">
-              {activeTab === "photos" && <Photos />}
-              {activeTab === "videos" && <Videos />}
-              {activeTab === "audios" && <Audios />}
-            </div>
-          </div>
-          <AssetTabs isCarouselOpen={isCarouselOpen} />
-        </WorkerProvider>
+        <AssetsPageProvider>
+          <AssetsContent activeTab={activeTab} />
+        </AssetsPageProvider>
       </AssetsProvider>
     </ErrorBoundary>
   );

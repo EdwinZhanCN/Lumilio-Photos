@@ -72,6 +72,16 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
+	// Parse FocalLength
+	for _, field := range []string{"FocalLength", "FocalLengthIn35mmFilm", "FocalLengthIn35mmFormat"} {
+		if focalLength, exists := rawData[field]; exists {
+			if val, err := strconv.ParseFloat(focalLength, 32); err == nil {
+				metadata.FocalLength = float32(val)
+				break
+			}
+		}
+	}
+
 	// Parse GPS Latitude
 	if lat, exists := rawData["GPSLatitude"]; exists {
 		if val, err := parseGPSCoordinate(lat); err == nil {

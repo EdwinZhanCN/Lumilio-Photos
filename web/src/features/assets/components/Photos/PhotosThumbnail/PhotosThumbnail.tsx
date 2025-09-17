@@ -36,7 +36,9 @@ const PhotosThumbnail = ({ asset, openCarousel }: PhotosThumbnailProps) => {
         <div className="bg-base-300 flex items-center justify-center text-base-content/50 h-40">
           <div className="text-center">
             <div className="text-xs">No Preview</div>
-            <div className="text-xs opacity-60">{asset.type}</div>
+            <div className="text-xs opacity-60">
+              {asset.mime_type || "Unknown MIME"}
+            </div>
           </div>
         </div>
       )}
