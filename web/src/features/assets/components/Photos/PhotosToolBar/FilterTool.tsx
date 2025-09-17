@@ -1,5 +1,6 @@
 import { ListFilterIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { assetService } from "@/services/assetsService";
 
 /* =========================
    Types
@@ -114,34 +115,20 @@ function useFilterOptions({
         let cm: string[] = cameraMakeOptions ?? [];
         let ln: string[] = lensOptions ?? [];
 
-        if (cm.length === 0) {
-          if (fetchCameraMakes) {
+        if (cm.length === 0 || ln.length === 0) {
+          if (fetchCameraMakes && fetchLenses) {
             cm = await fetchCameraMakes();
-          } else {
-            const res = await fetch("/api/camera-makes");
-            if (res.ok) {
-              const json = await res.json();
-              cm = Array.isArray(json)
-                ? json
-                : Array.isArray(json?.items)
-                  ? json.items
-                  : [];
-            }
-          }
-        }
-
-        if (ln.length === 0) {
-          if (fetchLenses) {
             ln = await fetchLenses();
           } else {
-            const res = await fetch("/api/lenses");
-            if (res.ok) {
-              const json = await res.json();
-              ln = Array.isArray(json)
-                ? json
-                : Array.isArray(json?.items)
-                  ? json.items
-                  : [];
+            // Use the new filter options API
+            const response = await assetService.getFilterOptions();
+            if (response.data.code === 0 && response.data.data) {
+              if (cm.length === 0) {
+                cm = response.data.data.camera_makes || [];
+              }
+              if (ln.length === 0) {
+                ln = response.data.data.lenses || [];
+              }
             }
           }
         }
@@ -986,7 +973,7 @@ export default function FilterTool({
 
   return (
     <div
-      className={`dropdown dropdown-end ${open ? "dropdown-open" : ""}`}
+      className={`dropdown dropdown-start ${open ? "dropdown-open" : ""}`}
       ref={rootRef}
     >
       <button

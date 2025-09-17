@@ -126,19 +126,93 @@ func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, in
 		return nil, fmt.Errorf("invalid UUID: %w", err)
 	}
 
+	// 1) Full relations (thumbnails + tags + albums)
+	if includeThumbnails && includeTags && includeAlbums {
+		dbAsset, err := s.queries.GetAssetWithRelations(ctx, pgUUID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get asset with relations: %w", err)
+		}
+		return dbAsset, nil
+	}
+
+	// 2) Thumbnails + Tags (albums not requested) -> still use relations query (albums will be empty in SQL)
 	if includeThumbnails && includeTags {
 		dbAsset, err := s.queries.GetAssetWithRelations(ctx, pgUUID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get asset with relations: %w", err)
 		}
 		return dbAsset, nil
-	} else if includeThumbnails {
+	}
+
+	// 3) Any case where albums are requested (but not both thumbnails & tags simultaneously handled above)
+	//    Manually compose result to avoid creating many specialized SQL queries.
+	if includeAlbums {
+		asset, err := s.queries.GetAssetByID(ctx, pgUUID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get asset: %w", err)
+		}
+
+		// Thumbnails (optional)
+		var thumbnails interface{} = []interface{}{}
+		if includeThumbnails {
+			tList, err := s.queries.GetThumbnailsByAsset(ctx, pgUUID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get thumbnails: %w", err)
+			}
+			thumbnails = tList
+		}
+
+		// Tags (optional)
+		var tags interface{} = []interface{}{}
+		if includeTags {
+			tagsRow, err := s.queries.GetAssetWithTags(ctx, pgUUID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get tags: %w", err)
+			}
+			tags = tagsRow.Tags
+		}
+
+		// Albums
+		albums, err := s.queries.GetAssetAlbums(ctx, pgUUID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get asset albums: %w", err)
+		}
+
+		result := map[string]interface{}{
+			"asset_id":          asset.AssetID,
+			"owner_id":          asset.OwnerID,
+			"type":              asset.Type,
+			"original_filename": asset.OriginalFilename,
+			"storage_path":      asset.StoragePath,
+			"mime_type":         asset.MimeType,
+			"file_size":         asset.FileSize,
+			"hash":              asset.Hash,
+			"width":             asset.Width,
+			"height":            asset.Height,
+			"duration":          asset.Duration,
+			"upload_time":       asset.UploadTime,
+			"is_deleted":        asset.IsDeleted,
+			"deleted_at":        asset.DeletedAt,
+			"specific_metadata": asset.SpecificMetadata,
+			"embedding":         asset.Embedding,
+			"thumbnails":        thumbnails,
+			"tags":              tags,
+			"albums":            albums,
+		}
+		return result, nil
+	}
+
+	// 4) Only thumbnails
+	if includeThumbnails {
 		dbAsset, err := s.queries.GetAssetWithThumbnails(ctx, pgUUID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get asset with thumbnails: %w", err)
 		}
 		return dbAsset, nil
-	} else if includeTags {
+	}
+
+	// 5) Only tags
+	if includeTags {
 		dbAsset, err := s.queries.GetAssetWithTags(ctx, pgUUID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get asset with tags: %w", err)
@@ -146,6 +220,7 @@ func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, in
 		return dbAsset, nil
 	}
 
+	// 6) Plain asset
 	return s.GetAsset(ctx, id)
 }
 

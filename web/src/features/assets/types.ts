@@ -1,4 +1,8 @@
-import { ListAssetsParams } from "@/services/getAssetsService";
+import {
+  ListAssetsParams,
+  SearchAssetsParams,
+  AssetFilter,
+} from "@/services/assetsService";
 
 /**
  * **Assets State Interface**
@@ -175,6 +179,70 @@ export interface AssetsActions {
    * ```
    */
   resetFilters: () => void;
+
+  /**
+   * **Perform Advanced Search Function**
+   *
+   * Execute advanced search using either filename matching or semantic vector search.
+   * Can be combined with comprehensive filters.
+   *
+   * @param params - Search parameters including query, search type, and optional filters
+   *
+   * @example
+   * ```tsx
+   * // Semantic search with filters
+   * await performAdvancedSearch({
+   *   query: "red bird on branch",
+   *   search_type: "semantic",
+   *   filter: { type: "PHOTO", rating: 5 },
+   *   limit: 20
+   * });
+   * ```
+   */
+  performAdvancedSearch: (params: SearchAssetsParams) => void;
+
+  /**
+   * **Apply Advanced Filter Function**
+   *
+   * Apply comprehensive filtering options including RAW, rating, liked status,
+   * filename patterns, date ranges, camera make, and lens.
+   *
+   * @param filter - Advanced filter criteria
+   *
+   * @example
+   * ```tsx
+   * // Filter by camera and rating
+   * await applyAdvancedFilter({
+   *   camera_make: "Canon",
+   *   rating: 5,
+   *   raw: true,
+   *   date: { from: "2024-01-01", to: "2024-01-31" }
+   * });
+   * ```
+   */
+  applyAdvancedFilter: (filter: AssetFilter) => void;
+
+  /**
+   * **Clear Search Function**
+   *
+   * Clears the current search context (both simple filename search and advanced semantic search),
+   * reverting the data layer back to the plain list (or filtered list if an advanced filter
+   * is still active).
+   *
+   * Typical trigger: user collapses / deactivates the Search UI button.
+   *
+   * @example
+   * ```tsx
+   * const { clearSearch } = useAssetsContext();
+   *
+   * function SearchToggle({ active }: { active: boolean }) {
+   *   useEffect(() => {
+   *     if (!active) clearSearch();
+   *   }, [active, clearSearch]);
+   * }
+   * ```
+   */
+  clearSearch: () => void;
 }
 
 /**

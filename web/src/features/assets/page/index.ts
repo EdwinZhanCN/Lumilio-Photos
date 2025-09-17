@@ -15,3 +15,8 @@ export {
   initialAssetsPageState,
   DEFAULT_SEARCH_QUERY,
 } from "./reducers/main.reducer";
+export {
+  filterReducer,
+  FILTER_INITIAL_STATE,
+  filterSelectors,
+} from "./reducers/filter.reducer";

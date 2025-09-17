@@ -59,7 +59,7 @@ function Videos() {
       </div>
 
       {isFetching && allAssets.length === 0 ? (
-        <PhotosLoadingSkeleton count={12} />
+        <PhotosLoadingSkeleton />
       ) : (
         <div className="space-y-4">
           {Object.keys(groupedVideos).map((groupKey) => (

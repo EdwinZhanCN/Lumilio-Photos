@@ -87,10 +87,16 @@ export function AssetsPageProvider({ children }: AssetsPageProviderProps) {
   // Keep isCarouselOpen in sync with the presence of :assetId param
   useEffect(() => {
     const open = !!params.assetId;
+    console.log("AssetsPageProvider: assetId param changed", {
+      assetId: params.assetId,
+      open,
+      currentIsCarouselOpen: state.isCarouselOpen,
+    });
     if (open !== state.isCarouselOpen) {
+      console.log("AssetsPageProvider: dispatching SET_CAROUSEL_OPEN", open);
       dispatch({ type: "SET_CAROUSEL_OPEN", payload: open });
     }
-  }, [params.assetId]);
+  }, [params.assetId, state.isCarouselOpen]);
 
   // Two-way sync: When URL query changes externally, hydrate state
   useEffect(() => {
@@ -176,6 +182,7 @@ export function useAssetsPageNavigation() {
 
   const open = React.useCallback(
     (assetId: string) => {
+      console.log("useAssetsPageNavigation.open called with assetId:", assetId);
       const currentParams = new URLSearchParams(searchParams);
       const path = location.pathname;
 
@@ -183,12 +190,15 @@ export function useAssetsPageNavigation() {
       if (path.includes("/videos")) basePath = "/assets/videos";
       else if (path.includes("/audios")) basePath = "/assets/audios";
 
-      navigate(`${basePath}/${assetId}?${currentParams.toString()}`);
+      const targetUrl = `${basePath}/${assetId}?${currentParams.toString()}`;
+      console.log("Navigating to:", targetUrl);
+      navigate(targetUrl);
     },
     [location.pathname, navigate, searchParams],
   );
 
   const close = React.useCallback(() => {
+    console.log("useAssetsPageNavigation.close called");
     const currentParams = new URLSearchParams(searchParams);
     const path = location.pathname;
 
@@ -196,7 +206,9 @@ export function useAssetsPageNavigation() {
     if (path.includes("/videos")) basePath = "/assets/videos";
     else if (path.includes("/audios")) basePath = "/assets/audios";
 
-    navigate(`${basePath}?${currentParams.toString()}`);
+    const targetUrl = `${basePath}?${currentParams.toString()}`;
+    console.log("Closing carousel, navigating to:", targetUrl);
+    navigate(targetUrl);
   }, [location.pathname, navigate, searchParams]);
 
   return { openCarousel: open, closeCarousel: close };

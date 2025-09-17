@@ -8,7 +8,7 @@ import "@/styles/custom-swiper.css";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
-import { getAssetService } from "@/services/getAssetsService";
+import { assetService } from "@/services/assetsService";
 
 interface FullScreenCarouselProps {
   photos: Asset[];
@@ -30,7 +30,7 @@ const FullScreenCarousel = ({
   const slides = useMemo(() => {
     return photos.map((photo) => {
       const largeImageUrl = photo.asset_id
-        ? getAssetService.getThumbnailUrl(photo.asset_id, "large")
+        ? assetService.getThumbnailUrl(photo.asset_id, "large")
         : undefined;
       return {
         src: largeImageUrl || "",

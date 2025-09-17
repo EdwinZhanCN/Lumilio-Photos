@@ -1,4 +1,4 @@
-import { getAssetService } from "@/services/getAssetsService";
+import { assetService } from "@/services/assetsService";
 
 interface PhotosThumbnailProps {
   asset: Asset;
@@ -7,7 +7,7 @@ interface PhotosThumbnailProps {
 
 const PhotosThumbnail = ({ asset, openCarousel }: PhotosThumbnailProps) => {
   const thumbnailUrl = asset.asset_id
-    ? getAssetService.getThumbnailUrl(asset.asset_id, "small")
+    ? assetService.getThumbnailUrl(asset.asset_id, "small")
     : undefined;
 
   const containerClasses = [

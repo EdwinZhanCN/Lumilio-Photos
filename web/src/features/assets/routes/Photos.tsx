@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { useInView } from "react-intersection-observer";
 import { useParams } from "react-router-dom";
 import PhotosToolBar from "@/features/assets/components/Photos/PhotosToolBar/PhotosToolBar";
@@ -15,6 +15,7 @@ import {
   getFlatAssetsFromGrouped,
   findAssetIndex,
 } from "@/lib/utils/assetGrouping.ts";
+import { FilterDTO } from "@/features/assets/components/Photos/PhotosToolBar/FilterTool";
 
 function Photos() {
   const { assetId } = useParams<{ assetId: string }>();
@@ -29,7 +30,12 @@ function Photos() {
 
   const { state, dispatch } = useAssetsPageContext();
   const { openCarousel, closeCarousel } = useAssetsPageNavigation();
-  const { isCarouselOpen, groupBy, searchQuery } = state;
+  const { isCarouselOpen, groupBy } = state;
+
+  const handleFiltersChange = useCallback((filters: FilterDTO) => {
+    // Filters are handled in PhotosToolBar and passed to AssetsContext
+    console.log("Filters changed:", filters);
+  }, []);
 
   const { ref, inView } = useInView({
     threshold: 0.5,
@@ -52,9 +58,24 @@ function Photos() {
   );
 
   const currentAssetIndex = useMemo(() => {
-    if (!assetId || flatAssets.length === 0) return -1;
-    return findAssetIndex(flatAssets, assetId);
+    if (!assetId || flatAssets.length === 0) {
+      console.log("currentAssetIndex: -1 (no assetId or empty flatAssets)");
+      return -1;
+    }
+    const index = findAssetIndex(flatAssets, assetId);
+    console.log("currentAssetIndex:", index, "for assetId:", assetId);
+    return index;
   }, [flatAssets, assetId]);
+
+  // Debug logging
+  console.log("Photos Debug:", {
+    assetId,
+    isCarouselOpen,
+    allAssetsCount: allAssets.length,
+    flatAssetsCount: flatAssets.length,
+    currentAssetIndex,
+    groupBy,
+  });
 
   if (error) {
     throw new Error(error);
@@ -64,20 +85,20 @@ function Photos() {
     <div>
       <PhotosToolBar
         groupBy={groupBy}
-        searchQuery={searchQuery}
         onGroupByChange={(v) => dispatch({ type: "SET_GROUP_BY", payload: v })}
-        onSearchQueryChange={(q) =>
-          dispatch({ type: "SET_SEARCH_QUERY", payload: q })
-        }
         onShowExifData={() => {}}
+        onFiltersChange={handleFiltersChange}
       />
 
       {isFetching && allAssets.length === 0 ? (
-        <PhotosLoadingSkeleton count={12} />
+        <PhotosLoadingSkeleton />
       ) : (
         <PhotosMasonry
           groupedPhotos={groupedPhotos}
-          openCarousel={openCarousel}
+          openCarousel={(id: string) => {
+            console.log("PhotosMasonry openCarousel clicked with id:", id);
+            openCarousel(id);
+          }}
         />
       )}
 
@@ -93,12 +114,18 @@ function Photos() {
         <div className="text-center p-4 text-gray-500">End of results.</div>
       )}
 
-      {isCarouselOpen && currentAssetIndex !== -1 && flatAssets.length > 0 && (
+      {isCarouselOpen && flatAssets.length > 0 && (
         <FullScreenCarousel
           photos={flatAssets}
-          initialSlide={currentAssetIndex}
-          onClose={closeCarousel}
-          onNavigate={openCarousel}
+          initialSlide={currentAssetIndex >= 0 ? currentAssetIndex : 0}
+          onClose={() => {
+            console.log("FullScreenCarousel onClose called");
+            closeCarousel();
+          }}
+          onNavigate={(id: string) => {
+            console.log("FullScreenCarousel onNavigate called with id:", id);
+            openCarousel(id);
+          }}
         />
       )}
     </div>
