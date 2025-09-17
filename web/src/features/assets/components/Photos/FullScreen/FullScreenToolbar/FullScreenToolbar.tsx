@@ -14,7 +14,7 @@ import {
   useExportImage,
   ExportOptions,
 } from "@/hooks/util-hooks/useExportImage.tsx";
-import { getAssetService } from "@/services/getAssetsService";
+import { assetService } from "@/services/assetsService";
 import { EllipsisHorizontalIcon } from "@heroicons/react/24/solid";
 
 interface FullScreenToolbarProps {
@@ -85,7 +85,7 @@ const FullScreenToolbar = ({
       if (!currentAsset?.asset_id) {
         throw new Error("Asset ID is missing.");
       }
-      url = getAssetService.getOriginalFileUrl(currentAsset.asset_id);
+      url = assetService.getOriginalFileUrl(currentAsset.asset_id);
       if (!url) {
         throw new Error("Failed to get original file URL.");
       }

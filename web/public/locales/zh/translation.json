@@ -18,18 +18,19 @@
         "na": "无"
     },
     "navbar": {
-        "search": {
-            "placeholder": "搜索",
-            "option": {
-                "name": "名称",
-                "tag": "标签",
-                "date": "日期",
-                "type": "文件类型"
-            }
-        },
         "theme": {
             "light": "浅色",
             "dark": "深色"
+        }
+    },
+    "search": {
+        "open": "搜索开启",
+        "close": "搜索关闭",
+        "placeholder": "搜索",
+        "placeholderai": "搜索：一只猫",
+        "option": {
+            "semantic": "智能搜索",
+            "filename": "文件名搜索"
         }
     },
     "sidebar": {

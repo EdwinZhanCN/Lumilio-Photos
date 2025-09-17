@@ -5,6 +5,71 @@ import { AxiosRequestConfig, AxiosResponse } from "axios";
 import { ApiResult } from "./uploadService";
 
 /**
+ * @interface SearchAssetsParams
+ * @description Parameters for searching assets with filename or semantic search
+ */
+export interface SearchAssetsParams {
+  query: string;
+  search_type: "filename" | "semantic";
+  filter?: AssetFilter;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * @interface AssetFilter
+ * @description Filter criteria for assets
+ */
+export interface AssetFilter {
+  type?: "PHOTO" | "VIDEO" | "AUDIO";
+  owner_id?: number;
+  raw?: boolean;
+  rating?: number;
+  liked?: boolean;
+  filename?: FilenameFilter;
+  date?: DateRange;
+  camera_make?: string;
+  lens?: string;
+}
+
+/**
+ * @interface FilenameFilter
+ * @description Filename filtering options
+ */
+export interface FilenameFilter {
+  mode: "contains" | "matches" | "startswith" | "endswith";
+  value: string;
+}
+
+/**
+ * @interface DateRange
+ * @description Date range filter
+ */
+export interface DateRange {
+  from?: string;
+  to?: string;
+}
+
+/**
+ * @interface FilterAssetsParams
+ * @description Parameters for filtering assets
+ */
+export interface FilterAssetsParams {
+  filter: AssetFilter;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * @interface FilterOptionsResponse
+ * @description Available filter options
+ */
+export interface FilterOptionsResponse {
+  camera_makes: string[];
+  lenses: string[];
+}
+
+/**
  * @interface AssetListResponse
  * @description The structure of the data object within the API response for listing assets.
  */
@@ -39,7 +104,7 @@ export interface ListAssetsParams {
  * @service AssetService
  * @description A collection of functions for interacting with the asset-related API endpoints.
  */
-export const getAssetService = {
+export const assetService = {
   /**
    * Fetches a paginated and filterable list of assets from the server.
    * @param {ListAssetsParams} params - An object containing query parameters for filtering and pagination.
@@ -117,6 +182,54 @@ export const getAssetService = {
    */
   getAssetTypes: async (): Promise<AxiosResponse<ApiResult<string[]>>> => {
     return api.get<ApiResult<string[]>>(`/api/v1/assets/types`);
+  },
+
+  /**
+   * Filter assets using comprehensive filtering options.
+   * @param {FilterAssetsParams} params - Filter criteria and pagination
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration
+   * @returns {Promise<AxiosResponse<ApiResult<AssetListResponse>>>} A promise that resolves to the filtered assets
+   */
+  filterAssets: async (
+    params: FilterAssetsParams,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<AssetListResponse>>> => {
+    return api.post<ApiResult<AssetListResponse>>(
+      "/api/v1/assets/filter",
+      params,
+      config,
+    );
+  },
+
+  /**
+   * Search assets using filename or semantic search.
+   * @param {SearchAssetsParams} params - Search parameters
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration
+   * @returns {Promise<AxiosResponse<ApiResult<AssetListResponse>>>} A promise that resolves to the search results
+   */
+  searchAssets: async (
+    params: SearchAssetsParams,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<AssetListResponse>>> => {
+    return api.post<ApiResult<AssetListResponse>>(
+      "/api/v1/assets/search",
+      params,
+      config,
+    );
+  },
+
+  /**
+   * Get available filter options (camera makes and lenses).
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration
+   * @returns {Promise<AxiosResponse<ApiResult<FilterOptionsResponse>>>} A promise that resolves to available filter options
+   */
+  getFilterOptions: async (
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<FilterOptionsResponse>>> => {
+    return api.get<ApiResult<FilterOptionsResponse>>(
+      "/api/v1/assets/filter-options",
+      config,
+    );
   },
 
   /**

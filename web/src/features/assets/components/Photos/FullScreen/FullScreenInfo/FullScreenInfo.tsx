@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useExtractExifdata } from "@/hooks/util-hooks/useExtractExifdata";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { getAssetService } from "@/services/getAssetsService";
+import { assetService } from "@/services/assetsService";
 import { AxiosError } from "axios";
 import { ExifDataDisplay } from "@/features/studio/components/panels/ExifDataDisplay.tsx";
 import {
@@ -90,7 +90,7 @@ const FullScreenInfo = ({ asset }: FullScreenInfoProps) => {
       }
 
       // Fetch the file using the service method for proper auth handling
-      const response = await getAssetService.getOriginalFile(asset.asset_id);
+      const response = await assetService.getOriginalFile(asset.asset_id);
       const blob = response.data;
       const file = new File([blob], asset.original_filename || "image", {
         type: asset.mime_type || "image/jpeg",

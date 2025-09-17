@@ -74,7 +74,7 @@ type AssetDTO struct {
 	UploadTime       time.Time                `json:"upload_time"`
 	IsDeleted        *bool                    `json:"is_deleted"`
 	DeletedAt        *time.Time               `json:"deleted_at,omitempty"`
-	Metadata         dbtypes.SpecificMetadata `json:"specific_metadata"`
+	Metadata         dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object"`
 }
 
 // toAssetDTO maps repo.Asset to AssetDTO
@@ -113,7 +113,7 @@ func toAssetDTO(a repo.Asset) AssetDTO {
 
 // UpdateAssetRequest represents the request structure for updating asset metadata
 type UpdateAssetRequest struct {
-	Metadata dbtypes.SpecificMetadata `json:"metadata"`
+	Metadata dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object"`
 }
 
 // MessageResponse represents a simple message response
