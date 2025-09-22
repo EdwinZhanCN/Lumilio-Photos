@@ -9,6 +9,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { assetService } from "@/services/assetsService";
+import FullScreenBasicInfo from "../FullScreenInfo/FullScreenBasicInfo";
 
 interface FullScreenCarouselProps {
   photos: Asset[];
@@ -71,6 +72,7 @@ const FullScreenCarousel = ({
       >
         <XMarkIcon className="w-6 h-6" />
       </button>
+      <FullScreenBasicInfo />
       <Swiper
         ref={swiperRef}
         modules={[Virtual, Navigation, Pagination]}

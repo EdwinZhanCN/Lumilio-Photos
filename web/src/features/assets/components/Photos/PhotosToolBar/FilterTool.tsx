@@ -1008,13 +1008,6 @@ export default function FilterTool({
                 onChange={(e) => setFilterEnabled(e.target.checked)}
               />
             </label>
-            <button
-              type="button"
-              className="btn btn-ghost btn-xs"
-              onClick={() => setOpen(false)}
-            >
-              Close
-            </button>
           </div>
         </div>
 

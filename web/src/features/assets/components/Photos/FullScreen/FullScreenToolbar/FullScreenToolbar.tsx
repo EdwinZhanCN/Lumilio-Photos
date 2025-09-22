@@ -16,6 +16,7 @@ import {
 } from "@/hooks/util-hooks/useExportImage.tsx";
 import { assetService } from "@/services/assetsService";
 import { EllipsisHorizontalIcon } from "@heroicons/react/24/solid";
+import { Ellipsis, HeartPlus, Info, Share, Trash2 } from "lucide-react";
 
 interface FullScreenToolbarProps {
   onToggleInfo: () => void;
@@ -358,6 +359,32 @@ const FullScreenToolbar = ({
           </div>
         </div>
       )}
+
+      <div className="fab fab-flower">
+        {/* a focusable div with tabIndex is necessary to work on all browsers. role="button" is necessary for accessibility */}
+        <div tabIndex={0} role="button" className="btn btn-circle btn-lg">
+          <Ellipsis />
+        </div>
+
+        {/* Main Action button replaces the original button when FAB is open */}
+        <div className="fab-close">
+          <span className="btn btn-circle btn-lg btn-error">✕</span>
+        </div>
+
+        {/* buttons that show up when FAB is open */}
+        <button className="btn btn-circle btn-lg">
+          <Info />
+        </button>
+        <button className="btn btn-circle btn-lg">
+          <HeartPlus />
+        </button>
+        <button className="btn btn-circle btn-lg">
+          <Share />
+        </button>
+        <button className="btn btn-circle btn-lg text-error">
+          <Trash2 />
+        </button>
+      </div>
     </>
   );
 };
