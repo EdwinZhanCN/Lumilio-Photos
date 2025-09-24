@@ -22,6 +22,7 @@ function loadPersisted(): SettingsState {
           ...initialState.ui,
           ...parsed.ui,
           language: parsed.ui?.language ?? getCurrentLanguage(),
+          region: parsed.ui?.region ?? "other",
         },
       };
     }
@@ -33,6 +34,7 @@ function loadPersisted(): SettingsState {
     ui: {
       ...initialState.ui,
       language: getCurrentLanguage(),
+      region: "other",
     },
   };
 }

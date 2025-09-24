@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useCallback, useState } from "react";
 import { useInView } from "react-intersection-observer";
 import { useParams } from "react-router-dom";
 import PhotosToolBar from "@/features/assets/components/Photos/PhotosToolBar/PhotosToolBar";
@@ -28,6 +28,11 @@ function Photos() {
     hasMore: hasNextPage,
   } = useAssetsContext();
 
+  // Local state to track asset updates
+  const [updatedAssets, setUpdatedAssets] = useState<Map<string, Asset>>(
+    new Map(),
+  );
+
   const { state, dispatch } = useAssetsPageContext();
   const { openCarousel, closeCarousel } = useAssetsPageNavigation();
   const { isCarouselOpen, groupBy } = state;
@@ -52,10 +57,16 @@ function Photos() {
     [allAssets, groupBy],
   );
 
-  const flatAssets = useMemo(
-    () => getFlatAssetsFromGrouped(groupedPhotos),
-    [groupedPhotos],
-  );
+  const flatAssets = useMemo(() => {
+    const baseAssets = getFlatAssetsFromGrouped(groupedPhotos);
+    // Apply any local updates to assets
+    return baseAssets.map((asset) => {
+      const updated = asset.asset_id
+        ? updatedAssets.get(asset.asset_id)
+        : undefined;
+      return updated || asset;
+    });
+  }, [groupedPhotos, updatedAssets]);
 
   const currentAssetIndex = useMemo(() => {
     if (!assetId || flatAssets.length === 0) {
@@ -80,6 +91,27 @@ function Photos() {
   if (error) {
     throw new Error(error);
   }
+
+  const handleAssetUpdate = useCallback((updatedAsset: Asset) => {
+    if (updatedAsset.asset_id) {
+      setUpdatedAssets(
+        (prev) => new Map(prev.set(updatedAsset.asset_id!, updatedAsset)),
+      );
+    }
+  }, []);
+
+  const handleAssetDelete = useCallback((deletedAssetId: string) => {
+    // Remove from updated assets map if it exists there
+    setUpdatedAssets((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(deletedAssetId);
+      return newMap;
+    });
+
+    // Note: The actual removal from the main assets list would typically
+    // require a context method or refetch. For now, the deleted asset
+    // will be filtered out naturally when the user navigates away and back.
+  }, []);
 
   return (
     <div>
@@ -126,6 +158,8 @@ function Photos() {
             console.log("FullScreenCarousel onNavigate called with id:", id);
             openCarousel(id);
           }}
+          onAssetUpdate={handleAssetUpdate}
+          onAssetDelete={handleAssetDelete}
         />
       )}
     </div>

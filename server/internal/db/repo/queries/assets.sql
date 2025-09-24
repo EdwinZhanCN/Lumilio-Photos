@@ -211,3 +211,57 @@ WHERE a.is_deleted = false
   AND a.specific_metadata->>'lens_model' IS NOT NULL
   AND a.specific_metadata->>'lens_model' != ''
 ORDER BY lens_model;
+
+-- name: UpdateAssetRating :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    COALESCE(specific_metadata, '{}'::jsonb),
+    '{rating}',
+    to_jsonb(sqlc.arg('rating')::integer)
+)
+WHERE asset_id = sqlc.arg('asset_id');
+
+-- name: UpdateAssetLike :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    COALESCE(specific_metadata, '{}'::jsonb),
+    '{liked}',
+    to_jsonb(sqlc.arg('liked')::boolean)
+)
+WHERE asset_id = sqlc.arg('asset_id');
+
+-- name: UpdateAssetRatingAndLike :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    jsonb_set(
+        COALESCE(specific_metadata, '{}'::jsonb),
+        '{rating}',
+        to_jsonb(sqlc.arg('rating')::integer)
+    ),
+    '{liked}',
+    to_jsonb(sqlc.arg('liked')::boolean)
+)
+WHERE asset_id = sqlc.arg('asset_id');
+
+-- name: UpdateAssetDescription :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    COALESCE(specific_metadata, '{}'::jsonb),
+    '{description}',
+    to_jsonb(sqlc.arg('description')::text)
+)
+WHERE asset_id = sqlc.arg('asset_id');
+
+-- name: GetAssetsByRating :many
+SELECT * FROM assets
+WHERE is_deleted = false
+  AND (specific_metadata->>'rating')::integer = sqlc.arg('rating')::integer
+ORDER BY upload_time DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: GetLikedAssets :many
+SELECT * FROM assets
+WHERE is_deleted = false
+  AND (specific_metadata->>'liked')::boolean = true
+ORDER BY upload_time DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');

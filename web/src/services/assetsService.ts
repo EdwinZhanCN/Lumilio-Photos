@@ -88,6 +88,39 @@ interface MessageResponse {
 }
 
 /**
+ * @interface UpdateRatingRequest
+ * @description Request body for updating asset rating
+ */
+export interface UpdateRatingRequest {
+  rating: number; // 0-5
+}
+
+/**
+ * @interface UpdateLikeRequest
+ * @description Request body for updating asset like status
+ */
+export interface UpdateLikeRequest {
+  liked: boolean;
+}
+
+/**
+ * @interface UpdateRatingAndLikeRequest
+ * @description Request body for updating both rating and like status
+ */
+export interface UpdateRatingAndLikeRequest {
+  rating: number; // 0-5
+  liked: boolean;
+}
+
+/**
+ * @interface UpdateDescriptionRequest
+ * @description Request body for updating asset description
+ */
+export interface UpdateDescriptionRequest {
+  description: string;
+}
+
+/**
  * @interface ListAssetsParams
  * @description Defines the shape of the query parameters object for the listAssets function.
  * All properties are optional, allowing for flexible filtering.
@@ -272,5 +305,87 @@ export const assetService = {
   getThumbnailUrl: (id: string, size: string = "small"): string => {
     const baseURL = api.defaults.baseURL || "http://localhost:8080";
     return `${baseURL}/api/v1/assets/${id}/thumbnail?size=${size}`;
+  },
+
+  /**
+   * Updates the rating of a specific asset.
+   * @param {string} id - The UUID of the asset.
+   * @param {number} rating - The rating (0-5).
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
+   * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
+   */
+  updateAssetRating: async (
+    id: string,
+    rating: number,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<MessageResponse>>> => {
+    const payload: UpdateRatingRequest = { rating };
+    return api.put<ApiResult<MessageResponse>>(
+      `/api/v1/assets/${id}/rating`,
+      payload,
+      config,
+    );
+  },
+
+  /**
+   * Updates the like status of a specific asset.
+   * @param {string} id - The UUID of the asset.
+   * @param {boolean} liked - The like status.
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
+   * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
+   */
+  updateAssetLike: async (
+    id: string,
+    liked: boolean,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<MessageResponse>>> => {
+    const payload: UpdateLikeRequest = { liked };
+    return api.put<ApiResult<MessageResponse>>(
+      `/api/v1/assets/${id}/like`,
+      payload,
+      config,
+    );
+  },
+
+  /**
+   * Updates both the rating and like status of a specific asset.
+   * @param {string} id - The UUID of the asset.
+   * @param {number} rating - The rating (0-5).
+   * @param {boolean} liked - The like status.
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
+   * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
+   */
+  updateAssetRatingAndLike: async (
+    id: string,
+    rating: number,
+    liked: boolean,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<MessageResponse>>> => {
+    const payload: UpdateRatingAndLikeRequest = { rating, liked };
+    return api.put<ApiResult<MessageResponse>>(
+      `/api/v1/assets/${id}/rating-and-like`,
+      payload,
+      config,
+    );
+  },
+
+  /**
+   * Updates the description of a specific asset.
+   * @param {string} id - The UUID of the asset.
+   * @param {string} description - The new description text.
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
+   * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
+   */
+  updateAssetDescription: async (
+    id: string,
+    description: string,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<MessageResponse>>> => {
+    const payload: UpdateDescriptionRequest = { description };
+    return api.put<ApiResult<MessageResponse>>(
+      `/api/v1/assets/${id}/description`,
+      payload,
+      config,
+    );
   },
 };

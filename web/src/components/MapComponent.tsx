@@ -1,69 +1,283 @@
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L, { LatLngExpression, LatLngTuple } from 'leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L, { LatLngExpression, LatLngTuple, DivIcon } from "leaflet";
+import { useSettingsContext } from "@/features/settings";
+import { useI18n } from "@/lib/i18n.tsx";
+import { useEffect, useState } from "react";
+import { assetService } from "@/services/assetsService";
+import { convertCoordinatesForMap } from "@/lib/utils/mapUtils";
 
-// 修复 Leaflet 默认图标问题
-// 这里要先删除 _getIconUrl，再为 Icon.Default 添加 mergeOptions
+// Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-errorå
+// @ts-expect-error
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
 });
 
-// 定义照片位置信息的类型
-type PhotoLocation = {
-  id: number;
+// Photo location data type
+export type PhotoLocation = {
+  id: string;
   position: LatLngExpression;
   title: string;
-  description: string;
+  description?: string;
+  thumbnailUrl?: string;
+  asset?: Asset;
 };
 
-// 组件接收的属性类型
+// Map component props
 interface MapComponentProps {
   photoLocations?: PhotoLocation[];
+  center?: LatLngTuple;
+  zoom?: number;
+  height?: string | number;
+  className?: string;
+  showSinglePhoto?: boolean; // For single photo display (basic info view)
 }
 
-function MapComponent({ photoLocations = [] }: MapComponentProps) {
-  // 如果没有照片位置数据，使用默认位置（北京）
-  const defaultCenter: LatLngTuple = [39.9042, 116.4074];
-  const defaultZoom = 5;
+// Create custom photo marker icon
+const createPhotoMarkerIcon = (
+  thumbnailUrl?: string,
+  size: number = 40,
+): DivIcon => {
+  return L.divIcon({
+    html: `
+      <div class="photo-marker" style="
+        width: ${size}px;
+        height: ${size}px;
+        border-radius: 8px;
+        border: 3px solid #ffffff;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        overflow: hidden;
+        background: #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      ">
+        ${
+          thumbnailUrl
+            ? `<img src="${thumbnailUrl}" alt="Photo" style="
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            "/>`
+            : `<div style="
+              width: 100%;
+              height: 100%;
+              background: linear-gradient(45deg, #3498db, #2980b9);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              font-size: ${size * 0.4}px;
+            ">📷</div>`
+        }
+      </div>
+    `,
+    className: "photo-marker-container",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+    popupAnchor: [0, -size],
+  });
+};
 
-  // 示例照片位置数据
-  const sampleLocations: PhotoLocation[] = [
-    { id: 1, position: [39.9042, 116.4074], title: '北京', description: '天安门广场' },
-    { id: 2, position: [31.2304, 121.4737], title: '上海', description: '外滩' },
-    { id: 3, position: [22.5431, 114.0579], title: '深圳', description: '深圳湾' },
-    { id: 4, position: [30.5728, 104.0668], title: '成都', description: '锦里古街' },
-  ];
+// Map tile layer configurations
+const mapConfigs = {
+  china: {
+    url: "https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}",
+    attribution: '&copy; <a href="https://ditu.amap.com/">高德地图</a>',
+    subdomains: ["1", "2", "3", "4"],
+    maxZoom: 18,
+  },
+  other: {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    subdomains: ["a", "b", "c"],
+    maxZoom: 19,
+  },
+};
 
-  // 如果有传入的地点就用传入的，否则用示例数据
-  const locations = photoLocations.length > 0 ? photoLocations : sampleLocations;
+function MapComponent({
+  photoLocations = [],
+  center,
+  zoom = 10,
+  height = "400px",
+  className = "",
+  showSinglePhoto = false,
+}: MapComponentProps) {
+  const { state } = useSettingsContext();
+  const { t } = useI18n();
+  const [mapKey, setMapKey] = useState(0);
+
+  // Determine which map provider to use based on region setting
+  const region = state.ui.region || "other";
+  const mapConfig = mapConfigs[region];
+  const isChina = region === "china";
+
+  // Convert photo locations coordinates for the appropriate map system
+  const convertedPhotoLocations = photoLocations.map((location) => {
+    const position = location.position as [number, number];
+    const converted = convertCoordinatesForMap(
+      position[1], // longitude
+      position[0], // latitude
+      isChina,
+    );
+    return {
+      ...location,
+      position: [converted.latitude, converted.longitude] as LatLngTuple,
+    };
+  });
+
+  // Default center based on region with coordinate conversion
+  const getDefaultCenter = (): LatLngTuple => {
+    if (center) {
+      const converted = convertCoordinatesForMap(center[1], center[0], isChina);
+      return [converted.latitude, converted.longitude];
+    }
+    return isChina ? [39.9042, 116.4074] : [51.505, -0.09]; // Beijing or London
+  };
+
+  // Force map re-render when region changes
+  useEffect(() => {
+    setMapKey((prev) => prev + 1);
+  }, [region]);
+
+  // Calculate map bounds if multiple photos
+  const getMapBounds = () => {
+    if (convertedPhotoLocations.length === 0) return undefined;
+    if (convertedPhotoLocations.length === 1) return undefined;
+
+    const bounds = L.latLngBounds(
+      convertedPhotoLocations.map(
+        (location) => location.position as LatLngTuple,
+      ),
+    );
+    return bounds;
+  };
+
+  // Get appropriate zoom level
+  const getZoomLevel = () => {
+    if (showSinglePhoto) return 15;
+    if (convertedPhotoLocations.length <= 1) return zoom;
+    return undefined; // Let fitBounds determine zoom
+  };
+
+  // Get map center
+  const getMapCenter = (): LatLngTuple => {
+    if (convertedPhotoLocations.length === 1) {
+      return convertedPhotoLocations[0].position as LatLngTuple;
+    }
+    return getDefaultCenter();
+  };
 
   return (
+    <div className={`map-container ${className}`} style={{ height }}>
+      <style>{`
+        .photo-marker-container .photo-marker:hover {
+          transform: scale(1.1);
+        }
+        .leaflet-container {
+          border-radius: 8px;
+        }
+        .leaflet-popup-content {
+          margin: 8px 12px;
+          line-height: 1.4;
+        }
+        .leaflet-popup-content h3 {
+          margin: 0 0 8px 0;
+          font-size: 16px;
+          font-weight: 600;
+        }
+        .leaflet-popup-content p {
+          margin: 0;
+          color: #666;
+          font-size: 14px;
+        }
+        .photo-popup-image {
+          width: 120px;
+          height: 80px;
+          object-fit: cover;
+          border-radius: 4px;
+          margin-bottom: 8px;
+        }
+      `}</style>
+
       <MapContainer
-          center={defaultCenter}
-          zoom={defaultZoom}
-          style={{ height: '100%', width: '100%' }}
+        key={mapKey}
+        center={getMapCenter()}
+        zoom={getZoomLevel()}
+        bounds={getMapBounds()}
+        boundsOptions={{ padding: [20, 20] }}
+        style={{ height: "100%", width: "100%" }}
+        zoomControl={true}
+        scrollWheelZoom={true}
       >
         <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={mapConfig.attribution}
+          url={mapConfig.url}
+          subdomains={mapConfig.subdomains}
+          maxZoom={mapConfig.maxZoom}
         />
 
-        {locations.map((location) => (
-            <Marker key={location.id} position={location.position}>
+        {convertedPhotoLocations.map((location) => {
+          const thumbnailUrl = location.asset?.asset_id
+            ? assetService.getThumbnailUrl(location.asset.asset_id, "small")
+            : undefined;
+          const markerSize = showSinglePhoto ? 50 : 40;
+
+          return (
+            <Marker
+              key={location.id}
+              position={location.position}
+              icon={createPhotoMarkerIcon(
+                location.thumbnailUrl || thumbnailUrl,
+                markerSize,
+              )}
+            >
               <Popup>
-                <div>
-                  <h3 className="font-bold">{location.title}</h3>
-                  <p>{location.description}</p>
+                <div className="photo-popup">
+                  {(location.thumbnailUrl || thumbnailUrl) && (
+                    <img
+                      src={location.thumbnailUrl || thumbnailUrl}
+                      alt={location.title}
+                      className="photo-popup-image"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                      }}
+                    />
+                  )}
+                  <h3>{location.title}</h3>
+                  {location.description && <p>{location.description}</p>}
+                  {location.asset && (
+                    <div className="text-xs text-gray-500 mt-2">
+                      {location.asset.original_filename}
+                      {location.asset.upload_time && (
+                        <div>
+                          {t("common.uploaded", {
+                            defaultValue: "Uploaded",
+                          })}
+                          :{" "}
+                          {new Date(
+                            location.asset.upload_time,
+                          ).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </Popup>
             </Marker>
-        ))}
+          );
+        })}
       </MapContainer>
+    </div>
   );
 }
 
