@@ -10,6 +10,8 @@ import MapComponent from "@/components/MapComponent";
 import { assetToPhotoLocation } from "@/lib/utils/mapUtils";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
+import { useSettingsContext } from "@/features/settings";
+import { geoService } from "@/services/geoService";
 
 interface FullScreenBasicInfoProps {
   asset?: Asset;
@@ -23,9 +25,12 @@ export default function FullScreenBasicInfo({
   const [detailedExif, setDetailedExif] = useState<any>(null);
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [locationName, setLocationName] = useState<string>("");
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const showMessage = useMessage();
   const { isExtracting, exifData, extractExifData } = useExtractExifdata();
   const { t } = useI18n();
+  const { state: settings } = useSettingsContext();
 
   /**
    * React 19 Optimistic Updates Implementation
@@ -222,6 +227,35 @@ export default function FullScreenBasicInfo({
     }
   }, [exifData]);
 
+  // Fetch location name when GPS coordinates are available
+  useEffect(() => {
+    if (md.gps_latitude && md.gps_longitude) {
+      setIsLoadingLocation(true);
+      const region = settings.ui.region || "other";
+      const language = settings.ui.language || "en";
+
+      geoService
+        .reverseGeocode(md.gps_latitude, md.gps_longitude, region, language)
+        .then((name) => {
+          setLocationName(name);
+        })
+        .catch((error) => {
+          console.error("Failed to get location name:", error);
+          setLocationName(
+            `${md.gps_latitude!.toFixed(4)}, ${md.gps_longitude!.toFixed(4)}`,
+          );
+        })
+        .finally(() => {
+          setIsLoadingLocation(false);
+        });
+    }
+  }, [
+    md.gps_latitude,
+    md.gps_longitude,
+    settings.ui.region,
+    settings.ui.language,
+  ]);
+
   return (
     <div className="absolute top-5 right-5 z-10 font-mono">
       <div className="card bg-base-100 w-max shadow-sm">
@@ -294,22 +328,6 @@ export default function FullScreenBasicInfo({
             </div>
           </div>
 
-          {/* GPS Coordinates */}
-          {(md.gps_latitude || md.gps_longitude) && (
-            <div className="rounded bg-base-200 p-2">
-              <div className="text-xs text-base-content/70 mb-1">
-                {t("assets.basicInfo.location")}
-              </div>
-              <div className="text-xs font-mono">
-                {md.gps_latitude &&
-                  `${t("assets.basicInfo.latitude")}: ${md.gps_latitude.toFixed(6)}`}
-                {md.gps_latitude && md.gps_longitude && " • "}
-                {md.gps_longitude &&
-                  `${t("assets.basicInfo.longitude")}: ${md.gps_longitude.toFixed(6)}`}
-              </div>
-            </div>
-          )}
-
           {/* Species Prediction */}
           {md.species_prediction && md.species_prediction.length > 0 && (
             <div className="rounded bg-base-200 p-2">
@@ -346,6 +364,40 @@ export default function FullScreenBasicInfo({
               className="min-h-[1.5rem]"
             />
           </div>
+
+          {/* GPS Coordinates and Location */}
+          {(md.gps_latitude || md.gps_longitude) && (
+            <div className="rounded bg-base-200 p-2">
+              <div className="text-xs text-base-content/70 mb-1">
+                {t("assets.basicInfo.location")}
+              </div>
+
+              {/* Location Name */}
+              <div className="text-sm mb-2">
+                {isLoadingLocation ? (
+                  <div className="flex items-center gap-2">
+                    <span className="loading loading-spinner loading-xs"></span>
+                    <span className="text-base-content/50">
+                      {t("assets.basicInfo.loadingLocation")}
+                    </span>
+                  </div>
+                ) : (
+                  locationName && (
+                    <div className="font-medium">{locationName}</div>
+                  )
+                )}
+              </div>
+
+              {/* GPS Coordinates */}
+              <div className="text-xs font-mono text-base-content/70">
+                {md.gps_latitude &&
+                  `${t("assets.basicInfo.latitude")}: ${md.gps_latitude.toFixed(6)}`}
+                {md.gps_latitude && md.gps_longitude && " • "}
+                {md.gps_longitude &&
+                  `${t("assets.basicInfo.longitude")}: ${md.gps_longitude.toFixed(6)}`}
+              </div>
+            </div>
+          )}
 
           {/* Map Display */}
           {(md.gps_latitude || md.gps_longitude) && asset && (

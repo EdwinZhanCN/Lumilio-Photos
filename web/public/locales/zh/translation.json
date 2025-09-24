@@ -3,20 +3,6 @@
         "name": "流明集",
         "tagline": "照片"
     },
-    "common": {
-        "ok": "确定",
-        "cancel": "取消",
-        "save": "保存",
-        "close": "关闭",
-        "loading": "加载中…",
-        "error": "错误",
-        "success": "成功",
-        "retry": "重试",
-        "edit": "编辑",
-        "delete": "删除",
-        "confirm": "确认",
-        "na": "无"
-    },
     "navbar": {
         "theme": {
             "light": "浅色",
@@ -116,7 +102,31 @@
         "audios": {
             "title": "音频"
         },
-        "empty": "暂无资产"
+        "empty": "暂无资产",
+        "basicInfo": {
+            "title": "基本信息",
+            "location": "位置",
+            "loadingLocation": "加载位置中...",
+            "aiSpeciesDetection": "AI 物种识别",
+            "description": "描述",
+            "noDescription": "尚未添加描述",
+            "clickToEdit": "点击编辑",
+            "descriptionPlaceholder": "为这张照片添加描述...",
+            "descriptionUpdated": "描述更新成功",
+            "descriptionUpdateError": "更新描述失败",
+            "viewExif": "查看 EXIF",
+            "loadingFile": "加载文件中...",
+            "extracting": "提取中...",
+            "latitude": "纬度",
+            "longitude": "经度",
+            "errors": {
+                "noAssetId": "资源 ID 不可用",
+                "notFound": "服务器上未找到原始文件",
+                "unauthorized": "访问原始文件需要身份验证",
+                "forbidden": "无权访问原始文件",
+                "extractFailed": "提取 EXIF 失败：{{message}}"
+            }
+        }
     },
     "upload": {
         "title": "上传照片",
@@ -220,32 +230,23 @@
         "uploaded": "上传于",
         "noLocationData": "无位置数据"
     },
-    "assets": {
-        "basicInfo": {
-            "title": "基本信息",
-            "location": "位置",
-            "aiSpeciesDetection": "AI 物种识别",
-            "description": "描述",
-            "noDescription": "尚未添加描述",
-            "clickToEdit": "点击编辑",
-            "descriptionPlaceholder": "为这张照片添加描述...",
-            "descriptionUpdated": "描述更新成功",
-            "descriptionUpdateError": "更新描述失败",
-            "viewExif": "查看 EXIF",
-            "loadingFile": "加载文件中...",
-            "extracting": "提取中...",
-            "latitude": "纬度",
-            "longitude": "经度",
-            "errors": {
-                "noAssetId": "资源 ID 不可用",
-                "notFound": "服务器上未找到原始文件",
-                "unauthorized": "访问原始文件需要身份验证",
-                "forbidden": "无权访问原始文件",
-                "extractFailed": "提取 EXIF 失败：{{message}}"
-            }
-        }
+    "common": {
+        "ok": "确定",
+        "cancel": "取消",
+        "save": "保存",
+        "close": "关闭",
+        "loading": "加载中…",
+        "error": "错误",
+        "success": "成功",
+        "retry": "重试",
+        "edit": "编辑",
+        "delete": "删除",
+        "confirm": "确认",
+        "na": "无",
+        "uploaded": "上传于",
+        "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
+        "clickToEdit": "点击编辑"
     },
-
     "monitor": {
         "title": "服务器监控",
         "status": {
@@ -274,23 +275,6 @@
         "deleting": "删除中...",
         "success": "照片删除成功",
         "error": "删除照片失败"
-    },
-    "common": {
-        "ok": "确定",
-        "cancel": "取消",
-        "save": "保存",
-        "close": "关闭",
-        "loading": "加载中…",
-        "error": "错误",
-        "success": "成功",
-        "retry": "重试",
-        "edit": "编辑",
-        "delete": "删除",
-        "confirm": "确认",
-        "na": "无",
-        "uploaded": "上传于",
-        "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
-        "clickToEdit": "点击编辑"
     },
     "lumen": {
         "title": "Lumen"
