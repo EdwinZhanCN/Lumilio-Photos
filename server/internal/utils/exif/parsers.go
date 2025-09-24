@@ -1,13 +1,18 @@
 package exif
 
 import (
+	"fmt"
 	"server/internal/db/dbtypes"
 	"strconv"
+	"strings"
 )
 
 // parsePhotoMetadata parses raw EXIF data into PhotoSpecificMetadata
 func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadata {
-	metadata := &dbtypes.PhotoSpecificMetadata{}
+	metadata := &dbtypes.PhotoSpecificMetadata{
+		Rating: 0,     // Set default rating to 0
+		Like:   false, // Set default like status to false
+	}
 
 	// Parse TakenTime from various datetime fields
 	for _, field := range []string{"DateTimeOriginal", "CreateDate", "DateTime"} {
@@ -75,7 +80,13 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 	// Parse FocalLength
 	for _, field := range []string{"FocalLength", "FocalLengthIn35mmFilm", "FocalLengthIn35mmFormat"} {
 		if focalLength, exists := rawData[field]; exists {
-			if val, err := strconv.ParseFloat(focalLength, 32); err == nil {
+			// Remove "mm" suffix and other common units
+			cleanFL := normalizeString(focalLength)
+			cleanFL = strings.TrimSuffix(cleanFL, " mm")
+			cleanFL = strings.TrimSuffix(cleanFL, "mm")
+			cleanFL = strings.TrimSpace(cleanFL)
+
+			if val, err := strconv.ParseFloat(cleanFL, 32); err == nil {
 				metadata.FocalLength = float32(val)
 				break
 			}
@@ -104,6 +115,75 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 				metadata.Description = normalized
 				break
 			}
+		}
+	}
+
+	// Parse Resolution (MP) from ImageWidth and ImageHeight
+	if widthStr, wOk := rawData["ImageWidth"]; wOk {
+		if heightStr, hOk := rawData["ImageHeight"]; hOk {
+			parseInt := func(s string) (int, bool) {
+				s = normalizeString(s)
+				if s == "" {
+					return 0, false
+				}
+				// Prefer first token in case of "4032 pixels"
+				if fields := strings.Fields(s); len(fields) > 0 {
+					s = fields[0]
+				}
+				if val, err := strconv.Atoi(s); err == nil {
+					return val, true
+				}
+				// Fallback: strip non-digits
+				digits := make([]rune, 0, len(s))
+				for _, r := range s {
+					if r >= '0' && r <= '9' {
+						digits = append(digits, r)
+					} else if len(digits) > 0 {
+						// stop at first non-digit after seeing digits
+						break
+					}
+				}
+				if len(digits) == 0 {
+					return 0, false
+				}
+				if val, err := strconv.Atoi(string(digits)); err == nil {
+					return val, true
+				}
+				return 0, false
+			}
+
+			if w, ok1 := parseInt(widthStr); ok1 {
+				if h, ok2 := parseInt(heightStr); ok2 && w > 0 && h > 0 {
+					// Keep Resolution as an integer number of megapixels (rounded)
+					pixels := w * h
+					mpInt := (pixels + 500_000) / 1_000_000
+					metadata.Resolution = fmt.Sprintf("%dMP", mpInt)
+					// Also set Dimensions if not already set from ImageSize
+					if metadata.Dimensions == "" {
+						metadata.Dimensions = fmt.Sprintf("%dx%d", w, h)
+					}
+				}
+			}
+		}
+	}
+
+	// Parse Exposure bias
+	for _, field := range []string{"ExposureCompensation"} {
+		if ebStr, exists := rawData[field]; exists {
+			if val, err := strconv.ParseFloat(ebStr, 32); err == nil {
+				metadata.Exposure = float32(val)
+				break
+			}
+		}
+	}
+
+	// Parse Dimensions from ImageSize or fallback to width x height
+	if sizeStr, exists := rawData["ImageSize"]; exists {
+		d := normalizeString(sizeStr)
+		if d != "" {
+			// Normalize common separators (e.g., "4032x3024" or "4032 x 3024")
+			d = strings.ReplaceAll(d, " ", "")
+			metadata.Dimensions = d
 		}
 	}
 

@@ -42,6 +42,14 @@ type AssetService interface {
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata []byte) error
 
+	// Rating management methods
+	UpdateAssetRating(ctx context.Context, id uuid.UUID, rating int) error
+	UpdateAssetLike(ctx context.Context, id uuid.UUID, liked bool) error
+	UpdateAssetRatingAndLike(ctx context.Context, id uuid.UUID, rating int, liked bool) error
+	UpdateAssetDescription(ctx context.Context, id uuid.UUID, description string) error
+	GetAssetsByRating(ctx context.Context, rating int, limit, offset int) ([]repo.Asset, error)
+	GetLikedAssets(ctx context.Context, limit, offset int) ([]repo.Asset, error)
+
 	AddAssetToAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error
 	RemoveAssetFromAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error
 
@@ -869,17 +877,95 @@ func (s *assetService) GetDistinctCameraMakes(ctx context.Context) ([]string, er
 }
 
 func (s *assetService) GetDistinctLenses(ctx context.Context) ([]string, error) {
-	rows, err := s.queries.GetDistinctLenses(ctx)
+	results, err := s.queries.GetDistinctLenses(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get distinct lenses: %w", err)
 	}
 
-	lenses := make([]string, 0, len(rows))
-	for _, row := range rows {
-		if str, ok := row.(string); ok && str != "" {
-			lenses = append(lenses, str)
+	lenses := make([]string, 0, len(results))
+	for _, result := range results {
+		if lens, ok := result.(string); ok && lens != "" {
+			lenses = append(lenses, lens)
 		}
 	}
 
 	return lenses, nil
+}
+
+// Rating management methods implementation
+
+func (s *assetService) UpdateAssetRating(ctx context.Context, id uuid.UUID, rating int) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	params := repo.UpdateAssetRatingParams{
+		AssetID: pgUUID,
+		Rating:  int32(rating),
+	}
+
+	return s.queries.UpdateAssetRating(ctx, params)
+}
+
+func (s *assetService) UpdateAssetLike(ctx context.Context, id uuid.UUID, liked bool) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	params := repo.UpdateAssetLikeParams{
+		AssetID: pgUUID,
+		Liked:   liked,
+	}
+
+	return s.queries.UpdateAssetLike(ctx, params)
+}
+
+func (s *assetService) UpdateAssetRatingAndLike(ctx context.Context, id uuid.UUID, rating int, liked bool) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	params := repo.UpdateAssetRatingAndLikeParams{
+		AssetID: pgUUID,
+		Rating:  int32(rating),
+		Liked:   liked,
+	}
+
+	return s.queries.UpdateAssetRatingAndLike(ctx, params)
+}
+
+func (s *assetService) UpdateAssetDescription(ctx context.Context, id uuid.UUID, description string) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	params := repo.UpdateAssetDescriptionParams{
+		AssetID:     pgUUID,
+		Description: description,
+	}
+
+	return s.queries.UpdateAssetDescription(ctx, params)
+}
+
+func (s *assetService) GetAssetsByRating(ctx context.Context, rating int, limit, offset int) ([]repo.Asset, error) {
+	params := repo.GetAssetsByRatingParams{
+		Rating: int32(rating),
+		Limit:  int32(limit),
+		Offset: int32(offset),
+	}
+
+	return s.queries.GetAssetsByRating(ctx, params)
+}
+
+func (s *assetService) GetLikedAssets(ctx context.Context, limit, offset int) ([]repo.Asset, error) {
+	params := repo.GetLikedAssetsParams{
+		Limit:  int32(limit),
+		Offset: int32(offset),
+	}
+
+	return s.queries.GetLikedAssets(ctx, params)
 }

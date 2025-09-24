@@ -379,6 +379,57 @@ func (q *Queries) GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerPara
 	return items, nil
 }
 
+const getAssetsByRating = `-- name: GetAssetsByRating :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+WHERE is_deleted = false
+  AND (specific_metadata->>'rating')::integer = $1::integer
+ORDER BY upload_time DESC
+LIMIT $3 OFFSET $2
+`
+
+type GetAssetsByRatingParams struct {
+	Rating int32 `db:"rating" json:"rating"`
+	Offset int32 `db:"offset" json:"offset"`
+	Limit  int32 `db:"limit" json:"limit"`
+}
+
+func (q *Queries) GetAssetsByRating(ctx context.Context, arg GetAssetsByRatingParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsByRating, arg.Rating, arg.Offset, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAssetsByType = `-- name: GetAssetsByType :many
 SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
 WHERE type = $1 AND is_deleted = false
@@ -480,6 +531,56 @@ func (q *Queries) GetDistinctLenses(ctx context.Context) ([]interface{}, error) 
 			return nil, err
 		}
 		items = append(items, lens_model)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getLikedAssets = `-- name: GetLikedAssets :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+WHERE is_deleted = false
+  AND (specific_metadata->>'liked')::boolean = true
+ORDER BY upload_time DESC
+LIMIT $2 OFFSET $1
+`
+
+type GetLikedAssetsParams struct {
+	Offset int32 `db:"offset" json:"offset"`
+	Limit  int32 `db:"limit" json:"limit"`
+}
+
+func (q *Queries) GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getLikedAssets, arg.Offset, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -924,6 +1025,46 @@ func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset
 	return i, err
 }
 
+const updateAssetDescription = `-- name: UpdateAssetDescription :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    COALESCE(specific_metadata, '{}'::jsonb),
+    '{description}',
+    to_jsonb($1::text)
+)
+WHERE asset_id = $2
+`
+
+type UpdateAssetDescriptionParams struct {
+	Description string      `db:"description" json:"description"`
+	AssetID     pgtype.UUID `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error {
+	_, err := q.db.Exec(ctx, updateAssetDescription, arg.Description, arg.AssetID)
+	return err
+}
+
+const updateAssetLike = `-- name: UpdateAssetLike :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    COALESCE(specific_metadata, '{}'::jsonb),
+    '{liked}',
+    to_jsonb($1::boolean)
+)
+WHERE asset_id = $2
+`
+
+type UpdateAssetLikeParams struct {
+	Liked   bool        `db:"liked" json:"liked"`
+	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetLike(ctx context.Context, arg UpdateAssetLikeParams) error {
+	_, err := q.db.Exec(ctx, updateAssetLike, arg.Liked, arg.AssetID)
+	return err
+}
+
 const updateAssetMetadata = `-- name: UpdateAssetMetadata :exec
 UPDATE assets
 SET specific_metadata = $2
@@ -937,5 +1078,50 @@ type UpdateAssetMetadataParams struct {
 
 func (q *Queries) UpdateAssetMetadata(ctx context.Context, arg UpdateAssetMetadataParams) error {
 	_, err := q.db.Exec(ctx, updateAssetMetadata, arg.AssetID, arg.SpecificMetadata)
+	return err
+}
+
+const updateAssetRating = `-- name: UpdateAssetRating :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    COALESCE(specific_metadata, '{}'::jsonb),
+    '{rating}',
+    to_jsonb($1::integer)
+)
+WHERE asset_id = $2
+`
+
+type UpdateAssetRatingParams struct {
+	Rating  int32       `db:"rating" json:"rating"`
+	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetRating(ctx context.Context, arg UpdateAssetRatingParams) error {
+	_, err := q.db.Exec(ctx, updateAssetRating, arg.Rating, arg.AssetID)
+	return err
+}
+
+const updateAssetRatingAndLike = `-- name: UpdateAssetRatingAndLike :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    jsonb_set(
+        COALESCE(specific_metadata, '{}'::jsonb),
+        '{rating}',
+        to_jsonb($1::integer)
+    ),
+    '{liked}',
+    to_jsonb($2::boolean)
+)
+WHERE asset_id = $3
+`
+
+type UpdateAssetRatingAndLikeParams struct {
+	Rating  int32       `db:"rating" json:"rating"`
+	Liked   bool        `db:"liked" json:"liked"`
+	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetRatingAndLike(ctx context.Context, arg UpdateAssetRatingAndLikeParams) error {
+	_, err := q.db.Exec(ctx, updateAssetRatingAndLike, arg.Rating, arg.Liked, arg.AssetID)
 	return err
 }

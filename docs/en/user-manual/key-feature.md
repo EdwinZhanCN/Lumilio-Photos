@@ -19,6 +19,36 @@ Fullscreen view is a detailed view for each photo, it includes serveral importan
 - Extract complete, professional EXIF data
 - Download EXIF data in JSON format
 
+All basic info stored
+- Original filename
+- Upload/Scanned time
+- MIME type
+
+**Photo Information**
+
+- **Capture Details**
+  - Capture Time
+  - Camera Model
+  - Lens Model
+  - Resolution (Megapixels)
+  - Dimensions
+  - File Size
+
+- **Technical Parameters**
+  - ISO Value
+  - Focal Length
+  - Exposure Compensation
+  - Shutter Speed
+  - Aperture Setting
+
+- **AI Analysis**
+  - Facial Recognition Data
+  - Detected Faces
+  - Geographic Location
+  - Image Embeddings
+  - Species Identification
+
+
 ### View in Original [⚠️ not implemented yet]
 
 - You can view your photos/videos in orginal format (RAW, ProResRAW support)

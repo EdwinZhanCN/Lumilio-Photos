@@ -1,3 +1,28 @@
+interface SpeciesPredictionMeta {
+  species?: string;
+  confidence?: number;
+}
+
+interface PhotoSpecificMetadata {
+  taken_time?: string;
+  camera_model?: string;
+  lens_model?: string;
+  exposure_time?: string;
+  f_number?: number;
+  focal_length?: number;
+  iso_speed?: number;
+  exposure?: number;
+  dimensions?: string;
+  resolution?: string;
+  gps_latitude?: number;
+  gps_longitude?: number;
+  description?: string;
+  species_prediction?: SpeciesPredictionMeta[];
+  is_raw?: boolean;
+  rating?: number;
+  liked?: boolean;
+}
+
 interface Asset {
   albums?: AssetAlbum[];
   asset_id?: string;
@@ -10,7 +35,7 @@ interface Asset {
   mime_type?: string;
   original_filename?: string;
   owner_id?: number;
-  specific_metadata?: JSON;
+  specific_metadata?: PhotoSpecificMetadata;
   storage_path?: string;
   tags?: AssetTag[];
   thumbnails?: AssetThumbnail[];

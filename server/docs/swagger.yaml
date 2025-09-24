@@ -298,6 +298,37 @@ definitions:
       specific_metadata:
         type: object
     type: object
+  handler.UpdateDescriptionRequest:
+    properties:
+      description:
+        example: A beautiful sunset photo
+        type: string
+    type: object
+  handler.UpdateLikeRequest:
+    properties:
+      liked:
+        example: true
+        type: boolean
+    type: object
+  handler.UpdateRatingAndLikeRequest:
+    properties:
+      liked:
+        example: true
+        type: boolean
+      rating:
+        example: 5
+        maximum: 5
+        minimum: 0
+        type: integer
+    type: object
+  handler.UpdateRatingRequest:
+    properties:
+      rating:
+        example: 5
+        maximum: 5
+        minimum: 0
+        type: integer
+    type: object
   handler.UploadResponse:
     properties:
       content_hash:
@@ -1073,6 +1104,94 @@ paths:
       summary: Add asset to album
       tags:
       - assets
+  /assets/{id}/description:
+    put:
+      consumes:
+      - application/json
+      description: Update the description/comment of a specific asset
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Description data
+        in: body
+        name: description
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateDescriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Description updated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.MessageResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/api.Result'
+        "404":
+          description: Asset not found
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Update asset description
+      tags:
+      - assets
+  /assets/{id}/like:
+    put:
+      consumes:
+      - application/json
+      description: Update the like/favorite status of a specific asset
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Like data
+        in: body
+        name: like
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateLikeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Like status updated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.MessageResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/api.Result'
+        "404":
+          description: Asset not found
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Update asset like status
+      tags:
+      - assets
   /assets/{id}/original:
     get:
       description: Serve the original file content for an asset by asset ID. Returns
@@ -1104,6 +1223,95 @@ paths:
           schema:
             $ref: '#/definitions/api.Result'
       summary: Get original file
+      tags:
+      - assets
+  /assets/{id}/rating:
+    put:
+      consumes:
+      - application/json
+      description: Update the rating (0-5) of a specific asset
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Rating data
+        in: body
+        name: rating
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateRatingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Rating updated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.MessageResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/api.Result'
+        "404":
+          description: Asset not found
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Update asset rating
+      tags:
+      - assets
+  /assets/{id}/rating-and-like:
+    put:
+      consumes:
+      - application/json
+      description: Update both the rating (0-5) and like/favorite status of a specific
+        asset
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Rating and like data
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateRatingAndLikeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Rating and like status updated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.MessageResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/api.Result'
+        "404":
+          description: Asset not found
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Update asset rating and like status
       tags:
       - assets
   /assets/{id}/thumbnail:
@@ -1236,6 +1444,85 @@ paths:
           schema:
             $ref: '#/definitions/api.Result'
       summary: Get filter options
+      tags:
+      - assets
+  /assets/liked:
+    get:
+      consumes:
+      - application/json
+      description: Get all assets that have been liked/favorited
+      parameters:
+      - default: 20
+        description: Number of assets to return
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of assets to skip
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Liked assets retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AssetListResponse'
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Get liked assets
+      tags:
+      - assets
+  /assets/rating/{rating}:
+    get:
+      consumes:
+      - application/json
+      description: Get assets with a specific rating (0-5)
+      parameters:
+      - description: Rating (0-5)
+        in: path
+        name: rating
+        required: true
+        type: integer
+      - default: 20
+        description: Number of assets to return
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of assets to skip
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Assets retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Result'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.AssetListResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/api.Result'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.Result'
+      summary: Get assets by rating
       tags:
       - assets
   /assets/search:

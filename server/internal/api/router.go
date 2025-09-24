@@ -24,6 +24,14 @@ type AssetControllerInterface interface {
 	FilterAssets(c *gin.Context)     // POST /assets/filter - Complex asset filtering
 	SearchAssets(c *gin.Context)     // POST /assets/search - Filename and semantic search
 	GetFilterOptions(c *gin.Context) // GET /assets/filter-options - Get available filter options
+
+	// Rating management operations
+	UpdateAssetRating(c *gin.Context)        // PUT /assets/:id/rating - Update asset rating
+	UpdateAssetLike(c *gin.Context)          // PUT /assets/:id/like - Update asset like status
+	UpdateAssetRatingAndLike(c *gin.Context) // PUT /assets/:id/rating-and-like - Update both rating and like
+	UpdateAssetDescription(c *gin.Context)   // PUT /assets/:id/description - Update asset description
+	GetAssetsByRating(c *gin.Context)        // GET /assets/rating/:rating - Get assets by rating
+	GetLikedAssets(c *gin.Context)           // GET /assets/liked - Get liked assets
 }
 
 // AuthControllerInterface defines the interface for authentication controllers
@@ -105,6 +113,14 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			assets.DELETE("/:id", assetController.DeleteAsset)
 			assets.POST("/:id/albums/:albumId", assetController.AddAssetToAlbum)
 			assets.GET("/:id/albums", albumController.GetAssetAlbums)
+
+			// Rating management routes
+			assets.PUT("/:id/rating", assetController.UpdateAssetRating)
+			assets.PUT("/:id/like", assetController.UpdateAssetLike)
+			assets.PUT("/:id/rating-and-like", assetController.UpdateAssetRatingAndLike)
+			assets.PUT("/:id/description", assetController.UpdateAssetDescription)
+			assets.GET("/rating/:rating", assetController.GetAssetsByRating)
+			assets.GET("/liked", assetController.GetLikedAssets)
 		}
 
 		// Album routes - with authentication required

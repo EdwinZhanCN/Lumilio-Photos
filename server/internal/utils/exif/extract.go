@@ -298,9 +298,7 @@ func (e *Extractor) handleIOConcurrent(stdin io.WriteCloser, stdout, stderr io.R
 		}
 	}
 
-	if errorBuffer.Len() > 0 {
-		return nil, fmt.Errorf("exiftool stderr: %s", errorBuffer.String())
-	}
+	// Ignore exiftool stderr; warnings are common even with exit code 0
 
 	return &outputBuffer, nil
 }
