@@ -75,6 +75,18 @@ const FullScreenCarousel = ({
     return () => window.removeEventListener("fullscreen:toggleInfo", handler);
   }, []);
 
+  // Add keyboard event handler for Escape key
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   const handleAssetUpdate = (updatedAsset: Asset) => {
     setCurrentAsset(updatedAsset);
     if (onAssetUpdate) {

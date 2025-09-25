@@ -799,17 +799,14 @@ paths:
     get:
       consumes:
       - application/json
-      description: Retrieve a paginated list of assets. Filter by type, owner, or
-        search query. Use 'vector=true|false' to control semantic vector search when
-        'q' is provided (feature must be enabled). At least one filter parameter is
-        required.
+      description: Retrieve a paginated list of assets. Filter by type or owner. At
+        least one filter parameter is required.
       parameters:
       - description: Asset type filter
         enum:
         - PHOTO
         - VIDEO
         - AUDIO
-        - DOCUMENT
         example: '"PHOTO"'
         in: query
         name: type
@@ -819,18 +816,6 @@ paths:
         in: query
         name: owner_id
         type: integer
-      - description: Search query (semantic vector search when enabled) and filename
-          match
-        example: '"red bird on a branch"'
-        in: query
-        name: q
-        type: string
-      - default: false
-        description: 'When q is set: true to use semantic vector search, false to
-          use filename search'
-        in: query
-        name: vector
-        type: boolean
       - default: 20
         description: Maximum number of results (max 100)
         example: 20
@@ -944,7 +929,7 @@ paths:
       consumes:
       - application/json
       description: Retrieve detailed information about a specific asset. Optionally
-        include thumbnails, tags, and albums.
+        include thumbnails, tags, albums, and species predictions.
       parameters:
       - description: Asset ID (UUID format)
         example: '"550e8400-e29b-41d4-a716-446655440000"'
@@ -966,6 +951,11 @@ paths:
         description: Include albums
         in: query
         name: include_albums
+        type: boolean
+      - default: true
+        description: Include species predictions
+        in: query
+        name: include_species
         type: boolean
       produces:
       - application/json

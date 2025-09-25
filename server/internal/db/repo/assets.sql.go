@@ -379,6 +379,172 @@ func (q *Queries) GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerPara
 	return items, nil
 }
 
+const getAssetsByOwnerAndTypesSorted = `-- name: GetAssetsByOwnerAndTypesSorted :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+WHERE owner_id = $1 AND type = ANY($2::text[]) AND is_deleted = false
+ORDER BY
+  CASE
+    WHEN $3 = 'taken_time' AND $4 = 'asc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
+    ELSE NULL
+  END ASC,
+  CASE
+    WHEN $3 = 'taken_time' AND $4 = 'desc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
+    ELSE NULL
+  END DESC,
+  CASE
+    WHEN $3 = 'upload_time' AND $4 = 'asc' THEN upload_time
+    ELSE NULL
+  END ASC,
+  CASE
+    WHEN $3 = 'upload_time' AND $4 = 'desc' THEN upload_time
+    ELSE NULL
+  END DESC,
+  CASE
+    WHEN $3 = 'rating' AND $4 = 'asc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
+    ELSE NULL
+  END ASC,
+  CASE
+    WHEN $3 = 'rating' AND $4 = 'desc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
+    ELSE NULL
+  END DESC
+LIMIT $6 OFFSET $5
+`
+
+type GetAssetsByOwnerAndTypesSortedParams struct {
+	OwnerID   *int32      `db:"owner_id" json:"owner_id"`
+	Types     []string    `db:"types" json:"types"`
+	SortBy    interface{} `db:"sort_by" json:"sort_by"`
+	SortOrder interface{} `db:"sort_order" json:"sort_order"`
+	Offset    int32       `db:"offset" json:"offset"`
+	Limit     int32       `db:"limit" json:"limit"`
+}
+
+func (q *Queries) GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAssetsByOwnerAndTypesSortedParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsByOwnerAndTypesSorted,
+		arg.OwnerID,
+		arg.Types,
+		arg.SortBy,
+		arg.SortOrder,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAssetsByOwnerSorted = `-- name: GetAssetsByOwnerSorted :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+WHERE owner_id = $1 AND is_deleted = false
+ORDER BY
+  CASE
+    WHEN $2 = 'taken_time' AND $3 = 'asc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
+    ELSE NULL
+  END ASC,
+  CASE
+    WHEN $2 = 'taken_time' AND $3 = 'desc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
+    ELSE NULL
+  END DESC,
+  CASE
+    WHEN $2 = 'upload_time' AND $3 = 'asc' THEN upload_time
+    ELSE NULL
+  END ASC,
+  CASE
+    WHEN $2 = 'upload_time' AND $3 = 'desc' THEN upload_time
+    ELSE NULL
+  END DESC,
+  CASE
+    WHEN $2 = 'rating' AND $3 = 'asc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
+    ELSE NULL
+  END ASC,
+  CASE
+    WHEN $2 = 'rating' AND $3 = 'desc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
+    ELSE NULL
+  END DESC
+LIMIT $4 OFFSET $5
+`
+
+type GetAssetsByOwnerSortedParams struct {
+	OwnerID *int32      `db:"owner_id" json:"owner_id"`
+	Column2 interface{} `db:"column_2" json:"column_2"`
+	Column3 interface{} `db:"column_3" json:"column_3"`
+	Limit   int32       `db:"limit" json:"limit"`
+	Offset  int32       `db:"offset" json:"offset"`
+}
+
+func (q *Queries) GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwnerSortedParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsByOwnerSorted,
+		arg.OwnerID,
+		arg.Column2,
+		arg.Column3,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAssetsByRating = `-- name: GetAssetsByRating :many
 SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
 WHERE is_deleted = false
@@ -445,6 +611,88 @@ type GetAssetsByTypeParams struct {
 
 func (q *Queries) GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams) ([]Asset, error) {
 	rows, err := q.db.Query(ctx, getAssetsByType, arg.Type, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAssetsByTypesSorted = `-- name: GetAssetsByTypesSorted :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+WHERE type = ANY($1::text[]) AND is_deleted = false
+ORDER BY
+  CASE
+    WHEN $2 = 'taken_time' AND $3 = 'asc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
+    ELSE NULL
+  END ASC,
+  CASE
+    WHEN $2 = 'taken_time' AND $3 = 'desc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
+    ELSE NULL
+  END DESC,
+  CASE
+    WHEN $2 = 'upload_time' AND $3 = 'asc' THEN upload_time
+    ELSE NULL
+  END ASC,
+  CASE
+    WHEN $2 = 'upload_time' AND $3 = 'desc' THEN upload_time
+    ELSE NULL
+  END DESC,
+  CASE
+    WHEN $2 = 'rating' AND $3 = 'asc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
+    ELSE NULL
+  END ASC,
+  CASE
+    WHEN $2 = 'rating' AND $3 = 'desc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
+    ELSE NULL
+  END DESC
+LIMIT $5 OFFSET $4
+`
+
+type GetAssetsByTypesSortedParams struct {
+	Types     []string    `db:"types" json:"types"`
+	SortBy    interface{} `db:"sort_by" json:"sort_by"`
+	SortOrder interface{} `db:"sort_order" json:"sort_order"`
+	Offset    int32       `db:"offset" json:"offset"`
+	Limit     int32       `db:"limit" json:"limit"`
+}
+
+func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsByTypesSorted,
+		arg.Types,
+		arg.SortBy,
+		arg.SortOrder,
+		arg.Offset,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}

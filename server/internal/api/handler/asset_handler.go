@@ -15,6 +15,7 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/service"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -459,7 +460,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 
 // GetAsset retrieves a single asset by ID
 // @Summary Get asset by ID
-// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, and albums.
+// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, and species predictions.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -467,6 +468,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 // @Param include_thumbnails query bool false "Include thumbnails" default(true)
 // @Param include_tags query bool false "Include tags" default(true)
 // @Param include_albums query bool false "Include albums" default(true)
+// @Param include_species query bool false "Include species predictions" default(true)
 // @Success 200 {object} api.Result{data=AssetDTO} "Asset details with optional relationships"
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 404 {object} api.Result "Asset not found"
@@ -483,8 +485,9 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 	includeThumbnails := c.DefaultQuery("include_thumbnails", "true") == "true"
 	includeTags := c.DefaultQuery("include_tags", "true") == "true"
 	includeAlbums := c.DefaultQuery("include_albums", "true") == "true"
+	includeSpecies := c.DefaultQuery("include_species", "true") == "true"
 
-	asset, err := h.assetService.GetAssetWithOptions(c.Request.Context(), id, includeThumbnails, includeTags, includeAlbums)
+	asset, err := h.assetService.GetAssetWithOptions(c.Request.Context(), id, includeThumbnails, includeTags, includeAlbums, includeSpecies)
 	if err != nil {
 		api.GinNotFound(c, err, "Asset not found")
 		return
@@ -495,16 +498,17 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 
 // ListAssets retrieves assets with optional filtering
 // @Summary List assets
-// @Description Retrieve a paginated list of assets. Filter by type, owner, or search query. Use 'vector=true|false' to control semantic vector search when 'q' is provided (feature must be enabled). At least one filter parameter is required.
+// @Description Retrieve a paginated list of assets. Filter by type(s) or owner. Supports sorting by taken_time, rating, or upload_time. At least one filter parameter is required.
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Param type query string false "Asset type filter" Enums(PHOTO,VIDEO,AUDIO,DOCUMENT) example("PHOTO")
+// @Param type query string false "Single asset type filter" Enums(PHOTO,VIDEO,AUDIO,DOCUMENT) example("PHOTO")
+// @Param types query string false "Multiple asset types filter (comma-separated)" example("PHOTO,VIDEO")
 // @Param owner_id query int false "Filter by owner ID" example(123)
-// @Param q query string false "Search query (semantic vector search when enabled) and filename match" example("red bird on a branch")
-// @Param vector query bool false "When q is set: true to use semantic vector search, false to use filename search" default(false)
 // @Param limit query int false "Maximum number of results (max 100)" default(20) example(20)
 // @Param offset query int false "Number of results to skip for pagination" default(0) example(0)
+// @Param sort_by query string false "Sort field" Enums(taken_time,rating,upload_time) default("upload_time") example("taken_time")
+// @Param sort_order query string false "Sort order" Enums(asc,desc) default("desc") example("desc")
 // @Success 200 {object} api.Result{data=AssetListResponse} "Assets retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid parameters"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -513,10 +517,10 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "20")
 	offsetStr := c.DefaultQuery("offset", "0")
 	typeStr := c.Query("type")
+	typesStr := c.Query("types")
 	ownerIDStr := c.Query("owner_id")
-	searchQuery := c.Query("q")
-	vectorFlag := c.DefaultQuery("vector", "false")
-	useVector := vectorFlag == "true"
+	sortBy := c.DefaultQuery("sort_by", "upload_time")
+	sortOrder := c.DefaultQuery("sort_order", "desc")
 
 	limit, _ := strconv.Atoi(limitStr)
 	offset, _ := strconv.Atoi(offsetStr)
@@ -525,39 +529,68 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 		limit = 100
 	}
 
+	// Validate sort parameters
+	validSortFields := map[string]bool{
+		"taken_time":  true,
+		"rating":      true,
+		"upload_time": true,
+	}
+	if !validSortFields[sortBy] {
+		api.GinBadRequest(c, errors.New("invalid sort_by"), "sort_by must be one of: taken_time, rating, upload_time")
+		return
+	}
+
+	if sortOrder != "asc" && sortOrder != "desc" {
+		api.GinBadRequest(c, errors.New("invalid sort_order"), "sort_order must be 'asc' or 'desc'")
+		return
+	}
+
 	ctx := c.Request.Context()
 	var assets []repo.Asset
 	var err error
 
-	switch {
-	case searchQuery != "":
-		var typePtr *string
-		if typeStr != "" {
-			at := dbtypes.AssetType(typeStr)
-			if at.Valid() {
-				typePtr = at.String()
+	// Determine asset types to filter by
+	var assetTypes []string
+	if typesStr != "" {
+		// Handle comma-separated types parameter
+		typeList := strings.Split(typesStr, ",")
+		for _, t := range typeList {
+			t = strings.TrimSpace(t)
+			assetType := dbtypes.AssetType(t)
+			if !assetType.Valid() {
+				api.GinBadRequest(c, errors.New("invalid asset type in types"), fmt.Sprintf("Invalid asset type: %s", t))
+				return
 			}
+			assetTypes = append(assetTypes, *assetType.String())
 		}
-		assets, err = h.assetService.SearchAssets(ctx, searchQuery, typePtr, useVector, limit, offset)
+	} else if typeStr != "" {
+		// Handle single type parameter for backward compatibility
+		assetType := dbtypes.AssetType(typeStr)
+		if !assetType.Valid() {
+			api.GinBadRequest(c, errors.New("invalid asset type"), "Invalid asset type")
+			return
+		}
+		assetTypes = append(assetTypes, *assetType.String())
+	}
 
+	switch {
 	case ownerIDStr != "":
 		ownerID, parseErr := strconv.Atoi(ownerIDStr)
 		if parseErr != nil {
 			api.GinBadRequest(c, parseErr, "Invalid owner_id")
 			return
 		}
-		assets, err = h.assetService.GetAssetsByOwner(ctx, ownerID, limit, offset)
-
-	case typeStr != "":
-		assetType := dbtypes.AssetType(typeStr)
-		if !assetType.Valid() {
-			api.GinBadRequest(c, errors.New("invalid asset type"), "Invalid asset type")
-			return
+		if len(assetTypes) > 0 {
+			assets, err = h.assetService.GetAssetsByOwnerAndTypes(ctx, ownerID, assetTypes, sortBy, sortOrder, limit, offset)
+		} else {
+			assets, err = h.assetService.GetAssetsByOwnerSorted(ctx, ownerID, sortBy, sortOrder, limit, offset)
 		}
-		assets, err = h.assetService.GetAssetsByType(ctx, *assetType.String(), limit, offset)
+
+	case len(assetTypes) > 0:
+		assets, err = h.assetService.GetAssetsByTypesSorted(ctx, assetTypes, sortBy, sortOrder, limit, offset)
 
 	default:
-		api.GinBadRequest(c, errors.New("missing query parameters"), "Please specify type, owner_id, or search query")
+		api.GinBadRequest(c, errors.New("missing query parameters"), "Please specify type, types, or owner_id")
 		return
 	}
 
@@ -610,7 +643,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	}
 
 	// First verify asset exists without loading full data
-	_, err = h.assetService.GetAssetWithOptions(c.Request.Context(), assetID, false, false, false)
+	_, err = h.assetService.GetAssetWithOptions(c.Request.Context(), assetID, false, false, false, false)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found"})

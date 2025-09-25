@@ -229,7 +229,7 @@ func (e *Extractor) runExifToolFromBuffer(ctx context.Context, buffer *bytes.Buf
 
 // buildExifToolArgs builds command line arguments for exiftool
 func (e *Extractor) buildExifToolArgs(tags []string) []string {
-	args := []string{"-j", "-charset", "utf8", "-fast", "-ignoreMinorErrors"}
+	args := []string{"-j", "-charset", "utf8", "-ignoreMinorErrors"}
 
 	// Add specific tags
 	for _, tag := range tags {

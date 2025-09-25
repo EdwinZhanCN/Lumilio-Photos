@@ -1,18 +1,48 @@
 export { AssetsProvider } from "./AssetsProvider";
 export { useAssetsContext } from "./hooks/useAssetsContext";
-export type { AssetsState, AssetsActions } from "./types";
+export { useAssetsView, useCurrentTabAssets } from "./hooks/useAssetsView";
 export {
-  AssetsPageProvider,
-  useAssetsPageContext,
-  useAssetsPageNavigation,
-  assetsPageReducer,
-  initialAssetsPageState,
-  DEFAULT_GROUP_BY,
-  DEFAULT_SEARCH_QUERY,
-} from "./page";
+  useAsset,
+  useAssets,
+  useAssetExists,
+  useAssetMeta,
+} from "./hooks/useAsset";
+export {
+  useAssetActions,
+  useAssetActionsSimple,
+} from "./hooks/useAssetActions";
+export {
+  useSelection,
+  useKeyboardSelection,
+  useSelectionState,
+  useBulkAssetOperations,
+} from "./hooks/useSelection";
+
+// Export types
 export type {
-  AssetsPageState,
-  AssetsPageAction,
-  AssetsPageContextValue,
+  AssetsState,
+  AssetsContextValue,
+  AssetViewDefinition,
+  AssetsViewResult,
+  AssetActionsResult,
+  SelectionResult,
+  TabType,
   GroupByType,
-} from "./page";
+  ViewDefinitionOptions,
+} from "./types";
+
+// Export shared components
+export { default as AssetsPageHeader } from "./components/shared/AssetsPageHeader";
+
+// Export utilities and selectors
+export { generateViewKey } from "./reducers/views.reducer";
+export {
+  selectActiveFilterCount,
+  selectHasActiveFilters,
+  selectFilterAsAssetFilter,
+} from "./reducers/filters.reducer";
+export {
+  selectTabTitle,
+  selectTabSupportsSemanticSearch,
+  selectTabAssetTypes,
+} from "./reducers/ui.reducer";

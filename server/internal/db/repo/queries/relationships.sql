@@ -78,12 +78,22 @@ SELECT
             )
         ) FILTER (WHERE al.album_id IS NOT NULL),
         '[]'
-    ) as albums
+    ) as albums,
+    COALESCE(
+        json_agg(DISTINCT
+            jsonb_build_object(
+                'label', sp.label,
+                'score', sp.score
+            )
+        ) FILTER (WHERE sp.label IS NOT NULL),
+        '[]'
+    ) as species_predictions
 FROM assets a
 LEFT JOIN thumbnails t ON a.asset_id = t.asset_id
 LEFT JOIN asset_tags at ON a.asset_id = at.asset_id
 LEFT JOIN tags tg ON at.tag_id = tg.tag_id
 LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
 LEFT JOIN albums al ON aa.album_id = al.album_id
+LEFT JOIN species_predictions sp ON a.asset_id = sp.asset_id
 WHERE a.asset_id = $1 AND a.is_deleted = false
 GROUP BY a.asset_id;
