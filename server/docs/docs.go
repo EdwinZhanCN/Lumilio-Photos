@@ -621,7 +621,7 @@ const docTemplate = `{
         },
         "/assets": {
             "get": {
-                "description": "Retrieve a paginated list of assets. Filter by type, owner, or search query. Use 'vector=true|false' to control semantic vector search when 'q' is provided (feature must be enabled). At least one filter parameter is required.",
+                "description": "Retrieve a paginated list of assets. Filter by type or owner. At least one filter parameter is required.",
                 "consumes": [
                     "application/json"
                 ],
@@ -637,8 +637,7 @@ const docTemplate = `{
                         "enum": [
                             "PHOTO",
                             "VIDEO",
-                            "AUDIO",
-                            "DOCUMENT"
+                            "AUDIO"
                         ],
                         "type": "string",
                         "example": "\"PHOTO\"",
@@ -651,20 +650,6 @@ const docTemplate = `{
                         "example": 123,
                         "description": "Filter by owner ID",
                         "name": "owner_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "example": "\"red bird on a branch\"",
-                        "description": "Search query (semantic vector search when enabled) and filename match",
-                        "name": "q",
-                        "in": "query"
-                    },
-                    {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "When q is set: true to use semantic vector search, false to use filename search",
-                        "name": "vector",
                         "in": "query"
                     },
                     {
@@ -1146,7 +1131,7 @@ const docTemplate = `{
         },
         "/assets/{id}": {
             "get": {
-                "description": "Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, and albums.",
+                "description": "Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, and species predictions.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1185,6 +1170,13 @@ const docTemplate = `{
                         "default": true,
                         "description": "Include albums",
                         "name": "include_albums",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Include species predictions",
+                        "name": "include_species",
                         "in": "query"
                     }
                 ],

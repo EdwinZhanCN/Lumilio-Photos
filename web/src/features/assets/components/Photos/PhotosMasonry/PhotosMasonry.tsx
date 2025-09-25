@@ -1,10 +1,13 @@
 import PhotosThumbnail from "../PhotosThumbnail/PhotosThumbnail";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface PhotosMasonryProps {
   groupedPhotos: Record<string, Asset[]>;
   openCarousel: (assetId: string) => void;
   isLoading?: boolean;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 // Utility function to reorder photos for natural reading order in masonry layout
@@ -42,8 +45,12 @@ const PhotosMasonry = ({
   groupedPhotos,
   openCarousel,
   isLoading = false,
+  onLoadMore,
+  hasMore = false,
+  isLoadingMore = false,
 }: PhotosMasonryProps) => {
   const [columnCount, setColumnCount] = useState(getColumnCount());
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // Update column count on resize
   useEffect(() => {
@@ -53,6 +60,39 @@ const PhotosMasonry = ({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // Intersection observer for infinite scroll
+  const handleLoadMore = useCallback(() => {
+    if (hasMore && !isLoadingMore && onLoadMore) {
+      onLoadMore();
+    }
+  }, [hasMore, isLoadingMore, onLoadMore]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0];
+        if (target.isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: "100px",
+      },
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef && hasMore) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [handleLoadMore, hasMore]);
 
   // We no longer use virtualization here — render groups directly while preserving reading order.
   // Keeping the reading order reordering utility (reorderForReadingOrder) above.
@@ -127,6 +167,20 @@ const PhotosMasonry = ({
           </div>
         );
       })}
+
+      {/* Load more trigger */}
+      {hasMore && (
+        <div ref={loadMoreRef} className="flex justify-center py-8">
+          {isLoadingMore ? (
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <span className="text-gray-500">Loading more photos...</span>
+            </div>
+          ) : (
+            <div className="text-gray-400">Loading more...</div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

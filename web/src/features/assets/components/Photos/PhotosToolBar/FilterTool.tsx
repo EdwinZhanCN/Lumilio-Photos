@@ -909,16 +909,42 @@ export default function FilterTool({
     lens,
   ]);
 
-  const emit = useCallback(() => {
-    onChange?.(buildDTO());
-  }, [onChange, buildDTO]);
+  // Use ref to store the latest onChange callback to avoid dependency issues
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
-  // Auto-emit on state change if enabled
+  // Memoize the filter DTO to prevent unnecessary re-renders
+  const filterDTO = useMemo(
+    () => buildDTO(),
+    [
+      filterEnabled,
+      rawEnabled,
+      rawMode,
+      ratingEnabled,
+      ratingValue,
+      likedEnabled,
+      likedValue,
+      filenameEnabled,
+      filenameOperator,
+      filenameValue,
+      dateEnabled,
+      dateFrom,
+      dateTo,
+      locationEnabled,
+      location,
+      cameraMakeEnabled,
+      cameraMake,
+      lensEnabled,
+      lens,
+    ],
+  );
+
+  // Auto-emit on filter state change if enabled
   useEffect(() => {
     if (autoApply) {
-      emit();
+      onChangeRef.current?.(filterDTO);
     }
-  }, [autoApply, emit]);
+  }, [autoApply, filterDTO]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -967,9 +993,9 @@ export default function FilterTool({
   }, [autoApply, onChange]);
 
   const applyNow = useCallback(() => {
-    emit();
+    onChangeRef.current?.(filterDTO);
     setOpen(false);
-  }, [emit]);
+  }, [filterDTO]);
 
   return (
     <div

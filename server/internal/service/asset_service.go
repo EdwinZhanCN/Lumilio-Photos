@@ -35,9 +35,12 @@ var (
 // AssetService defines the interface for asset-related operations
 type AssetService interface {
 	GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error)
-	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums bool) (interface{}, error)
+	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies bool) (interface{}, error)
 	GetAssetsByType(ctx context.Context, assetType string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwner(ctx context.Context, ownerID int, limit, offset int) ([]repo.Asset, error)
+	GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error)
+	GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error)
+	GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error)
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata []byte) error
@@ -128,14 +131,14 @@ func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset,
 	return &dbAsset, nil
 }
 
-func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums bool) (interface{}, error) {
+func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies bool) (interface{}, error) {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
 		return nil, fmt.Errorf("invalid UUID: %w", err)
 	}
 
-	// 1) Full relations (thumbnails + tags + albums)
-	if includeThumbnails && includeTags && includeAlbums {
+	// 1) Full relations (thumbnails + tags + albums) OR species predictions requested
+	if includeSpecies || (includeThumbnails && includeTags && includeAlbums) {
 		dbAsset, err := s.queries.GetAssetWithRelations(ctx, pgUUID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get asset with relations: %w", err)
@@ -252,6 +255,46 @@ func (s *assetService) GetAssetsByOwner(ctx context.Context, ownerID int, limit,
 	}
 
 	return s.queries.GetAssetsByOwner(ctx, params)
+}
+
+// GetAssetsByOwnerSorted retrieves assets by owner with custom sorting
+func (s *assetService) GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error) {
+	params := repo.GetAssetsByOwnerSortedParams{
+		OwnerID: int32PtrFromIntPtr(&ownerID),
+		Column2: sortBy,
+		Column3: sortOrder,
+		Limit:   int32(limit),
+		Offset:  int32(offset),
+	}
+
+	return s.queries.GetAssetsByOwnerSorted(ctx, params)
+}
+
+// GetAssetsByTypesSorted retrieves assets by multiple types with custom sorting
+func (s *assetService) GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error) {
+	params := repo.GetAssetsByTypesSortedParams{
+		Types:     assetTypes,
+		SortBy:    sortBy,
+		SortOrder: sortOrder,
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+	}
+
+	return s.queries.GetAssetsByTypesSorted(ctx, params)
+}
+
+// GetAssetsByOwnerAndTypes retrieves assets by owner and multiple types with custom sorting
+func (s *assetService) GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error) {
+	params := repo.GetAssetsByOwnerAndTypesSortedParams{
+		OwnerID:   int32PtrFromIntPtr(&ownerID),
+		Types:     assetTypes,
+		SortBy:    sortBy,
+		SortOrder: sortOrder,
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+	}
+
+	return s.queries.GetAssetsByOwnerAndTypesSorted(ctx, params)
 }
 
 // SearchAssets searches for assets by query and type

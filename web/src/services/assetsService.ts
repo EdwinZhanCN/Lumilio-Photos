@@ -126,11 +126,13 @@ export interface UpdateDescriptionRequest {
  * All properties are optional, allowing for flexible filtering.
  */
 export interface ListAssetsParams {
-  type?: "PHOTO" | "VIDEO" | "AUDIO" | "DOCUMENT";
+  type?: "PHOTO" | "VIDEO" | "AUDIO"; // Single type filtering
+  types?: string; // Multiple types as comma-separated string (e.g., "PHOTO,VIDEO")
   owner_id?: number;
-  q?: string;
   limit?: number;
   offset?: number;
+  sort_by?: "taken_time" | "rating" | "upload_time";
+  sort_order?: "asc" | "desc";
 }
 
 /**
