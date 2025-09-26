@@ -35,6 +35,7 @@ interface Asset {
   mime_type?: string;
   original_filename?: string;
   owner_id?: number;
+  taken_time?: string;
   specific_metadata?: PhotoSpecificMetadata;
   storage_path?: string;
   tags?: AssetTag[];

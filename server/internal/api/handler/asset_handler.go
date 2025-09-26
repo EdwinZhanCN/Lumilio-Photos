@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -183,12 +182,12 @@ type FilterAssetsRequest struct {
 
 // SearchAssetsRequest represents the request structure for searching assets
 type SearchAssetsRequest struct {
-	Query       string      `json:"query" binding:"required" example:"red bird on branch"`
-	SearchType  string      `json:"search_type" binding:"required" example:"filename" enums:"filename,semantic"`
-	MaxDistance *float64    `json:"max_distance,omitempty" example:"0.35"`
-	Filter      AssetFilter `json:"filter,omitempty"`
-	Limit       int         `json:"limit" example:"20" minimum:"1" maximum:"100"`
-	Offset      int         `json:"offset" example:"0" minimum:"0"`
+	Query      string `json:"query" binding:"required" example:"red bird on branch"`
+	SearchType string `json:"search_type" binding:"required" example:"filename" enums:"filename,semantic"`
+
+	Filter AssetFilter `json:"filter,omitempty"`
+	Limit  int         `json:"limit" example:"20" minimum:"1" maximum:"100"`
+	Offset int         `json:"offset" example:"0" minimum:"0"`
 }
 
 // OptionsResponse represents the response for filter options
@@ -995,21 +994,10 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 	} else {
-		// If the underlying service supports thresholded semantic search, pass optional max_distance from request body.
-		// Fallback to existing method otherwise.
-		if svc, ok := interface{}(h.assetService).(interface {
-			SearchAssetsVectorWithThreshold(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int, maxDistance *float64) ([]repo.Asset, error)
-		}); ok {
-			assets, err = svc.SearchAssetsVectorWithThreshold(ctx, req.Query,
-				typePtr, filter.OwnerID, filenameVal, filenameMode,
-				dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
-				filter.CameraMake, filter.Lens, req.Limit, req.Offset, req.MaxDistance)
-		} else {
-			assets, err = h.assetService.SearchAssetsVector(ctx, req.Query,
-				typePtr, filter.OwnerID, filenameVal, filenameMode,
-				dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
-				filter.CameraMake, filter.Lens, req.Limit, req.Offset)
-		}
+		assets, err = h.assetService.SearchAssetsVector(ctx, req.Query,
+			typePtr, filter.OwnerID, filenameVal, filenameMode,
+			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
+			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 	}
 
 	if err != nil {
