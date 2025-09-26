@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,6 +25,17 @@ const (
 	AssetTypeVideo = "VIDEO"
 	AssetTypeAudio = "AUDIO"
 )
+
+const defaultSemanticMaxDistance = 1.1
+
+func getDefaultSemanticMaxDistance() float64 {
+	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			return f
+		}
+	}
+	return defaultSemanticMaxDistance
+}
 
 // Error constants for asset service
 var (
@@ -38,9 +51,9 @@ type AssetService interface {
 	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies bool) (interface{}, error)
 	GetAssetsByType(ctx context.Context, assetType string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwner(ctx context.Context, ownerID int, limit, offset int) ([]repo.Asset, error)
-	GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error)
-	GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error)
-	GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error)
+	GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortOrder string, limit, offset int) ([]repo.Asset, error)
+	GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error)
+	GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error)
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata []byte) error
@@ -78,6 +91,7 @@ type AssetService interface {
 	FilterAssets(ctx context.Context, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
 	SearchAssetsFilename(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
 	SearchAssetsVector(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
+	SearchAssetsVectorWithThreshold(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int, maxDistance *float64) ([]repo.Asset, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]string, error)
 	GetDistinctLenses(ctx context.Context) ([]string, error)
 }
@@ -107,7 +121,8 @@ func NewAssetServiceWithML(q *repo.Queries, s storage.Storage, ml *MLService) (A
 
 // CreateAssetRecord creates a new asset record in the database
 func (s *assetService) CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error) {
-
+	// Note: taken_time will be set to NULL initially and updated later when EXIF is processed
+	// This is because we need to extract the time from the actual file content, not just the parameters
 	asset, err := s.queries.CreateAsset(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create asset: %w", err)
@@ -257,12 +272,11 @@ func (s *assetService) GetAssetsByOwner(ctx context.Context, ownerID int, limit,
 	return s.queries.GetAssetsByOwner(ctx, params)
 }
 
-// GetAssetsByOwnerSorted retrieves assets by owner with custom sorting
-func (s *assetService) GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error) {
+// GetAssetsByOwnerSorted retrieves assets by owner sorted by taken_time
+func (s *assetService) GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortOrder string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByOwnerSortedParams{
 		OwnerID: int32PtrFromIntPtr(&ownerID),
-		Column2: sortBy,
-		Column3: sortOrder,
+		Column2: sortOrder,
 		Limit:   int32(limit),
 		Offset:  int32(offset),
 	}
@@ -270,11 +284,10 @@ func (s *assetService) GetAssetsByOwnerSorted(ctx context.Context, ownerID int, 
 	return s.queries.GetAssetsByOwnerSorted(ctx, params)
 }
 
-// GetAssetsByTypesSorted retrieves assets by multiple types with custom sorting
-func (s *assetService) GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error) {
+// GetAssetsByTypesSorted retrieves assets by multiple types sorted by taken_time
+func (s *assetService) GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByTypesSortedParams{
 		Types:     assetTypes,
-		SortBy:    sortBy,
 		SortOrder: sortOrder,
 		Limit:     int32(limit),
 		Offset:    int32(offset),
@@ -283,12 +296,11 @@ func (s *assetService) GetAssetsByTypesSorted(ctx context.Context, assetTypes []
 	return s.queries.GetAssetsByTypesSorted(ctx, params)
 }
 
-// GetAssetsByOwnerAndTypes retrieves assets by owner and multiple types with custom sorting
-func (s *assetService) GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortBy, sortOrder string, limit, offset int) ([]repo.Asset, error) {
+// GetAssetsByOwnerAndTypes retrieves assets by owner and multiple types sorted by taken_time
+func (s *assetService) GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByOwnerAndTypesSortedParams{
 		OwnerID:   int32PtrFromIntPtr(&ownerID),
 		Types:     assetTypes,
-		SortBy:    sortBy,
 		SortOrder: sortOrder,
 		Limit:     int32(limit),
 		Offset:    int32(offset),
@@ -422,19 +434,53 @@ func (s *assetService) DetectDuplicates(ctx context.Context, hash string) ([]rep
 	return s.queries.GetAssetsByHash(ctx, &hash)
 }
 
-// UpdateAssetMetadata updates the specific metadata of an asset
+// UpdateAssetMetadata updates the specific metadata of an asset and extracts taken_time
 func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata []byte) error {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
 		return fmt.Errorf("invalid UUID: %w", err)
 	}
 
-	params := repo.UpdateAssetMetadataParams{
-		AssetID:          pgUUID,
-		SpecificMetadata: metadata,
+	// Get the asset to determine its type for taken_time extraction
+	asset, err := s.queries.GetAssetByID(ctx, pgUUID)
+	if err != nil {
+		return fmt.Errorf("failed to get asset for metadata update: %w", err)
 	}
 
-	return s.queries.UpdateAssetMetadata(ctx, params)
+	// Extract taken_time from metadata based on asset type
+	var takenTime *time.Time
+	assetType := dbtypes.AssetType(asset.Type)
+
+	switch assetType {
+	case dbtypes.AssetTypePhoto:
+		if photoMeta, err := dbtypes.UnmarshalPhoto(metadata); err == nil {
+			takenTime = photoMeta.TakenTime
+		}
+	case dbtypes.AssetTypeVideo:
+		if videoMeta, err := dbtypes.UnmarshalVideo(metadata); err == nil {
+			takenTime = videoMeta.RecordedTime
+		}
+	case dbtypes.AssetTypeAudio:
+		// Audio doesn't have taken time
+		takenTime = nil
+	}
+
+	// Use the new query that updates both metadata and taken_time
+	var takenTimeParam pgtype.Timestamptz
+	if takenTime != nil {
+		takenTimeParam = pgtype.Timestamptz{
+			Time:  *takenTime,
+			Valid: true,
+		}
+	}
+
+	params := repo.UpdateAssetMetadataWithTakenTimeParams{
+		AssetID:          pgUUID,
+		SpecificMetadata: metadata,
+		TakenTime:        takenTimeParam,
+	}
+
+	return s.queries.UpdateAssetMetadataWithTakenTime(ctx, params)
 }
 
 // DeleteAsset marks an asset as deleted
@@ -628,7 +674,7 @@ func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID
 // SaveNewThumbnail TODO: Refine this
 func (s *assetService) SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *repo.Asset, size string) error {
 	// TODO: Upload Thumbnail to different folder
-	storagePath, err := s.storage.UploadWithMetadata(ctx, buffers, asset.OriginalFilename+"_"+size, "")
+	storagePath, err := s.storage.UploadWithMetadata(ctx, buffers, asset.OriginalFilename+"_"+size+".webp", "")
 	if err != nil {
 		return err
 	}
@@ -824,83 +870,7 @@ func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, a
 }
 
 func (s *assetService) SearchAssetsVector(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
-	if s.ml == nil {
-		return nil, fmt.Errorf("ML service not available for semantic search")
-	}
-
-	// Get query embedding
-	embeddingResult, err := s.ml.ClipEmbed(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get query embedding: %w", err)
-	}
-
-	// Convert rating pointer for SQL
-	var ratingPtr *int32
-	if rating != nil {
-		r := int32(*rating)
-		ratingPtr = &r
-	}
-
-	// Convert dates to pgtype.Timestamptz
-	var fromTime, toTime pgtype.Timestamptz
-	if dateFrom != nil {
-		fromTime = pgtype.Timestamptz{Time: *dateFrom, Valid: true}
-	}
-	if dateTo != nil {
-		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
-	}
-
-	// Convert embedding to pgvector format
-	pgEmbeddingFloat32 := make([]float32, len(embeddingResult.Vector))
-	for i, v := range embeddingResult.Vector {
-		pgEmbeddingFloat32[i] = float32(v)
-	}
-	pgEmbedding := pgvector_go.NewVector(pgEmbeddingFloat32)
-
-	results, err := s.queries.SearchAssetsVector(ctx, repo.SearchAssetsVectorParams{
-		Embedding:    pgEmbedding,
-		AssetType:    assetType,
-		OwnerID:      ownerID,
-		FilenameVal:  filenameVal,
-		FilenameMode: filenameMode,
-		DateFrom:     fromTime,
-		DateTo:       toTime,
-		IsRaw:        isRaw,
-		Rating:       ratingPtr,
-		Liked:        liked,
-		CameraModel:  cameraMake,
-		LensModel:    lens,
-		Limit:        int32(limit),
-		Offset:       int32(offset),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to search assets with vector: %w", err)
-	}
-
-	// Extract assets from results (ignore distance for now)
-	assets := make([]repo.Asset, len(results))
-	for i, result := range results {
-		assets[i] = repo.Asset{
-			AssetID:          result.AssetID,
-			OwnerID:          result.OwnerID,
-			Type:             result.Type,
-			OriginalFilename: result.OriginalFilename,
-			StoragePath:      result.StoragePath,
-			MimeType:         result.MimeType,
-			FileSize:         result.FileSize,
-			Hash:             result.Hash,
-			Width:            result.Width,
-			Height:           result.Height,
-			Duration:         result.Duration,
-			UploadTime:       result.UploadTime,
-			IsDeleted:        result.IsDeleted,
-			DeletedAt:        result.DeletedAt,
-			SpecificMetadata: result.SpecificMetadata,
-			Embedding:        result.Embedding,
-		}
-	}
-
-	return assets, nil
+	return s.SearchAssetsVectorWithThreshold(ctx, query, assetType, ownerID, filenameVal, filenameMode, dateFrom, dateTo, isRaw, rating, liked, cameraMake, lens, limit, offset, nil)
 }
 
 func (s *assetService) GetDistinctCameraMakes(ctx context.Context) ([]string, error) {
@@ -1011,4 +981,134 @@ func (s *assetService) GetLikedAssets(ctx context.Context, limit, offset int) ([
 	}
 
 	return s.queries.GetLikedAssets(ctx, params)
+}
+
+func (s *assetService) SearchAssetsVectorWithThreshold(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int, maxDistance *float64) ([]repo.Asset, error) {
+	if s.ml == nil {
+		return nil, fmt.Errorf("ML service not available for semantic search")
+	}
+
+	// Get query embedding
+	embeddingResult, err := s.ml.ClipEmbed(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get query embedding: %w", err)
+	}
+
+	// Determine effective threshold (fallback to default if not provided)
+	if maxDistance == nil {
+		def := getDefaultSemanticMaxDistance()
+		maxDistance = &def
+	}
+
+	// Convert rating pointer for SQL
+	var ratingPtr *int32
+	if rating != nil {
+		r := int32(*rating)
+		ratingPtr = &r
+	}
+
+	// Convert dates to pgtype.Timestamptz
+	var fromTime, toTime pgtype.Timestamptz
+	if dateFrom != nil {
+		fromTime = pgtype.Timestamptz{Time: *dateFrom, Valid: true}
+	}
+	if dateTo != nil {
+		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
+	}
+
+	// Convert embedding to pgvector format
+	pgEmbeddingFloat32 := make([]float32, len(embeddingResult.Vector))
+	for i, v := range embeddingResult.Vector {
+		pgEmbeddingFloat32[i] = float32(v)
+	}
+	pgEmbedding := pgvector_go.NewVector(pgEmbeddingFloat32)
+
+	// Fetch enough rows so we can paginate after threshold filtering
+	requestLimit := int32(limit + offset)
+	if requestLimit <= 0 {
+		requestLimit = 1000
+	}
+
+	results, err := s.queries.SearchAssetsVector(ctx, repo.SearchAssetsVectorParams{
+		Embedding:    pgEmbedding,
+		AssetType:    assetType,
+		OwnerID:      ownerID,
+		FilenameVal:  filenameVal,
+		FilenameMode: filenameMode,
+		DateFrom:     fromTime,
+		DateTo:       toTime,
+		IsRaw:        isRaw,
+		Rating:       ratingPtr,
+		Liked:        liked,
+		CameraModel:  cameraMake,
+		LensModel:    lens,
+		Limit:        requestLimit,
+		Offset:       0,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to search assets with vector: %w", err)
+	}
+
+	// Filter by distance threshold, keep order (already ordered by distance ASC)
+	filtered := make([]repo.Asset, 0, len(results))
+	for _, result := range results {
+		var dist float64
+		switch d := result.Distance.(type) {
+		case float32:
+			dist = float64(d)
+		case float64:
+			dist = d
+		case int32:
+			dist = float64(d)
+		case int64:
+			dist = float64(d)
+		case string:
+			if parsed, perr := strconv.ParseFloat(d, 64); perr == nil {
+				dist = parsed
+			} else {
+				continue
+			}
+		default:
+			// Unknown type, skip this row
+			continue
+		}
+
+		if dist <= *maxDistance {
+			filtered = append(filtered, repo.Asset{
+				AssetID:          result.AssetID,
+				OwnerID:          result.OwnerID,
+				Type:             result.Type,
+				OriginalFilename: result.OriginalFilename,
+				StoragePath:      result.StoragePath,
+				MimeType:         result.MimeType,
+				FileSize:         result.FileSize,
+				Hash:             result.Hash,
+				Width:            result.Width,
+				Height:           result.Height,
+				Duration:         result.Duration,
+				UploadTime:       result.UploadTime,
+				IsDeleted:        result.IsDeleted,
+				DeletedAt:        result.DeletedAt,
+				SpecificMetadata: result.SpecificMetadata,
+				Embedding:        result.Embedding,
+			})
+		}
+	}
+
+	// Apply pagination after threshold filtering
+	if offset < 0 {
+		offset = 0
+	}
+	if limit < 0 {
+		limit = 0
+	}
+	if offset >= len(filtered) {
+		return []repo.Asset{}, nil
+	}
+	end := offset + limit
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+
+	return filtered[offset:end], nil
 }

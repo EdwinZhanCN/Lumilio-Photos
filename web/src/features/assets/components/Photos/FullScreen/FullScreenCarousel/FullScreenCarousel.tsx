@@ -30,7 +30,8 @@ const FullScreenCarousel = ({
   onAssetUpdate,
   onAssetDelete,
 }: FullScreenCarouselProps) => {
-  const swiperRef = useRef<any>(null);
+  const swiperRef = useRef<any>(null),
+    closingRef = useRef(false);
   const [showInfo, setShowInfo] = useState(false);
   const [currentAsset, setCurrentAsset] = useState(photos[initialSlide]);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -50,24 +51,22 @@ const FullScreenCarousel = ({
     });
   }, [photos]);
 
-  useEffect(() => {
-    if (swiperRef.current && swiperRef.current.swiper) {
-      swiperRef.current.swiper.slideTo(initialSlide, 0);
-    }
-    setCurrentAsset(photos[initialSlide]);
-  }, [initialSlide, photos]);
-
   const onSlideChange = (swiper: any) => {
-    const assetId = slides[swiper.activeIndex]?.assetId;
-    if (assetId) {
-      onNavigate(assetId);
-      setCurrentAsset(photos[swiper.activeIndex]);
-    }
+    if (closingRef.current) return;
+    const idx = swiper.activeIndex;
+    const assetId = slides[idx]?.assetId;
+    if (assetId && assetId !== currentAsset?.asset_id) onNavigate(assetId);
+    if (photos[idx]) setCurrentAsset(photos[idx]);
   };
 
   const toggleInfo = () => {
     setShowInfo(!showInfo);
   };
+  const handleClose = () => {
+    closingRef.current = true;
+    onClose();
+  };
+  //
 
   useEffect(() => {
     const handler = () => setShowInfo((s) => !s);
@@ -79,13 +78,13 @@ const FullScreenCarousel = ({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        handleClose();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [handleClose]);
 
   const handleAssetUpdate = (updatedAsset: Asset) => {
     setCurrentAsset(updatedAsset);
@@ -136,7 +135,7 @@ const FullScreenCarousel = ({
       }
 
       // Close the carousel
-      onClose();
+      handleClose();
     } catch (error) {
       console.error("Failed to delete asset:", error);
       showMessage("error", t("delete.error"));
@@ -153,7 +152,7 @@ const FullScreenCarousel = ({
   return (
     <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center animate-fade-in">
       <button
-        onClick={onClose}
+        onClick={handleClose}
         className="btn btn-ghost btn-sm absolute top-2 left-4 text-white z-20"
       >
         <XMarkIcon className="w-6 h-6" />

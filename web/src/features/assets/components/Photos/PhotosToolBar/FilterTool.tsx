@@ -762,67 +762,94 @@ export default function FilterTool({
   // Dropdown open state (independent of filter enabled)
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  // Freeze initial props after first mount to avoid reinitialization from incoming prop changes
+  const mountedRef = useRef(false);
+  const initialStableRef = useRef<FilterDTO | undefined>(initial);
+  useEffect(() => {
+    mountedRef.current = true;
+    // ignore subsequent initial prop changes
+  }, []);
 
   // Global filter enable/disable
   const [filterEnabled, setFilterEnabled] = useState<boolean>(
-    !!initial && Object.keys(initial).length > 0,
+    !!initialStableRef.current &&
+      Object.keys(initialStableRef.current).length > 0,
   );
 
   // RAW
   const [rawEnabled, setRawEnabled] = useState<boolean>(
-    typeof initial?.raw === "boolean",
+    typeof initialStableRef.current?.raw === "boolean",
   );
   const [rawMode, setRawMode] = useState<"include" | "exclude">(
-    initial?.raw === false ? "exclude" : "include",
+    initialStableRef.current?.raw === false ? "exclude" : "include",
   );
 
   // Rating: 5/4/3/2/1/unrated(0)
   const [ratingEnabled, setRatingEnabled] = useState<boolean>(
-    typeof initial?.rating === "number",
+    typeof initialStableRef.current?.rating === "number",
   );
   const [ratingValue, setRatingValue] = useState<number>(
-    typeof initial?.rating === "number" ? initial!.rating! : 5,
+    typeof initialStableRef.current?.rating === "number"
+      ? initialStableRef.current!.rating!
+      : 5,
   );
 
   // Liked: liked/unliked
   const [likedEnabled, setLikedEnabled] = useState<boolean>(
-    typeof initial?.liked === "boolean",
+    typeof initialStableRef.current?.liked === "boolean",
   );
-  const [likedValue, setLikedValue] = useState<boolean>(initial?.liked ?? true);
+  const [likedValue, setLikedValue] = useState<boolean>(
+    initialStableRef.current?.liked ?? true,
+  );
 
   // Filename: operator + value
   const [filenameEnabled, setFilenameEnabled] = useState<boolean>(
-    !!initial?.filename,
+    !!initialStableRef.current?.filename,
   );
   const [filenameOperator, setFilenameOperator] = useState<FilenameOperator>(
-    initial?.filename?.operator ?? "contains",
+    initialStableRef.current?.filename?.operator ?? "contains",
   );
   const [filenameValue, setFilenameValue] = useState<string>(
-    initial?.filename?.value ?? "",
+    initialStableRef.current?.filename?.value ?? "",
   );
 
   // Date range
-  const [dateEnabled, setDateEnabled] = useState<boolean>(!!initial?.date);
-  const [dateFrom, setDateFrom] = useState<string>(initial?.date?.from ?? "");
-  const [dateTo, setDateTo] = useState<string>(initial?.date?.to ?? "");
+  const [dateEnabled, setDateEnabled] = useState<boolean>(
+    !!initialStableRef.current?.date,
+  );
+  const [dateFrom, setDateFrom] = useState<string>(
+    initialStableRef.current?.date?.from ?? "",
+  );
+  const [dateTo, setDateTo] = useState<string>(
+    initialStableRef.current?.date?.to ?? "",
+  );
 
   // Location (BBox)
   const [locationEnabled, setLocationEnabled] = useState<boolean>(
-    !!initial?.location,
+    !!initialStableRef.current?.location,
   );
   const [location, setLocation] = useState<LocationBBox>(
-    initial?.location ?? { north: 0, south: 0, east: 0, west: 0 },
+    initialStableRef.current?.location ?? {
+      north: 0,
+      south: 0,
+      east: 0,
+      west: 0,
+    },
   );
 
   // Camera make / Lens
   const [cameraMakeEnabled, setCameraMakeEnabled] = useState<boolean>(
-    !!initial?.camera_make,
+    !!initialStableRef.current?.camera_make,
   );
   const [cameraMake, setCameraMake] = useState<string>(
-    initial?.camera_make ?? "",
+    initialStableRef.current?.camera_make ?? "",
   );
-  const [lensEnabled, setLensEnabled] = useState<boolean>(!!initial?.lens);
-  const [lens, setLens] = useState<string>(initial?.lens ?? "");
+  const [lensEnabled, setLensEnabled] = useState<boolean>(
+    !!initialStableRef.current?.lens,
+  );
+  const [lens, setLens] = useState<string>(
+    initialStableRef.current?.lens ?? "",
+  );
 
   // Options hook
   const { cameraMakeItems, lensItems, loadingOptions } = useFilterOptions({
@@ -863,6 +890,8 @@ export default function FilterTool({
     lens,
   ]);
 
+  // Build DTO from local UI state only when a section is enabled and has valid value.
+  // Disabled sections are ignored; for location, ignore zero bounding box to avoid sending empty spatial filters.
   const buildDTO = useCallback((): FilterDTO => {
     if (!filterEnabled) return {};
     const dto: FilterDTO = {};
@@ -881,7 +910,7 @@ export default function FilterTool({
         to: dateTo || undefined,
       };
     }
-    if (locationEnabled) {
+    if (locationEnabled && !isZeroBBox(location)) {
       dto.location = { ...location };
     }
     if (cameraMakeEnabled && cameraMake) dto.camera_make = cameraMake;
@@ -951,7 +980,8 @@ export default function FilterTool({
     const handler = (e: MouseEvent) => {
       if (!rootRef.current) return;
       if (!rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
+        // Only close if currently open to avoid unnecessary state churn
+        setOpen((prev) => (prev ? false : prev));
       }
     };
     document.addEventListener("mousedown", handler);
@@ -1009,7 +1039,7 @@ export default function FilterTool({
         onClick={() => setOpen((v) => !v)}
         title="Filters"
       >
-        <ListFilterIcon />
+        <ListFilterIcon className="w-4 h-4" />
         {enabledCount > 0 && (
           <span className="badge badge-xs badge-primary absolute -right-1 -top-1">
             {enabledCount}

@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useState } from "react";
 import { useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
-import PhotosMasonry from "@/features/assets/components/Photos/PhotosMasonry/PhotosMasonry";
+import JustifiedGallery from "@/features/assets/components/Photos/JustifiedGallery/JustifiedGallery";
 import FullScreenCarousel from "@/features/assets/components/Photos/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import PhotosLoadingSkeleton from "@/features/assets/components/Photos/PhotosLoadingSkeleton";
 import {
@@ -122,7 +122,7 @@ function Photos() {
       {isFetching && allAssets.length === 0 ? (
         <PhotosLoadingSkeleton />
       ) : (
-        <PhotosMasonry
+        <JustifiedGallery
           groupedPhotos={finalGroupedPhotos}
           openCarousel={(id: string) => {
             openCarousel(id);

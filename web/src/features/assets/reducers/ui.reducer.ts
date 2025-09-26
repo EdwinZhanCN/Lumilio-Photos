@@ -4,7 +4,7 @@ export const initialUIState: UIState = {
   currentTab: "photos",
   groupBy: "date",
   searchQuery: "",
-  searchMode: "semantic",
+  searchMode: "filename",
   isCarouselOpen: false,
   activeAssetId: undefined,
 };

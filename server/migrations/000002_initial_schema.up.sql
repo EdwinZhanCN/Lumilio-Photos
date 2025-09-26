@@ -42,6 +42,7 @@ CREATE TABLE assets (
     height             INTEGER,
     duration           DOUBLE PRECISION,
     upload_time        TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
+    taken_time         TIMESTAMPTZ,
     is_deleted         BOOLEAN       DEFAULT FALSE,
     deleted_at         TIMESTAMPTZ,
     specific_metadata  JSONB,
@@ -51,6 +52,12 @@ CREATE TABLE assets (
 CREATE INDEX idx_assets_owner_id ON assets(owner_id);
 CREATE INDEX idx_assets_type ON assets(type);
 CREATE INDEX idx_assets_hash ON assets(hash);
+CREATE INDEX idx_assets_taken_time ON assets(taken_time);
+
+-- Composite expression index for optimized type+taken_time queries
+CREATE INDEX idx_assets_type_taken_time_coalesce
+  ON assets(type, COALESCE(taken_time, upload_time) DESC)
+  WHERE is_deleted = false;
 
 -- Vector HNSW index for semantic search on embeddings
 CREATE INDEX assets_hnsw_idx ON assets USING hnsw (embedding vector_l2_ops)

@@ -21,7 +21,6 @@ export interface AssetViewDefinition {
   groupBy?: GroupByType;
   /** Sorting configuration */
   sort?: {
-    field: "taken_time" | "rating" | "upload_time";
     direction: "desc" | "asc";
   };
   /** Page size for pagination */

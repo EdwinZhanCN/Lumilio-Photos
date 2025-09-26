@@ -91,6 +91,16 @@ export const useAssetsView = (
     };
   }, [definition.filter, definition.inheritGlobalFilter, state.filters]);
 
+  // Whether there is any effective filter to apply
+  const hasEffectiveFilter = useMemo(() => {
+    return Object.keys(effectiveFilter || {}).length > 0;
+  }, [effectiveFilter]);
+  // Stable hash to compare filter changes without causing effect dependency churn
+  const effectiveFilterHash = useMemo(
+    () => JSON.stringify(effectiveFilter || {}),
+    [effectiveFilter],
+  );
+
   // Convert tab types to API mime types
   const getApiMimeTypes = useCallback(
     (tabTypes: TabType[]): ("PHOTO" | "VIDEO" | "AUDIO")[] => {
@@ -113,7 +123,7 @@ export const useAssetsView = (
     [],
   );
 
-  // Create parameters for listing assets (non-search)
+  // Create parameters for listing assets (non-search, no filters)
   const createListParams = useCallback(
     (page?: number): ListAssetsParams => {
       const params: ListAssetsParams = {
@@ -139,14 +149,40 @@ export const useAssetsView = (
 
       // Add sorting
       if (definition.sort) {
-        params.sort_by = definition.sort.field;
         params.sort_order = definition.sort.direction;
       }
 
-      // Add filters directly to params for list endpoint
-      Object.assign(params, effectiveFilter);
-
       return params;
+    },
+    [definition, getApiMimeTypes],
+  );
+
+  // Create parameters for filtering assets (non-search, with filters)
+  const createFilterParams = useCallback(
+    (page?: number) => {
+      const payload: {
+        filter: any;
+        limit: number;
+        offset?: number;
+      } = {
+        filter: { ...effectiveFilter },
+        limit: definition.pageSize || 50,
+      };
+
+      // Pagination
+      if (page && page > 1) {
+        payload.offset = (page - 1) * (definition.pageSize || 50);
+      }
+
+      // Single type only for filter API
+      if (definition.types && definition.types.length > 0) {
+        const mimeTypes = getApiMimeTypes(definition.types);
+        if (mimeTypes.length === 1) {
+          payload.filter.type = mimeTypes[0];
+        }
+      }
+
+      return payload;
     },
     [definition, effectiveFilter, getApiMimeTypes],
   );
@@ -214,6 +250,9 @@ export const useAssetsView = (
         if (isSearchOperation) {
           const searchParams = createSearchParams();
           result = await assetService.searchAssets(searchParams);
+        } else if (hasEffectiveFilter) {
+          const filterParams = createFilterParams();
+          result = await assetService.filterAssets(filterParams);
         } else {
           const listParams = createListParams();
           result = await assetService.listAssets(listParams);
@@ -274,11 +313,20 @@ export const useAssetsView = (
       disabled,
       viewKey,
       isSearchOperation,
+      hasEffectiveFilter,
       createSearchParams,
+      createFilterParams,
       createListParams,
       dispatch,
+      definition.pageSize,
     ],
   );
+
+  // Keep a stable ref to fetchAssets to use inside effects without re-subscribing
+  const fetchAssetsRef = useRef(fetchAssets);
+  useEffect(() => {
+    fetchAssetsRef.current = fetchAssets;
+  }, [fetchAssets]);
 
   // Fetch more (pagination)
   const fetchMore = useCallback(async () => {
@@ -308,6 +356,9 @@ export const useAssetsView = (
       if (isSearchOperation) {
         const searchParams = createSearchParams(nextPage);
         result = await assetService.searchAssets(searchParams);
+      } else if (hasEffectiveFilter) {
+        const filterParams = createFilterParams(nextPage);
+        result = await assetService.filterAssets(filterParams);
       } else {
         const listParams = createListParams(nextPage);
         result = await assetService.listAssets(listParams);
@@ -364,9 +415,12 @@ export const useAssetsView = (
     disabled,
     viewKey,
     isSearchOperation,
+    hasEffectiveFilter,
     createSearchParams,
+    createFilterParams,
     createListParams,
     dispatch,
+    definition.pageSize,
   ]);
 
   // Refetch function (clears and refetches)
@@ -392,11 +446,24 @@ export const useAssetsView = (
       viewState &&
       !viewState.isLoading &&
       viewState.assetIds.length === 0 &&
-      !viewState.error
+      !viewState.error &&
+      viewState.lastFetchAt === 0
     ) {
       fetchAssets();
     }
   }, [autoFetch, disabled, viewState, fetchAssets]);
+
+  // Track last applied filter hash to avoid initial refetch and loops
+  const lastAppliedFilterHashRef = useRef(effectiveFilterHash);
+
+  // Refetch when effective filters change after initial load
+  useEffect(() => {
+    if (disabled) return;
+    // Only refetch when the filter hash actually changes after mount
+    if (lastAppliedFilterHashRef.current === effectiveFilterHash) return;
+    lastAppliedFilterHashRef.current = effectiveFilterHash;
+    fetchAssetsRef.current(true);
+  }, [disabled, effectiveFilterHash]);
 
   // Generate groups if requested
   const groups = useMemo(() => {
@@ -447,10 +514,13 @@ export const useCurrentTabAssets = (
       groupBy: (groupBy as any) || state.ui.groupBy,
       pageSize: pageSize || 50,
       sort: { field: "taken_time", direction: "desc" },
-      search: state.ui.searchQuery
+      search: state.ui.searchQuery.trim()
         ? {
-            query: state.ui.searchQuery,
-            mode: state.ui.currentTab === "photos" ? "semantic" : "filename",
+            query: state.ui.searchQuery.trim(),
+            mode:
+              state.ui.currentTab === "photos"
+                ? state.ui.searchMode
+                : "filename",
           }
         : undefined,
     }),
@@ -458,6 +528,7 @@ export const useCurrentTabAssets = (
       state.ui.currentTab,
       state.ui.groupBy,
       state.ui.searchQuery,
+      state.ui.searchMode,
       groupBy,
       pageSize,
     ],

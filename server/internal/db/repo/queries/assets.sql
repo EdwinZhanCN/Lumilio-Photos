@@ -1,8 +1,8 @@
 -- name: CreateAsset :one
 INSERT INTO assets (
     owner_id, type, original_filename, storage_path, mime_type,
-    file_size, hash, width, height, duration, specific_metadata
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    file_size, hash, width, height, duration, taken_time, specific_metadata
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: GetAssetByID :one
@@ -31,6 +31,15 @@ RETURNING *;
 UPDATE assets
 SET specific_metadata = $2
 WHERE asset_id = $1;
+
+-- name: UpdateAssetMetadataWithTakenTime :exec
+UPDATE assets
+SET specific_metadata = sqlc.arg('specific_metadata'),
+    taken_time = CASE
+        WHEN sqlc.arg('taken_time')::timestamptz IS NOT NULL THEN sqlc.arg('taken_time')::timestamptz
+        ELSE COALESCE(taken_time, upload_time)
+    END
+WHERE asset_id = sqlc.arg('asset_id');
 
 -- name: DeleteAsset :exec
 UPDATE assets
@@ -270,88 +279,22 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 SELECT * FROM assets
 WHERE owner_id = $1 AND is_deleted = false
 ORDER BY
-  CASE
-    WHEN $2 = 'taken_time' AND $3 = 'asc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
-    ELSE NULL
-  END ASC,
-  CASE
-    WHEN $2 = 'taken_time' AND $3 = 'desc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
-    ELSE NULL
-  END DESC,
-  CASE
-    WHEN $2 = 'upload_time' AND $3 = 'asc' THEN upload_time
-    ELSE NULL
-  END ASC,
-  CASE
-    WHEN $2 = 'upload_time' AND $3 = 'desc' THEN upload_time
-    ELSE NULL
-  END DESC,
-  CASE
-    WHEN $2 = 'rating' AND $3 = 'asc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
-    ELSE NULL
-  END ASC,
-  CASE
-    WHEN $2 = 'rating' AND $3 = 'desc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
-    ELSE NULL
-  END DESC
-LIMIT $4 OFFSET $5;
+  CASE WHEN $2 = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
+  CASE WHEN $2 = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
+LIMIT $3 OFFSET $4;
 
 -- name: GetAssetsByTypesSorted :many
 SELECT * FROM assets
 WHERE type = ANY(sqlc.arg('types')::text[]) AND is_deleted = false
 ORDER BY
-  CASE
-    WHEN sqlc.arg('sort_by') = 'taken_time' AND sqlc.arg('sort_order') = 'asc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
-    ELSE NULL
-  END ASC,
-  CASE
-    WHEN sqlc.arg('sort_by') = 'taken_time' AND sqlc.arg('sort_order') = 'desc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
-    ELSE NULL
-  END DESC,
-  CASE
-    WHEN sqlc.arg('sort_by') = 'upload_time' AND sqlc.arg('sort_order') = 'asc' THEN upload_time
-    ELSE NULL
-  END ASC,
-  CASE
-    WHEN sqlc.arg('sort_by') = 'upload_time' AND sqlc.arg('sort_order') = 'desc' THEN upload_time
-    ELSE NULL
-  END DESC,
-  CASE
-    WHEN sqlc.arg('sort_by') = 'rating' AND sqlc.arg('sort_order') = 'asc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
-    ELSE NULL
-  END ASC,
-  CASE
-    WHEN sqlc.arg('sort_by') = 'rating' AND sqlc.arg('sort_order') = 'desc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
-    ELSE NULL
-  END DESC
+  CASE WHEN sqlc.arg('sort_order') = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
+  CASE WHEN sqlc.arg('sort_order') = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetAssetsByOwnerAndTypesSorted :many
 SELECT * FROM assets
 WHERE owner_id = $1 AND type = ANY(sqlc.arg('types')::text[]) AND is_deleted = false
 ORDER BY
-  CASE
-    WHEN sqlc.arg('sort_by') = 'taken_time' AND sqlc.arg('sort_order') = 'asc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
-    ELSE NULL
-  END ASC,
-  CASE
-    WHEN sqlc.arg('sort_by') = 'taken_time' AND sqlc.arg('sort_order') = 'desc' THEN COALESCE((specific_metadata->>'date_taken')::timestamptz, upload_time)
-    ELSE NULL
-  END DESC,
-  CASE
-    WHEN sqlc.arg('sort_by') = 'upload_time' AND sqlc.arg('sort_order') = 'asc' THEN upload_time
-    ELSE NULL
-  END ASC,
-  CASE
-    WHEN sqlc.arg('sort_by') = 'upload_time' AND sqlc.arg('sort_order') = 'desc' THEN upload_time
-    ELSE NULL
-  END DESC,
-  CASE
-    WHEN sqlc.arg('sort_by') = 'rating' AND sqlc.arg('sort_order') = 'asc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
-    ELSE NULL
-  END ASC,
-  CASE
-    WHEN sqlc.arg('sort_by') = 'rating' AND sqlc.arg('sort_order') = 'desc' THEN COALESCE((specific_metadata->>'rating')::integer, 0)
-    ELSE NULL
-  END DESC
+  CASE WHEN sqlc.arg('sort_order') = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
+  CASE WHEN sqlc.arg('sort_order') = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');

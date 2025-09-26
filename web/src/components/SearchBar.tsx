@@ -1,55 +1,67 @@
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline/index.js";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
+import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
 
 interface SearchBarProps {
-  value?: string;
-  onChange?: (query: string) => void;
-  /**
-   * Callback fired whenever the search UI (input) is activated or deactivated
-   * Allows parent to react (e.g., auto-switch to flat view)
-   */
-  onActivationChange?: (active: boolean) => void;
-  placeholder?: string;
   enableSemanticSearch?: boolean;
 }
 
 export default function SearchBar({
-  value = "",
-  onChange,
-  onActivationChange,
-  placeholder = "Search...",
-  enableSemanticSearch = true,
-}: SearchBarProps = {}) {
+  enableSemanticSearch = false,
+}: SearchBarProps) {
   const { t } = useI18n();
+  const { state, dispatch } = useAssetsContext();
 
-  const [searchText, setSearchText] = useState(value);
-  const [semanticSearch, setSemanticSearch] = useState(false);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setSearchText(newValue);
-    onChange?.(newValue);
-  };
-
+  const [searchText, setSearchText] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
   const [active, setActive] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Sync external value changes
-  useEffect(() => {
-    setSearchText(value);
-  }, [value]);
+  const isSemanticMode = state.ui.searchMode === "semantic";
 
-  // Handle search execution - simplified for new architecture
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchText(e.target.value);
+  };
+
+  // Debounced search function
+  const performSearch = useCallback(
+    async (query: string, isSemanticSearch: boolean) => {
+      if (!query.trim()) {
+        dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        // Update search mode based on semantic toggle
+        const searchMode = isSemanticSearch ? "semantic" : "filename";
+        dispatch({ type: "SET_SEARCH_MODE", payload: searchMode });
+
+        // Set search query
+        dispatch({ type: "SET_SEARCH_QUERY", payload: query.trim() });
+
+        // Auto-switch to flat view for better search results display
+        dispatch({ type: "SET_GROUP_BY", payload: "flat" });
+      } catch (error) {
+        console.error("Search error:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [dispatch],
+  );
+
+  // Debounce search execution
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchText !== value) {
-        onChange?.(searchText);
+      if (searchText || searchText === "") {
+        performSearch(searchText, isSemanticMode);
       }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchText, value, onChange]);
+  }, [searchText, isSemanticMode, performSearch]);
 
   useEffect(() => {
     if (active) {
@@ -58,39 +70,39 @@ export default function SearchBar({
     }
   }, [active]);
 
-  // Notify parent about activation state changes (single source)
-  useEffect(() => {
-    onActivationChange?.(active);
-  }, [active, onActivationChange]);
-
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      // Trigger immediate search on Enter
-      onChange?.(searchText);
+      performSearch(searchText, isSemanticMode);
     }
   };
+
+  const toggleSemanticSearch = useCallback(() => {
+    const newMode = isSemanticMode ? "filename" : "semantic";
+    dispatch({ type: "SET_SEARCH_MODE", payload: newMode });
+  }, [isSemanticMode, dispatch]);
 
   return (
     <div className="flex-1">
       <div className="flex justify-center">
         <div className="flex flex-row items-center gap-3 w-full max-w-lg">
           <button
-            className={`btn btn-sm btn-circle btn-soft btn-info ${active ? "btn-active" : ""}`}
+            className={`btn btn-sm btn-circle btn-soft btn-info ${active ? "btn-active" : ""} ${isSearching ? "loading" : ""}`}
             aria-pressed={active}
             onClick={() =>
               setActive((prev) => {
                 const next = !prev;
-                // Deactivating search: clear local search state
+                // Deactivating search: clear local and context search state
                 if (!next) {
                   setSearchText("");
-                  onChange?.("");
+                  dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
                 }
                 return next;
               })
             }
             title={active ? t("search.close") : t("search.open")}
+            disabled={isSearching}
           >
-            <MagnifyingGlassIcon className="size-5" />
+            {!isSearching && <MagnifyingGlassIcon className="w-4 h-4" />}
           </button>
           <div
             className={`search-controls flex flex-row items-center gap-3 ${active ? "visible" : "hidden"}`}
@@ -98,26 +110,36 @@ export default function SearchBar({
             <div className="relative">
               <input
                 ref={inputRef}
+                id="search-input"
+                name="search"
                 type="text"
                 placeholder={
-                  semanticSearch
+                  isSemanticMode && enableSemanticSearch
                     ? t("search.placeholderai", {
                         defaultValue: "Describe what you're looking for...",
                       })
-                    : placeholder
+                    : t("search.placeholder", {
+                        defaultValue: "Search by filename...",
+                      })
                 }
                 value={searchText}
                 className="input input-sm input-bordered search-input pr-8"
                 onChange={handleInputChange}
-                onKeyPress={handleKeyPress}
+                onKeyDown={handleKeyPress}
+                disabled={isSearching}
               />
+              {isSearching && (
+                <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                  <span className="loading loading-spinner loading-xs"></span>
+                </div>
+              )}
             </div>
 
             {enableSemanticSearch && (
               <div
                 className="tooltip tooltip-bottom"
                 data-tip={
-                  semanticSearch
+                  isSemanticMode
                     ? t("search.option.semantic")
                     : t("search.option.filename")
                 }
@@ -125,11 +147,9 @@ export default function SearchBar({
                 <label className="toggle animate-fade-in-x cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={semanticSearch && enableSemanticSearch}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setSemanticSearch(e.target.checked)
-                    }
-                    disabled={!enableSemanticSearch}
+                    checked={isSemanticMode}
+                    onChange={toggleSemanticSearch}
+                    disabled={isSearching}
                   />
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -139,9 +159,9 @@ export default function SearchBar({
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="lucide lucide-sparkles-icon lucide-sparkles"
+                    className="lucide lucide-sparkles"
                   >
-                    <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0 1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
+                    <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
                     <path d="M20 2v4" />
                     <path d="M22 4h-4" />
                     <circle cx="4" cy="20" r="2" />

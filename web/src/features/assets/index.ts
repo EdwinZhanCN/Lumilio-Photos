@@ -33,6 +33,7 @@ export type {
 
 // Export shared components
 export { default as AssetsPageHeader } from "./components/shared/AssetsPageHeader";
+export { default as JustifiedGallery } from "./components/Photos/JustifiedGallery/JustifiedGallery";
 
 // Export utilities and selectors
 export { generateViewKey } from "./reducers/views.reducer";
