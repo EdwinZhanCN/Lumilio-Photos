@@ -26,17 +26,6 @@ const (
 	AssetTypeAudio = "AUDIO"
 )
 
-const defaultSemanticMaxDistance = 1.1
-
-func getDefaultSemanticMaxDistance() float64 {
-	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			return f
-		}
-	}
-	return defaultSemanticMaxDistance
-}
-
 // Error constants for asset service
 var (
 	ErrInvalidAssetType     = errors.New("invalid asset type")
@@ -91,7 +80,6 @@ type AssetService interface {
 	FilterAssets(ctx context.Context, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
 	SearchAssetsFilename(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
 	SearchAssetsVector(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
-	SearchAssetsVectorWithThreshold(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int, maxDistance *float64) ([]repo.Asset, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]string, error)
 	GetDistinctLenses(ctx context.Context) ([]string, error)
 }
@@ -870,7 +858,135 @@ func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, a
 }
 
 func (s *assetService) SearchAssetsVector(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
-	return s.SearchAssetsVectorWithThreshold(ctx, query, assetType, ownerID, filenameVal, filenameMode, dateFrom, dateTo, isRaw, rating, liked, cameraMake, lens, limit, offset, nil)
+	if s.ml == nil {
+		return nil, fmt.Errorf("ML service not available for semantic search")
+	}
+
+	// Get query embedding
+	embeddingResult, err := s.ml.ClipEmbed(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get query embedding: %w", err)
+	}
+
+	// Convert rating pointer for SQL
+	var ratingPtr *int32
+	if rating != nil {
+		r := int32(*rating)
+		ratingPtr = &r
+	}
+
+	// Convert dates to pgtype.Timestamptz
+	var fromTime, toTime pgtype.Timestamptz
+	if dateFrom != nil {
+		fromTime = pgtype.Timestamptz{Time: *dateFrom, Valid: true}
+	}
+	if dateTo != nil {
+		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
+	}
+
+	// Convert embedding to pgvector format
+	pgEmbeddingFloat32 := make([]float32, len(embeddingResult.Vector))
+	for i, v := range embeddingResult.Vector {
+		pgEmbeddingFloat32[i] = float32(v)
+	}
+	pgEmbedding := pgvector_go.NewVector(pgEmbeddingFloat32)
+
+	// Fetch enough rows so we can paginate after threshold filtering
+	requestLimit := int32(limit + offset)
+	if requestLimit <= 0 {
+		requestLimit = 1000
+	}
+
+	results, err := s.queries.SearchAssetsVector(ctx, repo.SearchAssetsVectorParams{
+		Embedding:    pgEmbedding,
+		AssetType:    assetType,
+		OwnerID:      ownerID,
+		FilenameVal:  filenameVal,
+		FilenameMode: filenameMode,
+		DateFrom:     fromTime,
+		DateTo:       toTime,
+		IsRaw:        isRaw,
+		Rating:       ratingPtr,
+		Liked:        liked,
+		CameraModel:  cameraMake,
+		LensModel:    lens,
+		Limit:        requestLimit,
+		Offset:       0,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to search assets with vector: %w", err)
+	}
+
+	// Default distance threshold (env override: SEMANTIC_MAX_DISTANCE)
+	maxDistance := 1.235
+	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			maxDistance = f
+		}
+	}
+
+	// Filter by distance threshold, keep order (already ordered by distance ASC)
+	filtered := make([]repo.Asset, 0, len(results))
+	for _, result := range results {
+		var dist float64
+		switch d := result.Distance.(type) {
+		case float32:
+			dist = float64(d)
+		case float64:
+			dist = d
+		case int32:
+			dist = float64(d)
+		case int64:
+			dist = float64(d)
+		case string:
+			if parsed, perr := strconv.ParseFloat(d, 64); perr == nil {
+				dist = parsed
+			} else {
+				continue
+			}
+		default:
+			// Unknown type, skip this row
+			continue
+		}
+
+		if dist <= maxDistance {
+			filtered = append(filtered, repo.Asset{
+				AssetID:          result.AssetID,
+				OwnerID:          result.OwnerID,
+				Type:             result.Type,
+				OriginalFilename: result.OriginalFilename,
+				StoragePath:      result.StoragePath,
+				MimeType:         result.MimeType,
+				FileSize:         result.FileSize,
+				Hash:             result.Hash,
+				Width:            result.Width,
+				Height:           result.Height,
+				Duration:         result.Duration,
+				UploadTime:       result.UploadTime,
+				IsDeleted:        result.IsDeleted,
+				DeletedAt:        result.DeletedAt,
+				SpecificMetadata: result.SpecificMetadata,
+				Embedding:        result.Embedding,
+			})
+		}
+	}
+
+	// Apply pagination after threshold filtering
+	if offset < 0 {
+		offset = 0
+	}
+	if limit < 0 {
+		limit = 0
+	}
+	if offset >= len(filtered) {
+		return []repo.Asset{}, nil
+	}
+	end := offset + limit
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+
+	return filtered[offset:end], nil
 }
 
 func (s *assetService) GetDistinctCameraMakes(ctx context.Context) ([]string, error) {
@@ -981,134 +1097,4 @@ func (s *assetService) GetLikedAssets(ctx context.Context, limit, offset int) ([
 	}
 
 	return s.queries.GetLikedAssets(ctx, params)
-}
-
-func (s *assetService) SearchAssetsVectorWithThreshold(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int, maxDistance *float64) ([]repo.Asset, error) {
-	if s.ml == nil {
-		return nil, fmt.Errorf("ML service not available for semantic search")
-	}
-
-	// Get query embedding
-	embeddingResult, err := s.ml.ClipEmbed(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get query embedding: %w", err)
-	}
-
-	// Determine effective threshold (fallback to default if not provided)
-	if maxDistance == nil {
-		def := getDefaultSemanticMaxDistance()
-		maxDistance = &def
-	}
-
-	// Convert rating pointer for SQL
-	var ratingPtr *int32
-	if rating != nil {
-		r := int32(*rating)
-		ratingPtr = &r
-	}
-
-	// Convert dates to pgtype.Timestamptz
-	var fromTime, toTime pgtype.Timestamptz
-	if dateFrom != nil {
-		fromTime = pgtype.Timestamptz{Time: *dateFrom, Valid: true}
-	}
-	if dateTo != nil {
-		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
-	}
-
-	// Convert embedding to pgvector format
-	pgEmbeddingFloat32 := make([]float32, len(embeddingResult.Vector))
-	for i, v := range embeddingResult.Vector {
-		pgEmbeddingFloat32[i] = float32(v)
-	}
-	pgEmbedding := pgvector_go.NewVector(pgEmbeddingFloat32)
-
-	// Fetch enough rows so we can paginate after threshold filtering
-	requestLimit := int32(limit + offset)
-	if requestLimit <= 0 {
-		requestLimit = 1000
-	}
-
-	results, err := s.queries.SearchAssetsVector(ctx, repo.SearchAssetsVectorParams{
-		Embedding:    pgEmbedding,
-		AssetType:    assetType,
-		OwnerID:      ownerID,
-		FilenameVal:  filenameVal,
-		FilenameMode: filenameMode,
-		DateFrom:     fromTime,
-		DateTo:       toTime,
-		IsRaw:        isRaw,
-		Rating:       ratingPtr,
-		Liked:        liked,
-		CameraModel:  cameraMake,
-		LensModel:    lens,
-		Limit:        requestLimit,
-		Offset:       0,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to search assets with vector: %w", err)
-	}
-
-	// Filter by distance threshold, keep order (already ordered by distance ASC)
-	filtered := make([]repo.Asset, 0, len(results))
-	for _, result := range results {
-		var dist float64
-		switch d := result.Distance.(type) {
-		case float32:
-			dist = float64(d)
-		case float64:
-			dist = d
-		case int32:
-			dist = float64(d)
-		case int64:
-			dist = float64(d)
-		case string:
-			if parsed, perr := strconv.ParseFloat(d, 64); perr == nil {
-				dist = parsed
-			} else {
-				continue
-			}
-		default:
-			// Unknown type, skip this row
-			continue
-		}
-
-		if dist <= *maxDistance {
-			filtered = append(filtered, repo.Asset{
-				AssetID:          result.AssetID,
-				OwnerID:          result.OwnerID,
-				Type:             result.Type,
-				OriginalFilename: result.OriginalFilename,
-				StoragePath:      result.StoragePath,
-				MimeType:         result.MimeType,
-				FileSize:         result.FileSize,
-				Hash:             result.Hash,
-				Width:            result.Width,
-				Height:           result.Height,
-				Duration:         result.Duration,
-				UploadTime:       result.UploadTime,
-				IsDeleted:        result.IsDeleted,
-				DeletedAt:        result.DeletedAt,
-				SpecificMetadata: result.SpecificMetadata,
-				Embedding:        result.Embedding,
-			})
-		}
-	}
-
-	// Apply pagination after threshold filtering
-	if offset < 0 {
-		offset = 0
-	}
-	if limit < 0 {
-		limit = 0
-	}
-	if offset >= len(filtered) {
-		return []repo.Asset{}, nil
-	}
-	end := offset + limit
-	if end > len(filtered) {
-		end = len(filtered)
-	}
-
-	return filtered[offset:end], nil
 }
