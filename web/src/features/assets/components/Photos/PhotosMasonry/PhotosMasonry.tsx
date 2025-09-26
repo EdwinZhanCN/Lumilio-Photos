@@ -1,3 +1,4 @@
+import PhotosLoadingSkeleton from "../PhotosLoadingSkeleton";
 import PhotosThumbnail from "../PhotosThumbnail/PhotosThumbnail";
 import { useState, useEffect, useRef, useCallback } from "react";
 
@@ -27,12 +28,12 @@ const reorderForReadingOrder = (photos: Asset[], columns: number): Asset[] => {
     }
   }
 
-  return reordered.filter(Boolean); // Remove undefined entries
+  return reordered.filter(Boolean);
 };
 
 // Get current column count based on viewport
 const getColumnCount = (): number => {
-  if (typeof window === "undefined") return 3; // SSR fallback
+  if (typeof window === "undefined") return 3;
   const width = window.innerWidth;
   if (width >= 1280) return 5;
   if (width >= 1024) return 4;
@@ -94,35 +95,8 @@ const PhotosMasonry = ({
     };
   }, [handleLoadMore, hasMore]);
 
-  // We no longer use virtualization here — render groups directly while preserving reading order.
-  // Keeping the reading order reordering utility (reorderForReadingOrder) above.
-
   if (isLoading) {
-    // Your existing loading skeleton is fine, no changes needed
-    return (
-      <div className="space-y-6">
-        {[1, 2].map((groupIndex) => (
-          <div key={groupIndex} className="my-6">
-            <div className="skeleton h-6 w-32 mb-4"></div>
-            <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-2">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="break-inside-avoid mb-4 overflow-hidden rounded-lg shadow-md"
-                >
-                  <div
-                    className="skeleton w-full"
-                    style={{
-                      height: `${Math.floor(Math.random() * 200) + 150}px`,
-                    }}
-                  ></div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+    return <PhotosLoadingSkeleton />;
   }
 
   if (Object.keys(groupedPhotos).length === 0) {

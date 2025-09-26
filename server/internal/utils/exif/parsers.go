@@ -9,13 +9,14 @@ import (
 
 // parsePhotoMetadata parses raw EXIF data into PhotoSpecificMetadata
 func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadata {
+
 	metadata := &dbtypes.PhotoSpecificMetadata{
 		Rating: 0,     // Set default rating to 0
 		Like:   false, // Set default like status to false
 	}
 
-	// Parse TakenTime from various datetime fields
-	for _, field := range []string{"DateTimeOriginal", "CreateDate", "DateTime"} {
+	// Parse TakenTime from various datetime fields with expanded fallback options
+	for _, field := range []string{"DateTimeOriginal", "CreateDate", "DateTime", "ModifyDate", "FileModifyDate", "DateTimeDigitized", "SubSecDateTimeOriginal", "GPSDateTime"} {
 		if dateStr, exists := rawData[field]; exists && dateStr != "" {
 			if parsedTime, err := parseDateTime(dateStr); err == nil {
 				metadata.TakenTime = &parsedTime
@@ -225,8 +226,8 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 		}
 	}
 
-	// Parse RecordedTime
-	for _, field := range []string{"CreateDate", "DateTimeOriginal", "MediaCreateDate", "TrackCreateDate"} {
+	// Parse RecordedTime with expanded fallback options
+	for _, field := range []string{"CreateDate", "DateTimeOriginal", "MediaCreateDate", "TrackCreateDate", "ModifyDate", "FileModifyDate", "DateTimeDigitized"} {
 		if dateStr, exists := rawData[field]; exists && dateStr != "" {
 			if parsedTime, err := parseDateTime(dateStr); err == nil {
 				metadata.RecordedTime = &parsedTime

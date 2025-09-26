@@ -15,7 +15,7 @@ import (
 
 const getAssetWithRelations = `-- name: GetAssetWithRelations :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding,
     COALESCE(
         json_agg(DISTINCT
             jsonb_build_object(
@@ -81,6 +81,7 @@ type GetAssetWithRelationsRow struct {
 	Height             *int32                   `db:"height" json:"height"`
 	Duration           *float64                 `db:"duration" json:"duration"`
 	UploadTime         pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime          pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
 	IsDeleted          *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt          pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata   dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
@@ -107,6 +108,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 		&i.Height,
 		&i.Duration,
 		&i.UploadTime,
+		&i.TakenTime,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.SpecificMetadata,
@@ -121,7 +123,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 
 const getAssetWithTags = `-- name: GetAssetWithTags :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding,
     COALESCE(
         json_agg(
             json_build_object(
@@ -154,6 +156,7 @@ type GetAssetWithTagsRow struct {
 	Height           *int32                   `db:"height" json:"height"`
 	Duration         *float64                 `db:"duration" json:"duration"`
 	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
@@ -177,6 +180,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 		&i.Height,
 		&i.Duration,
 		&i.UploadTime,
+		&i.TakenTime,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.SpecificMetadata,
@@ -188,7 +192,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 
 const getAssetWithThumbnails = `-- name: GetAssetWithThumbnails :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding,
     COALESCE(
         json_agg(
             json_build_object(
@@ -225,6 +229,7 @@ type GetAssetWithThumbnailsRow struct {
 	Height           *int32                   `db:"height" json:"height"`
 	Duration         *float64                 `db:"duration" json:"duration"`
 	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
@@ -248,6 +253,7 @@ func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUI
 		&i.Height,
 		&i.Duration,
 		&i.UploadTime,
+		&i.TakenTime,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.SpecificMetadata,

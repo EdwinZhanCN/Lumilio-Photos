@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -182,11 +183,12 @@ type FilterAssetsRequest struct {
 
 // SearchAssetsRequest represents the request structure for searching assets
 type SearchAssetsRequest struct {
-	Query      string      `json:"query" binding:"required" example:"red bird on branch"`
-	SearchType string      `json:"search_type" binding:"required" example:"filename" enums:"filename,semantic"`
-	Filter     AssetFilter `json:"filter,omitempty"`
-	Limit      int         `json:"limit" example:"20" minimum:"1" maximum:"100"`
-	Offset     int         `json:"offset" example:"0" minimum:"0"`
+	Query       string      `json:"query" binding:"required" example:"red bird on branch"`
+	SearchType  string      `json:"search_type" binding:"required" example:"filename" enums:"filename,semantic"`
+	MaxDistance *float64    `json:"max_distance,omitempty" example:"0.35"`
+	Filter      AssetFilter `json:"filter,omitempty"`
+	Limit       int         `json:"limit" example:"20" minimum:"1" maximum:"100"`
+	Offset      int         `json:"offset" example:"0" minimum:"0"`
 }
 
 // OptionsResponse represents the response for filter options
@@ -498,7 +500,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 
 // ListAssets retrieves assets with optional filtering
 // @Summary List assets
-// @Description Retrieve a paginated list of assets. Filter by type(s) or owner. Supports sorting by taken_time, rating, or upload_time. At least one filter parameter is required.
+// @Description Retrieve a paginated list of assets. Filter by type(s) or owner. Assets are sorted by taken_time (photo capture time or video record time). At least one filter parameter is required.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -507,8 +509,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 // @Param owner_id query int false "Filter by owner ID" example(123)
 // @Param limit query int false "Maximum number of results (max 100)" default(20) example(20)
 // @Param offset query int false "Number of results to skip for pagination" default(0) example(0)
-// @Param sort_by query string false "Sort field" Enums(taken_time,rating,upload_time) default("upload_time") example("taken_time")
-// @Param sort_order query string false "Sort order" Enums(asc,desc) default("desc") example("desc")
+// @Param sort_order query string false "Sort order by taken_time" Enums(asc,desc) default("desc") example("desc")
 // @Success 200 {object} api.Result{data=AssetListResponse} "Assets retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid parameters"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -519,7 +520,6 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	typeStr := c.Query("type")
 	typesStr := c.Query("types")
 	ownerIDStr := c.Query("owner_id")
-	sortBy := c.DefaultQuery("sort_by", "upload_time")
 	sortOrder := c.DefaultQuery("sort_order", "desc")
 
 	limit, _ := strconv.Atoi(limitStr)
@@ -529,17 +529,7 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 		limit = 100
 	}
 
-	// Validate sort parameters
-	validSortFields := map[string]bool{
-		"taken_time":  true,
-		"rating":      true,
-		"upload_time": true,
-	}
-	if !validSortFields[sortBy] {
-		api.GinBadRequest(c, errors.New("invalid sort_by"), "sort_by must be one of: taken_time, rating, upload_time")
-		return
-	}
-
+	// Validate sort parameter
 	if sortOrder != "asc" && sortOrder != "desc" {
 		api.GinBadRequest(c, errors.New("invalid sort_order"), "sort_order must be 'asc' or 'desc'")
 		return
@@ -581,13 +571,13 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 			return
 		}
 		if len(assetTypes) > 0 {
-			assets, err = h.assetService.GetAssetsByOwnerAndTypes(ctx, ownerID, assetTypes, sortBy, sortOrder, limit, offset)
+			assets, err = h.assetService.GetAssetsByOwnerAndTypes(ctx, ownerID, assetTypes, sortOrder, limit, offset)
 		} else {
-			assets, err = h.assetService.GetAssetsByOwnerSorted(ctx, ownerID, sortBy, sortOrder, limit, offset)
+			assets, err = h.assetService.GetAssetsByOwnerSorted(ctx, ownerID, sortOrder, limit, offset)
 		}
 
 	case len(assetTypes) > 0:
-		assets, err = h.assetService.GetAssetsByTypesSorted(ctx, assetTypes, sortBy, sortOrder, limit, offset)
+		assets, err = h.assetService.GetAssetsByTypesSorted(ctx, assetTypes, sortOrder, limit, offset)
 
 	default:
 		api.GinBadRequest(c, errors.New("missing query parameters"), "Please specify type, types, or owner_id")
@@ -1005,10 +995,21 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 	} else {
-		assets, err = h.assetService.SearchAssetsVector(ctx, req.Query,
-			typePtr, filter.OwnerID, filenameVal, filenameMode,
-			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
-			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
+		// If the underlying service supports thresholded semantic search, pass optional max_distance from request body.
+		// Fallback to existing method otherwise.
+		if svc, ok := interface{}(h.assetService).(interface {
+			SearchAssetsVectorWithThreshold(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int, maxDistance *float64) ([]repo.Asset, error)
+		}); ok {
+			assets, err = svc.SearchAssetsVectorWithThreshold(ctx, req.Query,
+				typePtr, filter.OwnerID, filenameVal, filenameMode,
+				dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
+				filter.CameraMake, filter.Lens, req.Limit, req.Offset, req.MaxDistance)
+		} else {
+			assets, err = h.assetService.SearchAssetsVector(ctx, req.Query,
+				typePtr, filter.OwnerID, filenameVal, filenameMode,
+				dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
+				filter.CameraMake, filter.Lens, req.Limit, req.Offset)
+		}
 	}
 
 	if err != nil {

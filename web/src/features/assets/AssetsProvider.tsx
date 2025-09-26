@@ -113,7 +113,7 @@ export const AssetsProvider = ({ children }: AssetsProviderProps) => {
         currentTab,
         groupBy: urlGroupBy,
         searchQuery: urlQuery,
-        searchMode: currentTab === "photos" ? "semantic" : "filename",
+        searchMode: initialAssetsState.ui.searchMode,
         isCarouselOpen,
         activeAssetId: params.assetId,
       },

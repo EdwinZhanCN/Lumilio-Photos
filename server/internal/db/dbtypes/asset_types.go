@@ -42,7 +42,7 @@ type PhotoSpecificMetadata struct {
 	FNumber           float32                 `json:"f_number,omitempty"`
 	FocalLength       float32                 `json:"focal_length,omitempty"`
 	IsoSpeed          int                     `json:"iso_speed,omitempty"`
-	Exposure          float32                 `json:"exposure,omitempty"`
+	Exposure          float32                 `json:"exposure"`
 	Dimensions        string                  `json:"dimensions,omitempty"`
 	Resolution        string                  `json:"resolution,omitempty"`
 	GPSLatitude       float64                 `json:"gps_latitude,omitempty"`

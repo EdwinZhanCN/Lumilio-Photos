@@ -13,12 +13,44 @@ import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
 import { useSelection } from "@/features/assets/hooks/useSelection";
 import { GroupByType } from "@/features/assets/types";
 import { selectTabTitle } from "@/features/assets/reducers/ui.reducer";
-import { useCallback, useMemo, useRef, useEffect, useState } from "react";
+import { useCallback, useMemo, useRef, useEffect } from "react";
 
 interface AssetsPageHeaderProps {
   groupBy: GroupByType;
   onGroupByChange: (groupBy: GroupByType) => void;
   onFiltersChange?: (filters: FilterDTO) => void;
+}
+
+function mapFilenameModeToDTO(
+  mode?: "contains" | "matches" | "startswith" | "endswith",
+): "contains" | "matches" | "starts_with" | "ends_with" | undefined {
+  switch (mode) {
+    case "startswith":
+      return "starts_with";
+    case "endswith":
+      return "ends_with";
+    case "contains":
+    case "matches":
+      return mode;
+    default:
+      return undefined;
+  }
+}
+
+function mapFilenameOperatorToMode(
+  op?: "contains" | "matches" | "starts_with" | "ends_with",
+): "contains" | "matches" | "startswith" | "endswith" | undefined {
+  switch (op) {
+    case "starts_with":
+      return "startswith";
+    case "ends_with":
+      return "endswith";
+    case "contains":
+    case "matches":
+      return op;
+    default:
+      return undefined;
+  }
 }
 
 const AssetsPageHeader = ({
@@ -28,6 +60,32 @@ const AssetsPageHeader = ({
 }: AssetsPageHeaderProps) => {
   const { state, dispatch } = useAssetsContext();
   const selection = useSelection();
+
+  // Hydrate FilterTool from global filters (single source of truth)
+  const inboundDTO = useMemo(() => {
+    const f = state.filters;
+    if (!f?.enabled) return {};
+    const dto: FilterDTO = {};
+    if (typeof f.raw === "boolean") dto.raw = f.raw;
+    if (typeof f.rating === "number") dto.rating = f.rating;
+    if (typeof f.liked === "boolean") dto.liked = f.liked;
+    if (f.filename && f.filename.value?.trim()) {
+      dto.filename = {
+        operator: mapFilenameModeToDTO(f.filename.mode) as any,
+        value: f.filename.value,
+      };
+    }
+    if (f.date && (f.date.from || f.date.to)) {
+      dto.date = { from: f.date.from, to: f.date.to };
+    }
+    if (f.camera_make?.trim()) dto.camera_make = f.camera_make.trim();
+    if (f.lens?.trim()) dto.lens = f.lens.trim();
+    return dto;
+  }, [state.filters]);
+  const inboundHash = useMemo(
+    () => JSON.stringify(inboundDTO || {}),
+    [inboundDTO],
+  );
 
   const currentTab = state.ui.currentTab;
   // Get tab-specific configuration
@@ -45,33 +103,12 @@ const AssetsPageHeader = ({
     }
   }, [currentTab]);
 
-  // Handle search results
-
-  // Handle search query changes
-  const [debouncedValue, setDebouncedValue] = useState(state.ui.searchQuery);
-  const handleSearchQueryChange = useCallback((query: string) => {
-    setDebouncedValue(query);
-  }, []);
-
-  // Debounce effect to dispatch search query changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (debouncedValue !== state.ui.searchQuery) {
-        dispatch({ type: "SET_SEARCH_QUERY", payload: debouncedValue });
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [debouncedValue, state.ui.searchQuery, dispatch]);
-
   // Handle search activation (switch to flat view when searching)
-  const handleSearchActivationChange = useCallback(
-    (active: boolean) => {
-      if (active && groupBy !== "flat") {
-        onGroupByChange("flat");
-      }
-    },
-    [groupBy, onGroupByChange],
-  );
+  useEffect(() => {
+    if (state.ui.searchQuery.trim() && groupBy !== "flat") {
+      onGroupByChange("flat");
+    }
+  }, [state.ui.searchQuery, groupBy, onGroupByChange]);
 
   // Use ref to store the latest onFiltersChange callback to avoid dependency issues
   const onFiltersChangeRef = useRef(onFiltersChange);
@@ -85,54 +122,61 @@ const AssetsPageHeader = ({
   // Handle filter changes
   const handleFiltersChange = useCallback(
     (filters: FilterDTO) => {
-      onFiltersChangeRef.current?.(filters);
+      // Prevent re-emit loop when FilterTool mounts with initial values
+      const nextHash = JSON.stringify(filters || {});
+      if (nextHash === inboundHash) {
+        onFiltersChangeRef.current?.(filters);
+        return;
+      }
 
-      if (filters.raw !== undefined) {
-        dispatch({ type: "SET_FILTER_RAW", payload: filters.raw });
-      }
-      if (filters.rating !== undefined) {
-        dispatch({ type: "SET_FILTER_RATING", payload: filters.rating });
-      }
-      if (filters.liked !== undefined) {
-        dispatch({ type: "SET_FILTER_LIKED", payload: filters.liked });
-      }
+      // Build a full payload resetting all fields first (single source of truth)
+      const payload: any = {
+        enabled: Object.keys(filters).length > 0,
+        raw: undefined,
+        rating: undefined,
+        liked: undefined,
+        filename: undefined,
+        date: undefined,
+        camera_make: undefined,
+        lens: undefined,
+      };
+
+      if (filters.raw !== undefined) payload.raw = filters.raw;
+      if (filters.rating !== undefined) payload.rating = filters.rating;
+      if (filters.liked !== undefined) payload.liked = filters.liked;
+
       if (filters.filename && filters.filename.value.trim()) {
-        dispatch({
-          type: "SET_FILTER_FILENAME",
-          payload: {
-            mode:
-              filters.filename.operator === "starts_with"
-                ? "startswith"
-                : filters.filename.operator === "ends_with"
-                  ? "endswith"
-                  : filters.filename.operator,
-            value: filters.filename.value.trim(),
-          },
-        });
+        payload.filename = {
+          mode: mapFilenameOperatorToMode(filters.filename.operator),
+          value: filters.filename.value.trim(),
+        };
       }
+
       if (filters.date && (filters.date.from || filters.date.to)) {
-        dispatch({ type: "SET_FILTER_DATE", payload: filters.date });
+        payload.date = {
+          from: filters.date.from,
+          to: filters.date.to,
+        };
       }
+
       if (filters.camera_make && filters.camera_make.trim()) {
-        dispatch({
-          type: "SET_FILTER_CAMERA_MAKE",
-          payload: filters.camera_make.trim(),
-        });
+        payload.camera_make = filters.camera_make.trim();
       }
+
       if (filters.lens && filters.lens.trim()) {
-        dispatch({ type: "SET_FILTER_LENS", payload: filters.lens.trim() });
+        payload.lens = filters.lens.trim();
       }
 
-      // Enable filters if any are set
-      const hasFilters = Object.keys(filters).length > 0;
-      dispatch({ type: "SET_FILTERS_ENABLED", payload: hasFilters });
+      dispatch({ type: "BATCH_UPDATE_FILTERS", payload });
 
-      // Switch to flat view when filtering for better search/filter result visibility
-      if (hasFilters && groupBy !== "flat") {
+      // Switch to flat view when filtering for better result visibility
+      if (payload.enabled && groupBy !== "flat") {
         onGroupByChangeRef.current("flat");
       }
+
+      onFiltersChangeRef.current?.(filters);
     },
-    [dispatch, groupBy],
+    [dispatch, groupBy, inboundHash],
   );
 
   // Toggle selection mode
@@ -147,7 +191,11 @@ const AssetsPageHeader = ({
     >
       {/* Group By Dropdown */}
       <div className="dropdown">
-        <div tabIndex={0} role="button" className="btn btn-sm btn-ghost">
+        <div
+          tabIndex={0}
+          role="button"
+          className="btn btn-sm btn-soft btn-info"
+        >
           <FunnelIcon className="size-4" />
           Group by {groupBy}
         </div>
@@ -191,12 +239,16 @@ const AssetsPageHeader = ({
       </div>
 
       {/* Filter Tool */}
-      <FilterTool onChange={handleFiltersChange} autoApply={true} />
+      <FilterTool
+        initial={inboundDTO}
+        onChange={handleFiltersChange}
+        autoApply={true}
+      />
 
       {/* Selection Toggle Button */}
       <button
-        className={`btn btn-sm btn-circle btn-soft ${
-          selection.enabled ? "btn-primary" : "btn-info"
+        className={`btn btn-sm btn-circle btn-soft btn-info ${
+          selection.enabled ? "btn-active" : ""
         } relative`}
         onClick={handleToggleSelection}
         title={
@@ -212,13 +264,7 @@ const AssetsPageHeader = ({
       </button>
 
       {/* Search Bar */}
-      <SearchBar
-        value={debouncedValue}
-        onChange={handleSearchQueryChange}
-        onActivationChange={handleSearchActivationChange}
-        placeholder={`Search ${tabTitle.toLowerCase()}...`}
-        enableSemanticSearch={currentTab === "photos"}
-      />
+      <SearchBar enableSemanticSearch={currentTab === "photos"} />
     </PageHeader>
   );
 };

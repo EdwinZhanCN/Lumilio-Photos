@@ -32,7 +32,7 @@ type Storage interface {
 	Upload(ctx context.Context, file io.Reader, hash string) (string, error)
 
 	// UploadWithMetadata saves a file with additional metadata and returns its relative path
-	UploadWithMetadata(ctx context.Context, file io.Reader, filename string, contentType string) (string, error)
+	UploadWithMetadata(ctx context.Context, file io.Reader, filename string, hash string) (string, error)
 
 	// Delete removes a file by its path
 	Delete(ctx context.Context, path string) error

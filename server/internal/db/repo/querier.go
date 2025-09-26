@@ -74,6 +74,7 @@ type Querier interface {
 	UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error
 	UpdateAssetLike(ctx context.Context, arg UpdateAssetLikeParams) error
 	UpdateAssetMetadata(ctx context.Context, arg UpdateAssetMetadataParams) error
+	UpdateAssetMetadataWithTakenTime(ctx context.Context, arg UpdateAssetMetadataWithTakenTimeParams) error
 	UpdateAssetPositionInAlbum(ctx context.Context, arg UpdateAssetPositionInAlbumParams) error
 	UpdateAssetRating(ctx context.Context, arg UpdateAssetRatingParams) error
 	UpdateAssetRatingAndLike(ctx context.Context, arg UpdateAssetRatingAndLikeParams) error

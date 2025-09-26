@@ -25,9 +25,11 @@ DROP TABLE IF EXISTS tags;
 
 -- 5) Assets and related indexes (depends on users)
 DROP INDEX IF EXISTS assets_hnsw_idx;
+DROP INDEX IF EXISTS idx_assets_type_taken_time_coalesce;
 DROP INDEX IF EXISTS idx_assets_owner_id;
 DROP INDEX IF EXISTS idx_assets_type;
 DROP INDEX IF EXISTS idx_assets_hash;
+DROP INDEX IF EXISTS idx_assets_taken_time;
 DROP TABLE IF EXISTS assets;
 
 -- 6) Refresh tokens and indexes (depends on users)

@@ -317,7 +317,7 @@ export default function FullScreenBasicInfo({
                 {exposure + "s"}
               </div>
               <div className="px-2 py-0.5 rounded-full bg-base-100 text-xs">
-                {ev ? `EV ${ev}` : ev}
+                {ev + "ev"}
               </div>
               <div className="px-2 py-0.5 rounded-full bg-base-100 text-xs">
                 {focal}

@@ -131,7 +131,6 @@ export interface ListAssetsParams {
   owner_id?: number;
   limit?: number;
   offset?: number;
-  sort_by?: "taken_time" | "rating" | "upload_time";
   sort_order?: "asc" | "desc";
 }
 
