@@ -44,6 +44,7 @@ export const initialState: SettingsState = {
   },
   ui: {
     language: defaultLanguage,
+    region: "other",
     asset_page: {
       layout: "full",
     },

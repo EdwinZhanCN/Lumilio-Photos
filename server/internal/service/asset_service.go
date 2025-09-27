@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,12 +37,23 @@ var (
 // AssetService defines the interface for asset-related operations
 type AssetService interface {
 	GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error)
-	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums bool) (interface{}, error)
+	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies bool) (interface{}, error)
 	GetAssetsByType(ctx context.Context, assetType string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwner(ctx context.Context, ownerID int, limit, offset int) ([]repo.Asset, error)
+	GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortOrder string, limit, offset int) ([]repo.Asset, error)
+	GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error)
+	GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error)
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata []byte) error
+
+	// Rating management methods
+	UpdateAssetRating(ctx context.Context, id uuid.UUID, rating int) error
+	UpdateAssetLike(ctx context.Context, id uuid.UUID, liked bool) error
+	UpdateAssetRatingAndLike(ctx context.Context, id uuid.UUID, rating int, liked bool) error
+	UpdateAssetDescription(ctx context.Context, id uuid.UUID, description string) error
+	GetAssetsByRating(ctx context.Context, rating int, limit, offset int) ([]repo.Asset, error)
+	GetLikedAssets(ctx context.Context, limit, offset int) ([]repo.Asset, error)
 
 	AddAssetToAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error
 	RemoveAssetFromAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error
@@ -96,7 +109,8 @@ func NewAssetServiceWithML(q *repo.Queries, s storage.Storage, ml *MLService) (A
 
 // CreateAssetRecord creates a new asset record in the database
 func (s *assetService) CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error) {
-
+	// Note: taken_time will be set to NULL initially and updated later when EXIF is processed
+	// This is because we need to extract the time from the actual file content, not just the parameters
 	asset, err := s.queries.CreateAsset(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create asset: %w", err)
@@ -120,14 +134,14 @@ func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset,
 	return &dbAsset, nil
 }
 
-func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums bool) (interface{}, error) {
+func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies bool) (interface{}, error) {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
 		return nil, fmt.Errorf("invalid UUID: %w", err)
 	}
 
-	// 1) Full relations (thumbnails + tags + albums)
-	if includeThumbnails && includeTags && includeAlbums {
+	// 1) Full relations (thumbnails + tags + albums) OR species predictions requested
+	if includeSpecies || (includeThumbnails && includeTags && includeAlbums) {
 		dbAsset, err := s.queries.GetAssetWithRelations(ctx, pgUUID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get asset with relations: %w", err)
@@ -244,6 +258,43 @@ func (s *assetService) GetAssetsByOwner(ctx context.Context, ownerID int, limit,
 	}
 
 	return s.queries.GetAssetsByOwner(ctx, params)
+}
+
+// GetAssetsByOwnerSorted retrieves assets by owner sorted by taken_time
+func (s *assetService) GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortOrder string, limit, offset int) ([]repo.Asset, error) {
+	params := repo.GetAssetsByOwnerSortedParams{
+		OwnerID: int32PtrFromIntPtr(&ownerID),
+		Column2: sortOrder,
+		Limit:   int32(limit),
+		Offset:  int32(offset),
+	}
+
+	return s.queries.GetAssetsByOwnerSorted(ctx, params)
+}
+
+// GetAssetsByTypesSorted retrieves assets by multiple types sorted by taken_time
+func (s *assetService) GetAssetsByTypesSorted(ctx context.Context, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error) {
+	params := repo.GetAssetsByTypesSortedParams{
+		Types:     assetTypes,
+		SortOrder: sortOrder,
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+	}
+
+	return s.queries.GetAssetsByTypesSorted(ctx, params)
+}
+
+// GetAssetsByOwnerAndTypes retrieves assets by owner and multiple types sorted by taken_time
+func (s *assetService) GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error) {
+	params := repo.GetAssetsByOwnerAndTypesSortedParams{
+		OwnerID:   int32PtrFromIntPtr(&ownerID),
+		Types:     assetTypes,
+		SortOrder: sortOrder,
+		Limit:     int32(limit),
+		Offset:    int32(offset),
+	}
+
+	return s.queries.GetAssetsByOwnerAndTypesSorted(ctx, params)
 }
 
 // SearchAssets searches for assets by query and type
@@ -371,19 +422,53 @@ func (s *assetService) DetectDuplicates(ctx context.Context, hash string) ([]rep
 	return s.queries.GetAssetsByHash(ctx, &hash)
 }
 
-// UpdateAssetMetadata updates the specific metadata of an asset
+// UpdateAssetMetadata updates the specific metadata of an asset and extracts taken_time
 func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata []byte) error {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
 		return fmt.Errorf("invalid UUID: %w", err)
 	}
 
-	params := repo.UpdateAssetMetadataParams{
-		AssetID:          pgUUID,
-		SpecificMetadata: metadata,
+	// Get the asset to determine its type for taken_time extraction
+	asset, err := s.queries.GetAssetByID(ctx, pgUUID)
+	if err != nil {
+		return fmt.Errorf("failed to get asset for metadata update: %w", err)
 	}
 
-	return s.queries.UpdateAssetMetadata(ctx, params)
+	// Extract taken_time from metadata based on asset type
+	var takenTime *time.Time
+	assetType := dbtypes.AssetType(asset.Type)
+
+	switch assetType {
+	case dbtypes.AssetTypePhoto:
+		if photoMeta, err := dbtypes.UnmarshalPhoto(metadata); err == nil {
+			takenTime = photoMeta.TakenTime
+		}
+	case dbtypes.AssetTypeVideo:
+		if videoMeta, err := dbtypes.UnmarshalVideo(metadata); err == nil {
+			takenTime = videoMeta.RecordedTime
+		}
+	case dbtypes.AssetTypeAudio:
+		// Audio doesn't have taken time
+		takenTime = nil
+	}
+
+	// Use the new query that updates both metadata and taken_time
+	var takenTimeParam pgtype.Timestamptz
+	if takenTime != nil {
+		takenTimeParam = pgtype.Timestamptz{
+			Time:  *takenTime,
+			Valid: true,
+		}
+	}
+
+	params := repo.UpdateAssetMetadataWithTakenTimeParams{
+		AssetID:          pgUUID,
+		SpecificMetadata: metadata,
+		TakenTime:        takenTimeParam,
+	}
+
+	return s.queries.UpdateAssetMetadataWithTakenTime(ctx, params)
 }
 
 // DeleteAsset marks an asset as deleted
@@ -577,7 +662,7 @@ func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID
 // SaveNewThumbnail TODO: Refine this
 func (s *assetService) SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *repo.Asset, size string) error {
 	// TODO: Upload Thumbnail to different folder
-	storagePath, err := s.storage.UploadWithMetadata(ctx, buffers, asset.OriginalFilename+"_"+size, "")
+	storagePath, err := s.storage.UploadWithMetadata(ctx, buffers, asset.OriginalFilename+"_"+size+".webp", "")
 	if err != nil {
 		return err
 	}
@@ -806,6 +891,12 @@ func (s *assetService) SearchAssetsVector(ctx context.Context, query string, ass
 	}
 	pgEmbedding := pgvector_go.NewVector(pgEmbeddingFloat32)
 
+	// Fetch enough rows so we can paginate after threshold filtering
+	requestLimit := int32(limit + offset)
+	if requestLimit <= 0 {
+		requestLimit = 1000
+	}
+
 	results, err := s.queries.SearchAssetsVector(ctx, repo.SearchAssetsVectorParams{
 		Embedding:    pgEmbedding,
 		AssetType:    assetType,
@@ -819,37 +910,83 @@ func (s *assetService) SearchAssetsVector(ctx context.Context, query string, ass
 		Liked:        liked,
 		CameraModel:  cameraMake,
 		LensModel:    lens,
-		Limit:        int32(limit),
-		Offset:       int32(offset),
+		Limit:        requestLimit,
+		Offset:       0,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to search assets with vector: %w", err)
 	}
 
-	// Extract assets from results (ignore distance for now)
-	assets := make([]repo.Asset, len(results))
-	for i, result := range results {
-		assets[i] = repo.Asset{
-			AssetID:          result.AssetID,
-			OwnerID:          result.OwnerID,
-			Type:             result.Type,
-			OriginalFilename: result.OriginalFilename,
-			StoragePath:      result.StoragePath,
-			MimeType:         result.MimeType,
-			FileSize:         result.FileSize,
-			Hash:             result.Hash,
-			Width:            result.Width,
-			Height:           result.Height,
-			Duration:         result.Duration,
-			UploadTime:       result.UploadTime,
-			IsDeleted:        result.IsDeleted,
-			DeletedAt:        result.DeletedAt,
-			SpecificMetadata: result.SpecificMetadata,
-			Embedding:        result.Embedding,
+	// Default distance threshold (env override: SEMANTIC_MAX_DISTANCE)
+	maxDistance := 1.235
+	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			maxDistance = f
 		}
 	}
 
-	return assets, nil
+	// Filter by distance threshold, keep order (already ordered by distance ASC)
+	filtered := make([]repo.Asset, 0, len(results))
+	for _, result := range results {
+		var dist float64
+		switch d := result.Distance.(type) {
+		case float32:
+			dist = float64(d)
+		case float64:
+			dist = d
+		case int32:
+			dist = float64(d)
+		case int64:
+			dist = float64(d)
+		case string:
+			if parsed, perr := strconv.ParseFloat(d, 64); perr == nil {
+				dist = parsed
+			} else {
+				continue
+			}
+		default:
+			// Unknown type, skip this row
+			continue
+		}
+
+		if dist <= maxDistance {
+			filtered = append(filtered, repo.Asset{
+				AssetID:          result.AssetID,
+				OwnerID:          result.OwnerID,
+				Type:             result.Type,
+				OriginalFilename: result.OriginalFilename,
+				StoragePath:      result.StoragePath,
+				MimeType:         result.MimeType,
+				FileSize:         result.FileSize,
+				Hash:             result.Hash,
+				Width:            result.Width,
+				Height:           result.Height,
+				Duration:         result.Duration,
+				UploadTime:       result.UploadTime,
+				IsDeleted:        result.IsDeleted,
+				DeletedAt:        result.DeletedAt,
+				SpecificMetadata: result.SpecificMetadata,
+				Embedding:        result.Embedding,
+			})
+		}
+	}
+
+	// Apply pagination after threshold filtering
+	if offset < 0 {
+		offset = 0
+	}
+	if limit < 0 {
+		limit = 0
+	}
+	if offset >= len(filtered) {
+		return []repo.Asset{}, nil
+	}
+	end := offset + limit
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+
+	return filtered[offset:end], nil
 }
 
 func (s *assetService) GetDistinctCameraMakes(ctx context.Context) ([]string, error) {
@@ -869,17 +1006,95 @@ func (s *assetService) GetDistinctCameraMakes(ctx context.Context) ([]string, er
 }
 
 func (s *assetService) GetDistinctLenses(ctx context.Context) ([]string, error) {
-	rows, err := s.queries.GetDistinctLenses(ctx)
+	results, err := s.queries.GetDistinctLenses(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get distinct lenses: %w", err)
 	}
 
-	lenses := make([]string, 0, len(rows))
-	for _, row := range rows {
-		if str, ok := row.(string); ok && str != "" {
-			lenses = append(lenses, str)
+	lenses := make([]string, 0, len(results))
+	for _, result := range results {
+		if lens, ok := result.(string); ok && lens != "" {
+			lenses = append(lenses, lens)
 		}
 	}
 
 	return lenses, nil
+}
+
+// Rating management methods implementation
+
+func (s *assetService) UpdateAssetRating(ctx context.Context, id uuid.UUID, rating int) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	params := repo.UpdateAssetRatingParams{
+		AssetID: pgUUID,
+		Rating:  int32(rating),
+	}
+
+	return s.queries.UpdateAssetRating(ctx, params)
+}
+
+func (s *assetService) UpdateAssetLike(ctx context.Context, id uuid.UUID, liked bool) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	params := repo.UpdateAssetLikeParams{
+		AssetID: pgUUID,
+		Liked:   liked,
+	}
+
+	return s.queries.UpdateAssetLike(ctx, params)
+}
+
+func (s *assetService) UpdateAssetRatingAndLike(ctx context.Context, id uuid.UUID, rating int, liked bool) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	params := repo.UpdateAssetRatingAndLikeParams{
+		AssetID: pgUUID,
+		Rating:  int32(rating),
+		Liked:   liked,
+	}
+
+	return s.queries.UpdateAssetRatingAndLike(ctx, params)
+}
+
+func (s *assetService) UpdateAssetDescription(ctx context.Context, id uuid.UUID, description string) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	params := repo.UpdateAssetDescriptionParams{
+		AssetID:     pgUUID,
+		Description: description,
+	}
+
+	return s.queries.UpdateAssetDescription(ctx, params)
+}
+
+func (s *assetService) GetAssetsByRating(ctx context.Context, rating int, limit, offset int) ([]repo.Asset, error) {
+	params := repo.GetAssetsByRatingParams{
+		Rating: int32(rating),
+		Limit:  int32(limit),
+		Offset: int32(offset),
+	}
+
+	return s.queries.GetAssetsByRating(ctx, params)
+}
+
+func (s *assetService) GetLikedAssets(ctx context.Context, limit, offset int) ([]repo.Asset, error) {
+	params := repo.GetLikedAssetsParams{
+		Limit:  int32(limit),
+		Offset: int32(offset),
+	}
+
+	return s.queries.GetLikedAssets(ctx, params)
 }

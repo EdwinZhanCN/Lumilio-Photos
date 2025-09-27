@@ -40,6 +40,7 @@ type Asset struct {
 	Height           *int32                   `db:"height" json:"height"`
 	Duration         *float64                 `db:"duration" json:"duration"`
 	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`

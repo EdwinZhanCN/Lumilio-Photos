@@ -1,258 +1,285 @@
-import {
-  ListAssetsParams,
-  SearchAssetsParams,
-  AssetFilter,
-} from "@/services/assetsService";
+import { AssetFilter } from "@/services/assetsService";
 
-/**
- * **Assets State Interface**
- *
- * Defines the complete state structure for asset browsing operations.
- * This state is read-only and optimized for performance.
- *
- * @interface AssetsState
- * @since 1.0.0
- *
- * @example
- * ```tsx
- * function AssetCounter() {
- *   const { assets, isLoading, hasMore } = useAssetsContext();
- *
- *   return (
- *     <div>
- *       <p>Loaded {assets.length} assets</p>
- *       {isLoading && <p>Loading...</p>}
- *       {!hasMore && <p>All assets loaded</p>}
- *     </div>
- *   );
- * }
- * ```
- */
-export interface AssetsState {
-  /**
-   * Array of currently loaded assets.
-   * This list grows as more pages are fetched via infinite scrolling.
-   */
-  assets: Asset[];
+// ===== Core Types =====
+export type TabType = "photos" | "videos" | "audios";
+export type GroupByType = "date" | "type" | "album" | "flat";
 
-  /**
-   * Current filter and search parameters applied to the asset list.
-   *
-   * @see {@link ListAssetsParams} for available filter options
-   */
-  filters: ListAssetsParams;
+// ===== Asset View Definition =====
+export interface AssetViewDefinition {
+  /** Asset types to include */
+  types?: TabType[];
+  /** Filter conditions */
+  filter?: AssetFilter;
+  /** Whether to inherit global filters */
+  inheritGlobalFilter?: boolean;
+  /** Search configuration */
+  search?: {
+    query: string;
+    mode: "filename" | "semantic";
+  };
+  /** Grouping strategy */
+  groupBy?: GroupByType;
+  /** Sorting configuration */
+  sort?: {
+    direction: "desc" | "asc";
+  };
+  /** Page size for pagination */
+  pageSize?: number;
+  /** Pagination mode */
+  pagination?: "cursor" | "offset";
+  /** Manual stable key for view caching */
+  key?: string;
+}
+
+// ===== Entities State =====
+export interface EntityMeta {
+  lastUpdated: number;
+  isOptimistic?: boolean;
+  fetchOrigin?: string;
+}
+
+export interface EntitiesState {
+  assets: Record<string, Asset>;
+  meta: Record<string, EntityMeta>;
+}
+
+// ===== Views State =====
+export interface ViewState {
+  assetIds: string[];
   isLoading: boolean;
-  isLoadingNextPage: boolean;
-  error: string | null;
+  isLoadingMore: boolean;
   hasMore: boolean;
+  error: string | null;
+  pageInfo: {
+    cursor?: string;
+    page?: number;
+    total?: number;
+  };
+  definitionHash: string;
+  lastFetchAt: number;
 }
 
-/**
- * **Assets Actions Interface**
- *
- * Defines all available actions for manipulating asset state.
- * These functions are stable and won't cause re-renders for components that only use them.
- *
- * @interface AssetsActions
- * @since 1.0.0
- *
- */
-export interface AssetsActions {
-  /**
-   * **Fetch Assets Function**
-   *
-   * Fetches the first page of assets based on new parameters, replacing the current list.
-   * This is typically used when filters change or initial load occurs.
-   *
-   * @param params - Filter and pagination parameters
-   *
-   * @example
-   * ```tsx
-   * const { fetchAssets } = useAssetsContext();
-   *
-   * // Fetch photos uploaded in the last week
-   * await fetchAssets({
-   *   type: 'PHOTO',
-   *   dateRange: { start: '2024-01-01', end: '2024-01-07' },
-   *   limit: 20
-   * });
-   * ```
-   */
-  fetchAssets: (params: ListAssetsParams) => Promise<void>;
-
-  /**
-   * **Fetch Next Page Function**
-   *
-   * Fetches the next page of assets and appends them to the current list.
-   * Used for infinite scrolling implementations.
-   *
-   * @example
-   * ```tsx
-   * function InfiniteScroll() {
-   *   const { fetchNextPage, hasMore, isLoadingNextPage } = useAssetsContext();
-   *
-   *   useEffect(() => {
-   *     const handleScroll = () => {
-   *       if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000) {
-   *         if (hasMore && !isLoadingNextPage) {
-   *           fetchNextPage();
-   *         }
-   *       }
-   *     };
-   *
-   *     window.addEventListener('scroll', handleScroll);
-   *     return () => window.removeEventListener('scroll', handleScroll);
-   *   }, [fetchNextPage, hasMore, isLoadingNextPage]);
-   * }
-   * ```
-   */
-  fetchNextPage: () => Promise<void>;
-
-  /**
-   * **Apply Filter Function**
-   *
-   * Higher-level function to apply a new filter and refetch the asset list from the start.
-   * Automatically resets pagination when filters change.
-   *
-   * @param key - The filter parameter to update
-   * @param value - The new value for the filter parameter
-   *
-   * @example
-   * ```tsx
-   * // Filter by asset type
-   * applyFilter('type', 'PHOTO');
-   *
-   * // Filter by date range
-   * applyFilter('dateRange', { start: '2024-01-01', end: '2024-01-31' });
-   * ```
-   */
-  applyFilter: (key: keyof ListAssetsParams, value: any) => void;
-
-  /**
-   * **Set Search Query Function**
-   *
-   * Higher-level function to apply a new search query and refetch the asset list.
-   * Typically searches across filenames, descriptions, and tags.
-   *
-   * @param query - The search query string
-   *
-   * @example
-   * ```tsx
-   * function SearchBar() {
-   *   const { setSearchQuery } = useAssetsContext();
-   *   const [query, setQuery] = useState('');
-   *
-   *   const handleSearch = useMemo(
-   *     () => debounce((searchQuery: string) => {
-   *       setSearchQuery(searchQuery);
-   *     }, 300),
-   *     [setSearchQuery]
-   *   );
-   *
-   *   useEffect(() => {
-   *     handleSearch(query);
-   *   }, [query, handleSearch]);
-   *
-   *   return (
-   *     <input
-   *       value={query}
-   *       onChange={(e) => setQuery(e.target.value)}
-   *       placeholder="Search assets..."
-   *     />
-   *   );
-   * }
-   * ```
-   */
-  setSearchQuery: (query: string) => void;
-
-  /**
-   * **Reset Filters Function**
-   *
-   * Resets all filters to their default state and refetches the complete asset list.
-   * Useful for "Clear All" functionality.
-   *
-   * @example
-   * ```tsx
-   * <button onClick={resetFilters}>
-   *   Clear All Filters
-   * </button>
-   * ```
-   */
-  resetFilters: () => void;
-
-  /**
-   * **Perform Advanced Search Function**
-   *
-   * Execute advanced search using either filename matching or semantic vector search.
-   * Can be combined with comprehensive filters.
-   *
-   * @param params - Search parameters including query, search type, and optional filters
-   *
-   * @example
-   * ```tsx
-   * // Semantic search with filters
-   * await performAdvancedSearch({
-   *   query: "red bird on branch",
-   *   search_type: "semantic",
-   *   filter: { type: "PHOTO", rating: 5 },
-   *   limit: 20
-   * });
-   * ```
-   */
-  performAdvancedSearch: (params: SearchAssetsParams) => void;
-
-  /**
-   * **Apply Advanced Filter Function**
-   *
-   * Apply comprehensive filtering options including RAW, rating, liked status,
-   * filename patterns, date ranges, camera make, and lens.
-   *
-   * @param filter - Advanced filter criteria
-   *
-   * @example
-   * ```tsx
-   * // Filter by camera and rating
-   * await applyAdvancedFilter({
-   *   camera_make: "Canon",
-   *   rating: 5,
-   *   raw: true,
-   *   date: { from: "2024-01-01", to: "2024-01-31" }
-   * });
-   * ```
-   */
-  applyAdvancedFilter: (filter: AssetFilter) => void;
-
-  /**
-   * **Clear Search Function**
-   *
-   * Clears the current search context (both simple filename search and advanced semantic search),
-   * reverting the data layer back to the plain list (or filtered list if an advanced filter
-   * is still active).
-   *
-   * Typical trigger: user collapses / deactivates the Search UI button.
-   *
-   * @example
-   * ```tsx
-   * const { clearSearch } = useAssetsContext();
-   *
-   * function SearchToggle({ active }: { active: boolean }) {
-   *   useEffect(() => {
-   *     if (!active) clearSearch();
-   *   }, [active, clearSearch]);
-   * }
-   * ```
-   */
-  clearSearch: () => void;
+export interface ViewsState {
+  views: Record<string, ViewState>;
+  activeViewKeys: string[];
 }
 
-/**
- * **Assets Context Value Type**
- *
- * Combined type representing the complete API provided by the assets context.
- * Merges state and actions into a single interface for easier consumption.
- *
- * @since 1.0.0
- * @see {@link AssetsState} for state properties
- * @see {@link AssetsActions} for available actions
- */
-export type AssetsContextValue = AssetsState & AssetsActions;
+// ===== UI State =====
+export interface UIState {
+  currentTab: TabType;
+  groupBy: GroupByType;
+  searchQuery: string;
+  searchMode: "filename" | "semantic";
+  isCarouselOpen: boolean;
+  activeAssetId?: string;
+}
+
+// ===== Filters State =====
+export interface FiltersState {
+  enabled: boolean;
+  raw?: boolean;
+  rating?: number;
+  liked?: boolean;
+  filename?: {
+    mode: "contains" | "matches" | "startswith" | "endswith";
+    value: string;
+  };
+  date?: {
+    from?: string;
+    to?: string;
+  };
+  camera_make?: string;
+  lens?: string;
+}
+
+// ===== Selection State =====
+export interface SelectionState {
+  enabled: boolean;
+  selectedIds: Set<string>;
+  lastSelectedId?: string;
+  selectionMode: "single" | "multiple";
+}
+
+// ===== Main State =====
+export interface AssetsState {
+  entities: EntitiesState;
+  views: ViewsState;
+  ui: UIState;
+  filters: FiltersState;
+  selection: SelectionState;
+}
+
+// ===== Actions =====
+export type AssetsAction =
+  // Entity Actions
+  | {
+      type: "SET_ENTITY";
+      payload: { assetId: string; asset: Asset; meta?: Partial<EntityMeta> };
+    }
+  | {
+      type: "UPDATE_ENTITY";
+      payload: {
+        assetId: string;
+        updates: Partial<Asset>;
+        meta?: Partial<EntityMeta>;
+      };
+    }
+  | { type: "DELETE_ENTITY"; payload: { assetId: string } }
+  | {
+      type: "BATCH_SET_ENTITIES";
+      payload: { assets: Asset[]; meta?: Record<string, Partial<EntityMeta>> };
+    }
+
+  // View Actions
+  | {
+      type: "CREATE_VIEW";
+      payload: { viewKey: string; definition: AssetViewDefinition };
+    }
+  | { type: "SET_VIEW_LOADING"; payload: { viewKey: string; loading: boolean } }
+  | {
+      type: "SET_VIEW_ASSETS";
+      payload: {
+        viewKey: string;
+        assetIds: string[];
+        hasMore: boolean;
+        pageInfo: ViewState["pageInfo"];
+        replace?: boolean;
+      };
+    }
+  | {
+      type: "APPEND_VIEW_ASSETS";
+      payload: {
+        viewKey: string;
+        assetIds: string[];
+        hasMore: boolean;
+        pageInfo: ViewState["pageInfo"];
+      };
+    }
+  | {
+      type: "SET_VIEW_ERROR";
+      payload: { viewKey: string; error: string | null };
+    }
+  | {
+      type: "SET_VIEW_LOADING_MORE";
+      payload: { viewKey: string; loading: boolean };
+    }
+  | { type: "REMOVE_VIEW"; payload: { viewKey: string } }
+  | { type: "REMOVE_ASSET_FROM_VIEWS"; payload: { assetId: string } }
+
+  // UI Actions
+  | { type: "SET_CURRENT_TAB"; payload: TabType }
+  | { type: "SET_GROUP_BY"; payload: GroupByType }
+  | { type: "SET_SEARCH_QUERY"; payload: string }
+  | { type: "SET_SEARCH_MODE"; payload: "filename" | "semantic" }
+  | { type: "SET_CAROUSEL_OPEN"; payload: boolean }
+  | { type: "SET_ACTIVE_ASSET_ID"; payload: string | undefined }
+  | {
+      type: "HYDRATE_UI_FROM_URL";
+      payload: Partial<Pick<UIState, "groupBy" | "searchQuery">>;
+    }
+
+  // Filter Actions
+  | { type: "SET_FILTERS_ENABLED"; payload: boolean }
+  | { type: "SET_FILTER_RAW"; payload: boolean | undefined }
+  | { type: "SET_FILTER_RATING"; payload: number | undefined }
+  | { type: "SET_FILTER_LIKED"; payload: boolean | undefined }
+  | { type: "SET_FILTER_FILENAME"; payload: FiltersState["filename"] }
+  | { type: "SET_FILTER_DATE"; payload: FiltersState["date"] }
+  | { type: "SET_FILTER_CAMERA_MAKE"; payload: string | undefined }
+  | { type: "SET_FILTER_LENS"; payload: string | undefined }
+  | { type: "RESET_FILTERS" }
+  | { type: "BATCH_UPDATE_FILTERS"; payload: Partial<FiltersState> }
+
+  // Selection Actions
+  | { type: "SET_SELECTION_ENABLED"; payload: boolean }
+  | { type: "TOGGLE_ASSET_SELECTION"; payload: { assetId: string } }
+  | { type: "SELECT_ASSET"; payload: { assetId: string } }
+  | { type: "DESELECT_ASSET"; payload: { assetId: string } }
+  | { type: "SELECT_ALL"; payload: { assetIds: string[] } }
+  | { type: "CLEAR_SELECTION" }
+  | { type: "SET_SELECTION_MODE"; payload: "single" | "multiple" };
+
+// ===== Hook Return Types =====
+export interface AssetsViewResult {
+  assets: Asset[];
+  groups?: Record<string, Asset[]>;
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  error: string | null;
+  fetchMore: () => Promise<void>;
+  refetch: () => Promise<void>;
+  hasMore: boolean;
+  viewKey: string;
+  pageInfo: ViewState["pageInfo"];
+}
+
+export interface AssetActionsResult {
+  updateRating: (assetId: string, rating: number) => Promise<void>;
+  toggleLike: (assetId: string) => Promise<void>;
+  updateDescription: (assetId: string, description: string) => Promise<void>;
+  deleteAsset: (assetId: string) => Promise<void>;
+  batchUpdateAssets: (
+    updates: Array<{
+      assetId: string;
+      updates: Partial<Asset>;
+    }>,
+  ) => Promise<void>;
+  refreshAsset: (assetId: string) => Promise<void>;
+}
+
+export interface SelectionResult {
+  enabled: boolean;
+  selectedIds: Set<string>;
+  selectedCount: number;
+  isSelected: (assetId: string) => boolean;
+  toggle: (assetId: string) => void;
+  select: (assetId: string) => void;
+  deselect: (assetId: string) => void;
+  selectAll: (assetIds?: string[]) => void;
+  clear: () => void;
+  setEnabled: (enabled: boolean) => void;
+  selectionMode: "single" | "multiple";
+  setSelectionMode: (mode: "single" | "multiple") => void;
+
+  // Extended operations
+  selectRange: (
+    fromAssetId: string,
+    toAssetId: string,
+    assetIds: string[],
+  ) => void;
+  toggleRange: (
+    fromAssetId: string,
+    toAssetId: string,
+    assetIds: string[],
+  ) => void;
+  selectFiltered: (
+    assetIds: string[],
+    predicate: (assetId: string) => boolean,
+  ) => void;
+  deselectFiltered: (
+    assetIds: string[],
+    predicate: (assetId: string) => boolean,
+  ) => void;
+  invertSelection: (assetIds: string[]) => void;
+
+  // Computed properties
+  hasSelection: boolean;
+  selectedAsArray: string[];
+}
+
+// ===== Context Value =====
+export interface AssetsContextValue {
+  state: AssetsState;
+  dispatch: React.Dispatch<AssetsAction>;
+  // Navigation helpers
+  openCarousel: (assetId: string) => void;
+  closeCarousel: () => void;
+  switchTab: (tab: TabType) => void;
+}
+
+// ===== Utility Types =====
+export interface ViewDefinitionOptions {
+  autoFetch?: boolean;
+  disabled?: boolean;
+  withGroups?: boolean;
+}

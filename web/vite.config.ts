@@ -22,20 +22,22 @@ export default defineConfig({
     projects: [
       {
         test: {
-          name: 'happy-dom',
-          environment: 'happy-dom',
-          setupFiles: ['./setup.happy-dom.ts', '@vitest/web-worker'],
+          name: "happy-dom",
+          environment: "happy-dom",
+          setupFiles: ["./setup.happy-dom.ts", "@vitest/web-worker"],
         },
       },
       {
         test: {
-          include: ['**/*.worker.{ts,js}', '**/*.test.{ts,js}'],
-          name: 'node',
-          environment: 'node',
-          setupFiles: ['./setup.node.ts', '@vitest/web-worker'],
+          include: ["**/*.worker.{ts,js}", "**/*.test.{ts,js}"],
+          name: "node",
+          environment: "node",
+          setupFiles: ["./setup.node.ts", "@vitest/web-worker"],
         },
       },
     ],
   },
-
+  optimizeDeps: {
+    exclude: ["@immich/justified-layout-wasm"],
+  },
 });
