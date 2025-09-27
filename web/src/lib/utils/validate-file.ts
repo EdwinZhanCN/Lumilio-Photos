@@ -23,13 +23,26 @@ const isValidFileType = (file:File):boolean => {
         'video/mpeg'
     ];
 
+    const supportedAudioTypes = [
+        'audio/mpeg',
+        'audio/mp3',
+        'audio/wav',
+        'audio/flac',
+        'audio/ogg',
+        'audio/m4a',
+        'audio/aac'
+    ];
+
     // Check if it's an image type that starts with any of the supported prefixes
     const isImage = supportedImageTypes.some(type => file.type.startsWith(type));
 
     // Check if it's a supported video type
     const isVideo = supportedVideoTypes.includes(file.type);
 
-    return isImage || isVideo;
+    // Check if it's a supported audio type
+    const isAudio = supportedAudioTypes.includes(file.type);
+
+    return isImage || isVideo || isAudio;
 };
 
 /**
@@ -46,7 +59,7 @@ export const getSupportedRawExtensions = (): string[] => {
  */
 export const getSupportedFileExtensionsString = (): string => {
     const rawExtensions = getSupportedRawExtensions().join(',');
-    return `image/*,video/*,${rawExtensions},.mov,.mp4,.avi,.mkv`;
+    return `image/*,video/*,audio/*,${rawExtensions},.mov,.mp4,.avi,.mkv,.mp3,.wav,.flac,.m4a`;
 };
 
 export default isValidFileType;
