@@ -1,9 +1,9 @@
 import { useMemo, useCallback, useState } from "react";
 import { useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
-import JustifiedGallery from "@/features/assets/components/Photos/JustifiedGallery/JustifiedGallery";
-import FullScreenCarousel from "@/features/assets/components/Photos/FullScreen/FullScreenCarousel/FullScreenCarousel";
-import PhotosLoadingSkeleton from "@/features/assets/components/Photos/PhotosLoadingSkeleton";
+import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
+import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
+import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import {
   useAssetsContext,
   useAssetsNavigation,
@@ -15,7 +15,7 @@ import {
   getFlatAssetsFromGrouped,
   findAssetIndex,
 } from "@/lib/utils/assetGrouping.ts";
-import { FilterDTO } from "@/features/assets/components/Photos/PhotosToolBar/FilterTool";
+import { FilterDTO } from "@/features/assets/components/page/FilterTool/FilterTool";
 
 function Photos() {
   const { assetId } = useParams<{ assetId: string }>();

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import PhotosLoadingSkeleton from "../PhotosLoadingSkeleton";
+import PhotosLoadingSkeleton from "../LoadingSkeleton";
 import { assetService } from "@/services/assetsService";
 import {
   justifiedLayoutService,

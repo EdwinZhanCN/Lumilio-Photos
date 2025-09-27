@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { useInView } from "react-intersection-observer";
-import PhotosLoadingSkeleton from "@/features/assets/components/Photos/PhotosLoadingSkeleton";
+import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
 import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
-import { FilterDTO } from "@/features/assets/components/Photos/PhotosToolBar/FilterTool";
+import { FilterDTO } from "@/features/assets/components/page/FilterTool/FilterTool";
 import { useCallback } from "react";
 
 function Audios() {
