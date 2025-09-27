@@ -1,6 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { useMessage } from "@/hooks/util-hooks/useMessage.tsx";
 import { useWorker } from "@/contexts/WorkerProvider.tsx";
+import {
+  getOptimalBatchSize,
+  recordProcessingMetrics,
+  ProcessingPriority
+} from "@/utils/smartBatchSizing";
 
 export interface HashcodeProgress {
   numberProcessed: number;
@@ -28,6 +33,7 @@ export interface useGenerateHashcodeReturn {
   progress: HashcodeProgress | null;
   generateHashCodes: (
     files: FileList | File[],
+    priority?: ProcessingPriority,
   ) => Promise<HashcodeResult[] | undefined>;
   cancelGeneration: () => void;
 }
@@ -62,7 +68,7 @@ export const useGenerateHashcode = (
   }, [workerClient, isGenerating]);
 
   const generateHashCodes = useCallback(
-    async (files: FileList | File[]): Promise<HashcodeResult[] | undefined> => {
+    async (files: FileList | File[], priority: ProcessingPriority = ProcessingPriority.NORMAL): Promise<HashcodeResult[] | undefined> => {
       setIsGenerating(true);
       setProgress({ numberProcessed: 0, total: files.length });
 
@@ -73,8 +79,22 @@ export const useGenerateHashcode = (
       );
 
       try {
+        // Record anticipated batch size for performance tracking
+        const anticipatedBatchSize = getOptimalBatchSize("hash", files.length, priority);
+        
         const { hashResults } = await workerClient.generateHash(files);
         const processingTime = performance.now() - startTime;
+
+        // Record processing metrics
+        recordProcessingMetrics({
+          operationType: "hash",
+          batchSize: anticipatedBatchSize, // What we expected to use
+          processingTimeMs: processingTime,
+          filesProcessed: hashResults?.length || 0,
+          avgTimePerFile: hashResults?.length ? processingTime / hashResults.length : 0,
+          success: !!hashResults && hashResults.length > 0,
+          errorRate: hashResults ? Math.max(0, (files.length - hashResults.length) / files.length) : 1.0,
+        });
 
         if (onPerformanceMetrics) {
           onPerformanceMetrics({
@@ -82,7 +102,7 @@ export const useGenerateHashcode = (
             totalSize,
             processingTime,
             fileCount: files.length,
-            numberProcessed: hashResults.length,
+            numberProcessed: hashResults?.length || 0,
             filesPerSecond: files.length / (processingTime / 1000),
             bytesPerSecond: totalSize / (processingTime / 1000),
           });
@@ -100,6 +120,19 @@ export const useGenerateHashcode = (
             : "Unknown hash generation error";
         showMessage("error", `HashCode generation failed: ${errorMessage}`);
         setProgress((prev) => (prev ? { ...prev, error: errorMessage } : null));
+
+        // Record failure metrics
+        const processingTime = performance.now() - startTime;
+        recordProcessingMetrics({
+          operationType: "hash",
+          batchSize: files.length,
+          processingTimeMs: processingTime,
+          filesProcessed: 0,
+          avgTimePerFile: 0,
+          success: false,
+          errorRate: 1.0,
+        });
+
         return undefined; // Indicate failure
       } finally {
         setIsGenerating(false);
