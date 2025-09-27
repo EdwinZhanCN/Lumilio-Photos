@@ -8,7 +8,7 @@ import { SquareMousePointer, FunnelIcon } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FilterTool, {
   FilterDTO,
-} from "@/features/assets/components/Photos/PhotosToolBar/FilterTool";
+} from "@/features/assets/components/page/FilterTool/FilterTool";
 import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
 import { useSelection } from "@/features/assets/hooks/useSelection";
 import { GroupByType } from "@/features/assets/types";
