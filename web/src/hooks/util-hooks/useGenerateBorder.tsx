@@ -1,8 +1,11 @@
 import React, { useState, useCallback } from "react";
 import { useMessage } from "@/hooks/util-hooks/useMessage.tsx";
 import { useWorker } from "@/contexts/WorkerProvider.tsx";
-
-const BATCH_SIZE = 5; // Example batch size, can be configured
+import { 
+  getOptimalBatchSize, 
+  recordProcessingMetrics, 
+  ProcessingPriority 
+} from "@/utils/smartBatchSizing";
 
 export type BorderOptions = "COLORED" | "FROSTED" | "VIGNETTE";
 
@@ -51,6 +54,7 @@ export interface UseGenerateBordersReturn {
     files: File[],
     option: BorderOptions,
     param: BorderParams[BorderOptions],
+    priority?: ProcessingPriority,
   ) => Promise<void>;
   cancelGeneration: () => void;
 }
@@ -77,34 +81,86 @@ export const useGenerateBorders = (): UseGenerateBordersReturn => {
       files: File[],
       option: BorderOptions,
       param: BorderParams[BorderOptions],
+      priority: ProcessingPriority = ProcessingPriority.NORMAL,
     ): Promise<void> => {
       setIsGenerating(true);
       setProcessedImages({}); // Clear previous results
       setProgress({ processed: 0, total: files.length });
 
+      const startTime = performance.now();
+      let totalErrors = 0;
+
       try {
-        // Process files in batches to avoid overwhelming the worker with a single large message
-        for (let i = 0; i < files.length; i += BATCH_SIZE) {
-          const batch = files.slice(i, i + BATCH_SIZE);
-          const resultsMap = await workerClient.generateBorders(
-            batch,
-            option,
-            param,
-          );
+        // Get optimal batch size based on device capabilities and processing history
+        const batchSize = getOptimalBatchSize("border", files.length, priority);
+        
+        // Process files in dynamic batches
+        for (let i = 0; i < files.length; i += batchSize) {
+          const batch = files.slice(i, i + batchSize);
+          const batchStartTime = performance.now();
+          
+          try {
+            const resultsMap = await workerClient.generateBorders(
+              batch,
+              option,
+              param,
+            );
 
-          // Merge results from the current batch into the main state
-          setProcessedImages((prev) => ({
-            ...prev,
-            ...resultsMap,
-          }));
+            // Merge results from the current batch into the main state
+            setProcessedImages((prev) => ({
+              ...prev,
+              ...resultsMap,
+            }));
 
-          // Update progress
-          setProgress((prev) => ({
-            processed: (prev?.processed || 0) + batch.length,
-            total: files.length,
-          }));
+            // Update progress
+            setProgress((prev) => ({
+              processed: (prev?.processed || 0) + batch.length,
+              total: files.length,
+            }));
+
+            // Record successful batch metrics
+            const batchProcessingTime = performance.now() - batchStartTime;
+            recordProcessingMetrics({
+              operationType: "border",
+              batchSize: batch.length,
+              processingTimeMs: batchProcessingTime,
+              filesProcessed: batch.length,
+              avgTimePerFile: batchProcessingTime / batch.length,
+              success: true,
+              errorRate: 0,
+            });
+
+          } catch (batchError) {
+            totalErrors += batch.length;
+            console.warn(`Border generation batch ${i / batchSize + 1} failed:`, batchError);
+            
+            // Record failed batch metrics
+            const batchProcessingTime = performance.now() - batchStartTime;
+            recordProcessingMetrics({
+              operationType: "border",
+              batchSize: batch.length,
+              processingTimeMs: batchProcessingTime,
+              filesProcessed: 0, // No files processed in failed batch
+              avgTimePerFile: 0,
+              success: false,
+              errorRate: 1.0,
+            });
+
+            // Update processed count even for failed batch
+            setProgress((prev) => ({
+              processed: (prev?.processed || 0) + batch.length,
+              total: files.length,
+            }));
+          }
         }
-        showMessage("success", "Border generation complete!");
+
+        const successCount = files.length - totalErrors;
+        if (successCount > 0) {
+          showMessage("success", `Border generation complete! ${successCount}/${files.length} images processed successfully.`);
+        } else {
+          showMessage("error", "Border generation failed for all images.");
+        }
+
       } catch (error) {
         const errorMessage =
           error instanceof Error
@@ -120,6 +176,18 @@ export const useGenerateBorders = (): UseGenerateBordersReturn => {
               }
             : null,
         );
+
+        // Record overall failure metrics
+        const totalProcessingTime = performance.now() - startTime;
+        recordProcessingMetrics({
+          operationType: "border",
+          batchSize: files.length,
+          processingTimeMs: totalProcessingTime,
+          filesProcessed: 0,
+          avgTimePerFile: 0,
+          success: false,
+          errorRate: 1.0,
+        });
       } finally {
         setIsGenerating(false);
       }
