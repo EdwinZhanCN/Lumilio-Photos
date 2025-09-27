@@ -12,6 +12,7 @@ import { assetService } from "@/services/assetsService";
 import FullScreenBasicInfo from "../FullScreenInfo/FullScreenBasicInfo";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";
+import MediaViewer from "../../../shared/MediaViewer";
 
 interface FullScreenCarouselProps {
   photos: Asset[];
@@ -39,16 +40,10 @@ const FullScreenCarousel = ({
   const { t } = useI18n();
 
   const slides = useMemo(() => {
-    return photos.map((photo) => {
-      const largeImageUrl = photo.asset_id
-        ? assetService.getThumbnailUrl(photo.asset_id, "large")
-        : undefined;
-      return {
-        src: largeImageUrl || "",
-        alt: photo.original_filename || "Asset",
-        assetId: photo.asset_id!,
-      };
-    });
+    return photos.map((photo) => ({
+      asset: photo,
+      assetId: photo.asset_id!,
+    }));
   }, [photos]);
 
   const onSlideChange = (swiper: any) => {
@@ -171,13 +166,7 @@ const FullScreenCarousel = ({
       >
         {slides.map((slide, index) => (
           <SwiperSlide key={slide.assetId} virtualIndex={index}>
-            <div className="h-screen w-screen flex items-center justify-center p-4">
-              <img
-                src={slide.src}
-                alt={slide.alt}
-                className="max-h-full max-w-full object-contain select-none"
-              />
-            </div>
+            <MediaViewer asset={slide.asset} />
           </SwiperSlide>
         ))}
       </Swiper>
