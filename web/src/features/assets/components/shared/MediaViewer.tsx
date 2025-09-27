@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize, Music } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Maximize, Music, AlertCircle } from "lucide-react";
 import { assetService } from "@/services/assetsService";
+import { isVideo, isAudio, formatDuration } from "@/lib/utils/mediaTypes";
 
 interface MediaViewerProps {
   asset: Asset;
@@ -8,33 +9,9 @@ interface MediaViewerProps {
 }
 
 /**
- * Determines if an asset is a video based on MIME type or legacy type
+ * Formats time in seconds to MM:SS format (alias for consistency)
  */
-const isVideo = (asset: Asset): boolean => {
-  if (asset.mime_type) {
-    return asset.mime_type.startsWith("video/");
-  }
-  return asset.type === "VIDEO";
-};
-
-/**
- * Determines if an asset is audio based on MIME type or legacy type
- */
-const isAudio = (asset: Asset): boolean => {
-  if (asset.mime_type) {
-    return asset.mime_type.startsWith("audio/");
-  }
-  return asset.type === "AUDIO";
-};
-
-/**
- * Formats time in seconds to MM:SS format
- */
-const formatTime = (time: number): string => {
-  const minutes = Math.floor(time / 60);
-  const seconds = Math.floor(time % 60);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-};
+const formatTime = formatDuration;
 
 /**
  * MediaViewer component that renders appropriate viewer based on asset type
@@ -47,6 +24,8 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   const videoAsset = isVideo(asset);
   const audioAsset = isAudio(asset);
@@ -75,12 +54,24 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
       setVolume(media.volume);
       setIsMuted(media.muted);
     };
+    const handleLoadStart = () => {
+      setIsLoading(true);
+      setHasError(false);
+    };
+    const handleCanPlay = () => setIsLoading(false);
+    const handleError = () => {
+      setHasError(true);
+      setIsLoading(false);
+    };
 
     media.addEventListener("timeupdate", handleTimeUpdate);
     media.addEventListener("durationchange", handleDurationChange);
     media.addEventListener("play", handlePlay);
     media.addEventListener("pause", handlePause);
     media.addEventListener("volumechange", handleVolumeChange);
+    media.addEventListener("loadstart", handleLoadStart);
+    media.addEventListener("canplay", handleCanPlay);
+    media.addEventListener("error", handleError);
 
     return () => {
       media.removeEventListener("timeupdate", handleTimeUpdate);
@@ -88,6 +79,9 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
       media.removeEventListener("play", handlePlay);
       media.removeEventListener("pause", handlePause);
       media.removeEventListener("volumechange", handleVolumeChange);
+      media.removeEventListener("loadstart", handleLoadStart);
+      media.removeEventListener("canplay", handleCanPlay);
+      media.removeEventListener("error", handleError);
     };
   }, [mediaRef]);
 
@@ -182,62 +176,95 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
           className="max-h-full max-w-full object-contain"
           controls={false}
           preload="metadata"
+          aria-label={`Video: ${asset.original_filename || "Video file"}`}
         />
         
-        {/* Custom video controls overlay */}
-        <div className="absolute bottom-4 left-4 right-4 bg-black/80 rounded-lg p-3 text-white">
-          <div className="flex items-center gap-3 mb-2">
-            <button
-              onClick={togglePlayPause}
-              className="btn btn-circle btn-sm bg-white/20 border-none hover:bg-white/30"
-            >
-              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-            </button>
-            
-            <div className="flex-1">
-              <input
-                type="range"
-                min="0"
-                max={duration || 0}
-                value={currentTime}
-                onChange={handleSeek}
-                className="range range-sm range-primary w-full"
-              />
-            </div>
-            
-            <span className="text-sm font-mono">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </span>
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <div className="loading loading-spinner loading-lg text-white"></div>
           </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        )}
+        
+        {/* Error state */}
+        {hasError && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-white">
+            <div className="text-center">
+              <AlertCircle className="w-12 h-12 mx-auto mb-2" />
+              <div className="text-lg mb-1">Unable to load video</div>
+              <div className="text-sm opacity-70">
+                {asset.original_filename || "Video file"}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Custom video controls overlay */}
+        {!hasError && (
+          <div className="absolute bottom-4 left-4 right-4 bg-black/80 rounded-lg p-3 text-white">
+            <div className="flex items-center gap-3 mb-2">
               <button
-                onClick={toggleMute}
+                onClick={togglePlayPause}
                 className="btn btn-circle btn-sm bg-white/20 border-none hover:bg-white/30"
+                aria-label={isPlaying ? "Pause video" : "Play video"}
+                disabled={isLoading || hasError}
               >
-                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
               </button>
               
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={isMuted ? 0 : volume}
-                onChange={handleVolumeChange}
-                className="range range-sm range-primary w-20"
-              />
+              <div className="flex-1">
+                <input
+                  type="range"
+                  min="0"
+                  max={duration || 0}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  className="range range-sm range-primary w-full"
+                  aria-label="Video progress"
+                  disabled={isLoading || hasError}
+                />
+              </div>
+              
+              <span className="text-sm font-mono">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
             </div>
             
-            <button
-              onClick={toggleFullscreen}
-              className="btn btn-circle btn-sm bg-white/20 border-none hover:bg-white/30"
-            >
-              <Maximize className="w-4 h-4" />
-            </button>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleMute}
+                  className="btn btn-circle btn-sm bg-white/20 border-none hover:bg-white/30"
+                  aria-label={isMuted ? "Unmute video" : "Mute video"}
+                  disabled={isLoading || hasError}
+                >
+                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </button>
+                
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  className="range range-sm range-primary w-20"
+                  aria-label="Volume"
+                  disabled={isLoading || hasError}
+                />
+              </div>
+              
+              <button
+                onClick={toggleFullscreen}
+                className="btn btn-circle btn-sm bg-white/20 border-none hover:bg-white/30"
+                aria-label="Enter fullscreen"
+                disabled={isLoading || hasError}
+              >
+                <Maximize className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
   }
@@ -247,68 +274,104 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
     return (
       <div className={`w-full h-full flex items-center justify-center ${className}`}>
         <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl p-8 text-white shadow-2xl max-w-md w-full mx-4">
-          <audio ref={audioRef} src={mediaUrl} preload="metadata" />
+          <audio 
+            ref={audioRef} 
+            src={mediaUrl} 
+            preload="metadata"
+            aria-label={`Audio: ${asset.original_filename || "Audio file"}`}
+          />
+          
+          {/* Loading indicator */}
+          {isLoading && (
+            <div className="text-center mb-6">
+              <div className="loading loading-spinner loading-lg text-white mb-2"></div>
+              <div className="text-sm opacity-70">Loading audio...</div>
+            </div>
+          )}
+          
+          {/* Error state */}
+          {hasError && (
+            <div className="text-center mb-6">
+              <AlertCircle className="w-12 h-12 mx-auto mb-2" />
+              <div className="text-lg mb-1">Unable to load audio</div>
+              <div className="text-sm opacity-70">
+                {asset.original_filename || "Audio file"}
+              </div>
+            </div>
+          )}
           
           {/* Audio visualization */}
-          <div className="text-center mb-6">
-            <div className="w-24 h-24 mx-auto mb-4 bg-white/20 rounded-full flex items-center justify-center">
-              <Music className="w-12 h-12" />
-            </div>
-            <h3 className="text-xl font-bold mb-1">
-              {asset.original_filename?.replace(/\.[^/.]+$/, "") || "Audio File"}
-            </h3>
-            <p className="text-white/70 text-sm">
-              {asset.mime_type || "Audio"}
-            </p>
-          </div>
-          
-          {/* Progress bar */}
-          <div className="mb-4">
-            <input
-              type="range"
-              min="0"
-              max={duration || 0}
-              value={currentTime}
-              onChange={handleSeek}
-              className="range range-sm range-primary w-full"
-            />
-            <div className="flex justify-between text-sm text-white/70 mt-1">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
-          </div>
-          
-          {/* Controls */}
-          <div className="flex items-center justify-center gap-4">
-            <button
-              onClick={toggleMute}
-              className="btn btn-circle btn-sm bg-white/20 border-none hover:bg-white/30"
-            >
-              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            </button>
-            
-            <button
-              onClick={togglePlayPause}
-              className="btn btn-circle btn-lg bg-white/30 border-none hover:bg-white/40"
-            >
-              {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
-            </button>
-            
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.1"
-              value={isMuted ? 0 : volume}
-              onChange={handleVolumeChange}
-              className="range range-sm range-primary w-20"
-            />
-          </div>
-          
-          {/* Keyboard shortcuts hint */}
-          <div className="text-center text-xs text-white/50 mt-4">
-            Space: Play/Pause • ←→: Seek • ↑↓: Volume • M: Mute
-          </div>
+          {!hasError && !isLoading && (
+            <>
+              <div className="text-center mb-6">
+                <div className="w-24 h-24 mx-auto mb-4 bg-white/20 rounded-full flex items-center justify-center">
+                  <Music className="w-12 h-12" />
+                </div>
+                <h3 className="text-xl font-bold mb-1">
+                  {asset.original_filename?.replace(/\.[^/.]+$/, "") || "Audio File"}
+                </h3>
+                <p className="text-white/70 text-sm">
+                  {asset.mime_type || "Audio"}
+                </p>
+              </div>
+              
+              {/* Progress bar */}
+              <div className="mb-4">
+                <input
+                  type="range"
+                  min="0"
+                  max={duration || 0}
+                  value={currentTime}
+                  onChange={handleSeek}
+                  className="range range-sm range-primary w-full"
+                  aria-label="Audio progress"
+                  disabled={isLoading || hasError}
+                />
+                <div className="flex justify-between text-sm text-white/70 mt-1">
+                  <span>{formatTime(currentTime)}</span>
+                  <span>{formatTime(duration)}</span>
+                </div>
+              </div>
+              
+              {/* Controls */}
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={toggleMute}
+                  className="btn btn-circle btn-sm bg-white/20 border-none hover:bg-white/30"
+                  aria-label={isMuted ? "Unmute audio" : "Mute audio"}
+                  disabled={isLoading || hasError}
+                >
+                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </button>
+                
+                <button
+                  onClick={togglePlayPause}
+                  className="btn btn-circle btn-lg bg-white/30 border-none hover:bg-white/40"
+                  aria-label={isPlaying ? "Pause audio" : "Play audio"}
+                  disabled={isLoading || hasError}
+                >
+                  {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+                </button>
+                
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  className="range range-sm range-primary w-20"
+                  aria-label="Volume"
+                  disabled={isLoading || hasError}
+                />
+              </div>
+              
+              {/* Keyboard shortcuts hint */}
+              <div className="text-center text-xs text-white/50 mt-4">
+                Space: Play/Pause • ←→: Seek • ↑↓: Volume • M: Mute
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
