@@ -57,7 +57,7 @@ export const uploadService = {
         ...config,
         headers: {
           "Content-Type": "multipart/form-data",
-          ...(config?.headers ?? {}),
+          ...config?.headers,
         },
       },
     );
@@ -84,7 +84,7 @@ export const uploadService = {
       headers: {
         "Content-Type": "multipart/form-data",
         "X-Content-Hash": hash,
-        ...(config?.headers ?? {}),
+        ...config?.headers,
       },
     });
   },

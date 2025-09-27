@@ -1,8 +1,15 @@
 import { useSettingsContext } from "@/features/settings";
 import { ModelRecord } from "@mlc-ai/web-llm";
 import React, { useEffect, useState } from "react";
+import {
+  SparklesIcon,
+  CpuChipIcon,
+  Cog6ToothIcon,
+} from "@heroicons/react/24/outline";
+import { useI18n } from "@/lib/i18n.tsx";
 
 export default function LumenSettings() {
+  const { t } = useI18n();
   const { state, dispatch } = useSettingsContext();
   const { lumen: lumenSettings } = state;
 
@@ -108,22 +115,24 @@ export default function LumenSettings() {
   };
 
   return (
-    <div className="h-full">
-      <h1 className="text-3xl font-bold my-3">Lumen on Browser</h1>
-      <p>
-        Lumen is an on browser AI assistant, you can chat with it click the
-        Lumen avatar on the nav bar. <br /> Also, It gathers the information for
-        your bio atalas. This function is auto-disabled on mobile phones.
-      </p>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <SparklesIcon className="size-6 text-primary" />
+        <h2 className="text-2xl font-bold">
+          {t("settings.lumenSettings.title")}
+        </h2>
+      </div>
+      <p>{t("settings.lumenSettings.description")}</p>
       {isMobile && (
         <div className="alert alert-warning mb-4">
-          <span>
-            Lumen is disabled on mobile devices due to performance limitations.
-          </span>
+          <span>{t("settings.lumenSettings.mobileDisabledWarning")}</span>
         </div>
       )}
-      <div>
-        <h1 className="text-2xl font-bold my-2">Enable</h1>
+
+      <section className="space-y-3">
+        <h3 className="text-lg font-semibold">
+          {t("settings.lumenSettings.enable")}
+        </h3>
         <input
           type="checkbox"
           checked={localSettings.enabled ?? true}
@@ -131,67 +140,81 @@ export default function LumenSettings() {
           disabled={isMobile}
           className={`toggle toggle-primary ${isMobile ? "opacity-50" : ""}`}
         />
-      </div>
-      <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-bold my-2">Choose your Model</h1>
-      </div>
-      <p>
-        We highly recommend you using Qwen3 series, they are open-sourced, small
-        and powerful. <br />
-        However, you can configure your own model list in Advanced settings, we
-        use WebLLM as our backbone.
-      </p>
-      <div className="flex flex-wrap md:flex-nowrap gap-4 py-3 overflow-x-auto">
-        {lumenSettings.modelRecords?.map((modelRecord) => (
-          <div
-            key={modelRecord.model_id}
-            className="card bg-base-100 shadow-sm flex-1 max-w-[500px]"
-          >
-            {(modelRecord.model_id === "Qwen3-4B-q4f16_1-MLC" ||
-              modelRecord.model_id === "Qwen3-1.7B-q4f16_1-MLC") && (
-              <figure className="px-10 pt-10">
-                <img
-                  src="https://qianwen-res.oss-accelerate-overseas.aliyuncs.com/logo_qwen3.png"
-                  alt={modelRecord.model_id}
-                  className="rounded-xl"
-                />
-              </figure>
-            )}
-            <div className="card-body items-center text-center">
-              <h2 className="card-title">{modelRecord.model_id}</h2>
-              <p>
-                VRAM Required: {Math.round(modelRecord.vram_required_MB || 0)}MB
-              </p>
-              <div className="card-actions">
-                <input
-                  type="radio"
-                  name="radio-4"
-                  className="radio radio-primary"
-                  value={modelRecord.model_id}
-                  checked={localSettings.model === modelRecord.model_id}
-                  onChange={handleModelChange}
-                  disabled={isMobile}
-                />
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <CpuChipIcon className="size-6 text-primary" />
+          <h3 className="text-lg font-semibold">
+            {t("settings.lumenSettings.chooseModel")}
+          </h3>
+        </div>
+        <p>{t("settings.lumenSettings.modelDescription")}</p>
+        <div className="flex flex-wrap md:flex-nowrap gap-4 py-3 overflow-x-auto">
+          {lumenSettings.modelRecords?.map((modelRecord) => (
+            <div
+              key={modelRecord.model_id}
+              className="card bg-base-100 shadow-sm flex-1 max-w-[500px]"
+            >
+              {(modelRecord.model_id === "Qwen3-4B-q4f16_1-MLC" ||
+                modelRecord.model_id === "Qwen3-1.7B-q4f16_1-MLC") && (
+                <figure className="px-10 pt-10">
+                  <img
+                    src="https://qianwen-res.oss-accelerate-overseas.aliyuncs.com/logo_qwen3.png"
+                    alt={modelRecord.model_id}
+                    className="rounded-xl"
+                  />
+                </figure>
+              )}
+              <div className="card-body items-center text-center">
+                <h2 className="card-title">{modelRecord.model_id}</h2>
+                <p>
+                  {t("settings.lumenSettings.vramRequired")}:{" "}
+                  {Math.round(modelRecord.vram_required_MB || 0)}
+                  MB
+                </p>
+                <div className="card-actions">
+                  <input
+                    type="radio"
+                    name="radio-4"
+                    className="radio radio-primary"
+                    value={modelRecord.model_id}
+                    checked={localSettings.model === modelRecord.model_id}
+                    onChange={handleModelChange}
+                    disabled={isMobile}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-      <div>
-        <h1 className="text-2xl font-bold my-2">System Prompt (Chat Only)</h1>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h3 className="text-lg font-semibold">
+          {t("settings.lumenSettings.systemPrompt")}
+        </h3>
         <textarea
-          placeholder="Enter your system prompt here..."
+          placeholder={t("settings.lumenSettings.systemPromptPlaceholder")}
           className="textarea textarea-primary w-full h-32"
           value={localSettings.systemPrompt ?? ""}
           onChange={handleSystemPromptChange}
           disabled={isMobile}
         ></textarea>
-      </div>
-      <div>
-        <h1 className="text-2xl font-bold my-2">Advanced settings</h1>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Cog6ToothIcon className="size-6 text-primary" />
+          <h3 className="text-lg font-semibold">
+            {t("settings.lumenSettings.advancedSettings")}
+          </h3>
+        </div>
         <div className="flex flex-col gap-2">
           <label className="flex items-center gap-2">
-            <span className="w-32">Temperature</span>
+            <span className="w-32">
+              {t("settings.lumenSettings.temperature")}
+            </span>
             <input
               type="range"
               min={0}
@@ -205,7 +228,7 @@ export default function LumenSettings() {
             <span>{localSettings.temperature}</span>
           </label>
           <label className="flex items-center gap-2">
-            <span className="w-32">Top P</span>
+            <span className="w-32">{t("settings.lumenSettings.topP")}</span>
             <input
               type="range"
               min={0}
@@ -219,10 +242,12 @@ export default function LumenSettings() {
             <span>{localSettings.top_p}</span>
           </label>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold my-2">Model List (JSON)</h1>
+        <div className="space-y-3">
+          <h4 className="text-base font-medium">
+            {t("settings.lumenSettings.modelList")}
+          </h4>
           <p>
-            Check config from{" "}
+            {t("settings.lumenSettings.modelListDescription")}{" "}
             <a
               href="https://github.com/mlc-ai/web-llm/blob/main/src/config.ts"
               rel="noreferrer"
@@ -231,7 +256,6 @@ export default function LumenSettings() {
             >
               WebLLM
             </a>
-            (Do not edit this unless you know what is it)
           </p>
           <textarea
             className="textarea textarea-primary w-full h-64"
@@ -246,15 +270,15 @@ export default function LumenSettings() {
             onClick={handleSave}
             disabled={!hasUnsavedChanges() || isMobile}
           >
-            Save {hasUnsavedChanges() && "(*)"}
+            {t("settings.lumenSettings.save")} {hasUnsavedChanges() && "(*)"}
           </button>
           {hasUnsavedChanges() && (
             <div className="text-sm text-warning self-center">
-              You have unsaved changes
+              {t("settings.lumenSettings.unsavedChanges")}
             </div>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

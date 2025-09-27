@@ -23,6 +23,10 @@ export const groupAssets = (
     case "album":
       grouped = groupAssetsByAlbum(assets);
       break;
+    case "flat":
+      // Flat mode: present all assets in a single unsectioned group
+      grouped = { "All Results": assets };
+      break;
     default:
       grouped = { "All Assets": assets };
   }

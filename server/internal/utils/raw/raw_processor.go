@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"time"
 
@@ -255,9 +256,22 @@ func (p *Processor) processWithDcraw(ctx context.Context, rawData []byte, filena
 		return nil, fmt.Errorf("dcraw not found: %w", err)
 	}
 
+	// Write RAW data to a temp file because some dcraw builds don't accept '-' stdin
+	tmpFile, err := os.CreateTemp("", "dcraw-*.raw")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file for dcraw: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	if _, err := tmpFile.Write(rawData); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("failed to write RAW data to temp file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close temp RAW file: %w", err)
+	}
+
 	// dcraw command: -c (stdout), -q 3 (high quality), -w (auto white balance)
-	cmd := exec.CommandContext(ctx, "dcraw", "-c", "-q", "3", "-w", "-")
-	cmd.Stdin = bytes.NewReader(rawData)
+	cmd := exec.CommandContext(ctx, "dcraw", "-c", "-q", "3", "-w", tmpFile.Name())
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -293,8 +307,22 @@ func (p *Processor) processWithLibRaw(ctx context.Context, rawData []byte, filen
 	}
 
 	// This is a simplified implementation - in practice you might use libraw directly via cgo
-	cmd := exec.CommandContext(ctx, "unprocessed_raw", "-T", "-")
-	cmd.Stdin = bytes.NewReader(rawData)
+	// Write RAW data to a temp file because some libraw tools don't accept '-' stdin
+	tmpFile, err := os.CreateTemp("", "libraw-*.raw")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file for libraw: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	if _, err := tmpFile.Write(rawData); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("failed to write RAW data to temp file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close temp RAW file: %w", err)
+	}
+
+	// This is a simplified implementation - in practice you might use libraw directly via cgo
+	cmd := exec.CommandContext(ctx, "unprocessed_raw", "-T", tmpFile.Name())
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -330,8 +358,20 @@ func (p *Processor) processWithImageMagick(ctx context.Context, rawData []byte, 
 	}
 
 	// ImageMagick command to convert RAW to JPEG
-	cmd := exec.CommandContext(ctx, "convert", "-", "-quality", fmt.Sprintf("%d", p.options.Quality), "jpeg:-")
-	cmd.Stdin = bytes.NewReader(rawData)
+	// Write RAW data to a temp file to avoid stdin '-' issues on some builds
+	tmpFile, err := os.CreateTemp("", "imagemagick-*.raw")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file for ImageMagick: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	if _, err := tmpFile.Write(rawData); err != nil {
+		tmpFile.Close()
+		return nil, fmt.Errorf("failed to write RAW data to temp file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close temp RAW file: %w", err)
+	}
+	cmd := exec.CommandContext(ctx, "convert", tmpFile.Name(), "-quality", fmt.Sprintf("%d", p.options.Quality), "jpeg:-")
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

@@ -1,32 +1,62 @@
-import { useContext, useMemo } from "react";
+import { useContext } from "react";
+import { AssetsContext } from "../AssetsProvider";
 import { AssetsContextValue } from "../types";
-import { AssetsStateContext, AssetsActionsContext } from "../AssetsProvider";
 
 /**
- * **Assets Context Hook**
+ * Main hook for accessing the assets context.
+ * Provides access to the complete assets state and dispatch function.
  *
- * Primary hook for components to interact with the assets context.
- * Provides type-safe access to both state and actions with automatic error handling.
- *
- * @returns Combined assets state and actions
+ * @returns AssetsContextValue containing state and dispatch
  * @throws Error if used outside of AssetsProvider
  *
- * @since 1.0.0
- * @see {@link AssetsProvider} for the context provider
- * @see {@link AssetsContextValue} for the complete API reference
+ * @example
+ * ```tsx
+ * function MyComponent() {
+ *   const { state, dispatch } = useAssetsContext();
+ *
+ *   const handleSelectAsset = (assetId: string) => {
+ *     dispatch({ type: "SELECT_ASSET", payload: { assetId } });
+ *   };
+ *
+ *   return <div>Current tab: {state.ui.currentTab}</div>;
+ * }
+ * ```
  */
-export function useAssetsContext(): AssetsContextValue {
-  const state = useContext(AssetsStateContext);
-  const actions = useContext(AssetsActionsContext);
+export const useAssetsContext = (): AssetsContextValue => {
+  const context = useContext(AssetsContext);
 
-  if (state === undefined || actions === undefined) {
+  if (context === undefined) {
     throw new Error("useAssetsContext must be used within an AssetsProvider");
   }
 
-  const contextValue = useMemo(
-    () => ({ ...state, ...actions }),
-    [state, actions],
-  );
+  return context;
+};
 
-  return contextValue;
-}
+/**
+ * Hook for accessing navigation helpers from the context.
+ * These are convenience methods for common navigation operations.
+ *
+ * @returns Navigation helper functions
+ *
+ * @example
+ * ```tsx
+ * function CarouselButton() {
+ *   const { openCarousel, closeCarousel } = useAssetsNavigation();
+ *
+ *   return (
+ *     <button onClick={() => openCarousel('asset-123')}>
+ *       Open Asset
+ *     </button>
+ *   );
+ * }
+ * ```
+ */
+export const useAssetsNavigation = () => {
+  const { openCarousel, closeCarousel, switchTab } = useAssetsContext();
+
+  return {
+    openCarousel,
+    closeCarousel,
+    switchTab,
+  };
+};

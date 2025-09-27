@@ -1,8 +1,8 @@
-import { RectangleStackIcon } from "@heroicons/react/24/solid";
+import { GalleryVerticalEnd } from "lucide-react";
 
 function ImgStackView() {
   return (
-    <div className="group relative inline-block size-28">
+    <div className="group relative inline-block size-50">
       {/* Back card */}
       <div className="absolute inset-0 translate-x-2 translate-y-2 -rotate-2 rounded-2xl border border-base-300/60 bg-gradient-to-br from-base-200 to-base-100 shadow-lg transition-transform duration-300 ease-out group-hover:translate-x-2.5 group-hover:translate-y-2.5" />
 
@@ -15,10 +15,7 @@ function ImgStackView() {
         <div className="pointer-events-none absolute -left-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br from-primary/30 to-transparent blur-2xl opacity-70" />
         <div className="pointer-events-none absolute -right-8 -bottom-10 h-28 w-28 rounded-full bg-gradient-to-tr from-secondary/30 to-transparent blur-2xl opacity-70" />
 
-        {/* Icon container */}
-        <div className="relative z-10 rounded-xl bg-base-100/70 px-3 py-3 ring-1 ring-inset ring-base-300/60 backdrop-blur">
-          <RectangleStackIcon className="size-10 text-base-content/80" />
-        </div>
+        <GalleryVerticalEnd className="size-10 text-base-content/80" />
 
         {/* Subtle floating animation on hover */}
         <div className="pointer-events-none absolute inset-0 transition-transform duration-300 ease-out group-hover:-translate-y-0.5" />

@@ -73,42 +73,87 @@ func parseGPSCoordinate(coordStr string) (float64, error) {
 }
 
 // parseDMSCoordinate parses degree/minute/second format coordinates
-// Example: "37 deg 46' 29.66\" N" -> 37.774906
+// Example: "30 deg 13' 57.47\" N" -> 30.232630555555556
 func parseDMSCoordinate(dmsStr string) (float64, error) {
-	// This is a simplified DMS parser
-	// Full implementation would handle all variations of DMS notation
+	original := dmsStr
 
-	// Extract direction (N, S, E, W)
+	// Extract direction (N, S, E, W) - required for DMS format
 	direction := ""
 	if strings.HasSuffix(dmsStr, " N") || strings.HasSuffix(dmsStr, " S") ||
 		strings.HasSuffix(dmsStr, " E") || strings.HasSuffix(dmsStr, " W") {
 		direction = dmsStr[len(dmsStr)-1:]
 		dmsStr = strings.TrimSpace(dmsStr[:len(dmsStr)-2])
+	} else {
+		return 0, fmt.Errorf("DMS coordinate missing direction (N/S/E/W): %s", original)
 	}
 
-	// Split by degree marker
-	parts := strings.Split(dmsStr, " deg")
-	if len(parts) < 2 {
-		parts = strings.Split(dmsStr, "°")
+	var degrees, minutes, seconds float64
+	var err error
+
+	// Parse degrees
+	var degreeStr string
+	if strings.Contains(dmsStr, " deg ") {
+		parts := strings.SplitN(dmsStr, " deg ", 2)
+		degreeStr = strings.TrimSpace(parts[0])
+		if len(parts) > 1 {
+			dmsStr = parts[1] // remaining part after degrees
+		} else {
+			dmsStr = ""
+		}
+	} else if strings.Contains(dmsStr, "°") {
+		parts := strings.SplitN(dmsStr, "°", 2)
+		degreeStr = strings.TrimSpace(parts[0])
+		if len(parts) > 1 {
+			dmsStr = strings.TrimSpace(parts[1])
+		} else {
+			dmsStr = ""
+		}
+	} else {
+		return 0, fmt.Errorf("unable to parse DMS coordinate - no degree marker: %s", original)
 	}
 
-	if len(parts) > 0 {
-		if deg, err := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64); err == nil {
-			result := deg
+	degrees, err = strconv.ParseFloat(degreeStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("unable to parse degrees from: %s", original)
+	}
 
-			// For now, just return degrees (full DMS parsing would be more complex)
-			// TODO: Implement full minutes and seconds parsing
+	// Parse minutes if present
+	if strings.Contains(dmsStr, "'") {
+		parts := strings.SplitN(dmsStr, "'", 2)
+		minuteStr := strings.TrimSpace(parts[0])
+		minutes, err = strconv.ParseFloat(minuteStr, 64)
+		if err != nil {
+			return 0, fmt.Errorf("unable to parse minutes from: %s", original)
+		}
 
-			// Apply direction
-			if direction == "S" || direction == "W" {
-				result = -result
-			}
-
-			return result, nil
+		if len(parts) > 1 {
+			dmsStr = strings.TrimSpace(parts[1]) // remaining part after minutes
+		} else {
+			dmsStr = ""
 		}
 	}
 
-	return 0, fmt.Errorf("unable to parse DMS coordinate: %s", dmsStr)
+	// Parse seconds if present
+	if strings.Contains(dmsStr, "\"") {
+		secondStr := strings.TrimSpace(strings.TrimSuffix(dmsStr, "\""))
+		if secondStr != "" {
+			seconds, err = strconv.ParseFloat(secondStr, 64)
+			if err != nil {
+				return 0, fmt.Errorf("unable to parse seconds from: %s", original)
+			}
+		}
+	}
+
+	// Convert DMS to decimal degrees
+	// Formula: decimal = degrees + minutes/60 + seconds/3600
+	result := degrees + minutes/60.0 + seconds/3600.0
+
+	// Apply direction (South and West are negative)
+	if direction == "S" || direction == "W" {
+		result = -result
+	}
+
+	return result, nil
 }
 
 // parseBitrate parses bitrate values from various formats

@@ -10,7 +10,6 @@ import UploadAssets from "@/features/upload/routes/UploadAssets";
 import { Portfolio } from "@/features/portfolio";
 import Collections from "@/features/collections/routes/Collections";
 import Updates from "@/features/updates/routes/Updates";
-import Search from "@/features/search/routes/Search";
 
 export const routes = [
   {
@@ -56,10 +55,6 @@ export const routes = [
   {
     path: "/assets/audios/:assetId",
     element: <Assets />,
-  },
-  {
-    path: "/search/",
-    element: <Search />,
   },
   {
     path: "/upload-photos",

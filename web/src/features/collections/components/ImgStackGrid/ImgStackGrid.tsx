@@ -66,13 +66,13 @@ function ImgStackGrid({
       {albums.map((album) => (
         <div
           key={album.id}
-          className="group cursor-pointer transition-transform hover:scale-105"
+          className="group cursor-pointer transition-transform hover:scale-105 flex flex-col items-center text-center"
           onClick={() => onAlbumClick?.(album)}
         >
           <div className="mb-2">
             <ImgStackView />
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 w-full">
             <h3 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
               {album.name}
             </h3>
