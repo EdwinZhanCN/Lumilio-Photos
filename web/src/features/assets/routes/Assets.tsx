@@ -6,13 +6,13 @@ import Videos from "./Videos";
 import { AssetsProvider } from "../AssetsProvider";
 import { ErrorBoundary } from "react-error-boundary";
 import AssetTabs from "@/features/assets/components/AssetTabs";
-import { AssetsPageProvider, useAssetsPageContext } from "@/features/assets";
+import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import ErrorFallBack from "@/components/ErrorFallBack";
 
 const AssetsContent = ({ activeTab }: { activeTab: string }) => {
-  const { state } = useAssetsPageContext();
-  const { isCarouselOpen } = state;
+  const { state } = useAssetsContext();
+  const { isCarouselOpen } = state.ui;
 
   return (
     <WorkerProvider preload={["exif", "export"]}>
@@ -48,9 +48,7 @@ const Assets = () => {
       )}
     >
       <AssetsProvider>
-        <AssetsPageProvider>
-          <AssetsContent activeTab={activeTab} />
-        </AssetsPageProvider>
+        <AssetsContent activeTab={activeTab} />
       </AssetsProvider>
     </ErrorBoundary>
   );

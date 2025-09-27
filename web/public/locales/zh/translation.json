@@ -3,20 +3,6 @@
         "name": "流明集",
         "tagline": "照片"
     },
-    "common": {
-        "ok": "确定",
-        "cancel": "取消",
-        "save": "保存",
-        "close": "关闭",
-        "loading": "加载中…",
-        "error": "错误",
-        "success": "成功",
-        "retry": "重试",
-        "edit": "编辑",
-        "delete": "删除",
-        "confirm": "确认",
-        "na": "无"
-    },
     "navbar": {
         "theme": {
             "light": "浅色",
@@ -116,7 +102,31 @@
         "audios": {
             "title": "音频"
         },
-        "empty": "暂无资产"
+        "empty": "暂无资产",
+        "basicInfo": {
+            "title": "基本信息",
+            "location": "位置",
+            "loadingLocation": "加载位置中...",
+            "aiSpeciesDetection": "AI 物种识别",
+            "description": "描述",
+            "noDescription": "尚未添加描述",
+            "clickToEdit": "点击编辑",
+            "descriptionPlaceholder": "为这张照片添加描述...",
+            "descriptionUpdated": "描述更新成功",
+            "descriptionUpdateError": "更新描述失败",
+            "viewExif": "查看 EXIF",
+            "loadingFile": "加载文件中...",
+            "extracting": "提取中...",
+            "latitude": "纬度",
+            "longitude": "经度",
+            "errors": {
+                "noAssetId": "资源 ID 不可用",
+                "notFound": "服务器上未找到原始文件",
+                "unauthorized": "访问原始文件需要身份验证",
+                "forbidden": "无权访问原始文件",
+                "extractFailed": "提取 EXIF 失败：{{message}}"
+            }
+        }
     },
     "upload": {
         "title": "上传照片",
@@ -179,8 +189,63 @@
     "settings": {
         "title": "设置",
         "ui": "界面",
+        "server": "服务器",
         "lumen": "Lumen",
-        "language": "语言"
+        "language": "语言",
+        "region": "地区",
+        "languageAndRegion": "语言和地区",
+        "regionOptions": {
+            "china": "中国大陆",
+            "other": "其他国家和地区"
+        },
+        "assetPage": "资源页面",
+        "pageLayout": "页面布局",
+        "serverSettings": {
+            "healthCheckInterval": "健康检查间隔",
+            "healthCheckDescription": "控制应用程序检测服务器健康状态的频率。较低的数值会更频繁地更新，但可能增加网络使用量。",
+            "presets": "预设值：",
+            "reset": "重置"
+        },
+        "lumenSettings": {
+            "title": "浏览器端 Lumen",
+            "description": "Lumen 是一个浏览器端 AI 助手，您可以点击导航栏上的 Lumen 头像与其聊天。此外，它还会为您的生物图集收集信息。此功能在移动设备上自动禁用。",
+            "mobileDisabledWarning": "由于性能限制，Lumen 在移动设备上被禁用。",
+            "enable": "启用",
+            "chooseModel": "选择您的模型",
+            "modelDescription": "我们强烈推荐您使用 Qwen3 系列，它们是开源的、小巧且功能强大的模型。不过，您可以在高级设置中配置自己的模型列表，我们使用 WebLLM 作为底层框架。",
+            "vramRequired": "所需显存",
+            "systemPrompt": "系统提示词（仅聊天）",
+            "systemPromptPlaceholder": "在此输入您的系统提示词...",
+            "advancedSettings": "高级设置",
+            "temperature": "温度",
+            "topP": "Top P",
+            "modelList": "模型列表 (JSON)",
+            "modelListDescription": "请查看 WebLLM 的配置（除非您知道这是什么，否则请勿编辑）",
+            "save": "保存",
+            "unsavedChanges": "您有未保存的更改"
+        }
+    },
+    "map": {
+        "photoLocation": "照片位置",
+        "uploaded": "上传于",
+        "noLocationData": "无位置数据"
+    },
+    "common": {
+        "ok": "确定",
+        "cancel": "取消",
+        "save": "保存",
+        "close": "关闭",
+        "loading": "加载中…",
+        "error": "错误",
+        "success": "成功",
+        "retry": "重试",
+        "edit": "编辑",
+        "delete": "删除",
+        "confirm": "确认",
+        "na": "无",
+        "uploaded": "上传于",
+        "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
+        "clickToEdit": "点击编辑"
     },
     "monitor": {
         "title": "服务器监控",
@@ -188,6 +253,28 @@
             "online": "在线",
             "offline": "离线"
         }
+    },
+    "rating": {
+        "unrated": "未评分",
+        "none": "无",
+        "stars": "{{count}} 星",
+        "stars_plural": "{{count}} 星",
+        "like": "喜欢",
+        "unlike": "取消喜欢",
+        "liked": "已喜欢",
+        "notLiked": "未喜欢",
+        "updateSuccess": "评分更新成功",
+        "updateError": "更新评分失败"
+    },
+    "delete": {
+        "confirmTitle": "删除照片",
+        "confirmMessage": "确定要删除 \"{{filename}}\" 吗？",
+        "thisAsset": "这张照片",
+        "softDeleteNote": "这将标记照片为已删除。文件不会被永久删除。",
+        "confirm": "删除照片",
+        "deleting": "删除中...",
+        "success": "照片删除成功",
+        "error": "删除照片失败"
     },
     "lumen": {
         "title": "Lumen"

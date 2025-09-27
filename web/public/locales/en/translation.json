@@ -3,20 +3,7 @@
         "name": "Lumilio",
         "tagline": "Photos"
     },
-    "common": {
-        "ok": "OK",
-        "cancel": "Cancel",
-        "save": "Save",
-        "close": "Close",
-        "loading": "Loading...",
-        "error": "Error",
-        "success": "Success",
-        "retry": "Retry",
-        "edit": "Edit",
-        "delete": "Delete",
-        "confirm": "Confirm",
-        "na": "N/A"
-    },
+
     "navbar": {
         "theme": {
             "light": "Light",
@@ -108,7 +95,8 @@
                         "extractFailed": "Failed to extract EXIF: {{message}}"
                     }
                 }
-            }
+            },
+            "filter": {}
         },
         "videos": {
             "title": "Videos"
@@ -116,7 +104,31 @@
         "audios": {
             "title": "Audios"
         },
-        "empty": "No assets yet"
+        "empty": "No assets yet",
+        "basicInfo": {
+            "title": "Basic Info",
+            "location": "Location",
+            "loadingLocation": "Loading location...",
+            "aiSpeciesDetection": "AI Species Detection",
+            "description": "Description",
+            "noDescription": "No description added yet",
+            "clickToEdit": "Click to edit",
+            "descriptionPlaceholder": "Add a description for this photo...",
+            "descriptionUpdated": "Description updated successfully",
+            "descriptionUpdateError": "Failed to update description",
+            "viewExif": "View EXIF",
+            "loadingFile": "Loading File...",
+            "extracting": "Extracting...",
+            "latitude": "Lat",
+            "longitude": "Lng",
+            "errors": {
+                "noAssetId": "Asset ID not available",
+                "notFound": "Original file not found on server",
+                "unauthorized": "Authentication required to access original file",
+                "forbidden": "Access denied to original file",
+                "extractFailed": "Failed to extract EXIF: {{message}}"
+            }
+        }
     },
     "upload": {
         "title": "Upload Photos",
@@ -179,8 +191,63 @@
     "settings": {
         "title": "Settings",
         "ui": "UI",
+        "server": "Server",
         "lumen": "Lumen",
-        "language": "Language"
+        "language": "Language",
+        "region": "Region",
+        "languageAndRegion": "Language & Region",
+        "regionOptions": {
+            "china": "China Mainland",
+            "other": "Other country and region"
+        },
+        "assetPage": "Asset Page",
+        "pageLayout": "Page Layout",
+        "serverSettings": {
+            "healthCheckInterval": "Health check interval",
+            "healthCheckDescription": "Control how often the app pings the server for health status. Lower values update more frequently but may increase network usage.",
+            "presets": "Presets:",
+            "reset": "Reset"
+        },
+        "lumenSettings": {
+            "title": "Lumen on Browser",
+            "description": "Lumen is an on browser AI assistant, you can chat with it click the Lumen avatar on the nav bar. Also, It gathers the information for your bio atalas. This function is auto-disabled on mobile phones.",
+            "mobileDisabledWarning": "Lumen is disabled on mobile devices due to performance limitations.",
+            "enable": "Enable",
+            "chooseModel": "Choose your Model",
+            "modelDescription": "We highly recommend you using Qwen3 series, they are open-sourced, small and powerful. However, you can configure your own model list in Advanced settings, we use WebLLM as our backbone.",
+            "vramRequired": "VRAM Required",
+            "systemPrompt": "System Prompt (Chat Only)",
+            "systemPromptPlaceholder": "Enter your system prompt here...",
+            "advancedSettings": "Advanced Settings",
+            "temperature": "Temperature",
+            "topP": "Top P",
+            "modelList": "Model List (JSON)",
+            "modelListDescription": "Check config from WebLLM (Do not edit this unless you know what is it)",
+            "save": "Save",
+            "unsavedChanges": "You have unsaved changes"
+        }
+    },
+    "map": {
+        "photoLocation": "Photo Location",
+        "uploaded": "Uploaded",
+        "noLocationData": "No location data available"
+    },
+    "common": {
+        "ok": "OK",
+        "cancel": "Cancel",
+        "save": "Save",
+        "close": "Close",
+        "loading": "Loading...",
+        "error": "Error",
+        "success": "Success",
+        "retry": "Retry",
+        "edit": "Edit",
+        "delete": "Delete",
+        "confirm": "Confirm",
+        "na": "N/A",
+        "uploaded": "Uploaded",
+        "pressCtrlEnterToSave": "Press Ctrl+Enter to save",
+        "clickToEdit": "Click to edit"
     },
     "monitor": {
         "title": "Server Monitor",
@@ -188,6 +255,28 @@
             "online": "Online",
             "offline": "Offline"
         }
+    },
+    "rating": {
+        "unrated": "Unrated",
+        "none": "None",
+        "stars": "{{count}} star",
+        "stars_plural": "{{count}} stars",
+        "like": "Like",
+        "unlike": "Unlike",
+        "liked": "Liked",
+        "notLiked": "Not liked",
+        "updateSuccess": "Rating updated successfully",
+        "updateError": "Failed to update rating"
+    },
+    "delete": {
+        "confirmTitle": "Delete Photo",
+        "confirmMessage": "Are you sure you want to delete \"{{filename}}\"?",
+        "thisAsset": "this photo",
+        "softDeleteNote": "This will mark the photo as deleted. The file will not be permanently removed.",
+        "confirm": "Delete Photo",
+        "deleting": "Deleting...",
+        "success": "Photo deleted successfully",
+        "error": "Failed to delete photo"
     },
     "lumen": {
         "title": "Lumen"

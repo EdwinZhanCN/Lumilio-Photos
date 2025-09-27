@@ -11,6 +11,7 @@ export interface LumenSettings {
 
 export interface UISettings {
   language?: "en" | "zh";
+  region?: "china" | "other";
   asset_page?: {
     layout: "compact" | "wide" | "full";
   };
@@ -37,6 +38,7 @@ export type SettingsAction =
   // UI Actions
   | { type: "SET_ASSETS_LAYOUT"; payload: "compact" | "wide" | "full" }
   | { type: "SET_LANGUAGE"; payload: "en" | "zh" }
+  | { type: "SET_REGION"; payload: "china" | "other" }
   // Server Actions
   | { type: "SET_SERVER_UPDATE_TIMESPAN"; payload: number };
 
