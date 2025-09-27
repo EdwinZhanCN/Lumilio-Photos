@@ -1,113 +1,136 @@
-import { useEffect, useMemo, useCallback } from "react";
-import { useInView } from "react-intersection-observer";
+import { useMemo, useCallback, useState } from "react";
 import { useParams } from "react-router-dom";
-import PhotosToolBar from "@/features/assets/components/Photos/PhotosToolBar/PhotosToolBar";
-import PhotosMasonry from "@/features/assets/components/Photos/PhotosMasonry/PhotosMasonry";
-import FullScreenCarousel from "@/features/assets/components/Photos/FullScreen/FullScreenCarousel/FullScreenCarousel";
-import PhotosLoadingSkeleton from "@/features/assets/components/Photos/PhotosLoadingSkeleton";
-import { useAssetsContext } from "../hooks/useAssetsContext";
+import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
+import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
+import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
+import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import {
-  useAssetsPageContext,
-  useAssetsPageNavigation,
-} from "@/features/assets";
+  useAssetsContext,
+  useAssetsNavigation,
+} from "@/features/assets/hooks/useAssetsContext";
+import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
+import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import {
   groupAssets,
   getFlatAssetsFromGrouped,
   findAssetIndex,
 } from "@/lib/utils/assetGrouping.ts";
-import { FilterDTO } from "@/features/assets/components/Photos/PhotosToolBar/FilterTool";
+import { FilterDTO } from "@/features/assets/components/page/FilterTool/FilterTool";
 
 function Photos() {
   const { assetId } = useParams<{ assetId: string }>();
+  const { state, dispatch } = useAssetsContext();
+  const { openCarousel, closeCarousel } = useAssetsNavigation();
+  const { deleteAsset } = useAssetActions();
+
+  // Local state to track asset updates
+  const [updatedAssets, setUpdatedAssets] = useState<Map<string, Asset>>(
+    new Map(),
+  );
+
+  const { groupBy, isCarouselOpen } = state.ui;
+
+  // Get assets for current view using the new hook
   const {
     assets: allAssets,
-    error,
+    groups: groupedAssets,
     isLoading: isFetching,
-    isLoadingNextPage: isFetchingNextPage,
-    fetchNextPage,
+    isLoadingMore: isFetchingNextPage,
+    fetchMore: fetchNextPage,
     hasMore: hasNextPage,
-  } = useAssetsContext();
-
-  const { state, dispatch } = useAssetsPageContext();
-  const { openCarousel, closeCarousel } = useAssetsPageNavigation();
-  const { isCarouselOpen, groupBy } = state;
+    error,
+  } = useCurrentTabAssets({
+    withGroups: true,
+    groupBy,
+  });
 
   const handleFiltersChange = useCallback((filters: FilterDTO) => {
-    // Filters are handled in PhotosToolBar and passed to AssetsContext
+    // Filters are now handled directly in AssetsPageHeader
     console.log("Filters changed:", filters);
   }, []);
 
-  const { ref, inView } = useInView({
-    threshold: 0.5,
-  });
-
-  useEffect(() => {
-    if (inView && hasNextPage && !isFetchingNextPage) {
+  const handleLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
-  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const groupedPhotos = useMemo(
-    () => groupAssets(allAssets, groupBy),
-    [allAssets, groupBy],
-  );
+  // Use grouped assets if available, otherwise group manually
+  const finalGroupedPhotos = useMemo(() => {
+    if (groupedAssets && Object.keys(groupedAssets).length > 0) {
+      return groupedAssets;
+    }
+    return groupAssets(allAssets, groupBy);
+  }, [groupedAssets, allAssets, groupBy]);
 
-  const flatAssets = useMemo(
-    () => getFlatAssetsFromGrouped(groupedPhotos),
-    [groupedPhotos],
-  );
+  const flatAssets = useMemo(() => {
+    const baseAssets = getFlatAssetsFromGrouped(finalGroupedPhotos);
+    // Apply any local updates to assets
+    return baseAssets.map((asset) => {
+      const updated = asset.asset_id
+        ? updatedAssets.get(asset.asset_id)
+        : undefined;
+      return updated || asset;
+    });
+  }, [finalGroupedPhotos, updatedAssets]);
 
   const currentAssetIndex = useMemo(() => {
     if (!assetId || flatAssets.length === 0) {
-      console.log("currentAssetIndex: -1 (no assetId or empty flatAssets)");
       return -1;
     }
     const index = findAssetIndex(flatAssets, assetId);
-    console.log("currentAssetIndex:", index, "for assetId:", assetId);
     return index;
   }, [flatAssets, assetId]);
-
-  // Debug logging
-  console.log("Photos Debug:", {
-    assetId,
-    isCarouselOpen,
-    allAssetsCount: allAssets.length,
-    flatAssetsCount: flatAssets.length,
-    currentAssetIndex,
-    groupBy,
-  });
 
   if (error) {
     throw new Error(error);
   }
 
+  const handleAssetUpdate = useCallback((updatedAsset: Asset) => {
+    if (updatedAsset.asset_id) {
+      setUpdatedAssets(
+        (prev) => new Map(prev.set(updatedAsset.asset_id!, updatedAsset)),
+      );
+    }
+  }, []);
+
+  const handleAssetDelete = useCallback(
+    (deletedAssetId: string) => {
+      // Remove from updated assets map if it exists there
+      setUpdatedAssets((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(deletedAssetId);
+        return newMap;
+      });
+
+      // Delete via the actions hook which handles the store updates
+      deleteAsset(deletedAssetId).catch((error) => {
+        console.error("Failed to delete asset:", error);
+      });
+    },
+    [deleteAsset],
+  );
+
   return (
     <div>
-      <PhotosToolBar
+      <AssetsPageHeader
         groupBy={groupBy}
         onGroupByChange={(v) => dispatch({ type: "SET_GROUP_BY", payload: v })}
-        onShowExifData={() => {}}
         onFiltersChange={handleFiltersChange}
       />
 
       {isFetching && allAssets.length === 0 ? (
         <PhotosLoadingSkeleton />
       ) : (
-        <PhotosMasonry
-          groupedPhotos={groupedPhotos}
+        <JustifiedGallery
+          groupedPhotos={finalGroupedPhotos}
           openCarousel={(id: string) => {
-            console.log("PhotosMasonry openCarousel clicked with id:", id);
             openCarousel(id);
           }}
+          onLoadMore={handleLoadMore}
+          hasMore={hasNextPage}
+          isLoadingMore={isFetchingNextPage}
         />
-      )}
-
-      <div ref={ref} className="h-10 w-full" />
-
-      {isFetchingNextPage && (
-        <div className="text-center p-4">
-          <span className="loading loading-dots loading-md"></span>
-        </div>
       )}
 
       {!hasNextPage && allAssets.length > 0 && (
@@ -119,13 +142,13 @@ function Photos() {
           photos={flatAssets}
           initialSlide={currentAssetIndex >= 0 ? currentAssetIndex : 0}
           onClose={() => {
-            console.log("FullScreenCarousel onClose called");
             closeCarousel();
           }}
           onNavigate={(id: string) => {
-            console.log("FullScreenCarousel onNavigate called with id:", id);
             openCarousel(id);
           }}
+          onAssetUpdate={handleAssetUpdate}
+          onAssetDelete={handleAssetDelete}
         />
       )}
     </div>

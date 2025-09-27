@@ -15,12 +15,13 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/service"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 )
@@ -116,6 +117,27 @@ type UpdateAssetRequest struct {
 	Metadata dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object"`
 }
 
+// UpdateRatingRequest represents the request structure for updating asset rating
+type UpdateRatingRequest struct {
+	Rating int `json:"rating" example:"5" validate:"min=0,max=5"`
+}
+
+// UpdateLikeRequest represents the request structure for updating asset like status
+type UpdateLikeRequest struct {
+	Liked bool `json:"liked" example:"true"`
+}
+
+// UpdateRatingAndLikeRequest represents the request structure for updating both rating and like status
+type UpdateRatingAndLikeRequest struct {
+	Rating int  `json:"rating" example:"5" validate:"min=0,max=5"`
+	Liked  bool `json:"liked" example:"true"`
+}
+
+// UpdateDescriptionRequest represents the request structure for updating asset description
+type UpdateDescriptionRequest struct {
+	Description string `json:"description" example:"A beautiful sunset photo"`
+}
+
 // MessageResponse represents a simple message response
 type MessageResponse struct {
 	Message string `json:"message" example:"Operation completed successfully"`
@@ -160,11 +182,12 @@ type FilterAssetsRequest struct {
 
 // SearchAssetsRequest represents the request structure for searching assets
 type SearchAssetsRequest struct {
-	Query      string      `json:"query" binding:"required" example:"red bird on branch"`
-	SearchType string      `json:"search_type" binding:"required" example:"filename" enums:"filename,semantic"`
-	Filter     AssetFilter `json:"filter,omitempty"`
-	Limit      int         `json:"limit" example:"20" minimum:"1" maximum:"100"`
-	Offset     int         `json:"offset" example:"0" minimum:"0"`
+	Query      string `json:"query" binding:"required" example:"red bird on branch"`
+	SearchType string `json:"search_type" binding:"required" example:"filename" enums:"filename,semantic"`
+
+	Filter AssetFilter `json:"filter,omitempty"`
+	Limit  int         `json:"limit" example:"20" minimum:"1" maximum:"100"`
+	Offset int         `json:"offset" example:"0" minimum:"0"`
 }
 
 // OptionsResponse represents the response for filter options
@@ -438,7 +461,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 
 // GetAsset retrieves a single asset by ID
 // @Summary Get asset by ID
-// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, and albums.
+// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, and species predictions.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -446,6 +469,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 // @Param include_thumbnails query bool false "Include thumbnails" default(true)
 // @Param include_tags query bool false "Include tags" default(true)
 // @Param include_albums query bool false "Include albums" default(true)
+// @Param include_species query bool false "Include species predictions" default(true)
 // @Success 200 {object} api.Result{data=AssetDTO} "Asset details with optional relationships"
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 404 {object} api.Result "Asset not found"
@@ -462,8 +486,9 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 	includeThumbnails := c.DefaultQuery("include_thumbnails", "true") == "true"
 	includeTags := c.DefaultQuery("include_tags", "true") == "true"
 	includeAlbums := c.DefaultQuery("include_albums", "true") == "true"
+	includeSpecies := c.DefaultQuery("include_species", "true") == "true"
 
-	asset, err := h.assetService.GetAssetWithOptions(c.Request.Context(), id, includeThumbnails, includeTags, includeAlbums)
+	asset, err := h.assetService.GetAssetWithOptions(c.Request.Context(), id, includeThumbnails, includeTags, includeAlbums, includeSpecies)
 	if err != nil {
 		api.GinNotFound(c, err, "Asset not found")
 		return
@@ -474,16 +499,16 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 
 // ListAssets retrieves assets with optional filtering
 // @Summary List assets
-// @Description Retrieve a paginated list of assets. Filter by type, owner, or search query. Use 'vector=true|false' to control semantic vector search when 'q' is provided (feature must be enabled). At least one filter parameter is required.
+// @Description Retrieve a paginated list of assets. Filter by type(s) or owner. Assets are sorted by taken_time (photo capture time or video record time). At least one filter parameter is required.
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Param type query string false "Asset type filter" Enums(PHOTO,VIDEO,AUDIO,DOCUMENT) example("PHOTO")
+// @Param type query string false "Single asset type filter" Enums(PHOTO,VIDEO,AUDIO,DOCUMENT) example("PHOTO")
+// @Param types query string false "Multiple asset types filter (comma-separated)" example("PHOTO,VIDEO")
 // @Param owner_id query int false "Filter by owner ID" example(123)
-// @Param q query string false "Search query (semantic vector search when enabled) and filename match" example("red bird on a branch")
-// @Param vector query bool false "When q is set: true to use semantic vector search, false to use filename search" default(false)
 // @Param limit query int false "Maximum number of results (max 100)" default(20) example(20)
 // @Param offset query int false "Number of results to skip for pagination" default(0) example(0)
+// @Param sort_order query string false "Sort order by taken_time" Enums(asc,desc) default("desc") example("desc")
 // @Success 200 {object} api.Result{data=AssetListResponse} "Assets retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid parameters"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -492,10 +517,9 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "20")
 	offsetStr := c.DefaultQuery("offset", "0")
 	typeStr := c.Query("type")
+	typesStr := c.Query("types")
 	ownerIDStr := c.Query("owner_id")
-	searchQuery := c.Query("q")
-	vectorFlag := c.DefaultQuery("vector", "false")
-	useVector := vectorFlag == "true"
+	sortOrder := c.DefaultQuery("sort_order", "desc")
 
 	limit, _ := strconv.Atoi(limitStr)
 	offset, _ := strconv.Atoi(offsetStr)
@@ -504,39 +528,58 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 		limit = 100
 	}
 
+	// Validate sort parameter
+	if sortOrder != "asc" && sortOrder != "desc" {
+		api.GinBadRequest(c, errors.New("invalid sort_order"), "sort_order must be 'asc' or 'desc'")
+		return
+	}
+
 	ctx := c.Request.Context()
 	var assets []repo.Asset
 	var err error
 
-	switch {
-	case searchQuery != "":
-		var typePtr *string
-		if typeStr != "" {
-			at := dbtypes.AssetType(typeStr)
-			if at.Valid() {
-				typePtr = at.String()
+	// Determine asset types to filter by
+	var assetTypes []string
+	if typesStr != "" {
+		// Handle comma-separated types parameter
+		typeList := strings.Split(typesStr, ",")
+		for _, t := range typeList {
+			t = strings.TrimSpace(t)
+			assetType := dbtypes.AssetType(t)
+			if !assetType.Valid() {
+				api.GinBadRequest(c, errors.New("invalid asset type in types"), fmt.Sprintf("Invalid asset type: %s", t))
+				return
 			}
+			assetTypes = append(assetTypes, *assetType.String())
 		}
-		assets, err = h.assetService.SearchAssets(ctx, searchQuery, typePtr, useVector, limit, offset)
+	} else if typeStr != "" {
+		// Handle single type parameter for backward compatibility
+		assetType := dbtypes.AssetType(typeStr)
+		if !assetType.Valid() {
+			api.GinBadRequest(c, errors.New("invalid asset type"), "Invalid asset type")
+			return
+		}
+		assetTypes = append(assetTypes, *assetType.String())
+	}
 
+	switch {
 	case ownerIDStr != "":
 		ownerID, parseErr := strconv.Atoi(ownerIDStr)
 		if parseErr != nil {
 			api.GinBadRequest(c, parseErr, "Invalid owner_id")
 			return
 		}
-		assets, err = h.assetService.GetAssetsByOwner(ctx, ownerID, limit, offset)
-
-	case typeStr != "":
-		assetType := dbtypes.AssetType(typeStr)
-		if !assetType.Valid() {
-			api.GinBadRequest(c, errors.New("invalid asset type"), "Invalid asset type")
-			return
+		if len(assetTypes) > 0 {
+			assets, err = h.assetService.GetAssetsByOwnerAndTypes(ctx, ownerID, assetTypes, sortOrder, limit, offset)
+		} else {
+			assets, err = h.assetService.GetAssetsByOwnerSorted(ctx, ownerID, sortOrder, limit, offset)
 		}
-		assets, err = h.assetService.GetAssetsByType(ctx, *assetType.String(), limit, offset)
+
+	case len(assetTypes) > 0:
+		assets, err = h.assetService.GetAssetsByTypesSorted(ctx, assetTypes, sortOrder, limit, offset)
 
 	default:
-		api.GinBadRequest(c, errors.New("missing query parameters"), "Please specify type, owner_id, or search query")
+		api.GinBadRequest(c, errors.New("missing query parameters"), "Please specify type, types, or owner_id")
 		return
 	}
 
@@ -589,7 +632,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	}
 
 	// First verify asset exists without loading full data
-	_, err = h.assetService.GetAssetWithOptions(c.Request.Context(), assetID, false, false, false)
+	_, err = h.assetService.GetAssetWithOptions(c.Request.Context(), assetID, false, false, false, false)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found"})
@@ -1006,5 +1049,275 @@ func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 		CameraMakes: cameraMakes,
 		Lenses:      lenses,
 	}
+	api.GinSuccess(c, response)
+}
+
+// Rating Management Handlers
+
+// UpdateAssetRating updates the rating of an asset
+// @Summary Update asset rating
+// @Description Update the rating (0-5) of a specific asset
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Param rating body UpdateRatingRequest true "Rating data"
+// @Success 200 {object} api.Result{data=MessageResponse} "Rating updated successfully"
+// @Failure 400 {object} api.Result "Bad request"
+// @Failure 404 {object} api.Result "Asset not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/{id}/rating [put]
+func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	var req UpdateRatingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	if req.Rating < 0 || req.Rating > 5 {
+		api.GinBadRequest(c, nil, "Rating must be between 0 and 5")
+		return
+	}
+
+	err = h.assetService.UpdateAssetRating(c.Request.Context(), id, req.Rating)
+	if err != nil {
+		log.Printf("Failed to update asset rating: %v", err)
+		api.GinInternalError(c, err, "Failed to update rating")
+		return
+	}
+
+	api.GinSuccess(c, MessageResponse{Message: "Rating updated successfully"})
+}
+
+// UpdateAssetLike updates the like status of an asset
+// @Summary Update asset like status
+// @Description Update the like/favorite status of a specific asset
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Param like body UpdateLikeRequest true "Like data"
+// @Success 200 {object} api.Result{data=MessageResponse} "Like status updated successfully"
+// @Failure 400 {object} api.Result "Bad request"
+// @Failure 404 {object} api.Result "Asset not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/{id}/like [put]
+func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	var req UpdateLikeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	err = h.assetService.UpdateAssetLike(c.Request.Context(), id, req.Liked)
+	if err != nil {
+		log.Printf("Failed to update asset like status: %v", err)
+		api.GinInternalError(c, err, "Failed to update like status")
+		return
+	}
+
+	api.GinSuccess(c, MessageResponse{Message: "Like status updated successfully"})
+}
+
+// UpdateAssetRatingAndLike updates both rating and like status of an asset
+// @Summary Update asset rating and like status
+// @Description Update both the rating (0-5) and like/favorite status of a specific asset
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Param data body UpdateRatingAndLikeRequest true "Rating and like data"
+// @Success 200 {object} api.Result{data=MessageResponse} "Rating and like status updated successfully"
+// @Failure 400 {object} api.Result "Bad request"
+// @Failure 404 {object} api.Result "Asset not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/{id}/rating-and-like [put]
+func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	var req UpdateRatingAndLikeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	if req.Rating < 0 || req.Rating > 5 {
+		api.GinBadRequest(c, nil, "Rating must be between 0 and 5")
+		return
+	}
+
+	err = h.assetService.UpdateAssetRatingAndLike(c.Request.Context(), id, req.Rating, req.Liked)
+	if err != nil {
+		log.Printf("Failed to update asset rating and like status: %v", err)
+		api.GinInternalError(c, err, "Failed to update rating and like status")
+		return
+	}
+
+	api.GinSuccess(c, MessageResponse{Message: "Rating and like status updated successfully"})
+}
+
+// UpdateAssetDescription updates the description of an asset
+// @Summary Update asset description
+// @Description Update the description/comment of a specific asset
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Param description body UpdateDescriptionRequest true "Description data"
+// @Success 200 {object} api.Result{data=MessageResponse} "Description updated successfully"
+// @Failure 400 {object} api.Result "Bad request"
+// @Failure 404 {object} api.Result "Asset not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/{id}/description [put]
+func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	var req UpdateDescriptionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	err = h.assetService.UpdateAssetDescription(c.Request.Context(), id, req.Description)
+	if err != nil {
+		log.Printf("Failed to update asset description: %v", err)
+		api.GinInternalError(c, err, "Failed to update description")
+		return
+	}
+
+	api.GinSuccess(c, MessageResponse{Message: "Description updated successfully"})
+}
+
+// GetAssetsByRating gets assets filtered by rating
+// @Summary Get assets by rating
+// @Description Get assets with a specific rating (0-5)
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param rating path int true "Rating (0-5)"
+// @Param limit query int false "Number of assets to return" default(20)
+// @Param offset query int false "Number of assets to skip" default(0)
+// @Success 200 {object} api.Result{data=AssetListResponse} "Assets retrieved successfully"
+// @Failure 400 {object} api.Result "Bad request"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/rating/{rating} [get]
+func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
+	ratingStr := c.Param("rating")
+	rating, err := strconv.Atoi(ratingStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid rating parameter")
+		return
+	}
+
+	if rating < 0 || rating > 5 {
+		api.GinBadRequest(c, nil, "Rating must be between 0 and 5")
+		return
+	}
+
+	limit := 20
+	offset := 0
+
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	if offsetStr := c.Query("offset"); offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+
+	assets, err := h.assetService.GetAssetsByRating(c.Request.Context(), rating, limit, offset)
+	if err != nil {
+		log.Printf("Failed to get assets by rating: %v", err)
+		api.GinInternalError(c, err, "Failed to retrieve assets")
+		return
+	}
+
+	assetDTOs := make([]AssetDTO, len(assets))
+	for i, asset := range assets {
+		assetDTOs[i] = toAssetDTO(asset)
+	}
+
+	response := AssetListResponse{
+		Assets: assetDTOs,
+		Limit:  limit,
+		Offset: offset,
+	}
+
+	api.GinSuccess(c, response)
+}
+
+// GetLikedAssets gets all liked/favorited assets
+// @Summary Get liked assets
+// @Description Get all assets that have been liked/favorited
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param limit query int false "Number of assets to return" default(20)
+// @Param offset query int false "Number of assets to skip" default(0)
+// @Success 200 {object} api.Result{data=AssetListResponse} "Liked assets retrieved successfully"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/liked [get]
+func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
+	limit := 20
+	offset := 0
+
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	if offsetStr := c.Query("offset"); offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+
+	assets, err := h.assetService.GetLikedAssets(c.Request.Context(), limit, offset)
+	if err != nil {
+		log.Printf("Failed to get liked assets: %v", err)
+		api.GinInternalError(c, err, "Failed to retrieve liked assets")
+		return
+	}
+
+	assetDTOs := make([]AssetDTO, len(assets))
+	for i, asset := range assets {
+		assetDTOs[i] = toAssetDTO(asset)
+	}
+
+	response := AssetListResponse{
+		Assets: assetDTOs,
+		Limit:  limit,
+		Offset: offset,
+	}
+
 	api.GinSuccess(c, response)
 }

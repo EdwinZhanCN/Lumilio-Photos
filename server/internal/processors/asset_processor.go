@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
 
@@ -86,6 +87,7 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 		Width:            nil,
 		Height:           nil,
 		Duration:         nil,
+		TakenTime:        pgtype.Timestamptz{Time: time.Now(), Valid: true}, // Fallback to current time, will be updated when EXIF is processed
 		SpecificMetadata: nil,
 	}
 

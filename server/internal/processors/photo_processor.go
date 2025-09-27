@@ -153,6 +153,10 @@ func (ap *AssetProcessor) processRAWAsset(
 		if meta, ok := exifResult.Metadata.(*dbtypes.PhotoSpecificMetadata); ok {
 			// Mark as RAW file
 			meta.IsRAW = true
+			// Set default rating to 0
+			meta.Rating = 0
+			// Set default like status to false
+			meta.Like = false
 
 			// Add dimensions from processed preview if available
 			if rawResult.Width > 0 && rawResult.Height > 0 {
@@ -298,6 +302,10 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 		if meta, ok := exifResult.Metadata.(*dbtypes.PhotoSpecificMetadata); ok {
 			// Mark as non-RAW
 			meta.IsRAW = false
+			// Set default rating to 0
+			meta.Rating = 0
+			// Set default like status to false
+			meta.Like = false
 
 			sm, err := dbtypes.MarshalMeta(meta)
 			if err != nil {

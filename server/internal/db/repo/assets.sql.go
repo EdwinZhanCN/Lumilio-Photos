@@ -57,9 +57,9 @@ func (q *Queries) AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) er
 const createAsset = `-- name: CreateAsset :one
 INSERT INTO assets (
     owner_id, type, original_filename, storage_path, mime_type,
-    file_size, hash, width, height, duration, specific_metadata
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding
+    file_size, hash, width, height, duration, taken_time, specific_metadata
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding
 `
 
 type CreateAssetParams struct {
@@ -73,6 +73,7 @@ type CreateAssetParams struct {
 	Width            *int32                   `db:"width" json:"width"`
 	Height           *int32                   `db:"height" json:"height"`
 	Duration         *float64                 `db:"duration" json:"duration"`
+	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 }
 
@@ -88,6 +89,7 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 		arg.Width,
 		arg.Height,
 		arg.Duration,
+		arg.TakenTime,
 		arg.SpecificMetadata,
 	)
 	var i Asset
@@ -104,6 +106,7 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 		&i.Height,
 		&i.Duration,
 		&i.UploadTime,
+		&i.TakenTime,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.SpecificMetadata,
@@ -156,7 +159,7 @@ func (q *Queries) DeleteAsset(ctx context.Context, assetID pgtype.UUID) error {
 }
 
 const filterAssets = `-- name: FilterAssets :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding FROM assets a
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding FROM assets a
 WHERE a.is_deleted = false
   AND ($1::text IS NULL OR a.type = $1)
   AND ($2::integer IS NULL OR a.owner_id = $2)
@@ -243,6 +246,7 @@ func (q *Queries) FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]A
 			&i.Height,
 			&i.Duration,
 			&i.UploadTime,
+			&i.TakenTime,
 			&i.IsDeleted,
 			&i.DeletedAt,
 			&i.SpecificMetadata,
@@ -259,7 +263,7 @@ func (q *Queries) FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]A
 }
 
 const getAssetByID = `-- name: GetAssetByID :one
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
 WHERE asset_id = $1 AND is_deleted = false
 `
 
@@ -279,6 +283,7 @@ func (q *Queries) GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset,
 		&i.Height,
 		&i.Duration,
 		&i.UploadTime,
+		&i.TakenTime,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.SpecificMetadata,
@@ -288,7 +293,7 @@ func (q *Queries) GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset,
 }
 
 const getAssetsByHash = `-- name: GetAssetsByHash :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
 WHERE hash = $1 AND is_deleted = false
 `
 
@@ -314,6 +319,7 @@ func (q *Queries) GetAssetsByHash(ctx context.Context, hash *string) ([]Asset, e
 			&i.Height,
 			&i.Duration,
 			&i.UploadTime,
+			&i.TakenTime,
 			&i.IsDeleted,
 			&i.DeletedAt,
 			&i.SpecificMetadata,
@@ -330,7 +336,7 @@ func (q *Queries) GetAssetsByHash(ctx context.Context, hash *string) ([]Asset, e
 }
 
 const getAssetsByOwner = `-- name: GetAssetsByOwner :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
 WHERE owner_id = $1 AND is_deleted = false
 ORDER BY upload_time DESC
 LIMIT $2 OFFSET $3
@@ -364,6 +370,179 @@ func (q *Queries) GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerPara
 			&i.Height,
 			&i.Duration,
 			&i.UploadTime,
+			&i.TakenTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAssetsByOwnerAndTypesSorted = `-- name: GetAssetsByOwnerAndTypesSorted :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+WHERE owner_id = $1 AND type = ANY($2::text[]) AND is_deleted = false
+ORDER BY
+  CASE WHEN $3 = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
+  CASE WHEN $3 = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
+LIMIT $5 OFFSET $4
+`
+
+type GetAssetsByOwnerAndTypesSortedParams struct {
+	OwnerID   *int32      `db:"owner_id" json:"owner_id"`
+	Types     []string    `db:"types" json:"types"`
+	SortOrder interface{} `db:"sort_order" json:"sort_order"`
+	Offset    int32       `db:"offset" json:"offset"`
+	Limit     int32       `db:"limit" json:"limit"`
+}
+
+func (q *Queries) GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAssetsByOwnerAndTypesSortedParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsByOwnerAndTypesSorted,
+		arg.OwnerID,
+		arg.Types,
+		arg.SortOrder,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAssetsByOwnerSorted = `-- name: GetAssetsByOwnerSorted :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+WHERE owner_id = $1 AND is_deleted = false
+ORDER BY
+  CASE WHEN $2 = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
+  CASE WHEN $2 = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
+LIMIT $3 OFFSET $4
+`
+
+type GetAssetsByOwnerSortedParams struct {
+	OwnerID *int32      `db:"owner_id" json:"owner_id"`
+	Column2 interface{} `db:"column_2" json:"column_2"`
+	Limit   int32       `db:"limit" json:"limit"`
+	Offset  int32       `db:"offset" json:"offset"`
+}
+
+func (q *Queries) GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwnerSortedParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsByOwnerSorted,
+		arg.OwnerID,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAssetsByRating = `-- name: GetAssetsByRating :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+WHERE is_deleted = false
+  AND (specific_metadata->>'rating')::integer = $1::integer
+ORDER BY upload_time DESC
+LIMIT $3 OFFSET $2
+`
+
+type GetAssetsByRatingParams struct {
+	Rating int32 `db:"rating" json:"rating"`
+	Offset int32 `db:"offset" json:"offset"`
+	Limit  int32 `db:"limit" json:"limit"`
+}
+
+func (q *Queries) GetAssetsByRating(ctx context.Context, arg GetAssetsByRatingParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsByRating, arg.Rating, arg.Offset, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
 			&i.IsDeleted,
 			&i.DeletedAt,
 			&i.SpecificMetadata,
@@ -380,7 +559,7 @@ func (q *Queries) GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerPara
 }
 
 const getAssetsByType = `-- name: GetAssetsByType :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
 WHERE type = $1 AND is_deleted = false
 ORDER BY upload_time DESC
 LIMIT $2 OFFSET $3
@@ -414,6 +593,66 @@ func (q *Queries) GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams
 			&i.Height,
 			&i.Duration,
 			&i.UploadTime,
+			&i.TakenTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAssetsByTypesSorted = `-- name: GetAssetsByTypesSorted :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+WHERE type = ANY($1::text[]) AND is_deleted = false
+ORDER BY
+  CASE WHEN $2 = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
+  CASE WHEN $2 = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
+LIMIT $4 OFFSET $3
+`
+
+type GetAssetsByTypesSortedParams struct {
+	Types     []string    `db:"types" json:"types"`
+	SortOrder interface{} `db:"sort_order" json:"sort_order"`
+	Offset    int32       `db:"offset" json:"offset"`
+	Limit     int32       `db:"limit" json:"limit"`
+}
+
+func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsByTypesSorted,
+		arg.Types,
+		arg.SortOrder,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
 			&i.IsDeleted,
 			&i.DeletedAt,
 			&i.SpecificMetadata,
@@ -480,6 +719,57 @@ func (q *Queries) GetDistinctLenses(ctx context.Context) ([]interface{}, error) 
 			return nil, err
 		}
 		items = append(items, lens_model)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getLikedAssets = `-- name: GetLikedAssets :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+WHERE is_deleted = false
+  AND (specific_metadata->>'liked')::boolean = true
+ORDER BY upload_time DESC
+LIMIT $2 OFFSET $1
+`
+
+type GetLikedAssetsParams struct {
+	Offset int32 `db:"offset" json:"offset"`
+	Limit  int32 `db:"limit" json:"limit"`
+}
+
+func (q *Queries) GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getLikedAssets, arg.Offset, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Embedding,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -597,7 +887,7 @@ func (q *Queries) RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAsset
 }
 
 const searchAssets = `-- name: SearchAssets :many
-SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding FROM assets
 WHERE is_deleted = false
 AND ($1::text IS NULL OR original_filename ILIKE '%' || $1 || '%')
 AND ($2::text IS NULL OR type = $2)
@@ -639,6 +929,7 @@ func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]A
 			&i.Height,
 			&i.Duration,
 			&i.UploadTime,
+			&i.TakenTime,
 			&i.IsDeleted,
 			&i.DeletedAt,
 			&i.SpecificMetadata,
@@ -655,7 +946,7 @@ func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]A
 }
 
 const searchAssetsFilename = `-- name: SearchAssetsFilename :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding FROM assets a
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding FROM assets a
 WHERE a.is_deleted = false
   AND a.original_filename ILIKE '%' || $1 || '%'
   AND ($2::text IS NULL OR a.type = $2)
@@ -745,6 +1036,7 @@ func (q *Queries) SearchAssetsFilename(ctx context.Context, arg SearchAssetsFile
 			&i.Height,
 			&i.Duration,
 			&i.UploadTime,
+			&i.TakenTime,
 			&i.IsDeleted,
 			&i.DeletedAt,
 			&i.SpecificMetadata,
@@ -761,7 +1053,7 @@ func (q *Queries) SearchAssetsFilename(ctx context.Context, arg SearchAssetsFile
 }
 
 const searchAssetsVector = `-- name: SearchAssetsVector :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding, (a.embedding <-> $1::vector) AS distance FROM assets a
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding, (a.embedding <-> $1::vector) AS distance FROM assets a
 WHERE a.is_deleted = false
   AND a.embedding IS NOT NULL
   AND ($2::text IS NULL OR a.type = $2)
@@ -827,6 +1119,7 @@ type SearchAssetsVectorRow struct {
 	Height           *int32                   `db:"height" json:"height"`
 	Duration         *float64                 `db:"duration" json:"duration"`
 	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
@@ -871,6 +1164,7 @@ func (q *Queries) SearchAssetsVector(ctx context.Context, arg SearchAssetsVector
 			&i.Height,
 			&i.Duration,
 			&i.UploadTime,
+			&i.TakenTime,
 			&i.IsDeleted,
 			&i.DeletedAt,
 			&i.SpecificMetadata,
@@ -891,7 +1185,7 @@ const updateAsset = `-- name: UpdateAsset :one
 UPDATE assets
 SET original_filename = $2, specific_metadata = $3, updated_at = CURRENT_TIMESTAMP
 WHERE asset_id = $1
-RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, is_deleted, deleted_at, specific_metadata, embedding
+RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, embedding
 `
 
 type UpdateAssetParams struct {
@@ -916,12 +1210,53 @@ func (q *Queries) UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset
 		&i.Height,
 		&i.Duration,
 		&i.UploadTime,
+		&i.TakenTime,
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.SpecificMetadata,
 		&i.Embedding,
 	)
 	return i, err
+}
+
+const updateAssetDescription = `-- name: UpdateAssetDescription :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    COALESCE(specific_metadata, '{}'::jsonb),
+    '{description}',
+    to_jsonb($1::text)
+)
+WHERE asset_id = $2
+`
+
+type UpdateAssetDescriptionParams struct {
+	Description string      `db:"description" json:"description"`
+	AssetID     pgtype.UUID `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error {
+	_, err := q.db.Exec(ctx, updateAssetDescription, arg.Description, arg.AssetID)
+	return err
+}
+
+const updateAssetLike = `-- name: UpdateAssetLike :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    COALESCE(specific_metadata, '{}'::jsonb),
+    '{liked}',
+    to_jsonb($1::boolean)
+)
+WHERE asset_id = $2
+`
+
+type UpdateAssetLikeParams struct {
+	Liked   bool        `db:"liked" json:"liked"`
+	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetLike(ctx context.Context, arg UpdateAssetLikeParams) error {
+	_, err := q.db.Exec(ctx, updateAssetLike, arg.Liked, arg.AssetID)
+	return err
 }
 
 const updateAssetMetadata = `-- name: UpdateAssetMetadata :exec
@@ -937,5 +1272,71 @@ type UpdateAssetMetadataParams struct {
 
 func (q *Queries) UpdateAssetMetadata(ctx context.Context, arg UpdateAssetMetadataParams) error {
 	_, err := q.db.Exec(ctx, updateAssetMetadata, arg.AssetID, arg.SpecificMetadata)
+	return err
+}
+
+const updateAssetMetadataWithTakenTime = `-- name: UpdateAssetMetadataWithTakenTime :exec
+UPDATE assets
+SET specific_metadata = $1,
+    taken_time = CASE
+        WHEN $2::timestamptz IS NOT NULL THEN $2::timestamptz
+        ELSE COALESCE(taken_time, upload_time)
+    END
+WHERE asset_id = $3
+`
+
+type UpdateAssetMetadataWithTakenTimeParams struct {
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetMetadataWithTakenTime(ctx context.Context, arg UpdateAssetMetadataWithTakenTimeParams) error {
+	_, err := q.db.Exec(ctx, updateAssetMetadataWithTakenTime, arg.SpecificMetadata, arg.TakenTime, arg.AssetID)
+	return err
+}
+
+const updateAssetRating = `-- name: UpdateAssetRating :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    COALESCE(specific_metadata, '{}'::jsonb),
+    '{rating}',
+    to_jsonb($1::integer)
+)
+WHERE asset_id = $2
+`
+
+type UpdateAssetRatingParams struct {
+	Rating  int32       `db:"rating" json:"rating"`
+	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetRating(ctx context.Context, arg UpdateAssetRatingParams) error {
+	_, err := q.db.Exec(ctx, updateAssetRating, arg.Rating, arg.AssetID)
+	return err
+}
+
+const updateAssetRatingAndLike = `-- name: UpdateAssetRatingAndLike :exec
+UPDATE assets
+SET specific_metadata = jsonb_set(
+    jsonb_set(
+        COALESCE(specific_metadata, '{}'::jsonb),
+        '{rating}',
+        to_jsonb($1::integer)
+    ),
+    '{liked}',
+    to_jsonb($2::boolean)
+)
+WHERE asset_id = $3
+`
+
+type UpdateAssetRatingAndLikeParams struct {
+	Rating  int32       `db:"rating" json:"rating"`
+	Liked   bool        `db:"liked" json:"liked"`
+	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
+}
+
+func (q *Queries) UpdateAssetRatingAndLike(ctx context.Context, arg UpdateAssetRatingAndLikeParams) error {
+	_, err := q.db.Exec(ctx, updateAssetRatingAndLike, arg.Rating, arg.Liked, arg.AssetID)
 	return err
 }

@@ -1,7 +1,9 @@
 import { ServerStackIcon } from "@heroicons/react/24/outline";
 import { useSettingsContext } from "@/features/settings";
+import { useI18n } from "@/lib/i18n.tsx";
 
 export default function ServerSettings() {
+  const { t } = useI18n();
   const { state, dispatch } = useSettingsContext();
   const value = state.server.update_timespan;
 
@@ -17,14 +19,15 @@ export default function ServerSettings() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
         <ServerStackIcon className="size-6 text-primary" />
-        <h2 className="text-2xl font-bold">Server</h2>
+        <h2 className="text-2xl font-bold">{t("settings.server")}</h2>
       </div>
 
       <section className="space-y-2">
-        <h3 className="text-lg font-semibold">Health check interval</h3>
+        <h3 className="text-lg font-semibold">
+          {t("settings.serverSettings.healthCheckInterval")}
+        </h3>
         <p className="text-sm opacity-70">
-          Control how often the app pings the server for health status. Lower
-          values update more frequently but may increase network usage.
+          {t("settings.serverSettings.healthCheckDescription")}
         </p>
         <div className="flex items-center gap-3">
           <input
@@ -41,7 +44,9 @@ export default function ServerSettings() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm opacity-70 mr-1">Presets:</span>
+          <span className="text-sm opacity-70 mr-1">
+            {t("settings.serverSettings.presets")}
+          </span>
           {presets.map((p) => (
             <button
               key={p}
@@ -57,7 +62,7 @@ export default function ServerSettings() {
             onClick={() => setTimespan(5)}
             title="Reset to default (5s)"
           >
-            Reset
+            {t("settings.serverSettings.reset")}
           </button>
         </div>
       </section>
