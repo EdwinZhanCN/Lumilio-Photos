@@ -1,6 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useMessage } from "@/hooks/util-hooks/useMessage.tsx";
 import { useWorker } from "@/contexts/WorkerProvider.tsx";
+import {
+  getOptimalBatchSize,
+  recordProcessingMetrics,
+  ProcessingPriority
+} from "@/utils/smartBatchSizing";
 
 // Define the shape of the progress state for better type safety
 export type ExifExtractionProgress = {
@@ -14,7 +19,7 @@ export interface useExtractExifdataReturn {
   isExtracting: boolean;
   exifData: Record<number, any> | null;
   progress: ExifExtractionProgress;
-  extractExifData: (files: File[]) => Promise<void>;
+  extractExifData: (files: File[], priority?: ProcessingPriority) => Promise<void>;
   cancelExtraction: () => void;
 }
 
@@ -53,18 +58,24 @@ export const useExtractExifdata = (): useExtractExifdataReturn => {
   }, [workerClient]); // Depend on the workerClient instance
 
   /**
-   * Extracts EXIF data from the given files.
+   * Extracts EXIF data from the given files using smart batch sizing.
    * The function is wrapped in useCallback for performance optimization,
    * ensuring it's not recreated on every render unless its dependencies change.
    */
   const extractExifData = useCallback(
-    async (files: File[]): Promise<void> => {
+    async (files: File[], priority: ProcessingPriority = ProcessingPriority.NORMAL): Promise<void> => {
       setIsExtracting(true);
       setExifData(null); // Reset previous data
       setProgress({ processed: 0, total: files.length });
 
+      const startTime = performance.now();
+
       try {
+        // Record anticipated batch size for performance tracking
+        const anticipatedBatchSize = getOptimalBatchSize("exif", files.length, priority);
+        
         const results = await workerClient.extractExif(files);
+        const processingTime = performance.now() - startTime;
 
         if (results && results.exifResults) {
           const formattedExifData = results.exifResults.reduce(
@@ -75,8 +86,30 @@ export const useExtractExifdata = (): useExtractExifdataReturn => {
             {} as Record<number, any>,
           );
           setExifData(formattedExifData);
+
+          // Record successful processing metrics
+          recordProcessingMetrics({
+            operationType: "exif",
+            batchSize: anticipatedBatchSize,
+            processingTimeMs: processingTime,
+            filesProcessed: results.exifResults.length,
+            avgTimePerFile: processingTime / results.exifResults.length,
+            success: true,
+            errorRate: Math.max(0, (files.length - results.exifResults.length) / files.length),
+          });
         } else {
           setExifData(null);
+          
+          // Record failure metrics
+          recordProcessingMetrics({
+            operationType: "exif",
+            batchSize: anticipatedBatchSize,
+            processingTimeMs: processingTime,
+            filesProcessed: 0,
+            avgTimePerFile: 0,
+            success: false,
+            errorRate: 1.0,
+          });
         }
       } catch (error) {
         const errorMessage = (error as Error).message;
@@ -86,6 +119,18 @@ export const useExtractExifdata = (): useExtractExifdataReturn => {
           error: errorMessage,
           failedAt: prev?.processed,
         }));
+
+        // Record error metrics
+        const processingTime = performance.now() - startTime;
+        recordProcessingMetrics({
+          operationType: "exif",
+          batchSize: files.length,
+          processingTimeMs: processingTime,
+          filesProcessed: 0,
+          avgTimePerFile: 0,
+          success: false,
+          errorRate: 1.0,
+        });
       } finally {
         setIsExtracting(false);
         // Do not clear progress here to allow UI to show final state

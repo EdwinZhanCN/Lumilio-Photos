@@ -2,10 +2,12 @@ import {
   CursorArrowRippleIcon,
   ServerStackIcon,
   SparklesIcon,
+  CpuChipIcon,
 } from "@heroicons/react/24/solid";
 import LumenSettings from "./Tabs/LumenSettings";
 import UISettings from "./Tabs/UISettings";
 import ServerSettings from "./Tabs/ServerSettings";
+import PerformanceSettings from "./Tabs/PerformanceSettings";
 import { useI18n } from "@/lib/i18n.tsx";
 
 export default function SettingsTab() {
@@ -21,6 +23,15 @@ export default function SettingsTab() {
         </label>
         <div className="tab-content bg-base-100 border-base-300 p-6">
           <UISettings />
+        </div>
+
+        <label className="tab gap-1 cursor-pointer">
+          <input type="radio" name="my_tabs_4" />
+          <CpuChipIcon className="size-4" />
+          Performance
+        </label>
+        <div className="tab-content bg-base-100 border-base-300 p-6">
+          <PerformanceSettings />
         </div>
 
         <label className="tab gap-1 cursor-pointer">
