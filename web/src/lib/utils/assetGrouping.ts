@@ -153,8 +153,6 @@ const formatTypeGroupKey = (mimeOrLegacyType: string): string => {
       return "video/*";
     case "AUDIO":
       return "audio/*";
-    case "DOCUMENT":
-      return "application/*";
     default:
       return "Unknown MIME";
   }

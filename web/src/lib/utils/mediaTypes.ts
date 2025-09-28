@@ -33,24 +33,14 @@ export const isPhoto = (asset: Asset): boolean => {
 };
 
 /**
- * Determines if an asset is a document based on MIME type or legacy type
- */
-export const isDocument = (asset: Asset): boolean => {
-  if (asset.mime_type) {
-    return asset.mime_type.startsWith("application/") || 
-           asset.mime_type.startsWith("text/");
-  }
-  return asset.type === "DOCUMENT";
-};
-
-/**
  * Gets the media type category for an asset
  */
-export const getMediaType = (asset: Asset): "video" | "audio" | "photo" | "document" | "unknown" => {
+export const getMediaType = (
+  asset: Asset,
+): "video" | "audio" | "photo" | "unknown" => {
   if (isVideo(asset)) return "video";
   if (isAudio(asset)) return "audio";
   if (isPhoto(asset)) return "photo";
-  if (isDocument(asset)) return "document";
   return "unknown";
 };
 
@@ -67,17 +57,20 @@ export const formatDuration = (duration?: number): string => {
 /**
  * Gets the appropriate ARIA label for an asset
  */
-export const getAssetAriaLabel = (asset: Asset, includeDuration = true): string => {
+export const getAssetAriaLabel = (
+  asset: Asset,
+  includeDuration = true,
+): string => {
   const filename = asset.original_filename || "Asset";
   const mediaType = getMediaType(asset);
-  const duration = asset.duration || asset.specific_metadata?.duration;
-  
+  const duration = asset.duration;
+
   let label = `${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}: ${filename}`;
-  
+
   if (includeDuration && duration && (isVideo(asset) || isAudio(asset))) {
     label += `, ${formatDuration(duration)} duration`;
   }
-  
+
   return label;
 };
 
@@ -86,15 +79,15 @@ export const getAssetAriaLabel = (asset: Asset, includeDuration = true): string 
  */
 export const getFileTypeDescription = (asset: Asset): string => {
   const mediaType = getMediaType(asset);
-  
+
   if (asset.mime_type) {
     // Convert MIME type to readable format
-    const [category, subtype] = asset.mime_type.split('/');
+    const [category, subtype] = asset.mime_type.split("/");
     if (subtype) {
       return `${subtype.toUpperCase()} ${category}`;
     }
     return asset.mime_type;
   }
-  
+
   return asset.type || mediaType;
 };
