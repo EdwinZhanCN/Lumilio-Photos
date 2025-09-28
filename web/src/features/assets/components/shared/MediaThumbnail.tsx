@@ -1,6 +1,11 @@
 import React from "react";
-import { Play, Music, FileText, Video, Headphones } from "lucide-react";
-import { isVideo, isAudio, isDocument, formatDuration, getAssetAriaLabel } from "@/lib/utils/mediaTypes";
+import { Play, Music, Video, Headphones } from "lucide-react";
+import {
+  isVideo,
+  isAudio,
+  formatDuration,
+  getAssetAriaLabel,
+} from "@/lib/utils/mediaTypes";
 
 interface MediaThumbnailProps {
   asset: Asset;
@@ -20,21 +25,20 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
 }) => {
   const videoAsset = isVideo(asset);
   const audioAsset = isAudio(asset);
-  const documentAsset = isDocument(asset);
-  const duration = asset.duration || asset.specific_metadata?.duration;
+  const duration = asset.duration;
   const ariaLabel = getAssetAriaLabel(asset);
 
   // Photo or thumbnail available - render image with potential overlays
   if (thumbnailUrl && !audioAsset) {
     return (
-      <div 
-        className={`relative w-full h-full ${className}`} 
+      <div
+        className={`relative w-full h-full ${className}`}
         onClick={onClick}
         role="button"
         tabIndex={0}
         aria-label={ariaLabel}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             onClick?.();
           }
@@ -46,7 +50,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
           className="w-full h-full object-cover transition-transform duration-200 hover:scale-105"
           loading="lazy"
         />
-        
+
         {/* Media type indicator badge */}
         {videoAsset && (
           <div className="absolute top-2 left-2">
@@ -56,16 +60,19 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
             </div>
           </div>
         )}
-        
+
         {/* Video play overlay */}
         {videoAsset && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-black/60 rounded-full p-3 hover:bg-black/80 transition-colors" aria-hidden="true">
+            <div
+              className="bg-black/60 rounded-full p-3 hover:bg-black/80 transition-colors"
+              aria-hidden="true"
+            >
               <Play className="w-8 h-8 text-white fill-white ml-1" />
             </div>
           </div>
         )}
-        
+
         {/* Duration badge for videos */}
         {videoAsset && duration && (
           <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
@@ -79,14 +86,14 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   // Audio asset - render audio-specific visualization
   if (audioAsset) {
     return (
-      <div 
+      <div
         className={`w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-center text-white cursor-pointer hover:from-purple-600 hover:to-pink-600 transition-colors ${className}`}
         onClick={onClick}
         role="button"
         tabIndex={0}
         aria-label={ariaLabel}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             onClick?.();
           }
@@ -99,7 +106,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
             <span className="sr-only">Audio</span>
           </div>
         </div>
-        
+
         <Music className="w-12 h-12 mb-2" aria-hidden="true" />
         <div className="text-center px-2">
           <div className="text-sm font-medium truncate max-w-full">
@@ -115,45 +122,16 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
     );
   }
 
-  // Document or other file types
-  if (documentAsset) {
-    return (
-      <div 
-        className={`w-full h-full bg-base-300 flex flex-col items-center justify-center text-base-content/70 cursor-pointer hover:bg-base-200 transition-colors ${className}`}
-        onClick={onClick}
-        role="button"
-        tabIndex={0}
-        aria-label={`Document: ${asset.original_filename || "Unknown file"}`}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onClick?.();
-          }
-        }}
-      >
-        <FileText className="w-12 h-12 mb-2" aria-hidden="true" />
-        <div className="text-center px-2">
-          <div className="text-sm font-medium truncate max-w-full">
-            {asset.original_filename || "Document"}
-          </div>
-          <div className="text-xs opacity-60 mt-1">
-            {asset.mime_type || asset.type || "Unknown"}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Fallback for no preview available
   return (
-    <div 
+    <div
       className={`w-full h-full bg-base-300 flex items-center justify-center text-base-content/50 cursor-pointer hover:bg-base-200 transition-colors ${className}`}
       onClick={onClick}
       role="button"
       tabIndex={0}
       aria-label={`Asset: ${asset.original_filename || "Unknown file"}`}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onClick?.();
         }
