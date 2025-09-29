@@ -21,7 +21,7 @@ SELECT
 FROM assets a
 LEFT JOIN thumbnails t ON a.asset_id = t.asset_id
 WHERE a.asset_id = $1 AND a.is_deleted = false
-GROUP BY a.asset_id;
+GROUP BY a.asset_id, a.rating, a.liked;
 
 -- name: GetAssetWithTags :one
 SELECT
@@ -42,7 +42,7 @@ FROM assets a
 LEFT JOIN asset_tags at ON a.asset_id = at.asset_id
 LEFT JOIN tags tg ON at.tag_id = tg.tag_id
 WHERE a.asset_id = $1 AND a.is_deleted = false
-GROUP BY a.asset_id;
+GROUP BY a.asset_id, a.rating, a.liked;
 
 -- name: GetAssetWithRelations :one
 SELECT
@@ -96,4 +96,4 @@ LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
 LEFT JOIN albums al ON aa.album_id = al.album_id
 LEFT JOIN species_predictions sp ON a.asset_id = sp.asset_id
 WHERE a.asset_id = $1 AND a.is_deleted = false
-GROUP BY a.asset_id;
+GROUP BY a.asset_id, a.rating, a.liked;

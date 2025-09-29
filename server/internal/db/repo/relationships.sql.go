@@ -15,7 +15,7 @@ import (
 
 const getAssetWithRelations = `-- name: GetAssetWithRelations :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.embedding,
     COALESCE(
         json_agg(DISTINCT
             jsonb_build_object(
@@ -65,7 +65,7 @@ LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
 LEFT JOIN albums al ON aa.album_id = al.album_id
 LEFT JOIN species_predictions sp ON a.asset_id = sp.asset_id
 WHERE a.asset_id = $1 AND a.is_deleted = false
-GROUP BY a.asset_id
+GROUP BY a.asset_id, a.rating, a.liked
 `
 
 type GetAssetWithRelationsRow struct {
@@ -85,6 +85,8 @@ type GetAssetWithRelationsRow struct {
 	IsDeleted          *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt          pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata   dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating             *int32                   `db:"rating" json:"rating"`
+	Liked              *bool                    `db:"liked" json:"liked"`
 	Embedding          *pgvector_go.Vector      `db:"embedding" json:"embedding"`
 	Thumbnails         interface{}              `db:"thumbnails" json:"thumbnails"`
 	Tags               interface{}              `db:"tags" json:"tags"`
@@ -112,6 +114,8 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.SpecificMetadata,
+		&i.Rating,
+		&i.Liked,
 		&i.Embedding,
 		&i.Thumbnails,
 		&i.Tags,
@@ -123,7 +127,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 
 const getAssetWithTags = `-- name: GetAssetWithTags :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.embedding,
     COALESCE(
         json_agg(
             json_build_object(
@@ -140,7 +144,7 @@ FROM assets a
 LEFT JOIN asset_tags at ON a.asset_id = at.asset_id
 LEFT JOIN tags tg ON at.tag_id = tg.tag_id
 WHERE a.asset_id = $1 AND a.is_deleted = false
-GROUP BY a.asset_id
+GROUP BY a.asset_id, a.rating, a.liked
 `
 
 type GetAssetWithTagsRow struct {
@@ -160,6 +164,8 @@ type GetAssetWithTagsRow struct {
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating           *int32                   `db:"rating" json:"rating"`
+	Liked            *bool                    `db:"liked" json:"liked"`
 	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
 	Tags             interface{}              `db:"tags" json:"tags"`
 }
@@ -184,6 +190,8 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.SpecificMetadata,
+		&i.Rating,
+		&i.Liked,
 		&i.Embedding,
 		&i.Tags,
 	)
@@ -192,7 +200,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 
 const getAssetWithThumbnails = `-- name: GetAssetWithThumbnails :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.embedding,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.embedding,
     COALESCE(
         json_agg(
             json_build_object(
@@ -213,7 +221,7 @@ SELECT
 FROM assets a
 LEFT JOIN thumbnails t ON a.asset_id = t.asset_id
 WHERE a.asset_id = $1 AND a.is_deleted = false
-GROUP BY a.asset_id
+GROUP BY a.asset_id, a.rating, a.liked
 `
 
 type GetAssetWithThumbnailsRow struct {
@@ -233,6 +241,8 @@ type GetAssetWithThumbnailsRow struct {
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating           *int32                   `db:"rating" json:"rating"`
+	Liked            *bool                    `db:"liked" json:"liked"`
 	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
 	Thumbnails       interface{}              `db:"thumbnails" json:"thumbnails"`
 }
@@ -257,6 +267,8 @@ func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUI
 		&i.IsDeleted,
 		&i.DeletedAt,
 		&i.SpecificMetadata,
+		&i.Rating,
+		&i.Liked,
 		&i.Embedding,
 		&i.Thumbnails,
 	)

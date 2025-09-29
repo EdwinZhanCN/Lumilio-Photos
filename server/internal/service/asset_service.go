@@ -8,10 +8,12 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,6 +84,12 @@ type AssetService interface {
 	SearchAssetsVector(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]string, error)
 	GetDistinctLenses(ctx context.Context) ([]string, error)
+
+	// Video and Audio processing methods
+	SaveVideoVersion(ctx context.Context, videoReader io.Reader, asset *repo.Asset, version string) error
+	SaveAudioVersion(ctx context.Context, audioReader io.Reader, asset *repo.Asset, version string) error
+	UpdateAssetDuration(ctx context.Context, id uuid.UUID, duration float64) error
+	UpdateAssetDimensions(ctx context.Context, id uuid.UUID, width, height int32) error
 }
 
 type assetService struct {
@@ -1097,4 +1105,86 @@ func (s *assetService) GetLikedAssets(ctx context.Context, limit, offset int) ([
 	}
 
 	return s.queries.GetLikedAssets(ctx, params)
+}
+
+// Video and Audio processing methods implementation
+
+func (s *assetService) SaveVideoVersion(ctx context.Context, videoReader io.Reader, asset *repo.Asset, version string) error {
+	// Generate filename with version suffix
+	filename := asset.OriginalFilename
+	if version != "original" {
+		// Remove original extension and add version
+		ext := filepath.Ext(filename)
+		nameWithoutExt := strings.TrimSuffix(filename, ext)
+		filename = fmt.Sprintf("%s_%s.mp4", nameWithoutExt, version)
+	}
+
+	// Upload to storage
+	hash := ""
+	if asset.Hash != nil {
+		hash = *asset.Hash
+	}
+	storagePath, err := s.storage.UploadWithMetadata(ctx, videoReader, filename, hash)
+	if err != nil {
+		return fmt.Errorf("failed to upload video version %s: %w", version, err)
+	}
+
+	// TODO: Store video version metadata in database if needed
+	// For now, we're storing versions in storage with different filenames
+	log.Printf("Saved video version %s for asset %s at path %s", version, asset.AssetID.Bytes, storagePath)
+	return nil
+}
+
+func (s *assetService) SaveAudioVersion(ctx context.Context, audioReader io.Reader, asset *repo.Asset, version string) error {
+	// Generate filename with version suffix
+	filename := asset.OriginalFilename
+	if version != "original" {
+		// Remove original extension and add version
+		ext := filepath.Ext(filename)
+		nameWithoutExt := strings.TrimSuffix(filename, ext)
+		filename = fmt.Sprintf("%s_%s.mp3", nameWithoutExt, version)
+	}
+
+	// Upload to storage
+	hash := ""
+	if asset.Hash != nil {
+		hash = *asset.Hash
+	}
+	storagePath, err := s.storage.UploadWithMetadata(ctx, audioReader, filename, hash)
+	if err != nil {
+		return fmt.Errorf("failed to upload audio version %s: %w", version, err)
+	}
+
+	// TODO: Store audio version metadata in database if needed
+	log.Printf("Saved audio version %s for asset %s at path %s", version, asset.AssetID.Bytes, storagePath)
+	return nil
+}
+
+func (s *assetService) UpdateAssetDuration(ctx context.Context, id uuid.UUID, duration float64) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	params := repo.UpdateAssetDurationParams{
+		AssetID:  pgUUID,
+		Duration: &duration,
+	}
+
+	return s.queries.UpdateAssetDuration(ctx, params)
+}
+
+func (s *assetService) UpdateAssetDimensions(ctx context.Context, id uuid.UUID, width, height int32) error {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	params := repo.UpdateAssetDimensionsParams{
+		AssetID: pgUUID,
+		Width:   &width,
+		Height:  &height,
+	}
+
+	return s.queries.UpdateAssetDimensions(ctx, params)
 }

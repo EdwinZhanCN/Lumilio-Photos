@@ -50,8 +50,7 @@ type PhotoSpecificMetadata struct {
 	Description       string                  `json:"description,omitempty"`
 	SpeciesPrediction []SpeciesPredictionMeta `json:"species_prediction,omitempty"`
 	IsRAW             bool                    `json:"is_raw,omitempty"`
-	Rating            int                     `json:"rating,omitempty"`
-	Like              bool                    `json:"liked,omitempty"`
+	// Note: rating and liked fields are now direct columns in the assets table
 }
 
 type SpeciesPredictionMeta struct {
@@ -60,27 +59,27 @@ type SpeciesPredictionMeta struct {
 }
 
 type VideoSpecificMetadata struct {
-	Codec        string     `json:"codec,omitempty"`
-	Bitrate      int        `json:"bitrate,omitempty"`
-	FrameRate    float64    `json:"frame_rate,omitempty"`
-	RecordedTime *time.Time `json:"recorded_time,omitempty"`
-	CameraModel  string     `json:"camera_model,omitempty"`
-	GPSLatitude  float64    `json:"gps_latitude,omitempty"`
-	GPSLongitude float64    `json:"gps_longitude,omitempty"`
-	Description  string     `json:"description,omitempty"`
+	Codec        string     `json:"codec,omitempty" example:"H.264"`
+	Bitrate      int        `json:"bitrate,omitempty" example:"1000000"`
+	FrameRate    float64    `json:"frame_rate,omitempty" example:"30.0"`
+	RecordedTime *time.Time `json:"recorded_time,omitempty" example:"2023-01-01T00:00:00Z"`
+	CameraModel  string     `json:"camera_model,omitempty" example:"Canon EOS 5D Mark IV"`
+	GPSLatitude  float64    `json:"gps_latitude,omitempty" example:"37.7749"`
+	GPSLongitude float64    `json:"gps_longitude,omitempty" example:"-122.4194"`
+	Description  string     `json:"description,omitempty" example:"A beautiful sunset over the ocean"`
 }
 
 type AudioSpecificMetadata struct {
-	Codec       string `json:"codec,omitempty"`
-	Bitrate     int    `json:"bitrate,omitempty"`
-	SampleRate  int    `json:"sample_rate,omitempty"`
-	Channels    int    `json:"channels,omitempty"`
-	Artist      string `json:"artist,omitempty"`
-	Album       string `json:"album,omitempty"`
-	Title       string `json:"title,omitempty"`
-	Genre       string `json:"genre,omitempty"`
-	Year        int    `json:"year,omitempty"`
-	Description string `json:"description,omitempty"`
+	Codec       string `json:"codec,omitempty" example:"AAC"`
+	Bitrate     int    `json:"bitrate,omitempty" example:"128000"`
+	SampleRate  int    `json:"sample_rate,omitempty" example:"44100"`
+	Channels    int    `json:"channels,omitempty" example:"2"`
+	Artist      string `json:"artist,omitempty" example:"John Doe"`
+	Album       string `json:"album,omitempty" example:"Album Title"`
+	Title       string `json:"title,omitempty" example:"Song Title"`
+	Genre       string `json:"genre,omitempty" example:"Pop"`
+	Year        int    `json:"year,omitempty" example:"2023"`
+	Description string `json:"description,omitempty" example:"Song Description"`
 }
 
 // ----- 便捷（反）序列化函数 -----

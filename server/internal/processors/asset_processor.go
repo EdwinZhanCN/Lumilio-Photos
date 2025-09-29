@@ -89,6 +89,8 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 		Duration:         nil,
 		TakenTime:        pgtype.Timestamptz{Time: time.Now(), Valid: true}, // Fallback to current time, will be updated when EXIF is processed
 		SpecificMetadata: nil,
+		Rating:           func() *int32 { r := int32(0); return &r }(),
+		Liked:            nil,
 	}
 
 	asset, err := ap.assetService.CreateAssetRecord(ctx, params)
@@ -101,11 +103,11 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 		err := ap.processPhotoAsset(ctx, asset, assetFile)
 		return asset, err
 	case string(dbtypes.AssetTypeVideo):
-		//TODO: implement
-		return asset, ap.processVideoAsset(asset)
+		err := ap.processVideoAsset(ctx, asset, assetFile)
+		return asset, err
 	case string(dbtypes.AssetTypeAudio):
-		//TODO: implement
-		return asset, ap.processAudioAsset(asset)
+		err := ap.processAudioAsset(ctx, asset, assetFile)
+		return asset, err
 	default:
 		return asset, fmt.Errorf("unsupported asset type: %s", asset.Type)
 	}
