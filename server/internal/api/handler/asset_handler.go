@@ -743,6 +743,136 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	c.File(fullPath)
 }
 
+// GetWebVideo serves the web-optimized video version by asset ID
+// @Summary Get web-optimized video
+// @Description Serve the web-optimized MP4 video version for an asset by asset ID.
+// @Tags assets
+// @Produce video/mp4
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {file} file "Web-optimized video file"
+// @Failure 400 {object} api.Result "Invalid asset ID"
+// @Failure 404 {object} api.Result "Asset not found or not a video"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/{id}/video/web [get]
+func (h *AssetHandler) GetWebVideo(c *gin.Context) {
+	// Parse asset ID from URL parameter
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	// Get asset metadata from service
+	asset, err := h.assetService.GetAsset(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.GinNotFound(c, err, "Asset not found")
+			return
+		}
+		log.Printf("Failed to retrieve asset metadata: %v", err)
+		api.GinInternalError(c, err, "Failed to retrieve asset")
+		return
+	}
+
+	// Check if asset is a video
+	if asset.Type != "VIDEO" {
+		api.GinBadRequest(c, fmt.Errorf("asset is not a video"), "Asset is not a video")
+		return
+	}
+
+	// Construct web video file path
+	ext := filepath.Ext(asset.OriginalFilename)
+	nameWithoutExt := strings.TrimSuffix(asset.OriginalFilename, ext)
+	webVideoFilename := fmt.Sprintf("%s_web.mp4", nameWithoutExt)
+	webVideoPath := filepath.Join(filepath.Dir(asset.StoragePath), webVideoFilename)
+	fullPath := filepath.Join(h.StorageBasePath, webVideoPath)
+
+	// Check if web version exists, fallback to original
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		// Fallback to original file
+		fullPath = filepath.Join(h.StorageBasePath, asset.StoragePath)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			log.Printf("Video file not found at path: %s", fullPath)
+			api.GinNotFound(c, err, "Video file not found")
+			return
+		}
+	}
+
+	// Set appropriate headers for video streaming
+	c.Header("Cache-Control", "public, max-age=86400") // Cache for 1 day
+	c.Header("Content-Type", "video/mp4")
+	c.Header("Accept-Ranges", "bytes") // Enable range requests for video seeking
+
+	// Serve the file
+	c.File(fullPath)
+}
+
+// GetWebAudio serves the web-optimized audio version by asset ID
+// @Summary Get web-optimized audio
+// @Description Serve the web-optimized MP3 audio version for an asset by asset ID.
+// @Tags assets
+// @Produce audio/mpeg
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {file} file "Web-optimized audio file"
+// @Failure 400 {object} api.Result "Invalid asset ID"
+// @Failure 404 {object} api.Result "Asset not found or not audio"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/{id}/audio/web [get]
+func (h *AssetHandler) GetWebAudio(c *gin.Context) {
+	// Parse asset ID from URL parameter
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	// Get asset metadata from service
+	asset, err := h.assetService.GetAsset(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.GinNotFound(c, err, "Asset not found")
+			return
+		}
+		log.Printf("Failed to retrieve asset metadata: %v", err)
+		api.GinInternalError(c, err, "Failed to retrieve asset")
+		return
+	}
+
+	// Check if asset is audio
+	if asset.Type != "AUDIO" {
+		api.GinBadRequest(c, fmt.Errorf("asset is not audio"), "Asset is not audio")
+		return
+	}
+
+	// Construct web audio file path
+	ext := filepath.Ext(asset.OriginalFilename)
+	nameWithoutExt := strings.TrimSuffix(asset.OriginalFilename, ext)
+	webAudioFilename := fmt.Sprintf("%s_web.mp3", nameWithoutExt)
+	webAudioPath := filepath.Join(filepath.Dir(asset.StoragePath), webAudioFilename)
+	fullPath := filepath.Join(h.StorageBasePath, webAudioPath)
+
+	// Check if web version exists, fallback to original
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		// Fallback to original file
+		fullPath = filepath.Join(h.StorageBasePath, asset.StoragePath)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			log.Printf("Audio file not found at path: %s", fullPath)
+			api.GinNotFound(c, err, "Audio file not found")
+			return
+		}
+	}
+
+	// Set appropriate headers for audio streaming
+	c.Header("Cache-Control", "public, max-age=86400") // Cache for 1 day
+	c.Header("Content-Type", "audio/mpeg")
+	c.Header("Accept-Ranges", "bytes") // Enable range requests for audio seeking
+
+	// Serve the file
+	c.File(fullPath)
+}
+
 // UpdateAsset updates asset metadata
 // @Summary Update asset metadata
 // @Description Update the specific metadata of an asset (e.g., photo EXIF data, video metadata).

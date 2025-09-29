@@ -19,6 +19,8 @@ CREATE TABLE assets (
     is_deleted BOOLEAN DEFAULT false,
     deleted_at TIMESTAMPTZ,
     specific_metadata JSONB,
+    rating INTEGER,
+	liked BOOLEAN DEFAULT false,
     embedding VECTOR(512)
 );
 

@@ -1,8 +1,8 @@
 -- name: CreateAsset :one
 INSERT INTO assets (
     owner_id, type, original_filename, storage_path, mime_type,
-    file_size, hash, width, height, duration, taken_time, specific_metadata
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    file_size, hash, width, height, duration, taken_time, specific_metadata, rating, liked
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING *;
 
 -- name: GetAssetByID :one
@@ -123,11 +123,11 @@ WHERE a.is_deleted = false
   )
   AND (sqlc.narg('rating')::integer IS NULL OR
     CASE
-      WHEN sqlc.narg('rating') = 0 THEN a.specific_metadata->>'rating' IS NULL
-      ELSE (a.specific_metadata->>'rating')::integer = sqlc.narg('rating')
+      WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL
+      ELSE a.rating = sqlc.narg('rating')
     END
   )
-  AND (sqlc.narg('liked')::boolean IS NULL OR (a.specific_metadata->>'liked')::boolean = sqlc.narg('liked'))
+  AND (sqlc.narg('liked')::boolean IS NULL OR a.liked = sqlc.narg('liked'))
   AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
   AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
 ORDER BY a.upload_time DESC
@@ -159,11 +159,11 @@ WHERE a.is_deleted = false
   )
   AND (sqlc.narg('rating')::integer IS NULL OR
     CASE
-      WHEN sqlc.narg('rating') = 0 THEN a.specific_metadata->>'rating' IS NULL
-      ELSE (a.specific_metadata->>'rating')::integer = sqlc.narg('rating')
+      WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL
+      ELSE a.rating = sqlc.narg('rating')
     END
   )
-  AND (sqlc.narg('liked')::boolean IS NULL OR (a.specific_metadata->>'liked')::boolean = sqlc.narg('liked'))
+  AND (sqlc.narg('liked')::boolean IS NULL OR a.liked = sqlc.narg('liked'))
   AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
   AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
 ORDER BY a.upload_time DESC
@@ -195,11 +195,11 @@ WHERE a.is_deleted = false
   )
   AND (sqlc.narg('rating')::integer IS NULL OR
     CASE
-      WHEN sqlc.narg('rating') = 0 THEN a.specific_metadata->>'rating' IS NULL
-      ELSE (a.specific_metadata->>'rating')::integer = sqlc.narg('rating')
+      WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL
+      ELSE a.rating = sqlc.narg('rating')
     END
   )
-  AND (sqlc.narg('liked')::boolean IS NULL OR (a.specific_metadata->>'liked')::boolean = sqlc.narg('liked'))
+  AND (sqlc.narg('liked')::boolean IS NULL OR a.liked = sqlc.narg('liked'))
   AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
   AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
 ORDER BY (a.embedding <-> sqlc.arg('embedding')::vector)
@@ -223,33 +223,18 @@ ORDER BY lens_model;
 
 -- name: UpdateAssetRating :exec
 UPDATE assets
-SET specific_metadata = jsonb_set(
-    COALESCE(specific_metadata, '{}'::jsonb),
-    '{rating}',
-    to_jsonb(sqlc.arg('rating')::integer)
-)
+SET rating = sqlc.arg('rating')::integer
 WHERE asset_id = sqlc.arg('asset_id');
 
 -- name: UpdateAssetLike :exec
 UPDATE assets
-SET specific_metadata = jsonb_set(
-    COALESCE(specific_metadata, '{}'::jsonb),
-    '{liked}',
-    to_jsonb(sqlc.arg('liked')::boolean)
-)
+SET liked = sqlc.arg('liked')::boolean
 WHERE asset_id = sqlc.arg('asset_id');
 
 -- name: UpdateAssetRatingAndLike :exec
 UPDATE assets
-SET specific_metadata = jsonb_set(
-    jsonb_set(
-        COALESCE(specific_metadata, '{}'::jsonb),
-        '{rating}',
-        to_jsonb(sqlc.arg('rating')::integer)
-    ),
-    '{liked}',
-    to_jsonb(sqlc.arg('liked')::boolean)
-)
+SET rating = sqlc.arg('rating')::integer,
+    liked = sqlc.arg('liked')::boolean
 WHERE asset_id = sqlc.arg('asset_id');
 
 -- name: UpdateAssetDescription :exec
@@ -264,14 +249,14 @@ WHERE asset_id = sqlc.arg('asset_id');
 -- name: GetAssetsByRating :many
 SELECT * FROM assets
 WHERE is_deleted = false
-  AND (specific_metadata->>'rating')::integer = sqlc.arg('rating')::integer
+  AND rating = sqlc.arg('rating')::integer
 ORDER BY upload_time DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetLikedAssets :many
 SELECT * FROM assets
 WHERE is_deleted = false
-  AND (specific_metadata->>'liked')::boolean = true
+  AND liked = true
 ORDER BY upload_time DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
@@ -297,4 +282,119 @@ WHERE owner_id = $1 AND type = ANY(sqlc.arg('types')::text[]) AND is_deleted = f
 ORDER BY
   CASE WHEN sqlc.arg('sort_order') = 'asc' THEN COALESCE(taken_time, upload_time) END ASC,
   CASE WHEN sqlc.arg('sort_order') = 'desc' THEN COALESCE(taken_time, upload_time) END DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: UpdateAssetDuration :exec
+UPDATE assets
+SET duration = $2
+WHERE asset_id = $1;
+
+-- name: UpdateAssetDimensions :exec
+UPDATE assets
+SET width = $2, height = $3
+WHERE asset_id = $1;
+
+-- name: GetAssetsByRatingRange :many
+SELECT * FROM assets
+WHERE is_deleted = false
+  AND rating IS NOT NULL
+  AND rating >= sqlc.arg('min_rating')::integer
+  AND rating <= sqlc.arg('max_rating')::integer
+  AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'))
+ORDER BY rating DESC, upload_time DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: GetLikedAssetsByOwner :many
+SELECT * FROM assets
+WHERE is_deleted = false
+  AND liked = true
+  AND owner_id = sqlc.arg('owner_id')::integer
+ORDER BY upload_time DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: GetTopRatedAssets :many
+SELECT * FROM assets
+WHERE is_deleted = false
+  AND rating IS NOT NULL
+  AND rating >= sqlc.arg('min_rating')::integer
+  AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'))
+ORDER BY rating DESC, upload_time DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: GetAssetsByRatingAndType :many
+SELECT * FROM assets
+WHERE is_deleted = false
+  AND rating = sqlc.arg('rating')::integer
+  AND type = sqlc.arg('asset_type')::text
+  AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'))
+ORDER BY upload_time DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: GetLikedAssetsByType :many
+SELECT * FROM assets
+WHERE is_deleted = false
+  AND liked = true
+  AND type = sqlc.arg('asset_type')::text
+  AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'))
+ORDER BY upload_time DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: CountAssetsByRating :many
+SELECT rating, COUNT(*) as count
+FROM assets
+WHERE is_deleted = false
+  AND rating IS NOT NULL
+  AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'))
+GROUP BY rating
+ORDER BY rating DESC;
+
+-- name: CountLikedAssets :one
+SELECT COUNT(*) as count
+FROM assets
+WHERE is_deleted = false
+  AND liked = true
+  AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'));
+
+-- name: GetAssetStatsForOwner :one
+SELECT
+  COUNT(*) as total_assets,
+  COUNT(CASE WHEN liked = true THEN 1 END) as liked_count,
+  COUNT(CASE WHEN rating IS NOT NULL THEN 1 END) as rated_count,
+  AVG(rating) as avg_rating,
+  MAX(rating) as max_rating,
+  MIN(rating) as min_rating
+FROM assets
+WHERE is_deleted = false
+  AND owner_id = sqlc.arg('owner_id')::integer;
+
+-- name: BulkUpdateAssetRating :exec
+UPDATE assets
+SET rating = sqlc.arg('rating')::integer
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND is_deleted = false;
+
+-- name: BulkUpdateAssetLiked :exec
+UPDATE assets
+SET liked = sqlc.arg('liked')::boolean
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND is_deleted = false;
+
+-- name: BulkToggleAssetLiked :exec
+UPDATE assets
+SET liked = NOT liked
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND is_deleted = false;
+
+-- name: GetAssetsByOwnerWithRatingLiked :many
+SELECT * FROM assets
+WHERE owner_id = sqlc.arg('owner_id')::integer
+  AND is_deleted = false
+  AND (sqlc.narg('has_rating')::boolean IS NULL OR
+       (sqlc.narg('has_rating') = true AND rating IS NOT NULL) OR
+       (sqlc.narg('has_rating') = false AND rating IS NULL))
+  AND (sqlc.narg('is_liked')::boolean IS NULL OR liked = sqlc.narg('is_liked'))
+ORDER BY
+  CASE WHEN sqlc.arg('sort_by') = 'rating' THEN rating END DESC NULLS LAST,
+  CASE WHEN sqlc.arg('sort_by') = 'upload_time' THEN upload_time END DESC,
+  CASE WHEN sqlc.arg('sort_by') = 'taken_time' THEN COALESCE(taken_time, upload_time) END DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');

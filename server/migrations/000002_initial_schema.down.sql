@@ -25,6 +25,9 @@ DROP TABLE IF EXISTS tags;
 
 -- 5) Assets and related indexes (depends on users)
 DROP INDEX IF EXISTS assets_hnsw_idx;
+DROP INDEX IF EXISTS idx_assets_rating_liked;
+DROP INDEX IF EXISTS idx_assets_liked;
+DROP INDEX IF EXISTS idx_assets_rating;
 DROP INDEX IF EXISTS idx_assets_type_taken_time_coalesce;
 DROP INDEX IF EXISTS idx_assets_owner_id;
 DROP INDEX IF EXISTS idx_assets_type;

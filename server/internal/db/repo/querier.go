@@ -13,6 +13,11 @@ import (
 type Querier interface {
 	AddAssetToAlbum(ctx context.Context, arg AddAssetToAlbumParams) error
 	AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) error
+	BulkToggleAssetLiked(ctx context.Context, assetIds []pgtype.UUID) error
+	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
+	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
+	CountAssetsByRating(ctx context.Context, ownerID *int32) ([]CountAssetsByRatingRow, error)
+	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
@@ -33,6 +38,7 @@ type Querier interface {
 	GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]GetAssetAlbumsRow, error)
 	GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	GetAssetEmbedding(ctx context.Context, assetID pgtype.UUID) (GetAssetEmbeddingRow, error)
+	GetAssetStatsForOwner(ctx context.Context, ownerID int32) (GetAssetStatsForOwnerRow, error)
 	GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error)
 	GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error)
 	GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUID) (GetAssetWithThumbnailsRow, error)
@@ -40,13 +46,18 @@ type Querier interface {
 	GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerParams) ([]Asset, error)
 	GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAssetsByOwnerAndTypesSortedParams) ([]Asset, error)
 	GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwnerSortedParams) ([]Asset, error)
+	GetAssetsByOwnerWithRatingLiked(ctx context.Context, arg GetAssetsByOwnerWithRatingLikedParams) ([]Asset, error)
 	GetAssetsByRating(ctx context.Context, arg GetAssetsByRatingParams) ([]Asset, error)
+	GetAssetsByRatingAndType(ctx context.Context, arg GetAssetsByRatingAndTypeParams) ([]Asset, error)
+	GetAssetsByRatingRange(ctx context.Context, arg GetAssetsByRatingRangeParams) ([]Asset, error)
 	GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams) ([]Asset, error)
 	GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error)
 	GetAssetsWithEmbeddings(ctx context.Context, arg GetAssetsWithEmbeddingsParams) ([]GetAssetsWithEmbeddingsRow, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
+	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
+	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]SpeciesPrediction, error)
 	GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeciesPredictionsByLabelParams) ([]SpeciesPrediction, error)
@@ -56,6 +67,7 @@ type Querier interface {
 	GetThumbnailByAssetAndSize(ctx context.Context, arg GetThumbnailByAssetAndSizeParams) (Thumbnail, error)
 	GetThumbnailByID(ctx context.Context, thumbnailID int32) (Thumbnail, error)
 	GetThumbnailsByAsset(ctx context.Context, assetID pgtype.UUID) ([]Thumbnail, error)
+	GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsParams) ([]Asset, error)
 	GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesForAssetParams) ([]SpeciesPrediction, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, userID int32) (User, error)
@@ -72,6 +84,8 @@ type Querier interface {
 	UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
 	UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error
+	UpdateAssetDimensions(ctx context.Context, arg UpdateAssetDimensionsParams) error
+	UpdateAssetDuration(ctx context.Context, arg UpdateAssetDurationParams) error
 	UpdateAssetLike(ctx context.Context, arg UpdateAssetLikeParams) error
 	UpdateAssetMetadata(ctx context.Context, arg UpdateAssetMetadataParams) error
 	UpdateAssetMetadataWithTakenTime(ctx context.Context, arg UpdateAssetMetadataWithTakenTimeParams) error

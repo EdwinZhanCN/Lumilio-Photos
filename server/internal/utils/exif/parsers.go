@@ -10,10 +10,7 @@ import (
 // parsePhotoMetadata parses raw EXIF data into PhotoSpecificMetadata
 func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadata {
 
-	metadata := &dbtypes.PhotoSpecificMetadata{
-		Rating: 0,     // Set default rating to 0
-		Like:   false, // Set default like status to false
-	}
+	metadata := &dbtypes.PhotoSpecificMetadata{}
 
 	// Parse TakenTime from various datetime fields with expanded fallback options
 	for _, field := range []string{"DateTimeOriginal", "CreateDate", "DateTime", "ModifyDate", "FileModifyDate", "DateTimeDigitized", "SubSecDateTimeOriginal", "GPSDateTime"} {
