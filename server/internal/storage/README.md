@@ -2,16 +2,31 @@
 
 ```toml
 repository-root/
-├── .lumilio/               # System directory (hidden)
-│   ├── assets/             # Transcoded content
-│   ├── staging/            # Upload staging
-│   ├── temp/               # Processing workspace
-│   └── trash/              # Soft deletes (assets)
-│   └── backups/            # Config file backup
-│   └── logs/               # Application logs (app, error, operations)
-├── .lumiliorepo            # Repository config file (hidden)
-├── inbox/                  # Structured uploads
-└── [user-managed]/         # User organization space
+├── .lumilio/                # System-managed (protected)
+│   ├── assets/
+│   │   ├── thumbnails/     # Generated thumbnails by size
+│   │   │   ├── 150/        # 150px thumbnails
+│   │   │   ├── 300/        # 300px thumbnails
+│   │   │   └── 1024/       # Large previews
+│   │   ├── videos/         # Transcoded video files
+│   │   │   └── web/        # MP4/H.264 ≤1080p (target) transcodes
+│   │   ├── audios/         # Transcoded audio files
+│   │   │   └── web/        # transcoded MP3
+│   ├── staging/            # Upload staging area
+│   │   ├── incoming/       # Files being uploaded
+│   │   └── failed/         # Failed upload attempts
+│   ├── temp/              # Temporary processing files
+│   └── trash/             # Soft-delete assets
+├── .lumiliorepo           # Repository configuration
+├── inbox/                 # Structured uploads (protected)
+│   ├── 2024/              # Date-based or hash-based
+│   │   ├── 01/            # Depends on storage strategy
+│   │   └── 02/
+│   └── ...
+└── [user-space]/          # User-managed files (unprotected)
+    ├── Family Photos/     # User can organize however
+    ├── Vacations/         # they want
+    └── ...
 ```
 
 **Example Repository Config File**

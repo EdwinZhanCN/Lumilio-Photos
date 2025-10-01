@@ -164,8 +164,8 @@ func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, asset *repo.A
 			return fmt.Errorf("save 1080p version: %w", err)
 		}
 
-		// Keep original for high-resolution videos
-		return ap.copyVideoAsWebVersion(ctx, asset, videoPath, "original")
+		// Do not save original copy; only the web (downscaled/transcoded) version is kept
+		return nil
 	}
 }
 

@@ -182,22 +182,7 @@ func (rm *DefaultRepositoryManager) ValidateRepository(path string) (*Validation
 		return result, nil
 	}
 
-	// Validate repository directory structure
-	requiredDirs := []string{
-		".lumilio",
-		".lumilio/assets",
-		".lumilio/assets/thumbnails",
-		".lumilio/assets/videos",
-		".lumilio/assets/audios",
-		".lumilio/staging",
-		".lumilio/temp",
-		".lumilio/trash",
-		".lumilio/logs",
-		".lumilio/backups",
-		"inbox",
-	}
-
-	for _, dir := range requiredDirs {
+	for _, dir := range Directories {
 		dirPath := filepath.Join(cleanPath, dir)
 		if info, err := os.Stat(dirPath); os.IsNotExist(err) {
 			result.Warnings = append(result.Warnings, fmt.Sprintf("Missing directory: %s", dir))
@@ -494,25 +479,8 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config Repositor
 
 // createRepositoryStructure creates the full directory structure for a new repository
 func (rm *DefaultRepositoryManager) createRepositoryStructure(repoPath string) error {
-	// Define directory structure that matches ValidateRepository expectations
-	directories := []string{
-		// System directories (matches ValidateRepository)
-		".lumilio",
-		".lumilio/assets",
-		".lumilio/assets/thumbnails",
-		".lumilio/assets/videos",
-		".lumilio/assets/audios",
-		".lumilio/staging", // Upload staging area
-		".lumilio/temp",    // General temporary processing
-		".lumilio/trash",   // Soft-deleted user assets
-		".lumilio/logs",    // Application and operation logs
-		".lumilio/backups", // Config version backups
-		// Content directories
-		"inbox", // Structured uploads
-	}
-
 	// Create all directories
-	for _, dir := range directories {
+	for _, dir := range Directories {
 		dirPath := filepath.Join(repoPath, dir)
 		if err := os.MkdirAll(dirPath, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
