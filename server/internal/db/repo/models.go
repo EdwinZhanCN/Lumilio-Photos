@@ -65,6 +65,17 @@ type RefreshToken struct {
 	IsRevoked *bool              `db:"is_revoked" json:"is_revoked"`
 }
 
+type Repository struct {
+	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
+	Name      string             `db:"name" json:"name"`
+	Path      string             `db:"path" json:"path"`
+	Config    []byte             `db:"config" json:"config"`
+	Status    *string            `db:"status" json:"status"`
+	LastSync  pgtype.Timestamptz `db:"last_sync" json:"last_sync"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type SpeciesPrediction struct {
 	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
 	Label   string      `db:"label" json:"label"`

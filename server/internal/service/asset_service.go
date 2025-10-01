@@ -79,9 +79,9 @@ type AssetService interface {
 	SaveNewSpeciesPredictions(ctx context.Context, pgUUID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
 
 	// New filtering and search methods
-	FilterAssets(ctx context.Context, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
-	SearchAssetsFilename(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
-	SearchAssetsVector(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
+	FilterAssets(ctx context.Context, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
+	SearchAssetsFilename(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
+	SearchAssetsVector(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]string, error)
 	GetDistinctLenses(ctx context.Context) ([]string, error)
 
@@ -93,21 +93,23 @@ type AssetService interface {
 }
 
 type assetService struct {
-	queries *repo.Queries
-	storage storage.Storage
-	ml      *MLService
+	queries     *repo.Queries
+	storage     storage.Storage
+	ml          *MLService
+	repoManager storage.RepositoryManager
 }
 
 // NewAssetService creates a new instance of AssetService with storage configuration
-func NewAssetService(q *repo.Queries, s storage.Storage) (AssetService, error) {
-	return NewAssetServiceWithML(q, s, nil)
+func NewAssetService(q *repo.Queries, s storage.Storage, rm storage.RepositoryManager) (AssetService, error) {
+	return NewAssetServiceWithML(q, s, nil, rm)
 }
 
-func NewAssetServiceWithML(q *repo.Queries, s storage.Storage, ml *MLService) (AssetService, error) {
+func NewAssetServiceWithML(q *repo.Queries, s storage.Storage, ml *MLService, rm storage.RepositoryManager) (AssetService, error) {
 	return &assetService{
-		queries: q,
-		storage: s,
-		ml:      ml,
+		queries:     q,
+		storage:     s,
+		ml:          ml,
+		repoManager: rm,
 	}, nil
 }
 
@@ -796,7 +798,19 @@ func intPtrFromInt32Ptr(i32 *int32) *int {
 // New filtering and search methods
 // ================================
 
-func (s *assetService) FilterAssets(ctx context.Context, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
+func (s *assetService) FilterAssets(ctx context.Context, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
+	// Convert repository ID to path if provided
+	var repoPath *string
+	if repositoryID != nil && *repositoryID != "" {
+		if s.repoManager != nil {
+			path, err := s.repoManager.GetRepositoryPath(*repositoryID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get repository path: %w", err)
+			}
+			repoPath = &path
+		}
+	}
+
 	// Convert rating pointer for SQL
 	var ratingPtr *int32
 	if rating != nil {
@@ -816,6 +830,7 @@ func (s *assetService) FilterAssets(ctx context.Context, assetType *string, owne
 	return s.queries.FilterAssets(ctx, repo.FilterAssetsParams{
 		AssetType:    assetType,
 		OwnerID:      ownerID,
+		RepoPath:     repoPath,
 		FilenameVal:  filenameVal,
 		FilenameMode: filenameMode,
 		DateFrom:     fromTime,
@@ -830,7 +845,19 @@ func (s *assetService) FilterAssets(ctx context.Context, assetType *string, owne
 	})
 }
 
-func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
+func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
+	// Convert repository ID to path if provided
+	var repoPath *string
+	if repositoryID != nil && *repositoryID != "" {
+		if s.repoManager != nil {
+			path, err := s.repoManager.GetRepositoryPath(*repositoryID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get repository path: %w", err)
+			}
+			repoPath = &path
+		}
+	}
+
 	// Convert rating pointer for SQL
 	var ratingPtr *int32
 	if rating != nil {
@@ -851,6 +878,7 @@ func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, a
 		Query:        &query,
 		AssetType:    assetType,
 		OwnerID:      ownerID,
+		RepoPath:     repoPath,
 		FilenameVal:  filenameVal,
 		FilenameMode: filenameMode,
 		DateFrom:     fromTime,
@@ -865,9 +893,21 @@ func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, a
 	})
 }
 
-func (s *assetService) SearchAssetsVector(ctx context.Context, query string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
+func (s *assetService) SearchAssetsVector(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
 	if s.ml == nil {
 		return nil, fmt.Errorf("ML service not available for semantic search")
+	}
+
+	// Convert repository ID to path if provided
+	var repoPath *string
+	if repositoryID != nil && *repositoryID != "" {
+		if s.repoManager != nil {
+			path, err := s.repoManager.GetRepositoryPath(*repositoryID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get repository path: %w", err)
+			}
+			repoPath = &path
+		}
 	}
 
 	// Get query embedding
@@ -909,6 +949,7 @@ func (s *assetService) SearchAssetsVector(ctx context.Context, query string, ass
 		Embedding:    pgEmbedding,
 		AssetType:    assetType,
 		OwnerID:      ownerID,
+		RepoPath:     repoPath,
 		FilenameVal:  filenameVal,
 		FilenameMode: filenameMode,
 		DateFrom:     fromTime,

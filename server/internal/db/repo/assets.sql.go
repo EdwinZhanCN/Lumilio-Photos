@@ -265,40 +265,42 @@ SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mi
 WHERE a.is_deleted = false
   AND ($1::text IS NULL OR a.type = $1)
   AND ($2::integer IS NULL OR a.owner_id = $2)
-  AND ($3::text IS NULL OR
-    CASE $4::text
-      WHEN 'contains' THEN a.original_filename ILIKE '%' || $3 || '%'
-      WHEN 'matches' THEN a.original_filename ILIKE $3
-      WHEN 'startswith' THEN a.original_filename ILIKE $3 || '%'
-      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $3
+  AND ($3::text IS NULL OR a.storage_path LIKE $3 || '%')
+  AND ($4::text IS NULL OR
+    CASE $5::text
+      WHEN 'contains' THEN a.original_filename ILIKE '%' || $4 || '%'
+      WHEN 'matches' THEN a.original_filename ILIKE $4
+      WHEN 'startswith' THEN a.original_filename ILIKE $4 || '%'
+      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $4
       ELSE true
     END
   )
-  AND ($5::timestamptz IS NULL OR a.upload_time >= $5)
-  AND ($6::timestamptz IS NULL OR a.upload_time <= $6)
-  AND ($7::boolean IS NULL OR
+  AND ($6::timestamptz IS NULL OR a.upload_time >= $6)
+  AND ($7::timestamptz IS NULL OR a.upload_time <= $7)
+  AND ($8::boolean IS NULL OR
     CASE
-      WHEN $7 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
-      WHEN $7 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+      WHEN $8 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      WHEN $8 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
       ELSE true
     END
   )
-  AND ($8::integer IS NULL OR
+  AND ($9::integer IS NULL OR
     CASE
-      WHEN $8 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $8
+      WHEN $9 = 0 THEN a.rating IS NULL
+      ELSE a.rating = $9
     END
   )
-  AND ($9::boolean IS NULL OR a.liked = $9)
-  AND ($10::text IS NULL OR a.specific_metadata->>'camera_model' = $10)
-  AND ($11::text IS NULL OR a.specific_metadata->>'lens_model' = $11)
+  AND ($10::boolean IS NULL OR a.liked = $10)
+  AND ($11::text IS NULL OR a.specific_metadata->>'camera_model' = $11)
+  AND ($12::text IS NULL OR a.specific_metadata->>'lens_model' = $12)
 ORDER BY a.upload_time DESC
-LIMIT $13 OFFSET $12
+LIMIT $14 OFFSET $13
 `
 
 type FilterAssetsParams struct {
 	AssetType    *string            `db:"asset_type" json:"asset_type"`
 	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
+	RepoPath     *string            `db:"repo_path" json:"repo_path"`
 	FilenameVal  *string            `db:"filename_val" json:"filename_val"`
 	FilenameMode *string            `db:"filename_mode" json:"filename_mode"`
 	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
@@ -316,6 +318,7 @@ func (q *Queries) FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]A
 	rows, err := q.db.Query(ctx, filterAssets,
 		arg.AssetType,
 		arg.OwnerID,
+		arg.RepoPath,
 		arg.FilenameVal,
 		arg.FilenameMode,
 		arg.DateFrom,
@@ -1252,6 +1255,62 @@ func (q *Queries) GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsBy
 	return items, nil
 }
 
+const getRepositoryAssetStats = `-- name: GetRepositoryAssetStats :one
+
+SELECT
+  COUNT(*) as total_assets,
+  COUNT(CASE WHEN type = 'PHOTO' THEN 1 END) as photo_count,
+  COUNT(CASE WHEN type = 'VIDEO' THEN 1 END) as video_count,
+  COUNT(CASE WHEN type = 'AUDIO' THEN 1 END) as audio_count,
+  COUNT(CASE WHEN liked = true THEN 1 END) as liked_count,
+  COUNT(CASE WHEN rating IS NOT NULL THEN 1 END) as rated_count,
+  AVG(rating) as avg_rating,
+  SUM(file_size) as total_size,
+  MIN(upload_time) as oldest_upload,
+  MAX(upload_time) as newest_upload
+FROM assets
+WHERE is_deleted = false
+  AND storage_path LIKE $1 || '%'
+  AND ($2::integer IS NULL OR owner_id = $2)
+`
+
+type GetRepositoryAssetStatsParams struct {
+	RepoPath *string `db:"repo_path" json:"repo_path"`
+	OwnerID  *int32  `db:"owner_id" json:"owner_id"`
+}
+
+type GetRepositoryAssetStatsRow struct {
+	TotalAssets  int64       `db:"total_assets" json:"total_assets"`
+	PhotoCount   int64       `db:"photo_count" json:"photo_count"`
+	VideoCount   int64       `db:"video_count" json:"video_count"`
+	AudioCount   int64       `db:"audio_count" json:"audio_count"`
+	LikedCount   int64       `db:"liked_count" json:"liked_count"`
+	RatedCount   int64       `db:"rated_count" json:"rated_count"`
+	AvgRating    float64     `db:"avg_rating" json:"avg_rating"`
+	TotalSize    int64       `db:"total_size" json:"total_size"`
+	OldestUpload interface{} `db:"oldest_upload" json:"oldest_upload"`
+	NewestUpload interface{} `db:"newest_upload" json:"newest_upload"`
+}
+
+// Repository Asset Statistics (kept for repository management)
+func (q *Queries) GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error) {
+	row := q.db.QueryRow(ctx, getRepositoryAssetStats, arg.RepoPath, arg.OwnerID)
+	var i GetRepositoryAssetStatsRow
+	err := row.Scan(
+		&i.TotalAssets,
+		&i.PhotoCount,
+		&i.VideoCount,
+		&i.AudioCount,
+		&i.LikedCount,
+		&i.RatedCount,
+		&i.AvgRating,
+		&i.TotalSize,
+		&i.OldestUpload,
+		&i.NewestUpload,
+	)
+	return i, err
+}
+
 const getThumbnailByAssetAndSize = `-- name: GetThumbnailByAssetAndSize :one
 SELECT thumbnail_id, asset_id, size, storage_path, mime_type, created_at FROM thumbnails
 WHERE asset_id = $1 AND size = $2
@@ -1490,41 +1549,43 @@ WHERE a.is_deleted = false
   AND a.original_filename ILIKE '%' || $1 || '%'
   AND ($2::text IS NULL OR a.type = $2)
   AND ($3::integer IS NULL OR a.owner_id = $3)
-  AND ($4::text IS NULL OR
-    CASE $5::text
-      WHEN 'contains' THEN a.original_filename ILIKE '%' || $4 || '%'
-      WHEN 'matches' THEN a.original_filename ILIKE $4
-      WHEN 'startswith' THEN a.original_filename ILIKE $4 || '%'
-      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $4
+  AND ($4::text IS NULL OR a.storage_path LIKE $4 || '%')
+  AND ($5::text IS NULL OR
+    CASE $6::text
+      WHEN 'contains' THEN a.original_filename ILIKE '%' || $5 || '%'
+      WHEN 'matches' THEN a.original_filename ILIKE $5
+      WHEN 'startswith' THEN a.original_filename ILIKE $5 || '%'
+      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $5
       ELSE true
     END
   )
-  AND ($6::timestamptz IS NULL OR a.upload_time >= $6)
-  AND ($7::timestamptz IS NULL OR a.upload_time <= $7)
-  AND ($8::boolean IS NULL OR
+  AND ($7::timestamptz IS NULL OR a.upload_time >= $7)
+  AND ($8::timestamptz IS NULL OR a.upload_time <= $8)
+  AND ($9::boolean IS NULL OR
     CASE
-      WHEN $8 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
-      WHEN $8 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+      WHEN $9 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      WHEN $9 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
       ELSE true
     END
   )
-  AND ($9::integer IS NULL OR
+  AND ($10::integer IS NULL OR
     CASE
-      WHEN $9 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $9
+      WHEN $10 = 0 THEN a.rating IS NULL
+      ELSE a.rating = $10
     END
   )
-  AND ($10::boolean IS NULL OR a.liked = $10)
-  AND ($11::text IS NULL OR a.specific_metadata->>'camera_model' = $11)
-  AND ($12::text IS NULL OR a.specific_metadata->>'lens_model' = $12)
+  AND ($11::boolean IS NULL OR a.liked = $11)
+  AND ($12::text IS NULL OR a.specific_metadata->>'camera_model' = $12)
+  AND ($13::text IS NULL OR a.specific_metadata->>'lens_model' = $13)
 ORDER BY a.upload_time DESC
-LIMIT $14 OFFSET $13
+LIMIT $15 OFFSET $14
 `
 
 type SearchAssetsFilenameParams struct {
 	Query        *string            `db:"query" json:"query"`
 	AssetType    *string            `db:"asset_type" json:"asset_type"`
 	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
+	RepoPath     *string            `db:"repo_path" json:"repo_path"`
 	FilenameVal  *string            `db:"filename_val" json:"filename_val"`
 	FilenameMode *string            `db:"filename_mode" json:"filename_mode"`
 	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
@@ -1543,6 +1604,7 @@ func (q *Queries) SearchAssetsFilename(ctx context.Context, arg SearchAssetsFile
 		arg.Query,
 		arg.AssetType,
 		arg.OwnerID,
+		arg.RepoPath,
 		arg.FilenameVal,
 		arg.FilenameMode,
 		arg.DateFrom,
@@ -1599,41 +1661,43 @@ WHERE a.is_deleted = false
   AND a.embedding IS NOT NULL
   AND ($2::text IS NULL OR a.type = $2)
   AND ($3::integer IS NULL OR a.owner_id = $3)
-  AND ($4::text IS NULL OR
-    CASE $5::text
-      WHEN 'contains' THEN a.original_filename ILIKE '%' || $4 || '%'
-      WHEN 'matches' THEN a.original_filename ILIKE $4
-      WHEN 'startswith' THEN a.original_filename ILIKE $4 || '%'
-      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $4
+  AND ($4::text IS NULL OR a.storage_path LIKE $4 || '%')
+  AND ($5::text IS NULL OR
+    CASE $6::text
+      WHEN 'contains' THEN a.original_filename ILIKE '%' || $5 || '%'
+      WHEN 'matches' THEN a.original_filename ILIKE $5
+      WHEN 'startswith' THEN a.original_filename ILIKE $5 || '%'
+      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $5
       ELSE true
     END
   )
-  AND ($6::timestamptz IS NULL OR a.upload_time >= $6)
-  AND ($7::timestamptz IS NULL OR a.upload_time <= $7)
-  AND ($8::boolean IS NULL OR
+  AND ($7::timestamptz IS NULL OR a.upload_time >= $7)
+  AND ($8::timestamptz IS NULL OR a.upload_time <= $8)
+  AND ($9::boolean IS NULL OR
     CASE
-      WHEN $8 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
-      WHEN $8 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+      WHEN $9 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      WHEN $9 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
       ELSE true
     END
   )
-  AND ($9::integer IS NULL OR
+  AND ($10::integer IS NULL OR
     CASE
-      WHEN $9 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $9
+      WHEN $10 = 0 THEN a.rating IS NULL
+      ELSE a.rating = $10
     END
   )
-  AND ($10::boolean IS NULL OR a.liked = $10)
-  AND ($11::text IS NULL OR a.specific_metadata->>'camera_model' = $11)
-  AND ($12::text IS NULL OR a.specific_metadata->>'lens_model' = $12)
+  AND ($11::boolean IS NULL OR a.liked = $11)
+  AND ($12::text IS NULL OR a.specific_metadata->>'camera_model' = $12)
+  AND ($13::text IS NULL OR a.specific_metadata->>'lens_model' = $13)
 ORDER BY (a.embedding <-> $1::vector)
-LIMIT $14 OFFSET $13
+LIMIT $15 OFFSET $14
 `
 
 type SearchAssetsVectorParams struct {
 	Embedding    pgvector_go.Vector `db:"embedding" json:"embedding"`
 	AssetType    *string            `db:"asset_type" json:"asset_type"`
 	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
+	RepoPath     *string            `db:"repo_path" json:"repo_path"`
 	FilenameVal  *string            `db:"filename_val" json:"filename_val"`
 	FilenameMode *string            `db:"filename_mode" json:"filename_mode"`
 	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
@@ -1675,6 +1739,7 @@ func (q *Queries) SearchAssetsVector(ctx context.Context, arg SearchAssetsVector
 		arg.Embedding,
 		arg.AssetType,
 		arg.OwnerID,
+		arg.RepoPath,
 		arg.FilenameVal,
 		arg.FilenameMode,
 		arg.DateFrom,

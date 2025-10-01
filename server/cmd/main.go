@@ -103,9 +103,10 @@ func main() {
 		}
 		mlSvc = service.NewFromConn(mlConn)
 	}
+	repoManager := storage.NewRepositoryManager(queries)
 
 	// Initialize Service (AssetService optionally ML-enabled)
-	assetService, err := service.NewAssetServiceWithML(queries, storageService, mlSvc)
+	assetService, err := service.NewAssetServiceWithML(queries, storageService, mlSvc, repoManager)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}

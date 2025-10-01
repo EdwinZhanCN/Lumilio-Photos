@@ -103,6 +103,7 @@ SELECT a.* FROM assets a
 WHERE a.is_deleted = false
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('repo_path')::text IS NULL OR a.storage_path LIKE sqlc.narg('repo_path') || '%')
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE sqlc.narg('filename_mode')::text
       WHEN 'contains' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
@@ -139,6 +140,7 @@ WHERE a.is_deleted = false
   AND a.original_filename ILIKE '%' || sqlc.arg('query') || '%'
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('repo_path')::text IS NULL OR a.storage_path LIKE sqlc.narg('repo_path') || '%')
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE sqlc.narg('filename_mode')::text
       WHEN 'contains' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
@@ -175,6 +177,7 @@ WHERE a.is_deleted = false
   AND a.embedding IS NOT NULL
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('repo_path')::text IS NULL OR a.storage_path LIKE sqlc.narg('repo_path') || '%')
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE sqlc.narg('filename_mode')::text
       WHEN 'contains' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
@@ -398,3 +401,22 @@ ORDER BY
   CASE WHEN sqlc.arg('sort_by') = 'upload_time' THEN upload_time END DESC,
   CASE WHEN sqlc.arg('sort_by') = 'taken_time' THEN COALESCE(taken_time, upload_time) END DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- Repository Asset Statistics (kept for repository management)
+
+-- name: GetRepositoryAssetStats :one
+SELECT
+  COUNT(*) as total_assets,
+  COUNT(CASE WHEN type = 'PHOTO' THEN 1 END) as photo_count,
+  COUNT(CASE WHEN type = 'VIDEO' THEN 1 END) as video_count,
+  COUNT(CASE WHEN type = 'AUDIO' THEN 1 END) as audio_count,
+  COUNT(CASE WHEN liked = true THEN 1 END) as liked_count,
+  COUNT(CASE WHEN rating IS NOT NULL THEN 1 END) as rated_count,
+  AVG(rating) as avg_rating,
+  SUM(file_size) as total_size,
+  MIN(upload_time) as oldest_upload,
+  MAX(upload_time) as newest_upload
+FROM assets
+WHERE is_deleted = false
+  AND storage_path LIKE sqlc.arg('repo_path') || '%'
+  AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'));
