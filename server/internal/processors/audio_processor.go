@@ -124,7 +124,7 @@ func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, asset *repo.A
 	// Smart transcoding strategy for web compatibility
 	if strings.ToLower(audioInfo.Format) == "mp3" && audioInfo.Bitrate >= 128 && audioInfo.Bitrate <= 320 {
 		// Audio is already MP3 with good bitrate, just copy to storage
-		return ap.copyAudioAsWebVersion(ctx, asset, audioPath, "web")
+		return ap.copyAudioForWeb(ctx, asset, audioPath, "web")
 	}
 
 	// Need to transcode to MP3
@@ -134,26 +134,8 @@ func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, asset *repo.A
 	}
 	defer os.Remove(outputPath)
 
-	// For lossless formats (FLAC, WAV) with good quality, keep both versions
-	if ap.shouldKeepOriginalAudio(audioInfo) {
-		// Save transcoded MP3 version
-		if err := ap.saveTranscodedAudio(ctx, asset, outputPath, "web"); err != nil {
-			return fmt.Errorf("save mp3 version: %w", err)
-		}
-		// Keep original for audiophiles
-		return ap.copyAudioAsWebVersion(ctx, asset, audioPath, "original")
-	}
-
 	// Just save the MP3 version
 	return ap.saveTranscodedAudio(ctx, asset, outputPath, "web")
-}
-
-func (ap *AssetProcessor) shouldKeepOriginalAudio(audioInfo *AudioInfo) bool {
-	// Keep original for high-quality lossless formats
-	format := strings.ToLower(audioInfo.Format)
-	return format == "flac" || format == "wav" ||
-		(format == "aiff" && audioInfo.SampleRate >= 44100) ||
-		(audioInfo.Bitrate > 320) // High bitrate files
 }
 
 func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath string, audioInfo *AudioInfo) (string, error) {
@@ -189,7 +171,7 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 	return outputPath, nil
 }
 
-func (ap *AssetProcessor) copyAudioAsWebVersion(ctx context.Context, asset *repo.Asset, audioPath, version string) error {
+func (ap *AssetProcessor) copyAudioForWeb(ctx context.Context, asset *repo.Asset, audioPath, version string) error {
 	audioFile, err := os.Open(audioPath)
 	if err != nil {
 		return fmt.Errorf("open audio file: %w", err)

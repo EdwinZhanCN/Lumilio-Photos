@@ -1151,14 +1151,10 @@ func (s *assetService) GetLikedAssets(ctx context.Context, limit, offset int) ([
 // Video and Audio processing methods implementation
 
 func (s *assetService) SaveVideoVersion(ctx context.Context, videoReader io.Reader, asset *repo.Asset, version string) error {
-	// Generate filename with version suffix
-	filename := asset.OriginalFilename
-	if version != "original" {
-		// Remove original extension and add version
-		ext := filepath.Ext(filename)
-		nameWithoutExt := strings.TrimSuffix(filename, ext)
-		filename = fmt.Sprintf("%s_%s.mp4", nameWithoutExt, version)
-	}
+	// Always generate a web-compatible MP4 with version suffix
+	ext := filepath.Ext(asset.OriginalFilename)
+	nameWithoutExt := strings.TrimSuffix(asset.OriginalFilename, ext)
+	filename := fmt.Sprintf("%s_%s.mp4", nameWithoutExt, version)
 
 	// Upload to storage
 	hash := ""
@@ -1170,21 +1166,15 @@ func (s *assetService) SaveVideoVersion(ctx context.Context, videoReader io.Read
 		return fmt.Errorf("failed to upload video version %s: %w", version, err)
 	}
 
-	// TODO: Store video version metadata in database if needed
-	// For now, we're storing versions in storage with different filenames
 	log.Printf("Saved video version %s for asset %s at path %s", version, asset.AssetID.Bytes, storagePath)
 	return nil
 }
 
 func (s *assetService) SaveAudioVersion(ctx context.Context, audioReader io.Reader, asset *repo.Asset, version string) error {
-	// Generate filename with version suffix
-	filename := asset.OriginalFilename
-	if version != "original" {
-		// Remove original extension and add version
-		ext := filepath.Ext(filename)
-		nameWithoutExt := strings.TrimSuffix(filename, ext)
-		filename = fmt.Sprintf("%s_%s.mp3", nameWithoutExt, version)
-	}
+	// Always generate a web-compatible MP3 with version suffix
+	ext := filepath.Ext(asset.OriginalFilename)
+	nameWithoutExt := strings.TrimSuffix(asset.OriginalFilename, ext)
+	filename := fmt.Sprintf("%s_%s.mp3", nameWithoutExt, version)
 
 	// Upload to storage
 	hash := ""
@@ -1196,7 +1186,6 @@ func (s *assetService) SaveAudioVersion(ctx context.Context, audioReader io.Read
 		return fmt.Errorf("failed to upload audio version %s: %w", version, err)
 	}
 
-	// TODO: Store audio version metadata in database if needed
 	log.Printf("Saved audio version %s for asset %s at path %s", version, asset.AssetID.Bytes, storagePath)
 	return nil
 }
