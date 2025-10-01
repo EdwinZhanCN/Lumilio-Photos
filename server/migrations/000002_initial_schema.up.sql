@@ -55,6 +55,7 @@ CREATE INDEX idx_assets_owner_id ON assets(owner_id);
 CREATE INDEX idx_assets_type ON assets(type);
 CREATE INDEX idx_assets_hash ON assets(hash);
 CREATE INDEX idx_assets_taken_time ON assets(taken_time);
+CREATE INDEX IF NOT EXISTS idx_assets_storage_path ON assets(storage_path);
 
 -- Composite expression index for optimized type+taken_time queries
 CREATE INDEX idx_assets_type_taken_time_coalesce

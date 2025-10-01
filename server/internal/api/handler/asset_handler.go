@@ -162,15 +162,16 @@ type DateRange struct {
 
 // AssetFilter represents comprehensive filtering options
 type AssetFilter struct {
-	Type       *string         `json:"type,omitempty" example:"PHOTO" enums:"PHOTO,VIDEO,AUDIO"`
-	OwnerID    *int32          `json:"owner_id,omitempty" example:"123"`
-	RAW        *bool           `json:"raw,omitempty" example:"true"`
-	Rating     *int            `json:"rating,omitempty" example:"5" minimum:"0" maximum:"5"`
-	Liked      *bool           `json:"liked,omitempty" example:"true"`
-	Filename   *FilenameFilter `json:"filename,omitempty"`
-	Date       *DateRange      `json:"date,omitempty"`
-	CameraMake *string         `json:"camera_make,omitempty" example:"Canon"`
-	Lens       *string         `json:"lens,omitempty" example:"EF 50mm f/1.8"`
+	RepositoryID *string         `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Type         *string         `json:"type,omitempty" example:"PHOTO" enums:"PHOTO,VIDEO,AUDIO"`
+	OwnerID      *int32          `json:"owner_id,omitempty" example:"123"`
+	RAW          *bool           `json:"raw,omitempty" example:"true"`
+	Rating       *int            `json:"rating,omitempty" example:"5" minimum:"0" maximum:"5"`
+	Liked        *bool           `json:"liked,omitempty" example:"true"`
+	Filename     *FilenameFilter `json:"filename,omitempty"`
+	Date         *DateRange      `json:"date,omitempty"`
+	CameraMake   *string         `json:"camera_make,omitempty" example:"Canon"`
+	Lens         *string         `json:"lens,omitempty" example:"EF 50mm f/1.8"`
 }
 
 // FilterAssetsRequest represents the request structure for filtering assets
@@ -993,7 +994,7 @@ func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 
 // FilterAssets handles asset filtering with complex filters
 // @Summary Filter assets
-// @Description Filter assets using comprehensive filtering options including RAW, rating, liked status, filename patterns, date ranges, camera make, and lens
+// @Description Filter assets using comprehensive filtering options including repository selection, RAW, rating, liked status, filename patterns, date ranges, camera make, and lens
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -1039,7 +1040,7 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 	}
 
 	assets, err := h.assetService.FilterAssets(ctx,
-		typePtr, filter.OwnerID, filenameVal, filenameMode,
+		filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
 		dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 		filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 
@@ -1064,7 +1065,7 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 
 // SearchAssets handles both filename and semantic search with optional filtering
 // @Summary Search assets
-// @Description Search assets using either filename matching or semantic vector search. Can be combined with comprehensive filters.
+// @Description Search assets using either filename matching or semantic vector search. Can be combined with comprehensive filters including repository selection.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -1120,12 +1121,12 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 
 	if req.SearchType == "filename" {
 		assets, err = h.assetService.SearchAssetsFilename(ctx, req.Query,
-			typePtr, filter.OwnerID, filenameVal, filenameMode,
+			filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 	} else {
 		assets, err = h.assetService.SearchAssetsVector(ctx, req.Query,
-			typePtr, filter.OwnerID, filenameVal, filenameMode,
+			filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 	}
