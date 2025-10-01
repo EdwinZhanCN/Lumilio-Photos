@@ -44,6 +44,8 @@ type Asset struct {
 	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating           *int32                   `db:"rating" json:"rating"`
+	Liked            *bool                    `db:"liked" json:"liked"`
 	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
 }
 
@@ -61,6 +63,17 @@ type RefreshToken struct {
 	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	IsRevoked *bool              `db:"is_revoked" json:"is_revoked"`
+}
+
+type Repository struct {
+	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
+	Name      string             `db:"name" json:"name"`
+	Path      string             `db:"path" json:"path"`
+	Config    []byte             `db:"config" json:"config"`
+	Status    *string            `db:"status" json:"status"`
+	LastSync  pgtype.Timestamptz `db:"last_sync" json:"last_sync"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type SpeciesPrediction struct {

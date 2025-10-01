@@ -46,6 +46,8 @@ CREATE TABLE assets (
     is_deleted         BOOLEAN       DEFAULT FALSE,
     deleted_at         TIMESTAMPTZ,
     specific_metadata  JSONB,
+    rating             INTEGER,
+    liked              BOOLEAN       DEFAULT FALSE,
     embedding          VECTOR(512)
 );
 
@@ -53,6 +55,7 @@ CREATE INDEX idx_assets_owner_id ON assets(owner_id);
 CREATE INDEX idx_assets_type ON assets(type);
 CREATE INDEX idx_assets_hash ON assets(hash);
 CREATE INDEX idx_assets_taken_time ON assets(taken_time);
+CREATE INDEX IF NOT EXISTS idx_assets_storage_path ON assets(storage_path);
 
 -- Composite expression index for optimized type+taken_time queries
 CREATE INDEX idx_assets_type_taken_time_coalesce
@@ -62,6 +65,11 @@ CREATE INDEX idx_assets_type_taken_time_coalesce
 -- Vector HNSW index for semantic search on embeddings
 CREATE INDEX assets_hnsw_idx ON assets USING hnsw (embedding vector_l2_ops)
 WITH (m = 16, ef_construction = 200);
+
+-- Indexes for rating and liked columns for better query performance
+CREATE INDEX idx_assets_rating ON assets(rating) WHERE rating IS NOT NULL;
+CREATE INDEX idx_assets_liked ON assets(liked) WHERE liked = true;
+CREATE INDEX idx_assets_rating_liked ON assets(rating, liked) WHERE rating IS NOT NULL OR liked = true;
 
 -- 4) Thumbnails
 CREATE TABLE thumbnails (

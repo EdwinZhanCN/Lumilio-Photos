@@ -40,7 +40,7 @@ interface Asset {
   storage_path?: string;
   tags?: AssetTag[];
   thumbnails?: AssetThumbnail[];
-  type?: "PHOTO" | "VIDEO" | "AUDIO" | "DOCUMENT";
+  type?: "PHOTO" | "VIDEO" | "AUDIO";
   upload_time?: string;
   width?: number;
 }
