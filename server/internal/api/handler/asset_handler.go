@@ -162,15 +162,16 @@ type DateRange struct {
 
 // AssetFilter represents comprehensive filtering options
 type AssetFilter struct {
-	Type       *string         `json:"type,omitempty" example:"PHOTO" enums:"PHOTO,VIDEO,AUDIO"`
-	OwnerID    *int32          `json:"owner_id,omitempty" example:"123"`
-	RAW        *bool           `json:"raw,omitempty" example:"true"`
-	Rating     *int            `json:"rating,omitempty" example:"5" minimum:"0" maximum:"5"`
-	Liked      *bool           `json:"liked,omitempty" example:"true"`
-	Filename   *FilenameFilter `json:"filename,omitempty"`
-	Date       *DateRange      `json:"date,omitempty"`
-	CameraMake *string         `json:"camera_make,omitempty" example:"Canon"`
-	Lens       *string         `json:"lens,omitempty" example:"EF 50mm f/1.8"`
+	RepositoryID *string         `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Type         *string         `json:"type,omitempty" example:"PHOTO" enums:"PHOTO,VIDEO,AUDIO"`
+	OwnerID      *int32          `json:"owner_id,omitempty" example:"123"`
+	RAW          *bool           `json:"raw,omitempty" example:"true"`
+	Rating       *int            `json:"rating,omitempty" example:"5" minimum:"0" maximum:"5"`
+	Liked        *bool           `json:"liked,omitempty" example:"true"`
+	Filename     *FilenameFilter `json:"filename,omitempty"`
+	Date         *DateRange      `json:"date,omitempty"`
+	CameraMake   *string         `json:"camera_make,omitempty" example:"Canon"`
+	Lens         *string         `json:"lens,omitempty" example:"EF 50mm f/1.8"`
 }
 
 // FilterAssetsRequest represents the request structure for filtering assets
@@ -743,6 +744,136 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	c.File(fullPath)
 }
 
+// GetWebVideo serves the web-optimized video version by asset ID
+// @Summary Get web-optimized video
+// @Description Serve the web-optimized MP4 video version for an asset by asset ID.
+// @Tags assets
+// @Produce video/mp4
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {file} file "Web-optimized video file"
+// @Failure 400 {object} api.Result "Invalid asset ID"
+// @Failure 404 {object} api.Result "Asset not found or not a video"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/{id}/video/web [get]
+func (h *AssetHandler) GetWebVideo(c *gin.Context) {
+	// Parse asset ID from URL parameter
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	// Get asset metadata from service
+	asset, err := h.assetService.GetAsset(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.GinNotFound(c, err, "Asset not found")
+			return
+		}
+		log.Printf("Failed to retrieve asset metadata: %v", err)
+		api.GinInternalError(c, err, "Failed to retrieve asset")
+		return
+	}
+
+	// Check if asset is a video
+	if asset.Type != "VIDEO" {
+		api.GinBadRequest(c, fmt.Errorf("asset is not a video"), "Asset is not a video")
+		return
+	}
+
+	// Construct web video file path
+	ext := filepath.Ext(asset.OriginalFilename)
+	nameWithoutExt := strings.TrimSuffix(asset.OriginalFilename, ext)
+	webVideoFilename := fmt.Sprintf("%s_web.mp4", nameWithoutExt)
+	webVideoPath := filepath.Join(filepath.Dir(asset.StoragePath), webVideoFilename)
+	fullPath := filepath.Join(h.StorageBasePath, webVideoPath)
+
+	// Check if web version exists, fallback to original
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		// Fallback to original file
+		fullPath = filepath.Join(h.StorageBasePath, asset.StoragePath)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			log.Printf("Video file not found at path: %s", fullPath)
+			api.GinNotFound(c, err, "Video file not found")
+			return
+		}
+	}
+
+	// Set appropriate headers for video streaming
+	c.Header("Cache-Control", "public, max-age=86400") // Cache for 1 day
+	c.Header("Content-Type", "video/mp4")
+	c.Header("Accept-Ranges", "bytes") // Enable range requests for video seeking
+
+	// Serve the file
+	c.File(fullPath)
+}
+
+// GetWebAudio serves the web-optimized audio version by asset ID
+// @Summary Get web-optimized audio
+// @Description Serve the web-optimized MP3 audio version for an asset by asset ID.
+// @Tags assets
+// @Produce audio/mpeg
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {file} file "Web-optimized audio file"
+// @Failure 400 {object} api.Result "Invalid asset ID"
+// @Failure 404 {object} api.Result "Asset not found or not audio"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /assets/{id}/audio/web [get]
+func (h *AssetHandler) GetWebAudio(c *gin.Context) {
+	// Parse asset ID from URL parameter
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	// Get asset metadata from service
+	asset, err := h.assetService.GetAsset(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			api.GinNotFound(c, err, "Asset not found")
+			return
+		}
+		log.Printf("Failed to retrieve asset metadata: %v", err)
+		api.GinInternalError(c, err, "Failed to retrieve asset")
+		return
+	}
+
+	// Check if asset is audio
+	if asset.Type != "AUDIO" {
+		api.GinBadRequest(c, fmt.Errorf("asset is not audio"), "Asset is not audio")
+		return
+	}
+
+	// Construct web audio file path
+	ext := filepath.Ext(asset.OriginalFilename)
+	nameWithoutExt := strings.TrimSuffix(asset.OriginalFilename, ext)
+	webAudioFilename := fmt.Sprintf("%s_web.mp3", nameWithoutExt)
+	webAudioPath := filepath.Join(filepath.Dir(asset.StoragePath), webAudioFilename)
+	fullPath := filepath.Join(h.StorageBasePath, webAudioPath)
+
+	// Check if web version exists, fallback to original
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		// Fallback to original file
+		fullPath = filepath.Join(h.StorageBasePath, asset.StoragePath)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			log.Printf("Audio file not found at path: %s", fullPath)
+			api.GinNotFound(c, err, "Audio file not found")
+			return
+		}
+	}
+
+	// Set appropriate headers for audio streaming
+	c.Header("Cache-Control", "public, max-age=86400") // Cache for 1 day
+	c.Header("Content-Type", "audio/mpeg")
+	c.Header("Accept-Ranges", "bytes") // Enable range requests for audio seeking
+
+	// Serve the file
+	c.File(fullPath)
+}
+
 // UpdateAsset updates asset metadata
 // @Summary Update asset metadata
 // @Description Update the specific metadata of an asset (e.g., photo EXIF data, video metadata).
@@ -863,7 +994,7 @@ func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 
 // FilterAssets handles asset filtering with complex filters
 // @Summary Filter assets
-// @Description Filter assets using comprehensive filtering options including RAW, rating, liked status, filename patterns, date ranges, camera make, and lens
+// @Description Filter assets using comprehensive filtering options including repository selection, RAW, rating, liked status, filename patterns, date ranges, camera make, and lens
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -909,7 +1040,7 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 	}
 
 	assets, err := h.assetService.FilterAssets(ctx,
-		typePtr, filter.OwnerID, filenameVal, filenameMode,
+		filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
 		dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 		filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 
@@ -934,7 +1065,7 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 
 // SearchAssets handles both filename and semantic search with optional filtering
 // @Summary Search assets
-// @Description Search assets using either filename matching or semantic vector search. Can be combined with comprehensive filters.
+// @Description Search assets using either filename matching or semantic vector search. Can be combined with comprehensive filters including repository selection.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -990,12 +1121,12 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 
 	if req.SearchType == "filename" {
 		assets, err = h.assetService.SearchAssetsFilename(ctx, req.Query,
-			typePtr, filter.OwnerID, filenameVal, filenameMode,
+			filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 	} else {
 		assets, err = h.assetService.SearchAssetsVector(ctx, req.Query,
-			typePtr, filter.OwnerID, filenameVal, filenameMode,
+			filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 	}

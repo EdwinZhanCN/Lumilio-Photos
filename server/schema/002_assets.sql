@@ -19,6 +19,8 @@ CREATE TABLE assets (
     is_deleted BOOLEAN DEFAULT false,
     deleted_at TIMESTAMPTZ,
     specific_metadata JSONB,
+    rating INTEGER,
+	liked BOOLEAN DEFAULT false,
     embedding VECTOR(512)
 );
 
@@ -45,6 +47,7 @@ CREATE INDEX idx_assets_owner_id ON assets(owner_id);
 CREATE INDEX idx_assets_type ON assets(type);
 CREATE INDEX idx_assets_hash ON assets(hash);
 CREATE INDEX idx_assets_taken_time ON assets(taken_time);
+CREATE INDEX idx_assets_storage_path ON assets(storage_path);
 CREATE INDEX idx_thumbnails_asset_id ON thumbnails(asset_id);
 CREATE INDEX idx_species_predictions_asset_id ON species_predictions(asset_id);
 

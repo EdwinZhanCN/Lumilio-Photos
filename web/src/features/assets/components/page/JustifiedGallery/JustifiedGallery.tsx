@@ -5,6 +5,7 @@ import {
   justifiedLayoutService,
   type LayoutResult,
 } from "@/services/justifiedLayoutService";
+import MediaThumbnail from "../../shared/MediaThumbnail";
 
 interface JustifiedGalleryProps {
   groupedPhotos: Record<string, Asset[]>;
@@ -320,23 +321,11 @@ const JustifiedGallery = ({
                       }}
                       onClick={() => openCarousel(positioned.asset.asset_id!)}
                     >
-                      {thumbnailUrl ? (
-                        <img
-                          src={thumbnailUrl}
-                          alt={positioned.asset.original_filename || "Asset"}
-                          className="w-full h-full object-cover transition-transform duration-200 hover:scale-105"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-base-300 flex items-center justify-center text-base-content/50">
-                          <div className="text-center">
-                            <div className="text-xs">No Preview</div>
-                            <div className="text-xs opacity-60">
-                              {positioned.asset.mime_type || "Unknown MIME"}
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      <MediaThumbnail
+                        asset={positioned.asset}
+                        thumbnailUrl={thumbnailUrl}
+                        className="cursor-pointer"
+                      />
                     </div>
                   );
                 },

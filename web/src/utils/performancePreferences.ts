@@ -1,17 +1,17 @@
 /**
  * Performance Preferences System
- * 
+ *
  * Manages user preferences for memory vs speed trade-offs in batch processing.
- * 
+ *
  * @author Edwin Zhan
  * @since 1.1.0
  */
 
 export enum PerformanceProfile {
-  MEMORY_SAVER = "memory_saver",    // Optimize for low memory usage
-  BALANCED = "balanced",            // Balance memory and speed
-  SPEED_OPTIMIZED = "speed",        // Optimize for fastest processing
-  ADAPTIVE = "adaptive",            // Let system decide based on device
+  MEMORY_SAVER = "memory_saver", // Optimize for low memory usage
+  BALANCED = "balanced", // Balance memory and speed
+  SPEED_OPTIMIZED = "speed", // Optimize for fastest processing
+  ADAPTIVE = "adaptive", // Let system decide based on device
 }
 
 export interface PerformancePreferences {
@@ -29,7 +29,7 @@ const DEFAULT_PREFERENCES: PerformancePreferences = {
   maxConcurrentOperations: 3,
 };
 
-const STORAGE_KEY = 'lumilio_performance_preferences';
+const STORAGE_KEY = "lumilio_performance_preferences";
 
 /**
  * Performance Preferences Manager
@@ -139,7 +139,7 @@ export class PerformancePreferencesManager {
    */
   private loadPreferences(): PerformancePreferences {
     try {
-      if (typeof localStorage !== 'undefined') {
+      if (typeof localStorage !== "undefined") {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsed = JSON.parse(stored);
@@ -147,7 +147,7 @@ export class PerformancePreferencesManager {
         }
       }
     } catch (error) {
-      console.warn('Failed to load performance preferences:', error);
+      console.warn("Failed to load performance preferences:", error);
     }
     return { ...DEFAULT_PREFERENCES };
   }
@@ -157,11 +157,11 @@ export class PerformancePreferencesManager {
    */
   private savePreferences(): void {
     try {
-      if (typeof localStorage !== 'undefined') {
+      if (typeof localStorage !== "undefined") {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(this.preferences));
       }
     } catch (error) {
-      console.warn('Failed to save performance preferences:', error);
+      console.warn("Failed to save performance preferences:", error);
     }
   }
 
@@ -169,11 +169,11 @@ export class PerformancePreferencesManager {
    * Notifies all listeners of preference changes
    */
   private notifyListeners(): void {
-    this.listeners.forEach(listener => {
+    this.listeners.forEach((listener) => {
       try {
         listener(this.preferences);
       } catch (error) {
-        console.warn('Performance preferences listener error:', error);
+        console.warn("Performance preferences listener error:", error);
       }
     });
   }
@@ -188,7 +188,7 @@ export const globalPerformancePreferences = new PerformancePreferencesManager();
 export function usePerformancePreferences() {
   return {
     preferences: globalPerformancePreferences.getPreferences(),
-    updatePreferences: (updates: Partial<PerformancePreferences>) => 
+    updatePreferences: (updates: Partial<PerformancePreferences>) =>
       globalPerformancePreferences.updatePreferences(updates),
     resetToDefaults: () => globalPerformancePreferences.resetToDefaults(),
   };
