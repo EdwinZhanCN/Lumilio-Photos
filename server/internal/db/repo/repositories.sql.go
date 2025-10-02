@@ -9,6 +9,8 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"server/internal/db/dbtypes"
+	"server/internal/storage/repocfg"
 )
 
 const countRepositories = `-- name: CountRepositories :one
@@ -27,7 +29,7 @@ SELECT COUNT(*) FROM repositories
 WHERE status = $1
 `
 
-func (q *Queries) CountRepositoriesByStatus(ctx context.Context, status *string) (int64, error) {
+func (q *Queries) CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error) {
 	row := q.db.QueryRow(ctx, countRepositoriesByStatus, status)
 	var count int64
 	err := row.Scan(&count)
@@ -49,13 +51,13 @@ INSERT INTO repositories (
 `
 
 type CreateRepositoryParams struct {
-	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
-	Name      string             `db:"name" json:"name"`
-	Path      string             `db:"path" json:"path"`
-	Config    []byte             `db:"config" json:"config"`
-	Status    *string            `db:"status" json:"status"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	RepoID    pgtype.UUID              `db:"repo_id" json:"repo_id"`
+	Name      string                   `db:"name" json:"name"`
+	Path      string                   `db:"path" json:"path"`
+	Config    repocfg.RepositoryConfig `db:"config" json:"config"`
+	Status    dbtypes.RepoStatus       `db:"status" json:"status"`
+	CreatedAt pgtype.Timestamptz       `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error) {
@@ -239,11 +241,11 @@ RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at
 `
 
 type UpdateRepositoryParams struct {
-	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
-	Name      string             `db:"name" json:"name"`
-	Config    []byte             `db:"config" json:"config"`
-	Status    *string            `db:"status" json:"status"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	RepoID    pgtype.UUID              `db:"repo_id" json:"repo_id"`
+	Name      string                   `db:"name" json:"name"`
+	Config    repocfg.RepositoryConfig `db:"config" json:"config"`
+	Status    dbtypes.RepoStatus       `db:"status" json:"status"`
+	UpdatedAt pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error) {
@@ -310,7 +312,7 @@ RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at
 
 type UpdateRepositoryStatusParams struct {
 	RepoID    pgtype.UUID        `db:"repo_id" json:"repo_id"`
-	Status    *string            `db:"status" json:"status"`
+	Status    dbtypes.RepoStatus `db:"status" json:"status"`
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
