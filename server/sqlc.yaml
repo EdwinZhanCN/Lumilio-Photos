@@ -41,3 +41,11 @@ sql:
                     go_type:
                         import: "server/internal/db/dbtypes"
                         type: "SpecificMetadata"
+                  - column: "repositories.config"
+                    go_type:
+                        import: "server/internal/storage/repocfg"
+                        type: "RepositoryConfig"
+                  - column: "repositories.status"
+                    go_type:
+                        import: "server/internal/db/dbtypes"
+                        type: "RepoStatus"
