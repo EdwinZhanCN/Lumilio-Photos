@@ -21,16 +21,25 @@ type Querier interface {
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
+	CountSyncOperationsByStatus(ctx context.Context, arg CountSyncOperationsByStatusParams) (int64, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
+	// File Records Queries
+	CreateFileRecord(ctx context.Context, arg CreateFileRecordParams) (FileRecord, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	CreateSpeciesPrediction(ctx context.Context, arg CreateSpeciesPredictionParams) (SpeciesPrediction, error)
+	// Sync Operations Queries
+	CreateSyncOperation(ctx context.Context, arg CreateSyncOperationParams) (SyncOperation, error)
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
 	CreateThumbnail(ctx context.Context, arg CreateThumbnailParams) (Thumbnail, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteAlbum(ctx context.Context, albumID int32) error
+	DeleteAllFileRecordsForRepo(ctx context.Context, repositoryID pgtype.UUID) error
 	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteFileRecord(ctx context.Context, arg DeleteFileRecordParams) error
+	DeleteOldSyncOperations(ctx context.Context, arg DeleteOldSyncOperationsParams) error
+	DeleteOrphanedFileRecords(ctx context.Context, arg DeleteOrphanedFileRecordsParams) (int64, error)
 	DeleteRepositories(ctx context.Context, dollar_1 []pgtype.UUID) error
 	DeleteRepository(ctx context.Context, repoID pgtype.UUID) error
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
@@ -61,6 +70,12 @@ type Querier interface {
 	GetAssetsWithEmbeddings(ctx context.Context, arg GetAssetsWithEmbeddingsParams) ([]GetAssetsWithEmbeddingsRow, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
+	GetFailedSyncOperations(ctx context.Context, arg GetFailedSyncOperationsParams) ([]SyncOperation, error)
+	GetFileRecord(ctx context.Context, arg GetFileRecordParams) (FileRecord, error)
+	GetFileRecordCount(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	GetFileRecordsByHash(ctx context.Context, contentHash *string) ([]FileRecord, error)
+	GetLatestSyncOperation(ctx context.Context, repositoryID pgtype.UUID) (SyncOperation, error)
+	GetLatestSyncOperationByType(ctx context.Context, arg GetLatestSyncOperationByTypeParams) (SyncOperation, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
@@ -69,8 +84,11 @@ type Querier interface {
 	// Repository Asset Statistics (kept for repository management)
 	GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error)
 	GetRepositoryByPath(ctx context.Context, path string) (Repository, error)
+	GetRunningSyncOperations(ctx context.Context, repositoryID pgtype.UUID) ([]SyncOperation, error)
 	GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]SpeciesPrediction, error)
 	GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeciesPredictionsByLabelParams) ([]SpeciesPrediction, error)
+	GetSyncOperation(ctx context.Context, id int64) (SyncOperation, error)
+	GetSyncStatistics(ctx context.Context, repositoryID pgtype.UUID) (GetSyncStatisticsRow, error)
 	GetTagByID(ctx context.Context, tagID int32) (Tag, error)
 	GetTagByName(ctx context.Context, tagName string) (Tag, error)
 	GetTagsByCategory(ctx context.Context, category *string) ([]Tag, error)
@@ -83,7 +101,11 @@ type Querier interface {
 	GetUserByID(ctx context.Context, userID int32) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
+	ListFileRecords(ctx context.Context, repositoryID pgtype.UUID) ([]FileRecord, error)
+	ListFileRecordsByGeneration(ctx context.Context, arg ListFileRecordsByGenerationParams) ([]FileRecord, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
+	ListSyncOperations(ctx context.Context, arg ListSyncOperationsParams) ([]SyncOperation, error)
+	ListSyncOperationsByType(ctx context.Context, arg ListSyncOperationsByTypeParams) ([]SyncOperation, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
@@ -105,12 +127,15 @@ type Querier interface {
 	UpdateAssetPositionInAlbum(ctx context.Context, arg UpdateAssetPositionInAlbumParams) error
 	UpdateAssetRating(ctx context.Context, arg UpdateAssetRatingParams) error
 	UpdateAssetRatingAndLike(ctx context.Context, arg UpdateAssetRatingAndLikeParams) error
+	UpdateFileRecord(ctx context.Context, arg UpdateFileRecordParams) (FileRecord, error)
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
+	UpdateSyncOperation(ctx context.Context, arg UpdateSyncOperationParams) (SyncOperation, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
+	UpsertFileRecord(ctx context.Context, arg UpsertFileRecordParams) (FileRecord, error)
 }
 
 var _ Querier = (*Queries)(nil)

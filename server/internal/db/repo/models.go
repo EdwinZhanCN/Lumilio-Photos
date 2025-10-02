@@ -57,6 +57,19 @@ type AssetTag struct {
 	Source     string         `db:"source" json:"source"`
 }
 
+type FileRecord struct {
+	ID             int64              `db:"id" json:"id"`
+	RepositoryID   pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	FilePath       string             `db:"file_path" json:"file_path"`
+	FileSize       int64              `db:"file_size" json:"file_size"`
+	ModTime        pgtype.Timestamptz `db:"mod_time" json:"mod_time"`
+	ContentHash    *string            `db:"content_hash" json:"content_hash"`
+	LastScanned    pgtype.Timestamptz `db:"last_scanned" json:"last_scanned"`
+	ScanGeneration *int64             `db:"scan_generation" json:"scan_generation"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type RefreshToken struct {
 	TokenID   int32              `db:"token_id" json:"token_id"`
 	UserID    int32              `db:"user_id" json:"user_id"`
@@ -81,6 +94,22 @@ type SpeciesPrediction struct {
 	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
 	Label   string      `db:"label" json:"label"`
 	Score   float32     `db:"score" json:"score"`
+}
+
+type SyncOperation struct {
+	ID            int64              `db:"id" json:"id"`
+	RepositoryID  pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	OperationType string             `db:"operation_type" json:"operation_type"`
+	FilesScanned  *int32             `db:"files_scanned" json:"files_scanned"`
+	FilesAdded    *int32             `db:"files_added" json:"files_added"`
+	FilesUpdated  *int32             `db:"files_updated" json:"files_updated"`
+	FilesRemoved  *int32             `db:"files_removed" json:"files_removed"`
+	StartTime     pgtype.Timestamptz `db:"start_time" json:"start_time"`
+	EndTime       pgtype.Timestamptz `db:"end_time" json:"end_time"`
+	DurationMs    *int64             `db:"duration_ms" json:"duration_ms"`
+	Status        *string            `db:"status" json:"status"`
+	ErrorMessage  *string            `db:"error_message" json:"error_message"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type Tag struct {

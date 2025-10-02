@@ -36,6 +36,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eino-contrib/jsonschema v1.0.0 // indirect
 	github.com/evanphx/json-patch v0.5.2 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/getkin/kin-openapi v0.118.0 // indirect
 	github.com/goph/emperror v0.17.2 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
