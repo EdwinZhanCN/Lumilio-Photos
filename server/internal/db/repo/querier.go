@@ -8,6 +8,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"server/internal/db/dbtypes"
 )
 
 type Querier interface {
@@ -19,7 +20,7 @@ type Querier interface {
 	CountAssetsByRating(ctx context.Context, ownerID *int32) ([]CountAssetsByRatingRow, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
-	CountRepositoriesByStatus(ctx context.Context, status *string) (int64, error)
+	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)

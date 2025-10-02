@@ -1,13 +1,14 @@
 package storage
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -25,27 +26,30 @@ type RepositoryManager interface {
 	ValidateRepository(path string) (*ValidationResult, error)
 
 	// Repository lifecycle CRUD
-	InitializeRepository(path string, config RepositoryConfig) (*repo.Repository, error)
+	InitializeRepository(path string, config repocfg.RepositoryConfig) (*repo.Repository, error)
 	AddRepository(path string) (*repo.Repository, error)
 	GetRepository(id string) (*repo.Repository, error)
 	GetRepositoryByPath(path string) (*repo.Repository, error)
 	ListRepositories() ([]*repo.Repository, error)
 	RemoveRepository(id string) error
 	RemoveRepositories(ids []string) error
-	UpdateRepository(id string, config RepositoryConfig) (*repo.Repository, error)
+	UpdateRepository(id string, config repocfg.RepositoryConfig) (*repo.Repository, error)
 
 	// Repository-Asset relationship (path-based)
 	GetRepositoryAssetStats(repoID string, ownerID *int32) (*RepositoryAssetStats, error)
 
 	// Configuration management
-	LoadConfig(repoPath string) (*RepositoryConfig, error)
-	SaveConfig(repoPath string, config *RepositoryConfig) error
+	LoadConfig(repoPath string) (*repocfg.RepositoryConfig, error)
+	SaveConfig(repoPath string, config *repocfg.RepositoryConfig) error
 
 	// Validation
 	IsNestedRepository(path string) (bool, string, error)
 
 	// Helper methods
 	GetRepositoryPath(repoID string) (string, error)
+
+	// Staging operations (delegated to staging manager)
+	GetStagingManager() StagingManager
 }
 
 // RepositoryAssetStats contains statistics about assets in a repository
@@ -64,13 +68,17 @@ type RepositoryAssetStats struct {
 
 // DefaultRepositoryManager implements the RepositoryManager interface
 type DefaultRepositoryManager struct {
-	queries *repo.Queries
+	queries        *repo.Queries
+	dirManager     DirectoryManager
+	stagingManager StagingManager
 }
 
 // NewRepositoryManager creates a new repository manager instance
 func NewRepositoryManager(queries *repo.Queries) RepositoryManager {
 	return &DefaultRepositoryManager{
-		queries: queries,
+		queries:        queries,
+		dirManager:     NewDirectoryManager(),
+		stagingManager: NewStagingManager(),
 	}
 }
 
@@ -98,7 +106,7 @@ func (rm *DefaultRepositoryManager) AddRepository(path string) (*repo.Repository
 	}
 
 	// Load configuration
-	config, err := LoadConfigFromFile(cleanPath)
+	config, err := repocfg.LoadConfigFromFile(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load repository configuration: %w", err)
 	}
@@ -107,12 +115,6 @@ func (rm *DefaultRepositoryManager) AddRepository(path string) (*repo.Repository
 	_, err = rm.GetRepository(config.ID)
 	if err == nil {
 		return nil, fmt.Errorf("repository with ID %s is already registered", config.ID)
-	}
-
-	// Create database record
-	configJSON, err := json.Marshal(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal configuration: %w", err)
 	}
 
 	repoUUID, err := uuid.Parse(config.ID)
@@ -125,8 +127,8 @@ func (rm *DefaultRepositoryManager) AddRepository(path string) (*repo.Repository
 		RepoID:    pgtype.UUID{Bytes: repoUUID, Valid: true},
 		Name:      config.Name,
 		Path:      cleanPath,
-		Config:    configJSON,
-		Status:    stringPtr("active"),
+		Config:    *config,
+		Status:    dbtypes.RepoStatusActive,
 		CreatedAt: pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
 		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	})
@@ -175,21 +177,24 @@ func (rm *DefaultRepositoryManager) ValidateRepository(path string) (*Validation
 	}
 
 	// Validate configuration file
-	config, err := LoadConfigFromFile(cleanPath)
+	config, err := repocfg.LoadConfigFromFile(cleanPath)
 	if err != nil {
 		result.Valid = false
 		result.Errors = append(result.Errors, fmt.Sprintf("Invalid configuration: %v", err))
 		return result, nil
 	}
 
-	for _, dir := range Directories {
-		dirPath := filepath.Join(cleanPath, dir)
-		if info, err := os.Stat(dirPath); os.IsNotExist(err) {
-			result.Warnings = append(result.Warnings, fmt.Sprintf("Missing directory: %s", dir))
-		} else if err == nil && !info.IsDir() {
-			result.Errors = append(result.Errors, fmt.Sprintf("Expected directory but found file: %s", dir))
+	// Use directory manager for structure validation
+	structureValidation, err := rm.dirManager.ValidateStructure(cleanPath)
+	if err != nil {
+		result.Valid = false
+		result.Errors = append(result.Errors, fmt.Sprintf("Directory structure validation failed: %v", err))
+	} else {
+		if !structureValidation.Valid {
 			result.Valid = false
 		}
+		result.Errors = append(result.Errors, structureValidation.InvalidPaths...)
+		result.Warnings = append(result.Warnings, structureValidation.Warnings...)
 	}
 
 	// Check for nested repositories
@@ -259,12 +264,12 @@ func (rm *DefaultRepositoryManager) IsNestedRepository(path string) (bool, strin
 }
 
 // LoadConfig loads repository configuration from the given path
-func (rm *DefaultRepositoryManager) LoadConfig(repoPath string) (*RepositoryConfig, error) {
-	return LoadConfigFromFile(repoPath)
+func (rm *DefaultRepositoryManager) LoadConfig(repoPath string) (*repocfg.RepositoryConfig, error) {
+	return repocfg.LoadConfigFromFile(repoPath)
 }
 
 // SaveConfig saves repository configuration to the given path
-func (rm *DefaultRepositoryManager) SaveConfig(repoPath string, config *RepositoryConfig) error {
+func (rm *DefaultRepositoryManager) SaveConfig(repoPath string, config *repocfg.RepositoryConfig) error {
 	return config.SaveConfigToFile(repoPath)
 }
 
@@ -293,7 +298,7 @@ func (rm *DefaultRepositoryManager) checkDirectoryPermissions(path string) error
 }
 
 // InitializeRepository creates a new repository with full directory structure
-func (rm *DefaultRepositoryManager) InitializeRepository(path string, config RepositoryConfig) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
@@ -301,7 +306,7 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config Rep
 	}
 
 	// Check if repository already exists
-	if IsRepositoryRoot(cleanPath) {
+	if repocfg.IsRepositoryRoot(cleanPath) {
 		return nil, fmt.Errorf("repository already exists at %s", cleanPath)
 	}
 
@@ -319,8 +324,8 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config Rep
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	// Create directory structure
-	if err := rm.createRepositoryStructure(cleanPath); err != nil {
+	// Create directory structure using directory manager
+	if err := rm.dirManager.CreateStructure(cleanPath); err != nil {
 		return nil, fmt.Errorf("failed to create repository structure: %w", err)
 	}
 
@@ -329,14 +334,6 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config Rep
 		// Clean up on failure
 		os.RemoveAll(cleanPath)
 		return nil, fmt.Errorf("failed to save configuration: %w", err)
-	}
-
-	// Create database record
-	configJSON, err := json.Marshal(config)
-	if err != nil {
-		// Clean up on failure
-		os.RemoveAll(cleanPath)
-		return nil, fmt.Errorf("failed to marshal configuration: %w", err)
 	}
 
 	repoUUID, err := uuid.Parse(config.ID)
@@ -351,8 +348,8 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config Rep
 		RepoID:    pgtype.UUID{Bytes: repoUUID, Valid: true},
 		Name:      config.Name,
 		Path:      cleanPath,
-		Config:    configJSON,
-		Status:    stringPtr("active"),
+		Config:    config,
+		Status:    dbtypes.RepoStatusActive,
 		CreatedAt: pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
 		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	})
@@ -439,7 +436,7 @@ func (rm *DefaultRepositoryManager) RemoveRepositories(ids []string) error {
 	return nil
 }
 
-func (rm *DefaultRepositoryManager) UpdateRepository(id string, config RepositoryConfig) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.RepositoryConfig) (*repo.Repository, error) {
 	repoUUID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
@@ -450,19 +447,13 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config Repositor
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	// Marshal configuration
-	configJSON, err := json.Marshal(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal configuration: %w", err)
-	}
-
 	// Update database record
 	now := time.Now()
 	dbRepo, err := rm.queries.UpdateRepository(nil, repo.UpdateRepositoryParams{
 		RepoID:    pgtype.UUID{Bytes: repoUUID, Valid: true},
 		Name:      config.Name,
-		Config:    configJSON,
-		Status:    stringPtr("active"),
+		Config:    config,
+		Status:    dbtypes.RepoStatusActive,
 		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	})
 	if err != nil {
@@ -475,33 +466,6 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config Repositor
 	}
 
 	return &dbRepo, nil
-}
-
-// createRepositoryStructure creates the full directory structure for a new repository
-func (rm *DefaultRepositoryManager) createRepositoryStructure(repoPath string) error {
-	// Create all directories
-	for _, dir := range Directories {
-		dirPath := filepath.Join(repoPath, dir)
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
-	}
-
-	// Create initial log files
-	logFiles := map[string]string{
-		".lumilio/logs/app.log":        "# Lumilio application logs\n",
-		".lumilio/logs/error.log":      "# Lumilio error logs\n",
-		".lumilio/logs/operations.log": "# Lumilio operations logs\n",
-	}
-
-	for logFile, content := range logFiles {
-		logPath := filepath.Join(repoPath, logFile)
-		if err := os.WriteFile(logPath, []byte(content), 0644); err != nil {
-			return fmt.Errorf("failed to create log file %s: %w", logFile, err)
-		}
-	}
-
-	return nil
 }
 
 // GetRepositoryAssetStats returns comprehensive statistics about assets in a repository
@@ -562,4 +526,9 @@ func (rm *DefaultRepositoryManager) GetRepositoryPath(repoID string) (string, er
 		return "", fmt.Errorf("failed to get repository: %w", err)
 	}
 	return repository.Path, nil
+}
+
+// GetStagingManager returns the staging manager instance
+func (rm *DefaultRepositoryManager) GetStagingManager() StagingManager {
+	return rm.stagingManager
 }
