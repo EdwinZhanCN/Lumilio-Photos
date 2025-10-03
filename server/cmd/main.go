@@ -82,15 +82,10 @@ func main() {
 		log.Fatalf("Failed to create staging directory: %v", err)
 	}
 
-	storageConfig := storage.LoadStorageConfigFromEnv()
-	log.Printf("💾 Storage strategy: %s (%s)", storageConfig.Strategy, storageConfig.Strategy.GetDescription())
-	log.Printf("💾 Storage path: %s", storageConfig.BasePath)
-	log.Printf("💾 Preserve filenames: %t", storageConfig.Options.PreserveOriginalFilename)
-	log.Printf("💾 Duplicate handling: %s", storageConfig.Options.HandleDuplicateFilenames)
-	storageService, err := storage.NewStorageWithConfig(storageConfig)
-	if err != nil {
-		log.Fatalf("Failed to initialize storage: %v", err)
-	}
+	// Initialize new repository-based storage system
+	repoManager := storage.NewRepositoryManager(queries)
+	stagingManager := storage.NewStagingManager()
+	log.Println("✅ Repository Storage System Initialized")
 
 	// Initialize optional ML connection/services based on config
 	var mlConn *grpc.ClientConn
@@ -103,10 +98,9 @@ func main() {
 		}
 		mlSvc = service.NewFromConn(mlConn)
 	}
-	repoManager := storage.NewRepositoryManager(queries)
 
 	// Initialize Service (AssetService optionally ML-enabled)
-	assetService, err := service.NewAssetServiceWithML(queries, storageService, mlSvc, repoManager)
+	assetService, err := service.NewAssetServiceWithML(queries, mlSvc, repoManager)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
@@ -123,7 +117,7 @@ func main() {
 	// Create River client
 	queueClient, err := queue.New(pgxPool, workers)
 	// Add Workers
-	assetProcessor := processors.NewAssetProcessor(assetService, storageService, queueClient, appConfig)
+	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, appConfig)
 	river.AddWorker[queue.ProcessAssetArgs](workers, &queue.ProcessAssetWorker{Processor: assetProcessor})
 
 	// Initialize CLIP dispatcher and worker if enabled
@@ -156,8 +150,8 @@ func main() {
 
 	log.Println("✅ Queues initialized successfully")
 
-	// Initialize controllers - pass the staging path and task queue to the handler
-	assetController := handler.NewAssetHandler(assetService, appConfig.StagingPath, queueClient)
+	// Initialize controllers with new storage system
+	assetController := handler.NewAssetHandler(assetService, queries, repoManager, stagingManager, queueClient)
 	authController := handler.NewAuthHandler(authService)
 	albumController := handler.NewAlbumHandler(&albumService, queries)
 

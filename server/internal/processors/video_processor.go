@@ -30,6 +30,7 @@ type VideoInfo struct {
 
 func (ap *AssetProcessor) processVideoAsset(
 	ctx context.Context,
+	repository repo.Repository,
 	asset *repo.Asset,
 	fileReader io.Reader,
 ) error {

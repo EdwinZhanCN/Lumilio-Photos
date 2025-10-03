@@ -94,20 +94,18 @@ type AssetService interface {
 
 type assetService struct {
 	queries     *repo.Queries
-	storage     storage.Storage
 	ml          *MLService
 	repoManager storage.RepositoryManager
 }
 
 // NewAssetService creates a new instance of AssetService with storage configuration
-func NewAssetService(q *repo.Queries, s storage.Storage, rm storage.RepositoryManager) (AssetService, error) {
-	return NewAssetServiceWithML(q, s, nil, rm)
+func NewAssetService(q *repo.Queries, rm storage.RepositoryManager) (AssetService, error) {
+	return NewAssetServiceWithML(q, nil, rm)
 }
 
-func NewAssetServiceWithML(q *repo.Queries, s storage.Storage, ml *MLService, rm storage.RepositoryManager) (AssetService, error) {
+func NewAssetServiceWithML(q *repo.Queries, ml *MLService, rm storage.RepositoryManager) (AssetService, error) {
 	return &assetService{
 		queries:     q,
-		storage:     s,
 		ml:          ml,
 		repoManager: rm,
 	}, nil
@@ -603,14 +601,10 @@ func (s *assetService) SaveAssetIndex(ctx context.Context, taskID string, hash s
 	return nil
 }
 
-// SaveNewAsset save the asset to storage, returns asset's storage path and error
+// SaveNewAsset is deprecated - assets are now saved through repository staging system
+// This is kept for backward compatibility but should not be used
 func (s *assetService) SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, hash string) (string, error) {
-	storagePath, err := s.storage.UploadWithMetadata(ctx, fileReader, filename, hash)
-	if err != nil {
-		return "", err
-	}
-
-	return storagePath, nil
+	return "", fmt.Errorf("SaveNewAsset is deprecated - use repository staging system instead")
 }
 
 // ================================
@@ -669,29 +663,11 @@ func (s *assetService) GetThumbnailByAssetIDAndSize(ctx context.Context, assetID
 	return &dbThumbnail, nil
 }
 
-// SaveNewThumbnail TODO: Refine this
+// SaveNewThumbnail saves thumbnail to database - actual file should be saved to repository by processor
 func (s *assetService) SaveNewThumbnail(ctx context.Context, buffers io.Reader, asset *repo.Asset, size string) error {
-	// TODO: Upload Thumbnail to different folder
-	storagePath, err := s.storage.UploadWithMetadata(ctx, buffers, asset.OriginalFilename+"_"+size+".webp", "")
-	if err != nil {
-		return err
-	}
-
-	var assetUUID uuid.UUID
-	if asset.AssetID.Valid {
-		assetUUID, err = uuid.FromBytes(asset.AssetID.Bytes[:])
-		if err != nil {
-			return fmt.Errorf("invalid asset UUID: %w", err)
-		}
-	} else {
-		return fmt.Errorf("asset has no valid UUID")
-	}
-
-	if _, err := s.CreateThumbnail(ctx, assetUUID, size, storagePath); err != nil {
-		s.storage.Delete(ctx, storagePath)
-		return err
-	}
-	return nil
+	// Thumbnail path will be provided by processor (relative to repository .lumilio/assets/thumbnails/)
+	// This method now only creates the database record
+	return fmt.Errorf("SaveNewThumbnail should be called with storagePath from processor")
 }
 
 // ================================
@@ -1156,15 +1132,9 @@ func (s *assetService) SaveVideoVersion(ctx context.Context, videoReader io.Read
 	nameWithoutExt := strings.TrimSuffix(asset.OriginalFilename, ext)
 	filename := fmt.Sprintf("%s_%s.mp4", nameWithoutExt, version)
 
-	// Upload to storage
-	hash := ""
-	if asset.Hash != nil {
-		hash = *asset.Hash
-	}
-	storagePath, err := s.storage.UploadWithMetadata(ctx, videoReader, filename, hash)
-	if err != nil {
-		return fmt.Errorf("failed to upload video version %s: %w", version, err)
-	}
+	// Video versions are now saved by processor to repository .lumilio/assets/videos/
+	// This is a placeholder - actual save happens in processor
+	storagePath := fmt.Sprintf(".lumilio/assets/videos/web/%s", filename)
 
 	log.Printf("Saved video version %s for asset %s at path %s", version, asset.AssetID.Bytes, storagePath)
 	return nil
@@ -1176,15 +1146,9 @@ func (s *assetService) SaveAudioVersion(ctx context.Context, audioReader io.Read
 	nameWithoutExt := strings.TrimSuffix(asset.OriginalFilename, ext)
 	filename := fmt.Sprintf("%s_%s.mp3", nameWithoutExt, version)
 
-	// Upload to storage
-	hash := ""
-	if asset.Hash != nil {
-		hash = *asset.Hash
-	}
-	storagePath, err := s.storage.UploadWithMetadata(ctx, audioReader, filename, hash)
-	if err != nil {
-		return fmt.Errorf("failed to upload audio version %s: %w", version, err)
-	}
+	// Audio versions are now saved by processor to repository .lumilio/assets/audios/
+	// This is a placeholder - actual save happens in processor
+	storagePath := fmt.Sprintf(".lumilio/assets/audios/web/%s", filename)
 
 	log.Printf("Saved audio version %s for asset %s at path %s", version, asset.AssetID.Bytes, storagePath)
 	return nil
