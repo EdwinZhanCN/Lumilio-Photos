@@ -14,6 +14,7 @@ import (
 	"server/internal/processors"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"server/internal/storage"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
 
@@ -199,35 +201,46 @@ type OptionsResponse struct {
 
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
-	assetService    service.AssetService
-	stagingPath     string
-	queueClient     *river.Client[pgx.Tx]
-	StorageBasePath string // Path where assets are stored
+	assetService   service.AssetService
+	queries        *repo.Queries
+	repoManager    storage.RepositoryManager
+	stagingManager storage.StagingManager
+	queueClient    *river.Client[pgx.Tx]
 }
 
 // NewAssetHandler creates a new AssetHandler instance
-func NewAssetHandler(assetService service.AssetService, stagingPath string, queueClient *river.Client[pgx.Tx]) *AssetHandler {
+func NewAssetHandler(
+	assetService service.AssetService,
+	queries *repo.Queries,
+	repoManager storage.RepositoryManager,
+	stagingManager storage.StagingManager,
+	queueClient *river.Client[pgx.Tx],
+) *AssetHandler {
 	return &AssetHandler{
-		assetService:    assetService,
-		stagingPath:     stagingPath,
-		queueClient:     queueClient,
-		StorageBasePath: os.Getenv("STORAGE_PATH"),
+		assetService:   assetService,
+		queries:        queries,
+		repoManager:    repoManager,
+		stagingManager: stagingManager,
+		queueClient:    queueClient,
 	}
 }
 
 // UploadAsset handles asset upload requests
 // @Summary Upload a single asset
-// @Description Upload a single photo, video, audio file, or document to the system. The file is staged and queued for processing.
+// @Description Upload a single photo, video, audio file, or document to the system. The file is staged in a repository and queued for processing.
 // @Tags assets
 // @Accept multipart/form-data
 // @Produce json
 // @Param file formData file true "Asset file to upload"
-// @Param X-Content-Hash header string false "MLService-calculated BLAKE3 hash of the file"
+// @Param repository_id formData string false "Repository UUID (optional, uses default if not provided)"
+// @Param X-Content-Hash header string false "Client-calculated BLAKE3 hash of the file"
 // @Success 200 {object} api.Result{data=UploadResponse} "Upload successful"
 // @Failure 400 {object} api.Result "Bad request - no file provided or parse error"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets [post]
 func (h *AssetHandler) UploadAsset(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	// Parse multipart form
 	err := c.Request.ParseMultipartForm(32 << 20) // 32MB max
 	if err != nil {
@@ -242,33 +255,58 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	}
 	defer file.Close()
 
+	// Get or use default repository
+	repositoryID := c.PostForm("repository_id")
+	var repository repo.Repository
+	if repositoryID != "" {
+		repoUUID, err := uuid.Parse(repositoryID)
+		if err != nil {
+			api.GinBadRequest(c, err, "Invalid repository ID")
+			return
+		}
+		repository, err = h.queries.GetRepository(ctx, pgtype.UUID{Bytes: repoUUID, Valid: true})
+		if err != nil {
+			api.GinNotFound(c, err, "Repository not found")
+			return
+		}
+	} else {
+		// Use first available repository as default
+		repositories, err := h.queries.ListRepositories(ctx)
+		if err != nil || len(repositories) == 0 {
+			api.GinBadRequest(c, errors.New("no repository available"), "Please specify a repository_id or create a repository first")
+			return
+		}
+		repository = repositories[0]
+	}
+
+	// Get client hash or calculate it
 	clientHash := c.GetHeader("X-Content-Hash")
 	if clientHash == "" {
-		log.Println("Warning: No content hash provided by client")
-		clientHash = uuid.New().String()
+		log.Println("Warning: No content hash provided by client, will calculate during processing")
+		clientHash = "" // Will be calculated by processor
 	}
 
-	stagingFileName := uuid.New().String()
-	fileExt := filepath.Ext(header.Filename)
-	stagingFilePath := filepath.Join(h.stagingPath, stagingFileName+fileExt)
-
-	if err := os.MkdirAll(h.stagingPath, 0755); err != nil {
-		log.Printf("Failed to create staging directory: %v", err)
-		api.GinInternalError(c, err, "Upload failed")
-		return
-	}
-
-	stagingFile, err := os.Create(stagingFilePath)
+	// Create staging file in repository
+	stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, header.Filename)
 	if err != nil {
 		log.Printf("Failed to create staging file: %v", err)
 		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
-	defer stagingFile.Close()
 
-	_, err = io.Copy(stagingFile, file)
+	// Write uploaded content to staging file
+	osFile, err := os.Create(stagingFile.Path)
+	if err != nil {
+		log.Printf("Failed to open staging file: %v", err)
+		api.GinInternalError(c, err, "Upload failed")
+		return
+	}
+
+	_, err = io.Copy(osFile, file)
+	osFile.Close()
 	if err != nil {
 		log.Printf("Failed to copy file to staging: %v", err)
+		os.Remove(stagingFile.Path)
 		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
@@ -279,15 +317,25 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	}
 
 	payload := processors.AssetPayload{
-		ClientHash:  clientHash,
-		StagedPath:  stagingFilePath,
-		UserID:      userID,
-		Timestamp:   time.Now(),
-		ContentType: header.Header.Get("Content-Type"),
-		FileName:    header.Filename,
+		ClientHash:   clientHash,
+		StagedPath:   stagingFile.Path,
+		UserID:       userID,
+		Timestamp:    time.Now(),
+		ContentType:  header.Header.Get("Content-Type"),
+		FileName:     header.Filename,
+		RepositoryID: uuid.UUID(repository.RepoID.Bytes).String(),
 	}
 
-	jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), jobs.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
+	jobInsetResult, err := h.queueClient.Insert(ctx, jobs.ProcessAssetArgs{
+		ClientHash:   payload.ClientHash,
+		StagedPath:   payload.StagedPath,
+		UserID:       payload.UserID,
+		Timestamp:    payload.Timestamp,
+		ContentType:  payload.ContentType,
+		FileName:     payload.FileName,
+		RepositoryID: payload.RepositoryID,
+	}, &river.InsertOpts{Queue: "process_asset"})
+
 	if err != nil {
 		log.Printf("Failed to enqueue task: %v", err)
 		api.GinInternalError(c, err, "Upload failed")
@@ -299,7 +347,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		return
 	}
 	jobId := jobInsetResult.Job.ID
-	log.Printf("Task %d enqueued for processing file %s", jobId, header.Filename)
+	log.Printf("Task %d enqueued for processing file %s in repository %s", jobId, header.Filename, repository.Name)
 
 	response := UploadResponse{
 		TaskID:      jobId,
@@ -307,23 +355,26 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		FileName:    header.Filename,
 		Size:        header.Size,
 		ContentHash: clientHash,
-		Message:     "File received and queued for processing",
+		Message:     fmt.Sprintf("File received and queued for processing in repository '%s'", repository.Name),
 	}
 	api.GinSuccess(c, response)
 }
 
 // BatchUploadAssets handles multiple asset uploads
 // @Summary Batch upload assets
-// @Description Batch upload multiple assets using a multipart/form-data request. Each file part's field name must be its BLAKE3 content hash. All files are staged and queued for processing.
+// @Description Batch upload multiple assets to a repository. Each file part's field name should be its BLAKE3 content hash. All files are staged and queued for processing.
 // @Tags assets
 // @Accept multipart/form-data
 // @Produce json
+// @Param repository_id formData string false "Repository UUID (optional, uses default if not provided)"
 // @Success 200 {object} api.Result{data=BatchUploadResponse} "Batch upload completed"
 // @Failure 400 {object} api.Result "Bad request - no files provided or parse error"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/batch [post]
 func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
-	err := c.Request.ParseMultipartForm(128 << 20) // 128MB max for batch
+	ctx := c.Request.Context()
+
+	err := c.Request.ParseMultipartForm(256 << 20) // 256MB max for batch
 	if err != nil {
 		api.GinBadRequest(c, err, "Failed to parse form")
 		return
@@ -333,6 +384,30 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	if form == nil || len(form.File) == 0 {
 		api.GinBadRequest(c, errors.New("no files provided"), "No files provided")
 		return
+	}
+
+	// Get or use default repository
+	repositoryID := c.PostForm("repository_id")
+	var repository repo.Repository
+	if repositoryID != "" {
+		repoUUID, err := uuid.Parse(repositoryID)
+		if err != nil {
+			api.GinBadRequest(c, err, "Invalid repository ID")
+			return
+		}
+		repository, err = h.queries.GetRepository(ctx, pgtype.UUID{Bytes: repoUUID, Valid: true})
+		if err != nil {
+			api.GinNotFound(c, err, "Repository not found")
+			return
+		}
+	} else {
+		// Use first available repository as default
+		repositories, err := h.queries.ListRepositories(ctx)
+		if err != nil || len(repositories) == 0 {
+			api.GinBadRequest(c, errors.New("no repository available"), "Please specify a repository_id or create a repository first")
+			return
+		}
+		repository = repositories[0]
 	}
 
 	userID := c.GetString("user_id")
@@ -360,24 +435,8 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			continue
 		}
 
-		stagingFileName := uuid.New().String()
-		fileExt := filepath.Ext(header.Filename)
-		stagingFilePath := filepath.Join(h.stagingPath, stagingFileName+fileExt)
-
-		if err := os.MkdirAll(h.stagingPath, 0755); err != nil {
-			log.Printf("Failed to create staging directory: %v", err)
-			errMsg := "Failed to create staging directory: " + err.Error()
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: clientHash,
-				Error:       &errMsg,
-			})
-			file.Close()
-			continue
-		}
-
-		stagingFile, err := os.Create(stagingFilePath)
+		// Create staging file in repository
+		stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, header.Filename)
 		if err != nil {
 			log.Printf("Failed to create staging file: %v", err)
 			errMsg := "Failed to create staging file: " + err.Error()
@@ -391,11 +450,26 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			continue
 		}
 
-		_, err = io.Copy(stagingFile, file)
-		stagingFile.Close()
+		osFile, err := os.Create(stagingFile.Path)
+		if err != nil {
+			log.Printf("Failed to open staging file: %v", err)
+			errMsg := "Failed to open staging file: " + err.Error()
+			results = append(results, BatchUploadResult{
+				Success:     false,
+				FileName:    header.Filename,
+				ContentHash: clientHash,
+				Error:       &errMsg,
+			})
+			file.Close()
+			continue
+		}
+
+		_, err = io.Copy(osFile, file)
+		osFile.Close()
 		file.Close()
 		if err != nil {
 			log.Printf("Failed to copy file to staging: %v", err)
+			os.Remove(stagingFile.Path)
 			errMsg := "Failed to copy file to staging: " + err.Error()
 			results = append(results, BatchUploadResult{
 				Success:     false,
@@ -407,15 +481,25 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		}
 
 		payload := processors.AssetPayload{
-			ClientHash:  clientHash,
-			StagedPath:  stagingFilePath,
-			UserID:      userID,
-			Timestamp:   time.Now(),
-			ContentType: header.Header.Get("Content-Type"),
-			FileName:    header.Filename,
+			ClientHash:   clientHash,
+			StagedPath:   stagingFile.Path,
+			UserID:       userID,
+			Timestamp:    time.Now(),
+			ContentType:  header.Header.Get("Content-Type"),
+			FileName:     header.Filename,
+			RepositoryID: uuid.UUID(repository.RepoID.Bytes).String(),
 		}
 
-		jobInsetResult, err := h.queueClient.Insert(c.Request.Context(), jobs.ProcessAssetArgs(payload), &river.InsertOpts{Queue: "process_asset"})
+		jobInsetResult, err := h.queueClient.Insert(ctx, jobs.ProcessAssetArgs{
+			ClientHash:   payload.ClientHash,
+			StagedPath:   payload.StagedPath,
+			UserID:       payload.UserID,
+			Timestamp:    payload.Timestamp,
+			ContentType:  payload.ContentType,
+			FileName:     payload.FileName,
+			RepositoryID: payload.RepositoryID,
+		}, &river.InsertOpts{Queue: "process_asset"})
+
 		if err != nil {
 			log.Printf("Failed to enqueue task: %v", err)
 			errMsg := "Failed to enqueue task: " + err.Error()
@@ -439,12 +523,12 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		}
 		jobId := jobInsetResult.Job.ID
 
-		log.Printf("Task %d enqueued for processing file %s", jobId, header.Filename)
+		log.Printf("Task %d enqueued for processing file %s in repository %s", jobId, header.Filename, repository.Name)
 
 		taskID := jobId
 		status := "processing"
 		size := header.Size
-		message := "File received and queued for processing"
+		message := fmt.Sprintf("File received and queued for processing in repository '%s'", repository.Name)
 
 		results = append(results, BatchUploadResult{
 			Success:     true,
@@ -656,7 +740,19 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 		return
 	}
 
-	fullPath := filepath.Join(h.StorageBasePath, thumbnail.StoragePath)
+	// Thumbnail paths are repository-relative, stored in .lumilio/assets/thumbnails/
+	// For now, we need to find which repository this asset belongs to
+	// Since we don't track asset->repository mapping yet, we'll try to construct the path
+	// This is a temporary solution until we implement proper file_records lookup
+	fullPath := thumbnail.StoragePath
+	if !filepath.IsAbs(fullPath) {
+		// Try to find the repository by listing all repositories
+		repositories, err := h.queries.ListRepositories(c.Request.Context())
+		if err == nil && len(repositories) > 0 {
+			// Use first repository for now - proper implementation needs file_records
+			fullPath = filepath.Join(repositories[0].Path, thumbnail.StoragePath)
+		}
+	}
 
 	// Get file info for proper cache control
 	fileInfo, err := os.Stat(fullPath)
@@ -705,6 +801,8 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/{id}/original [get]
 func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	// Parse asset ID from URL parameter
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -714,7 +812,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	}
 
 	// Get asset metadata from service
-	asset, err := h.assetService.GetAsset(c.Request.Context(), id)
+	asset, err := h.assetService.GetAsset(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.GinNotFound(c, err, "Asset not found")
@@ -725,8 +823,17 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 		return
 	}
 
-	// Construct full file path
-	fullPath := filepath.Join(h.StorageBasePath, asset.StoragePath)
+	// Construct full file path from repository-relative storage path
+	// Asset paths are stored relative to repository root (e.g., "inbox/2024/01/photo.jpg")
+	fullPath := asset.StoragePath
+	if !filepath.IsAbs(fullPath) {
+		// Try to find the repository by listing all repositories
+		repositories, err := h.queries.ListRepositories(ctx)
+		if err == nil && len(repositories) > 0 {
+			// Use first repository for now - proper implementation needs file_records
+			fullPath = filepath.Join(repositories[0].Path, asset.StoragePath)
+		}
+	}
 
 	// Check if file exists
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
@@ -756,6 +863,8 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/{id}/video/web [get]
 func (h *AssetHandler) GetWebVideo(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	// Parse asset ID from URL parameter
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -765,7 +874,7 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	}
 
 	// Get asset metadata from service
-	asset, err := h.assetService.GetAsset(c.Request.Context(), id)
+	asset, err := h.assetService.GetAsset(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.GinNotFound(c, err, "Asset not found")
@@ -782,17 +891,28 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 		return
 	}
 
-	// Construct web video file path
+	// Get repository path for this asset
+	repositories, err := h.queries.ListRepositories(ctx)
+	if err != nil || len(repositories) == 0 {
+		api.GinInternalError(c, err, "Failed to access repository")
+		return
+	}
+	repoPath := repositories[0].Path
+
+	// Construct web video file path in .lumilio/assets/videos/web/
 	ext := filepath.Ext(asset.OriginalFilename)
 	nameWithoutExt := strings.TrimSuffix(asset.OriginalFilename, ext)
 	webVideoFilename := fmt.Sprintf("%s_web.mp4", nameWithoutExt)
-	webVideoPath := filepath.Join(filepath.Dir(asset.StoragePath), webVideoFilename)
-	fullPath := filepath.Join(h.StorageBasePath, webVideoPath)
+	webVideoPath := filepath.Join(storage.DefaultStructure.VideosDir, "web", webVideoFilename)
+	fullPath := filepath.Join(repoPath, webVideoPath)
 
 	// Check if web version exists, fallback to original
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		// Fallback to original file
-		fullPath = filepath.Join(h.StorageBasePath, asset.StoragePath)
+		fullPath = asset.StoragePath
+		if !filepath.IsAbs(fullPath) {
+			fullPath = filepath.Join(repoPath, asset.StoragePath)
+		}
 		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			log.Printf("Video file not found at path: %s", fullPath)
 			api.GinNotFound(c, err, "Video file not found")
@@ -821,6 +941,8 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/{id}/audio/web [get]
 func (h *AssetHandler) GetWebAudio(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	// Parse asset ID from URL parameter
 	idStr := c.Param("id")
 	id, err := uuid.Parse(idStr)
@@ -830,7 +952,7 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	}
 
 	// Get asset metadata from service
-	asset, err := h.assetService.GetAsset(c.Request.Context(), id)
+	asset, err := h.assetService.GetAsset(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			api.GinNotFound(c, err, "Asset not found")
@@ -847,17 +969,28 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 		return
 	}
 
-	// Construct web audio file path
+	// Get repository path for this asset
+	repositories, err := h.queries.ListRepositories(ctx)
+	if err != nil || len(repositories) == 0 {
+		api.GinInternalError(c, err, "Failed to access repository")
+		return
+	}
+	repoPath := repositories[0].Path
+
+	// Construct web audio file path in .lumilio/assets/audios/web/
 	ext := filepath.Ext(asset.OriginalFilename)
 	nameWithoutExt := strings.TrimSuffix(asset.OriginalFilename, ext)
 	webAudioFilename := fmt.Sprintf("%s_web.mp3", nameWithoutExt)
-	webAudioPath := filepath.Join(filepath.Dir(asset.StoragePath), webAudioFilename)
-	fullPath := filepath.Join(h.StorageBasePath, webAudioPath)
+	webAudioPath := filepath.Join(storage.DefaultStructure.AudiosDir, "web", webAudioFilename)
+	fullPath := filepath.Join(repoPath, webAudioPath)
 
 	// Check if web version exists, fallback to original
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		// Fallback to original file
-		fullPath = filepath.Join(h.StorageBasePath, asset.StoragePath)
+		fullPath = asset.StoragePath
+		if !filepath.IsAbs(fullPath) {
+			fullPath = filepath.Join(repoPath, asset.StoragePath)
+		}
 		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			log.Printf("Audio file not found at path: %s", fullPath)
 			api.GinNotFound(c, err, "Audio file not found")
@@ -1417,6 +1550,7 @@ func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/liked [get]
 func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
+	ctx := c.Request.Context()
 	limit := 20
 	offset := 0
 
@@ -1432,7 +1566,7 @@ func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
 		}
 	}
 
-	assets, err := h.assetService.GetLikedAssets(c.Request.Context(), limit, offset)
+	assets, err := h.assetService.GetLikedAssets(ctx, limit, offset)
 	if err != nil {
 		log.Printf("Failed to get liked assets: %v", err)
 		api.GinInternalError(c, err, "Failed to retrieve liked assets")

@@ -34,6 +34,7 @@ type CLIPPayload struct {
 
 func (ap *AssetProcessor) processPhotoAsset(
 	ctx context.Context,
+	repository repo.Repository,
 	asset *repo.Asset,
 	fileReader io.Reader,
 ) error {
@@ -41,15 +42,16 @@ func (ap *AssetProcessor) processPhotoAsset(
 	isRAWFile := raw.IsRAWFile(asset.OriginalFilename)
 
 	if isRAWFile {
-		return ap.processRAWAsset(ctx, asset, fileReader)
+		return ap.processRAWAsset(ctx, repository, asset, fileReader)
 	} else {
-		return ap.processStandardPhotoAsset(ctx, asset, fileReader)
+		return ap.processStandardPhotoAsset(ctx, repository, asset, fileReader)
 	}
 }
 
 // processRAWAsset handles RAW file processing with the strategy: embedded preview first, then full render
 func (ap *AssetProcessor) processRAWAsset(
 	ctx context.Context,
+	repository repo.Repository,
 	asset *repo.Asset,
 	fileReader io.Reader,
 ) error {
@@ -237,6 +239,7 @@ func (ap *AssetProcessor) processRAWAsset(
 // processStandardPhotoAsset handles non-RAW photo processing
 func (ap *AssetProcessor) processStandardPhotoAsset(
 	ctx context.Context,
+	repository repo.Repository,
 	asset *repo.Asset,
 	fileReader io.Reader,
 ) error {

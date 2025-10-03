@@ -30,6 +30,7 @@ type AudioInfo struct {
 
 func (ap *AssetProcessor) processAudioAsset(
 	ctx context.Context,
+	repository repo.Repository,
 	asset *repo.Asset,
 	fileReader io.Reader,
 ) error {
