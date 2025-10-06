@@ -11,9 +11,9 @@ repository-root/
 ├── .lumilio/                # System-managed (protected)
 │   ├── assets/
 │   │   ├── thumbnails/     # Generated thumbnails by size
-│   │   │   ├── 150/        # 150px thumbnails
-│   │   │   ├── 300/        # 300px thumbnails
-│   │   │   └── 1024/       # Large previews
+│   │   │   ├── small/        # 150px thumbnails
+│   │   │   ├── medium/        # 300px thumbnails
+│   │   │   └── large/       # Large previews
 │   │   ├── videos/         # Transcoded video files
 │   │   │   └── web/        # MP4/H.264 ≤1080p (target) transcodes
 │   │   ├── audios/         # Transcoded audio files
@@ -49,7 +49,7 @@ repository-root/
   - Repairs missing directories and structure issues
 
 #### 2. StagingManager
-- **File**: `staging_manager.go` 
+- **File**: `staging_manager.go`
 - **Purpose**: Handles staging operations with repository configuration integration
 - **Key Features**:
   - Creates staging files for uploads

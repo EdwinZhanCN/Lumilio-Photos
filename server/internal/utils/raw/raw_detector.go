@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"server/internal/utils/file"
 	"strings"
 )
 
@@ -81,10 +82,9 @@ type DetectionResult struct {
 }
 
 // IsRAWFile checks if a file is a RAW file based on filename
+// This now uses the centralized file validator for consistency
 func IsRAWFile(filename string) bool {
-	ext := strings.ToLower(filepath.Ext(filename))
-	_, exists := RAWExtensions[ext]
-	return exists
+	return file.IsRAWFile(filename)
 }
 
 // GetRAWFormat returns the RAW format based on filename

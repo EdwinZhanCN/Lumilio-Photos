@@ -1,138 +1,118 @@
-// src/services/getAssetService.ts
+// src/services/assetsService.ts
 
 import api from "@/lib/http-commons/api.ts";
-import { AxiosRequestConfig, AxiosResponse } from "axios";
-import { ApiResult } from "./uploadService";
+import type { AxiosRequestConfig, AxiosResponse } from "axios";
+import type { components, paths } from "@/lib/http-commons/schema.d.ts";
+import type { ApiResult } from "./uploadService";
+
+// ============================================================================
+// Type Aliases from Generated Schema
+// ============================================================================
+
+type Schemas = components["schemas"];
+type Paths = paths;
 
 /**
- * @interface SearchAssetsParams
- * @description Parameters for searching assets with filename or semantic search
+ * Asset data transfer object
  */
-export interface SearchAssetsParams {
-  query: string;
-  search_type: "filename" | "semantic";
-  filter?: AssetFilter;
-  limit?: number;
-  offset?: number;
-}
+export type Asset = Schemas["handler.AssetDTO"];
 
 /**
- * @interface AssetFilter
- * @description Filter criteria for assets
+ * Asset list response with pagination
  */
-export interface AssetFilter {
-  type?: "PHOTO" | "VIDEO" | "AUDIO";
-  owner_id?: number;
-  raw?: boolean;
-  rating?: number;
-  liked?: boolean;
-  filename?: FilenameFilter;
-  date?: DateRange;
-  camera_make?: string;
-  lens?: string;
-}
+export type AssetListResponse = Schemas["handler.AssetListResponse"];
 
 /**
- * @interface FilenameFilter
- * @description Filename filtering options
+ * Asset types response
  */
-export interface FilenameFilter {
-  mode: "contains" | "matches" | "startswith" | "endswith";
-  value: string;
-}
+export type AssetTypesResponse = Schemas["handler.AssetTypesResponse"];
 
 /**
- * @interface DateRange
- * @description Date range filter
+ * Message response for operations
  */
-export interface DateRange {
-  from?: string;
-  to?: string;
-}
+export type MessageResponse = Schemas["handler.MessageResponse"];
 
 /**
- * @interface FilterAssetsParams
- * @description Parameters for filtering assets
+ * Asset filter criteria
  */
-export interface FilterAssetsParams {
-  filter: AssetFilter;
-  limit?: number;
-  offset?: number;
-}
+export type AssetFilter = Schemas["handler.AssetFilter"];
 
 /**
- * @interface FilterOptionsResponse
- * @description Available filter options
+ * Filename filter options
  */
-export interface FilterOptionsResponse {
-  camera_makes: string[];
-  lenses: string[];
-}
+export type FilenameFilter = Schemas["handler.FilenameFilter"];
 
 /**
- * @interface AssetListResponse
- * @description The structure of the data object within the API response for listing assets.
+ * Date range filter
  */
-interface AssetListResponse {
-  assets: Asset[];
-  limit: number;
-  offset: number;
-}
+export type DateRange = Schemas["handler.DateRange"];
 
 /**
- * @interface MessageResponse
- * @description A generic success message response from the API.
+ * Filter assets request
  */
-interface MessageResponse {
-  message: string;
-}
+export type FilterAssetsRequest = Schemas["handler.FilterAssetsRequest"];
 
 /**
- * @interface UpdateRatingRequest
- * @description Request body for updating asset rating
+ * Search assets request
  */
-export interface UpdateRatingRequest {
-  rating: number; // 0-5
-}
+export type SearchAssetsRequest = Schemas["handler.SearchAssetsRequest"];
 
 /**
- * @interface UpdateLikeRequest
- * @description Request body for updating asset like status
+ * Filter options response (camera makes and lenses)
  */
-export interface UpdateLikeRequest {
-  liked: boolean;
-}
+export type FilterOptionsResponse = Schemas["handler.OptionsResponse"];
 
 /**
- * @interface UpdateRatingAndLikeRequest
- * @description Request body for updating both rating and like status
+ * Update asset request
  */
-export interface UpdateRatingAndLikeRequest {
-  rating: number; // 0-5
-  liked: boolean;
-}
+export type UpdateAssetRequest = Schemas["handler.UpdateAssetRequest"];
 
 /**
- * @interface UpdateDescriptionRequest
- * @description Request body for updating asset description
+ * Update rating request
  */
-export interface UpdateDescriptionRequest {
-  description: string;
-}
+export type UpdateRatingRequest = Schemas["handler.UpdateRatingRequest"];
 
 /**
- * @interface ListAssetsParams
- * @description Defines the shape of the query parameters object for the listAssets function.
- * All properties are optional, allowing for flexible filtering.
+ * Update like request
  */
-export interface ListAssetsParams {
-  type?: "PHOTO" | "VIDEO" | "AUDIO"; // Single type filtering
-  types?: string; // Multiple types as comma-separated string (e.g., "PHOTO,VIDEO")
-  owner_id?: number;
-  limit?: number;
-  offset?: number;
-  sort_order?: "asc" | "desc";
-}
+export type UpdateLikeRequest = Schemas["handler.UpdateLikeRequest"];
+
+/**
+ * Update rating and like request
+ */
+export type UpdateRatingAndLikeRequest =
+  Schemas["handler.UpdateRatingAndLikeRequest"];
+
+/**
+ * Update description request
+ */
+export type UpdateDescriptionRequest =
+  Schemas["handler.UpdateDescriptionRequest"];
+
+/**
+ * List assets query parameters - extracted directly from paths
+ */
+export type ListAssetsParams = NonNullable<
+  Paths["/assets"]["get"]["parameters"]["query"]
+>;
+
+/**
+ * Get asset by ID query parameters
+ */
+export type GetAssetByIdParams = NonNullable<
+  Paths["/assets/{id}"]["get"]["parameters"]["query"]
+>;
+
+// ============================================================================
+// Re-export commonly used types for backward compatibility
+// ============================================================================
+
+export type SearchAssetsParams = SearchAssetsRequest;
+export type FilterAssetsParams = FilterAssetsRequest;
+
+// ============================================================================
+// Asset Service
+// ============================================================================
 
 /**
  * @service AssetService
@@ -149,9 +129,6 @@ export const assetService = {
     params: ListAssetsParams,
     config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<ApiResult<AssetListResponse>>> => {
-    // We pass the params object directly to axios.
-    // Axios will automatically construct the query string,
-    // ignoring any properties that are undefined.
     return api.get<ApiResult<AssetListResponse>>("/api/v1/assets", {
       ...config,
       params: params,
@@ -161,93 +138,119 @@ export const assetService = {
   /**
    * Fetches the detailed information for a single asset by its ID.
    * @param {string} id - The UUID of the asset.
+   * @param {GetAssetByIdParams} [params] - Optional query parameters (include_thumbnails, include_tags, etc.)
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
    * @returns {Promise<AxiosResponse<ApiResult<Asset>>>} A promise resolving to the asset's details.
    */
   getAssetById: async (
     id: string,
+    params?: GetAssetByIdParams,
+    config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<ApiResult<Asset>>> => {
-    return api.get<ApiResult<Asset>>(`/api/v1/assets/${id}`);
+    return api.get<ApiResult<Asset>>(`/api/v1/assets/${id}`, {
+      ...config,
+      params,
+    });
   },
 
   /**
-   * Deletes an asset by its ID.
+   * Deletes an asset by its ID (soft delete).
    * @param {string} id - The UUID of the asset to delete.
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
    * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
    */
   deleteAsset: async (
     id: string,
+    config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<ApiResult<MessageResponse>>> => {
-    return api.delete<ApiResult<MessageResponse>>(`/api/v1/assets/${id}`);
+    return api.delete<ApiResult<MessageResponse>>(
+      `/api/v1/assets/${id}`,
+      config,
+    );
   },
 
   /**
    * Updates the metadata for a specific asset.
    * @param {string} id - The UUID of the asset to update.
-   * @param {JSON} metadata - The new metadata to apply.
+   * @param {UpdateAssetRequest} request - The metadata update request.
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
    * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
    */
   updateAssetMetadata: async (
     id: string,
-    metadata: JSON,
+    request: UpdateAssetRequest,
+    config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<ApiResult<MessageResponse>>> => {
-    // The payload for the PUT request needs to be in the shape { metadata: { ... } }
-    const payload = { metadata };
-    return api.put<ApiResult<MessageResponse>>(`/api/v1/assets/${id}`, payload);
+    return api.put<ApiResult<MessageResponse>>(
+      `/api/v1/assets/${id}`,
+      request,
+      config,
+    );
   },
 
   /**
    * Adds an asset to a specific album.
    * @param {string} assetId - The UUID of the asset.
    * @param {number} albumId - The ID of the album.
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
    * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
    */
   addAssetToAlbum: async (
     assetId: string,
     albumId: number,
+    config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<ApiResult<MessageResponse>>> => {
     return api.post<ApiResult<MessageResponse>>(
       `/api/v1/assets/${assetId}/albums/${albumId}`,
+      undefined,
+      config,
     );
   },
 
   /**
    * Fetches the list of all supported asset types.
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
    * @returns {Promise<AxiosResponse<ApiResult<AssetTypesResponse>>>} A promise resolving to the list of types.
    */
-  getAssetTypes: async (): Promise<AxiosResponse<ApiResult<string[]>>> => {
-    return api.get<ApiResult<string[]>>(`/api/v1/assets/types`);
+  getAssetTypes: async (
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<AssetTypesResponse>>> => {
+    return api.get<ApiResult<AssetTypesResponse>>(
+      `/api/v1/assets/types`,
+      config,
+    );
   },
 
   /**
    * Filter assets using comprehensive filtering options.
-   * @param {FilterAssetsParams} params - Filter criteria and pagination
+   * @param {FilterAssetsRequest} request - Filter criteria and pagination
    * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration
    * @returns {Promise<AxiosResponse<ApiResult<AssetListResponse>>>} A promise that resolves to the filtered assets
    */
   filterAssets: async (
-    params: FilterAssetsParams,
+    request: FilterAssetsRequest,
     config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<ApiResult<AssetListResponse>>> => {
     return api.post<ApiResult<AssetListResponse>>(
       "/api/v1/assets/filter",
-      params,
+      request,
       config,
     );
   },
 
   /**
    * Search assets using filename or semantic search.
-   * @param {SearchAssetsParams} params - Search parameters
+   * @param {SearchAssetsRequest} request - Search parameters
    * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration
    * @returns {Promise<AxiosResponse<ApiResult<AssetListResponse>>>} A promise that resolves to the search results
    */
   searchAssets: async (
-    params: SearchAssetsParams,
+    request: SearchAssetsRequest,
     config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<ApiResult<AssetListResponse>>> => {
     return api.post<ApiResult<AssetListResponse>>(
       "/api/v1/assets/search",
-      params,
+      request,
       config,
     );
   },
@@ -264,6 +267,47 @@ export const assetService = {
       "/api/v1/assets/filter-options",
       config,
     );
+  },
+
+  /**
+   * Get assets by rating (0-5).
+   * @param {number} rating - The rating to filter by (0-5)
+   * @param {number} [limit=20] - Maximum number of results
+   * @param {number} [offset=0] - Number of results to skip
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration
+   * @returns {Promise<AxiosResponse<ApiResult<AssetListResponse>>>} A promise that resolves to the assets
+   */
+  getAssetsByRating: async (
+    rating: number,
+    limit: number = 20,
+    offset: number = 0,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<AssetListResponse>>> => {
+    return api.get<ApiResult<AssetListResponse>>(
+      `/api/v1/assets/rating/${rating}`,
+      {
+        ...config,
+        params: { limit, offset },
+      },
+    );
+  },
+
+  /**
+   * Get liked/favorited assets.
+   * @param {number} [limit=20] - Maximum number of results
+   * @param {number} [offset=0] - Number of results to skip
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration
+   * @returns {Promise<AxiosResponse<ApiResult<AssetListResponse>>>} A promise that resolves to the liked assets
+   */
+  getLikedAssets: async (
+    limit: number = 20,
+    offset: number = 0,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<AssetListResponse>>> => {
+    return api.get<ApiResult<AssetListResponse>>("/api/v1/assets/liked", {
+      ...config,
+      params: { limit, offset },
+    });
   },
 
   /**
@@ -300,12 +344,35 @@ export const assetService = {
    * Fetches the thumbnail URL for an asset by its ID.
    * This method returns a URL that can be used to fetch the thumbnail image.
    * @param {string} id - The UUID of the asset.
-   * @param {string} [size="small"] - The size of the thumbnail. Can be "small", "medium", or "large".
+   * @param {"small" | "medium" | "large"} [size="small"] - The size of the thumbnail.
    * @returns {string} The URL to fetch the thumbnail image.
    */
-  getThumbnailUrl: (id: string, size: string = "small"): string => {
+  getThumbnailUrl: (
+    id: string,
+    size: "small" | "medium" | "large" = "small",
+  ): string => {
     const baseURL = api.defaults.baseURL || "http://localhost:8080";
     return `${baseURL}/api/v1/assets/${id}/thumbnail?size=${size}`;
+  },
+
+  /**
+   * Get web-optimized video URL for an asset.
+   * @param {string} id - The UUID of the asset.
+   * @returns {string} The URL to fetch the web-optimized video.
+   */
+  getWebVideoUrl: (id: string): string => {
+    const baseURL = api.defaults.baseURL || "http://localhost:8080";
+    return `${baseURL}/api/v1/assets/${id}/video/web`;
+  },
+
+  /**
+   * Get web-optimized audio URL for an asset.
+   * @param {string} id - The UUID of the asset.
+   * @returns {string} The URL to fetch the web-optimized audio.
+   */
+  getWebAudioUrl: (id: string): string => {
+    const baseURL = api.defaults.baseURL || "http://localhost:8080";
+    return `${baseURL}/api/v1/assets/${id}/audio/web`;
   },
 
   /**
@@ -388,5 +455,18 @@ export const assetService = {
       payload,
       config,
     );
+  },
+
+  /**
+   * Get albums containing a specific asset.
+   * @param {string} id - The UUID of the asset.
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
+   * @returns {Promise<AxiosResponse<ApiResult<any>>>} A promise resolving to the list of albums.
+   */
+  getAssetAlbums: async (
+    id: string,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<any>>> => {
+    return api.get<ApiResult<any>>(`/api/v1/assets/${id}/albums`, config);
   },
 };

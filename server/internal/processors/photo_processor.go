@@ -192,7 +192,7 @@ func (ap *AssetProcessor) processRAWAsset(
 			if buf.Len() == 0 {
 				continue
 			}
-			if err := ap.assetService.SaveNewThumbnail(gCtx, buf, asset, name); err != nil {
+			if err := ap.assetService.SaveNewThumbnail(gCtx, repository.Path, buf, asset, name); err != nil {
 				return fmt.Errorf("save thumb %s: %w", name, err)
 			}
 		}
@@ -332,7 +332,7 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 			if buf.Len() == 0 {
 				continue
 			}
-			if err := ap.assetService.SaveNewThumbnail(gCtx, buf, asset, name); err != nil {
+			if err := ap.assetService.SaveNewThumbnail(gCtx, repository.Path, buf, asset, name); err != nil {
 				return fmt.Errorf("save thumb %s: %w", name, err)
 			}
 		}

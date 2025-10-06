@@ -119,7 +119,7 @@ func TestStagingManager_InboxIntegration(t *testing.T) {
 		err = os.WriteFile(stagingFile.Path, content, 0644)
 		require.NoError(t, err)
 
-		err = sm.CommitStagingFileToInbox(stagingFile, "")
+		_, err = sm.CommitStagingFileToInbox(stagingFile, "")
 		require.NoError(t, err)
 
 		// Verify file is in inbox with date structure
@@ -159,7 +159,7 @@ func TestStagingManager_InboxIntegration(t *testing.T) {
 		err = os.WriteFile(stagingFile.Path, content, 0644)
 		require.NoError(t, err)
 
-		err = sm.CommitStagingFileToInbox(stagingFile, "")
+		_, err = sm.CommitStagingFileToInbox(stagingFile, "")
 		require.NoError(t, err)
 
 		// Verify file is directly in inbox
@@ -186,7 +186,7 @@ func TestStagingManager_InboxIntegration(t *testing.T) {
 
 		// Provide a hash for CAS
 		hash := "abcdef123456789"
-		err = sm.CommitStagingFileToInbox(stagingFile, hash)
+		_, err = sm.CommitStagingFileToInbox(stagingFile, hash)
 		require.NoError(t, err)
 
 		// Verify file is in CAS structure: inbox/ab/cd/ef/abcdef123456789.jpg
@@ -212,7 +212,7 @@ func TestStagingManager_InboxIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Provide insufficient hash (should fallback to date)
-		err = sm.CommitStagingFileToInbox(stagingFile, "abc") // Too short
+		_, err = sm.CommitStagingFileToInbox(stagingFile, "abc") // Too short
 		require.NoError(t, err)
 
 		// Should fall back to date strategy - verify file is in date structure
@@ -256,7 +256,7 @@ func TestStagingManager_DuplicateHandling(t *testing.T) {
 		require.NoError(t, err)
 		err = os.WriteFile(staging1.Path, []byte("first"), 0644)
 		require.NoError(t, err)
-		err = sm.CommitStagingFileToInbox(staging1, "")
+		_, err = sm.CommitStagingFileToInbox(staging1, "")
 		require.NoError(t, err)
 
 		// Create second file with same name
@@ -264,7 +264,7 @@ func TestStagingManager_DuplicateHandling(t *testing.T) {
 		require.NoError(t, err)
 		err = os.WriteFile(staging2.Path, []byte("second"), 0644)
 		require.NoError(t, err)
-		err = sm.CommitStagingFileToInbox(staging2, "")
+		_, err = sm.CommitStagingFileToInbox(staging2, "")
 		require.NoError(t, err)
 
 		// Verify both files exist with different names
@@ -293,7 +293,7 @@ func TestStagingManager_DuplicateHandling(t *testing.T) {
 		require.NoError(t, err)
 		err = os.WriteFile(staging1.Path, []byte("first uuid"), 0644)
 		require.NoError(t, err)
-		err = sm.CommitStagingFileToInbox(staging1, "")
+		_, err = sm.CommitStagingFileToInbox(staging1, "")
 		require.NoError(t, err)
 
 		// Create second file with same name
@@ -301,7 +301,7 @@ func TestStagingManager_DuplicateHandling(t *testing.T) {
 		require.NoError(t, err)
 		err = os.WriteFile(staging2.Path, []byte("second uuid"), 0644)
 		require.NoError(t, err)
-		err = sm.CommitStagingFileToInbox(staging2, "")
+		_, err = sm.CommitStagingFileToInbox(staging2, "")
 		require.NoError(t, err)
 
 		// Verify both files exist with UUID suffixes
@@ -387,7 +387,7 @@ func TestStagingManager_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("commit to inbox with nil staging file", func(t *testing.T) {
-		err := sm.CommitStagingFileToInbox(nil, "hash")
+		_, err := sm.CommitStagingFileToInbox(nil, "hash")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "staging file is nil")
 	})
@@ -411,7 +411,7 @@ func TestStagingManager_ErrorHandling(t *testing.T) {
 		stagingFile, err := sm.CreateStagingFile(testDir, "no-config.jpg")
 		require.NoError(t, err)
 
-		err = sm.CommitStagingFileToInbox(stagingFile, "")
+		_, err = sm.CommitStagingFileToInbox(stagingFile, "")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to load repository config")
 	})

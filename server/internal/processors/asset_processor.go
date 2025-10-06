@@ -58,14 +58,7 @@ func NewAssetProcessor(
 }
 
 func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (*repo.Asset, error) {
-	// Verify staged file exists
-	info, err := os.Stat(task.StagedPath)
-	if err != nil {
-		return nil, fmt.Errorf("staged file not found: %w", err)
-	}
-	fileSize := info.Size()
-
-	// Get repository information
+	// Get repository information first (needed to resolve inbox path if staging missing)
 	var repository repo.Repository
 	if task.RepositoryID != "" {
 		repoUUID, err := uuid.Parse(task.RepositoryID)
@@ -92,28 +85,57 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 		ownerIDPtr = &ownerID
 	}
 
-	contentType := file.DetermineAssetType(task.ContentType)
-
-	// Commit staged file to repository inbox using StagingManager
-	// Convert task.StagedPath to StagingFile structure
-	stagingFile := &storage.StagingFile{
-		ID:        filepath.Base(task.StagedPath),
-		RepoPath:  repository.Path,
-		Path:      task.StagedPath,
-		Filename:  task.FileName,
-		CreatedAt: task.Timestamp,
+	// Validate file first
+	validationResult := file.ValidateFile(task.FileName, task.ContentType)
+	if !validationResult.Valid {
+		return nil, fmt.Errorf("file validation failed: %s", validationResult.ErrorReason)
 	}
+	contentType := validationResult.AssetType
 
-	// Commit to inbox based on repository configuration
-	err = ap.stagingManager.CommitStagingFileToInbox(stagingFile, task.ClientHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to commit staged file to inbox: %w", err)
+	// Determine file location: prefer staged path, but tolerate if it was already committed by a previous attempt
+	var (
+		fileInfo      os.FileInfo
+		fileSize      int64
+		inboxPath     string
+		usedCommitted bool
+	)
+
+	if info, err := os.Stat(task.StagedPath); err == nil {
+		fileInfo = info
+	} else {
+		// Staged file is missing – try to locate the expected committed file path and continue
+		resolvedPath, rerr := ap.stagingManager.ResolveInboxPath(repository.Path, task.FileName, task.ClientHash)
+		if rerr != nil {
+			return nil, fmt.Errorf("staged file not found and failed to resolve inbox path: %w", err)
+		}
+		committed := filepath.Join(repository.Path, resolvedPath)
+		if cinfo, serr := os.Stat(committed); serr == nil {
+			fileInfo = cinfo
+			inboxPath = resolvedPath
+			usedCommitted = true
+		} else {
+			return nil, fmt.Errorf("staged file not found and no committed file at expected path %s: %w", committed, err)
+		}
 	}
+	fileSize = fileInfo.Size()
 
-	// Resolve the final storage path (relative to repository root)
-	inboxPath, err := ap.stagingManager.ResolveInboxPath(repository.Path, task.FileName, task.ClientHash)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve inbox path: %w", err)
+	// Commit staged file to repository inbox only if it hasn't already been committed
+	if !usedCommitted {
+		// Convert task.StagedPath to StagingFile structure
+		stagingFile := &storage.StagingFile{
+			ID:        filepath.Base(task.StagedPath),
+			RepoPath:  repository.Path,
+			Path:      task.StagedPath,
+			Filename:  task.FileName,
+			CreatedAt: task.Timestamp,
+		}
+
+		// Commit to inbox based on repository configuration and capture the final relative path (single source of truth)
+		finalRelPath, err := ap.stagingManager.CommitStagingFileToInbox(stagingFile, task.ClientHash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to commit staged file to inbox: %w", err)
+		}
+		inboxPath = finalRelPath
 	}
 
 	// Create asset record with repository-relative path

@@ -32,6 +32,7 @@ type AppConfig struct {
 	Debug         bool
 	LogLevel      string
 	CLIPEnabled   bool
+	SyncEnabled   bool
 }
 
 type LLMConfig struct {
@@ -150,6 +151,7 @@ func LoadAppConfig() AppConfig {
 			Debug:         true,
 			LogLevel:      "debug",
 			CLIPEnabled:   true,
+			SyncEnabled:   true,
 		}
 	} else {
 		cfg = AppConfig{
@@ -160,6 +162,7 @@ func LoadAppConfig() AppConfig {
 			Debug:         false,
 			LogLevel:      "info",
 			CLIPEnabled:   false,
+			SyncEnabled:   true,
 		}
 	}
 
@@ -188,6 +191,11 @@ func LoadAppConfig() AppConfig {
 		cfg.CLIPEnabled = true
 	} else if clipEnabled == "false" {
 		cfg.CLIPEnabled = false
+	}
+	if syncEnabled := os.Getenv("SYNC_ENABLED"); syncEnabled == "true" {
+		cfg.SyncEnabled = true
+	} else if syncEnabled == "false" {
+		cfg.SyncEnabled = false
 	}
 
 	return cfg

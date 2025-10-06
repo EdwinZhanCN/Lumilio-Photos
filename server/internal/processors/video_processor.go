@@ -66,12 +66,12 @@ func (ap *AssetProcessor) processVideoAsset(
 
 	// Goroutine 2: Transcode video (smart strategy)
 	g.Go(func() error {
-		return ap.transcodeVideoSmart(gCtx, asset, tempFile.Name(), videoInfo)
+		return ap.transcodeVideoSmart(gCtx, repository.Path, asset, tempFile.Name(), videoInfo)
 	})
 
 	// Goroutine 3: Generate thumbnail
 	g.Go(func() error {
-		return ap.generateVideoThumbnail(gCtx, asset, tempFile.Name())
+		return ap.generateVideoThumbnail(gCtx, repository.Path, asset, tempFile.Name())
 	})
 
 	if err := g.Wait(); err != nil {
@@ -126,13 +126,13 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 	return nil
 }
 
-func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, asset *repo.Asset, videoPath string, videoInfo *VideoInfo) error {
+func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string, videoInfo *VideoInfo) error {
 	maxHeight := 1080
 
 	// Smart transcoding strategy
 	if videoInfo.Height <= maxHeight && strings.ToLower(videoInfo.Format) == "mp4" && strings.Contains(strings.ToLower(videoInfo.Codec), "h264") {
 		// Video is already in good format and resolution, just copy to storage
-		return ap.copyVideoAsWebVersion(ctx, asset, videoPath, "web")
+		return ap.copyVideoAsWebVersion(ctx, repoPath, asset, videoPath, "web")
 	}
 
 	if videoInfo.Height <= maxHeight {
@@ -143,7 +143,7 @@ func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, asset *repo.A
 		}
 		defer os.Remove(outputPath)
 
-		return ap.saveTranscodedVideo(ctx, asset, outputPath, "web")
+		return ap.saveTranscodedVideo(ctx, repoPath, asset, outputPath, "web")
 	} else {
 		// Video needs downscaling + transcoding
 		// Calculate new dimensions maintaining aspect ratio
@@ -161,7 +161,7 @@ func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, asset *repo.A
 		}
 		defer os.Remove(outputPath1080p)
 
-		if err := ap.saveTranscodedVideo(ctx, asset, outputPath1080p, "web"); err != nil {
+		if err := ap.saveTranscodedVideo(ctx, repoPath, asset, outputPath1080p, "web"); err != nil {
 			return fmt.Errorf("save 1080p version: %w", err)
 		}
 
@@ -197,27 +197,27 @@ func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath str
 	return outputPath, nil
 }
 
-func (ap *AssetProcessor) copyVideoAsWebVersion(ctx context.Context, asset *repo.Asset, videoPath, version string) error {
+func (ap *AssetProcessor) copyVideoAsWebVersion(ctx context.Context, repoPath string, asset *repo.Asset, videoPath, version string) error {
 	videoFile, err := os.Open(videoPath)
 	if err != nil {
 		return fmt.Errorf("open video file: %w", err)
 	}
 	defer videoFile.Close()
 
-	return ap.assetService.SaveVideoVersion(ctx, videoFile, asset, version)
+	return ap.assetService.SaveVideoVersion(ctx, repoPath, videoFile, asset, version)
 }
 
-func (ap *AssetProcessor) saveTranscodedVideo(ctx context.Context, asset *repo.Asset, outputPath, version string) error {
+func (ap *AssetProcessor) saveTranscodedVideo(ctx context.Context, repoPath string, asset *repo.Asset, outputPath, version string) error {
 	transcodedFile, err := os.Open(outputPath)
 	if err != nil {
 		return fmt.Errorf("open transcoded file: %w", err)
 	}
 	defer transcodedFile.Close()
 
-	return ap.assetService.SaveVideoVersion(ctx, transcodedFile, asset, version)
+	return ap.assetService.SaveVideoVersion(ctx, repoPath, transcodedFile, asset, version)
 }
 
-func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, asset *repo.Asset, videoPath string) error {
+func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string) error {
 	// Generate thumbnail at 1 second mark (or 10% of duration, whichever is smaller)
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("thumb_%s.jpg", asset.AssetID.Bytes))
 	defer os.Remove(outputPath)
@@ -270,7 +270,7 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, asset *rep
 		if buf.Len() == 0 {
 			continue
 		}
-		if err := ap.assetService.SaveNewThumbnail(ctx, buf, asset, name); err != nil {
+		if err := ap.assetService.SaveNewThumbnail(ctx, repoPath, buf, asset, name); err != nil {
 			return fmt.Errorf("save thumbnail %s: %w", name, err)
 		}
 	}
