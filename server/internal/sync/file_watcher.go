@@ -90,12 +90,12 @@ func (fw *FileWatcher) AddRepository(repoID uuid.UUID, repoPath string) error {
 		return fmt.Errorf("repository %s is already being watched", repoID)
 	}
 
-	// Construct user-managed path (assuming "user" directory in repository)
-	userManagedPath := filepath.Join(repoPath, "user")
+	// Construct user-managed path (use repository root)
+	userManagedPath := repoPath
 
 	// Check if user-managed directory exists
 	if _, err := os.Stat(userManagedPath); os.IsNotExist(err) {
-		return fmt.Errorf("user-managed directory does not exist: %s", userManagedPath)
+		return fmt.Errorf("repository directory does not exist: %s", userManagedPath)
 	}
 
 	// Add directory and all subdirectories to watcher
@@ -329,8 +329,9 @@ func (fw *FileWatcher) addDirectoryRecursive(path string) error {
 		}
 
 		if info.IsDir() {
-			// Skip hidden directories
-			if strings.HasPrefix(filepath.Base(walkPath), ".") && walkPath != path {
+			// Skip hidden directories and inbox
+			base := filepath.Base(walkPath)
+			if (strings.HasPrefix(base, ".") || base == "inbox") && walkPath != path {
 				return filepath.SkipDir
 			}
 

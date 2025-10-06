@@ -17,7 +17,7 @@ type StagingManager interface {
 	// Staging operations with repository configuration support
 	CreateStagingFile(repoPath, filename string) (*StagingFile, error)
 	CommitStagingFile(stagingFile *StagingFile, finalPath string) error
-	CommitStagingFileToInbox(stagingFile *StagingFile, hash string) error
+	CommitStagingFileToInbox(stagingFile *StagingFile, hash string) (string, error)
 	CleanupStaging(repoPath string, maxAge time.Duration) error
 
 	// Path resolution
@@ -47,25 +47,28 @@ func (sm *DefaultStagingManager) CommitStagingFile(stagingFile *StagingFile, fin
 }
 
 // CommitStagingFileToInbox commits a staging file to the inbox using repository configuration
-func (sm *DefaultStagingManager) CommitStagingFileToInbox(stagingFile *StagingFile, hash string) error {
+func (sm *DefaultStagingManager) CommitStagingFileToInbox(stagingFile *StagingFile, hash string) (string, error) {
 	if stagingFile == nil {
-		return fmt.Errorf("staging file is nil")
+		return "", fmt.Errorf("staging file is nil")
 	}
 
 	// Load repository configuration
 	cfg, err := repocfg.LoadConfigFromFile(stagingFile.RepoPath)
 	if err != nil {
-		return fmt.Errorf("failed to load repository config: %w", err)
+		return "", fmt.Errorf("failed to load repository config: %w", err)
 	}
 
 	// Resolve inbox path based on repository configuration
 	inboxPath, err := sm.resolveInboxRelativePath(stagingFile.RepoPath, cfg, stagingFile.Filename, hash)
 	if err != nil {
-		return fmt.Errorf("failed to resolve inbox path: %w", err)
+		return "", fmt.Errorf("failed to resolve inbox path: %w", err)
 	}
 
 	// Commit to the resolved inbox path
-	return sm.CommitStagingFile(stagingFile, inboxPath)
+	if err := sm.CommitStagingFile(stagingFile, inboxPath); err != nil {
+		return "", err
+	}
+	return inboxPath, nil
 }
 
 // ResolveInboxPath resolves the final inbox path for a file based on repository configuration

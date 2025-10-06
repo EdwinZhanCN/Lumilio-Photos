@@ -1,56 +1,83 @@
 import api from "@/lib/http-commons/api.ts";
-import { AxiosRequestConfig, AxiosResponse } from "axios";
-// Response interfaces based on swagger.yaml
-export interface UploadResponse {
-  content_hash: string;
-  file_name: string;
-  message: string;
-  size: number;
-  status: string;
-  task_id: string;
-}
+import type { AxiosRequestConfig, AxiosResponse } from "axios";
+import type { components } from "@/lib/http-commons/schema.d.ts";
 
-// 根据您的 Go 后端和响应示例，这是单个结果的精确类型
-export interface BatchUploadResult {
-  success: boolean;
-  file_name: string;
-  content_hash: string;
-  task_id: string;
-  status: string;
-  size: number;
-  message: string;
-  error?: string; // 失败时可能有
-}
+// ============================================================================
+// Type Aliases from Generated Schema
+// ============================================================================
 
-// 这是响应体中 `data` 字段的内容
-export interface BatchUploadData {
-  results: BatchUploadResult[];
-}
+type Schemas = components["schemas"];
 
-// 这是最外层的标准 API 响应结构
-export interface ApiResult<T> {
-  code: number;
-  message: string;
-  data: T;
-}
+/**
+ * Standard API response wrapper
+ */
+export type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
+  data?: T;
+};
+
+/**
+ * Single file upload response
+ */
+export type UploadResponse = Schemas["handler.UploadResponse"];
+
+/**
+ * Batch upload response containing results array
+ */
+export type BatchUploadResponse = Schemas["handler.BatchUploadResponse"];
+
+/**
+ * Individual file result within batch upload
+ */
+export type BatchUploadResult = Schemas["handler.BatchUploadResult"];
+
+// ============================================================================
+// Upload Service
+// ============================================================================
 
 export const uploadService = {
   /**
+   * Upload a single file to the server
+   * @param file - The file to upload
+   * @param hash - Unique file identifier (BLAKE3 hash)
+   * @param config - Optional Axios config (e.g., onUploadProgress)
+   * @returns A promise resolving to an Axios response with UploadResponse
+   */
+  uploadFile: async (
+    file: File,
+    hash: string,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<UploadResponse>>> => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return api.post<ApiResult<UploadResponse>>("/api/v1/assets", formData, {
+      ...config,
+      headers: {
+        "Content-Type": "multipart/form-data",
+        "X-Content-Hash": hash,
+        ...config?.headers,
+      },
+    });
+  },
+
+  /**
    * Batch upload multiple files.
-   * The Axios response `data` will be wrapped in our standard ApiResult.
+   * Each file's field name should be its BLAKE3 content hash.
+   * @param files - Array of file objects with their computed hashes
+   * @param config - Optional Axios config
+   * @returns A promise resolving to batch upload results
    */
   batchUploadFiles: async (
     files: { file: File; hash: string }[],
     config?: AxiosRequestConfig,
-  ): Promise<AxiosResponse<ApiResult<BatchUploadData>>> => {
+  ): Promise<AxiosResponse<ApiResult<BatchUploadResponse>>> => {
     const formData = new FormData();
 
     files.forEach((fileObj) => {
       formData.append(fileObj.hash, fileObj.file, fileObj.file.name);
     });
 
-    // T in api.post<T> now refers to the entire { code, message, data } object
-    return api.post<ApiResult<BatchUploadData>>(
+    return api.post<ApiResult<BatchUploadResponse>>(
       "/api/v1/assets/batch",
       formData,
       {
@@ -61,31 +88,5 @@ export const uploadService = {
         },
       },
     );
-  },
-
-  /**
-   * Upload a file to the server
-   * @param file - The file to upload
-   * @param hash - Unique file identifier
-   * @param config - Optional Axios config (e.g., onUploadProgress)
-   * @returns A promise resolving to an Axios response with UploadResponse
-   */
-  uploadFile: async (
-    file: File,
-    hash: string,
-    config?: AxiosRequestConfig,
-  ): Promise<AxiosResponse<UploadResponse>> => {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    // Add the hash as a header instead of form data
-    return api.post<UploadResponse>("/api/v1/assets", formData, {
-      ...config,
-      headers: {
-        "Content-Type": "multipart/form-data",
-        "X-Content-Hash": hash,
-        ...config?.headers,
-      },
-    });
   },
 };

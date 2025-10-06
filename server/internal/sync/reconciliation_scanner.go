@@ -91,11 +91,11 @@ func (rs *ReconciliationScanner) ReconcileRepository(ctx context.Context, repoID
 
 // reconcile performs the actual reconciliation work
 func (rs *ReconciliationScanner) reconcile(ctx context.Context, repoID uuid.UUID, repoPath string, config ReconciliationConfig, stats *SyncStats) error {
-	userManagedPath := filepath.Join(repoPath, "user")
+	userManagedPath := repoPath
 
-	// Check if user-managed directory exists
+	// Check if repository directory exists
 	if _, err := os.Stat(userManagedPath); os.IsNotExist(err) {
-		return fmt.Errorf("user-managed directory does not exist: %s", userManagedPath)
+		return fmt.Errorf("repository directory does not exist: %s", userManagedPath)
 	}
 
 	// Increment scan generation
@@ -137,8 +137,8 @@ func (rs *ReconciliationScanner) scanDirectory(ctx context.Context, repoID uuid.
 
 		// Skip directories
 		if info.IsDir() {
-			// Skip hidden directories
-			if strings.HasPrefix(filepath.Base(path), ".") && path != basePath {
+			// Skip hidden directories and inbox
+			if (strings.HasPrefix(filepath.Base(path), ".") && path != basePath) || (filepath.Base(path) == "inbox" && path != basePath) {
 				return filepath.SkipDir
 			}
 			return nil

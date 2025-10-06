@@ -15,6 +15,8 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/service"
 	"server/internal/storage"
+	filevalidator "server/internal/utils/file"
+	"server/internal/utils/hash"
 	"strconv"
 	"strings"
 	"time"
@@ -27,6 +29,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
+
+type UploadAssetRequest struct {
+	RepositoryID string `form:"repository_id"`
+}
+
+type BatchUploadRequest struct {
+	RepositoryID string `form:"repository_id"`
+}
 
 // UploadResponse represents the response structure for file upload
 type UploadResponse struct {
@@ -241,8 +251,13 @@ func NewAssetHandler(
 func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	// Parse multipart form
-	err := c.Request.ParseMultipartForm(32 << 20) // 32MB max
+	var req UploadAssetRequest
+	if err := c.ShouldBind(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request")
+		return
+	}
+
+	err := c.Request.ParseMultipartForm(32 << 20)
 	if err != nil {
 		api.GinBadRequest(c, err, "Failed to parse form")
 		return
@@ -255,8 +270,16 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// Get or use default repository
-	repositoryID := c.PostForm("repository_id")
+	// Validate file type
+	contentType := header.Header.Get("Content-Type")
+	validationResult := filevalidator.ValidateFile(header.Filename, contentType)
+	if !validationResult.Valid {
+		api.GinBadRequest(c, fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason))
+		return
+	}
+	log.Printf("Validated file %s as %s (RAW: %v)", header.Filename, validationResult.AssetType, validationResult.IsRAW)
+
+	repositoryID := req.RepositoryID
 	var repository repo.Repository
 	if repositoryID != "" {
 		repoUUID, err := uuid.Parse(repositoryID)
@@ -279,12 +302,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		repository = repositories[0]
 	}
 
-	// Get client hash or calculate it
 	clientHash := c.GetHeader("X-Content-Hash")
-	if clientHash == "" {
-		log.Println("Warning: No content hash provided by client, will calculate during processing")
-		clientHash = "" // Will be calculated by processor
-	}
 
 	// Create staging file in repository
 	stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, header.Filename)
@@ -309,6 +327,24 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		os.Remove(stagingFile.Path)
 		api.GinInternalError(c, err, "Upload failed")
 		return
+	}
+
+	// Calculate hash if not provided by client
+	if clientHash == "" {
+		log.Println("No content hash provided by client, calculating hash...")
+		hashResult, err := hash.CalculateFileHash(stagingFile.Path, hash.AlgorithmBLAKE3, true)
+		if err != nil {
+			log.Printf("Failed to calculate hash: %v", err)
+			os.Remove(stagingFile.Path)
+			api.GinInternalError(c, err, "Failed to calculate file hash")
+			return
+		}
+		clientHash = hashResult.Hash
+		if hashResult.IsQuick {
+			log.Printf("Calculated quick hash for large file %s: %s", header.Filename, clientHash)
+		} else {
+			log.Printf("Calculated hash for %s: %s", header.Filename, clientHash)
+		}
 	}
 
 	userID := c.GetString("user_id")
@@ -374,7 +410,13 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	err := c.Request.ParseMultipartForm(256 << 20) // 256MB max for batch
+	var req BatchUploadRequest
+	if err := c.ShouldBind(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request")
+		return
+	}
+
+	err := c.Request.ParseMultipartForm(256 << 20)
 	if err != nil {
 		api.GinBadRequest(c, err, "Failed to parse form")
 		return
@@ -386,8 +428,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		return
 	}
 
-	// Get or use default repository
-	repositoryID := c.PostForm("repository_id")
+	repositoryID := req.RepositoryID
 	var repository repo.Repository
 	if repositoryID != "" {
 		repoUUID, err := uuid.Parse(repositoryID)
@@ -417,11 +458,26 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 
 	var results []BatchUploadResult
 
-	for clientHash, headers := range form.File {
+	for fieldName, headers := range form.File {
 		if len(headers) == 0 {
 			continue
 		}
 		header := headers[0]
+
+		// Validate file type first
+		contentType := header.Header.Get("Content-Type")
+		validationResult := filevalidator.ValidateFile(header.Filename, contentType)
+		if !validationResult.Valid {
+			errMsg := "Unsupported file type: " + validationResult.ErrorReason
+			results = append(results, BatchUploadResult{
+				Success:     false,
+				FileName:    header.Filename,
+				ContentHash: fieldName,
+				Error:       &errMsg,
+			})
+			continue
+		}
+		log.Printf("Validated file %s as %s (RAW: %v)", header.Filename, validationResult.AssetType, validationResult.IsRAW)
 
 		file, err := header.Open()
 		if err != nil {
@@ -429,7 +485,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			results = append(results, BatchUploadResult{
 				Success:     false,
 				FileName:    header.Filename,
-				ContentHash: clientHash,
+				ContentHash: fieldName,
 				Error:       &errMsg,
 			})
 			continue
@@ -443,7 +499,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			results = append(results, BatchUploadResult{
 				Success:     false,
 				FileName:    header.Filename,
-				ContentHash: clientHash,
+				ContentHash: fieldName,
 				Error:       &errMsg,
 			})
 			file.Close()
@@ -457,7 +513,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			results = append(results, BatchUploadResult{
 				Success:     false,
 				FileName:    header.Filename,
-				ContentHash: clientHash,
+				ContentHash: fieldName,
 				Error:       &errMsg,
 			})
 			file.Close()
@@ -474,10 +530,35 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			results = append(results, BatchUploadResult{
 				Success:     false,
 				FileName:    header.Filename,
-				ContentHash: clientHash,
+				ContentHash: fieldName,
 				Error:       &errMsg,
 			})
 			continue
+		}
+
+		// Use fieldName as clientHash, or calculate if it doesn't look like a valid hash
+		clientHash := fieldName
+		if !hash.ValidateHash(clientHash, hash.AlgorithmBLAKE3) && !hash.ValidateHash(clientHash, hash.AlgorithmSHA256) {
+			log.Printf("Field name '%s' is not a valid hash, calculating hash for %s...", fieldName, header.Filename)
+			hashResult, err := hash.CalculateFileHash(stagingFile.Path, hash.AlgorithmBLAKE3, true)
+			if err != nil {
+				log.Printf("Failed to calculate hash: %v", err)
+				os.Remove(stagingFile.Path)
+				errMsg := "Failed to calculate file hash: " + err.Error()
+				results = append(results, BatchUploadResult{
+					Success:     false,
+					FileName:    header.Filename,
+					ContentHash: fieldName,
+					Error:       &errMsg,
+				})
+				continue
+			}
+			clientHash = hashResult.Hash
+			if hashResult.IsQuick {
+				log.Printf("Calculated quick hash for large file %s: %s", header.Filename, clientHash)
+			} else {
+				log.Printf("Calculated hash for %s: %s", header.Filename, clientHash)
+			}
 		}
 
 		payload := processors.AssetPayload{
@@ -502,6 +583,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 
 		if err != nil {
 			log.Printf("Failed to enqueue task: %v", err)
+			os.Remove(stagingFile.Path)
 			errMsg := "Failed to enqueue task: " + err.Error()
 			results = append(results, BatchUploadResult{
 				Success:     false,
@@ -512,6 +594,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 			continue
 		}
 		if jobInsetResult == nil || jobInsetResult.Job == nil {
+			os.Remove(stagingFile.Path)
 			errMsg := "Failed to enqueue task: empty result"
 			results = append(results, BatchUploadResult{
 				Success:     false,

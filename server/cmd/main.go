@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"server/internal/queue"
 	"server/internal/service"
 	"server/internal/storage"
+	"server/internal/storage/repocfg"
 	"server/proto"
 
 	"github.com/riverqueue/river"
@@ -49,7 +51,7 @@ func init() {
 // @in header
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token.
-
+// @openapi 3.0.0
 func main() {
 	// Load configurations
 	dbConfig := config.LoadDBConfig()
@@ -82,10 +84,19 @@ func main() {
 		log.Fatalf("Failed to create staging directory: %v", err)
 	}
 
-	// Initialize new repository-based storage system
-	repoManager := storage.NewRepositoryManager(queries)
+	// Initialize new repository-based storage system with sync enabled
+	repoManager, err := storage.NewRepositoryManager(queries, pgxPool, appConfig.SyncEnabled)
+	if err != nil {
+		log.Fatalf("Failed to initialize repository manager: %v", err)
+	}
 	stagingManager := storage.NewStagingManager()
 	log.Println("✅ Repository Storage System Initialized")
+	// Initialize primary storage repository
+	log.Println("📁 Initializing primary storage repository...")
+	if err := initPrimaryStorage(repoManager); err != nil {
+		log.Printf("Warning: Failed to initialize primary storage: %v", err)
+		log.Println("Please ensure STORAGE_PATH environment variable is set")
+	}
 
 	// Initialize optional ML connection/services based on config
 	var mlConn *grpc.ClientConn
@@ -171,7 +182,80 @@ func main() {
 	log.Printf("🌐 Server starting on port %s...", appConfig.Port)
 	log.Printf("📖 API Documentation: http://localhost:%s/swagger/index.html", appConfig.Port)
 	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", appConfig.Port)
+
+	// Ensure graceful shutdown of sync system
+	defer func() {
+		if appConfig.SyncEnabled {
+			log.Println("Shutting down sync manager...")
+			if err := repoManager.StopSync(); err != nil {
+				log.Printf("Error stopping sync manager: %v", err)
+			}
+		}
+	}()
+
 	if err := http.ListenAndServe(":"+appConfig.Port, router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func initPrimaryStorage(repoManager storage.RepositoryManager) error {
+	// Load environment variables
+	storagePath := os.Getenv("STORAGE_PATH")
+	if storagePath == "" {
+		return fmt.Errorf("STORAGE_PATH environment variable is required")
+	}
+
+	storageStrategy := os.Getenv("STORAGE_STRATEGY")
+	if storageStrategy == "" {
+		storageStrategy = "date" // Default to date strategy
+	}
+
+	preserveFilename := os.Getenv("STORAGE_PRESERVE_FILENAME")
+	preserve := preserveFilename != "false" // Default to true
+
+	duplicateHandling := os.Getenv("STORAGE_DUPLICATE_HANDLING")
+	if duplicateHandling == "" {
+		duplicateHandling = "rename" // Default to rename
+	}
+
+	// If a repository already exists at the storage path, register it if needed
+	if repocfg.IsRepositoryRoot(storagePath) {
+		// If it's already registered in DB, we're done
+		if existing, err := repoManager.GetRepositoryByPath(storagePath); err == nil {
+			log.Printf("✅ Primary storage already initialized at: %s", storagePath)
+			log.Printf("   Repository ID: %s", existing.RepoID.Bytes)
+			return nil
+		}
+
+		// Otherwise, register the existing repository
+		existingRepo, err := repoManager.AddRepository(storagePath)
+		if err != nil {
+			return fmt.Errorf("failed to register existing primary storage repository: %w", err)
+		}
+
+		log.Printf("✅ Primary storage registered at: %s", storagePath)
+		log.Printf("   Repository ID: %s", existingRepo.RepoID.Bytes)
+		return nil
+	}
+
+	// Create repository configuration
+	cfg := repocfg.NewRepositoryConfig(
+		"Primary Storage",
+		repocfg.WithStorageStrategy(storageStrategy),
+		repocfg.WithLocalSettings(preserve, duplicateHandling, 0, false, false),
+	)
+
+	// Initialize a new repository with the configuration
+	repo, err := repoManager.InitializeRepository(storagePath, *cfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize primary storage repository: %w", err)
+	}
+
+	log.Printf("✅ Primary storage initialized at: %s", storagePath)
+	log.Printf("   Repository ID: %s", repo.RepoID)
+	log.Printf("   Storage Strategy: %s", storageStrategy)
+	log.Printf("   Duplicate Handling: %s", duplicateHandling)
+	log.Printf("   Preserve Filename: %v", preserve)
+
+	return nil
 }

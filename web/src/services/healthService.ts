@@ -1,10 +1,20 @@
+// src/services/healthService.ts
+
 import api from "@/lib/http-commons/api.ts";
 import type { AxiosResponse } from "axios";
+
+// ============================================================================
+// Constants
+// ============================================================================
 
 export const HEALTH_ENDPOINT = "/api/v1/health";
 export const MIN_HEALTH_INTERVAL_SEC = 1;
 export const MAX_HEALTH_INTERVAL_SEC = 50;
 export const DEFAULT_HEALTH_INTERVAL_SEC = 5;
+
+// ============================================================================
+// Health Check Types
+// ============================================================================
 
 export interface HealthCheckResult<T = any> {
   online: boolean;
@@ -13,19 +23,23 @@ export interface HealthCheckResult<T = any> {
   error?: string;
 }
 
+// ============================================================================
+// Health Service
+// ============================================================================
+
 /**
-  Fetch raw health response using shared axios instance.
-  Consumers rarely need this directly. Prefer checkHealth or isServerOnline.
-*/
+ * Fetch raw health response using shared axios instance.
+ * Consumers rarely need this directly. Prefer checkHealth or isServerOnline.
+ */
 export async function fetchHealth<T = any>(): Promise<AxiosResponse<T>> {
   // Accept non-2xx for explicit online=false classification without throwing
   return api.get<T>(HEALTH_ENDPOINT, { validateStatus: () => true });
 }
 
 /**
-  Calls /api/v1/health and returns normalized result.
-  online is true for 2xx responses, false otherwise (including network errors).
-*/
+ * Calls /api/v1/health and returns normalized result.
+ * online is true for 2xx responses, false otherwise (including network errors).
+ */
 export async function checkHealth<T = any>(): Promise<HealthCheckResult<T>> {
   try {
     const res = await fetchHealth<T>();
@@ -48,29 +62,32 @@ export async function checkHealth<T = any>(): Promise<HealthCheckResult<T>> {
 }
 
 /**
-  Lightweight convenience wrapper to get online/offline state.
-*/
+ * Lightweight convenience wrapper to get online/offline state.
+ */
 export async function isServerOnline(): Promise<boolean> {
   const result = await checkHealth();
   return result.online;
 }
 
 /**
-  Starts polling the health endpoint at the specified interval (in seconds).
-  Invokes onUpdate with the latest HealthCheckResult after each poll.
-  Returns a cleanup function to stop polling.
-
-  Example:
-    const stop = pollHealth(5, ({ online }) => setOnline(online));
-    // later: stop()
-*/
+ * Starts polling the health endpoint at the specified interval (in seconds).
+ * Invokes onUpdate with the latest HealthCheckResult after each poll.
+ * Returns a cleanup function to stop polling.
+ *
+ * @example
+ * const stop = pollHealth(5, ({ online }) => setOnline(online));
+ * // later: stop()
+ */
 export function pollHealth<T = any>(
   intervalSeconds: number,
   onUpdate: (result: HealthCheckResult<T>) => void,
 ): () => void {
   const ms = Math.max(
     1000,
-    Math.min(MAX_HEALTH_INTERVAL_SEC, Math.max(MIN_HEALTH_INTERVAL_SEC, intervalSeconds)) * 1000,
+    Math.min(
+      MAX_HEALTH_INTERVAL_SEC,
+      Math.max(MIN_HEALTH_INTERVAL_SEC, intervalSeconds),
+    ) * 1000,
   );
 
   let cancelled = false;

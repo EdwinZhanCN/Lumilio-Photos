@@ -66,12 +66,12 @@ func (ap *AssetProcessor) processAudioAsset(
 
 	// Goroutine 2: Transcode audio (smart strategy)
 	g.Go(func() error {
-		return ap.transcodeAudioSmart(gCtx, asset, tempFile.Name(), audioInfo)
+		return ap.transcodeAudioSmart(gCtx, repository.Path, asset, tempFile.Name(), audioInfo)
 	})
 
 	// Goroutine 3: Generate waveform visualization (optional)
 	g.Go(func() error {
-		return ap.generateWaveform(gCtx, asset, tempFile.Name())
+		return ap.generateWaveform(gCtx, repository.Path, asset, tempFile.Name())
 	})
 
 	if err := g.Wait(); err != nil {
@@ -121,11 +121,11 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 	return nil
 }
 
-func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, asset *repo.Asset, audioPath string, audioInfo *AudioInfo) error {
+func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, repoPath string, asset *repo.Asset, audioPath string, audioInfo *AudioInfo) error {
 	// Smart transcoding strategy for web compatibility
 	if strings.ToLower(audioInfo.Format) == "mp3" && audioInfo.Bitrate >= 128 && audioInfo.Bitrate <= 320 {
 		// Audio is already MP3 with good bitrate, just copy to storage
-		return ap.copyAudioForWeb(ctx, asset, audioPath, "web")
+		return ap.copyAudioForWeb(ctx, repoPath, asset, audioPath, "web")
 	}
 
 	// Need to transcode to MP3
@@ -136,7 +136,7 @@ func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, asset *repo.A
 	defer os.Remove(outputPath)
 
 	// Just save the MP3 version
-	return ap.saveTranscodedAudio(ctx, asset, outputPath, "web")
+	return ap.saveTranscodedAudio(ctx, repoPath, asset, outputPath, "web")
 }
 
 func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath string, audioInfo *AudioInfo) (string, error) {
@@ -172,27 +172,27 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 	return outputPath, nil
 }
 
-func (ap *AssetProcessor) copyAudioForWeb(ctx context.Context, asset *repo.Asset, audioPath, version string) error {
+func (ap *AssetProcessor) copyAudioForWeb(ctx context.Context, repoPath string, asset *repo.Asset, audioPath, version string) error {
 	audioFile, err := os.Open(audioPath)
 	if err != nil {
 		return fmt.Errorf("open audio file: %w", err)
 	}
 	defer audioFile.Close()
 
-	return ap.assetService.SaveAudioVersion(ctx, audioFile, asset, version)
+	return ap.assetService.SaveAudioVersion(ctx, repoPath, audioFile, asset, version)
 }
 
-func (ap *AssetProcessor) saveTranscodedAudio(ctx context.Context, asset *repo.Asset, outputPath, version string) error {
+func (ap *AssetProcessor) saveTranscodedAudio(ctx context.Context, repoPath string, asset *repo.Asset, outputPath, version string) error {
 	transcodedFile, err := os.Open(outputPath)
 	if err != nil {
 		return fmt.Errorf("open transcoded file: %w", err)
 	}
 	defer transcodedFile.Close()
 
-	return ap.assetService.SaveAudioVersion(ctx, transcodedFile, asset, version)
+	return ap.assetService.SaveAudioVersion(ctx, repoPath, transcodedFile, asset, version)
 }
 
-func (ap *AssetProcessor) generateWaveform(ctx context.Context, asset *repo.Asset, audioPath string) error {
+func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string, asset *repo.Asset, audioPath string) error {
 	// Generate waveform visualization image
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("waveform_%s.png", asset.AssetID.Bytes))
 	defer os.Remove(outputPath)
@@ -225,7 +225,7 @@ func (ap *AssetProcessor) generateWaveform(ctx context.Context, asset *repo.Asse
 	}
 
 	// Save as a special "waveform" thumbnail
-	return ap.assetService.SaveNewThumbnail(ctx, buf, asset, "waveform")
+	return ap.assetService.SaveNewThumbnail(ctx, repoPath, buf, asset, "waveform")
 }
 
 func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
