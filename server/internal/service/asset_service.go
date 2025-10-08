@@ -13,7 +13,6 @@ import (
 	"server/internal/db/repo"
 	"server/internal/storage"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -479,7 +478,7 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 	return s.queries.UpdateAssetMetadataWithTakenTime(ctx, params)
 }
 
-// DeleteAsset marks an asset as deleted
+// DeleteAsset marks an asset as deleted, and move the asset to the trash folder
 func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
@@ -838,16 +837,14 @@ func intPtrFromInt32Ptr(i32 *int32) *int {
 // ================================
 
 func (s *assetService) FilterAssets(ctx context.Context, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
-	// Convert repository ID to path if provided
-	var repoPath *string
+	// Convert repository ID string to pgtype.UUID if provided
+	var repoUUID pgtype.UUID
 	if repositoryID != nil && *repositoryID != "" {
-		if s.repoManager != nil {
-			path, err := s.repoManager.GetRepositoryPath(*repositoryID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get repository path: %w", err)
-			}
-			repoPath = &path
+		parsedUUID, err := uuid.Parse(*repositoryID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid repository ID: %w", err)
 		}
+		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
 	}
 
 	// Convert rating pointer for SQL
@@ -869,7 +866,7 @@ func (s *assetService) FilterAssets(ctx context.Context, repositoryID *string, a
 	return s.queries.FilterAssets(ctx, repo.FilterAssetsParams{
 		AssetType:    assetType,
 		OwnerID:      ownerID,
-		RepoPath:     repoPath,
+		RepositoryID: repoUUID,
 		FilenameVal:  filenameVal,
 		FilenameMode: filenameMode,
 		DateFrom:     fromTime,
@@ -885,16 +882,14 @@ func (s *assetService) FilterAssets(ctx context.Context, repositoryID *string, a
 }
 
 func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
-	// Convert repository ID to path if provided
-	var repoPath *string
+	// Convert repository ID string to pgtype.UUID if provided
+	var repoUUID pgtype.UUID
 	if repositoryID != nil && *repositoryID != "" {
-		if s.repoManager != nil {
-			path, err := s.repoManager.GetRepositoryPath(*repositoryID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get repository path: %w", err)
-			}
-			repoPath = &path
+		parsedUUID, err := uuid.Parse(*repositoryID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid repository ID: %w", err)
 		}
+		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
 	}
 
 	// Convert rating pointer for SQL
@@ -917,7 +912,7 @@ func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, r
 		Query:        &query,
 		AssetType:    assetType,
 		OwnerID:      ownerID,
-		RepoPath:     repoPath,
+		RepositoryID: repoUUID,
 		FilenameVal:  filenameVal,
 		FilenameMode: filenameMode,
 		DateFrom:     fromTime,
@@ -937,16 +932,14 @@ func (s *assetService) SearchAssetsVector(ctx context.Context, query string, rep
 		return nil, fmt.Errorf("ML service not available for semantic search")
 	}
 
-	// Convert repository ID to path if provided
-	var repoPath *string
+	// Convert repository ID string to pgtype.UUID if provided
+	var repoUUID pgtype.UUID
 	if repositoryID != nil && *repositoryID != "" {
-		if s.repoManager != nil {
-			path, err := s.repoManager.GetRepositoryPath(*repositoryID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get repository path: %w", err)
-			}
-			repoPath = &path
+		parsedUUID, err := uuid.Parse(*repositoryID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid repository ID: %w", err)
 		}
+		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
 	}
 
 	// Get query embedding
@@ -988,7 +981,7 @@ func (s *assetService) SearchAssetsVector(ctx context.Context, query string, rep
 		Embedding:    pgEmbedding,
 		AssetType:    assetType,
 		OwnerID:      ownerID,
-		RepoPath:     repoPath,
+		RepositoryID: repoUUID,
 		FilenameVal:  filenameVal,
 		FilenameMode: filenameMode,
 		DateFrom:     fromTime,
@@ -1334,40 +1327,4 @@ func (s *assetService) UpdateAssetDimensions(ctx context.Context, id uuid.UUID, 
 	}
 
 	return s.queries.UpdateAssetDimensions(ctx, params)
-}
-
-// extractRepoPath extracts the repository root path from an asset's storage path
-// Storage path formats:
-//   - "{repo_path}/inbox/2024/01/file.jpg"
-//   - "{repo_path}/user/photos/file.jpg"
-//
-// Returns the repository root path
-func (s *assetService) extractRepoPath(storagePath string) string {
-	// Storage path should contain either /inbox/ or /user/
-	// Find the position of these markers
-	inboxIdx := strings.Index(storagePath, "/inbox/")
-	userIdx := strings.Index(storagePath, "/user/")
-
-	var cutIdx int
-	if inboxIdx != -1 {
-		cutIdx = inboxIdx
-	} else if userIdx != -1 {
-		cutIdx = userIdx
-	} else {
-		// If neither found, try to find .lumilio (might be a processed file path)
-		lumilioIdx := strings.Index(storagePath, "/.lumilio/")
-		if lumilioIdx != -1 {
-			cutIdx = lumilioIdx
-		} else {
-			// Fallback: assume first directory component is repo path
-			parts := strings.Split(storagePath, string(filepath.Separator))
-			if len(parts) > 1 {
-				// Return everything except the last component
-				return filepath.Join(parts[:len(parts)-1]...)
-			}
-			return ""
-		}
-	}
-
-	return storagePath[:cutIdx]
 }

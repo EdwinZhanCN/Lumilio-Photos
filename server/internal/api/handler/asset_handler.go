@@ -1,15 +1,18 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"server/internal/api"
 	"server/internal/db/dbtypes"
+	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
 	"server/internal/processors"
 	"server/internal/queue/jobs"
@@ -17,6 +20,8 @@ import (
 	"server/internal/storage"
 	filevalidator "server/internal/utils/file"
 	"server/internal/utils/hash"
+	"server/internal/utils/memory"
+	"server/internal/utils/upload"
 	"strconv"
 	"strings"
 	"time"
@@ -31,11 +36,26 @@ import (
 )
 
 type UploadAssetRequest struct {
-	RepositoryID string `form:"repository_id"`
+	RepositoryID string `form:"repository_id" binding:"omitempty,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
 type BatchUploadRequest struct {
-	RepositoryID string `form:"repository_id"`
+	RepositoryID string `form:"repository_id" binding:"omitempty,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+}
+
+// ReprocessAssetRequest represents the request structure for asset reprocessing
+type ReprocessAssetRequest struct {
+	Tasks          []string `json:"tasks" binding:"omitempty" example:"thumbnail_small,thumbnail_medium,transcode_1080p"`
+	ForceFullRetry bool     `json:"force_full_retry,omitempty" example:"false"`
+}
+
+// ReprocessAssetResponse represents the response structure for asset reprocessing
+type ReprocessAssetResponse struct {
+	AssetID     string   `json:"asset_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Status      string   `json:"status" example:"queued"`
+	Message     string   `json:"message" example:"Reprocessing job queued successfully"`
+	FailedTasks []string `json:"failed_tasks,omitempty" example:"thumbnail_small,transcode_1080p"`
+	RetryTasks  []string `json:"retry_tasks,omitempty" example:"thumbnail_small,transcode_1080p"`
 }
 
 // UploadResponse represents the response structure for file upload
@@ -64,6 +84,41 @@ type BatchUploadResult struct {
 	Error       *string `json:"error,omitempty"`     // Only present for failed uploads
 }
 
+// UploadConfigResponse represents the response structure for upload configuration
+type UploadConfigResponse struct {
+	ChunkSize     int64 `json:"chunk_size"`     // in bytes
+	MaxConcurrent int   `json:"max_concurrent"` // maximum concurrent uploads
+	MemoryBuffer  int64 `json:"memory_buffer"`  // safety buffer in bytes
+}
+
+// SessionProgress represents progress information for an upload session
+type SessionProgress struct {
+	SessionID    string    `json:"session_id"`
+	Filename     string    `json:"filename"`
+	Status       string    `json:"status"`   // pending, uploading, merging, completed, failed
+	Progress     float64   `json:"progress"` // 0-1
+	Received     int       `json:"received_chunks"`
+	Total        int       `json:"total_chunks"`
+	BytesDone    int64     `json:"bytes_done"`
+	BytesTotal   int64     `json:"bytes_total"`
+	LastActivity time.Time `json:"last_activity"`
+}
+
+// ProgressSummary represents summary information for all upload sessions
+type ProgressSummary struct {
+	TotalSessions   int     `json:"total_sessions"`
+	ActiveSessions  int     `json:"active_sessions"`
+	CompletedFiles  int     `json:"completed_files"`
+	FailedSessions  int     `json:"failed_sessions"`
+	OverallProgress float64 `json:"overall_progress"`
+}
+
+// UploadProgressResponse represents the response structure for upload progress
+type UploadProgressResponse struct {
+	Sessions []SessionProgress `json:"sessions"`
+	Summary  ProgressSummary   `json:"summary"`
+}
+
 // AssetListResponse represents the response structure for asset listing
 type AssetListResponse struct {
 	Assets []AssetDTO `json:"assets"`
@@ -75,6 +130,7 @@ type AssetListResponse struct {
 type AssetDTO struct {
 	AssetID          string                   `json:"asset_id"`
 	OwnerID          *int32                   `json:"owner_id"`
+	RepositoryID     *string                  `json:"repository_id,omitempty"`
 	Type             string                   `json:"type"`
 	OriginalFilename string                   `json:"original_filename"`
 	StoragePath      string                   `json:"storage_path"`
@@ -85,6 +141,9 @@ type AssetDTO struct {
 	Height           *int32                   `json:"height"`
 	Duration         *float64                 `json:"duration"`
 	UploadTime       time.Time                `json:"upload_time"`
+	TakenTime        *time.Time               `json:"taken_time,omitempty"`
+	Rating           *int32                   `json:"rating,omitempty"`
+	Liked            *bool                    `json:"liked,omitempty"`
 	IsDeleted        *bool                    `json:"is_deleted"`
 	DeletedAt        *time.Time               `json:"deleted_at,omitempty"`
 	Metadata         dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object"`
@@ -105,12 +164,23 @@ func toAssetDTO(a repo.Asset) AssetDTO {
 		t := a.DeletedAt.Time
 		deletedAt = &t
 	}
+	var repositoryID *string
+	if a.RepositoryID.Valid {
+		repoUUID := uuid.UUID(a.RepositoryID.Bytes).String()
+		repositoryID = &repoUUID
+	}
+	var takenTime *time.Time
+	if a.TakenTime.Valid {
+		t := a.TakenTime.Time
+		takenTime = &t
+	}
 	return AssetDTO{
 		AssetID:          id,
 		OwnerID:          a.OwnerID,
+		RepositoryID:     repositoryID,
 		Type:             a.Type,
 		OriginalFilename: a.OriginalFilename,
-		StoragePath:      a.StoragePath,
+		StoragePath:      *a.StoragePath,
 		MimeType:         a.MimeType,
 		FileSize:         a.FileSize,
 		Hash:             a.Hash,
@@ -118,6 +188,9 @@ func toAssetDTO(a repo.Asset) AssetDTO {
 		Height:           a.Height,
 		Duration:         a.Duration,
 		UploadTime:       uploadTime,
+		TakenTime:        takenTime,
+		Rating:           a.Rating,
+		Liked:            a.Liked,
 		IsDeleted:        a.IsDeleted,
 		DeletedAt:        deletedAt,
 		Metadata:         a.SpecificMetadata,
@@ -216,6 +289,9 @@ type AssetHandler struct {
 	repoManager    storage.RepositoryManager
 	stagingManager storage.StagingManager
 	queueClient    *river.Client[pgx.Tx]
+	memoryMonitor  *memory.MemoryMonitor
+	sessionManager *upload.SessionManager
+	chunkMerger    *upload.ChunkMerger
 }
 
 // NewAssetHandler creates a new AssetHandler instance
@@ -226,12 +302,19 @@ func NewAssetHandler(
 	stagingManager storage.StagingManager,
 	queueClient *river.Client[pgx.Tx],
 ) *AssetHandler {
+	memoryMonitor := memory.NewMemoryMonitor()
+	sessionManager := upload.NewSessionManager(30 * time.Minute) // 30 minute timeout
+	chunkMerger := upload.NewChunkMerger(storage.DefaultStructure.TempDir)
+
 	return &AssetHandler{
 		assetService:   assetService,
 		queries:        queries,
 		repoManager:    repoManager,
 		stagingManager: stagingManager,
 		queueClient:    queueClient,
+		memoryMonitor:  memoryMonitor,
+		sessionManager: sessionManager,
+		chunkMerger:    chunkMerger,
 	}
 }
 
@@ -242,7 +325,7 @@ func NewAssetHandler(
 // @Accept multipart/form-data
 // @Produce json
 // @Param file formData file true "Asset file to upload"
-// @Param repository_id formData string false "Repository UUID (optional, uses default if not provided)"
+// @Param repository_id formData string false "Repository UUID (uses default repository if not provided)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param X-Content-Hash header string false "Client-calculated BLAKE3 hash of the file"
 // @Success 200 {object} api.Result{data=UploadResponse} "Upload successful"
 // @Failure 400 {object} api.Result "Bad request - no file provided or parse error"
@@ -396,13 +479,15 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	api.GinSuccess(c, response)
 }
 
-// BatchUploadAssets handles multiple asset uploads
-// @Summary Batch upload assets
-// @Description Batch upload multiple assets to a repository. Each file part's field name should be its BLAKE3 content hash. All files are staged and queued for processing.
+// BatchUploadAssets handles multiple asset uploads with unified chunk support
+// @Summary Batch upload assets with chunk support
+// @Description Unified batch upload endpoint that supports both small files and chunked large files. Field names should follow format: single_{session_id} for single files or chunk_{session_id}_{index}_{total} for chunks.
 // @Tags assets
 // @Accept multipart/form-data
 // @Produce json
-// @Param repository_id formData string false "Repository UUID (optional, uses default if not provided)"
+// @Param repository_id formData string false "Repository UUID (uses default repository if not provided)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Param file formData file false "Single file upload - use format: single_{session_id}" example("single_123e4567-e89b-12d3-a456-426614174000")
+// @Param file formData file false "Chunked file upload - use format: chunk_{session_id}_{index}_{total}" example("chunk_123e4567-e89b-12d3-a456-426614174000_1_10")
 // @Success 200 {object} api.Result{data=BatchUploadResponse} "Batch upload completed"
 // @Failure 400 {object} api.Result "Bad request - no files provided or parse error"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -456,175 +541,140 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		userID = "anonymous"
 	}
 
+	// Group files by session
+	sessionGroups := h.groupFilesBySession(form.File)
 	var results []BatchUploadResult
 
-	for fieldName, headers := range form.File {
-		if len(headers) == 0 {
-			continue
-		}
-		header := headers[0]
-
-		// Validate file type first
-		contentType := header.Header.Get("Content-Type")
-		validationResult := filevalidator.ValidateFile(header.Filename, contentType)
-		if !validationResult.Valid {
-			errMsg := "Unsupported file type: " + validationResult.ErrorReason
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: fieldName,
-				Error:       &errMsg,
-			})
-			continue
-		}
-		log.Printf("Validated file %s as %s (RAW: %v)", header.Filename, validationResult.AssetType, validationResult.IsRAW)
-
-		file, err := header.Open()
+	// Process each session
+	for sessionID, files := range sessionGroups {
+		result, err := h.processUploadSession(ctx, sessionID, files, repository, userID)
 		if err != nil {
-			errMsg := "Failed to open file: " + err.Error()
+			// Handle session-level errors
+			errMsg := err.Error()
 			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: fieldName,
-				Error:       &errMsg,
+				Success:  false,
+				FileName: sessionID,
+				Error:    &errMsg,
 			})
-			continue
+		} else {
+			results = append(results, *result)
 		}
+	}
 
-		// Create staging file in repository
-		stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, header.Filename)
-		if err != nil {
-			log.Printf("Failed to create staging file: %v", err)
-			errMsg := "Failed to create staging file: " + err.Error()
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: fieldName,
-				Error:       &errMsg,
-			})
-			file.Close()
-			continue
-		}
-
-		osFile, err := os.Create(stagingFile.Path)
-		if err != nil {
-			log.Printf("Failed to open staging file: %v", err)
-			errMsg := "Failed to open staging file: " + err.Error()
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: fieldName,
-				Error:       &errMsg,
-			})
-			file.Close()
-			continue
-		}
-
-		_, err = io.Copy(osFile, file)
-		osFile.Close()
-		file.Close()
-		if err != nil {
-			log.Printf("Failed to copy file to staging: %v", err)
-			os.Remove(stagingFile.Path)
-			errMsg := "Failed to copy file to staging: " + err.Error()
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: fieldName,
-				Error:       &errMsg,
-			})
-			continue
-		}
-
-		// Use fieldName as clientHash, or calculate if it doesn't look like a valid hash
-		clientHash := fieldName
-		if !hash.ValidateHash(clientHash, hash.AlgorithmBLAKE3) && !hash.ValidateHash(clientHash, hash.AlgorithmSHA256) {
-			log.Printf("Field name '%s' is not a valid hash, calculating hash for %s...", fieldName, header.Filename)
-			hashResult, err := hash.CalculateFileHash(stagingFile.Path, hash.AlgorithmBLAKE3, true)
-			if err != nil {
-				log.Printf("Failed to calculate hash: %v", err)
-				os.Remove(stagingFile.Path)
-				errMsg := "Failed to calculate file hash: " + err.Error()
-				results = append(results, BatchUploadResult{
-					Success:     false,
-					FileName:    header.Filename,
-					ContentHash: fieldName,
-					Error:       &errMsg,
-				})
-				continue
-			}
-			clientHash = hashResult.Hash
-			if hashResult.IsQuick {
-				log.Printf("Calculated quick hash for large file %s: %s", header.Filename, clientHash)
-			} else {
-				log.Printf("Calculated hash for %s: %s", header.Filename, clientHash)
-			}
-		}
-
-		payload := processors.AssetPayload{
-			ClientHash:   clientHash,
-			StagedPath:   stagingFile.Path,
-			UserID:       userID,
-			Timestamp:    time.Now(),
-			ContentType:  header.Header.Get("Content-Type"),
-			FileName:     header.Filename,
-			RepositoryID: uuid.UUID(repository.RepoID.Bytes).String(),
-		}
-
-		jobInsetResult, err := h.queueClient.Insert(ctx, jobs.ProcessAssetArgs{
-			ClientHash:   payload.ClientHash,
-			StagedPath:   payload.StagedPath,
-			UserID:       payload.UserID,
-			Timestamp:    payload.Timestamp,
-			ContentType:  payload.ContentType,
-			FileName:     payload.FileName,
-			RepositoryID: payload.RepositoryID,
-		}, &river.InsertOpts{Queue: "process_asset"})
-
-		if err != nil {
-			log.Printf("Failed to enqueue task: %v", err)
-			os.Remove(stagingFile.Path)
-			errMsg := "Failed to enqueue task: " + err.Error()
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: clientHash,
-				Error:       &errMsg,
-			})
-			continue
-		}
-		if jobInsetResult == nil || jobInsetResult.Job == nil {
-			os.Remove(stagingFile.Path)
-			errMsg := "Failed to enqueue task: empty result"
-			results = append(results, BatchUploadResult{
-				Success:     false,
-				FileName:    header.Filename,
-				ContentHash: clientHash,
-				Error:       &errMsg,
-			})
-			continue
-		}
-		jobId := jobInsetResult.Job.ID
-
-		log.Printf("Task %d enqueued for processing file %s in repository %s", jobId, header.Filename, repository.Name)
-
-		taskID := jobId
-		status := "processing"
-		size := header.Size
-		message := fmt.Sprintf("File received and queued for processing in repository '%s'", repository.Name)
-
-		results = append(results, BatchUploadResult{
-			Success:     true,
-			FileName:    header.Filename,
-			ContentHash: clientHash,
-			TaskID:      &taskID,
-			Status:      &status,
-			Size:        &size,
-			Message:     &message,
-		})
+	// Clean up expired sessions periodically
+	if len(sessionGroups) > 0 {
+		go h.cleanupExpiredSessions()
 	}
 
 	api.GinSuccess(c, BatchUploadResponse{Results: results})
+}
+
+// GetUploadConfig returns current upload configuration
+// @Summary Get upload configuration
+// @Description Get current upload configuration including chunk size and concurrency limits based on system memory
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.Result{data=UploadConfigResponse} "Upload configuration retrieved"
+// @Router /assets/batch/config [get]
+func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
+	config, err := h.memoryMonitor.GetOptimalChunkConfig()
+	if err != nil {
+		// Fallback to default config
+		config = &memory.ChunkConfig{
+			ChunkSize:      5 * 1024 * 1024,
+			MaxConcurrent:  3,
+			MemoryBuffer:   100 * 1024 * 1024,
+			UpdateInterval: 30,
+		}
+	}
+
+	response := UploadConfigResponse{
+		ChunkSize:     config.ChunkSize,
+		MaxConcurrent: config.MaxConcurrent,
+		MemoryBuffer:  config.MemoryBuffer,
+	}
+
+	api.GinSuccess(c, response)
+}
+
+// GetUploadProgress returns upload progress for sessions
+// @Summary Get upload progress
+// @Description Get detailed progress information for upload sessions
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param session_ids query string false "Comma-separated session IDs (optional)"
+// @Success 200 {object} api.Result{data=UploadProgressResponse} "Upload progress details"
+// @Router /assets/batch/progress [get]
+func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
+	sessionIDsParam := c.Query("session_ids")
+	var targetSessions []*upload.UploadSession
+
+	if sessionIDsParam != "" {
+		// Get specific sessions
+		sessionIDs := strings.Split(sessionIDsParam, ",")
+		for _, sessionID := range sessionIDs {
+			if session, exists := h.sessionManager.GetSession(sessionID); exists {
+				targetSessions = append(targetSessions, session)
+			}
+		}
+	} else {
+		// Get all sessions for current user
+		userID := c.GetString("user_id")
+		if userID == "" {
+			userID = "anonymous"
+		}
+		targetSessions = h.sessionManager.GetSessionsByUser(userID)
+	}
+
+	var sessionsProgress []SessionProgress
+	var totalBytesDone, totalBytesTotal int64
+	var completedFiles int
+
+	for _, session := range targetSessions {
+		progress, _ := h.sessionManager.GetSessionProgress(session.SessionID)
+
+		sessionProgress := SessionProgress{
+			SessionID:    session.SessionID,
+			Filename:     session.Filename,
+			Status:       session.Status,
+			Progress:     progress,
+			Received:     len(session.ReceivedChunks),
+			Total:        session.TotalChunks,
+			BytesDone:    session.BytesReceived,
+			BytesTotal:   session.TotalSize,
+			LastActivity: session.LastActivity,
+		}
+
+		sessionsProgress = append(sessionsProgress, sessionProgress)
+		totalBytesDone += session.BytesReceived
+		totalBytesTotal += session.TotalSize
+
+		if session.Status == "completed" {
+			completedFiles++
+		}
+	}
+
+	overallProgress := 0.0
+	if totalBytesTotal > 0 {
+		overallProgress = float64(totalBytesDone) / float64(totalBytesTotal)
+	}
+
+	summary := ProgressSummary{
+		TotalSessions:   len(targetSessions),
+		ActiveSessions:  h.sessionManager.GetActiveSessionCount(),
+		CompletedFiles:  completedFiles,
+		FailedSessions:  0, // Would need to track failures separately
+		OverallProgress: overallProgress,
+	}
+
+	response := UploadProgressResponse{
+		Sessions: sessionsProgress,
+		Summary:  summary,
+	}
+
+	api.GinSuccess(c, response)
 }
 
 // GetAsset retrieves a single asset by ID
@@ -908,13 +958,14 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 
 	// Construct full file path from repository-relative storage path
 	// Asset paths are stored relative to repository root (e.g., "inbox/2024/01/photo.jpg")
-	fullPath := asset.StoragePath
+	fullPathPtr := asset.StoragePath
+	fullPath := *fullPathPtr
 	if !filepath.IsAbs(fullPath) {
 		// Try to find the repository by listing all repositories
 		repositories, err := h.queries.ListRepositories(ctx)
 		if err == nil && len(repositories) > 0 {
 			// Use first repository for now - proper implementation needs file_records
-			fullPath = filepath.Join(repositories[0].Path, asset.StoragePath)
+			fullPath = filepath.Join(repositories[0].Path, *asset.StoragePath)
 		}
 	}
 
@@ -992,9 +1043,9 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	// Check if web version exists, fallback to original
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		// Fallback to original file
-		fullPath = asset.StoragePath
+		fullPath = *asset.StoragePath
 		if !filepath.IsAbs(fullPath) {
-			fullPath = filepath.Join(repoPath, asset.StoragePath)
+			fullPath = filepath.Join(repoPath, *asset.StoragePath)
 		}
 		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			log.Printf("Video file not found at path: %s", fullPath)
@@ -1070,9 +1121,9 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	// Check if web version exists, fallback to original
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		// Fallback to original file
-		fullPath = asset.StoragePath
+		fullPath = *asset.StoragePath
 		if !filepath.IsAbs(fullPath) {
-			fullPath = filepath.Join(repoPath, asset.StoragePath)
+			fullPath = filepath.Join(repoPath, *asset.StoragePath)
 		}
 		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			log.Printf("Audio file not found at path: %s", fullPath)
@@ -1668,4 +1719,584 @@ func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
 	}
 
 	api.GinSuccess(c, response)
+}
+
+// Helper methods for unified chunk upload
+
+// cleanupExpiredSessions periodically cleans up expired upload sessions
+func (h *AssetHandler) cleanupExpiredSessions() {
+	expiredCount := h.sessionManager.CleanupExpiredSessions()
+	if expiredCount > 0 {
+		log.Printf("Cleaned up %d expired upload sessions", expiredCount)
+	}
+}
+
+// stringPtr returns a pointer to a string
+func stringPtr(s string) *string {
+	return &s
+}
+
+// groupFilesBySession groups uploaded files by their session ID
+func (h *AssetHandler) groupFilesBySession(formFiles map[string][]*multipart.FileHeader) map[string]map[string]*multipart.FileHeader {
+	sessionGroups := make(map[string]map[string]*multipart.FileHeader)
+
+	for fieldName, headers := range formFiles {
+		if len(headers) == 0 {
+			continue
+		}
+
+		fileInfo, err := upload.ParseFileField(fieldName)
+		if err != nil {
+			log.Printf("Invalid field name format: %s - %v", fieldName, err)
+			continue
+		}
+
+		if sessionGroups[fileInfo.SessionID] == nil {
+			sessionGroups[fileInfo.SessionID] = make(map[string]*multipart.FileHeader)
+		}
+		sessionGroups[fileInfo.SessionID][fieldName] = headers[0]
+	}
+
+	return sessionGroups
+}
+
+// processUploadSession processes a complete upload session (single file or chunks)
+func (h *AssetHandler) processUploadSession(ctx context.Context, sessionID string, files map[string]*multipart.FileHeader, repository repo.Repository, userID string) (*BatchUploadResult, error) {
+	// Get first file to determine session type
+	var firstFileInfo *upload.FileFieldInfo
+	for fieldName := range files {
+		fileInfo, err := upload.ParseFileField(fieldName)
+		if err != nil {
+			return nil, err
+		}
+		firstFileInfo = fileInfo
+		break
+	}
+
+	if firstFileInfo == nil {
+		return nil, errors.New("no valid files in session")
+	}
+
+	// Check memory availability for large files
+	if firstFileInfo.Type == "chunk" {
+		totalSize := int64(0)
+		for _, header := range files {
+			totalSize += header.Size
+		}
+
+		canAccept, reason := h.memoryMonitor.CanAcceptNewUpload(totalSize)
+		if !canAccept {
+			return nil, fmt.Errorf("insufficient system memory: %s", reason)
+		}
+	}
+
+	// Process based on session type
+	if firstFileInfo.Type == "single" {
+		return h.processSingleFileSession(ctx, sessionID, files, repository, userID)
+	} else {
+		return h.processChunkedFileSession(ctx, sessionID, files, firstFileInfo.TotalChunks, repository, userID)
+	}
+}
+
+// processSingleFileSession processes a single file upload session
+func (h *AssetHandler) processSingleFileSession(ctx context.Context, sessionID string, files map[string]*multipart.FileHeader, repository repo.Repository, userID string) (*BatchUploadResult, error) {
+	if len(files) != 1 {
+		return nil, fmt.Errorf("single file session should have exactly 1 file, got %d", len(files))
+	}
+
+	var header *multipart.FileHeader
+	for _, h := range files {
+		header = h
+		break
+	}
+
+	// Validate file type
+	contentType := header.Header.Get("Content-Type")
+	validationResult := filevalidator.ValidateFile(header.Filename, contentType)
+	if !validationResult.Valid {
+		return nil, fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason)
+	}
+
+	// Create session for tracking
+	session := h.sessionManager.CreateSession(header.Filename, header.Size, 1, contentType, repository.Path, userID)
+	h.sessionManager.UpdateSessionStatus(sessionID, "uploading")
+
+	// Process the single file
+	return h.processCompletedUpload(ctx, header, session, repository, "")
+}
+
+// processChunkedFileSession processes a chunked file upload session
+func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID string, files map[string]*multipart.FileHeader, totalChunks int, repository repo.Repository, userID string) (*BatchUploadResult, error) {
+	// Get filename from first chunk
+	var filename string
+	for _, header := range files {
+		filename = header.Filename
+		break
+	}
+
+	// Calculate total size
+	totalSize := int64(0)
+	for _, header := range files {
+		totalSize += header.Size
+	}
+
+	// Validate file type using first chunk
+	var firstHeader *multipart.FileHeader
+	for _, header := range files {
+		firstHeader = header
+		break
+	}
+	contentType := firstHeader.Header.Get("Content-Type")
+	validationResult := filevalidator.ValidateFile(filename, contentType)
+	if !validationResult.Valid {
+		return nil, fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason)
+	}
+
+	// Create session for tracking
+	session := h.sessionManager.CreateSession(filename, totalSize, totalChunks, contentType, repository.Path, userID)
+
+	// Update session with received chunks
+	for fieldName, header := range files {
+		fileInfo, err := upload.ParseFileField(fieldName)
+		if err != nil {
+			continue
+		}
+		h.sessionManager.UpdateSessionChunk(sessionID, fileInfo.ChunkIndex, header.Size)
+	}
+
+	// Check if all chunks are received
+	if !h.sessionManager.IsSessionComplete(sessionID) {
+		// Not all chunks received yet, return progress
+		progress, _ := h.sessionManager.GetSessionProgress(sessionID)
+		status := "uploading"
+		message := fmt.Sprintf("Upload in progress: %.1f%% complete", progress*100)
+
+		return &BatchUploadResult{
+			Success:  true,
+			FileName: filename,
+			Status:   &status,
+			Message:  &message,
+		}, nil
+	}
+
+	// All chunks received, merge and process
+	h.sessionManager.UpdateSessionStatus(sessionID, "merging")
+
+	// Merge chunks
+	chunkInfos := make([]upload.ChunkInfo, 0, len(files))
+	for fieldName, header := range files {
+		fileInfo, _ := upload.ParseFileField(fieldName)
+
+		// Save chunk to temporary file
+		tempFile, err := h.stagingManager.CreateStagingFile(repository.Path, fmt.Sprintf("chunk_%s_%d", sessionID, fileInfo.ChunkIndex))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create chunk file: %w", err)
+		}
+
+		file, err := header.Open()
+		if err != nil {
+			return nil, fmt.Errorf("failed to open chunk: %w", err)
+		}
+
+		osFile, err := os.Create(tempFile.Path)
+		if err != nil {
+			file.Close()
+			return nil, fmt.Errorf("failed to create chunk file: %w", err)
+		}
+
+		_, err = io.Copy(osFile, file)
+		osFile.Close()
+		file.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to save chunk: %w", err)
+		}
+
+		chunkInfos = append(chunkInfos, upload.ChunkInfo{
+			SessionID:  sessionID,
+			ChunkIndex: fileInfo.ChunkIndex,
+			FilePath:   tempFile.Path,
+			Size:       header.Size,
+		})
+	}
+
+	// Merge all chunks
+	mergeResult, err := h.chunkMerger.MergeChunks(sessionID, chunkInfos)
+	if err != nil {
+		h.sessionManager.SetSessionError(sessionID, err.Error())
+		// Cleanup chunk files
+		h.chunkMerger.CleanupChunks(chunkInfos)
+		return nil, fmt.Errorf("failed to merge chunks: %w", err)
+	}
+
+	// Create a mock header for the merged file
+	mergedHeader := &multipart.FileHeader{
+		Filename: filename,
+		Size:     mergeResult.TotalSize,
+		Header:   map[string][]string{},
+	}
+	mergedHeader.Header.Set("Content-Type", contentType)
+
+	// Process the merged file
+	result, processErr := h.processCompletedUpload(ctx, mergedHeader, session, repository, mergeResult.MergedFilePath)
+
+	// Cleanup regardless of processing result
+	h.chunkMerger.CleanupChunks(chunkInfos)
+	if mergeResult.MergedFilePath != "" {
+		h.chunkMerger.CleanupMergedFile(mergeResult.MergedFilePath)
+	}
+
+	if processErr != nil {
+		h.sessionManager.SetSessionError(sessionID, processErr.Error())
+		return nil, processErr
+	}
+
+	h.sessionManager.UpdateSessionStatus(sessionID, "completed")
+	return result, nil
+}
+
+// processCompletedUpload processes a completed upload (single file or merged chunks)
+func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multipart.FileHeader, session *upload.UploadSession, repository repo.Repository, mergedFilePath string) (*BatchUploadResult, error) {
+	var stagingFilePath string
+
+	if mergedFilePath != "" {
+		// Use the merged file path for chunked uploads
+		stagingFilePath = mergedFilePath
+	} else {
+		// Create staging file for single file uploads
+		stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, header.Filename)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create staging file: %w", err)
+		}
+		stagingFilePath = stagingFile.Path
+
+		// Copy single file to staging
+		file, err := header.Open()
+		if err != nil {
+			return nil, fmt.Errorf("failed to open file: %w", err)
+		}
+		defer file.Close()
+
+		osFile, err := os.Create(stagingFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open staging file: %w", err)
+		}
+		defer osFile.Close()
+
+		_, err = io.Copy(osFile, file)
+		if err != nil {
+			os.Remove(stagingFilePath)
+			return nil, fmt.Errorf("failed to copy file to staging: %w", err)
+		}
+	}
+
+	// Calculate hash (always use quick hash for large files)
+	hashResult, err := hash.CalculateFileHash(stagingFilePath, hash.AlgorithmBLAKE3, true)
+	if err != nil {
+		if mergedFilePath == "" {
+			os.Remove(stagingFilePath)
+		}
+		return nil, fmt.Errorf("failed to calculate file hash: %w", err)
+	}
+
+	finalHash := hashResult.Hash
+	hashMethod := "quick"
+	if !hashResult.IsQuick {
+		hashMethod = "full"
+	}
+
+	log.Printf("Calculated %s hash for %s: %s", hashMethod, header.Filename, finalHash)
+
+	// Check for hash collision before enqueueing
+	collision, err := h.checkHashCollisionBeforeEnqueue(ctx, finalHash, header.Filename, uuid.UUID(repository.RepoID.Bytes).String())
+	if err != nil {
+		if mergedFilePath == "" {
+			os.Remove(stagingFilePath)
+		}
+		return nil, fmt.Errorf("failed to check hash collision: %w", err)
+	}
+
+	if collision {
+		if mergedFilePath == "" {
+			os.Remove(stagingFilePath)
+		}
+		return &BatchUploadResult{
+			Success:     false,
+			FileName:    header.Filename,
+			ContentHash: finalHash,
+			Error:       stringPtr("File with same content already exists in repository"),
+		}, nil
+	}
+
+	// Enqueue for processing
+	jobResult, err := h.queueClient.Insert(ctx, jobs.ProcessAssetArgs{
+		ClientHash:   finalHash,
+		StagedPath:   stagingFilePath,
+		UserID:       session.UserID,
+		Timestamp:    time.Now(),
+		ContentType:  session.ContentType,
+		FileName:     session.Filename,
+		RepositoryID: uuid.UUID(repository.RepoID.Bytes).String(),
+	}, &river.InsertOpts{Queue: "process_asset"})
+
+	if err != nil {
+		if mergedFilePath == "" {
+			os.Remove(stagingFilePath)
+		}
+		return nil, fmt.Errorf("failed to enqueue task: %w", err)
+	}
+
+	if jobResult == nil || jobResult.Job == nil {
+		if mergedFilePath == "" {
+			os.Remove(stagingFilePath)
+		}
+		return nil, errors.New("failed to enqueue task: empty result")
+	}
+
+	taskID := jobResult.Job.ID
+	status := "processing"
+	size := header.Size
+	message := fmt.Sprintf("File uploaded with %s hash and queued for processing in repository '%s'", hashMethod, repository.Name)
+
+	log.Printf("Task %d enqueued for processing file %s in repository %s", taskID, header.Filename, repository.Name)
+
+	return &BatchUploadResult{
+		Success:     true,
+		FileName:    header.Filename,
+		ContentHash: finalHash,
+		TaskID:      &taskID,
+		Status:      &status,
+		Size:        &size,
+		Message:     &message,
+	}, nil
+}
+
+// checkHashCollisionBeforeEnqueue checks if a file with the same hash already exists
+func (h *AssetHandler) checkHashCollisionBeforeEnqueue(ctx context.Context, hash string, filename string, repositoryID string) (bool, error) {
+	repoUUID, err := uuid.Parse(repositoryID)
+	if err != nil {
+		return false, fmt.Errorf("invalid repository ID: %w", err)
+	}
+
+	// Check if asset with same hash exists in the repository using the new query
+	existing, err := h.queries.GetAssetByHashAndRepository(ctx, repo.GetAssetByHashAndRepositoryParams{
+		Hash:         &hash,
+		RepositoryID: pgtype.UUID{Bytes: repoUUID, Valid: true},
+	})
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// No existing asset found, no collision
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to check hash collision: %w", err)
+	}
+
+	// Found existing asset with same hash
+	if existing.OriginalFilename != filename {
+		log.Printf("Hash collision detected in repository %s: %s (new) vs %s (existing)", repositoryID, filename, existing.OriginalFilename)
+		return true, nil
+	}
+	// Same filename: likely a duplicate upload
+	log.Printf("Duplicate upload detected: %s with hash %s", filename, hash)
+
+	return false, nil
+}
+
+// ReprocessAsset reprocesses a failed or warning asset
+// @Summary Reprocess asset
+// @Description Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Param request body ReprocessAssetRequest false "Reprocessing tasks (optional)"
+// @Success 200 {object} ReprocessAssetResponse
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /assets/{id}/reprocess [post]
+func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// Parse asset ID
+	assetIDStr := c.Param("id")
+	assetID, err := uuid.Parse(assetIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID"})
+		return
+	}
+
+	// Parse request body
+	var req ReprocessAssetRequest
+	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
+		// Allow empty body
+		req = ReprocessAssetRequest{}
+	}
+
+	// Validate requested tasks
+	if len(req.Tasks) > 0 {
+		validTasks := map[string]bool{
+			"extract_exif":         true,
+			"extract_metadata":     true,
+			"generate_thumbnails":  true,
+			"save_thumbnails":      true,
+			"transcode_video":      true,
+			"transcode_audio":      true,
+			"generate_web_version": true,
+			"clip_processing":      true,
+			"raw_processing":       true,
+		}
+
+		for _, task := range req.Tasks {
+			if !validTasks[task] {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid task name: %s", task)})
+				return
+			}
+		}
+	}
+
+	// Get the asset to check its current status
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(assetID.String()); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID format"})
+		return
+	}
+
+	asset, err := h.queries.GetAssetByID(ctx, pgUUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get asset"})
+		return
+	}
+
+	// Parse current status
+	var currentStatus status.AssetStatus
+	if len(asset.Status) > 0 {
+		currentStatus, err = status.FromJSONB(asset.Status)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse asset status"})
+			return
+		}
+	}
+
+	// Check if asset is retryable
+	if !currentStatus.IsRetryable() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Asset is not in a retryable state"})
+		return
+	}
+
+	// Check for fatal errors
+	if currentStatus.HasFatalErrors() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Asset has fatal errors that prevent reprocessing"})
+		return
+	}
+
+	// Determine retry strategy
+	if len(req.Tasks) == 0 || req.ForceFullRetry {
+		// Full retry - reset status and enqueue full processing job
+		updatedAsset, err := h.queries.ResetAssetStatusForRetry(ctx, pgUUID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset asset status"})
+			return
+		}
+
+		// Get repository information
+		repository, err := h.queries.GetRepository(ctx, updatedAsset.RepositoryID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get repository"})
+			return
+		}
+
+		// Check if storage path exists
+		if updatedAsset.StoragePath == nil || *updatedAsset.StoragePath == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Asset has no storage path"})
+			return
+		}
+
+		// Resolve the full path to the asset file
+		assetPath := filepath.Join(repository.Path, *updatedAsset.StoragePath)
+
+		// Check if the file exists
+		if _, err := os.Stat(assetPath); os.IsNotExist(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Asset file not found"})
+			return
+		}
+
+		// Create a new processing job
+		// Handle nil pointers for Hash and OwnerID
+		clientHash := ""
+		if updatedAsset.Hash != nil {
+			clientHash = *updatedAsset.Hash
+		}
+
+		userID := ""
+		if updatedAsset.OwnerID != nil {
+			userID = fmt.Sprintf("%d", *updatedAsset.OwnerID)
+		}
+
+		jobArgs := jobs.ProcessAssetArgs{
+			ClientHash:   clientHash,
+			StagedPath:   assetPath, // Use the actual asset path for reprocessing
+			UserID:       userID,
+			Timestamp:    time.Now(),
+			ContentType:  updatedAsset.MimeType,
+			FileName:     updatedAsset.OriginalFilename,
+			RepositoryID: repository.RepoID.String(),
+		}
+
+		// Enqueue the reprocessing job
+		jobResult, err := h.queueClient.Insert(ctx, jobArgs, &river.InsertOpts{
+			Queue: "process_asset",
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue reprocessing job"})
+			return
+		}
+
+		log.Printf("Full reprocessing job %d enqueued for asset %s", jobResult.Job.ID, assetID.String())
+
+		// Return success response
+		response := ReprocessAssetResponse{
+			AssetID:    assetID.String(),
+			Status:     "queued",
+			Message:    "Full reprocessing job queued successfully",
+			RetryTasks: []string{"all_failed_tasks"}, // Indicate full retry
+		}
+
+		c.JSON(http.StatusOK, response)
+		return
+	} else {
+		// Selective retry - enqueue selective retry job
+		// Create selective retry job payload
+		retryArgs := processors.AssetRetryPayload{
+			AssetID:        assetID.String(),
+			RetryTasks:     req.Tasks,
+			ForceFullRetry: req.ForceFullRetry,
+		}
+
+		// Enqueue the selective retry job
+		jobResult, err := h.queueClient.Insert(ctx, retryArgs, &river.InsertOpts{
+			Queue: "retry_asset",
+		})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue selective retry job"})
+			return
+		}
+
+		log.Printf("Selective retry job %d enqueued for asset %s, tasks: %v", jobResult.Job.ID, assetID.String(), req.Tasks)
+
+		// Return success response
+		response := ReprocessAssetResponse{
+			AssetID:    assetID.String(),
+			Status:     "queued",
+			Message:    "Selective retry job queued successfully",
+			RetryTasks: req.Tasks,
+		}
+
+		c.JSON(http.StatusOK, response)
+		return
+	}
 }

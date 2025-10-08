@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useEffect, useState } from "react";
 import { assetService } from "@/services/assetsService";
 import { convertCoordinatesForMap } from "@/lib/utils/mapUtils";
+import { Asset } from "@/services";
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment

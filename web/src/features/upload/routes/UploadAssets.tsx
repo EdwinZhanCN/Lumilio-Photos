@@ -1,34 +1,33 @@
-import PreviewUploadSection from "../components/PreviewUploadSection";
-import BatchUploadSection from "../components/BatchUploadSection";
+import UnifiedUploadSection from "../components/UnifiedUploadSection";
 import { UploadProvider } from "../UploadProvider";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import PageHeader from "@/components/PageHeader";
 import { useUploadContext } from "@/features/upload";
-import React, { useRef } from "react";
+import React from "react";
 import { ArrowUpTrayIcon } from "@heroicons/react/24/outline";
 
 const UploadHeader: React.FC = () => {
   const {
     state,
     isProcessing,
-    uploadAllFiles,
-    clearAllFiles,
+    uploadFiles,
+    clearFiles,
     uploadProgress,
     hashcodeProgress,
     isGeneratingHashCodes,
+    previewCount,
   } = useUploadContext();
-  const clearRef = useRef<HTMLInputElement | null>(null);
 
-  const total = state.totalFilesCount;
+  const total = state.files.length;
   const subtitle =
     isGeneratingHashCodes && hashcodeProgress?.total
       ? `Hashing ${hashcodeProgress.numberProcessed ?? 0}/${hashcodeProgress.total}`
       : isProcessing && uploadProgress > 0
         ? `Uploading ${uploadProgress.toFixed(1)}%`
         : total > 0
-          ? `${total} files selected (${state.preview.count} preview, ${state.batch.count} batch)`
+          ? `${total} files selected (${previewCount} with previews)`
           : "No files selected";
 
   return (
@@ -38,14 +37,16 @@ const UploadHeader: React.FC = () => {
     >
       <button
         className="btn btn-sm btn-ghost"
-        onClick={() => clearAllFiles(clearRef)}
+        onClick={() => {
+          clearFiles();
+        }}
         disabled={isProcessing || total === 0}
       >
         Clear All
       </button>
       <button
         className="btn btn-sm btn-primary"
-        onClick={() => uploadAllFiles()}
+        onClick={() => uploadFiles()}
         disabled={isProcessing || total === 0}
       >
         {isProcessing ? "Processing..." : "Upload All"}
@@ -65,29 +66,15 @@ const UploadAssets = () => {
             FallbackComponent={(props) => (
               <ErrorFallBack
                 code={"500"}
-                title={"Preview Upload Section Error!"}
+                title={"Upload Section Error!"}
                 message={
-                  "The preview upload section failed to load or encountered an error during operation."
+                  "The upload section failed to load or encountered an error during operation."
                 }
                 {...props}
               />
             )}
           >
-            <PreviewUploadSection />
-          </ErrorBoundary>
-          <ErrorBoundary
-            FallbackComponent={(props) => (
-              <ErrorFallBack
-                code={"500"}
-                title={"Batch Upload Section Error!"}
-                message={
-                  "The batch upload section failed to load or encountered an error during operation."
-                }
-                {...props}
-              />
-            )}
-          >
-            <BatchUploadSection />
+            <UnifiedUploadSection />
           </ErrorBoundary>
         </div>
       </UploadProvider>

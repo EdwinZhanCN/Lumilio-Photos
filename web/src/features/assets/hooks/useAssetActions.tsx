@@ -4,6 +4,7 @@ import { AssetActionsResult } from "../types";
 import { assetService } from "@/services/assetsService";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";
+import { Asset } from "@/services";
 
 /**
  * Hook for performing business operations on assets.

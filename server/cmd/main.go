@@ -223,7 +223,7 @@ func initPrimaryStorage(repoManager storage.RepositoryManager) error {
 		// If it's already registered in DB, we're done
 		if existing, err := repoManager.GetRepositoryByPath(storagePath); err == nil {
 			log.Printf("✅ Primary storage already initialized at: %s", storagePath)
-			log.Printf("   Repository ID: %s", existing.RepoID.Bytes)
+			log.Printf("   Repository ID: %s", existing.RepoID)
 			return nil
 		}
 
@@ -234,7 +234,7 @@ func initPrimaryStorage(repoManager storage.RepositoryManager) error {
 		}
 
 		log.Printf("✅ Primary storage registered at: %s", storagePath)
-		log.Printf("   Repository ID: %s", existingRepo.RepoID.Bytes)
+		log.Printf("   Repository ID: %s", existingRepo.RepoID)
 		return nil
 	}
 

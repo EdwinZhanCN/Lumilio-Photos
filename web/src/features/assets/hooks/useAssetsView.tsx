@@ -22,6 +22,7 @@ import {
   SearchAssetsParams,
 } from "@/services/assetsService";
 import { groupAssets } from "@/lib/utils/assetGrouping";
+import { Asset } from "@/services";
 
 /**
  * Primary hook for accessing asset data through view definitions.
@@ -272,8 +273,8 @@ export const useAssetsView = (
 
         // Update view with asset IDs
         const newAssetIds = assets
-          .map((asset: Asset) => asset.asset_id!)
-          .filter(Boolean);
+          .map((asset: Asset) => asset.asset_id)
+          .filter((id): id is string => Boolean(id));
 
         dispatch({
           type: "SET_VIEW_ASSETS",
@@ -378,8 +379,8 @@ export const useAssetsView = (
 
       // Append to view
       const newAssetIds = assets
-        .map((asset: Asset) => asset.asset_id!)
-        .filter(Boolean);
+        .map((asset: Asset) => asset.asset_id)
+        .filter((id): id is string => Boolean(id));
 
       dispatch({
         type: "APPEND_VIEW_ASSETS",

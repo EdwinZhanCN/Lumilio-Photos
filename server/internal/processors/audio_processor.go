@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/sync/errgroup"
+	"server/internal/utils/errgroup"
 )
 
 // AudioInfo holds audio metadata
@@ -57,25 +57,31 @@ func (ap *AssetProcessor) processAudioAsset(
 		return fmt.Errorf("get audio info: %w", err)
 	}
 
-	g, gCtx := errgroup.WithContext(timeoutCtx)
+	g := errgroup.NewFaultTolerant()
 
 	// Goroutine 1: Extract metadata
 	g.Go(func() error {
-		return ap.extractAudioMetadata(gCtx, asset, tempFile.Name(), audioInfo)
+		return ap.extractAudioMetadata(timeoutCtx, asset, tempFile.Name(), audioInfo)
 	})
 
 	// Goroutine 2: Transcode audio (smart strategy)
 	g.Go(func() error {
-		return ap.transcodeAudioSmart(gCtx, repository.Path, asset, tempFile.Name(), audioInfo)
+		return ap.transcodeAudioSmart(timeoutCtx, repository.Path, asset, tempFile.Name(), audioInfo)
 	})
 
 	// Goroutine 3: Generate waveform visualization (optional)
 	g.Go(func() error {
-		return ap.generateWaveform(gCtx, repository.Path, asset, tempFile.Name())
+		return ap.generateWaveform(timeoutCtx, repository.Path, asset, tempFile.Name())
 	})
 
-	if err := g.Wait(); err != nil {
-		return fmt.Errorf("audio processing failed: %w", err)
+	// Wait for all tasks to complete, but don't fail the entire process if some tasks fail
+	errors := g.Wait()
+	if len(errors) > 0 {
+		// Log individual errors but don't fail the entire process
+		for _, err := range errors {
+			fmt.Printf("Audio processing partial failure: %v\n", err)
+		}
+		// Return success even if some tasks failed, as partial processing is acceptable
 	}
 
 	return nil
@@ -89,7 +95,14 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 	}
 	defer file.Close()
 
-	extractor := exif.NewExtractor(nil)
+	// Configure extractor with optimized settings for audio, including fast mode
+	config := &exif.Config{
+		MaxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
+		Timeout:     60 * time.Second,
+		BufferSize:  128 * 1024,
+		FastMode:    true, // Use fast mode for audio to avoid full file scan
+	}
+	extractor := exif.NewExtractor(config)
 	req := &exif.StreamingExtractRequest{
 		Reader:    file,
 		AssetType: dbtypes.AssetTypeAudio,

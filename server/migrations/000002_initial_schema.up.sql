@@ -28,13 +28,28 @@ CREATE TABLE refresh_tokens (
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX idx_refresh_tokens_tokens_token ON refresh_tokens(token);
 
--- 3) Assets (universal)
+-- 3) Repositories (must exist before assets)
+CREATE TABLE repositories (
+    repo_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    path TEXT NOT NULL UNIQUE,
+    config JSONB,
+    status TEXT DEFAULT 'active',
+    last_sync TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_repositories_status ON repositories(status);
+CREATE INDEX idx_repositories_path ON repositories(path);
+
+-- 4) Assets (universal)
 CREATE TABLE assets (
     asset_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     owner_id           INTEGER REFERENCES users(user_id),
     type               VARCHAR(20)  NOT NULL CHECK (type IN ('PHOTO', 'VIDEO', 'AUDIO')),
     original_filename  VARCHAR(255) NOT NULL,
-    storage_path       VARCHAR(50)  NOT NULL,
+    storage_path       VARCHAR(512),
     mime_type          VARCHAR(50)  NOT NULL,
     file_size          BIGINT       NOT NULL,
     hash               VARCHAR(64),
@@ -48,14 +63,18 @@ CREATE TABLE assets (
     specific_metadata  JSONB,
     rating             INTEGER,
     liked              BOOLEAN       DEFAULT FALSE,
-    embedding          VECTOR(512)
+    repository_id      UUID REFERENCES repositories(repo_id),
+    embedding          VECTOR(512),
+    status             JSONB NOT NULL DEFAULT '{"state": "processing", "message": "Pending processing"}',
+    UNIQUE (repository_id, storage_path)
 );
+
 
 CREATE INDEX idx_assets_owner_id ON assets(owner_id);
 CREATE INDEX idx_assets_type ON assets(type);
 CREATE INDEX idx_assets_hash ON assets(hash);
 CREATE INDEX idx_assets_taken_time ON assets(taken_time);
-CREATE INDEX IF NOT EXISTS idx_assets_storage_path ON assets(storage_path);
+CREATE INDEX idx_assets_repository_id ON assets(repository_id);
 
 -- Composite expression index for optimized type+taken_time queries
 CREATE INDEX idx_assets_type_taken_time_coalesce
@@ -71,7 +90,7 @@ CREATE INDEX idx_assets_rating ON assets(rating) WHERE rating IS NOT NULL;
 CREATE INDEX idx_assets_liked ON assets(liked) WHERE liked = true;
 CREATE INDEX idx_assets_rating_liked ON assets(rating, liked) WHERE rating IS NOT NULL OR liked = true;
 
--- 4) Thumbnails
+-- 5) Thumbnails
 CREATE TABLE thumbnails (
     thumbnail_id  SERIAL PRIMARY KEY,
     asset_id      UUID         NOT NULL REFERENCES assets(asset_id),
@@ -83,7 +102,7 @@ CREATE TABLE thumbnails (
 
 CREATE INDEX idx_thumbnails_asset_id ON thumbnails(asset_id);
 
--- 5) Species Predictions
+-- 6) Species Predictions
 CREATE TABLE species_predictions (
     asset_id  UUID         NOT NULL REFERENCES assets(asset_id),
     label     VARCHAR(255) NOT NULL,
@@ -93,7 +112,7 @@ CREATE TABLE species_predictions (
 
 CREATE INDEX idx_species_predictions_asset_id ON species_predictions(asset_id);
 
--- 6) Tags
+-- 7) Tags
 CREATE TABLE tags (
     tag_id          SERIAL PRIMARY KEY,
     tag_name        VARCHAR(50) UNIQUE NOT NULL,
@@ -101,7 +120,7 @@ CREATE TABLE tags (
     is_ai_generated BOOLEAN DEFAULT TRUE
 );
 
--- 7) Asset Tags (junction)
+-- 8) Asset Tags (junction)
 CREATE TABLE asset_tags (
     asset_id   UUID    NOT NULL REFERENCES assets(asset_id),
     tag_id     INTEGER NOT NULL REFERENCES tags(tag_id),
@@ -110,7 +129,7 @@ CREATE TABLE asset_tags (
     PRIMARY KEY (asset_id, tag_id)
 );
 
--- 8) Albums
+-- 9) Albums
 CREATE TABLE albums (
     album_id       SERIAL PRIMARY KEY,
     user_id        INTEGER      NOT NULL REFERENCES users(user_id),
@@ -123,7 +142,7 @@ CREATE TABLE albums (
 
 CREATE INDEX idx_albums_user_id ON albums(user_id);
 
--- 9) Album Assets (junction)
+-- 10) Album Assets (junction)
 CREATE TABLE album_assets (
     album_id   INTEGER NOT NULL REFERENCES albums(album_id),
     asset_id   UUID    NOT NULL REFERENCES assets(asset_id),

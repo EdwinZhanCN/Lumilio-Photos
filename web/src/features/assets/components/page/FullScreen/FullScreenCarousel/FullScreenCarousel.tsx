@@ -13,6 +13,7 @@ import FullScreenBasicInfo from "../FullScreenInfo/FullScreenBasicInfo";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";
 import MediaViewer from "../../../shared/MediaViewer";
+import type { Asset } from "@/lib/http-commons/schema-extensions";
 
 interface FullScreenCarouselProps {
   photos: Asset[];
@@ -91,7 +92,7 @@ const FullScreenCarousel = ({
   const handleLikeToggle = async () => {
     if (!currentAsset?.asset_id) return;
 
-    const currentLiked = currentAsset.specific_metadata?.liked || false;
+    const currentLiked = currentAsset.liked || false;
     const newLiked = !currentLiked;
 
     try {
@@ -101,9 +102,9 @@ const FullScreenCarousel = ({
       // Update the actual asset state after successful API call
       const updatedAsset = {
         ...currentAsset,
+        liked: newLiked,
         specific_metadata: {
           ...currentAsset.specific_metadata,
-          liked: newLiked,
         },
       };
 
@@ -237,15 +238,11 @@ const FullScreenCarousel = ({
         {/* Like / Favorite */}
         <button
           className={`btn btn-circle btn-lg ${
-            currentAsset?.specific_metadata?.liked ? "text-red-500" : ""
+            currentAsset?.liked ? "text-red-500" : ""
           }`}
           onClick={handleLikeToggle}
         >
-          <Heart
-            className={`${
-              currentAsset?.specific_metadata?.liked ? "fill-red-500" : ""
-            }`}
-          />
+          <Heart className={`${currentAsset?.liked ? "fill-red-500" : ""}`} />
         </button>
 
         {/* Share / Export */}

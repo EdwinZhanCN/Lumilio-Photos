@@ -1,5 +1,6 @@
 import { init, JustifiedLayout } from "@immich/justified-layout-wasm";
-
+import type { Asset } from "@/lib/http-commons/schema-extensions";
+import { isPhotoMetadata } from "@/lib/http-commons/metadata-types";
 export interface LayoutPosition {
   top: number;
   left: number;
@@ -296,12 +297,14 @@ class JustifiedLayoutService {
     let height = asset.height;
 
     // Try to extract dimensions from metadata if missing
-    if ((!width || !height) && asset.specific_metadata?.dimensions) {
-      const dimensions = asset.specific_metadata.dimensions;
-      const match = dimensions.match(/(\d+)(?:×|x)(\d+)/i);
-      if (match) {
-        width = parseInt(match[1], 10);
-        height = parseInt(match[2], 10);
+    if (!width || !height) {
+      const metadata = asset.specific_metadata;
+      if (isPhotoMetadata(asset.type, metadata) && metadata.dimensions) {
+        const match = metadata.dimensions.match(/(\d+)(?:×|x)(\d+)/i);
+        if (match) {
+          width = parseInt(match[1], 10);
+          height = parseInt(match[2], 10);
+        }
       }
     }
 

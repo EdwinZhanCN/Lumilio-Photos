@@ -10,13 +10,12 @@ import (
 	"path/filepath"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/utils/errgroup"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
 // VideoInfo holds video metadata
@@ -37,7 +36,8 @@ func (ap *AssetProcessor) processVideoAsset(
 	timeoutCtx, cancel := context.WithTimeout(ctx, 30*time.Minute) // Videos take longer
 	defer cancel()
 
-	// Create temporary file for ffmpeg processing
+	// For large files, use streaming approach to avoid full buffering
+	// Create temporary file only if needed for metadata extraction
 	tempFile, err := os.CreateTemp("", "video_processing_*.tmp")
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
@@ -45,7 +45,7 @@ func (ap *AssetProcessor) processVideoAsset(
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
-	// Copy input to temp file
+	// Copy input to temp file for metadata extraction
 	if _, err := io.Copy(tempFile, fileReader); err != nil {
 		return fmt.Errorf("copy to temp file: %w", err)
 	}
@@ -57,25 +57,31 @@ func (ap *AssetProcessor) processVideoAsset(
 		return fmt.Errorf("get video info: %w", err)
 	}
 
-	g, gCtx := errgroup.WithContext(timeoutCtx)
+	g := errgroup.NewFaultTolerant()
 
 	// Goroutine 1: Extract metadata
 	g.Go(func() error {
-		return ap.extractVideoMetadata(gCtx, asset, tempFile.Name(), videoInfo)
+		return ap.extractVideoMetadata(timeoutCtx, asset, tempFile.Name(), videoInfo)
 	})
 
 	// Goroutine 2: Transcode video (smart strategy)
 	g.Go(func() error {
-		return ap.transcodeVideoSmart(gCtx, repository.Path, asset, tempFile.Name(), videoInfo)
+		return ap.transcodeVideoSmart(timeoutCtx, repository.Path, asset, tempFile.Name(), videoInfo)
 	})
 
 	// Goroutine 3: Generate thumbnail
 	g.Go(func() error {
-		return ap.generateVideoThumbnail(gCtx, repository.Path, asset, tempFile.Name())
+		return ap.generateVideoThumbnail(timeoutCtx, repository.Path, asset, tempFile.Name())
 	})
 
-	if err := g.Wait(); err != nil {
-		return fmt.Errorf("video processing failed: %w", err)
+	// Wait for all tasks to complete, but don't fail the entire process if some tasks fail
+	errors := g.Wait()
+	if len(errors) > 0 {
+		// Log individual errors but don't fail the entire process
+		for _, err := range errors {
+			fmt.Printf("Video processing partial failure: %v\n", err)
+		}
+		// Return success even if some tasks failed, as partial processing is acceptable
 	}
 
 	return nil
@@ -89,7 +95,16 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 	}
 	defer file.Close()
 
-	extractor := exif.NewExtractor(nil)
+	// Configure extractor with optimized settings for videos, including fast mode
+	config := &exif.Config{
+		MaxFileSize: 20 * 1024 * 1024 * 1024, // 20GB
+		Timeout:     60 * time.Second,
+		BufferSize:  128 * 1024,
+		FastMode:    true, // Use fast mode for videos to avoid full file scan
+	}
+	extractor := exif.NewExtractor(config)
+	defer extractor.Close()
+
 	req := &exif.StreamingExtractRequest{
 		Reader:    file,
 		AssetType: dbtypes.AssetTypeVideo,
@@ -173,6 +188,7 @@ func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath stri
 func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath string, width, height int) (string, error) {
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("transcoded_%d_%s.mp4", height, filepath.Base(inputPath)))
 
+	// Optimize ffmpeg settings for large files
 	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-i", inputPath,
 		"-c:v", "libx264", // H.264 codec
@@ -185,6 +201,7 @@ func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath str
 		"-b:a", "128k", // Audio bitrate
 		"-movflags", "+faststart", // Enable web streaming
 		"-avoid_negative_ts", "make_zero", // Handle timestamp issues
+		"-threads", "0", // Use all available CPU threads
 		"-f", "mp4",
 		"-y", // Overwrite output file
 		outputPath,

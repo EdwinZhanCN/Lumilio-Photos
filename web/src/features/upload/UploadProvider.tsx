@@ -3,11 +3,25 @@ import { useUploadProcess } from "@/hooks/api-hooks/useUploadProcess";
 import { uploadReducer, initialState } from "./reducers";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { UploadContext } from "./types";
+import { useSettingsContext } from "@/features/settings";
+import { useGenerateThumbnail } from "@/hooks/util-hooks/useGenerateThumbnail";
 
 export function UploadProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(uploadReducer, initialState);
   const showMessage = useMessage();
   const uploadProcess = useUploadProcess();
+  const { state: settings } = useSettingsContext();
+  const { isGenerating, progress, generatePreviews } = useGenerateThumbnail();
+
+  // Get settings with defaults
+  const maxPreviewCount = settings.ui.upload?.max_preview_count ?? 30;
+  const maxTotalFiles = settings.ui.upload?.max_total_files ?? 100;
+
+  // Calculate how many files currently have previews
+  const previewCount = useMemo(
+    () => state.previews.filter((p) => p !== "").length,
+    [state.previews],
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -31,81 +45,122 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const clearPreviewFiles = useCallback(
-    (fileInputRef: React.RefObject<HTMLInputElement | null>) => {
-      dispatch({ type: "CLEAR_PREVIEW_FILES" });
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+  /**
+   * Add files to the upload queue
+   * @param files - Files to add
+   * @param generatePreviewsFlag - Whether to generate preview thumbnails for these files
+   */
+  const addFiles = useCallback(
+    async (files: File[], generatePreviewsFlag: boolean) => {
+      if (files.length === 0) return;
+
+      // Check total files limit
+      const availableSlots = maxTotalFiles - state.files.length;
+      if (availableSlots <= 0) {
+        showMessage("error", `Maximum ${maxTotalFiles} files allowed`);
+        return;
+      }
+
+      const filesToAdd = files.slice(0, availableSlots);
+      if (files.length > availableSlots) {
+        showMessage(
+          "hint",
+          `${files.length - availableSlots} files exceeded the limit and were removed`,
+        );
+      }
+
+      // Determine how many previews to generate
+      let previewsToGenerate = 0;
+      if (generatePreviewsFlag) {
+        const currentPreviewCount = state.previews.filter(
+          (p) => p !== "",
+        ).length;
+        const availablePreviewSlots = maxPreviewCount - currentPreviewCount;
+        previewsToGenerate = Math.min(filesToAdd.length, availablePreviewSlots);
+
+        if (previewsToGenerate < filesToAdd.length) {
+          showMessage(
+            "info",
+            `Generating previews for first ${previewsToGenerate} files (limit: ${maxPreviewCount})`,
+          );
+        }
+      }
+
+      const startIndex = state.files.length;
+
+      // Add files with empty preview strings initially
+      dispatch({
+        type: "ADD_FILES",
+        payload: {
+          files: filesToAdd,
+          previews: filesToAdd.map(() => ""),
+        },
+      });
+
+      // Generate previews for the first N files if requested
+      if (previewsToGenerate > 0) {
+        try {
+          const filesToPreview = filesToAdd.slice(0, previewsToGenerate);
+          const result = await generatePreviews(filesToPreview);
+
+          if (result instanceof Error) {
+            throw result;
+          }
+
+          if (!result) {
+            throw new Error("Preview generation returned undefined");
+          }
+
+          const previewUrls = result.map((p) => p?.url || "");
+
+          dispatch({
+            type: "UPDATE_PREVIEW_URLS",
+            payload: {
+              startIndex,
+              urls: previewUrls,
+            },
+          });
+        } catch (error) {
+          console.error("Preview generation failed:", error);
+          showMessage(
+            "error",
+            error instanceof Error
+              ? error.message
+              : "Failed to generate previews",
+          );
+        }
       }
     },
-    [],
+    [
+      state.files.length,
+      state.previews,
+      maxTotalFiles,
+      maxPreviewCount,
+      showMessage,
+      generatePreviews,
+    ],
   );
 
-  const clearBatchFiles = useCallback(
-    (fileInputRef: React.RefObject<HTMLInputElement | null>) => {
-      dispatch({ type: "CLEAR_BATCH_FILES" });
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    },
-    [],
-  );
+  const clearFiles = useCallback(() => {
+    dispatch({ type: "CLEAR_FILES" });
+  }, []);
 
-  const clearAllFiles = useCallback(
-    (fileInputRef: React.RefObject<HTMLInputElement | null>) => {
-      dispatch({ type: "CLEAR_ALL_FILES" });
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    },
-    [],
-  );
-
-  const uploadPreviewFiles = useCallback(async () => {
-    if (!state.preview.files.length) {
-      showMessage("info", "No preview files selected for upload.");
-      return;
-    }
-    try {
-      await uploadProcess.processFiles(state.preview.files);
-      dispatch({ type: "CLEAR_PREVIEW_FILES" });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Preview upload failed";
-      showMessage("error", errorMessage);
-    }
-  }, [state.preview.files, uploadProcess, showMessage]);
-
-  const uploadBatchFiles = useCallback(async () => {
-    if (!state.batch.files.length) {
-      showMessage("info", "No batch files selected for upload.");
-      return;
-    }
-    try {
-      await uploadProcess.processFiles(state.batch.files);
-      dispatch({ type: "CLEAR_BATCH_FILES" });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Batch upload failed";
-      showMessage("error", errorMessage);
-    }
-  }, [state.batch.files, uploadProcess, showMessage]);
-
-  const uploadAllFiles = useCallback(async () => {
-    const allFiles = [...state.preview.files, ...state.batch.files];
-    if (!allFiles.length) {
+  const uploadFiles = useCallback(async () => {
+    if (!state.files.length) {
       showMessage("info", "No files selected for upload.");
       return;
     }
+
     try {
-      await uploadProcess.processFiles(allFiles);
-      dispatch({ type: "CLEAR_ALL_FILES" });
+      await uploadProcess.processFiles(state.files);
+      dispatch({ type: "CLEAR_FILES" });
+      showMessage("success", "Upload completed successfully!");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Upload failed";
       showMessage("error", errorMessage);
     }
-  }, [state.preview.files, state.batch.files, uploadProcess, showMessage]);
+  }, [state.files, uploadProcess, showMessage]);
 
   const contextValue = useMemo(
     () => ({
@@ -114,35 +169,37 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       handleDragOver,
       handleDragLeave,
       handleDrop,
-      clearPreviewFiles,
-      clearBatchFiles,
-      clearAllFiles,
-      uploadPreviewFiles,
-      uploadBatchFiles,
-      uploadAllFiles,
+      addFiles,
+      clearFiles,
+      uploadFiles,
       isProcessing:
         uploadProcess.isGeneratingHashCodes || uploadProcess.isUploading,
-      resetUploadStatus: uploadProcess.resetStatus,
       uploadProgress: uploadProcess.uploadProgress,
       hashcodeProgress: uploadProcess.hashcodeProgress,
       isGeneratingHashCodes: uploadProcess.isGeneratingHashCodes,
+      isGeneratingPreviews: isGenerating,
+      previewProgress: progress,
+      maxPreviewCount,
+      maxTotalFiles,
+      previewCount,
     }),
     [
       state,
       handleDragOver,
       handleDragLeave,
       handleDrop,
-      clearPreviewFiles,
-      clearBatchFiles,
-      clearAllFiles,
-      uploadPreviewFiles,
-      uploadBatchFiles,
-      uploadAllFiles,
+      addFiles,
+      clearFiles,
+      uploadFiles,
       uploadProcess.isGeneratingHashCodes,
       uploadProcess.isUploading,
-      uploadProcess.resetStatus,
       uploadProcess.uploadProgress,
       uploadProcess.hashcodeProgress,
+      isGenerating,
+      progress,
+      maxPreviewCount,
+      maxTotalFiles,
+      previewCount,
     ],
   );
 

@@ -6,6 +6,7 @@ import {
   PhotoIcon,
   GlobeAltIcon,
   CursorArrowRippleIcon,
+  ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline";
 
 export default function UISettings() {
@@ -86,6 +87,57 @@ export default function UISettings() {
         <div className="flex items-center gap-2">
           <LayoutDashboard className="size-6 text-primary" />
           <h4 className="text-base font-medium">{t("settings.pageLayout")}</h4>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-2">
+          <ArrowUpTrayIcon className="size-6 text-primary" />
+          <h3 className="text-lg font-semibold">Upload Settings</h3>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <label className="font-semibold min-w-40">Max Preview Count</label>
+            <input
+              type="number"
+              className="input input-bordered w-32"
+              min="0"
+              max="100"
+              value={state.ui.upload?.max_preview_count ?? 30}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 0;
+                dispatch({
+                  type: "SET_UPLOAD_MAX_PREVIEW_COUNT",
+                  payload: value,
+                });
+              }}
+            />
+            <span className="text-sm text-base-content/70">
+              Number of files to generate thumbnails for
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="font-semibold min-w-40">Max Total Files</label>
+            <input
+              type="number"
+              className="input input-bordered w-32"
+              min="1"
+              max="500"
+              value={state.ui.upload?.max_total_files ?? 100}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 1;
+                dispatch({
+                  type: "SET_UPLOAD_MAX_TOTAL_FILES",
+                  payload: value,
+                });
+              }}
+            />
+            <span className="text-sm text-base-content/70">
+              Maximum number of files that can be uploaded at once
+            </span>
+          </div>
         </div>
       </section>
     </div>

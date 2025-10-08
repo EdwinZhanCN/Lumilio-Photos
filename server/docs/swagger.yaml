@@ -53,15 +53,23 @@ components:
           type: integer
         is_deleted:
           type: boolean
+        liked:
+          type: boolean
         mime_type:
           type: string
         original_filename:
           type: string
         owner_id:
           type: integer
+        rating:
+          type: integer
+        repository_id:
+          type: string
         specific_metadata:
           type: object
         storage_path:
+          type: string
+        taken_time:
           type: string
         type:
           type: string
@@ -263,6 +271,62 @@ components:
           type: array
           uniqueItems: false
       type: object
+    handler.ProgressSummary:
+      properties:
+        active_sessions:
+          type: integer
+        completed_files:
+          type: integer
+        failed_sessions:
+          type: integer
+        overall_progress:
+          type: number
+        total_sessions:
+          type: integer
+      type: object
+    handler.ReprocessAssetRequest:
+      properties:
+        force_full_retry:
+          example: false
+          type: boolean
+        tasks:
+          example:
+          - thumbnail_small
+          - thumbnail_medium
+          - transcode_1080p
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+      type: object
+    handler.ReprocessAssetResponse:
+      properties:
+        asset_id:
+          example: 550e8400-e29b-41d4-a716-446655440000
+          type: string
+        failed_tasks:
+          example:
+          - thumbnail_small
+          - transcode_1080p
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        message:
+          example: Reprocessing job queued successfully
+          type: string
+        retry_tasks:
+          example:
+          - thumbnail_small
+          - transcode_1080p
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        status:
+          example: queued
+          type: string
+      type: object
     handler.SearchAssetsRequest:
       properties:
         filter:
@@ -288,6 +352,29 @@ components:
       required:
       - query
       - search_type
+      type: object
+    handler.SessionProgress:
+      properties:
+        bytes_done:
+          type: integer
+        bytes_total:
+          type: integer
+        filename:
+          type: string
+        last_activity:
+          type: string
+        progress:
+          description: 0-1
+          type: number
+        received_chunks:
+          type: integer
+        session_id:
+          type: string
+        status:
+          description: pending, uploading, merging, completed, failed
+          type: string
+        total_chunks:
+          type: integer
       type: object
     handler.UpdateAlbumRequest:
       properties:
@@ -340,6 +427,28 @@ components:
           maximum: 5
           minimum: 0
           type: integer
+      type: object
+    handler.UploadConfigResponse:
+      properties:
+        chunk_size:
+          description: in bytes
+          type: integer
+        max_concurrent:
+          description: maximum concurrent uploads
+          type: integer
+        memory_buffer:
+          description: safety buffer in bytes
+          type: integer
+      type: object
+    handler.UploadProgressResponse:
+      properties:
+        sessions:
+          items:
+            $ref: '#/components/schemas/handler.SessionProgress'
+          type: array
+          uniqueItems: false
+        summary:
+          $ref: '#/components/schemas/handler.ProgressSummary'
       type: object
     handler.UploadResponse:
       properties:
@@ -1067,8 +1176,9 @@ paths:
         content:
           multipart/form-data:
             schema:
+              example: '"550e8400-e29b-41d4-a716-446655440000"'
               type: string
-        description: Repository UUID (optional, uses default if not provided)
+        description: Repository UUID (uses default repository if not provided)
       responses:
         "200":
           content:
@@ -1765,6 +1875,57 @@ paths:
       summary: Update asset rating and like status
       tags:
       - assets
+  /assets/{id}/reprocess:
+    post:
+      description: Reprocess a failed or warning asset by resetting its status and
+        re-enqueuing for processing
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/handler.ReprocessAssetRequest'
+        description: Reprocessing tasks (optional)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/handler.ReprocessAssetResponse'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+          description: Internal Server Error
+      summary: Reprocess asset
+      tags:
+      - assets
   /assets/{id}/thumbnail:
     get:
       description: Retrieve a specific thumbnail image for an asset by asset ID and
@@ -1864,15 +2025,15 @@ paths:
       - assets
   /assets/batch:
     post:
-      description: Batch upload multiple assets to a repository. Each file part's
-        field name should be its BLAKE3 content hash. All files are staged and queued
-        for processing.
+      description: 'Unified batch upload endpoint that supports both small files and
+        chunked large files. Field names should follow format: single_{session_id}
+        for single files or chunk_{session_id}_{index}_{total} for chunks.'
       requestBody:
         content:
           multipart/form-data:
             schema:
-              type: string
-        description: Repository UUID (optional, uses default if not provided)
+              type: file
+        description: 'Chunked file upload - use format: chunk_{session_id}_{index}_{total}'
       responses:
         "200":
           content:
@@ -1912,7 +2073,90 @@ paths:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Internal server error
-      summary: Batch upload assets
+      summary: Batch upload assets with chunk support
+      tags:
+      - assets
+  /assets/batch/config:
+    get:
+      description: Get current upload configuration including chunk size and concurrency
+        limits based on system memory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: Upload configuration retrieved
+      summary: Get upload configuration
+      tags:
+      - assets
+  /assets/batch/progress:
+    get:
+      description: Get detailed progress information for upload sessions
+      parameters:
+      - description: Comma-separated session IDs (optional)
+        in: query
+        name: session_ids
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: Upload progress details
+      summary: Get upload progress
       tags:
       - assets
   /assets/filter:

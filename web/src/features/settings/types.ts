@@ -15,6 +15,10 @@ export interface UISettings {
   asset_page?: {
     layout: "compact" | "wide" | "full";
   };
+  upload?: {
+    max_preview_count: number; // 生成预览图的最大数量
+    max_total_files: number; // 总文件上传数量限制
+  };
 }
 
 export interface ServerSettings {
@@ -39,6 +43,9 @@ export type SettingsAction =
   | { type: "SET_ASSETS_LAYOUT"; payload: "compact" | "wide" | "full" }
   | { type: "SET_LANGUAGE"; payload: "en" | "zh" }
   | { type: "SET_REGION"; payload: "china" | "other" }
+  // Upload Actions
+  | { type: "SET_UPLOAD_MAX_PREVIEW_COUNT"; payload: number }
+  | { type: "SET_UPLOAD_MAX_TOTAL_FILES"; payload: number }
   // Server Actions
   | { type: "SET_SERVER_UPDATE_TIMESPAN"; payload: number };
 

@@ -23,24 +23,29 @@ DROP TABLE IF EXISTS albums;
 -- 4) Tags (standalone after asset_tags is dropped)
 DROP TABLE IF EXISTS tags;
 
--- 5) Assets and related indexes (depends on users)
+-- 5) Assets and related indexes (depends on users and repositories)
 DROP INDEX IF EXISTS assets_hnsw_idx;
 DROP INDEX IF EXISTS idx_assets_rating_liked;
 DROP INDEX IF EXISTS idx_assets_liked;
 DROP INDEX IF EXISTS idx_assets_rating;
 DROP INDEX IF EXISTS idx_assets_type_taken_time_coalesce;
+DROP INDEX IF EXISTS idx_assets_repository_id;
 DROP INDEX IF EXISTS idx_assets_owner_id;
 DROP INDEX IF EXISTS idx_assets_type;
 DROP INDEX IF EXISTS idx_assets_hash;
 DROP INDEX IF EXISTS idx_assets_taken_time;
-DROP INDEX IF EXISTS idx_assets_storage_path;
 DROP TABLE IF EXISTS assets;
 
+-- 6) Repositories (drop after assets)
+DROP INDEX IF EXISTS idx_repositories_path;
+DROP INDEX IF EXISTS idx_repositories_status;
+DROP TABLE IF EXISTS repositories;
 
--- 6) Refresh tokens and indexes (depends on users)
+
+-- 7) Refresh tokens and indexes (depends on users)
 DROP INDEX IF EXISTS idx_refresh_tokens_user_id;
 DROP INDEX IF EXISTS idx_refresh_tokens_tokens_token;
 DROP TABLE IF EXISTS refresh_tokens;
 
--- 7) Users (base table)
+-- 8) Users (base table)
 DROP TABLE IF EXISTS users;

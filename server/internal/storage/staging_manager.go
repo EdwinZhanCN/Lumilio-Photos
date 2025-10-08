@@ -18,10 +18,12 @@ type StagingManager interface {
 	CreateStagingFile(repoPath, filename string) (*StagingFile, error)
 	CommitStagingFile(stagingFile *StagingFile, finalPath string) error
 	CommitStagingFileToInbox(stagingFile *StagingFile, hash string) (string, error)
+	MoveStagingToFailed(stagingFile *StagingFile) error
 	CleanupStaging(repoPath string, maxAge time.Duration) error
 
 	// Path resolution
 	ResolveInboxPath(repoPath string, originalFilename, hash string) (string, error)
+	ResolveFailedPath(repoPath string, originalFilename string) (string, error)
 }
 
 // DefaultStagingManager implements the StagingManager interface
@@ -69,6 +71,42 @@ func (sm *DefaultStagingManager) CommitStagingFileToInbox(stagingFile *StagingFi
 		return "", err
 	}
 	return inboxPath, nil
+}
+
+// MoveStagingToFailed moves a staging file to the failed directory
+func (sm *DefaultStagingManager) MoveStagingToFailed(stagingFile *StagingFile) error {
+	if stagingFile == nil {
+		return fmt.Errorf("staging file is nil")
+	}
+
+	// Resolve failed path
+	failedPath, err := sm.ResolveFailedPath(stagingFile.RepoPath, stagingFile.Filename)
+	if err != nil {
+		return fmt.Errorf("failed to resolve failed path: %w", err)
+	}
+
+	// Move to failed directory
+	if err := sm.CommitStagingFile(stagingFile, failedPath); err != nil {
+		return fmt.Errorf("failed to move staging file to failed directory: %w", err)
+	}
+	return nil
+}
+
+// ResolveFailedPath resolves the path for failed files
+func (sm *DefaultStagingManager) ResolveFailedPath(repoPath string, originalFilename string) (string, error) {
+	failedDir := filepath.Join(repoPath, DefaultStructure.FailedDir)
+	if err := os.MkdirAll(failedDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create failed directory: %w", err)
+	}
+
+	// Use timestamp to avoid filename conflicts
+	timestamp := time.Now().Format("20060102_150405")
+	base := filepath.Base(originalFilename)
+	ext := filepath.Ext(base)
+	name := strings.TrimSuffix(base, ext)
+	failedFilename := fmt.Sprintf("%s_%s%s", name, timestamp, ext)
+
+	return filepath.Join(DefaultStructure.FailedDir, failedFilename), nil
 }
 
 // ResolveInboxPath resolves the final inbox path for a file based on repository configuration

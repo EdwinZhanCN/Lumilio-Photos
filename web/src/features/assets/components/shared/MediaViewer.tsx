@@ -1,7 +1,16 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Play, Pause, Volume2, VolumeX, Maximize, Music, AlertCircle } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Volume2,
+  VolumeX,
+  Maximize,
+  Music,
+  AlertCircle,
+} from "lucide-react";
 import { assetService } from "@/services/assetsService";
 import { isVideo, isAudio, formatDuration } from "@/lib/utils/mediaTypes";
+import { Asset } from "@/services";
 
 interface MediaViewerProps {
   asset: Asset;
@@ -32,14 +41,15 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
   const mediaRef = videoAsset ? videoRef : audioRef;
 
   // Get media source URL
-  const mediaUrl = asset.asset_id 
+  const mediaUrl = asset.asset_id
     ? assetService.getOriginalFileUrl(asset.asset_id)
     : undefined;
 
   // For photos, get large thumbnail as fallback to original
-  const imageUrl = !videoAsset && !audioAsset && asset.asset_id
-    ? assetService.getThumbnailUrl(asset.asset_id, "large")
-    : undefined;
+  const imageUrl =
+    !videoAsset && !audioAsset && asset.asset_id
+      ? assetService.getThumbnailUrl(asset.asset_id, "large")
+      : undefined;
 
   // Media event handlers
   useEffect(() => {
@@ -89,7 +99,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!mediaRef.current) return;
-      
+
       switch (e.code) {
         case "Space":
           e.preventDefault();
@@ -101,11 +111,17 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
           break;
         case "ArrowLeft":
           e.preventDefault();
-          mediaRef.current.currentTime = Math.max(0, mediaRef.current.currentTime - 10);
+          mediaRef.current.currentTime = Math.max(
+            0,
+            mediaRef.current.currentTime - 10,
+          );
           break;
         case "ArrowRight":
           e.preventDefault();
-          mediaRef.current.currentTime = Math.min(duration, mediaRef.current.currentTime + 10);
+          mediaRef.current.currentTime = Math.min(
+            duration,
+            mediaRef.current.currentTime + 10,
+          );
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -169,7 +185,9 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
   // Video player
   if (videoAsset && mediaUrl) {
     return (
-      <div className={`relative w-full h-full flex items-center justify-center ${className}`}>
+      <div
+        className={`relative w-full h-full flex items-center justify-center ${className}`}
+      >
         <video
           ref={videoRef}
           src={mediaUrl}
@@ -178,14 +196,14 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
           preload="metadata"
           aria-label={`Video: ${asset.original_filename || "Video file"}`}
         />
-        
+
         {/* Loading indicator */}
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
             <div className="loading loading-spinner loading-lg text-white"></div>
           </div>
         )}
-        
+
         {/* Error state */}
         {hasError && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-white">
@@ -198,7 +216,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
             </div>
           </div>
         )}
-        
+
         {/* Custom video controls overlay */}
         {!hasError && (
           <div className="absolute bottom-4 left-4 right-4 bg-black/80 rounded-lg p-3 text-white">
@@ -209,9 +227,13 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
                 aria-label={isPlaying ? "Pause video" : "Play video"}
                 disabled={isLoading || hasError}
               >
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                {isPlaying ? (
+                  <Pause className="w-4 h-4" />
+                ) : (
+                  <Play className="w-4 h-4 ml-0.5" />
+                )}
               </button>
-              
+
               <div className="flex-1">
                 <input
                   type="range"
@@ -224,12 +246,12 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
                   disabled={isLoading || hasError}
                 />
               </div>
-              
+
               <span className="text-sm font-mono">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
             </div>
-            
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
@@ -238,9 +260,13 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
                   aria-label={isMuted ? "Unmute video" : "Mute video"}
                   disabled={isLoading || hasError}
                 >
-                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  {isMuted ? (
+                    <VolumeX className="w-4 h-4" />
+                  ) : (
+                    <Volume2 className="w-4 h-4" />
+                  )}
                 </button>
-                
+
                 <input
                   type="range"
                   min="0"
@@ -253,7 +279,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
                   disabled={isLoading || hasError}
                 />
               </div>
-              
+
               <button
                 onClick={toggleFullscreen}
                 className="btn btn-circle btn-sm bg-white/20 border-none hover:bg-white/30"
@@ -272,15 +298,17 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
   // Audio player
   if (audioAsset && mediaUrl) {
     return (
-      <div className={`w-full h-full flex items-center justify-center ${className}`}>
+      <div
+        className={`w-full h-full flex items-center justify-center ${className}`}
+      >
         <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl p-8 text-white shadow-2xl max-w-md w-full mx-4">
-          <audio 
-            ref={audioRef} 
-            src={mediaUrl} 
+          <audio
+            ref={audioRef}
+            src={mediaUrl}
             preload="metadata"
             aria-label={`Audio: ${asset.original_filename || "Audio file"}`}
           />
-          
+
           {/* Loading indicator */}
           {isLoading && (
             <div className="text-center mb-6">
@@ -288,7 +316,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
               <div className="text-sm opacity-70">Loading audio...</div>
             </div>
           )}
-          
+
           {/* Error state */}
           {hasError && (
             <div className="text-center mb-6">
@@ -299,7 +327,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
               </div>
             </div>
           )}
-          
+
           {/* Audio visualization */}
           {!hasError && !isLoading && (
             <>
@@ -308,13 +336,14 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
                   <Music className="w-12 h-12" />
                 </div>
                 <h3 className="text-xl font-bold mb-1">
-                  {asset.original_filename?.replace(/\.[^/.]+$/, "") || "Audio File"}
+                  {asset.original_filename?.replace(/\.[^/.]+$/, "") ||
+                    "Audio File"}
                 </h3>
                 <p className="text-white/70 text-sm">
                   {asset.mime_type || "Audio"}
                 </p>
               </div>
-              
+
               {/* Progress bar */}
               <div className="mb-4">
                 <input
@@ -332,7 +361,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
                   <span>{formatTime(duration)}</span>
                 </div>
               </div>
-              
+
               {/* Controls */}
               <div className="flex items-center justify-center gap-4">
                 <button
@@ -341,18 +370,26 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
                   aria-label={isMuted ? "Unmute audio" : "Mute audio"}
                   disabled={isLoading || hasError}
                 >
-                  {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  {isMuted ? (
+                    <VolumeX className="w-4 h-4" />
+                  ) : (
+                    <Volume2 className="w-4 h-4" />
+                  )}
                 </button>
-                
+
                 <button
                   onClick={togglePlayPause}
                   className="btn btn-circle btn-lg bg-white/30 border-none hover:bg-white/40"
                   aria-label={isPlaying ? "Pause audio" : "Play audio"}
                   disabled={isLoading || hasError}
                 >
-                  {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+                  {isPlaying ? (
+                    <Pause className="w-6 h-6" />
+                  ) : (
+                    <Play className="w-6 h-6 ml-0.5" />
+                  )}
                 </button>
-                
+
                 <input
                   type="range"
                   min="0"
@@ -365,7 +402,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
                   disabled={isLoading || hasError}
                 />
               </div>
-              
+
               {/* Keyboard shortcuts hint */}
               <div className="text-center text-xs text-white/50 mt-4">
                 Space: Play/Pause • ←→: Seek • ↑↓: Volume • M: Mute
@@ -380,7 +417,9 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
   // Photo display (fallback to existing behavior)
   if (imageUrl) {
     return (
-      <div className={`h-screen w-screen flex items-center justify-center p-4 ${className}`}>
+      <div
+        className={`h-screen w-screen flex items-center justify-center p-4 ${className}`}
+      >
         <img
           src={imageUrl}
           alt={asset.original_filename || "Asset"}
@@ -392,7 +431,9 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
 
   // Fallback for unsupported or missing media
   return (
-    <div className={`w-full h-full flex items-center justify-center text-white ${className}`}>
+    <div
+      className={`w-full h-full flex items-center justify-center text-white ${className}`}
+    >
       <div className="text-center">
         <div className="text-xl mb-2">Media not available</div>
         <div className="text-sm opacity-70">
