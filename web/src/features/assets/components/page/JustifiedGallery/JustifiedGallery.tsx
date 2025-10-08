@@ -6,6 +6,7 @@ import {
   type LayoutResult,
 } from "@/services/justifiedLayoutService";
 import MediaThumbnail from "../../shared/MediaThumbnail";
+import { Asset } from "@/services";
 
 interface JustifiedGalleryProps {
   groupedPhotos: Record<string, Asset[]>;
@@ -100,16 +101,6 @@ const JustifiedGallery = ({
     const config =
       justifiedLayoutService.createResponsiveConfig(containerWidth);
 
-    // Calculate approximate column count for debugging
-    const minItemWidth = 150;
-    const approxColumns = Math.floor(
-      (config.rowWidth + config.spacing) / (minItemWidth + config.spacing),
-    );
-
-    console.log(
-      `Gallery responsive config - Container Width: ${containerWidth}px, Row Width: ${config.rowWidth}px, ~${approxColumns} columns, Row Height: ${config.rowHeight}px`,
-    );
-
     return config;
   }, [containerWidth]);
 
@@ -203,15 +194,30 @@ const JustifiedGallery = ({
         return;
       }
 
-      const positions: PositionedAsset[] = layout.positions.map(
-        (pos, index) => ({
-          asset: assets[index],
-          top: pos.top,
-          left: pos.left,
-          width: pos.width,
-          height: pos.height,
-        }),
-      );
+      const positions: PositionedAsset[] = layout.positions
+        .map((pos, index) => {
+          const asset = assets[index];
+          // Skip assets that don't exist or have no asset_id
+          if (!asset || !asset.asset_id) {
+            console.warn(
+              "Skipping asset with missing asset_id in group",
+              groupKey,
+              "at index",
+              index,
+            );
+            return null;
+          }
+          return {
+            asset,
+            top: pos.top,
+            left: pos.left,
+            width: pos.width,
+            height: pos.height,
+          };
+        })
+        .filter(
+          (positioned): positioned is PositionedAsset => positioned !== null,
+        );
 
       results[groupKey] = {
         positions,
@@ -223,11 +229,11 @@ const JustifiedGallery = ({
     return results;
   }, [groupedPhotos, layouts]);
 
-  if (isLoading) {
+  if (isLoading || layoutsLoading) {
     return <PhotosLoadingSkeleton />;
   }
 
-  if (!serviceReady && layoutsLoading) {
+  if (!serviceReady) {
     return (
       <div className="flex justify-center items-center py-12">
         <span className="loading loading-spinner loading-lg"></span>
@@ -302,16 +308,23 @@ const JustifiedGallery = ({
             >
               {layout.positions.map(
                 (positioned: PositionedAsset, index: number) => {
-                  const thumbnailUrl = positioned.asset.asset_id
-                    ? assetService.getThumbnailUrl(
-                        positioned.asset.asset_id,
-                        "small",
-                      )
-                    : undefined;
+                  // Defensive check: ensure asset and asset_id exist
+                  if (!positioned.asset || !positioned.asset.asset_id) {
+                    console.warn(
+                      "Skipping asset with missing asset_id at index",
+                      index,
+                    );
+                    return null;
+                  }
+
+                  const thumbnailUrl = assetService.getThumbnailUrl(
+                    positioned.asset.asset_id,
+                    "small",
+                  );
 
                   return (
                     <div
-                      key={positioned.asset.asset_id || `asset-${index}`}
+                      key={positioned.asset.asset_id}
                       className="absolute overflow-hidden rounded-sm shadow-md hover:shadow-xl transition-all duration-200 hover:-translate-y-1 animate-fade-in cursor-pointer"
                       style={{
                         top: `${positioned.top}px`,

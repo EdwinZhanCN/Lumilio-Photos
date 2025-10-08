@@ -595,8 +595,8 @@ func (rm *DefaultRepositoryManager) GetRepositoryAssetStats(repoID string, owner
 
 	// Get repository asset statistics
 	stats, err := rm.queries.GetRepositoryAssetStats(context.Background(), repo.GetRepositoryAssetStatsParams{
-		RepoPath: &repository.Path,
-		OwnerID:  ownerID,
+		RepositoryID: repository.RepoID,
+		OwnerID:      ownerID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get asset stats for repository: %w", err)

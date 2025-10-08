@@ -15,7 +15,7 @@ import (
 
 const getAssetWithRelations = `-- name: GetAssetWithRelations :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.embedding,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.embedding, a.status,
     COALESCE(
         json_agg(DISTINCT
             jsonb_build_object(
@@ -73,7 +73,7 @@ type GetAssetWithRelationsRow struct {
 	OwnerID            *int32                   `db:"owner_id" json:"owner_id"`
 	Type               string                   `db:"type" json:"type"`
 	OriginalFilename   string                   `db:"original_filename" json:"original_filename"`
-	StoragePath        string                   `db:"storage_path" json:"storage_path"`
+	StoragePath        *string                  `db:"storage_path" json:"storage_path"`
 	MimeType           string                   `db:"mime_type" json:"mime_type"`
 	FileSize           int64                    `db:"file_size" json:"file_size"`
 	Hash               *string                  `db:"hash" json:"hash"`
@@ -87,7 +87,9 @@ type GetAssetWithRelationsRow struct {
 	SpecificMetadata   dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 	Rating             *int32                   `db:"rating" json:"rating"`
 	Liked              *bool                    `db:"liked" json:"liked"`
+	RepositoryID       pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Embedding          *pgvector_go.Vector      `db:"embedding" json:"embedding"`
+	Status             []byte                   `db:"status" json:"status"`
 	Thumbnails         interface{}              `db:"thumbnails" json:"thumbnails"`
 	Tags               interface{}              `db:"tags" json:"tags"`
 	Albums             interface{}              `db:"albums" json:"albums"`
@@ -116,7 +118,9 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
+		&i.RepositoryID,
 		&i.Embedding,
+		&i.Status,
 		&i.Thumbnails,
 		&i.Tags,
 		&i.Albums,
@@ -127,7 +131,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 
 const getAssetWithTags = `-- name: GetAssetWithTags :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.embedding,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.embedding, a.status,
     COALESCE(
         json_agg(
             json_build_object(
@@ -152,7 +156,7 @@ type GetAssetWithTagsRow struct {
 	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
 	Type             string                   `db:"type" json:"type"`
 	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
-	StoragePath      string                   `db:"storage_path" json:"storage_path"`
+	StoragePath      *string                  `db:"storage_path" json:"storage_path"`
 	MimeType         string                   `db:"mime_type" json:"mime_type"`
 	FileSize         int64                    `db:"file_size" json:"file_size"`
 	Hash             *string                  `db:"hash" json:"hash"`
@@ -166,7 +170,9 @@ type GetAssetWithTagsRow struct {
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 	Rating           *int32                   `db:"rating" json:"rating"`
 	Liked            *bool                    `db:"liked" json:"liked"`
+	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
+	Status           []byte                   `db:"status" json:"status"`
 	Tags             interface{}              `db:"tags" json:"tags"`
 }
 
@@ -192,7 +198,9 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
+		&i.RepositoryID,
 		&i.Embedding,
+		&i.Status,
 		&i.Tags,
 	)
 	return i, err
@@ -200,7 +208,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 
 const getAssetWithThumbnails = `-- name: GetAssetWithThumbnails :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.embedding,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.embedding, a.status,
     COALESCE(
         json_agg(
             json_build_object(
@@ -229,7 +237,7 @@ type GetAssetWithThumbnailsRow struct {
 	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
 	Type             string                   `db:"type" json:"type"`
 	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
-	StoragePath      string                   `db:"storage_path" json:"storage_path"`
+	StoragePath      *string                  `db:"storage_path" json:"storage_path"`
 	MimeType         string                   `db:"mime_type" json:"mime_type"`
 	FileSize         int64                    `db:"file_size" json:"file_size"`
 	Hash             *string                  `db:"hash" json:"hash"`
@@ -243,7 +251,9 @@ type GetAssetWithThumbnailsRow struct {
 	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
 	Rating           *int32                   `db:"rating" json:"rating"`
 	Liked            *bool                    `db:"liked" json:"liked"`
+	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
+	Status           []byte                   `db:"status" json:"status"`
 	Thumbnails       interface{}              `db:"thumbnails" json:"thumbnails"`
 }
 
@@ -269,7 +279,9 @@ func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUI
 		&i.SpecificMetadata,
 		&i.Rating,
 		&i.Liked,
+		&i.RepositoryID,
 		&i.Embedding,
+		&i.Status,
 		&i.Thumbnails,
 	)
 	return i, err

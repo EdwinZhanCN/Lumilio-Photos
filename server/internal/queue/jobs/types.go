@@ -30,3 +30,12 @@ type ProcessClipArgs struct {
 }
 
 func (ProcessClipArgs) Kind() string { return "process_clip" }
+
+// AssetRetryPayload is the River job payload for selective retry of asset processing tasks
+type AssetRetryPayload struct {
+	AssetID        string   `json:"assetId" river:"unique"`
+	RetryTasks     []string `json:"retryTasks,omitempty"` // Empty means retry all failed tasks
+	ForceFullRetry bool     `json:"forceFullRetry,omitempty"`
+}
+
+func (AssetRetryPayload) Kind() string { return "retry_asset" }

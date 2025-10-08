@@ -4,6 +4,7 @@ import api from "@/lib/http-commons/api.ts";
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import type { components, paths } from "@/lib/http-commons/schema.d.ts";
 import type { ApiResult } from "./uploadService";
+import type { Asset as ExtendedAsset } from "@/lib/http-commons/schema-extensions";
 
 // ============================================================================
 // Type Aliases from Generated Schema
@@ -13,9 +14,10 @@ type Schemas = components["schemas"];
 type Paths = paths;
 
 /**
- * Asset data transfer object
+ * Asset data transfer object with properly typed specific_metadata
+ * This uses the extended type from schema-extensions.ts
  */
-export type Asset = Schemas["handler.AssetDTO"];
+export type Asset = ExtendedAsset;
 
 /**
  * Asset list response with pagination

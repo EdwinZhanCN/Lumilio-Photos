@@ -3,14 +3,17 @@ package processors
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"server/config"
 	"server/internal/db/dbtypes"
+	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/utils/file"
+	"server/internal/utils/raw"
 	"time"
 
 	"github.com/google/uuid"
@@ -58,7 +61,7 @@ func NewAssetProcessor(
 }
 
 func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (*repo.Asset, error) {
-	// Get repository information first (needed to resolve inbox path if staging missing)
+	// Get repository information first
 	var repository repo.Repository
 	if task.RepositoryID != "" {
 		repoUUID, err := uuid.Parse(task.RepositoryID)
@@ -92,69 +95,53 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 	}
 	contentType := validationResult.AssetType
 
-	// Determine file location: prefer staged path, but tolerate if it was already committed by a previous attempt
+	// Check if file exists in staging
 	var (
-		fileInfo      os.FileInfo
-		fileSize      int64
-		inboxPath     string
-		usedCommitted bool
+		fileInfo    os.FileInfo
+		fileSize    int64
+		stagingFile *storage.StagingFile
 	)
 
 	if info, err := os.Stat(task.StagedPath); err == nil {
 		fileInfo = info
-	} else {
-		// Staged file is missing – try to locate the expected committed file path and continue
-		resolvedPath, rerr := ap.stagingManager.ResolveInboxPath(repository.Path, task.FileName, task.ClientHash)
-		if rerr != nil {
-			return nil, fmt.Errorf("staged file not found and failed to resolve inbox path: %w", err)
-		}
-		committed := filepath.Join(repository.Path, resolvedPath)
-		if cinfo, serr := os.Stat(committed); serr == nil {
-			fileInfo = cinfo
-			inboxPath = resolvedPath
-			usedCommitted = true
-		} else {
-			return nil, fmt.Errorf("staged file not found and no committed file at expected path %s: %w", committed, err)
-		}
-	}
-	fileSize = fileInfo.Size()
+		fileSize = fileInfo.Size()
 
-	// Commit staged file to repository inbox only if it hasn't already been committed
-	if !usedCommitted {
-		// Convert task.StagedPath to StagingFile structure
-		stagingFile := &storage.StagingFile{
+		// Create staging file structure
+		stagingFile = &storage.StagingFile{
 			ID:        filepath.Base(task.StagedPath),
 			RepoPath:  repository.Path,
 			Path:      task.StagedPath,
 			Filename:  task.FileName,
 			CreatedAt: task.Timestamp,
 		}
-
-		// Commit to inbox based on repository configuration and capture the final relative path (single source of truth)
-		finalRelPath, err := ap.stagingManager.CommitStagingFileToInbox(stagingFile, task.ClientHash)
-		if err != nil {
-			return nil, fmt.Errorf("failed to commit staged file to inbox: %w", err)
-		}
-		inboxPath = finalRelPath
+	} else {
+		return nil, fmt.Errorf("staged file not found: %w", err)
 	}
 
-	// Create asset record with repository-relative path
-	// Note: repository_id will be added after migration is run
+	// Create asset record with NULL storage_path initially
+	initialStatus := status.NewProcessingStatus("Asset processing started")
+	statusJSON, err := initialStatus.ToJSONB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal initial status: %w", err)
+	}
+
 	params := repo.CreateAssetParams{
 		OwnerID:          ownerIDPtr,
 		Type:             string(contentType),
 		OriginalFilename: task.FileName,
-		StoragePath:      inboxPath, // Store relative path within repository
+		StoragePath:      nil, // Will be set after successful processing
 		MimeType:         task.ContentType,
 		FileSize:         fileSize,
 		Hash:             &task.ClientHash,
 		Width:            nil,
 		Height:           nil,
 		Duration:         nil,
-		TakenTime:        pgtype.Timestamptz{Time: time.Now(), Valid: true}, // Fallback to current time, will be updated when EXIF is processed
+		TakenTime:        pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		SpecificMetadata: nil,
 		Rating:           func() *int32 { r := int32(0); return &r }(),
 		Liked:            nil,
+		RepositoryID:     pgtype.UUID{Bytes: repository.RepoID.Bytes, Valid: true},
+		Status:           statusJSON,
 	}
 
 	asset, err := ap.assetService.CreateAssetRecord(ctx, params)
@@ -162,26 +149,149 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 		return nil, fmt.Errorf("failed to create asset record: %w", err)
 	}
 
-	// Open the committed file for processing
-	committedFilePath := filepath.Join(repository.Path, inboxPath)
-	assetFile, err := os.Open(committedFilePath)
+	// Process the asset with comprehensive error handling
+	err = ap.processAssetWithStatus(ctx, repository, asset, stagingFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open committed file: %w", err)
+		// If processing failed completely, move file to failed directory and update status
+		if stagingFile != nil {
+			if moveErr := ap.stagingManager.MoveStagingToFailed(stagingFile); moveErr != nil {
+				// Log the error but don't fail the entire process
+				fmt.Printf("Failed to move file to failed directory: %v\n", moveErr)
+			}
+		}
+
+		// Update status to failed
+		failedStatus := status.NewFailedStatus("Asset processing failed", []status.ErrorDetail{
+			{Task: "process_asset", Error: err.Error()},
+		})
+		statusJSON, _ := failedStatus.ToJSONB()
+		_, _ = ap.queries.UpdateAssetStatus(ctx, repo.UpdateAssetStatusParams{
+			AssetID: asset.AssetID,
+			Status:  statusJSON,
+		})
+
+		return asset, err
+	}
+
+	return asset, nil
+}
+
+// processAssetWithStatus handles the main processing logic with status tracking
+func (ap *AssetProcessor) processAssetWithStatus(ctx context.Context, repository repo.Repository, asset *repo.Asset, stagingFile *storage.StagingFile) error {
+	// Open the staging file for processing
+	assetFile, err := os.Open(stagingFile.Path)
+	if err != nil {
+		return fmt.Errorf("failed to open staging file: %w", err)
 	}
 	defer assetFile.Close()
 
-	// Process based on asset type
+	// Process based on asset type and collect errors
+	var processingErrors []status.ErrorDetail
+
 	switch asset.Type {
 	case string(dbtypes.AssetTypePhoto):
-		err := ap.processPhotoAsset(ctx, repository, asset, assetFile)
-		return asset, err
+		photoErrors := ap.processPhotoAssetWithErrors(ctx, repository, asset, assetFile)
+		processingErrors = append(processingErrors, photoErrors...)
 	case string(dbtypes.AssetTypeVideo):
-		err := ap.processVideoAsset(ctx, repository, asset, assetFile)
-		return asset, err
+		videoErrors := ap.processVideoAssetWithErrors(ctx, repository, asset, assetFile)
+		processingErrors = append(processingErrors, videoErrors...)
 	case string(dbtypes.AssetTypeAudio):
-		err := ap.processAudioAsset(ctx, repository, asset, assetFile)
-		return asset, err
+		audioErrors := ap.processAudioAssetWithErrors(ctx, repository, asset, assetFile)
+		processingErrors = append(processingErrors, audioErrors...)
 	default:
-		return asset, fmt.Errorf("unsupported asset type: %s", asset.Type)
+		return fmt.Errorf("unsupported asset type: %s", asset.Type)
 	}
+
+	// Determine final status based on errors
+	var finalStatus status.AssetStatus
+	var finalStoragePath string
+
+	if len(processingErrors) == 0 {
+		// All processing succeeded - commit to inbox
+		finalRelPath, err := ap.stagingManager.CommitStagingFileToInbox(stagingFile, "")
+		if err != nil {
+			return fmt.Errorf("failed to commit file to inbox: %w", err)
+		}
+		finalStoragePath = finalRelPath
+		finalStatus = status.NewCompleteStatus()
+	} else {
+		// Some processing failed - commit to inbox but mark as warning
+		finalRelPath, err := ap.stagingManager.CommitStagingFileToInbox(stagingFile, "")
+		if err != nil {
+			return fmt.Errorf("failed to commit file to inbox: %w", err)
+		}
+		finalStoragePath = finalRelPath
+		finalStatus = status.NewWarningStatus("Asset processed with warnings", processingErrors)
+	}
+
+	// Update asset with final storage path and status
+	statusJSON, err := finalStatus.ToJSONB()
+	if err != nil {
+		return fmt.Errorf("failed to marshal final status: %w", err)
+	}
+
+	_, err = ap.queries.UpdateAssetStoragePathAndStatus(ctx, repo.UpdateAssetStoragePathAndStatusParams{
+		AssetID:     asset.AssetID,
+		StoragePath: &finalStoragePath,
+		Status:      statusJSON,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update asset storage path and status: %w", err)
+	}
+
+	return nil
+}
+
+// processPhotoAssetWithErrors processes photo assets and returns detailed error information
+func (ap *AssetProcessor) processPhotoAssetWithErrors(ctx context.Context, repository repo.Repository, asset *repo.Asset, fileReader io.Reader) []status.ErrorDetail {
+	var errors []status.ErrorDetail
+
+	// First check if this is a RAW file
+	isRAWFile := raw.IsRAWFile(asset.OriginalFilename)
+
+	if isRAWFile {
+		if err := ap.processRAWAsset(ctx, repository, asset, fileReader); err != nil {
+			errors = append(errors, status.ErrorDetail{
+				Task:  "raw_processing",
+				Error: err.Error(),
+			})
+		}
+	} else {
+		if err := ap.processStandardPhotoAsset(ctx, repository, asset, fileReader); err != nil {
+			errors = append(errors, status.ErrorDetail{
+				Task:  "photo_processing",
+				Error: err.Error(),
+			})
+		}
+	}
+
+	return errors
+}
+
+// processVideoAssetWithErrors processes video assets and returns detailed error information
+func (ap *AssetProcessor) processVideoAssetWithErrors(ctx context.Context, repository repo.Repository, asset *repo.Asset, fileReader io.Reader) []status.ErrorDetail {
+	var errors []status.ErrorDetail
+
+	if err := ap.processVideoAsset(ctx, repository, asset, fileReader); err != nil {
+		errors = append(errors, status.ErrorDetail{
+			Task:  "video_processing",
+			Error: err.Error(),
+		})
+	}
+
+	return errors
+}
+
+// processAudioAssetWithErrors processes audio assets and returns detailed error information
+func (ap *AssetProcessor) processAudioAssetWithErrors(ctx context.Context, repository repo.Repository, asset *repo.Asset, fileReader io.Reader) []status.ErrorDetail {
+	var errors []status.ErrorDetail
+
+	if err := ap.processAudioAsset(ctx, repository, asset, fileReader); err != nil {
+		errors = append(errors, status.ErrorDetail{
+			Task:  "audio_processing",
+			Error: err.Error(),
+		})
+	}
+
+	return errors
 }

@@ -16,6 +16,7 @@ import {
   findAssetIndex,
 } from "@/lib/utils/assetGrouping.ts";
 import { FilterDTO } from "@/features/assets/components/page/FilterTool/FilterTool";
+import { Asset } from "@/lib/http-commons";
 
 function Photos() {
   const { assetId } = useParams<{ assetId: string }>();

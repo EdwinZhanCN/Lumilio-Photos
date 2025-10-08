@@ -4,8 +4,9 @@ import { useWorker } from "@/contexts/WorkerProvider.tsx";
 import {
   getOptimalBatchSize,
   recordProcessingMetrics,
-  ProcessingPriority
+  ProcessingPriority,
 } from "@/utils/smartBatchSizing";
+import { Asset } from "@/services";
 
 export interface ExportOptions {
   format: "jpeg" | "png" | "webp" | "original";
@@ -23,12 +24,16 @@ export interface ExportProgress {
 }
 
 export interface useExportImageReturn {
-    isExporting: boolean;
-    exportProgress: ExportProgress | null;
-    downloadOriginal: (asset: Asset) => Promise<void>;
-    exportImage: (asset: Asset, options: ExportOptions) => Promise<void>;
-    exportMultiple: (assets: Asset[], options: ExportOptions, priority?: ProcessingPriority) => Promise<void>;
-    cancelExport: () => void;
+  isExporting: boolean;
+  exportProgress: ExportProgress | null;
+  downloadOriginal: (asset: Asset) => Promise<void>;
+  exportImage: (asset: Asset, options: ExportOptions) => Promise<void>;
+  exportMultiple: (
+    assets: Asset[],
+    options: ExportOptions,
+    priority?: ProcessingPriority,
+  ) => Promise<void>;
+  cancelExport: () => void;
 }
 
 /**
@@ -40,7 +45,7 @@ export interface useExportImageReturn {
  * @since 1.1.0
  * @returns {useExportImageReturn} Hook state and actions for image export.
  */
-export const useExportImage = ():useExportImageReturn => {
+export const useExportImage = (): useExportImageReturn => {
   const workerClient = useWorker();
   const showMessage = useMessage();
 
@@ -163,7 +168,11 @@ export const useExportImage = ():useExportImageReturn => {
    * Exports multiple images using smart batch sizing for optimal performance.
    */
   const exportMultiple = useCallback(
-    async (assets: Asset[], options: ExportOptions, priority: ProcessingPriority = ProcessingPriority.HIGH): Promise<void> => {
+    async (
+      assets: Asset[],
+      options: ExportOptions,
+      priority: ProcessingPriority = ProcessingPriority.HIGH,
+    ): Promise<void> => {
       if (assets.length === 0) {
         showMessage("info", "No images selected for export");
         return;
@@ -178,8 +187,12 @@ export const useExportImage = ():useExportImageReturn => {
 
       try {
         // Get optimal batch size for export operations
-        const batchSize = getOptimalBatchSize("export", assets.length, priority);
-        
+        const batchSize = getOptimalBatchSize(
+          "export",
+          assets.length,
+          priority,
+        );
+
         // Process in smart batches
         for (let i = 0; i < assets.length; i += batchSize) {
           const batch = assets.slice(i, i + batchSize);
@@ -191,7 +204,7 @@ export const useExportImage = ():useExportImageReturn => {
           for (let j = 0; j < batch.length; j++) {
             const asset = batch[j];
             const globalIndex = i + j;
-            
+
             if (!asset.storage_path) {
               batchErrors++;
               continue;
@@ -200,14 +213,18 @@ export const useExportImage = ():useExportImageReturn => {
             setExportProgress((prev) => ({
               ...prev!,
               processed: globalIndex,
-              currentFile: asset.original_filename || `Image ${globalIndex + 1}`,
+              currentFile:
+                asset.original_filename || `Image ${globalIndex + 1}`,
             }));
 
             try {
-              const result = await workerClient.exportImage(asset.storage_path, {
-                ...options,
-                filename: generateFilename(asset, options),
-              });
+              const result = await workerClient.exportImage(
+                asset.storage_path,
+                {
+                  ...options,
+                  filename: generateFilename(asset, options),
+                },
+              );
 
               if (result.status === "complete" && result.blob) {
                 downloadBlob(result.blob, result.filename!);
@@ -218,7 +235,10 @@ export const useExportImage = ():useExportImageReturn => {
                 totalErrors++;
               }
             } catch (error) {
-              console.warn(`Failed to export ${asset.original_filename}:`, error);
+              console.warn(
+                `Failed to export ${asset.original_filename}:`,
+                error,
+              );
               batchErrors++;
               totalErrors++;
             }
@@ -231,32 +251,37 @@ export const useExportImage = ():useExportImageReturn => {
             batchSize: batch.length,
             processingTimeMs: batchProcessingTime,
             filesProcessed: batchSuccessCount,
-            avgTimePerFile: batchSuccessCount > 0 ? batchProcessingTime / batchSuccessCount : 0,
+            avgTimePerFile:
+              batchSuccessCount > 0
+                ? batchProcessingTime / batchSuccessCount
+                : 0,
             success: batchErrors === 0,
             errorRate: batchErrors / batch.length,
           });
 
           // Update progress after batch completion
-          setExportProgress((prev) => ({ 
-            ...prev!, 
-            processed: Math.min(i + batchSize, assets.length) 
+          setExportProgress((prev) => ({
+            ...prev!,
+            processed: Math.min(i + batchSize, assets.length),
           }));
         }
 
         // Show final results
         if (successCount > 0) {
           showMessage(
-            successCount === assets.length ? "success" : "warning",
+            successCount === assets.length ? "success" : "info",
             `Export completed. Successfully exported ${successCount} of ${assets.length} images.`,
           );
         } else {
           showMessage("error", "Export failed for all images.");
         }
-
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Export failed";
+        const errorMessage =
+          error instanceof Error ? error.message : "Export failed";
         showMessage("error", errorMessage);
-        setExportProgress((prev) => prev ? { ...prev, error: errorMessage } : null);
+        setExportProgress((prev) =>
+          prev ? { ...prev, error: errorMessage } : null,
+        );
 
         // Record overall failure
         const totalProcessingTime = performance.now() - startTime;
@@ -265,7 +290,8 @@ export const useExportImage = ():useExportImageReturn => {
           batchSize: assets.length,
           processingTimeMs: totalProcessingTime,
           filesProcessed: successCount,
-          avgTimePerFile: successCount > 0 ? totalProcessingTime / successCount : 0,
+          avgTimePerFile:
+            successCount > 0 ? totalProcessingTime / successCount : 0,
           success: false,
           errorRate: totalErrors / assets.length,
         });

@@ -24,6 +24,9 @@ type Config struct {
 
 	// CacheSize maximum number of entries in cache
 	CacheSize int
+
+	// FastMode use exiftool fast mode (skip scanning entire file)
+	FastMode bool
 }
 
 // DefaultConfig returns a default configuration
@@ -31,11 +34,12 @@ func DefaultConfig() *Config {
 	return &Config{
 		Timeout:       30 * time.Second,
 		BufferSize:    8192,
-		MaxFileSize:   100 * 1024 * 1024, // 100MB
-		WorkerCount:   4,
-		RetryAttempts: 3,
-		EnableCaching: true,
-		CacheSize:     1000,
+		MaxFileSize:   2 * 1024 * 1024 * 1024, // 2GB
+		WorkerCount:   8,
+		RetryAttempts: 2,
+		EnableCaching: false, // Disable caching for large files to save memory
+		CacheSize:     100,   // Reduced cache size for large file processing
+		FastMode:      false, // Default to full scan for accuracy
 	}
 }
 

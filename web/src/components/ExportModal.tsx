@@ -13,7 +13,7 @@ import {
 } from "@/hooks/util-hooks/useExportImage.tsx";
 import { assetService } from "@/services/assetsService";
 import { PaintBrushIcon } from "@heroicons/react/24/outline";
-
+import { Asset } from "@/services";
 type ExportFormat = "png" | "jpeg" | "webp";
 
 interface ExportModalProps {

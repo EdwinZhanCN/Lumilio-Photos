@@ -15,6 +15,7 @@ func New(dbpool *pgxpool.Pool, workers *river.Workers) (*river.Client[pgx.Tx], e
 		Queues: map[string]river.QueueConfig{
 			"process_asset": {MaxWorkers: 5},
 			"process_clip":  {MaxWorkers: 1},
+			"retry_asset":   {MaxWorkers: 2},
 		},
 		Workers: workers,
 	})

@@ -1,8 +1,8 @@
 -- name: CreateAsset :one
 INSERT INTO assets (
     owner_id, type, original_filename, storage_path, mime_type,
-    file_size, hash, width, height, duration, taken_time, specific_metadata, rating, liked
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    file_size, hash, width, height, duration, taken_time, specific_metadata, rating, liked, repository_id, status
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 RETURNING *;
 
 -- name: GetAssetByID :one
@@ -54,9 +54,94 @@ AND ($2::text IS NULL OR type = $2)
 ORDER BY upload_time DESC
 LIMIT $3 OFFSET $4;
 
+-- name: UpdateAssetStatus :one
+UPDATE assets
+SET status = $2
+WHERE asset_id = $1
+RETURNING *;
+
+-- name: UpdateAssetStoragePathAndStatus :one
+UPDATE assets
+SET
+    storage_path = $2,
+    status = $3
+WHERE asset_id = $1
+RETURNING *;
+
+-- name: GetAssetsByStatus :many
+SELECT * FROM assets
+WHERE status->>'state' = $1 AND is_deleted = false
+ORDER BY upload_time DESC
+LIMIT $2 OFFSET $3;
+
+-- name: GetAssetsWithWarnings :many
+SELECT * FROM assets
+WHERE status->>'state' = 'warning' AND is_deleted = false
+ORDER BY upload_time DESC
+LIMIT $1 OFFSET $2;
+
+-- name: GetAssetsWithErrors :many
+SELECT * FROM assets
+WHERE status->>'state' = 'failed' AND is_deleted = false
+ORDER BY upload_time DESC
+LIMIT $1 OFFSET $2;
+
+-- name: GetAssetsByStatusAndRepository :many
+SELECT * FROM assets
+WHERE status->>'state' = $1 AND repository_id = $2 AND is_deleted = false
+ORDER BY upload_time DESC
+LIMIT $3 OFFSET $4;
+
+-- name: GetAssetsByStatusAndOwner :many
+SELECT * FROM assets
+WHERE status->>'state' = $1 AND owner_id = $2 AND is_deleted = false
+ORDER BY upload_time DESC
+LIMIT $3 OFFSET $4;
+
+-- name: CountAssetsByStatus :one
+SELECT COUNT(*) as count
+FROM assets
+WHERE status->>'state' = $1 AND is_deleted = false;
+
+-- name: CountAssetsByStatusAndRepository :one
+SELECT COUNT(*) as count
+FROM assets
+WHERE status->>'state' = $1 AND repository_id = $2 AND is_deleted = false;
+
+-- name: CountAssetsByStatusAndOwner :one
+SELECT COUNT(*) as count
+FROM assets
+WHERE status->>'state' = $1 AND owner_id = $2 AND is_deleted = false;
+
+-- name: ResetAssetStatusForRetry :one
+UPDATE assets
+SET status = jsonb_set(
+    status,
+    '{state}',
+    '"processing"'
+)
+WHERE asset_id = $1 AND status->>'state' IN ('warning', 'failed')
+RETURNING *;
+
+-- name: UpdateAssetStatusWithErrors :one
+UPDATE assets
+SET status = $2
+WHERE asset_id = $1
+RETURNING *;
+
+-- name: BulkUpdateAssetStatus :exec
+UPDATE assets
+SET status = $2
+WHERE asset_id = ANY($1::uuid[])
+  AND is_deleted = false;
+
 -- name: GetAssetsByHash :many
 SELECT * FROM assets
 WHERE hash = $1 AND is_deleted = false;
+
+-- name: GetAssetByHashAndRepository :one
+SELECT * FROM assets
+WHERE hash = $1 AND repository_id = $2 AND is_deleted = false;
 
 -- name: CreateThumbnail :one
 INSERT INTO thumbnails (asset_id, size, storage_path, mime_type)
@@ -103,7 +188,7 @@ SELECT a.* FROM assets a
 WHERE a.is_deleted = false
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
-  AND (sqlc.narg('repo_path')::text IS NULL OR a.storage_path LIKE sqlc.narg('repo_path') || '%')
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE sqlc.narg('filename_mode')::text
       WHEN 'contains' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
@@ -140,7 +225,7 @@ WHERE a.is_deleted = false
   AND a.original_filename ILIKE '%' || sqlc.arg('query') || '%'
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
-  AND (sqlc.narg('repo_path')::text IS NULL OR a.storage_path LIKE sqlc.narg('repo_path') || '%')
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE sqlc.narg('filename_mode')::text
       WHEN 'contains' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
@@ -177,7 +262,7 @@ WHERE a.is_deleted = false
   AND a.embedding IS NOT NULL
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
-  AND (sqlc.narg('repo_path')::text IS NULL OR a.storage_path LIKE sqlc.narg('repo_path') || '%')
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE sqlc.narg('filename_mode')::text
       WHEN 'contains' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
@@ -418,5 +503,5 @@ SELECT
   MAX(upload_time) as newest_upload
 FROM assets
 WHERE is_deleted = false
-  AND storage_path LIKE sqlc.arg('repo_path') || '%'
+  AND repository_id = sqlc.arg('repository_id')::uuid
   AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'));

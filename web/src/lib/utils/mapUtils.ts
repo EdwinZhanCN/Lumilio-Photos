@@ -4,6 +4,8 @@ import {
   needsCoordinateConversion,
   type Coordinate,
 } from "./coordinateConversion";
+import type { Asset } from "@/lib/http-commons/schema-extensions";
+import { isPhotoMetadata } from "@/lib/http-commons/metadata-types";
 
 /**
  * Convert an Asset with GPS coordinates to PhotoLocation format
@@ -15,7 +17,12 @@ export const assetToPhotoLocation = (
 ): PhotoLocation | null => {
   const metadata = asset.specific_metadata;
 
-  if (!metadata?.gps_latitude || !metadata?.gps_longitude) {
+  // Check if metadata is photo metadata with GPS data
+  if (!isPhotoMetadata(asset.type, metadata)) {
+    return null;
+  }
+
+  if (!metadata.gps_latitude || !metadata.gps_longitude) {
     return null;
   }
 

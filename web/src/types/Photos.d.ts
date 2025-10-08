@@ -1,4 +1,3 @@
-
 /**
  * @fileoverview This file contains the type definitions for the Photos page.
  *
@@ -6,7 +5,7 @@
  * @since 1.0.0
  */
 
-import { Asset } from "@/types/Asset";
+import { Asset } from "@/lib/http-commons/schema-extensions";
 
 /**
  * Defines the shape of the state for the Photos page.
@@ -41,4 +40,3 @@ export type PhotosAction =
   | { type: "CLEAR_SELECTED_ASSET" }
   | { type: "OPEN_CAROUSEL" }
   | { type: "CLOSE_CAROUSEL" };
-

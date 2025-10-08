@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useAssetsContext } from "./useAssetsContext";
 import { selectAsset, selectAssetMeta } from "../reducers/entities.reducer";
+import { Asset } from "@/services";
 
 /**
  * Hook for accessing a single asset from the entity store.
@@ -83,16 +84,19 @@ export const useAssets = (assetIds: string[]) => {
   const { state } = useAssetsContext();
 
   const assetsMap = useMemo(() => {
-    const result: Record<string, {
-      asset?: Asset;
-      meta?: any;
-      exists: boolean;
-      isOptimistic: boolean;
-      lastUpdated?: number;
-      fetchOrigin?: string;
-    }> = {};
+    const result: Record<
+      string,
+      {
+        asset?: Asset;
+        meta?: any;
+        exists: boolean;
+        isOptimistic: boolean;
+        lastUpdated?: number;
+        fetchOrigin?: string;
+      }
+    > = {};
 
-    assetIds.forEach(assetId => {
+    assetIds.forEach((assetId) => {
       const asset = selectAsset(state.entities, assetId);
       const meta = selectAssetMeta(state.entities, assetId);
 

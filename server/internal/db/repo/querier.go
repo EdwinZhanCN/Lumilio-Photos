@@ -17,7 +17,11 @@ type Querier interface {
 	BulkToggleAssetLiked(ctx context.Context, assetIds []pgtype.UUID) error
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
+	BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error
 	CountAssetsByRating(ctx context.Context, ownerID *int32) ([]CountAssetsByRatingRow, error)
+	CountAssetsByStatus(ctx context.Context, status []byte) (int64, error)
+	CountAssetsByStatusAndOwner(ctx context.Context, arg CountAssetsByStatusAndOwnerParams) (int64, error)
+	CountAssetsByStatusAndRepository(ctx context.Context, arg CountAssetsByStatusAndRepositoryParams) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
@@ -51,6 +55,7 @@ type Querier interface {
 	GetAlbumByID(ctx context.Context, albumID int32) (Album, error)
 	GetAlbumsByUser(ctx context.Context, arg GetAlbumsByUserParams) ([]Album, error)
 	GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]GetAssetAlbumsRow, error)
+	GetAssetByHashAndRepository(ctx context.Context, arg GetAssetByHashAndRepositoryParams) (Asset, error)
 	GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	GetAssetEmbedding(ctx context.Context, assetID pgtype.UUID) (GetAssetEmbeddingRow, error)
 	GetAssetStatsForOwner(ctx context.Context, ownerID int32) (GetAssetStatsForOwnerRow, error)
@@ -65,9 +70,14 @@ type Querier interface {
 	GetAssetsByRating(ctx context.Context, arg GetAssetsByRatingParams) ([]Asset, error)
 	GetAssetsByRatingAndType(ctx context.Context, arg GetAssetsByRatingAndTypeParams) ([]Asset, error)
 	GetAssetsByRatingRange(ctx context.Context, arg GetAssetsByRatingRangeParams) ([]Asset, error)
+	GetAssetsByStatus(ctx context.Context, arg GetAssetsByStatusParams) ([]Asset, error)
+	GetAssetsByStatusAndOwner(ctx context.Context, arg GetAssetsByStatusAndOwnerParams) ([]Asset, error)
+	GetAssetsByStatusAndRepository(ctx context.Context, arg GetAssetsByStatusAndRepositoryParams) ([]Asset, error)
 	GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams) ([]Asset, error)
 	GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error)
 	GetAssetsWithEmbeddings(ctx context.Context, arg GetAssetsWithEmbeddingsParams) ([]GetAssetsWithEmbeddingsRow, error)
+	GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErrorsParams) ([]Asset, error)
+	GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWarningsParams) ([]Asset, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
 	GetFailedSyncOperations(ctx context.Context, arg GetFailedSyncOperationsParams) ([]SyncOperation, error)
@@ -111,6 +121,7 @@ type Querier interface {
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
 	RepositoryExists(ctx context.Context, path string) (bool, error)
+	ResetAssetStatusForRetry(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	SearchAssetsFilename(ctx context.Context, arg SearchAssetsFilenameParams) ([]Asset, error)
@@ -127,6 +138,9 @@ type Querier interface {
 	UpdateAssetPositionInAlbum(ctx context.Context, arg UpdateAssetPositionInAlbumParams) error
 	UpdateAssetRating(ctx context.Context, arg UpdateAssetRatingParams) error
 	UpdateAssetRatingAndLike(ctx context.Context, arg UpdateAssetRatingAndLikeParams) error
+	UpdateAssetStatus(ctx context.Context, arg UpdateAssetStatusParams) (Asset, error)
+	UpdateAssetStatusWithErrors(ctx context.Context, arg UpdateAssetStatusWithErrorsParams) (Asset, error)
+	UpdateAssetStoragePathAndStatus(ctx context.Context, arg UpdateAssetStoragePathAndStatusParams) (Asset, error)
 	UpdateFileRecord(ctx context.Context, arg UpdateFileRecordParams) (FileRecord, error)
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)

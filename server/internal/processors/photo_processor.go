@@ -16,9 +16,10 @@ import (
 
 	"github.com/h2non/bimg"
 
+	"server/internal/utils/errgroup"
+
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
-	"golang.org/x/sync/errgroup"
 )
 
 var thumbnailSizes = map[string][2]int{
@@ -89,7 +90,14 @@ func (ap *AssetProcessor) processRAWAsset(
 	previewReader := bytes.NewReader(rawResult.PreviewData)
 
 	// Use the standard processing pipeline but with different readers
-	extractor := exif.NewExtractor(nil)
+	// Configure extractor for photos - don't use fast mode to get full metadata
+	config := &exif.Config{
+		MaxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
+		Timeout:     60 * time.Second,
+		BufferSize:  128 * 1024,
+		FastMode:    false, // Don't use fast mode for photos to get complete EXIF data
+	}
+	extractor := exif.NewExtractor(config)
 
 	// Reset the original reader for EXIF extraction (we want RAW EXIF data)
 	readSeeker.Seek(0, io.SeekStart)
@@ -129,7 +137,7 @@ func (ap *AssetProcessor) processRAWAsset(
 		_, _ = io.Copy(mw, previewReader)
 	}()
 
-	g, gCtx := errgroup.WithContext(timeoutCtx)
+	g := errgroup.NewFaultTolerant()
 
 	go func() {
 		<-timeoutCtx.Done()
@@ -148,7 +156,7 @@ func (ap *AssetProcessor) processRAWAsset(
 			Filename:  asset.OriginalFilename,
 			Size:      asset.FileSize,
 		}
-		exifResult, err := extractor.ExtractFromStream(gCtx, req)
+		exifResult, err := extractor.ExtractFromStream(timeoutCtx, req)
 		if err != nil {
 			return fmt.Errorf("extract exif: %w", err)
 		}
@@ -167,7 +175,7 @@ func (ap *AssetProcessor) processRAWAsset(
 				return fmt.Errorf("metadata marshal: %w", err)
 			}
 
-			if err := ap.assetService.UpdateAssetMetadata(gCtx, asset.AssetID.Bytes, sm); err != nil {
+			if err := ap.assetService.UpdateAssetMetadata(timeoutCtx, asset.AssetID.Bytes, sm); err != nil {
 				return fmt.Errorf("save exif meta: %w", err)
 			}
 		}
@@ -185,15 +193,15 @@ func (ap *AssetProcessor) processRAWAsset(
 		}
 
 		if err := imaging.StreamThumbnails(thumbR, thumbnailSizes, outputs); err != nil {
-			return fmt.Errorf("stream thumbnails: %w", err)
+			return fmt.Errorf("generate_thumbnails: %w", err)
 		}
 
 		for name, buf := range buffers {
 			if buf.Len() == 0 {
 				continue
 			}
-			if err := ap.assetService.SaveNewThumbnail(gCtx, repository.Path, buf, asset, name); err != nil {
-				return fmt.Errorf("save thumb %s: %w", name, err)
+			if err := ap.assetService.SaveNewThumbnail(timeoutCtx, repository.Path, buf, asset, name); err != nil {
+				return fmt.Errorf("save_thumbnails: %w", err)
 			}
 		}
 		return nil
@@ -213,24 +221,30 @@ func (ap *AssetProcessor) processRAWAsset(
 			}
 			tiny, err := imaging.ProcessImageStream(clipR, tinyOpts)
 			if err != nil {
-				return fmt.Errorf("process CLIP thumbnail: %w", err)
+				return fmt.Errorf("clip_processing: %w", err)
 			}
 
 			payload := CLIPPayload{
 				asset.AssetID,
 				tiny,
 			}
-			_, err = ap.queueClient.Insert(gCtx, jobs.ProcessClipArgs(payload), &river.InsertOpts{Queue: "process_clip"})
+			_, err = ap.queueClient.Insert(timeoutCtx, jobs.ProcessClipArgs(payload), &river.InsertOpts{Queue: "process_clip"})
 			if err != nil {
-				return fmt.Errorf("enqueue CLIP job: %w", err)
+				return fmt.Errorf("clip_processing: %w", err)
 			}
 			_, _ = io.Copy(io.Discard, clipR)
 			return nil
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return err
+	// Wait for all tasks to complete, but don't fail the entire process if some tasks fail
+	errors := g.Wait()
+	if len(errors) > 0 {
+		// Log individual errors but don't fail the entire process
+		for _, err := range errors {
+			log.Printf("RAW photo processing partial failure: %v", err)
+		}
+		// Return success even if some tasks failed, as partial processing is acceptable
 	}
 
 	return nil
@@ -243,7 +257,14 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 	asset *repo.Asset,
 	fileReader io.Reader,
 ) error {
-	extractor := exif.NewExtractor(nil)
+	// Configure extractor for photos - don't use fast mode to get full metadata
+	config := &exif.Config{
+		MaxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
+		Timeout:     60 * time.Second,
+		BufferSize:  128 * 1024,
+		FastMode:    false, // Don't use fast mode for photos to get complete EXIF data
+	}
+	extractor := exif.NewExtractor(config)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -275,7 +296,7 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 		_, _ = io.Copy(mw, fileReader)
 	}()
 
-	g, gCtx := errgroup.WithContext(timeoutCtx)
+	g := errgroup.NewFaultTolerant()
 
 	go func() {
 		<-timeoutCtx.Done()
@@ -294,9 +315,9 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 			Filename:  asset.OriginalFilename,
 			Size:      asset.FileSize,
 		}
-		exifResult, err := extractor.ExtractFromStream(gCtx, req)
+		exifResult, err := extractor.ExtractFromStream(timeoutCtx, req)
 		if err != nil {
-			return fmt.Errorf("extract exif: %w", err)
+			return fmt.Errorf("extract_exif: %w", err)
 		}
 		if meta, ok := exifResult.Metadata.(*dbtypes.PhotoSpecificMetadata); ok {
 			// Mark as non-RAW
@@ -307,8 +328,8 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 				return fmt.Errorf("metadata marshal: %w", err)
 			}
 
-			if err := ap.assetService.UpdateAssetMetadata(gCtx, asset.AssetID.Bytes, sm); err != nil {
-				return fmt.Errorf("save exif meta: %w", err)
+			if err := ap.assetService.UpdateAssetMetadata(timeoutCtx, asset.AssetID.Bytes, sm); err != nil {
+				return fmt.Errorf("save_exif_meta: %w", err)
 			}
 		}
 		return nil
@@ -325,15 +346,15 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 		}
 
 		if err := imaging.StreamThumbnails(thumbR, thumbnailSizes, outputs); err != nil {
-			return fmt.Errorf("stream thumbnails: %w", err)
+			return fmt.Errorf("generate_thumbnails: %w", err)
 		}
 
 		for name, buf := range buffers {
 			if buf.Len() == 0 {
 				continue
 			}
-			if err := ap.assetService.SaveNewThumbnail(gCtx, repository.Path, buf, asset, name); err != nil {
-				return fmt.Errorf("save thumb %s: %w", name, err)
+			if err := ap.assetService.SaveNewThumbnail(timeoutCtx, repository.Path, buf, asset, name); err != nil {
+				return fmt.Errorf("save_thumbnails: %w", err)
 			}
 		}
 		return nil
@@ -353,24 +374,30 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 			tiny, err := imaging.ProcessImageStream(clipR, tinyOpts)
 
 			if err != nil {
-				return fmt.Errorf("process CLIP thumbnail: %w", err)
+				return fmt.Errorf("clip_processing: %w", err)
 			}
 
 			payload := CLIPPayload{
 				asset.AssetID,
 				tiny,
 			}
-			_, err = ap.queueClient.Insert(gCtx, jobs.ProcessClipArgs(payload), &river.InsertOpts{Queue: "process_clip"})
+			_, err = ap.queueClient.Insert(timeoutCtx, jobs.ProcessClipArgs(payload), &river.InsertOpts{Queue: "process_clip"})
 			if err != nil {
-				return fmt.Errorf("enqueue CLIP job: %w", err)
+				return fmt.Errorf("clip_processing: %w", err)
 			}
 			_, _ = io.Copy(io.Discard, clipR)
 			return nil
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return err
+	// Wait for all tasks to complete, but don't fail the entire process if some tasks fail
+	errors := g.Wait()
+	if len(errors) > 0 {
+		// Log individual errors but don't fail the entire process
+		for _, err := range errors {
+			log.Printf("Standard photo processing partial failure: %v", err)
+		}
+		// Return success even if some tasks failed, as partial processing is acceptable
 	}
 
 	return nil

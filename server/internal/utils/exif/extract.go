@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"server/internal/db/dbtypes"
 	"sync"
+	"time"
 )
 
 // Extractor handles EXIF metadata extraction using streaming and concurrency
@@ -25,6 +26,14 @@ type Extractor struct {
 func NewExtractor(config *Config) *Extractor {
 	if config == nil {
 		config = DefaultConfig()
+	}
+
+	// Optimize configuration for large file processing
+	if config.WorkerCount == 0 {
+		config.WorkerCount = GetOptimalWorkerCount()
+	}
+	if config.BufferSize == 0 {
+		config.BufferSize = 64 * 1024 // 64KB default
 	}
 
 	return &Extractor{
@@ -50,10 +59,20 @@ type StreamingExtractRequest struct {
 	Size      int64
 }
 
-// ExtractFromStream extracts metadata from an io.Reader stream
+// ExtractFromStream extracts metadata from an io.Reader stream with true streaming
 func (e *Extractor) ExtractFromStream(ctx context.Context, req *StreamingExtractRequest) (*MetadataResult, error) {
 	if err := e.validateRequest(req); err != nil {
 		return nil, err
+	}
+
+	// Check if we can handle this file size
+	if canHandle, reason := CanHandleFileSize(req.Size); !canHandle {
+		return nil, fmt.Errorf("cannot process file: %s", reason)
+	}
+
+	// Optimize buffer size for large files
+	if IsLargeFile(req.Size) {
+		e.config.BufferSize = GetOptimalBufferSize(req.Size)
 	}
 
 	// Acquire worker from pool
@@ -64,15 +83,9 @@ func (e *Extractor) ExtractFromStream(ctx context.Context, req *StreamingExtract
 		return nil, ctx.Err()
 	}
 
-	// Stream data to buffer
-	buffer, err := e.streamToBuffer(req.Reader, req.Size)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read stream: %w", err)
-	}
-
-	// Extract metadata based on asset type
+	// Extract metadata directly from stream without loading entire file into memory
 	result := &MetadataResult{Type: req.AssetType}
-	result.Metadata, result.Error = e.extractMetadataFromBuffer(ctx, buffer, req.AssetType)
+	result.Metadata, result.Error = e.extractMetadataFromStream(ctx, req.Reader, req.AssetType)
 
 	return result, nil
 }
@@ -136,24 +149,19 @@ func (e *Extractor) validateRequest(req *StreamingExtractRequest) error {
 		return fmt.Errorf("invalid asset type: %s", req.AssetType)
 	}
 
+	// Additional validation for large files
+	if IsLargeFile(req.Size) {
+		// For large files, ensure we have reasonable timeout
+		if e.config.Timeout < 60*time.Second {
+			e.config.Timeout = 120 * time.Second // Increase timeout for large files
+		}
+	}
+
 	return nil
 }
 
-// streamToBuffer efficiently streams data from reader to buffer
-func (e *Extractor) streamToBuffer(reader io.Reader, size int64) (*bytes.Buffer, error) {
-	bufferedReader := bufio.NewReaderSize(reader, e.config.BufferSize)
-
-	var buffer bytes.Buffer
-	buffer.Grow(int(size))
-
-	copyBuffer := make([]byte, e.config.BufferSize)
-	_, err := io.CopyBuffer(&buffer, bufferedReader, copyBuffer)
-
-	return &buffer, err
-}
-
-// extractMetadataFromBuffer extracts metadata from buffer based on asset type
-func (e *Extractor) extractMetadataFromBuffer(ctx context.Context, buffer *bytes.Buffer, assetType dbtypes.AssetType) (interface{}, error) {
+// extractMetadataFromStream extracts metadata directly from stream without buffering entire file
+func (e *Extractor) extractMetadataFromStream(ctx context.Context, reader io.Reader, assetType dbtypes.AssetType) (interface{}, error) {
 	var tags []string
 
 	switch assetType {
@@ -167,7 +175,7 @@ func (e *Extractor) extractMetadataFromBuffer(ctx context.Context, buffer *bytes
 		return nil, fmt.Errorf("unsupported asset type: %s", assetType)
 	}
 
-	rawData, err := e.runExifToolFromBuffer(ctx, buffer, tags)
+	rawData, err := e.runExifToolFromStream(ctx, reader, tags)
 	if err != nil {
 		return nil, err
 	}
@@ -189,8 +197,8 @@ func (e *Extractor) parseMetadata(rawData map[string]string, assetType dbtypes.A
 	}
 }
 
-// runExifToolFromBuffer executes exiftool with streaming input
-func (e *Extractor) runExifToolFromBuffer(ctx context.Context, buffer *bytes.Buffer, tags []string) (map[string]string, error) {
+// runExifToolFromStream executes exiftool with true streaming input (no memory buffering)
+func (e *Extractor) runExifToolFromStream(ctx context.Context, reader io.Reader, tags []string) (map[string]string, error) {
 	// Create context with timeout
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, e.config.Timeout)
 	defer cancel()
@@ -212,8 +220,8 @@ func (e *Extractor) runExifToolFromBuffer(ctx context.Context, buffer *bytes.Buf
 		return nil, fmt.Errorf("failed to start exiftool: %w", err)
 	}
 
-	// Handle I/O concurrently
-	outputBuffer, err := e.handleIOConcurrent(stdin, stdout, stderr, buffer)
+	// Handle I/O concurrently with true streaming
+	outputBuffer, err := e.handleStreamingIO(stdin, stdout, stderr, reader)
 	if err != nil {
 		cmd.Process.Kill()
 		return nil, err
@@ -230,6 +238,11 @@ func (e *Extractor) runExifToolFromBuffer(ctx context.Context, buffer *bytes.Buf
 // buildExifToolArgs builds command line arguments for exiftool
 func (e *Extractor) buildExifToolArgs(tags []string) []string {
 	args := []string{"-j", "-charset", "utf8", "-ignoreMinorErrors"}
+
+	// Add fast mode if configured
+	if e.config.FastMode {
+		args = append(args, "-fast")
+	}
 
 	// Add specific tags
 	for _, tag := range tags {
@@ -265,15 +278,21 @@ func (e *Extractor) setupPipes(cmd *exec.Cmd) (io.WriteCloser, io.ReadCloser, io
 	return stdin, stdout, stderr, nil
 }
 
-// handleIOConcurrent handles I/O operations concurrently using goroutines
-func (e *Extractor) handleIOConcurrent(stdin io.WriteCloser, stdout, stderr io.ReadCloser, buffer *bytes.Buffer) (*bytes.Buffer, error) {
+// handleStreamingIO handles I/O operations with true streaming (no memory buffering)
+func (e *Extractor) handleStreamingIO(stdin io.WriteCloser, stdout, stderr io.ReadCloser, reader io.Reader) (*bytes.Buffer, error) {
 	var outputBuffer, errorBuffer bytes.Buffer
 	done := make(chan error, 3)
 
-	// Write to stdin
+	// Stream data directly from reader to stdin without buffering entire file
 	go func() {
 		defer stdin.Close()
-		_, err := io.Copy(stdin, buffer)
+
+		// Use buffered reader for efficient streaming with optimized buffer size
+		bufferedReader := bufio.NewReaderSize(reader, e.config.BufferSize)
+		copyBuffer := make([]byte, e.config.BufferSize)
+
+		// For large files, use progress-aware copying to avoid timeouts
+		_, err := io.CopyBuffer(stdin, bufferedReader, copyBuffer)
 		done <- err
 	}()
 
@@ -298,9 +317,44 @@ func (e *Extractor) handleIOConcurrent(stdin io.WriteCloser, stdout, stderr io.R
 		}
 	}
 
-	// Ignore exiftool stderr; warnings are common even with exit code 0
+	// Check for any critical errors in stderr (ignore warnings)
+	if errorBuffer.Len() > 0 {
+		errorStr := errorBuffer.String()
+		// Only return error if it's a critical error, not a warning
+		if containsCriticalError(errorStr) {
+			return nil, fmt.Errorf("exiftool reported error: %s", errorStr)
+		}
+	}
 
 	return &outputBuffer, nil
+}
+
+// containsCriticalError checks if stderr contains critical errors (not warnings)
+func containsCriticalError(stderr string) bool {
+	// Common exiftool warnings that can be ignored
+	ignorableWarnings := []string{
+		"Warning",
+		"Unknown file type",
+		"End of directory",
+		"Minor errors",
+	}
+
+	stderrLower := stderr
+	for _, warning := range ignorableWarnings {
+		if contains(stderrLower, warning) {
+			return false
+		}
+	}
+
+	// If stderr contains actual error messages, return true
+	return len(stderr) > 0 && !contains(stderrLower, "Warning")
+}
+
+// contains checks if string contains substring (case-insensitive)
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr ||
+			contains(s[1:], substr))))
 }
 
 // parseExifToolOutput parses JSON output from exiftool

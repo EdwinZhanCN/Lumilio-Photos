@@ -34,6 +34,9 @@ type AssetControllerInterface interface {
 	UpdateAssetDescription(c *gin.Context)   // PUT /assets/:id/description - Update asset description
 	GetAssetsByRating(c *gin.Context)        // GET /assets/rating/:rating - Get assets by rating
 	GetLikedAssets(c *gin.Context)           // GET /assets/liked - Get liked assets
+
+	// Reprocessing operations
+	ReprocessAsset(c *gin.Context) // POST /assets/:id/reprocess - Reprocess failed or warning assets
 }
 
 // AuthControllerInterface defines the interface for authentication controllers
@@ -125,6 +128,7 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			assets.PUT("/:id/description", assetController.UpdateAssetDescription)
 			assets.GET("/rating/:rating", assetController.GetAssetsByRating)
 			assets.GET("/liked", assetController.GetLikedAssets)
+			assets.POST("/:id/reprocess", assetController.ReprocessAsset)
 		}
 
 		// Album routes - with authentication required

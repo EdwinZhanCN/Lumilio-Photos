@@ -804,7 +804,7 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description Repository UUID (optional, uses default if not provided) */
+            /** @description Repository UUID (uses default repository if not provided) */
             requestBody?: {
                 content: {
                     "multipart/form-data": string;
@@ -1765,6 +1765,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/assets/{id}/reprocess": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reprocess asset
+         * @description Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Asset ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Reprocessing tasks (optional) */
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["handler.ReprocessAssetRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["handler.ReprocessAssetResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: string;
+                        };
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: string;
+                        };
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            [key: string]: string;
+                        };
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/assets/{id}/thumbnail": {
         parameters: {
             query?: never;
@@ -1924,8 +2004,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Batch upload assets
-         * @description Batch upload multiple assets to a repository. Each file part's field name should be its BLAKE3 content hash. All files are staged and queued for processing.
+         * Batch upload assets with chunk support
+         * @description Unified batch upload endpoint that supports both small files and chunked large files. Field names should follow format: single_{session_id} for single files or chunk_{session_id}_{index}_{total} for chunks.
          */
         post: {
             parameters: {
@@ -1934,10 +2014,10 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description Repository UUID (optional, uses default if not provided) */
+            /** @description Chunked file upload - use format: chunk_{session_id}_{index}_{total} */
             requestBody?: {
                 content: {
-                    "multipart/form-data": string;
+                    "multipart/form-data": Record<string, never>;
                 };
             };
             responses: {
@@ -1988,6 +2068,131 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assets/batch/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get upload configuration
+         * @description Get current upload configuration including chunk size and concurrency limits based on system memory
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Upload configuration retrieved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/assets/batch/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get upload progress
+         * @description Get detailed progress information for upload sessions
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Comma-separated session IDs (optional) */
+                    session_ids?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Upload progress details */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2903,11 +3108,15 @@ export interface components {
             hash?: string;
             height?: number;
             is_deleted?: boolean;
+            liked?: boolean;
             mime_type?: string;
             original_filename?: string;
             owner_id?: number;
+            rating?: number;
+            repository_id?: string;
             specific_metadata?: Record<string, never>;
             storage_path?: string;
+            taken_time?: string;
             type?: string;
             upload_time?: string;
             width?: number;
@@ -3015,6 +3224,41 @@ export interface components {
             camera_makes?: string[];
             lenses?: string[];
         };
+        "handler.ProgressSummary": {
+            active_sessions?: number;
+            completed_files?: number;
+            failed_sessions?: number;
+            overall_progress?: number;
+            total_sessions?: number;
+        };
+        "handler.ReprocessAssetRequest": {
+            /** @example false */
+            force_full_retry?: boolean;
+            /** @example [
+             *       "thumbnail_small",
+             *       "thumbnail_medium",
+             *       "transcode_1080p"
+             *     ] */
+            tasks?: string[];
+        };
+        "handler.ReprocessAssetResponse": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            asset_id?: string;
+            /** @example [
+             *       "thumbnail_small",
+             *       "transcode_1080p"
+             *     ] */
+            failed_tasks?: string[];
+            /** @example Reprocessing job queued successfully */
+            message?: string;
+            /** @example [
+             *       "thumbnail_small",
+             *       "transcode_1080p"
+             *     ] */
+            retry_tasks?: string[];
+            /** @example queued */
+            status?: string;
+        };
         "handler.SearchAssetsRequest": {
             filter?: components["schemas"]["handler.AssetFilter"];
             /** @example 20 */
@@ -3028,6 +3272,19 @@ export interface components {
              * @enum {string}
              */
             search_type: "filename" | "semantic";
+        };
+        "handler.SessionProgress": {
+            bytes_done?: number;
+            bytes_total?: number;
+            filename?: string;
+            last_activity?: string;
+            /** @description 0-1 */
+            progress?: number;
+            received_chunks?: number;
+            session_id?: string;
+            /** @description pending, uploading, merging, completed, failed */
+            status?: string;
+            total_chunks?: number;
         };
         "handler.UpdateAlbumRequest": {
             album_name?: string;
@@ -3057,6 +3314,18 @@ export interface components {
         "handler.UpdateRatingRequest": {
             /** @example 5 */
             rating?: number;
+        };
+        "handler.UploadConfigResponse": {
+            /** @description in bytes */
+            chunk_size?: number;
+            /** @description maximum concurrent uploads */
+            max_concurrent?: number;
+            /** @description safety buffer in bytes */
+            memory_buffer?: number;
+        };
+        "handler.UploadProgressResponse": {
+            sessions?: components["schemas"]["handler.SessionProgress"][];
+            summary?: components["schemas"]["handler.ProgressSummary"];
         };
         "handler.UploadResponse": {
             /** @example abcd1234567890 */
