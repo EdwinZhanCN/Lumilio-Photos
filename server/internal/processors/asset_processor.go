@@ -102,9 +102,11 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 		stagingFile *storage.StagingFile
 	)
 
+	fmt.Printf("AssetProcessor: Checking staged file at path: %s\n", task.StagedPath)
 	if info, err := os.Stat(task.StagedPath); err == nil {
 		fileInfo = info
 		fileSize = fileInfo.Size()
+		fmt.Printf("AssetProcessor: Found staged file, size: %d bytes\n", fileSize)
 
 		// Create staging file structure
 		stagingFile = &storage.StagingFile{
@@ -114,7 +116,9 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 			Filename:  task.FileName,
 			CreatedAt: task.Timestamp,
 		}
+		fmt.Printf("AssetProcessor: Created staging file structure for: %s\n", task.FileName)
 	} else {
+		fmt.Printf("AssetProcessor: ERROR - Staged file not found at %s: %v\n", task.StagedPath, err)
 		return nil, fmt.Errorf("staged file not found: %w", err)
 	}
 
@@ -153,11 +157,9 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 	err = ap.processAssetWithStatus(ctx, repository, asset, stagingFile)
 	if err != nil {
 		// If processing failed completely, move file to failed directory and update status
-		if stagingFile != nil {
-			if moveErr := ap.stagingManager.MoveStagingToFailed(stagingFile); moveErr != nil {
-				// Log the error but don't fail the entire process
-				fmt.Printf("Failed to move file to failed directory: %v\n", moveErr)
-			}
+		if moveErr := ap.stagingManager.MoveStagingToFailed(stagingFile); moveErr != nil {
+			// Log the error but don't fail the entire process
+			fmt.Printf("Failed to move file to failed directory: %v\n", moveErr)
 		}
 
 		// Update status to failed
@@ -178,9 +180,11 @@ func (ap *AssetProcessor) ProcessAsset(ctx context.Context, task AssetPayload) (
 
 // processAssetWithStatus handles the main processing logic with status tracking
 func (ap *AssetProcessor) processAssetWithStatus(ctx context.Context, repository repo.Repository, asset *repo.Asset, stagingFile *storage.StagingFile) error {
+	fmt.Printf("processAssetWithStatus: Opening staging file: %s\n", stagingFile.Path)
 	// Open the staging file for processing
 	assetFile, err := os.Open(stagingFile.Path)
 	if err != nil {
+		fmt.Printf("processAssetWithStatus: ERROR - Failed to open staging file %s: %v\n", stagingFile.Path, err)
 		return fmt.Errorf("failed to open staging file: %w", err)
 	}
 	defer assetFile.Close()
@@ -208,18 +212,24 @@ func (ap *AssetProcessor) processAssetWithStatus(ctx context.Context, repository
 
 	if len(processingErrors) == 0 {
 		// All processing succeeded - commit to inbox
+		fmt.Printf("processAssetWithStatus: Committing file to inbox: %s\n", stagingFile.Path)
 		finalRelPath, err := ap.stagingManager.CommitStagingFileToInbox(stagingFile, "")
 		if err != nil {
+			fmt.Printf("processAssetWithStatus: ERROR - Failed to commit file to inbox: %v\n", err)
 			return fmt.Errorf("failed to commit file to inbox: %w", err)
 		}
+		fmt.Printf("processAssetWithStatus: Successfully committed file to: %s\n", finalRelPath)
 		finalStoragePath = finalRelPath
 		finalStatus = status.NewCompleteStatus()
 	} else {
 		// Some processing failed - commit to inbox but mark as warning
+		fmt.Printf("processAssetWithStatus: Committing file to inbox with warnings: %s\n", stagingFile.Path)
 		finalRelPath, err := ap.stagingManager.CommitStagingFileToInbox(stagingFile, "")
 		if err != nil {
+			fmt.Printf("processAssetWithStatus: ERROR - Failed to commit file to inbox: %v\n", err)
 			return fmt.Errorf("failed to commit file to inbox: %w", err)
 		}
+		fmt.Printf("processAssetWithStatus: Successfully committed file to: %s (with warnings)\n", finalRelPath)
 		finalStoragePath = finalRelPath
 		finalStatus = status.NewWarningStatus("Asset processed with warnings", processingErrors)
 	}

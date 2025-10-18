@@ -41,8 +41,11 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
   const mediaRef = videoAsset ? videoRef : audioRef;
 
   // Get media source URL
-  const mediaUrl = asset.asset_id
-    ? assetService.getOriginalFileUrl(asset.asset_id)
+  const webVideoUrl = asset.asset_id
+    ? assetService.getWebVideoUrl(asset.asset_id)
+    : undefined;
+  const webAudioUrl = asset.asset_id
+    ? assetService.getWebAudioUrl(asset.asset_id)
     : undefined;
 
   // For photos, get large thumbnail as fallback to original
@@ -183,15 +186,14 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
   };
 
   // Video player
-  if (videoAsset && mediaUrl) {
+  if (videoAsset && webVideoUrl) {
     return (
       <div
-        className={`relative w-full h-full flex items-center justify-center ${className}`}
+        className={`relative m-40 h-auto flex items-center justify-center p-6 ${className}`}
       >
         <video
           ref={videoRef}
-          src={mediaUrl}
-          className="max-h-full max-w-full object-contain"
+          src={webVideoUrl}
           controls={false}
           preload="metadata"
           aria-label={`Video: ${asset.original_filename || "Video file"}`}
@@ -219,7 +221,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
 
         {/* Custom video controls overlay */}
         {!hasError && (
-          <div className="absolute bottom-4 left-4 right-4 bg-black/80 rounded-lg p-3 text-white">
+          <div className="absolute bottom-6 left-6 right-6 bg-black/80 rounded-lg p-3 text-white">
             <div className="flex items-center gap-3 mb-2">
               <button
                 onClick={togglePlayPause}
@@ -296,7 +298,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
   }
 
   // Audio player
-  if (audioAsset && mediaUrl) {
+  if (audioAsset && webAudioUrl) {
     return (
       <div
         className={`w-full h-full flex items-center justify-center ${className}`}
@@ -304,7 +306,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
         <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl p-8 text-white shadow-2xl max-w-md w-full mx-4">
           <audio
             ref={audioRef}
-            src={mediaUrl}
+            src={webAudioUrl}
             preload="metadata"
             aria-label={`Audio: ${asset.original_filename || "Audio file"}`}
           />

@@ -3,6 +3,7 @@ package processors
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -207,7 +208,7 @@ func (ap *AssetProcessor) saveTranscodedAudio(ctx context.Context, repoPath stri
 
 func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string, asset *repo.Asset, audioPath string) error {
 	// Generate waveform visualization image
-	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("waveform_%s.png", asset.AssetID.Bytes))
+	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("waveform_%s.png", asset.AssetID))
 	defer os.Remove(outputPath)
 
 	cmd := exec.CommandContext(ctx, "ffmpeg",
@@ -242,11 +243,12 @@ func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string,
 }
 
 func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
-	// Get audio information using ffprobe
+	// Get audio information using ffprobe with JSON output
 	cmd := exec.Command("ffprobe",
 		"-v", "quiet",
-		"-show_entries", "stream=codec_name,sample_rate,channels,bit_rate,duration:format=format_name,duration,bit_rate",
-		"-of", "csv=p=0",
+		"-print_format", "json",
+		"-show_format",
+		"-show_streams",
 		"-select_streams", "a:0", // First audio stream
 		audioPath,
 	)
@@ -256,76 +258,69 @@ func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
 		return nil, fmt.Errorf("ffprobe failed: %w", err)
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	// Parse JSON output
+	var probeData struct {
+		Format  map[string]interface{}   `json:"format"`
+		Streams []map[string]interface{} `json:"streams"`
+	}
+
+	if err := json.Unmarshal(output, &probeData); err != nil {
+		return nil, fmt.Errorf("parse ffprobe json: %w", err)
+	}
+
 	info := &AudioInfo{}
 
-	// Parse stream info (first line)
-	if len(lines) > 0 {
-		streamParts := strings.Split(lines[0], ",")
-		if len(streamParts) >= 4 {
-			info.Codec = streamParts[0]
-			if sampleRate, err := strconv.Atoi(streamParts[1]); err == nil {
-				info.SampleRate = sampleRate
+	// Extract from streams (first audio stream)
+	if len(probeData.Streams) > 0 {
+		stream := probeData.Streams[0]
+
+		if codec, ok := stream["codec_name"].(string); ok {
+			info.Codec = codec
+		}
+
+		if sampleRate, ok := stream["sample_rate"].(string); ok {
+			if rate, err := strconv.Atoi(sampleRate); err == nil {
+				info.SampleRate = rate
 			}
-			if channels, err := strconv.Atoi(streamParts[2]); err == nil {
-				info.Channels = channels
+		}
+
+		if channels, ok := stream["channels"].(float64); ok {
+			info.Channels = int(channels)
+		}
+
+		if bitrate, ok := stream["bit_rate"].(string); ok {
+			if rate, err := strconv.Atoi(bitrate); err == nil {
+				info.Bitrate = rate / 1000 // Convert to kbps
 			}
-			if bitrate, err := strconv.Atoi(streamParts[3]); err == nil {
-				info.Bitrate = bitrate / 1000 // Convert to kbps
-			}
-			if len(streamParts) >= 5 {
-				if duration, err := strconv.ParseFloat(streamParts[4], 64); err == nil {
-					info.Duration = duration
-				}
+		}
+
+		if duration, ok := stream["duration"].(string); ok {
+			if dur, err := strconv.ParseFloat(duration, 64); err == nil {
+				info.Duration = dur
 			}
 		}
 	}
 
-	// Parse format info (second line)
-	if len(lines) > 1 {
-		formatParts := strings.Split(lines[1], ",")
-		if len(formatParts) >= 1 {
-			info.Format = formatParts[0]
-		}
-		if len(formatParts) >= 2 && info.Duration == 0 {
-			if duration, err := strconv.ParseFloat(formatParts[1], 64); err == nil {
-				info.Duration = duration
-			}
-		}
-		if len(formatParts) >= 3 && info.Bitrate == 0 {
-			if bitrate, err := strconv.Atoi(formatParts[2]); err == nil {
-				info.Bitrate = bitrate / 1000 // Convert to kbps
-			}
-		}
+	// Extract from format
+	if format, ok := probeData.Format["format_name"].(string); ok {
+		info.Format = format
 	}
 
-	// Fallback for duration if not found
 	if info.Duration == 0 {
-		if duration, err := ap.getAudioDuration(audioPath); err == nil {
-			info.Duration = duration
+		if duration, ok := probeData.Format["duration"].(string); ok {
+			if dur, err := strconv.ParseFloat(duration, 64); err == nil {
+				info.Duration = dur
+			}
+		}
+	}
+
+	if info.Bitrate == 0 {
+		if bitrate, ok := probeData.Format["bit_rate"].(string); ok {
+			if rate, err := strconv.Atoi(bitrate); err == nil {
+				info.Bitrate = rate / 1000 // Convert to kbps
+			}
 		}
 	}
 
 	return info, nil
-}
-
-func (ap *AssetProcessor) getAudioDuration(audioPath string) (float64, error) {
-	cmd := exec.Command("ffprobe",
-		"-v", "quiet",
-		"-show_entries", "format=duration",
-		"-of", "csv=p=0",
-		audioPath,
-	)
-
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, err
-	}
-
-	duration, err := strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return duration, nil
 }

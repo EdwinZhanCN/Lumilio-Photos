@@ -86,7 +86,7 @@ export default function AudioInfoView({
   const genre = fmt(metadata.genre);
   const year = fmt(metadata.year);
 
-  const currentRating = (metadata as any).rating || 0;
+  const currentRating = (asset as any).rating || 0;
 
   const handleRatingChange = (newRating: number) => {
     if (!asset?.asset_id || isPending) return;

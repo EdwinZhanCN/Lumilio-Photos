@@ -319,7 +319,7 @@ const JustifiedGallery = ({
 
                   const thumbnailUrl = assetService.getThumbnailUrl(
                     positioned.asset.asset_id,
-                    "small",
+                    "medium",
                   );
 
                   return (

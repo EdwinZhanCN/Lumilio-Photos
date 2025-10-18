@@ -67,6 +67,11 @@ components:
           type: string
         specific_metadata:
           type: object
+        status:
+          items:
+            type: integer
+          type: array
+          uniqueItems: false
         storage_path:
           type: string
         taken_time:

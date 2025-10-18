@@ -718,7 +718,7 @@ func (s *assetService) SaveNewThumbnail(ctx context.Context, repoPath string, bu
 		return fmt.Errorf("no data written for thumbnail")
 	}
 
-	log.Printf("Saved thumbnail for asset %s: size=%s, path=%s, bytes=%d", asset.AssetID.Bytes, size, thumbnailPath, written)
+	log.Printf("Saved thumbnail for asset %s: size=%s, path=%s, bytes=%d", asset.AssetID, size, thumbnailPath, written)
 
 	// Create database record with relative path
 	relPath := filepath.Join(".lumilio/assets/thumbnails", size, filename)
@@ -1236,7 +1236,7 @@ func (s *assetService) SaveVideoVersion(ctx context.Context, repoPath string, vi
 		return fmt.Errorf("no data written for video version")
 	}
 
-	log.Printf("Saved video version %s for asset %s at path %s, bytes=%d", version, asset.AssetID.Bytes, videoPath, written)
+	log.Printf("Saved video version %s for asset %s at path %s, bytes=%d", version, asset.AssetID, videoPath, written)
 	return nil
 }
 
@@ -1296,7 +1296,7 @@ func (s *assetService) SaveAudioVersion(ctx context.Context, repoPath string, au
 		return fmt.Errorf("no data written for audio version")
 	}
 
-	log.Printf("Saved audio version %s for asset %s at path %s, bytes=%d", version, asset.AssetID.Bytes, audioPath, written)
+	log.Printf("Saved audio version %s for asset %s at path %s, bytes=%d", version, asset.AssetID, audioPath, written)
 	return nil
 }
 
