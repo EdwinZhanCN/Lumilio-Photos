@@ -39,12 +39,14 @@ func NewSessionManager(timeout time.Duration) *SessionManager {
 	}
 }
 
-// CreateSession creates a new upload session
-func (sm *SessionManager) CreateSession(filename string, totalSize int64, totalChunks int, contentType, repositoryID, userID string) *UploadSession {
+// CreateSession creates a new upload session. If sessionID is empty, a new UUID is generated.
+func (sm *SessionManager) CreateSession(sessionID, filename string, totalSize int64, totalChunks int, contentType, repositoryID, userID string) *UploadSession {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	sessionID := uuid.New().String()
+	if sessionID == "" {
+		sessionID = uuid.New().String()
+	}
 	now := time.Now()
 
 	session := &UploadSession{

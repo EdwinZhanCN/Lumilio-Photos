@@ -1,90 +1,102 @@
 # Installation Guide
 
-::: danger IMPORTANT
-Read [App Compatibility](./user-manual-overview.md#compatibility) First!
-:::
-## Install Docker
-### Windows
-1. Download [Docker Desktop](https://www.docker.com/products/docker-desktop/) for Windows
-2. Install and follow the setup wizard
-3. Start Docker Desktop
-4. Open PowerShell and verify installation:
-```powershell
-docker --version
-docker-compose --version
+## Configurations
+
+### Minimal (极简)
+
+```json
+{
+    "ocr":{
+		"model" : "PP-OCRv5", // 对应huggingface仓库 Lumilio-Photos/PP-OCRv5, 对应modelscope仓库 LumilioPhotos/PP-OCRv5
+		"runtime": "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588" // 可选，或者其他芯片
+	}
+}
 ```
 
-### Mac
-1. Download [Docker Desktop](https://www.docker.com/products/docker-desktop/) for Mac
-2. Install the .dmg package
-3. Start Docker Desktop from Applications
-4. Open Terminal and verify installation:
-```bash
-docker --version
-docker-compose --version
+###  LightWeight （轻量）
+
+对于内存 >= 4GB 且没有独立GPU的，例如 `Intel N100` , 包含标准CLIP, Face Recognition和OCR服务。
+
+```json
+{
+	"region": "cn" | "other", // cn 选用modelscope作为platform, 其余为huggingface
+	"clip":{
+		"model" : "MobileCLIP-B" | "CN-CLIP_ViT-B/16", // 对应huggingface仓库 Lumilio-Photos/MobileCLIP-B, 对应modelscope仓库 LumilioPhotos/MobileCLIP-B, Chinese CLIP 类似
+		"runtime": "torch" | "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588" // 可选，或者其他芯片
+	},
+	"face":{
+		"model" : "buffalo_l", // 对应huggingface仓库 Lumilio-Photos/buffalo_l, 对应modelscope仓库 LumilioPhotos/buffalo_l
+		"runtime": "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588" // 可选，或者其他芯片
+	},
+	"ocr":{
+		"model" : "PP-OCRv5", // 对应huggingface仓库 Lumilio-Photos/PP-OCRv5, 对应modelscope仓库 LumilioPhotos/PP-OCRv5
+		"runtime": "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588" // 可选，或者其他芯片
+	}
+}
 ```
 
-### Linux
-1. Update package index:
-```bash
-sudo apt update
+### Basic （基础）
+
+包含所有feature服务，新增BioCLIP用于生物识别。
+
+```json
+{
+	"region": "cn" | "other", // cn 选用modelscope作为platform, 其余为huggingface
+	"clip":{
+		"model" : "MobileCLIP-B" | "CN-CLIP_ViT-B/16", // 对应huggingface仓库 Lumilio-Photos/MobileCLIP-B, 对应modelscope仓库 LumilioPhotos/MobileCLIP-B, Chinese CLIP 类似
+		"runtime": "torch" | "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588" // 可选，或者其他芯片
+	},
+	"face":{
+		"model" : "buffalo_l", // 对应huggingface仓库 Lumilio-Photos/buffalo_l, 对应modelscope仓库 LumilioPhotos/buffalo_l
+		"runtime": "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588" // 可选，或者其他芯片
+	},
+	"ocr":{
+		"model" : "PP-OCRv5", // 对应huggingface仓库 Lumilio-Photos/PP-OCRv5, 对应modelscope仓库 LumilioPhotos/PP-OCRv5
+		"runtime": "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588" // 可选，或者其他芯片
+	},
+	"bioclip":{
+		"model" : "bioclip-2", // 对应huggingface仓库 Lumilio-Photos/bioclip-2, 对应modelscope仓库 LumilioPhotos/bioclip-2
+		"runtime": "torch" | "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588", // 可选，或者其他芯片
+		"dataset": "TreeOfLife-10M" // 对应bioclip-2仓库下的TreeOfLife-10M.npz
+	}
+}
 ```
-2. Install dependencies:
-```bash
-sudo apt install apt-transport-https ca-certificates curl software-properties-common
+
+### Brave (激进)
+
+包含所有feature增强版
+
+```json
+{
+	"region": "cn" | "other", // cn 选用modelscope作为platform, 其余为huggingface
+	"clip":{
+		"model" : "MobileCLIP-L-14" | "CN-CLIPViT-L/14", // 对应huggingface仓库 Lumilio-Photos/MobileCLIP-L-14, 对应modelscope仓库 LumilioPhotos/MobileCLIP-L-14, Chinese CLIP 类似
+		"runtime": "torch" | "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588" // 可选，或者其他芯片
+	},
+	"face":{
+		"model" : "antelopev2", // 对应huggingface仓库 Lumilio-Photos/antelopev2, 对应modelscope仓库 LumilioPhotos/antelopev2
+		"runtime": "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588" // 可选，或者其他芯片
+	},
+	"ocr":{
+		"model" : "PP-OCRv5", // 对应huggingface仓库 Lumilio-Photos/PP-OCRv5, 对应modelscope仓库 LumilioPhotos/PP-OCRv5
+		"runtime": "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588" // 可选，或者其他芯片
+	},
+	"bioclip":{
+		"model" : "bioclip-2", // 对应huggingface仓库 Lumilio-Photos/bioclip-2, 对应modelscope仓库 LumilioPhotos/bioclip-2
+		"runtime": "torch" | "onnx" | "rknn",
+		"rknn_device": "none" | "rk3588", // 可选，或者其他芯片
+		"dataset": "TreeOfLife-200M" // 对应bioclip-2仓库下的TreeOfLife-200M.npz
+	}
+}
 ```
-3. Add Docker's GPG key:
-```bash
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-```
-4. Add Docker repository:
-```bash
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
-```
-5. Install Docker:
-```bash
-sudo apt update
-sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin
-```
-6. Verify installation:
-```bash
-docker --version
-docker compose version
-```
-
-## Docker-Compose
-
-### lumilio-app
-
-### lumilio-web
-
-### lumilio-db
-
-### lumilio-ml
-
-## CPU Acceleration
-### X86 (AVX)
-
-### ARM (SIMD)
-
-## GPU Acceleration
-### NVIDIA (CUDA)
-
-### AMD (ROCm)
-
-### Intel (DLBoost)
-waitlist
-
-## NPU Acceleration
-### RockChip (RNNX)
-
-### Apple (ANE)
-
-### Qualcomm (Hexagon DSP)
-waitlist
-
-### Google (TPU)
-waitlist
-
-
-

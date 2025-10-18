@@ -3115,6 +3115,7 @@ export interface components {
             rating?: number;
             repository_id?: string;
             specific_metadata?: Record<string, never>;
+            status?: number[];
             storage_path?: string;
             taken_time?: string;
             type?: string;

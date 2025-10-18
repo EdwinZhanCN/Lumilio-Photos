@@ -30,6 +30,21 @@ export type BatchUploadResponse = Schemas["handler.BatchUploadResponse"];
  */
 export type BatchUploadResult = Schemas["handler.BatchUploadResult"];
 
+/**
+ * Upload configuration response
+ */
+export type UploadConfigResponse = Schemas["handler.UploadConfigResponse"];
+
+/**
+ * Upload progress response
+ */
+export type UploadProgressResponse = Schemas["handler.UploadProgressResponse"];
+
+/**
+ * Session progress information
+ */
+export type SessionProgress = Schemas["handler.SessionProgress"];
+
 // ============================================================================
 // Upload Service
 // ============================================================================
@@ -61,20 +76,49 @@ export const uploadService = {
   },
 
   /**
-   * Batch upload multiple files.
-   * Each file's field name should be its BLAKE3 content hash.
-   * @param files - Array of file objects with their computed hashes
+   * Batch upload multiple files with unified chunk support
+   * Each file's field name should follow format: single_{session_id} for single files
+   * or chunk_{session_id}_{index}_{total} for chunks
+   * @param files - Array of file objects with session IDs and optional chunk info
+   * @param repositoryId - Optional repository UUID
    * @param config - Optional Axios config
    * @returns A promise resolving to batch upload results
    */
   batchUploadFiles: async (
-    files: { file: File; hash: string }[],
+    files: Array<{
+      file: File;
+      sessionId: string;
+      isChunk?: boolean;
+      chunkIndex?: number;
+      totalChunks?: number;
+    }>,
+    repositoryId?: string,
     config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<ApiResult<BatchUploadResponse>>> => {
     const formData = new FormData();
 
+    // Add repository ID if provided
+    if (repositoryId) {
+      formData.append("repository_id", repositoryId);
+    }
+
+    // Process each file with proper field naming
     files.forEach((fileObj) => {
-      formData.append(fileObj.hash, fileObj.file, fileObj.file.name);
+      let fieldName: string;
+
+      if (
+        fileObj.isChunk &&
+        fileObj.chunkIndex !== undefined &&
+        fileObj.totalChunks !== undefined
+      ) {
+        // Chunk format: chunk_{id}_{index}_{total}
+        fieldName = `chunk_${fileObj.sessionId}_${fileObj.chunkIndex}_${fileObj.totalChunks}`;
+      } else {
+        // Single file format: single_{id}
+        fieldName = `single_${fileObj.sessionId}`;
+      }
+
+      formData.append(fieldName, fileObj.file, fileObj.file.name);
     });
 
     return api.post<ApiResult<BatchUploadResponse>>(
@@ -88,5 +132,120 @@ export const uploadService = {
         },
       },
     );
+  },
+
+  /**
+   * Upload a single file as chunks
+   * @param file - The file to upload in chunks
+   * @param sessionId - Unique session identifier
+   * @param chunkSize - Size of each chunk in bytes
+   * @param repositoryId - Optional repository UUID
+   * @param onProgress - Optional progress callback
+   * @returns A promise resolving to batch upload results
+   */
+  uploadFileInChunks: async (
+    file: File,
+    sessionId: string,
+    chunkSize: number = 5 * 1024 * 1024, // 5MB default
+    repositoryId?: string,
+    onProgress?: (progress: number) => void,
+  ): Promise<AxiosResponse<ApiResult<BatchUploadResponse>>> => {
+    const totalChunks = Math.ceil(file.size / chunkSize);
+    const uploadPromises: Array<
+      Promise<AxiosResponse<ApiResult<BatchUploadResponse>>>
+    > = [];
+    const maxConcurrent = 3; // Limit concurrent uploads
+
+    // Upload chunks sequentially with concurrency control
+    for (
+      let chunkIndex = 0;
+      chunkIndex < totalChunks;
+      chunkIndex += maxConcurrent
+    ) {
+      const chunkBatch = [];
+
+      for (let i = 0; i < maxConcurrent && chunkIndex + i < totalChunks; i++) {
+        const currentChunkIndex = chunkIndex + i;
+        const start = currentChunkIndex * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const chunk = file.slice(start, end);
+
+        chunkBatch.push({
+          file: new File([chunk], file.name, { type: file.type }),
+          sessionId,
+          isChunk: true,
+          chunkIndex: currentChunkIndex,
+          totalChunks,
+        });
+      }
+
+      // Upload this batch of chunks
+      const response = await uploadService.batchUploadFiles(
+        chunkBatch,
+        repositoryId,
+      );
+
+      // Update progress
+      if (onProgress) {
+        const progress = Math.min(
+          ((chunkIndex + chunkBatch.length) / totalChunks) * 100,
+          100,
+        );
+        onProgress(progress);
+      }
+
+      uploadPromises.push(Promise.resolve(response));
+    }
+
+    // Return the last response
+    return uploadPromises[uploadPromises.length - 1];
+  },
+
+  /**
+   * Get upload configuration including chunk size and concurrency limits
+   * @returns A promise resolving to upload configuration
+   */
+  getUploadConfig: async (): Promise<
+    AxiosResponse<ApiResult<UploadConfigResponse>>
+  > => {
+    return api.get<ApiResult<UploadConfigResponse>>(
+      "/api/v1/assets/batch/config",
+    );
+  },
+
+  /**
+   * Get upload progress for specific sessions
+   * @param sessionIds - Optional comma-separated session IDs
+   * @returns A promise resolving to upload progress information
+   */
+  getUploadProgress: async (
+    sessionIds?: string,
+  ): Promise<AxiosResponse<ApiResult<UploadProgressResponse>>> => {
+    const params = sessionIds ? { session_ids: sessionIds } : undefined;
+    return api.get<ApiResult<UploadProgressResponse>>(
+      "/api/v1/assets/batch/progress",
+      { params },
+    );
+  },
+
+  /**
+   * Generate a unique session ID for file uploads
+   * @returns A unique session identifier
+   */
+  generateSessionId: (): string => {
+    return crypto.randomUUID();
+  },
+
+  /**
+   * Determine if a file should be uploaded in chunks based on size
+   * @param file - The file to check
+   * @param threshold - Size threshold in bytes (default: 10MB)
+   * @returns Whether the file should be chunked
+   */
+  shouldUseChunks: (
+    file: File,
+    threshold: number = 10 * 1024 * 1024,
+  ): boolean => {
+    return file.size > threshold;
   },
 };

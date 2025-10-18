@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"regexp"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
 	"server/internal/utils/raw"
+	"strconv"
 	"time"
 
 	"github.com/h2non/bimg"
@@ -326,6 +328,19 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 			sm, err := dbtypes.MarshalMeta(meta)
 			if err != nil {
 				return fmt.Errorf("metadata marshal: %w", err)
+			}
+
+			re := regexp.MustCompile(`(\d+)\D+(\d+)`)
+			matches := re.FindStringSubmatch(meta.Dimensions)
+			if len(matches) != 3 {
+				return fmt.Errorf("invalid dimensions format: %s", meta.Dimensions)
+			}
+
+			width, _ := strconv.ParseInt(matches[1], 10, 32)
+			height, _ := strconv.ParseInt(matches[2], 10, 32)
+
+			if err := ap.assetService.UpdateAssetDimensions(timeoutCtx, asset.AssetID.Bytes, int32(width), int32(height)); err != nil {
+				return fmt.Errorf("update_asset_dimensions: %w", err)
 			}
 
 			if err := ap.assetService.UpdateAssetMetadata(timeoutCtx, asset.AssetID.Bytes, sm); err != nil {

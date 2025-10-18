@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -147,6 +146,7 @@ type AssetDTO struct {
 	IsDeleted        *bool                    `json:"is_deleted"`
 	DeletedAt        *time.Time               `json:"deleted_at,omitempty"`
 	Metadata         dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object"`
+	Status           []byte                   `json:"status"`
 }
 
 // toAssetDTO maps repo.Asset to AssetDTO
@@ -194,6 +194,7 @@ func toAssetDTO(a repo.Asset) AssetDTO {
 		IsDeleted:        a.IsDeleted,
 		DeletedAt:        deletedAt,
 		Metadata:         a.SpecificMetadata,
+		Status:           a.Status,
 	}
 }
 
@@ -304,9 +305,9 @@ func NewAssetHandler(
 ) *AssetHandler {
 	memoryMonitor := memory.NewMemoryMonitor()
 	sessionManager := upload.NewSessionManager(30 * time.Minute) // 30 minute timeout
-	chunkMerger := upload.NewChunkMerger(storage.DefaultStructure.TempDir)
+	chunkMerger := upload.NewChunkMerger(storage.NewDirectoryManager())
 
-	return &AssetHandler{
+	handler := &AssetHandler{
 		assetService:   assetService,
 		queries:        queries,
 		repoManager:    repoManager,
@@ -316,6 +317,11 @@ func NewAssetHandler(
 		sessionManager: sessionManager,
 		chunkMerger:    chunkMerger,
 	}
+
+	// Start background cleanup tasks
+	go handler.startBackgroundCleanupTasks()
+
+	return handler
 }
 
 // UploadAsset handles asset upload requests
@@ -852,7 +858,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	// First verify asset exists without loading full data
 	_, err = h.assetService.GetAssetWithOptions(c.Request.Context(), assetID, false, false, false, false)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found"})
 			return
 		}
@@ -864,7 +870,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	// Get thumbnail from service
 	thumbnail, err := h.assetService.GetThumbnailByAssetIDAndSize(c.Request.Context(), assetID, size)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail not found"})
 			return
 		}
@@ -947,7 +953,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 	// Get asset metadata from service
 	asset, err := h.assetService.GetAsset(ctx, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			api.GinNotFound(c, err, "Asset not found")
 			return
 		}
@@ -1010,7 +1016,7 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	// Get asset metadata from service
 	asset, err := h.assetService.GetAsset(ctx, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			api.GinNotFound(c, err, "Asset not found")
 			return
 		}
@@ -1088,7 +1094,7 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	// Get asset metadata from service
 	asset, err := h.assetService.GetAsset(ctx, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			api.GinNotFound(c, err, "Asset not found")
 			return
 		}
@@ -1731,6 +1737,108 @@ func (h *AssetHandler) cleanupExpiredSessions() {
 	}
 }
 
+// startBackgroundCleanupTasks starts all background cleanup tasks
+func (h *AssetHandler) startBackgroundCleanupTasks() {
+	// Run session cleanup every 5 minutes
+	sessionTicker := time.NewTicker(5 * time.Minute)
+	defer sessionTicker.Stop()
+
+	// Run orphaned chunk cleanup every 30 minutes
+	orphanedChunkTicker := time.NewTicker(30 * time.Minute)
+	defer orphanedChunkTicker.Stop()
+
+	log.Println("Starting background cleanup tasks")
+
+	// First cleanup run immediately for both tasks
+	h.cleanupExpiredSessions()
+	h.cleanupOrphanedChunks()
+
+	// Main loop for cleanup tasks
+	for {
+		select {
+		case <-sessionTicker.C:
+			h.cleanupExpiredSessions()
+		case <-orphanedChunkTicker.C:
+			h.cleanupOrphanedChunks()
+		}
+	}
+}
+
+// cleanupOrphanedChunks removes orphaned chunk files that aren't associated with any active session
+func (h *AssetHandler) cleanupOrphanedChunks() {
+	log.Println("🔍 Starting orphaned chunk cleanup...")
+
+	// Get staging manager from repository manager
+	stagingManager := h.repoManager.GetStagingManager()
+
+	// Get all active session IDs
+	activeSessions := h.sessionManager.GetAllSessions()
+	activeSessionIDs := make(map[string]bool)
+	for _, session := range activeSessions {
+		activeSessionIDs[session.SessionID] = true
+	}
+
+	// Track stats
+	errorCount := 0
+
+	// Get all repository IDs that have active or recent upload activity
+	repoIDs := make(map[string]bool)
+	for _, session := range activeSessions {
+		if session.RepositoryID != "" {
+			repoIDs[session.RepositoryID] = true
+		}
+	}
+
+	// Convert map to slice
+	var repositoryIDs []string
+	for id := range repoIDs {
+		repositoryIDs = append(repositoryIDs, id)
+	}
+
+	// If there are no active repositories with sessions, we'll do a general cleanup
+	// of all known repositories
+	if len(repositoryIDs) == 0 {
+		// Get all repositories using ListRepositories
+		repositories, err := h.repoManager.ListRepositories()
+		if err != nil {
+			log.Printf("❌ Failed to list repositories for orphaned chunk cleanup: %v", err)
+		} else {
+			for _, repo := range repositories {
+				// Use staging manager's cleanup function with short max age (1 hour)
+				err := stagingManager.CleanupStaging(repo.Path, time.Hour)
+				if err != nil {
+					log.Printf("❌ Failed to cleanup staging for repository %s: %v", repo.Name, err)
+					errorCount++
+				} else {
+					log.Printf("✅ Cleaned up staging for repository %s", repo.Name)
+				}
+			}
+		}
+	} else {
+		// Cleanup for specific repositories with active sessions
+		for _, repoID := range repositoryIDs {
+			// Use GetRepository instead of GetRepositoryByID
+		repo, err := h.repoManager.GetRepository(repoID)
+			if err != nil {
+				log.Printf("❌ Failed to get repository with ID %s: %v", repoID, err)
+				errorCount++
+				continue
+			}
+
+			// Use staging manager's cleanup function with short max age (1 hour)
+			err = stagingManager.CleanupStaging(repo.Path, time.Hour)
+			if err != nil {
+				log.Printf("❌ Failed to cleanup staging for repository %s: %v", repo.Name, err)
+				errorCount++
+			} else {
+				log.Printf("✅ Cleaned up staging for repository %s", repo.Name)
+			}
+		}
+	}
+
+	log.Printf("✅ Orphaned chunk cleanup completed: %d errors", errorCount)
+}
+
 // stringPtr returns a pointer to a string
 func stringPtr(s string) *string {
 	return &s
@@ -1745,16 +1853,20 @@ func (h *AssetHandler) groupFilesBySession(formFiles map[string][]*multipart.Fil
 			continue
 		}
 
+		log.Printf("Processing field: %s with %d headers", fieldName, len(headers))
 		fileInfo, err := upload.ParseFileField(fieldName)
 		if err != nil {
 			log.Printf("Invalid field name format: %s - %v", fieldName, err)
 			continue
 		}
+		log.Printf("Parsed field: type=%s, session=%s, chunk_index=%d, total_chunks=%d",
+			fileInfo.Type, fileInfo.SessionID, fileInfo.ChunkIndex, fileInfo.TotalChunks)
 
 		if sessionGroups[fileInfo.SessionID] == nil {
 			sessionGroups[fileInfo.SessionID] = make(map[string]*multipart.FileHeader)
 		}
 		sessionGroups[fileInfo.SessionID][fieldName] = headers[0]
+		log.Printf("Added field to session group: %s", fileInfo.SessionID)
 	}
 
 	return sessionGroups
@@ -1765,11 +1877,15 @@ func (h *AssetHandler) processUploadSession(ctx context.Context, sessionID strin
 	// Get first file to determine session type
 	var firstFileInfo *upload.FileFieldInfo
 	for fieldName := range files {
+		log.Printf("processUploadSession: examining field %s", fieldName)
 		fileInfo, err := upload.ParseFileField(fieldName)
 		if err != nil {
+			log.Printf("processUploadSession: failed to parse field %s: %v", fieldName, err)
 			return nil, err
 		}
 		firstFileInfo = fileInfo
+		log.Printf("processUploadSession: first file info - type=%s, session=%s, chunks=%d/%d",
+			fileInfo.Type, fileInfo.SessionID, fileInfo.ChunkIndex, fileInfo.TotalChunks)
 		break
 	}
 
@@ -1792,8 +1908,10 @@ func (h *AssetHandler) processUploadSession(ctx context.Context, sessionID strin
 
 	// Process based on session type
 	if firstFileInfo.Type == "single" {
+		log.Printf("processUploadSession: processing as single file session")
 		return h.processSingleFileSession(ctx, sessionID, files, repository, userID)
 	} else {
+		log.Printf("processUploadSession: processing as chunked file session with %d total chunks", firstFileInfo.TotalChunks)
 		return h.processChunkedFileSession(ctx, sessionID, files, firstFileInfo.TotalChunks, repository, userID)
 	}
 }
@@ -1818,7 +1936,7 @@ func (h *AssetHandler) processSingleFileSession(ctx context.Context, sessionID s
 	}
 
 	// Create session for tracking
-	session := h.sessionManager.CreateSession(header.Filename, header.Size, 1, contentType, repository.Path, userID)
+	session := h.sessionManager.CreateSession("", header.Filename, header.Size, 1, contentType, repository.Path, userID)
 	h.sessionManager.UpdateSessionStatus(sessionID, "uploading")
 
 	// Process the single file
@@ -1852,39 +1970,34 @@ func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID 
 		return nil, fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason)
 	}
 
-	// Create session for tracking
-	session := h.sessionManager.CreateSession(filename, totalSize, totalChunks, contentType, repository.Path, userID)
+	session, exists := h.sessionManager.GetSession(sessionID)
+	if !exists {
+		log.Printf("processChunkedFileSession: creating new session %s", sessionID)
+		// Pass the client-provided sessionID to create the session
+		session = h.sessionManager.CreateSession(sessionID, filename, totalSize, totalChunks, contentType, repository.Path, userID)
+	} else {
+		log.Printf("processChunkedFileSession: using existing session %s", sessionID)
+	}
 
 	// Update session with received chunks
+	log.Printf("processChunkedFileSession: updating session with %d files", len(files))
 	for fieldName, header := range files {
+		log.Printf("processChunkedFileSession: processing field %s, size=%d", fieldName, header.Size)
 		fileInfo, err := upload.ParseFileField(fieldName)
 		if err != nil {
+			log.Printf("processChunkedFileSession: failed to parse field %s: %v", fieldName, err)
 			continue
 		}
-		h.sessionManager.UpdateSessionChunk(sessionID, fileInfo.ChunkIndex, header.Size)
+		log.Printf("processChunkedFileSession: updating chunk %d for session %s", fileInfo.ChunkIndex, sessionID)
+		success := h.sessionManager.UpdateSessionChunk(sessionID, fileInfo.ChunkIndex, header.Size)
+		log.Printf("processChunkedFileSession: chunk update result=%v", success)
 	}
 
-	// Check if all chunks are received
-	if !h.sessionManager.IsSessionComplete(sessionID) {
-		// Not all chunks received yet, return progress
-		progress, _ := h.sessionManager.GetSessionProgress(sessionID)
-		status := "uploading"
-		message := fmt.Sprintf("Upload in progress: %.1f%% complete", progress*100)
-
-		return &BatchUploadResult{
-			Success:  true,
-			FileName: filename,
-			Status:   &status,
-			Message:  &message,
-		}, nil
-	}
-
-	// All chunks received, merge and process
-	h.sessionManager.UpdateSessionStatus(sessionID, "merging")
-
-	// Merge chunks
+	// Save all chunks to staging directory and add to chunk merger
+	log.Printf("processChunkedFileSession: saving %d chunks to staging", len(files))
 	chunkInfos := make([]upload.ChunkInfo, 0, len(files))
 	for fieldName, header := range files {
+		log.Printf("processChunkedFileSession: preparing chunk from field %s", fieldName)
 		fileInfo, _ := upload.ParseFileField(fieldName)
 
 		// Save chunk to temporary file
@@ -1892,24 +2005,29 @@ func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID 
 		if err != nil {
 			return nil, fmt.Errorf("failed to create chunk file: %w", err)
 		}
+		log.Printf("Chunk %d saved to: %s", fileInfo.ChunkIndex, tempFile.Path)
 
 		file, err := header.Open()
 		if err != nil {
+			log.Printf("processChunkedFileSession: failed to open chunk %d: %v", fileInfo.ChunkIndex, err)
 			return nil, fmt.Errorf("failed to open chunk: %w", err)
 		}
 
 		osFile, err := os.Create(tempFile.Path)
 		if err != nil {
+			log.Printf("processChunkedFileSession: failed to create chunk file %s: %v", tempFile.Path, err)
 			file.Close()
 			return nil, fmt.Errorf("failed to create chunk file: %w", err)
 		}
 
-		_, err = io.Copy(osFile, file)
+		bytesCopied, err := io.Copy(osFile, file)
 		osFile.Close()
 		file.Close()
 		if err != nil {
+			log.Printf("processChunkedFileSession: failed to save chunk %d: %v", fileInfo.ChunkIndex, err)
 			return nil, fmt.Errorf("failed to save chunk: %w", err)
 		}
+		log.Printf("processChunkedFileSession: saved chunk %d, copied %d bytes to %s", fileInfo.ChunkIndex, bytesCopied, tempFile.Path)
 
 		chunkInfos = append(chunkInfos, upload.ChunkInfo{
 			SessionID:  sessionID,
@@ -1919,14 +2037,45 @@ func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID 
 		})
 	}
 
-	// Merge all chunks
-	mergeResult, err := h.chunkMerger.MergeChunks(sessionID, chunkInfos)
+	// Add chunks to chunk merger for tracking across requests
+	h.chunkMerger.AddChunks(sessionID, chunkInfos)
+
+	// Check if all chunks are received
+	log.Printf("processChunkedFileSession: checking if session %s is complete", sessionID)
+	isComplete := h.sessionManager.IsSessionComplete(sessionID)
+	log.Printf("processChunkedFileSession: session complete status=%v", isComplete)
+
+	if !isComplete {
+		// Not all chunks received yet, return progress
+		progress, exists := h.sessionManager.GetSessionProgress(sessionID)
+		log.Printf("processChunkedFileSession: progress=%f, exists=%v", progress, exists)
+		status := "uploading"
+		message := fmt.Sprintf("Upload in progress: %.1f%% complete", progress*100)
+		log.Printf("processChunkedFileSession: returning progress: %s", message)
+
+		result := &BatchUploadResult{
+			Success:  true,
+			FileName: filename,
+			Status:   &status,
+			Message:  &message,
+		}
+		log.Printf("processChunkedFileSession: returning progress result: %+v", result)
+		return result, nil
+	}
+
+	// All chunks received, merge and process
+	log.Printf("processChunkedFileSession: all chunks received, starting merge")
+	h.sessionManager.UpdateSessionStatus(sessionID, "merging")
+
+	// Merge all chunks using the chunk merger's stored chunks
+	mergeResult, err := h.chunkMerger.MergeChunks(sessionID, totalChunks, repository.Path)
 	if err != nil {
 		h.sessionManager.SetSessionError(sessionID, err.Error())
 		// Cleanup chunk files
-		h.chunkMerger.CleanupChunks(chunkInfos)
+		h.chunkMerger.CleanupChunks(sessionID)
 		return nil, fmt.Errorf("failed to merge chunks: %w", err)
 	}
+	log.Printf("Chunks merged to: %s (size: %d)", mergeResult.MergedFilePath, mergeResult.TotalSize)
 
 	// Create a mock header for the merged file
 	mergedHeader := &multipart.FileHeader{
@@ -1937,15 +2086,17 @@ func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID 
 	mergedHeader.Header.Set("Content-Type", contentType)
 
 	// Process the merged file
+	log.Printf("Starting processCompletedUpload for merged file: %s", mergeResult.MergedFilePath)
 	result, processErr := h.processCompletedUpload(ctx, mergedHeader, session, repository, mergeResult.MergedFilePath)
 
-	// Cleanup regardless of processing result
-	h.chunkMerger.CleanupChunks(chunkInfos)
-	if mergeResult.MergedFilePath != "" {
-		h.chunkMerger.CleanupMergedFile(mergeResult.MergedFilePath)
-	}
+	// Cleanup chunk files regardless of processing result
+	h.chunkMerger.CleanupChunks(sessionID)
 
 	if processErr != nil {
+		// Cleanup merged file only if processing failed
+		if mergeResult.MergedFilePath != "" {
+			h.chunkMerger.CleanupMergedFile(mergeResult.MergedFilePath)
+		}
 		h.sessionManager.SetSessionError(sessionID, processErr.Error())
 		return nil, processErr
 	}
@@ -1957,10 +2108,12 @@ func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID 
 // processCompletedUpload processes a completed upload (single file or merged chunks)
 func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multipart.FileHeader, session *upload.UploadSession, repository repo.Repository, mergedFilePath string) (*BatchUploadResult, error) {
 	var stagingFilePath string
+	log.Printf("processCompletedUpload: mergedFilePath=%s, filename=%s", mergedFilePath, header.Filename)
 
 	if mergedFilePath != "" {
 		// Use the merged file path for chunked uploads
 		stagingFilePath = mergedFilePath
+		log.Printf("Using merged file path for chunked upload: %s", stagingFilePath)
 	} else {
 		// Create staging file for single file uploads
 		stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, header.Filename)
@@ -1968,6 +2121,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 			return nil, fmt.Errorf("failed to create staging file: %w", err)
 		}
 		stagingFilePath = stagingFile.Path
+		log.Printf("Created staging file for single upload: %s", stagingFilePath)
 
 		// Copy single file to staging
 		file, err := header.Open()
@@ -1990,9 +2144,13 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	}
 
 	// Calculate hash (always use quick hash for large files)
+	log.Printf("Calculating hash for file: %s", stagingFilePath)
 	hashResult, err := hash.CalculateFileHash(stagingFilePath, hash.AlgorithmBLAKE3, true)
 	if err != nil {
+		log.Printf("Failed to calculate hash for %s: %v", stagingFilePath, err)
 		if mergedFilePath == "" {
+			os.Remove(stagingFilePath)
+		} else {
 			os.Remove(stagingFilePath)
 		}
 		return nil, fmt.Errorf("failed to calculate file hash: %w", err)
@@ -2011,12 +2169,16 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	if err != nil {
 		if mergedFilePath == "" {
 			os.Remove(stagingFilePath)
+		} else {
+			os.Remove(stagingFilePath)
 		}
 		return nil, fmt.Errorf("failed to check hash collision: %w", err)
 	}
 
 	if collision {
 		if mergedFilePath == "" {
+			os.Remove(stagingFilePath)
+		} else {
 			os.Remove(stagingFilePath)
 		}
 		return &BatchUploadResult{
@@ -2028,6 +2190,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	}
 
 	// Enqueue for processing
+	log.Printf("Enqueuing processing job for file: %s (hash: %s)", stagingFilePath, finalHash)
 	jobResult, err := h.queueClient.Insert(ctx, jobs.ProcessAssetArgs{
 		ClientHash:   finalHash,
 		StagedPath:   stagingFilePath,
@@ -2041,12 +2204,17 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	if err != nil {
 		if mergedFilePath == "" {
 			os.Remove(stagingFilePath)
+		} else {
+			os.Remove(stagingFilePath)
 		}
 		return nil, fmt.Errorf("failed to enqueue task: %w", err)
 	}
 
 	if jobResult == nil || jobResult.Job == nil {
+		log.Printf("Failed to enqueue task: empty result for file: %s", stagingFilePath)
 		if mergedFilePath == "" {
+			os.Remove(stagingFilePath)
+		} else {
 			os.Remove(stagingFilePath)
 		}
 		return nil, errors.New("failed to enqueue task: empty result")
@@ -2057,7 +2225,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	size := header.Size
 	message := fmt.Sprintf("File uploaded with %s hash and queued for processing in repository '%s'", hashMethod, repository.Name)
 
-	log.Printf("Task %d enqueued for processing file %s in repository %s", taskID, header.Filename, repository.Name)
+	log.Printf("Task %d enqueued for processing file %s in repository %s (staged path: %s)", taskID, header.Filename, repository.Name, stagingFilePath)
 
 	return &BatchUploadResult{
 		Success:     true,
@@ -2084,7 +2252,7 @@ func (h *AssetHandler) checkHashCollisionBeforeEnqueue(ctx context.Context, hash
 	})
 
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			// No existing asset found, no collision
 			return false, nil
 		}

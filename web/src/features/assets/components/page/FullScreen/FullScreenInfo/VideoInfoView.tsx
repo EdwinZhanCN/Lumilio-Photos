@@ -82,7 +82,7 @@ export default function VideoInfoView({
     ? `${metadata.gps_latitude!.toFixed(4)}, ${metadata.gps_longitude!.toFixed(4)}`
     : null;
 
-  const currentRating = (metadata as any).rating || 0;
+  const currentRating = (asset as any).rating || 0;
 
   const handleRatingChange = (newRating: number) => {
     if (!asset?.asset_id || isPending) return;

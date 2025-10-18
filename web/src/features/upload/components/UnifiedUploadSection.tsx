@@ -2,6 +2,7 @@ import React, { useRef, useEffect, ChangeEvent } from "react";
 import FileDropZone from "./FileDropZone";
 import ProgressIndicator from "./ProgressIndicator";
 import ImagePreviewGrid from "./ImagePreviewGrid";
+import FileUploadProgress from "./FileUploadProgress";
 import { useUploadContext } from "@/features/upload";
 import ValidateFile from "@/lib/utils/validate-file.ts";
 import { acceptFileExtensions } from "@/lib/utils/accept-file-extensions.ts";
@@ -17,6 +18,7 @@ function UnifiedUploadSection(): React.JSX.Element {
     isProcessing,
     isGeneratingPreviews,
     previewProgress,
+    fileProgress,
     maxPreviewCount,
     maxTotalFiles,
     previewCount,
@@ -40,7 +42,10 @@ function UnifiedUploadSection(): React.JSX.Element {
   /**
    * Handle file selection and validation.
    */
-  const handleFiles = async (selectedFiles: FileList, shouldGeneratePreviews: boolean = true) => {
+  const handleFiles = async (
+    selectedFiles: FileList,
+    shouldGeneratePreviews: boolean = true,
+  ) => {
     if (!selectedFiles || selectedFiles.length === 0) {
       return;
     }
@@ -87,14 +92,16 @@ function UnifiedUploadSection(): React.JSX.Element {
       <div className="mb-6 p-4 bg-base-200 rounded-lg">
         <div className="space-y-2 text-sm">
           <p>
-            <span className="font-semibold">Total files:</span> {fileCount} / {maxTotalFiles}
+            <span className="font-semibold">Total files:</span> {fileCount} /{" "}
+            {maxTotalFiles}
           </p>
           <p>
-            <span className="font-semibold">Files with previews:</span> {previewCount} / {maxPreviewCount}
+            <span className="font-semibold">Files with previews:</span>{" "}
+            {previewCount} / {maxPreviewCount}
           </p>
           <p className="text-base-content/70">
-            The first {maxPreviewCount} files will have thumbnail previews generated.
-            You can change these limits in Settings → UI Settings.
+            The first {maxPreviewCount} files will have thumbnail previews
+            generated. You can change these limits in Settings → UI Settings.
           </p>
         </div>
         <progress
@@ -186,10 +193,11 @@ function UnifiedUploadSection(): React.JSX.Element {
           <h3 className="font-semibold mb-3">Selected Files ({fileCount})</h3>
           <div className="space-y-1 max-h-60 overflow-y-auto">
             {files.slice(0, 10).map((file, index) => (
-              <div key={index} className="text-sm flex justify-between items-center">
-                <span className="truncate flex-1">
-                  {file.name}
-                </span>
+              <div
+                key={index}
+                className="text-sm flex justify-between items-center"
+              >
+                <span className="truncate flex-1">{file.name}</span>
                 <span className="text-base-content/70 ml-2">
                   {(file.size / 1024 / 1024).toFixed(2)} MB
                   {previews[index] && " (preview)"}
@@ -205,11 +213,16 @@ function UnifiedUploadSection(): React.JSX.Element {
         </div>
       )}
 
-      {/* Upload Progress */}
+      {/* Individual File Upload Progress */}
+      {fileProgress.length > 0 && (
+        <FileUploadProgress fileProgress={fileProgress} />
+      )}
+
+      {/* Overall Upload Progress */}
       {uploadProgress > 0 && (
         <div className="mt-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-sm font-medium">Upload Progress:</span>
+            <span className="text-sm font-medium">Overall Progress:</span>
             <span className="text-sm text-base-content/70">
               {uploadProgress.toFixed(1)}%
             </span>
@@ -238,7 +251,9 @@ function UnifiedUploadSection(): React.JSX.Element {
           className="btn btn-primary"
           disabled={fileCount === 0 || isProcessing}
         >
-          {isProcessing ? "Processing..." : `Upload ${fileCount} File${fileCount !== 1 ? 's' : ''}`}
+          {isProcessing
+            ? "Processing..."
+            : `Upload ${fileCount} File${fileCount !== 1 ? "s" : ""}`}
         </button>
       </div>
     </section>

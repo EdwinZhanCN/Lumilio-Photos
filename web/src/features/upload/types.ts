@@ -1,4 +1,5 @@
 import { DragEvent, Dispatch, createContext } from "react";
+import type { FileUploadProgress } from "@/hooks/api-hooks/useUploadProcess";
 
 /**
  * Single unified upload state
@@ -52,6 +53,7 @@ export interface UploadContextValue {
     numberProcessed?: number;
     total?: number;
   } | null;
+  fileProgress: FileUploadProgress[];
 
   // Settings
   maxPreviewCount: number;

@@ -15,7 +15,6 @@ import {
   getFlatAssetsFromGrouped,
   findAssetIndex,
 } from "@/lib/utils/assetGrouping.ts";
-import { FilterDTO } from "@/features/assets/components/page/FilterTool/FilterTool";
 import { Asset } from "@/lib/http-commons";
 
 function Photos() {
@@ -44,11 +43,6 @@ function Photos() {
     withGroups: true,
     groupBy,
   });
-
-  const handleFiltersChange = useCallback((filters: FilterDTO) => {
-    // Filters are now handled directly in AssetsPageHeader
-    console.log("Filters changed:", filters);
-  }, []);
 
   const handleLoadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -117,7 +111,7 @@ function Photos() {
       <AssetsPageHeader
         groupBy={groupBy}
         onGroupByChange={(v) => dispatch({ type: "SET_GROUP_BY", payload: v })}
-        onFiltersChange={handleFiltersChange}
+        onFiltersChange={() => {}}
       />
 
       {isFetching && allAssets.length === 0 ? (

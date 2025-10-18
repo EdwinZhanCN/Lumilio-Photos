@@ -3,6 +3,7 @@ package processors
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -71,7 +72,7 @@ func (ap *AssetProcessor) processVideoAsset(
 
 	// Goroutine 3: Generate thumbnail
 	g.Go(func() error {
-		return ap.generateVideoThumbnail(timeoutCtx, repository.Path, asset, tempFile.Name())
+		return ap.generateVideoThumbnail(timeoutCtx, repository.Path, asset, tempFile.Name(), videoInfo)
 	})
 
 	// Wait for all tasks to complete, but don't fail the entire process if some tasks fail
@@ -234,13 +235,13 @@ func (ap *AssetProcessor) saveTranscodedVideo(ctx context.Context, repoPath stri
 	return ap.assetService.SaveVideoVersion(ctx, repoPath, transcodedFile, asset, version)
 }
 
-func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string) error {
+func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string, info *VideoInfo) error {
 	// Generate thumbnail at 1 second mark (or 10% of duration, whichever is smaller)
-	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("thumb_%s.jpg", asset.AssetID.Bytes))
+	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("thumb_%s.jpg", asset.AssetID))
 	defer os.Remove(outputPath)
 
 	// Try to get video duration for better thumbnail timing
-	duration, _ := ap.getVideoDuration(videoPath)
+	duration := info.Duration
 	thumbnailTime := "00:00:01"
 	if duration > 0 && duration < 10 {
 		// For short videos, take thumbnail at 10% of duration
@@ -249,18 +250,22 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 	}
 
 	cmd := exec.CommandContext(ctx, "ffmpeg",
+		"-ss", thumbnailTime, // seek before input
 		"-i", videoPath,
-		"-ss", thumbnailTime,
 		"-vframes", "1",
-		"-q:v", "2", // High quality JPEG
-		"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease", // Limit thumbnail size
+		"-q:v", "2",
+		"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+		"-threads", "1",
 		"-f", "mjpeg",
-		"-y", // Overwrite
+		"-y",
 		outputPath,
 	)
 
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("generate thumbnail: %w", err)
+		return fmt.Errorf("generate thumbnail: %w\nstderr: %s", err, stderr.String())
 	}
 
 	// Generate multiple thumbnail sizes using existing imaging utils
@@ -296,7 +301,7 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 }
 
 func (ap *AssetProcessor) getVideoInfo(videoPath string) (*VideoInfo, error) {
-	// Get video information using ffprobe
+	// Get video information using ffprobe with JSON output
 	cmd := exec.Command("ffprobe",
 		"-v", "quiet",
 		"-print_format", "json",
@@ -306,83 +311,55 @@ func (ap *AssetProcessor) getVideoInfo(videoPath string) (*VideoInfo, error) {
 		videoPath,
 	)
 
-	_, err := cmd.Output()
+	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("ffprobe failed: %w", err)
 	}
 
-	// Simple parsing - in production you might want to use a JSON parser
+	// Parse JSON output
+	var probeData struct {
+		Streams []struct {
+			Width     int    `json:"width"`
+			Height    int    `json:"height"`
+			CodecName string `json:"codec_name"`
+			Duration  string `json:"duration"`
+		} `json:"streams"`
+		Format struct {
+			FormatName string `json:"format_name"`
+			Duration   string `json:"duration"`
+		} `json:"format"`
+	}
+
+	if err := json.Unmarshal(output, &probeData); err != nil {
+		return nil, fmt.Errorf("parse ffprobe json: %w", err)
+	}
+
 	info := &VideoInfo{}
 
-	// Get dimensions using simpler ffprobe command
-	dimCmd := exec.Command("ffprobe",
-		"-v", "quiet",
-		"-show_entries", "stream=width,height,codec_name,duration",
-		"-of", "csv=p=0",
-		"-select_streams", "v:0",
-		videoPath,
-	)
+	// Extract video stream info
+	if len(probeData.Streams) > 0 {
+		stream := probeData.Streams[0]
+		info.Width = stream.Width
+		info.Height = stream.Height
+		info.Codec = stream.CodecName
 
-	dimOutput, err := dimCmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("get dimensions: %w", err)
-	}
-
-	parts := strings.Split(strings.TrimSpace(string(dimOutput)), ",")
-	if len(parts) >= 4 {
-		if width, err := strconv.Atoi(parts[0]); err == nil {
-			info.Width = width
-		}
-		if height, err := strconv.Atoi(parts[1]); err == nil {
-			info.Height = height
-		}
-		info.Codec = parts[2]
-		if duration, err := strconv.ParseFloat(parts[3], 64); err == nil {
-			info.Duration = duration
-		}
-	}
-
-	// Get format info
-	formatCmd := exec.Command("ffprobe",
-		"-v", "quiet",
-		"-show_entries", "format=format_name,duration",
-		"-of", "csv=p=0",
-		videoPath,
-	)
-
-	formatOutput, err := formatCmd.Output()
-	if err == nil {
-		formatParts := strings.Split(strings.TrimSpace(string(formatOutput)), ",")
-		if len(formatParts) >= 1 {
-			info.Format = formatParts[0]
-		}
-		if len(formatParts) >= 2 && info.Duration == 0 {
-			if duration, err := strconv.ParseFloat(formatParts[1], 64); err == nil {
+		// Try to get duration from stream first
+		if stream.Duration != "" {
+			if duration, err := strconv.ParseFloat(stream.Duration, 64); err == nil {
 				info.Duration = duration
 			}
 		}
 	}
 
+	// Extract format info
+	info.Format = probeData.Format.FormatName
+
+	// If duration not set from stream, try format
+	if info.Duration == 0 && probeData.Format.Duration != "" {
+		if duration, err := strconv.ParseFloat(probeData.Format.Duration, 64); err == nil {
+			info.Duration = duration
+		}
+	}
+
 	return info, nil
-}
-
-func (ap *AssetProcessor) getVideoDuration(videoPath string) (float64, error) {
-	cmd := exec.Command("ffprobe",
-		"-v", "quiet",
-		"-show_entries", "format=duration",
-		"-of", "csv=p=0",
-		videoPath,
-	)
-
-	output, err := cmd.Output()
-	if err != nil {
-		return 0, err
-	}
-
-	duration, err := strconv.ParseFloat(strings.TrimSpace(string(output)), 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return duration, nil
 }
