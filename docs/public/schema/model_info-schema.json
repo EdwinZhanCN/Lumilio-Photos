@@ -1,0 +1,156 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://example.com/model-schema.json",
+    "title": "Model Configuration Schema",
+    "description": "Schema for Lumen AI model configuration files",
+    "type": "object",
+    "required": [
+        "name",
+        "version",
+        "description",
+        "model_type",
+        "embedding_dim",
+        "source",
+        "runtimes"
+    ],
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Model name identifier, this is also openclip model identifier if openclip is set as source format",
+            "minLength": 1,
+            "maxLength": 100
+        },
+        "version": {
+            "type": "string",
+            "description": "Model version",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "description": {
+            "type": "string",
+            "description": "Model description and purpose",
+            "minLength": 1,
+            "maxLength": 500
+        },
+        "model_type": {
+            "type": "string",
+            "description": "Type of the model"
+        },
+        "embedding_dim": {
+            "type": "integer",
+            "description": "Dimension of the embedding space",
+            "minimum": 1,
+            "maximum": 100000
+        },
+        "source": {
+            "type": "object",
+            "required": ["format", "repo_id"],
+            "properties": {
+                "format": {
+                    "type": "string",
+                    "enum": ["huggingface", "openclip", "modelscope", "custom"]
+                },
+                "repo_id": {
+                    "type": "string",
+                    "description": "Repository identifier for model source",
+                    "minLength": 1
+                }
+            },
+            "additionalProperties": false
+        },
+        "runtimes": {
+            "type": "object",
+            "minProperties": 1,
+            "patternProperties": {
+                "^[a-zA-Z0-9_-]+$": {
+                    "type": "object",
+                    "required": ["available"],
+                    "properties": {
+                        "available": {
+                            "type": "boolean"
+                        },
+                        "files": {
+                            "oneOf": [
+                                {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                {
+                                    "type": "object",
+                                    "patternProperties": {
+                                        "^[a-zA-Z0-9_-]+$": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "additionalProperties": false
+                                }
+                            ]
+                        },
+                        "devices": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "requirements": {
+                            "type": "object",
+                            "properties": {
+                                "python": {
+                                    "type": "string"
+                                },
+                                "dependencies": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        },
+        "datasets": {
+            "type": "object",
+            "patternProperties": {
+                "^[a-zA-Z0-9_-]+$": {
+                    "type": "string"
+                }
+            },
+            "additionalProperties": false
+        },
+        "metadata": {
+            "type": "object",
+            "properties": {
+                "license": {
+                    "type": "string"
+                },
+                "author": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "additionalProperties": false
+}
