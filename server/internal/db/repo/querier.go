@@ -22,42 +22,54 @@ type Querier interface {
 	CountAssetsByStatus(ctx context.Context, status []byte) (int64, error)
 	CountAssetsByStatusAndOwner(ctx context.Context, arg CountAssetsByStatusAndOwnerParams) (int64, error)
 	CountAssetsByStatusAndRepository(ctx context.Context, arg CountAssetsByStatusAndRepositoryParams) (int64, error)
+	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
-	CountSyncOperationsByStatus(ctx context.Context, arg CountSyncOperationsByStatusParams) (int64, error)
+	CreateAIDescription(ctx context.Context, arg CreateAIDescriptionParams) (AiDescription, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
-	// File Records Queries
-	CreateFileRecord(ctx context.Context, arg CreateFileRecordParams) (FileRecord, error)
+	CreateFaceCluster(ctx context.Context, arg CreateFaceClusterParams) (FaceCluster, error)
+	CreateFaceClusterMember(ctx context.Context, arg CreateFaceClusterMemberParams) (FaceClusterMember, error)
+	CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) (FaceItem, error)
+	CreateFaceResult(ctx context.Context, arg CreateFaceResultParams) (FaceResult, error)
+	CreateOCRResult(ctx context.Context, arg CreateOCRResultParams) (OcrResult, error)
+	CreateOCRTextItem(ctx context.Context, arg CreateOCRTextItemParams) (OcrTextItem, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	CreateSpeciesPrediction(ctx context.Context, arg CreateSpeciesPredictionParams) (SpeciesPrediction, error)
-	// Sync Operations Queries
-	CreateSyncOperation(ctx context.Context, arg CreateSyncOperationParams) (SyncOperation, error)
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
 	CreateThumbnail(ctx context.Context, arg CreateThumbnailParams) (Thumbnail, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteAIDescriptionByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAlbum(ctx context.Context, albumID int32) error
-	DeleteAllFileRecordsForRepo(ctx context.Context, repositoryID pgtype.UUID) error
+	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
-	DeleteFileRecord(ctx context.Context, arg DeleteFileRecordParams) error
-	DeleteOldSyncOperations(ctx context.Context, arg DeleteOldSyncOperationsParams) error
-	DeleteOrphanedFileRecords(ctx context.Context, arg DeleteOrphanedFileRecordsParams) (int64, error)
+	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
+	DeleteFaceCluster(ctx context.Context, clusterID int32) error
+	DeleteFaceClusterMember(ctx context.Context, arg DeleteFaceClusterMemberParams) error
+	DeleteFaceItemsByAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteFaceResultByAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteRepositories(ctx context.Context, dollar_1 []pgtype.UUID) error
 	DeleteRepository(ctx context.Context, repoID pgtype.UUID) error
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteTag(ctx context.Context, tagID int32) error
 	DeleteUser(ctx context.Context, userID int32) error
 	FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]Asset, error)
+	GetAIDescriptionByAsset(ctx context.Context, assetID pgtype.UUID) (AiDescription, error)
+	GetAIDescriptionStatsByModel(ctx context.Context) ([]GetAIDescriptionStatsByModelRow, error)
+	GetAIDescriptionsByModel(ctx context.Context, arg GetAIDescriptionsByModelParams) ([]AiDescription, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error)
 	GetAlbumByID(ctx context.Context, albumID int32) (Album, error)
 	GetAlbumsByUser(ctx context.Context, arg GetAlbumsByUserParams) ([]Album, error)
+	GetAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) ([]GetAllEmbeddingsForAssetRow, error)
+	GetAllFaceClusters(ctx context.Context) ([]FaceCluster, error)
 	GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]GetAssetAlbumsRow, error)
 	GetAssetByHashAndRepository(ctx context.Context, arg GetAssetByHashAndRepositoryParams) (Asset, error)
 	GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset, error)
-	GetAssetEmbedding(ctx context.Context, assetID pgtype.UUID) (GetAssetEmbeddingRow, error)
 	GetAssetStatsForOwner(ctx context.Context, ownerID int32) (GetAssetStatsForOwnerRow, error)
 	GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error)
 	GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error)
@@ -75,58 +87,90 @@ type Querier interface {
 	GetAssetsByStatusAndRepository(ctx context.Context, arg GetAssetsByStatusAndRepositoryParams) ([]Asset, error)
 	GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams) ([]Asset, error)
 	GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error)
-	GetAssetsWithEmbeddings(ctx context.Context, arg GetAssetsWithEmbeddingsParams) ([]GetAssetsWithEmbeddingsRow, error)
 	GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErrorsParams) ([]Asset, error)
 	GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWarningsParams) ([]Asset, error)
+	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
+	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
-	GetFailedSyncOperations(ctx context.Context, arg GetFailedSyncOperationsParams) ([]SyncOperation, error)
-	GetFileRecord(ctx context.Context, arg GetFileRecordParams) (FileRecord, error)
-	GetFileRecordCount(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
-	GetFileRecordsByHash(ctx context.Context, contentHash *string) ([]FileRecord, error)
-	GetLatestSyncOperation(ctx context.Context, repositoryID pgtype.UUID) (SyncOperation, error)
-	GetLatestSyncOperationByType(ctx context.Context, arg GetLatestSyncOperationByTypeParams) (SyncOperation, error)
+	GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (Embedding, error)
+	GetEmbeddingByType(ctx context.Context, arg GetEmbeddingByTypeParams) (Embedding, error)
+	GetEmbeddingModels(ctx context.Context, embeddingType string) ([]GetEmbeddingModelsRow, error)
+	GetFaceClusterByFaceID(ctx context.Context, faceID int32) (FaceCluster, error)
+	GetFaceClusterByID(ctx context.Context, clusterID int32) (FaceCluster, error)
+	GetFaceClusterByRepresentative(ctx context.Context, representativeFaceID int32) (FaceCluster, error)
+	GetFaceClusterMembers(ctx context.Context, clusterID int32) ([]GetFaceClusterMembersRow, error)
+	GetFaceDemographics(ctx context.Context, confidence float32) ([]GetFaceDemographicsRow, error)
+	GetFaceEmbeddingsForClustering(ctx context.Context, arg GetFaceEmbeddingsForClusteringParams) ([]GetFaceEmbeddingsForClusteringRow, error)
+	GetFaceItemByID(ctx context.Context, id int32) (FaceItem, error)
+	GetFaceItemsByAsset(ctx context.Context, assetID pgtype.UUID) ([]FaceItem, error)
+	GetFaceItemsByAssetWithLimit(ctx context.Context, arg GetFaceItemsByAssetWithLimitParams) ([]FaceItem, error)
+	GetFaceResultByAsset(ctx context.Context, assetID pgtype.UUID) (FaceResult, error)
+	GetFaceStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetFaceStatsByAssetRow, error)
+	GetFaceStatsByModel(ctx context.Context) ([]GetFaceStatsByModelRow, error)
+	GetFacesByExpression(ctx context.Context, arg GetFacesByExpressionParams) ([]FaceItem, error)
+	GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
+	GetLongAIDescriptions(ctx context.Context, arg GetLongAIDescriptionsParams) ([]AiDescription, error)
+	GetOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) (OcrResult, error)
+	GetOCRStatsByModel(ctx context.Context) ([]GetOCRStatsByModelRow, error)
+	GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetOCRTextItemStatsByAssetRow, error)
+	GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) ([]OcrTextItem, error)
+	GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOCRTextItemsByAssetWithLimitParams) ([]OcrTextItem, error)
+	GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (Embedding, error)
+	GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams) ([]FaceItem, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetRepository(ctx context.Context, repoID pgtype.UUID) (Repository, error)
 	// Repository Asset Statistics (kept for repository management)
 	GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error)
 	GetRepositoryByPath(ctx context.Context, path string) (Repository, error)
-	GetRunningSyncOperations(ctx context.Context, repositoryID pgtype.UUID) ([]SyncOperation, error)
+	GetSimilarFaces(ctx context.Context, arg GetSimilarFacesParams) ([]GetSimilarFacesRow, error)
 	GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]SpeciesPrediction, error)
 	GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeciesPredictionsByLabelParams) ([]SpeciesPrediction, error)
-	GetSyncOperation(ctx context.Context, id int64) (SyncOperation, error)
-	GetSyncStatistics(ctx context.Context, repositoryID pgtype.UUID) (GetSyncStatisticsRow, error)
 	GetTagByID(ctx context.Context, tagID int32) (Tag, error)
 	GetTagByName(ctx context.Context, tagName string) (Tag, error)
 	GetTagsByCategory(ctx context.Context, category *string) ([]Tag, error)
 	GetThumbnailByAssetAndSize(ctx context.Context, arg GetThumbnailByAssetAndSizeParams) (Thumbnail, error)
 	GetThumbnailByID(ctx context.Context, thumbnailID int32) (Thumbnail, error)
 	GetThumbnailsByAsset(ctx context.Context, assetID pgtype.UUID) ([]Thumbnail, error)
+	GetTopAIDescriptionsByTokens(ctx context.Context, limit int32) ([]AiDescription, error)
+	GetTopFacesByQuality(ctx context.Context, arg GetTopFacesByQualityParams) ([]FaceItem, error)
 	GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsParams) ([]Asset, error)
 	GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesForAssetParams) ([]SpeciesPrediction, error)
+	GetUnclusteredFaces(ctx context.Context, arg GetUnclusteredFacesParams) ([]FaceItem, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, userID int32) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
-	ListFileRecords(ctx context.Context, repositoryID pgtype.UUID) ([]FileRecord, error)
-	ListFileRecordsByGeneration(ctx context.Context, arg ListFileRecordsByGenerationParams) ([]FileRecord, error)
+	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
-	ListSyncOperations(ctx context.Context, arg ListSyncOperationsParams) ([]SyncOperation, error)
-	ListSyncOperationsByType(ctx context.Context, arg ListSyncOperationsByTypeParams) ([]SyncOperation, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	MergeFaceClusters(ctx context.Context, arg MergeFaceClustersParams) error
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
 	RepositoryExists(ctx context.Context, path string) (bool, error)
 	ResetAssetStatusForRetry(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
+	SearchAllEmbeddingsByType(ctx context.Context, arg SearchAllEmbeddingsByTypeParams) ([]SearchAllEmbeddingsByTypeRow, error)
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
+	SearchAssetsByAIDescription(ctx context.Context, arg SearchAssetsByAIDescriptionParams) ([]Asset, error)
+	SearchAssetsByAIDescriptionWithConfidence(ctx context.Context, arg SearchAssetsByAIDescriptionWithConfidenceParams) ([]Asset, error)
+	SearchAssetsByAISummary(ctx context.Context, arg SearchAssetsByAISummaryParams) ([]Asset, error)
+	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
+	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)
+	SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error)
+	SearchAssetsByOCRTextWithConfidence(ctx context.Context, arg SearchAssetsByOCRTextWithConfidenceParams) ([]Asset, error)
 	SearchAssetsFilename(ctx context.Context, arg SearchAssetsFilenameParams) ([]Asset, error)
 	SearchAssetsVector(ctx context.Context, arg SearchAssetsVectorParams) ([]SearchAssetsVectorRow, error)
-	SearchNearestAssets(ctx context.Context, arg SearchNearestAssetsParams) ([]SearchNearestAssetsRow, error)
+	SearchEmbeddingsByModel(ctx context.Context, arg SearchEmbeddingsByModelParams) ([]SearchEmbeddingsByModelRow, error)
+	SearchEmbeddingsByType(ctx context.Context, arg SearchEmbeddingsByTypeParams) ([]SearchEmbeddingsByTypeRow, error)
+	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
+	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
+	UpdateAIDescription(ctx context.Context, arg UpdateAIDescriptionParams) (AiDescription, error)
+	UpdateAIDescriptionStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
 	UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error
@@ -141,15 +185,17 @@ type Querier interface {
 	UpdateAssetStatus(ctx context.Context, arg UpdateAssetStatusParams) (Asset, error)
 	UpdateAssetStatusWithErrors(ctx context.Context, arg UpdateAssetStatusWithErrorsParams) (Asset, error)
 	UpdateAssetStoragePathAndStatus(ctx context.Context, arg UpdateAssetStoragePathAndStatusParams) (Asset, error)
-	UpdateFileRecord(ctx context.Context, arg UpdateFileRecordParams) (FileRecord, error)
+	UpdateFaceCluster(ctx context.Context, arg UpdateFaceClusterParams) (FaceCluster, error)
+	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)
+	UpdateFaceResultStats(ctx context.Context, assetID pgtype.UUID) error
+	UpdateOCRResultStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
-	UpdateSyncOperation(ctx context.Context, arg UpdateSyncOperationParams) (SyncOperation, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	// Unified embeddings table queries
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
-	UpsertFileRecord(ctx context.Context, arg UpsertFileRecordParams) (FileRecord, error)
 }
 
 var _ Querier = (*Queries)(nil)

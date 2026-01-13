@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	pgvector_go "github.com/pgvector/pgvector-go"
 	"server/internal/db/dbtypes"
 )
 
@@ -70,7 +69,7 @@ func (q *Queries) GetAlbumAssetCount(ctx context.Context, albumID int32) (int64,
 }
 
 const getAlbumAssets = `-- name: GetAlbumAssets :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.embedding, a.status, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = $1 AND a.is_deleted = false
@@ -97,7 +96,6 @@ type GetAlbumAssetsRow struct {
 	Rating           *int32                   `db:"rating" json:"rating"`
 	Liked            *bool                    `db:"liked" json:"liked"`
 	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Embedding        *pgvector_go.Vector      `db:"embedding" json:"embedding"`
 	Status           []byte                   `db:"status" json:"status"`
 	Position         *int32                   `db:"position" json:"position"`
 	AddedTime        pgtype.Timestamptz       `db:"added_time" json:"added_time"`
@@ -132,7 +130,6 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 			&i.Rating,
 			&i.Liked,
 			&i.RepositoryID,
-			&i.Embedding,
 			&i.Status,
 			&i.Position,
 			&i.AddedTime,

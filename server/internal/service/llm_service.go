@@ -13,6 +13,12 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
+const (
+	arkProvider      = "ark"
+	openAIProvider   = "openai"
+	deepseekProvider = "deepseek"
+)
+
 type LLMService interface {
 	AskLLM(ctx context.Context, query string) (resp string, err error)
 }
@@ -21,29 +27,29 @@ type LLMChatModel interface {
 	Generate(ctx context.Context, in []*schema.Message, opts ...model.Option) (*schema.Message, error)
 }
 
-type llmService struct {
+type LLmService struct {
 	config config.LLMConfig
 }
 
-func NewLLMService(llmConfig config.LLMConfig) (*llmService, error) {
-	return &llmService{
+func NewLLMService(llmConfig config.LLMConfig) (*LLmService, error) {
+	return &LLmService{
 		config: llmConfig,
 	}, nil
 }
 
-func (s *llmService) newChatModel(ctx context.Context) (LLMChatModel, error) {
+func (s *LLmService) newChatModel(ctx context.Context) (LLMChatModel, error) {
 	switch strings.ToLower(s.config.Provider) {
-	case "openai":
+	case openAIProvider:
 		return openai.NewChatModel(ctx, &openai.ChatModelConfig{
 			APIKey: s.config.APIKey,
 			Model:  s.config.ModelName,
 		})
-	case "deepseek":
+	case deepseekProvider:
 		return deepseek.NewChatModel(ctx, &deepseek.ChatModelConfig{
 			APIKey: s.config.APIKey,
 			Model:  s.config.ModelName,
 		})
-	case "ark", "":
+	case arkProvider:
 		return ark.NewChatModel(ctx, &ark.ChatModelConfig{
 			APIKey: s.config.APIKey,
 			Model:  s.config.ModelName,
@@ -57,7 +63,7 @@ func (s *llmService) newChatModel(ctx context.Context) (LLMChatModel, error) {
 	}
 }
 
-func (s *llmService) AskLLM(ctx context.Context, query string) (resp string, err error) {
+func (s *LLmService) AskLLM(ctx context.Context, query string) (resp string, err error) {
 
 	cm, err := s.newChatModel(ctx)
 	if err != nil {

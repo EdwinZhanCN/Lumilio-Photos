@@ -35,22 +35,6 @@ type CLIPPayload struct {
 	ImageData []byte
 }
 
-func (ap *AssetProcessor) processPhotoAsset(
-	ctx context.Context,
-	repository repo.Repository,
-	asset *repo.Asset,
-	fileReader io.Reader,
-) error {
-	// First check if this is a RAW file
-	isRAWFile := raw.IsRAWFile(asset.OriginalFilename)
-
-	if isRAWFile {
-		return ap.processRAWAsset(ctx, repository, asset, fileReader)
-	} else {
-		return ap.processStandardPhotoAsset(ctx, repository, asset, fileReader)
-	}
-}
-
 // processRAWAsset handles RAW file processing with the strategy: embedded preview first, then full render
 func (ap *AssetProcessor) processRAWAsset(
 	ctx context.Context,
@@ -91,49 +75,34 @@ func (ap *AssetProcessor) processRAWAsset(
 	// Now process the preview data like a regular photo
 	previewReader := bytes.NewReader(rawResult.PreviewData)
 
-	// Use the standard processing pipeline but with different readers
-	// Configure extractor for photos - don't use fast mode to get full metadata
-	config := &exif.Config{
-		MaxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
-		Timeout:     60 * time.Second,
-		BufferSize:  128 * 1024,
-		FastMode:    false, // Don't use fast mode for photos to get complete EXIF data
-	}
+	// Create streaming pipeline
+	config := ap.createEXIFConfig()
 	extractor := exif.NewExtractor(config)
 
 	// Reset the original reader for EXIF extraction (we want RAW EXIF data)
 	readSeeker.Seek(0, io.SeekStart)
 
-	exifR, exifW := io.Pipe()
-	clipR, clipW := io.Pipe()
-	thumbR, thumbW := io.Pipe()
-	defer exifR.Close()
-	defer clipR.Close()
-	defer thumbR.Close()
-
-	clipEnabled := ap.appConfig.CLIPEnabled
-	if !clipEnabled {
-		_ = clipW.Close()
-	}
+	streams := ap.createStreams()
+	defer ap.closeStreams(streams)
 
 	// Copy RAW data for EXIF extraction and preview data for thumbnails/CLIP
 	go func() {
-		defer exifW.Close()
-		if clipEnabled {
-			defer clipW.Close()
+		defer streams.EXIF.Writer.Close()
+		if ap.appConfig.MLConfig.CLIPEnabled {
+			defer streams.CLIP.Writer.Close()
 		}
-		defer thumbW.Close()
+		defer streams.Thumb.Writer.Close()
 
 		// Copy RAW data to EXIF extractor
 		go func() {
-			defer exifW.Close()
-			_, _ = io.Copy(exifW, readSeeker)
+			defer streams.EXIF.Writer.Close()
+			_, _ = io.Copy(streams.EXIF.Writer, readSeeker)
 		}()
 
 		// Copy preview data to thumbnail generator and CLIP processor
-		writers := []io.Writer{thumbW}
-		if clipEnabled {
-			writers = append(writers, clipW)
+		writers := []io.Writer{streams.Thumb.Writer}
+		if ap.appConfig.MLConfig.CLIPEnabled {
+			writers = append(writers, streams.CLIP.Writer)
 		}
 		mw := io.MultiWriter(writers...)
 		_, _ = io.Copy(mw, previewReader)
@@ -143,17 +112,17 @@ func (ap *AssetProcessor) processRAWAsset(
 
 	go func() {
 		<-timeoutCtx.Done()
-		exifW.Close()
-		thumbW.Close()
-		if clipEnabled {
-			clipW.Close()
+		streams.EXIF.Writer.Close()
+		streams.Thumb.Writer.Close()
+		if ap.appConfig.MLConfig.CLIPEnabled {
+			streams.CLIP.Writer.Close()
 		}
 	}()
 
 	// Extract EXIF from original RAW file
 	g.Go(func() error {
 		req := &exif.StreamingExtractRequest{
-			Reader:    exifR,
+			Reader:    streams.EXIF.Reader,
 			AssetType: dbtypes.AssetType(asset.Type),
 			Filename:  asset.OriginalFilename,
 			Size:      asset.FileSize,
@@ -186,66 +155,20 @@ func (ap *AssetProcessor) processRAWAsset(
 
 	// Generate thumbnails from preview data
 	g.Go(func() error {
-		outputs := make(map[string]io.Writer, len(thumbnailSizes))
-		buffers := make(map[string]*bytes.Buffer, len(thumbnailSizes))
-		for name := range thumbnailSizes {
-			buf := &bytes.Buffer{}
-			buffers[name] = buf
-			outputs[name] = buf
-		}
-
-		if err := imaging.StreamThumbnails(thumbR, thumbnailSizes, outputs); err != nil {
-			return fmt.Errorf("generate_thumbnails: %w", err)
-		}
-
-		for name, buf := range buffers {
-			if buf.Len() == 0 {
-				continue
-			}
-			if err := ap.assetService.SaveNewThumbnail(timeoutCtx, repository.Path, buf, asset, name); err != nil {
-				return fmt.Errorf("save_thumbnails: %w", err)
-			}
-		}
-		return nil
+		return ap.generateThumbnails(timeoutCtx, streams.Thumb.Reader, repository, asset)
 	})
 
 	// Process for CLIP if enabled
-	if clipEnabled {
+	if ap.appConfig.MLConfig.CLIPEnabled {
 		g.Go(func() error {
-			tinyOpts := bimg.Options{
-				Width:     224,
-				Height:    224,
-				Crop:      true,
-				Gravity:   bimg.GravitySmart,
-				Quality:   90,
-				Type:      bimg.WEBP,
-				NoProfile: true,
-			}
-			tiny, err := imaging.ProcessImageStream(clipR, tinyOpts)
-			if err != nil {
-				return fmt.Errorf("clip_processing: %w", err)
-			}
-
-			payload := CLIPPayload{
-				asset.AssetID,
-				tiny,
-			}
-			_, err = ap.queueClient.Insert(timeoutCtx, jobs.ProcessClipArgs(payload), &river.InsertOpts{Queue: "process_clip"})
-			if err != nil {
-				return fmt.Errorf("clip_processing: %w", err)
-			}
-			_, _ = io.Copy(io.Discard, clipR)
-			return nil
+			return ap.processCLIP(timeoutCtx, streams.CLIP.Reader, asset)
 		})
 	}
 
 	// Wait for all tasks to complete, but don't fail the entire process if some tasks fail
 	errors := g.Wait()
 	if len(errors) > 0 {
-		// Log individual errors but don't fail the entire process
-		for _, err := range errors {
-			log.Printf("RAW photo processing partial failure: %v", err)
-		}
+		ap.logProcessingErrors(errors, "RAW photo processing")
 		// Return success even if some tasks failed, as partial processing is acceptable
 	}
 
@@ -259,40 +182,27 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 	asset *repo.Asset,
 	fileReader io.Reader,
 ) error {
-	// Configure extractor for photos - don't use fast mode to get full metadata
-	config := &exif.Config{
-		MaxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
-		Timeout:     60 * time.Second,
-		BufferSize:  128 * 1024,
-		FastMode:    false, // Don't use fast mode for photos to get complete EXIF data
-	}
+	// Create streaming pipeline
+	config := ap.createEXIFConfig()
 	extractor := exif.NewExtractor(config)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	exifR, exifW := io.Pipe()
-	clipR, clipW := io.Pipe()
-	thumbR, thumbW := io.Pipe()
-	defer exifR.Close()
-	defer clipR.Close()
-	defer thumbR.Close()
+	streams := ap.createStreams()
+	defer ap.closeStreams(streams)
 
-	clipEnabled := ap.appConfig.CLIPEnabled
-	if !clipEnabled {
-		_ = clipW.Close()
-	}
-
+	// Copy image data to all processors
 	go func() {
-		defer exifW.Close()
-		if clipEnabled {
-			defer clipW.Close()
+		defer streams.EXIF.Writer.Close()
+		if ap.appConfig.MLConfig.CLIPEnabled {
+			defer streams.CLIP.Writer.Close()
 		}
-		defer thumbW.Close()
+		defer streams.Thumb.Writer.Close()
 
-		writers := []io.Writer{exifW, thumbW}
-		if clipEnabled {
-			writers = append(writers, clipW)
+		writers := []io.Writer{streams.EXIF.Writer, streams.Thumb.Writer}
+		if ap.appConfig.MLConfig.CLIPEnabled {
+			writers = append(writers, streams.CLIP.Writer)
 		}
 		mw := io.MultiWriter(writers...)
 		_, _ = io.Copy(mw, fileReader)
@@ -303,16 +213,16 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 	go func() {
 		<-timeoutCtx.Done()
 		// Closing writers will unblock io.Copy and downstream readers
-		exifW.Close()
-		thumbW.Close()
-		if clipEnabled {
-			clipW.Close()
+		streams.EXIF.Writer.Close()
+		streams.Thumb.Writer.Close()
+		if ap.appConfig.MLConfig.CLIPEnabled {
+			streams.CLIP.Writer.Close()
 		}
 	}()
 
 	g.Go(func() error {
 		req := &exif.StreamingExtractRequest{
-			Reader:    exifR,
+			Reader:    streams.EXIF.Reader,
 			AssetType: dbtypes.AssetType(asset.Type),
 			Filename:  asset.OriginalFilename,
 			Size:      asset.FileSize,
@@ -351,69 +261,141 @@ func (ap *AssetProcessor) processStandardPhotoAsset(
 	})
 
 	g.Go(func() error {
-		// 准备 outputs
-		outputs := make(map[string]io.Writer, len(thumbnailSizes))
-		buffers := make(map[string]*bytes.Buffer, len(thumbnailSizes))
-		for name := range thumbnailSizes {
-			buf := &bytes.Buffer{}
-			buffers[name] = buf
-			outputs[name] = buf
-		}
-
-		if err := imaging.StreamThumbnails(thumbR, thumbnailSizes, outputs); err != nil {
-			return fmt.Errorf("generate_thumbnails: %w", err)
-		}
-
-		for name, buf := range buffers {
-			if buf.Len() == 0 {
-				continue
-			}
-			if err := ap.assetService.SaveNewThumbnail(timeoutCtx, repository.Path, buf, asset, name); err != nil {
-				return fmt.Errorf("save_thumbnails: %w", err)
-			}
-		}
-		return nil
+		return ap.generateThumbnails(timeoutCtx, streams.Thumb.Reader, repository, asset)
 	})
 
-	if clipEnabled {
+	if ap.appConfig.MLConfig.CLIPEnabled {
 		g.Go(func() error {
-			tinyOpts := bimg.Options{
-				Width:     224,
-				Height:    224,
-				Crop:      true,
-				Gravity:   bimg.GravitySmart,
-				Quality:   90,
-				Type:      bimg.WEBP,
-				NoProfile: true,
-			}
-			tiny, err := imaging.ProcessImageStream(clipR, tinyOpts)
-
-			if err != nil {
-				return fmt.Errorf("clip_processing: %w", err)
-			}
-
-			payload := CLIPPayload{
-				asset.AssetID,
-				tiny,
-			}
-			_, err = ap.queueClient.Insert(timeoutCtx, jobs.ProcessClipArgs(payload), &river.InsertOpts{Queue: "process_clip"})
-			if err != nil {
-				return fmt.Errorf("clip_processing: %w", err)
-			}
-			_, _ = io.Copy(io.Discard, clipR)
-			return nil
+			return ap.processCLIP(timeoutCtx, streams.CLIP.Reader, asset)
 		})
 	}
 
 	// Wait for all tasks to complete, but don't fail the entire process if some tasks fail
 	errors := g.Wait()
 	if len(errors) > 0 {
-		// Log individual errors but don't fail the entire process
-		for _, err := range errors {
-			log.Printf("Standard photo processing partial failure: %v", err)
-		}
+		ap.logProcessingErrors(errors, "Standard photo processing")
 		// Return success even if some tasks failed, as partial processing is acceptable
 	}
 
 	return nil
+}
+
+// generateThumbnails generates thumbnails for all configured sizes
+func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Reader, repository repo.Repository, asset *repo.Asset) error {
+	outputs := make(map[string]io.Writer, len(thumbnailSizes))
+	buffers := make(map[string]*bytes.Buffer, len(thumbnailSizes))
+
+	for name := range thumbnailSizes {
+		buf := &bytes.Buffer{}
+		buffers[name] = buf
+		outputs[name] = buf
+	}
+
+	if err := imaging.StreamThumbnails(reader, thumbnailSizes, outputs); err != nil {
+		return fmt.Errorf("generate_thumbnails: %w", err)
+	}
+
+	for name, buf := range buffers {
+		if buf.Len() == 0 {
+			continue
+		}
+		if err := ap.assetService.SaveNewThumbnail(ctx, repository.Path, buf, asset, name); err != nil {
+			return fmt.Errorf("save_thumbnails: %w", err)
+		}
+	}
+	return nil
+}
+
+// processCLIP processes image for CLIP embedding generation
+func (ap *AssetProcessor) processCLIP(ctx context.Context, reader io.Reader, asset *repo.Asset) error {
+	tinyOpts := bimg.Options{
+		Width:     224,
+		Height:    224,
+		Crop:      true,
+		Gravity:   bimg.GravitySmart,
+		Quality:   90,
+		Type:      bimg.WEBP,
+		NoProfile: true,
+	}
+
+	tiny, err := imaging.ProcessImageStream(reader, tinyOpts)
+	if err != nil {
+		return fmt.Errorf("clip_processing: %w", err)
+	}
+
+	payload := CLIPPayload{
+		AssetID:   asset.AssetID,
+		ImageData: tiny,
+	}
+
+	_, err = ap.queueClient.Insert(ctx, jobs.ProcessClipArgs(payload), &river.InsertOpts{Queue: "process_clip"})
+	if err != nil {
+		return fmt.Errorf("clip_processing: %w", err)
+	}
+
+	_, _ = io.Copy(io.Discard, reader)
+	return nil
+}
+
+// ImageStreams holds the streaming pipes for image processing
+type ImageStreams struct {
+	EXIF struct {
+		Reader io.ReadCloser
+		Writer io.WriteCloser
+	}
+	Thumb struct {
+		Reader io.ReadCloser
+		Writer io.WriteCloser
+	}
+	CLIP struct {
+		Reader io.ReadCloser
+		Writer io.WriteCloser
+	}
+}
+
+// createEXIFConfig creates the EXIF extraction configuration
+func (ap *AssetProcessor) createEXIFConfig() *exif.Config {
+	return &exif.Config{
+		MaxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
+		Timeout:     60 * time.Second,
+		BufferSize:  128 * 1024,
+		FastMode:    false, // Don't use fast mode for photos to get complete EXIF data
+	}
+}
+
+// createStreams creates the streaming pipes for concurrent processing
+func (ap *AssetProcessor) createStreams() *ImageStreams {
+	streams := &ImageStreams{}
+
+	// Create pipes
+	streams.EXIF.Reader, streams.EXIF.Writer = io.Pipe()
+	streams.Thumb.Reader, streams.Thumb.Writer = io.Pipe()
+	streams.CLIP.Reader, streams.CLIP.Writer = io.Pipe()
+
+	// Close CLIP writer if disabled
+	if !ap.appConfig.MLConfig.CLIPEnabled {
+		streams.CLIP.Writer.Close()
+	}
+
+	return streams
+}
+
+// closeStreams safely closes all stream writers
+func (ap *AssetProcessor) closeStreams(streams *ImageStreams) {
+	if streams.EXIF.Writer != nil {
+		streams.EXIF.Writer.Close()
+	}
+	if streams.Thumb.Writer != nil {
+		streams.Thumb.Writer.Close()
+	}
+	if streams.CLIP.Writer != nil {
+		streams.CLIP.Writer.Close()
+	}
+}
+
+// logProcessingErrors logs processing errors with context
+func (ap *AssetProcessor) logProcessingErrors(errors []error, context string) {
+	for _, err := range errors {
+		log.Printf("%s partial failure: %v", context, err)
+	}
 }

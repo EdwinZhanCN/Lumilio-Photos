@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
@@ -18,13 +17,11 @@ import (
 	"server/internal/service"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
-	"server/proto"
 
 	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"go.uber.org/zap"
 )
 
 func init() {
@@ -78,14 +75,8 @@ func main() {
 	pgxPool := database.Pool
 	queries := database.Queries
 
-	// Load storage configuration
-	log.Printf("📁 Using staging path: %s", appConfig.StagingPath)
-	if err := os.MkdirAll(appConfig.StagingPath, 0755); err != nil {
-		log.Fatalf("Failed to create staging directory: %v", err)
-	}
-
-	// Initialize new repository-based storage system with sync enabled
-	repoManager, err := storage.NewRepositoryManager(queries, pgxPool, appConfig.SyncEnabled)
+	// Initialize new repository-based storage system
+	repoManager, err := storage.NewRepositoryManager(queries, pgxPool)
 	if err != nil {
 		log.Fatalf("Failed to initialize repository manager: %v", err)
 	}
@@ -98,20 +89,35 @@ func main() {
 		log.Println("Please ensure STORAGE_PATH environment variable is set")
 	}
 
-	// Initialize optional ML connection/services based on config
-	var mlConn *grpc.ClientConn
-	var mlSvc *service.MLService
-	if appConfig.CLIPEnabled {
-		var mlErr error
-		mlConn, mlErr = grpc.NewClient(appConfig.MLServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if mlErr != nil {
-			log.Fatalf("Failed to connect to ML gRPC server: %v", mlErr)
-		}
-		mlSvc = service.NewFromConn(mlConn)
+	zapLogger, err := zap.NewProduction()
+	if err != nil {
+		log.Fatalf("Failed to initialize zap logger: %v", err)
 	}
 
+	// Initialize lumen service
+	var lumenService service.LumenService
+	lumenService, err = service.NewLumenService(nil, zapLogger)
+	if err != nil {
+		log.Fatalf("Failed to initialize lumen service: %v", err)
+	}
+	err = lumenService.Start(ctx)
+	if err != nil {
+		log.Fatalf("Failed to start lumen service: %v", err)
+	}
+	defer func() {
+		err := lumenService.Close()
+		if err != nil {
+			log.Fatalf("Failed to close lumen service: %v", err)
+		}
+	}()
+	log.Println("✅ Lumen Service Initialized")
+
+	var embeddingService service.EmbeddingService
+	embeddingService = service.NewEmbeddingService(queries)
+	log.Println("✅ Embedding Service Initialized")
+
 	// Initialize Service (AssetService optionally ML-enabled)
-	assetService, err := service.NewAssetServiceWithML(queries, mlSvc, repoManager)
+	assetService, err := service.NewAssetService(queries, lumenService, &repoManager, embeddingService)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
@@ -121,6 +127,9 @@ func main() {
 	// }
 	authService := service.NewAuthService(queries)
 	albumService := service.NewAlbumService(queries)
+	aiDescrptionService := service.NewAIDescriptionService(queries, lumenService)
+	ocrService := service.NewOCRService(queries)
+	faceService := service.NewFaceService(queries)
 
 	// Initialize Queue and run migrations
 	workers := river.NewWorkers()
@@ -131,24 +140,40 @@ func main() {
 	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, appConfig)
 	river.AddWorker[queue.ProcessAssetArgs](workers, &queue.ProcessAssetWorker{Processor: assetProcessor})
 
-	// Initialize CLIP dispatcher and worker if enabled
-	if appConfig.CLIPEnabled {
-		defer func() {
-			if mlConn != nil {
-				mlConn.Close()
-			}
-		}()
-
-		clipClient := proto.NewInferenceClient(mlConn)
-		clipDispatcher := queue.NewClipBatchDispatcher(clipClient, 8, 1500*time.Millisecond)
-		clipDispatcher.Start(ctx)
-
+	if appConfig.MLConfig.CLIPEnabled {
 		// Register CLIP batch worker
 		river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
-			Dispatcher:   clipDispatcher,
-			AssetService: assetService,
+			LumenService:     lumenService,
+			EmbeddingService: embeddingService,
+			AssetService:     assetService,
 		})
 	}
+
+	if appConfig.MLConfig.CaptionEnabled {
+		// Register Caption batch worker
+		river.AddWorker[queue.ProcessCaptionArgs](workers, &queue.ProcessCaptionWorker{
+			AIDescriptionService: aiDescrptionService,
+			LumenService:         lumenService,
+		})
+	}
+
+	if appConfig.MLConfig.OCREnabled {
+		// Register OCR batch worker
+		river.AddWorker[queue.ProcessOcrArgs](workers, &queue.ProcessOcrWorker{
+			OCRService:   ocrService,
+			LumenService: lumenService,
+		})
+	}
+
+	if appConfig.MLConfig.FaceEnabled {
+		// Register Face Recognition batch worker
+		river.AddWorker[queue.ProcessFaceArgs](workers, &queue.ProcessFaceWorker{
+			FaceService:  faceService,
+			LumenService: lumenService,
+		})
+		log.Println("✅ Face Worker Registered")
+	}
+
 	if err != nil {
 		log.Fatalf("Failed to Initialize Queue: %v", err)
 	}
@@ -170,7 +195,7 @@ func main() {
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
 	docs.SwaggerInfo.Description = "Photo management system API with asset upload, processing, and organization features"
 	docs.SwaggerInfo.Version = "1.0"
-	docs.SwaggerInfo.Host = "localhost:" + appConfig.Port
+	docs.SwaggerInfo.Host = "localhost:" + appConfig.ServerConfig.Port
 	docs.SwaggerInfo.BasePath = "/api/v1"
 
 	// Set up router with new asset, album and auth endpoints
@@ -179,21 +204,11 @@ func main() {
 	// Add Swagger documentation endpoint
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	log.Printf("🌐 Server starting on port %s...", appConfig.Port)
-	log.Printf("📖 API Documentation: http://localhost:%s/swagger/index.html", appConfig.Port)
-	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", appConfig.Port)
+	log.Printf("🌐 Server starting on port %s...", appConfig.ServerConfig.Port)
+	log.Printf("📖 API Documentation: http://localhost:%s/swagger/index.html", appConfig.ServerConfig.Port)
+	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", appConfig.ServerConfig.Port)
 
-	// Ensure graceful shutdown of sync system
-	defer func() {
-		if appConfig.SyncEnabled {
-			log.Println("Shutting down sync manager...")
-			if err := repoManager.StopSync(); err != nil {
-				log.Printf("Error stopping sync manager: %v", err)
-			}
-		}
-	}()
-
-	if err := http.ListenAndServe(":"+appConfig.Port, router); err != nil {
+	if err := http.ListenAndServe(":"+appConfig.ServerConfig.Port, router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
