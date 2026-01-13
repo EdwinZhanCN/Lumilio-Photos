@@ -1,4 +1,5 @@
 import { AssetsAction, EntitiesState, EntityMeta } from "../types";
+import { Asset } from "@/services";
 
 export const initialEntitiesState: EntitiesState = {
   assets: {},

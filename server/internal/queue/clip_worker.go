@@ -7,51 +7,64 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/service"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
 
-// ProcessClipArgs is the job payload (reusing your processors.CLIPPayload struct).
+// ProcessClipArgs is the job payload.
 type ProcessClipArgs = jobs.ProcessClipArgs
 
-// Kind is defined on jobs.ProcessClipArgs
-
+// ProcessClipWorker handles CLIP embedding generation for assets
 type ProcessClipWorker struct {
 	river.WorkerDefaults[ProcessClipArgs]
 
-	Dispatcher   *ClipBatchDispatcher // injected at bootstrap; call Dispatcher.Start(context) once
-	AssetService service.AssetService
+	AssetService     service.AssetService
+	EmbeddingService service.EmbeddingService
+	LumenService     service.LumenService
 }
 
 func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClipArgs]) error {
 	args := job.Args
-	assetID := args.AssetID.String()
+	assetID := args.AssetID
 
-	// Submit to batcher (this will batch with other concurrent jobs).
-	res, err := w.Dispatcher.Submit(ctx, assetID, args.ImageData, "image/webp")
-	if err != nil {
-		return fmt.Errorf("batch submit: %w", err)
+	// Convert UUID to pgtype.UUID for database operations
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(assetID.String()); err != nil {
+		return fmt.Errorf("invalid UUID: %w", err)
 	}
 
-	// 1) Store embeddings in the database (replace with your persistence)
-	err = w.AssetService.SaveNewEmbedding(ctx, args.AssetID, res.Embedding.Vector)
+	embedding, err := w.LumenService.ClipImageEmbed(ctx, args.ImageData)
 	if err != nil {
-		return fmt.Errorf("save embedding: %w", err)
+		return fmt.Errorf("failed to generate CLIP embedding: %w", err)
 	}
 
-	// 2) Store smart classification (labels + meta["source"])
-	if res.Labels != nil {
-		preds := make([]dbtypes.SpeciesPredictionMeta, 0, len(res.Labels.Labels))
-		for _, l := range res.Labels.Labels {
-			preds = append(preds, dbtypes.SpeciesPredictionMeta{
-				Label: l.Label,
-				Score: l.Score,
-			})
-		}
-		if len(preds) > 0 {
-			if err = w.AssetService.SaveNewSpeciesPredictions(ctx, args.AssetID, preds); err != nil {
-				return fmt.Errorf("save prediction: %w", err)
+	err = w.EmbeddingService.SaveEmbedding(ctx, pgUUID,
+		service.EmbeddingTypeCLIP, embedding.ModelID, embedding.Vector, true)
+	if err != nil {
+		return fmt.Errorf("failed to save embedding: %w", err)
+	}
+
+	labels, err := w.LumenService.BioClipClassify(ctx, args.ImageData, 3)
+	if err != nil {
+		return fmt.Errorf("failed to classify image: %w", err)
+	}
+
+	// Also save species predictions if available
+	if labels != nil && len(labels) > 0 {
+		predictions := make([]dbtypes.SpeciesPredictionMeta, len(labels))
+		for i, pred := range labels {
+			predictions[i] = dbtypes.SpeciesPredictionMeta{
+				Label: pred.Label,
+				Score: pred.Score,
 			}
 		}
+
+		err = w.AssetService.SaveNewSpeciesPredictions(ctx, pgUUID, predictions)
+		if err != nil {
+			// Log error but don't fail the job
+			fmt.Printf("Failed to save species predictions: %v\n", err)
+		}
 	}
+
 	return nil
 }

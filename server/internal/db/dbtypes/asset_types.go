@@ -28,29 +28,24 @@ func (at AssetType) Valid() bool {
 	return false
 }
 
-// ✅ 方案A：大类型（零开销别名），底层就是 []byte
-// 注意：别名不能挂方法，因此解码用顶层函数提供
 type SpecificMetadata = json.RawMessage
 
-// ----- 各类具体的 metadata 结构（仅用于 JSON 编解码；与持久化解耦）-----
-
+// PhotoSpecificMetadata ----- 各类具体的 metadata 结构（仅用于 JSON 编解码；与持久化解耦）-----
 type PhotoSpecificMetadata struct {
-	TakenTime         *time.Time              `json:"taken_time,omitempty"`
-	CameraModel       string                  `json:"camera_model,omitempty"`
-	LensModel         string                  `json:"lens_model,omitempty"`
-	ExposureTime      string                  `json:"exposure_time,omitempty"`
-	FNumber           float32                 `json:"f_number,omitempty"`
-	FocalLength       float32                 `json:"focal_length,omitempty"`
-	IsoSpeed          int                     `json:"iso_speed,omitempty"`
-	Exposure          float32                 `json:"exposure"`
-	Dimensions        string                  `json:"dimensions,omitempty"`
-	Resolution        string                  `json:"resolution,omitempty"`
-	GPSLatitude       float64                 `json:"gps_latitude,omitempty"`
-	GPSLongitude      float64                 `json:"gps_longitude,omitempty"`
-	Description       string                  `json:"description,omitempty"`
-	SpeciesPrediction []SpeciesPredictionMeta `json:"species_prediction,omitempty"`
-	IsRAW             bool                    `json:"is_raw,omitempty"`
-	// Note: rating and liked fields are now direct columns in the assets table
+	TakenTime    *time.Time `json:"taken_time,omitempty"`
+	CameraModel  string     `json:"camera_model,omitempty"`
+	LensModel    string     `json:"lens_model,omitempty"`
+	ExposureTime string     `json:"exposure_time,omitempty"`
+	FNumber      float32    `json:"f_number,omitempty"`
+	FocalLength  float32    `json:"focal_length,omitempty"`
+	IsoSpeed     int        `json:"iso_speed,omitempty"`
+	Exposure     float32    `json:"exposure"`
+	Dimensions   string     `json:"dimensions,omitempty"`
+	Resolution   string     `json:"resolution,omitempty"`
+	GPSLatitude  float64    `json:"gps_latitude,omitempty"`
+	GPSLongitude float64    `json:"gps_longitude,omitempty"`
+	Description  string     `json:"description,omitempty"`
+	IsRAW        bool       `json:"is_raw,omitempty"`
 }
 
 type SpeciesPredictionMeta struct {

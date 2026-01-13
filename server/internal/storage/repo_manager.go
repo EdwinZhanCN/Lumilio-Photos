@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
-	"server/internal/sync"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -54,12 +52,6 @@ type RepositoryManager interface {
 
 	// Staging operations (delegated to staging manager)
 	GetStagingManager() StagingManager
-
-	// Sync operations
-	GetSyncStatus(ctx context.Context, repoID string) (*sync.SyncStatus, error)
-	TriggerSync(ctx context.Context, repoID string) error
-	IsSyncEnabled() bool
-	StopSync() error
 }
 
 // RepositoryAssetStats contains statistics about assets in a repository
@@ -81,37 +73,18 @@ type DefaultRepositoryManager struct {
 	queries        *repo.Queries
 	dirManager     DirectoryManager
 	stagingManager StagingManager
-	syncManager    *sync.SyncManager
-	pool           *pgxpool.Pool
+
+	pool *pgxpool.Pool
 }
 
 // NewRepositoryManager creates a new repository manager instance
 // If pool is nil, sync will be disabled
-func NewRepositoryManager(queries *repo.Queries, pool *pgxpool.Pool, enableSync bool) (RepositoryManager, error) {
+func NewRepositoryManager(queries *repo.Queries, pool *pgxpool.Pool) (RepositoryManager, error) {
 	rm := &DefaultRepositoryManager{
 		queries:        queries,
 		dirManager:     NewDirectoryManager(),
 		stagingManager: NewStagingManager(),
 		pool:           pool,
-	}
-
-	// Initialize sync manager if enabled and pool is available
-	if enableSync && pool != nil {
-		config := sync.DefaultSyncManagerConfig()
-		syncManager, err := sync.NewSyncManager(pool, config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create sync manager: %w", err)
-		}
-
-		err = syncManager.Start()
-		if err != nil {
-			return nil, fmt.Errorf("failed to start sync manager: %w", err)
-		}
-
-		rm.syncManager = syncManager
-		log.Println("✅ Sync system enabled and started")
-	} else {
-		log.Println("⚠️  Sync system disabled")
 	}
 
 	return rm, nil
@@ -169,17 +142,6 @@ func (rm *DefaultRepositoryManager) AddRepository(path string) (*repo.Repository
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database record: %w", err)
-	}
-
-	// Initialize sync if enabled
-	if rm.syncManager != nil {
-		err = rm.syncManager.AddRepository(repoUUID, cleanPath)
-		if err != nil {
-			log.Printf("⚠️  Failed to add repository to sync manager: %v", err)
-			// Don't fail the operation, just log warning
-		} else {
-			log.Printf("✅ Sync enabled for repository %s", config.ID)
-		}
 	}
 
 	return &dbRepo, nil
@@ -405,17 +367,6 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 		return nil, fmt.Errorf("failed to create database record: %w", err)
 	}
 
-	// Initialize sync if enabled
-	if rm.syncManager != nil {
-		err = rm.syncManager.AddRepository(repoUUID, cleanPath)
-		if err != nil {
-			log.Printf("⚠️  Failed to add repository to sync manager: %v", err)
-			// Don't fail the operation, just log warning
-		} else {
-			log.Printf("✅ Sync enabled for repository %s", config.ID)
-		}
-	}
-
 	return &dbRepo, nil
 }
 
@@ -467,14 +418,6 @@ func (rm *DefaultRepositoryManager) RemoveRepository(id string) error {
 		return fmt.Errorf("invalid repository ID: %w", err)
 	}
 
-	// Remove from sync manager first
-	if rm.syncManager != nil {
-		err = rm.syncManager.RemoveRepository(repoUUID)
-		if err != nil {
-			log.Printf("⚠️  Failed to remove repository from sync manager: %v", err)
-		}
-	}
-
 	err = rm.queries.DeleteRepository(context.Background(), pgtype.UUID{Bytes: repoUUID, Valid: true})
 	if err != nil {
 		return fmt.Errorf("failed to remove repository: %w", err)
@@ -486,53 +429,6 @@ func (rm *DefaultRepositoryManager) RemoveRepository(id string) error {
 // GetStagingManager returns the staging manager instance
 func (rm *DefaultRepositoryManager) GetStagingManager() StagingManager {
 	return rm.stagingManager
-}
-
-// GetSyncStatus returns the sync status for a repository
-func (rm *DefaultRepositoryManager) GetSyncStatus(ctx context.Context, repoID string) (*sync.SyncStatus, error) {
-	if rm.syncManager == nil {
-		return nil, fmt.Errorf("sync is not enabled")
-	}
-
-	repoUUID, err := uuid.Parse(repoID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid repository ID: %w", err)
-	}
-
-	return rm.syncManager.GetSyncStatus(ctx, repoUUID)
-}
-
-// TriggerSync manually triggers reconciliation for a repository
-func (rm *DefaultRepositoryManager) TriggerSync(ctx context.Context, repoID string) error {
-	if rm.syncManager == nil {
-		return fmt.Errorf("sync is not enabled")
-	}
-
-	repoUUID, err := uuid.Parse(repoID)
-	if err != nil {
-		return fmt.Errorf("invalid repository ID: %w", err)
-	}
-
-	repository, err := rm.GetRepository(repoID)
-	if err != nil {
-		return err
-	}
-
-	return rm.syncManager.TriggerReconciliation(repoUUID, repository.Path)
-}
-
-// IsSyncEnabled checks if the sync system is enabled
-func (rm *DefaultRepositoryManager) IsSyncEnabled() bool {
-	return rm.syncManager != nil
-}
-
-// StopSync stops the sync manager
-func (rm *DefaultRepositoryManager) StopSync() error {
-	if rm.syncManager == nil {
-		return nil
-	}
-
-	return rm.syncManager.Stop()
 }
 
 func (rm *DefaultRepositoryManager) RemoveRepositories(ids []string) error {

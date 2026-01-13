@@ -5,30 +5,30 @@
 **(Provider、Router、Service、Routes、Hooks)**
 ```mermaid
 flowchart TB
-  subgraph Provider[AssetsProvider (Context + Reducers + Effects)]
+  subgraph Provider[AssetsProvider-Context + Reducers + Effects]
     direction TB
-    S1[AssetsState\n{entities, views, ui, filters, selection}]
+    S1[AssetsState\nentities, views, ui, filters, selection]
     D1([dispatch])
-    E1[[effects:\n- init from URL + settings\n- persist to localStorage(filters, selection)\n- sync URL<->UI\n- sync carousel by route param\n- cleanup stale views]]
+    E1[[effects:\n- init from URL + settings\n- persist to localStorage\n- sync URL<->UI\n- sync carousel by route param\n- cleanup stale views]]
     S1 <-.- D1
   end
 
   subgraph Router[react-router]
     L[location.pathname]
-    Q[searchParams (?groupBy, ?q)]
+    Q[searchParams groupBy, q]
     P[params.assetId]
   end
 
   subgraph External
     Settings[SettingsContext]
     Storage[(localStorage)]
-    API[assetsService\n(list/search/update/delete...)]
+    API[assetsService\nlist, search, update, delete]
     Geo[geoService]
     Workers[WorkerProvider]
   end
 
   subgraph Routes[Feature Routes]
-    A1[Assets.tsx\n<AssetsProvider>…]
+    A1[Assets.tsx\n<AssetsProvider> wrapper]
     Pht[Photos.tsx]
     Vid[Videos.tsx]
     Aud[Audios.tsx]
@@ -36,12 +36,12 @@ flowchart TB
   end
 
   subgraph UI[Components + Hooks]
-    Hd[AssetsPageHeader\n(GroupBy, SearchBar, FilterTool, SelectionToggle)]
-    Masonry[PhotosMasonry -> PhotosThumbnail]
+    Hd[AssetsPageHeader\nGroupBy, SearchBar, FilterTool, SelectionToggle]
+    Masonry[JustifiedGallery -> MediaThumbnail]
     Carousel[FullScreenCarousel]
     Info[FullScreenBasicInfo]
     hook1[useAssetsContext]
-    hook2[useCurrentTabAssets/useAssetsView]
+    hook2[useAssetsView]
     hook3[useAssetActions]
     hook4[useSelection]
   end
@@ -53,16 +53,18 @@ flowchart TB
   Provider --> Routes
   A1 --> Pht & Vid & Aud & Tabs
 
+  %% Correct hook usage patterns
   Hd --> hook1
-  Masonry --> hook1
+  Masonry --> hook2
   Carousel --> hook1
-  Info --> hook1
-  Hd --> hook2
+  Info --> hook3
+  Hd --> hook4
   Pht --> hook2
 
   hook2 --> API
   API --> Provider
   hook3 --> API
+  hook1 --> Provider
   Info --> Geo
 
   %% URL <-> UI sync
@@ -113,10 +115,20 @@ classDiagram
     +raw?: boolean
     +rating?: number
     +liked?: boolean
-    +filename?: { mode, value }
-    +date?: { from, to }
+    +filename: FilenameFilter
+    +date: DateFilter
     +camera_make?: string
     +lens?: string
+  }
+
+  class FilenameFilter {
+    +mode: string
+    +value: string
+  }
+
+  class DateFilter {
+    +from?: string
+    +to?: string
   }
 
   class SelectionState {
@@ -140,6 +152,9 @@ classDiagram
   AssetsState --> UIState
   AssetsState --> FiltersState
   AssetsState --> SelectionState
+
+  FiltersState --> FilenameFilter
+  FiltersState --> DateFilter
 
   Reducers ..> EntitiesState
   Reducers ..> ViewsState
@@ -189,14 +204,14 @@ sequenceDiagram
 
 **URL <-> UI State bijection, Carousel**
 
-```
+```mermaid
 sequenceDiagram
   actor User
   participant UI as Component(Masonry/Thumbnail/Header)
   participant Nav as useAssetsNavigation(navigate)
   participant Router as react-router
   participant Provider as AssetsProvider(Effects)
-  participant UI2 as UI(Carosuel)
+  participant UI2 as UI(Carousel)
 
   User->>UI: 点击缩略图
   UI->>Nav: openCarousel(assetId)

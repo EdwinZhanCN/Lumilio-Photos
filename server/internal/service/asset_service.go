@@ -13,11 +13,12 @@ import (
 	"server/internal/db/repo"
 	"server/internal/storage"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	pgvector_go "github.com/pgvector/pgvector-go"
+	"github.com/pgvector/pgvector-go"
 )
 
 // Asset type constants
@@ -38,7 +39,7 @@ var (
 // AssetService defines the interface for asset-related operations
 type AssetService interface {
 	GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error)
-	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies bool) (interface{}, error)
+	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies, includeOCR, includeFaces, includeAIDescriptions bool) (interface{}, error)
 	GetAssetsByType(ctx context.Context, assetType string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwner(ctx context.Context, ownerID int, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortOrder string, limit, offset int) ([]repo.Asset, error)
@@ -62,8 +63,7 @@ type AssetService interface {
 	AddTagToAsset(ctx context.Context, assetID uuid.UUID, tagID int, confidence float32, source string) error
 	RemoveTagFromAsset(ctx context.Context, assetID uuid.UUID, tagID int) error
 
-	CreateThumbnail(ctx context.Context, assetID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
-	SearchAssets(ctx context.Context, query string, assetType *string, useVector bool, limit, offset int) ([]repo.Asset, error)
+	CreateThumbnail(ctx context.Context, assetID pgtype.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error)
 	DetectDuplicates(ctx context.Context, hash string) ([]repo.Asset, error)
 	SaveAssetIndex(ctx context.Context, taskID string, hash string) error
 	CreateAssetRecord(ctx context.Context, params repo.CreateAssetParams) (*repo.Asset, error)
@@ -74,7 +74,6 @@ type AssetService interface {
 
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, hash string) (string, error)
 	SaveNewThumbnail(ctx context.Context, repoPath string, buffers io.Reader, asset *repo.Asset, size string) error
-	SaveNewEmbedding(ctx context.Context, pgUUID pgtype.UUID, embedding []float32) error
 	SaveNewSpeciesPredictions(ctx context.Context, pgUUID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
 
 	// New filtering and search methods
@@ -92,21 +91,18 @@ type AssetService interface {
 }
 
 type assetService struct {
-	queries     *repo.Queries
-	ml          *MLService
-	repoManager storage.RepositoryManager
+	queries          *repo.Queries
+	lumen            LumenService
+	repoManager      *storage.RepositoryManager
+	embeddingService EmbeddingService
 }
 
-// NewAssetService creates a new instance of AssetService with storage configuration
-func NewAssetService(q *repo.Queries, rm storage.RepositoryManager) (AssetService, error) {
-	return NewAssetServiceWithML(q, nil, rm)
-}
-
-func NewAssetServiceWithML(q *repo.Queries, ml *MLService, rm storage.RepositoryManager) (AssetService, error) {
+func NewAssetService(q *repo.Queries, l LumenService, r *storage.RepositoryManager, e EmbeddingService) (AssetService, error) {
 	return &assetService{
-		queries:     q,
-		ml:          ml,
-		repoManager: rm,
+		queries:          q,
+		lumen:            l,
+		repoManager:      r,
+		embeddingService: e,
 	}, nil
 }
 
@@ -141,19 +137,59 @@ func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset,
 	return &dbAsset, nil
 }
 
-func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies bool) (interface{}, error) {
+func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies, includeOCR, includeFaces, includeAIDescriptions bool) (interface{}, error) {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
 		return nil, fmt.Errorf("invalid UUID: %w", err)
 	}
 
-	// 1) Full relations (thumbnails + tags + albums) OR species predictions requested
-	if includeSpecies || (includeThumbnails && includeTags && includeAlbums) {
+	// 1) Full relations (thumbnails + tags + albums) OR species predictions OR any AI data requested
+	if includeSpecies || includeOCR || includeFaces || includeAIDescriptions || (includeThumbnails && includeTags && includeAlbums) {
 		dbAsset, err := s.queries.GetAssetWithRelations(ctx, pgUUID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get asset with relations: %w", err)
 		}
-		return dbAsset, nil
+
+		// Create a map to conditionally include AI data based on flags
+		result := map[string]interface{}{
+			"asset_id":            dbAsset.AssetID,
+			"owner_id":            dbAsset.OwnerID,
+			"type":                dbAsset.Type,
+			"original_filename":   dbAsset.OriginalFilename,
+			"storage_path":        dbAsset.StoragePath,
+			"mime_type":           dbAsset.MimeType,
+			"file_size":           dbAsset.FileSize,
+			"hash":                dbAsset.Hash,
+			"width":               dbAsset.Width,
+			"height":              dbAsset.Height,
+			"duration":            dbAsset.Duration,
+			"taken_time":          dbAsset.TakenTime,
+			"upload_time":         dbAsset.UploadTime,
+			"is_deleted":          dbAsset.IsDeleted,
+			"deleted_at":          dbAsset.DeletedAt,
+			"specific_metadata":   dbAsset.SpecificMetadata,
+			"rating":              dbAsset.Rating,
+			"liked":               dbAsset.Liked,
+			"repository_id":       dbAsset.RepositoryID,
+			"status":              dbAsset.Status,
+			"thumbnails":          dbAsset.Thumbnails,
+			"tags":                dbAsset.Tags,
+			"albums":              dbAsset.Albums,
+			"species_predictions": dbAsset.SpeciesPredictions,
+		}
+
+		// Only include AI data if specifically requested
+		if includeOCR {
+			result["ocr_result"] = dbAsset.OcrResult
+		}
+		if includeFaces {
+			result["face_result"] = dbAsset.FaceResult
+		}
+		if includeAIDescriptions {
+			result["ai_description"] = dbAsset.AiDescription
+		}
+
+		return result, nil
 	}
 
 	// 2) Thumbnails + Tags (albums not requested) -> still use relations query (albums will be empty in SQL)
@@ -215,7 +251,6 @@ func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, in
 			"is_deleted":        asset.IsDeleted,
 			"deleted_at":        asset.DeletedAt,
 			"specific_metadata": asset.SpecificMetadata,
-			"embedding":         asset.Embedding,
 			"thumbnails":        thumbnails,
 			"tags":              tags,
 			"albums":            albums,
@@ -302,126 +337,6 @@ func (s *assetService) GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int
 	}
 
 	return s.queries.GetAssetsByOwnerAndTypesSorted(ctx, params)
-}
-
-// SearchAssets searches for assets by query and type
-func (s *assetService) SearchAssets(ctx context.Context, query string, assetType *string, useVector bool, limit, offset int) ([]repo.Asset, error) {
-	log.Printf("SearchAssets: query=%q type=%v useVector=%t limit=%d offset=%d", query, func() interface{} {
-		if assetType != nil {
-			return *assetType
-		}
-		return nil
-	}(), useVector, limit, offset)
-	// Try smart vector search first when we have an ML client and a non-empty query.
-	if useVector && s.ml != nil && query != "" {
-		if emb, err := s.ml.ClipEmbed(ctx, query); err == nil && emb != nil && len(emb.Vector) > 0 {
-			// Convert []float64 -> []float32 to fit pgvector-go.
-			fv := make([]float32, len(emb.Vector))
-			for i, v := range emb.Vector {
-				fv[i] = float32(v)
-			}
-			vec := pgvector_go.NewVector(fv)
-
-			// We fetch limit+offset items from ANN, then apply optional type filter and offset locally.
-			fetch := limit + offset
-			if fetch <= 0 {
-				fetch = limit
-			}
-			if fetch <= 0 {
-				fetch = 50
-			}
-
-			rows, vErr := s.queries.SearchNearestAssets(ctx, repo.SearchNearestAssetsParams{
-				Column1: vec,
-				Limit:   int32(fetch),
-			})
-			if vErr != nil {
-				log.Printf("Vector search: ANN error: %v", vErr)
-			} else {
-				log.Printf("Vector search: ANN returned %d candidates", len(rows))
-			}
-			if vErr == nil && len(rows) > 0 {
-				// Concurrently fetch assets to reduce latency, then filter in original ANN order.
-				type fetchRes struct {
-					idx   int
-					asset *repo.Asset
-				}
-				total := len(rows)
-				fetched := make([]*repo.Asset, total)
-				sem := make(chan struct{}, 8) // limit concurrent DB fetches
-				out := make(chan fetchRes, total)
-
-				for i, r := range rows {
-					sem <- struct{}{}
-					go func(i int, id pgtype.UUID) {
-						defer func() { <-sem }()
-						a, err := s.queries.GetAssetByID(ctx, id)
-						if err == nil {
-							out <- fetchRes{idx: i, asset: &a}
-						} else {
-							out <- fetchRes{idx: i, asset: nil}
-						}
-					}(i, r.AssetID)
-				}
-
-				// Collect all fetch results
-				for i := 0; i < total; i++ {
-					res := <-out
-					if res.asset != nil {
-						fetched[res.idx] = res.asset
-					}
-				}
-
-				// Log how many assets were successfully fetched from DB
-				countFetched := 0
-				for _, fa := range fetched {
-					if fa != nil {
-						countFetched++
-					}
-				}
-				log.Printf("Vector search: fetched %d/%d assets from DB", countFetched, total)
-				results := make([]repo.Asset, 0, limit)
-				skipped := 0
-				for i := 0; i < total && len(results) < limit; i++ {
-					a := fetched[i]
-					if a == nil {
-						continue
-					}
-					// Optional type filter
-					if assetType != nil && *assetType != "" && a.Type != *assetType {
-						continue
-					}
-					// Apply offset after filtering
-					if skipped < offset {
-						skipped++
-						continue
-					}
-					results = append(results, *a)
-				}
-
-				log.Printf("Vector search: after filtering (type=%v) and offset=%d -> skipped=%d returned=%d", func() interface{} {
-					if assetType != nil {
-						return *assetType
-					}
-					return nil
-				}(), offset, skipped, len(results))
-				if len(results) > 0 {
-					return results, nil
-				}
-			}
-		}
-	}
-	log.Printf("Vector search: no usable vector results; falling back to filename search")
-	// Fallback to filename search.
-	params := repo.SearchAssetsParams{
-		Column1: query,
-		Limit:   int32(limit),
-		Offset:  int32(offset),
-	}
-	if assetType != nil {
-		params.Column2 = *assetType
-	}
-	return s.queries.SearchAssets(ctx, params)
 }
 
 // DetectDuplicates finds assets with the same hash
@@ -611,14 +526,9 @@ func (s *assetService) SaveNewAsset(ctx context.Context, fileReader io.Reader, f
 // ================================
 
 // CreateThumbnail creates a new thumbnail for an asset
-func (s *assetService) CreateThumbnail(ctx context.Context, assetID uuid.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error) {
-	pgUUID := pgtype.UUID{}
-	if err := pgUUID.Scan(assetID.String()); err != nil {
-		return nil, fmt.Errorf("invalid UUID: %w", err)
-	}
-
+func (s *assetService) CreateThumbnail(ctx context.Context, assetID pgtype.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error) {
 	params := repo.CreateThumbnailParams{
-		AssetID:     pgUUID,
+		AssetID:     assetID,
 		Size:        size,
 		StoragePath: thumbnailPath,
 		MimeType:    "image/webp",
@@ -718,11 +628,12 @@ func (s *assetService) SaveNewThumbnail(ctx context.Context, repoPath string, bu
 		return fmt.Errorf("no data written for thumbnail")
 	}
 
-	log.Printf("Saved thumbnail for asset %s: size=%s, path=%s, bytes=%d", asset.AssetID, size, thumbnailPath, written)
+	assetUUID, _ := uuid.FromBytes(asset.AssetID.Bytes[:])
+	log.Printf("Saved thumbnail for asset %s: size=%s, path=%s, bytes=%d", assetUUID.String(), size, thumbnailPath, written)
 
 	// Create database record with relative path
 	relPath := filepath.Join(".lumilio/assets/thumbnails", size, filename)
-	_, err = s.CreateThumbnail(ctx, asset.AssetID.Bytes, size, relPath)
+	_, err = s.CreateThumbnail(ctx, asset.AssetID, size, relPath)
 	if err != nil {
 		// Clean up file if database insertion fails
 		os.Remove(thumbnailPath)
@@ -735,18 +646,6 @@ func (s *assetService) SaveNewThumbnail(ctx context.Context, repoPath string, bu
 // ================================
 // ML CRUD Operations
 // ================================
-
-func (s *assetService) SaveNewEmbedding(ctx context.Context, pgUUID pgtype.UUID, embedding []float32) error {
-	// Convert []float32 to pgvector.Vector
-	vector := pgvector_go.NewVector(embedding)
-
-	params := repo.UpsertEmbeddingParams{
-		AssetID:   pgUUID,
-		Embedding: &vector,
-	}
-
-	return s.queries.UpsertEmbedding(ctx, params)
-}
 
 func (s *assetService) SaveNewSpeciesPredictions(ctx context.Context, pgUUID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error {
 	// First, delete existing predictions for the asset
@@ -769,6 +668,8 @@ func (s *assetService) SaveNewSpeciesPredictions(ctx context.Context, pgUUID pgt
 	return nil
 
 }
+
+// TODO: SaveNewDescription (VLM)
 
 // ================================
 // Helper functions
@@ -928,9 +829,25 @@ func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, r
 }
 
 func (s *assetService) SearchAssetsVector(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
-	if s.ml == nil {
-		return nil, fmt.Errorf("ML service not available for semantic search")
+	if s.lumen == nil {
+		return nil, fmt.Errorf("lumen service not available for semantic search")
 	}
+
+	// 1. Get text embedding using LumenService
+	embeddingResult, err := s.lumen.ClipTextEmbed(ctx, []byte(query))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get query embedding: %w", err)
+	}
+
+	// Convert lumen embedding vector to float32
+	queryVector := make([]float32, len(embeddingResult.Vector))
+	for i, v := range embeddingResult.Vector {
+		queryVector[i] = float32(v)
+	}
+
+	// 2. Prepare query parameters for database-level filtering and search
+	pgVector := pgvector.NewVector(queryVector)
+	pgVectorPtr := &pgVector
 
 	// Convert repository ID string to pgtype.UUID if provided
 	var repoUUID pgtype.UUID
@@ -942,10 +859,12 @@ func (s *assetService) SearchAssetsVector(ctx context.Context, query string, rep
 		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
 	}
 
-	// Get query embedding
-	embeddingResult, err := s.ml.ClipEmbed(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get query embedding: %w", err)
+	// Default distance threshold (env override: SEMANTIC_MAX_DISTANCE)
+	maxDistance := 0.5
+	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			maxDistance = f
+		}
 	}
 
 	// Convert rating pointer for SQL
@@ -964,110 +883,78 @@ func (s *assetService) SearchAssetsVector(ctx context.Context, query string, rep
 		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
 	}
 
-	// Convert embedding to pgvector format
-	pgEmbeddingFloat32 := make([]float32, len(embeddingResult.Vector))
-	for i, v := range embeddingResult.Vector {
-		pgEmbeddingFloat32[i] = float32(v)
+	// 3. Execute optimized single SQL query with vector search and all filters
+	params := repo.SearchAssetsVectorParams{
+		Embedding:     pgVectorPtr,
+		EmbeddingType: string(EmbeddingTypeCLIP), // Use CLIP embeddings by default
+		AssetType:     assetType,
+		OwnerID:       ownerID,
+		RepositoryID:  repoUUID,
+		FilenameVal:   filenameVal,
+		FilenameMode:  filenameMode,
+		DateFrom:      fromTime,
+		DateTo:        toTime,
+		IsRaw:         isRaw,
+		Rating:        ratingPtr,
+		Liked:         liked,
+		CameraModel:   cameraMake,
+		LensModel:     lens,
+		MaxDistance:   &maxDistance,
+		Offset:        int32(offset),
+		Limit:         int32(limit),
 	}
-	pgEmbedding := pgvector_go.NewVector(pgEmbeddingFloat32)
 
-	// Fetch enough rows so we can paginate after threshold filtering
-	requestLimit := int32(limit + offset)
-	if requestLimit <= 0 {
-		requestLimit = 1000
-	}
-
-	results, err := s.queries.SearchAssetsVector(ctx, repo.SearchAssetsVectorParams{
-		Embedding:    pgEmbedding,
-		AssetType:    assetType,
-		OwnerID:      ownerID,
-		RepositoryID: repoUUID,
-		FilenameVal:  filenameVal,
-		FilenameMode: filenameMode,
-		DateFrom:     fromTime,
-		DateTo:       toTime,
-		IsRaw:        isRaw,
-		Rating:       ratingPtr,
-		Liked:        liked,
-		CameraModel:  cameraMake,
-		LensModel:    lens,
-		Limit:        requestLimit,
-		Offset:       0,
-	})
+	// 4. Execute optimized database query
+	results, err := s.queries.SearchAssetsVector(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search assets with vector: %w", err)
 	}
 
-	// Default distance threshold (env override: SEMANTIC_MAX_DISTANCE)
-	maxDistance := 1.235
-	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			maxDistance = f
+	// 5. Convert results to Asset slice (distance field is in the result but we don't return it to client)
+	assets := make([]repo.Asset, len(results))
+	for i, result := range results {
+		assets[i] = repo.Asset{
+			AssetID:          result.AssetID,
+			OwnerID:          result.OwnerID,
+			Type:             result.Type,
+			OriginalFilename: result.OriginalFilename,
+			StoragePath:      result.StoragePath,
+			MimeType:         result.MimeType,
+			FileSize:         result.FileSize,
+			Hash:             result.Hash,
+			Width:            result.Width,
+			Height:           result.Height,
+			Duration:         result.Duration,
+			TakenTime:        result.TakenTime,
+			UploadTime:       result.UploadTime,
+			IsDeleted:        result.IsDeleted,
+			DeletedAt:        result.DeletedAt,
+			SpecificMetadata: result.SpecificMetadata,
+			Rating:           result.Rating,
+			Liked:            result.Liked,
+			RepositoryID:     result.RepositoryID,
+			Status:           result.Status,
 		}
 	}
 
-	// Filter by distance threshold, keep order (already ordered by distance ASC)
-	filtered := make([]repo.Asset, 0, len(results))
-	for _, result := range results {
-		var dist float64
-		switch d := result.Distance.(type) {
-		case float32:
-			dist = float64(d)
-		case float64:
-			dist = d
-		case int32:
-			dist = float64(d)
-		case int64:
-			dist = float64(d)
-		case string:
-			if parsed, perr := strconv.ParseFloat(d, 64); perr == nil {
-				dist = parsed
-			} else {
-				continue
-			}
-		default:
-			// Unknown type, skip this row
-			continue
-		}
+	return assets, nil
+}
 
-		if dist <= maxDistance {
-			filtered = append(filtered, repo.Asset{
-				AssetID:          result.AssetID,
-				OwnerID:          result.OwnerID,
-				Type:             result.Type,
-				OriginalFilename: result.OriginalFilename,
-				StoragePath:      result.StoragePath,
-				MimeType:         result.MimeType,
-				FileSize:         result.FileSize,
-				Hash:             result.Hash,
-				Width:            result.Width,
-				Height:           result.Height,
-				Duration:         result.Duration,
-				UploadTime:       result.UploadTime,
-				IsDeleted:        result.IsDeleted,
-				DeletedAt:        result.DeletedAt,
-				SpecificMetadata: result.SpecificMetadata,
-				Embedding:        result.Embedding,
-			})
-		}
+// Helper function for filename matching
+func matchFilename(filename, pattern, mode string) bool {
+	switch mode {
+	case "contains":
+		return strings.Contains(strings.ToLower(filename), strings.ToLower(pattern))
+	case "startswith":
+		return strings.HasPrefix(strings.ToLower(filename), strings.ToLower(pattern))
+	case "endswith":
+		return strings.HasSuffix(strings.ToLower(filename), strings.ToLower(pattern))
+	case "matches":
+		// Could implement regex matching here if needed
+		return strings.Contains(strings.ToLower(filename), strings.ToLower(pattern))
+	default:
+		return strings.Contains(strings.ToLower(filename), strings.ToLower(pattern))
 	}
-
-	// Apply pagination after threshold filtering
-	if offset < 0 {
-		offset = 0
-	}
-	if limit < 0 {
-		limit = 0
-	}
-	if offset >= len(filtered) {
-		return []repo.Asset{}, nil
-	}
-	end := offset + limit
-	if end > len(filtered) {
-		end = len(filtered)
-	}
-
-	return filtered[offset:end], nil
 }
 
 func (s *assetService) GetDistinctCameraMakes(ctx context.Context) ([]string, error) {
@@ -1180,7 +1067,7 @@ func (s *assetService) GetLikedAssets(ctx context.Context, limit, offset int) ([
 	return s.queries.GetLikedAssets(ctx, params)
 }
 
-// Video and Audio processing methods implementation
+// SaveVideoVersion Video and Audio processing methods implementation
 //
 // asset repo.Asset must be valid in following cases:
 //   - asset ID is not empty
@@ -1236,7 +1123,8 @@ func (s *assetService) SaveVideoVersion(ctx context.Context, repoPath string, vi
 		return fmt.Errorf("no data written for video version")
 	}
 
-	log.Printf("Saved video version %s for asset %s at path %s, bytes=%d", version, asset.AssetID, videoPath, written)
+	assetUUID, _ := uuid.FromBytes(asset.AssetID.Bytes[:])
+	log.Printf("Saved video version %s for asset %s at path %s, bytes=%d", version, assetUUID.String(), videoPath, written)
 	return nil
 }
 
@@ -1296,7 +1184,8 @@ func (s *assetService) SaveAudioVersion(ctx context.Context, repoPath string, au
 		return fmt.Errorf("no data written for audio version")
 	}
 
-	log.Printf("Saved audio version %s for asset %s at path %s, bytes=%d", version, asset.AssetID, audioPath, written)
+	assetUUID, _ := uuid.FromBytes(asset.AssetID.Bytes[:])
+	log.Printf("Saved audio version %s for asset %s at path %s, bytes=%d", version, assetUUID.String(), audioPath, written)
 	return nil
 }
 

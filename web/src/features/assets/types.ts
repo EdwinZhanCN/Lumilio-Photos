@@ -1,5 +1,5 @@
 import { AssetFilter } from "@/services/assetsService";
-
+import { Asset } from "@/services";
 // ===== Core Types =====
 export type TabType = "photos" | "videos" | "audios";
 export type GroupByType = "date" | "type" | "album" | "flat";

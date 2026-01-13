@@ -8,10 +8,6 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Unified Configuration Management
-// This package provides centralized configuration loading for both API and Worker services.
-// It ensures consistent environment variable loading and configuration management across all services.
-
 // DatabaseConfig holds all the configuration for the database connection.
 type DatabaseConfig struct {
 	Host           string
@@ -25,28 +21,34 @@ type DatabaseConfig struct {
 
 // AppConfig holds general application configuration
 type AppConfig struct {
-	Port          string
-	StagingPath   string
-	QueueDir      string
-	MLServiceAddr string
-	Debug         bool
-	LogLevel      string
-	CLIPEnabled   bool
-	SyncEnabled   bool
+	ServerConfig ServerConfig
+	LLMConfig    LLMConfig
+	MLConfig     MLConfig
+}
+
+type ServerConfig struct {
+	Port     string `env:"SERVER_PORT,default=8080"`
+	LogLevel string `env:"SERVER_LOG_LEVEL,default=info"`
 }
 
 type LLMConfig struct {
-	Provider  string
-	APIKey    string
-	ModelName string
+	AgentEnabled bool   `env:"LLM_AGENT_ENABLED,default=false"`
+	Provider     string `env:"LLM_PROVIDER,default="`
+	APIKey       string `env:"LLM_API_KEY,default="`
+	ModelName    string `env:"LLM_MODEL_NAME,default="`
+	BaseURL      string `env:"LLM_BASE_URL,default="`
+}
+
+type MLConfig struct {
+	CLIPEnabled    bool `env:"ML_CLIP_ENABLED,default=false"`
+	OCREnabled     bool `env:"ML_OCR_ENABLED,default=false"`
+	CaptionEnabled bool `env:"ML_CAPTION_ENABLED,default=false"`
+	FaceEnabled    bool `env:"ML_FACE_ENABLED,default=false"`
 }
 
 // IsDevelopmentMode checks if the application is running in development mode
-// Used consistently across all services to determine environment-specific configurations
 func IsDevelopmentMode() bool {
-	return strings.ToLower(os.Getenv("ENV")) == "development" ||
-		strings.ToLower(os.Getenv("ENVIRONMENT")) == "development" ||
-		os.Getenv("DEV_MODE") == "true"
+	return strings.ToLower(os.Getenv("SERVER_ENV")) == "development"
 }
 
 // LoadEnvironment loads environment variables from appropriate .env file
@@ -72,7 +74,7 @@ func LoadEnvironment() {
 	}
 
 	if isDev {
-		log.Println("🔧 Running in DEVELOPMENT mode")
+		log.Println("Running in DEVELOPMENT mode")
 	}
 }
 
@@ -86,22 +88,22 @@ func LoadDBConfig() DatabaseConfig {
 	if isDev {
 		// Development defaults - connect to localhost
 		cfg = DatabaseConfig{
-			Host:           "localhost", // For development, connect to localhost
+			Host:           "localhost",
 			Port:           "5432",
 			User:           "postgres",
 			Password:       "postgres",
-			DBName:         "lumiliophotos", // Match docker-compose database name
+			DBName:         "lumiliophotos",
 			SSL:            "disable",
 			ChannelBinding: "disable",
 		}
 	} else {
 		// Production/Docker defaults
 		cfg = DatabaseConfig{
-			Host:           "db", // In Docker Compose, the hostname is the service name
+			Host:           "db",
 			Port:           "5432",
 			User:           "postgres",
 			Password:       "postgres",
-			DBName:         "lumiliophotos", // Match docker-compose database name
+			DBName:         "lumiliophotos",
 			SSL:            "disable",
 			ChannelBinding: "disable",
 		}
@@ -123,10 +125,10 @@ func LoadDBConfig() DatabaseConfig {
 	if dbname := os.Getenv("DB_NAME"); dbname != "" {
 		cfg.DBName = dbname
 	}
-	if ssl := os.Getenv("SSL"); ssl != "" {
+	if ssl := os.Getenv("DB_SSL"); ssl != "" {
 		cfg.SSL = ssl
 	}
-	if cb := os.Getenv("CHANNEL_BINDING"); cb != "" {
+	if cb := os.Getenv("DB_CHANNEL_BINDING"); cb != "" {
 		cfg.ChannelBinding = cb
 	}
 
@@ -134,68 +136,88 @@ func LoadDBConfig() DatabaseConfig {
 }
 
 // LoadAppConfig loads general application configuration
-// Provides unified configuration for paths, ports, and service addresses
-// Used by both API and Worker services to maintain consistency
 func LoadAppConfig() AppConfig {
-	isDev := IsDevelopmentMode()
-
 	var cfg AppConfig
+	cfg.ServerConfig = LoadServerConfig()
+	cfg.MLConfig = LoadMLConfig()
+	cfg.LLMConfig = LoadLLMConfig()
 
-	// Set defaults based on environment
+	return cfg
+}
+
+func LoadServerConfig() ServerConfig {
+	var cfg ServerConfig
+
+	// Default to development settings
+	isDev := IsDevelopmentMode()
 	if isDev {
-		cfg = AppConfig{
-			Port:          "8080",
-			StagingPath:   "./staging",
-			QueueDir:      "./queue",
-			MLServiceAddr: "localhost:50051",
-			Debug:         true,
-			LogLevel:      "debug",
-			CLIPEnabled:   true,
-			SyncEnabled:   true,
+		cfg = ServerConfig{
+			Port:     "8080",
+			LogLevel: "debug",
 		}
 	} else {
-		cfg = AppConfig{
-			Port:          "8080",
-			StagingPath:   "/app/staging",
-			QueueDir:      "/app/queue",
-			MLServiceAddr: "ml:50051",
-			Debug:         false,
-			LogLevel:      "info",
-			CLIPEnabled:   false,
-			SyncEnabled:   true,
+		cfg = ServerConfig{
+			Port:     "8080",
+			LogLevel: "info",
 		}
 	}
 
 	// Override with environment variables if set
-	if port := os.Getenv("PORT"); port != "" {
+	if port := os.Getenv("SERVER_PORT"); port != "" {
 		cfg.Port = port
 	}
-	if stagingPath := os.Getenv("STAGING_PATH"); stagingPath != "" {
-		cfg.StagingPath = stagingPath
-	}
-	if queueDir := os.Getenv("QUEUE_DIR"); queueDir != "" {
-		cfg.QueueDir = queueDir
-	}
-	if mlAddr := os.Getenv("ML_SERVICE_ADDR"); mlAddr != "" {
-		cfg.MLServiceAddr = mlAddr
-	}
-	if debug := os.Getenv("DEBUG"); debug == "true" {
-		cfg.Debug = true
-	} else if debug == "false" {
-		cfg.Debug = false
-	}
-	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
+	if logLevel := os.Getenv("SERVER_LOG_LEVEL"); logLevel != "" {
 		cfg.LogLevel = logLevel
 	}
-	if clipEnabled := os.Getenv("CLIP_ENABLED"); clipEnabled == "true" {
+
+	return cfg
+}
+
+// LoadMLConfig loads ML/AI service configuration from environment variables
+func LoadMLConfig() MLConfig {
+	var cfg MLConfig
+
+	// Default to disabled for development, can be overridden by environment variables
+	isDev := IsDevelopmentMode()
+	if isDev {
+		cfg = MLConfig{
+			CLIPEnabled:    false,
+			OCREnabled:     false,
+			CaptionEnabled: false,
+			FaceEnabled:    false,
+		}
+	} else {
+		cfg = MLConfig{
+			CLIPEnabled:    true,
+			OCREnabled:     true,
+			CaptionEnabled: true,
+			FaceEnabled:    true,
+		}
+	}
+
+	// Override with environment variables if set
+	if clipEnabled := os.Getenv("ML_CLIP_ENABLED"); clipEnabled == "true" {
 		cfg.CLIPEnabled = true
 	} else if clipEnabled == "false" {
 		cfg.CLIPEnabled = false
 	}
-	if syncEnabled := os.Getenv("SYNC_ENABLED"); syncEnabled == "true" {
-		cfg.SyncEnabled = true
-	} else if syncEnabled == "false" {
-		cfg.SyncEnabled = false
+
+	if ocrEnabled := os.Getenv("ML_OCR_ENABLED"); ocrEnabled == "true" {
+		cfg.OCREnabled = true
+	} else if ocrEnabled == "false" {
+		cfg.OCREnabled = false
+	}
+
+	if captionEnabled := os.Getenv("ML_CAPTION_ENABLED"); captionEnabled == "true" {
+		cfg.CaptionEnabled = true
+	} else if captionEnabled == "false" {
+		cfg.CaptionEnabled = false
+	}
+
+	if faceEnabled := os.Getenv("ML_FACE_ENABLED"); faceEnabled == "true" {
+		cfg.FaceEnabled = true
+	} else if faceEnabled == "false" {
+		cfg.FaceEnabled = false
 	}
 
 	return cfg
@@ -204,6 +226,12 @@ func LoadAppConfig() AppConfig {
 // LoadLLMConfig loads LLM settings such as API key and model name from environment variables
 func LoadLLMConfig() LLMConfig {
 	var cfg LLMConfig
+
+	if enabled := os.Getenv("LLM_AGENT_ENABLED"); enabled == "true" {
+		cfg.AgentEnabled = true
+	} else {
+		cfg.AgentEnabled = false
+	}
 
 	if apiKey := os.Getenv("LLM_API_KEY"); apiKey != "" {
 		cfg.APIKey = apiKey
@@ -215,6 +243,10 @@ func LoadLLMConfig() LLMConfig {
 	//ark, deepseek, openai, claude, qwen, qianfan, gemini
 	if provider := os.Getenv("LLM_PROVIDER"); provider != "" {
 		cfg.Provider = provider
+	}
+
+	if baseURL := os.Getenv("LLM_BASE_URL"); baseURL != "" {
+		cfg.BaseURL = baseURL
 	}
 
 	return cfg

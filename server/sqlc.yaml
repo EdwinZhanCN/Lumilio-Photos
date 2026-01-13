@@ -14,21 +14,8 @@ sql:
               emit_prepared_queries: false
               emit_pointers_for_null_types: true
               overrides:
-                  - column: "assets.embedding"
-                    go_type:
-                        import: "github.com/pgvector/pgvector-go"
-                        type: "Vector"
-                        pointer: true
                   - column: "SearchNearestAssets.distance"
                     go_type: "float64"
-                  - column: "GetAssetEmbedding.embedding"
-                    go_type:
-                        import: "github.com/pgvector/pgvector-go"
-                        type: "Vector"
-                  - db_type: "vector"
-                    go_type:
-                        import: "github.com/pgvector/pgvector-go"
-                        type: "Vector"
                   - column: "GetAssetWithThumbnails.thumbnails"
                     go_type: "json.RawMessage"
                   - column: "GetAssetWithTags.tags"

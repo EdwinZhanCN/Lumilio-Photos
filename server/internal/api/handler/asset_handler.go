@@ -685,7 +685,7 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 
 // GetAsset retrieves a single asset by ID
 // @Summary Get asset by ID
-// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, and species predictions.
+// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and AI descriptions.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -694,6 +694,9 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 // @Param include_tags query bool false "Include tags" default(true)
 // @Param include_albums query bool false "Include albums" default(true)
 // @Param include_species query bool false "Include species predictions" default(true)
+// @Param include_ocr query bool false "Include OCR results" default(false)
+// @Param include_faces query bool false "Include face recognition" default(false)
+// @Param include_ai_descriptions query bool false "Include AI descriptions" default(false)
 // @Success 200 {object} api.Result{data=AssetDTO} "Asset details with optional relationships"
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 404 {object} api.Result "Asset not found"
@@ -712,7 +715,22 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 	includeAlbums := c.DefaultQuery("include_albums", "true") == "true"
 	includeSpecies := c.DefaultQuery("include_species", "true") == "true"
 
-	asset, err := h.assetService.GetAssetWithOptions(c.Request.Context(), id, includeThumbnails, includeTags, includeAlbums, includeSpecies)
+	// New AI includes - default to false to avoid performance impact
+	includeOCR := c.DefaultQuery("include_ocr", "false") == "true"
+	includeFaces := c.DefaultQuery("include_faces", "false") == "true"
+	includeAIDescriptions := c.DefaultQuery("include_ai_descriptions", "false") == "true"
+
+	asset, err := h.assetService.GetAssetWithOptions(
+		c.Request.Context(),
+		id,
+		includeThumbnails,
+		includeTags,
+		includeAlbums,
+		includeSpecies,
+		includeOCR,
+		includeFaces,
+		includeAIDescriptions,
+	)
 	if err != nil {
 		api.GinNotFound(c, err, "Asset not found")
 		return
@@ -856,7 +874,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 	}
 
 	// First verify asset exists without loading full data
-	_, err = h.assetService.GetAssetWithOptions(c.Request.Context(), assetID, false, false, false, false)
+	_, err = h.assetService.GetAssetWithOptions(c.Request.Context(), assetID, false, false, false, false, false, false, false)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found"})
@@ -1818,7 +1836,7 @@ func (h *AssetHandler) cleanupOrphanedChunks() {
 		// Cleanup for specific repositories with active sessions
 		for _, repoID := range repositoryIDs {
 			// Use GetRepository instead of GetRepositoryByID
-		repo, err := h.repoManager.GetRepository(repoID)
+			repo, err := h.repoManager.GetRepository(repoID)
 			if err != nil {
 				log.Printf("❌ Failed to get repository with ID %s: %v", repoID, err)
 				errorCount++

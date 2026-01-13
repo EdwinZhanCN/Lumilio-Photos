@@ -266,7 +266,7 @@ func (arp *AssetRetryProcessor) retryPhotoTasks(
 	}
 
 	// Retry CLIP processing if needed and enabled
-	if shouldRetryCLIP && arp.appConfig.CLIPEnabled {
+	if shouldRetryCLIP && arp.appConfig.MLConfig.CLIPEnabled {
 		g.Go(func() error {
 			return arp.retryPhotoCLIP(ctx, asset, fileReader)
 		})

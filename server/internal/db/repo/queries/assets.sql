@@ -257,9 +257,12 @@ ORDER BY a.upload_time DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: SearchAssetsVector :many
-SELECT a.*, (a.embedding <-> sqlc.arg('embedding')::vector) AS distance FROM assets a
+SELECT a.*, (e.embedding <-> sqlc.arg('embedding')::vector) AS distance
+FROM assets a
+JOIN embeddings e ON a.asset_id = e.asset_id
 WHERE a.is_deleted = false
-  AND a.embedding IS NOT NULL
+  AND e.embedding_type = sqlc.arg('embedding_type')::text
+  AND e.is_primary = true
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
@@ -290,7 +293,8 @@ WHERE a.is_deleted = false
   AND (sqlc.narg('liked')::boolean IS NULL OR a.liked = sqlc.narg('liked'))
   AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
   AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
-ORDER BY (a.embedding <-> sqlc.arg('embedding')::vector)
+  AND (e.embedding <-> sqlc.arg('embedding')::vector) <= sqlc.narg('max_distance')::float8
+ORDER BY (e.embedding <-> sqlc.arg('embedding')::vector)
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: GetDistinctCameraMakes :many
