@@ -1,6 +1,8 @@
 package queue
 
 import (
+	"runtime"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -10,7 +12,10 @@ import (
 // New River Client, add your queue here.
 func New(dbpool *pgxpool.Pool, workers *river.Workers) (*river.Client[pgx.Tx], error) {
 	// Queue configurations based on workload characteristics:
-	// - process_asset: High throughput, needs more workers for file processing
+	// - ingest_asset: High throughput, staging validation + record creation
+	// - metadata_asset: EXIF/ffmpeg probing, moderate throughput
+	// - thumbnail_asset: CPU-bound thumbnail generation, scaled to available cores
+	// - transcode_asset: Serialized video/audio transcoding, single worker to avoid resource contention
 	// - process_clip: CPU-intensive ML processing, limited workers
 	// - process_ocr: Text extraction, moderate workers
 	// - process_caption: AI captioning, resource-intensive, limited workers
@@ -19,9 +24,17 @@ func New(dbpool *pgxpool.Pool, workers *river.Workers) (*river.Client[pgx.Tx], e
 	client, err := river.NewClient(riverpgxv5.New(dbpool), &river.Config{
 		Schema: "public",
 		Queues: map[string]river.QueueConfig{
-			// Asset processing queue - handles file uploads and basic processing
-			// High throughput, needs multiple workers for concurrent file handling
-			"process_asset": {MaxWorkers: 5},
+			// Ingest queue - staging validation and asset record creation
+			"ingest_asset": {MaxWorkers: 50},
+
+			// Metadata queue - EXIF/ffmpeg probing
+			"metadata_asset": {MaxWorkers: 20},
+
+			// Thumbnail queue - CPU-bound; match available cores
+			"thumbnail_asset": {MaxWorkers: runtime.NumCPU()},
+
+			// Transcode queue - serialized video/audio transcoding
+			"transcode_asset": {MaxWorkers: 1},
 
 			// CLIP embedding queue - generates image embeddings and classifications
 			// CPU-intensive ML processing, limit workers to prevent resource exhaustion
