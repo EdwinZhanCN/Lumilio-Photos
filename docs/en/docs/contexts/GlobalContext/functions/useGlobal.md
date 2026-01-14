@@ -4,7 +4,7 @@
 
 > **useGlobal**(): `GlobalContextType`
 
-Defined in: [contexts/GlobalContext.tsx:75](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/63d906ff8915a62b27825a8beb4fcfc311301987/web/src/contexts/GlobalContext.tsx#L75)
+Defined in: [contexts/GlobalContext.tsx:75](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/fc7235ea377566f4cc2f62016aec0acb0e31f77b/web/src/contexts/GlobalContext.tsx#L75)
 
 ## Returns
 
