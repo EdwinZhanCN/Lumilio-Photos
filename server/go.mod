@@ -22,7 +22,7 @@ require (
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
-	github.com/swaggo/swag/v2 v2.0.0-rc4
+	github.com/swaggo/swag/v2 v2.0.0-rc5
 	github.com/zeebo/blake3 v0.2.4
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.42.0
@@ -71,7 +71,7 @@ require (
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
-	github.com/sv-tools/openapi v0.2.1 // indirect
+	github.com/sv-tools/openapi v0.4.0 // indirect
 	github.com/swaggo/swag v1.16.6 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
