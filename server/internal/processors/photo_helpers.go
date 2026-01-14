@@ -107,7 +107,23 @@ func (ap *AssetProcessor) extractRAWPreview(ctx context.Context, fullPath string
 func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset, fullPath string) error {
 	mlConfig := ap.appConfig.MLConfig
 
-	// Early return if no ML services enabled
+	// Gate by Lumen task availability if Lumen is present
+	if ap.lumenService != nil {
+		if mlConfig.CLIPEnabled && !ap.lumenService.IsTaskAvailable("clip_image_embed") {
+			mlConfig.CLIPEnabled = false
+		}
+		if mlConfig.OCREnabled && !ap.lumenService.IsTaskAvailable("ocr") {
+			mlConfig.OCREnabled = false
+		}
+		if mlConfig.CaptionEnabled && !ap.lumenService.IsTaskAvailable("vlm_generate") {
+			mlConfig.CaptionEnabled = false
+		}
+		if mlConfig.FaceEnabled && !ap.lumenService.IsTaskAvailable("face_detect_and_embed") {
+			mlConfig.FaceEnabled = false
+		}
+	}
+
+	// Early return if no ML services enabled or available
 	if !mlConfig.CLIPEnabled && !mlConfig.OCREnabled && !mlConfig.CaptionEnabled && !mlConfig.FaceEnabled {
 		return nil
 	}
