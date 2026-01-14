@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
@@ -17,7 +18,7 @@ type ProcessOcrArgs = jobs.ProcessOcrArgs
 type ProcessOcrWorker struct {
 	river.WorkerDefaults[ProcessOcrArgs]
 
-	OCRService service.OCRService
+	OCRService   service.OCRService
 	LumenService service.LumenService
 }
 
@@ -29,6 +30,11 @@ func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrAr
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(assetID.String()); err != nil {
 		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	// If task temporarily unavailable, snooze
+	if !w.LumenService.IsTaskAvailable("ocr") {
+		return river.JobSnooze(30 * time.Second)
 	}
 
 	// Perform OCR using LumenService

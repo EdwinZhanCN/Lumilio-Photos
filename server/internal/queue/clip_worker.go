@@ -6,6 +6,7 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
@@ -32,6 +33,11 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 		return fmt.Errorf("invalid UUID: %w", err)
 	}
 
+	// If tasks are temporarily unavailable, snooze for a short period
+	if !w.LumenService.IsTaskAvailable("clip_image_embed") || !w.LumenService.IsTaskAvailable("bioclip_classify") {
+		return river.JobSnooze(30 * time.Second)
+	}
+
 	embedding, err := w.LumenService.ClipImageEmbed(ctx, args.ImageData)
 	if err != nil {
 		return fmt.Errorf("failed to generate CLIP embedding: %w", err)
@@ -49,7 +55,7 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 	}
 
 	// Save species predictions to ML metadata if available
-	if labels != nil && len(labels) > 0 {
+	if len(labels) > 0 {
 		predictions := make([]dbtypes.SpeciesPredictionMeta, len(labels))
 		for i, pred := range labels {
 			predictions[i] = dbtypes.SpeciesPredictionMeta{

@@ -31,6 +31,7 @@ type AssetProcessor struct {
 	stagingManager storage.StagingManager
 	queueClient    *river.Client[pgx.Tx]
 	appConfig      config.AppConfig
+	lumenService   service.LumenService
 }
 
 // NewAssetProcessor constructs the processor with required dependencies.
@@ -41,6 +42,7 @@ func NewAssetProcessor(
 	stagingManager storage.StagingManager,
 	queueClient *river.Client[pgx.Tx],
 	appConfig config.AppConfig,
+	lumenService service.LumenService,
 ) *AssetProcessor {
 	return &AssetProcessor{
 		assetService:   assetService,
@@ -49,5 +51,6 @@ func NewAssetProcessor(
 		stagingManager: stagingManager,
 		queueClient:    queueClient,
 		appConfig:      appConfig,
+		lumenService:   lumenService,
 	}
 }

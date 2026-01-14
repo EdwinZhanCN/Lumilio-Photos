@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/client"
@@ -22,6 +23,8 @@ type LumenService interface {
 	VLMCaptionWithPrompt(ctx context.Context, imageData []byte, prompt string) (string, error)
 	VLMCaptionWithMetadata(ctx context.Context, imageData []byte, prompt string) (*types.TextGenerationV1, error)
 	GetAvailableModels(ctx context.Context) ([]*client.NodeInfo, error)
+	WarmupTasks(ctx context.Context, tasks []string) map[string]bool
+	IsTaskAvailable(taskName string) bool
 	Start(ctx context.Context) error
 	Close() error
 }
@@ -29,6 +32,15 @@ type LumenService interface {
 type lumenService struct {
 	lumenClient *client.LumenClient
 	logger      *zap.Logger
+
+	mu         sync.RWMutex
+	availCache map[string]taskAvailability
+	cacheTTL   time.Duration
+}
+
+type taskAvailability struct {
+	available bool
+	checkedAt time.Time
 }
 
 func NewLumenService(cfg *config.Config, logger *zap.Logger) (LumenService, error) {
@@ -40,6 +52,8 @@ func NewLumenService(cfg *config.Config, logger *zap.Logger) (LumenService, erro
 	return &lumenService{
 		lumenClient: lumenClient,
 		logger:      logger,
+		availCache:  make(map[string]taskAvailability),
+		cacheTTL:    15 * time.Second,
 	}, nil
 }
 
@@ -273,4 +287,35 @@ func (s *lumenService) VLMCaptionWithMetadata(ctx context.Context, imageData []b
 func (s *lumenService) GetAvailableModels(ctx context.Context) ([]*client.NodeInfo, error) {
 	nodes := s.lumenClient.GetNodes()
 	return nodes, nil
+}
+
+func (s *lumenService) WarmupTasks(ctx context.Context, tasks []string) map[string]bool {
+	results := make(map[string]bool, len(tasks))
+	for _, task := range tasks {
+		results[task] = s.updateTaskAvailability(task)
+	}
+	return results
+}
+
+func (s *lumenService) IsTaskAvailable(taskName string) bool {
+	s.mu.RLock()
+	entry, ok := s.availCache[taskName]
+	ttl := s.cacheTTL
+	s.mu.RUnlock()
+
+	if ok && time.Since(entry.checkedAt) < ttl {
+		return entry.available
+	}
+	return s.updateTaskAvailability(taskName)
+}
+
+func (s *lumenService) updateTaskAvailability(taskName string) bool {
+	available := s.lumenClient.IsTaskAvailable(taskName)
+	s.mu.Lock()
+	s.availCache[taskName] = taskAvailability{
+		available: available,
+		checkedAt: time.Now(),
+	}
+	s.mu.Unlock()
+	return available
 }
