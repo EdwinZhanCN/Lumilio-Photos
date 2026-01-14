@@ -4,7 +4,6 @@ import api from "@/lib/http-commons/api.ts";
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import type { components, paths } from "@/lib/http-commons/schema.d.ts";
 import type { ApiResult } from "./uploadService";
-import type { Asset as ExtendedAsset } from "@/lib/http-commons/schema-extensions";
 
 // ============================================================================
 // Type Aliases from Generated Schema
@@ -14,82 +13,81 @@ type Schemas = components["schemas"];
 type Paths = paths;
 
 /**
- * Asset data transfer object with properly typed specific_metadata
- * This uses the extended type from schema-extensions.ts
+ * Asset data transfer object
  */
-export type Asset = ExtendedAsset;
+export type Asset = Schemas["dto.AssetDTO"];
 
 /**
  * Asset list response with pagination
  */
-export type AssetListResponse = Schemas["handler.AssetListResponse"];
+export type AssetListResponse = Schemas["dto.AssetListResponseDTO"];
 
 /**
  * Asset types response
  */
-export type AssetTypesResponse = Schemas["handler.AssetTypesResponse"];
+export type AssetTypesResponse = Schemas["dto.AssetTypesResponseDTO"];
 
 /**
  * Message response for operations
  */
-export type MessageResponse = Schemas["handler.MessageResponse"];
+export type MessageResponse = Schemas["dto.MessageResponseDTO"];
 
 /**
  * Asset filter criteria
  */
-export type AssetFilter = Schemas["handler.AssetFilter"];
+export type AssetFilter = Schemas["dto.AssetFilterDTO"];
 
 /**
  * Filename filter options
  */
-export type FilenameFilter = Schemas["handler.FilenameFilter"];
+export type FilenameFilter = Schemas["dto.FilenameFilterDTO"];
 
 /**
  * Date range filter
  */
-export type DateRange = Schemas["handler.DateRange"];
+export type DateRange = Schemas["dto.DateRangeDTO"];
 
 /**
  * Filter assets request
  */
-export type FilterAssetsRequest = Schemas["handler.FilterAssetsRequest"];
+export type FilterAssetsRequest = Schemas["dto.FilterAssetsRequestDTO"];
 
 /**
  * Search assets request
  */
-export type SearchAssetsRequest = Schemas["handler.SearchAssetsRequest"];
+export type SearchAssetsRequest = Schemas["dto.SearchAssetsRequestDTO"];
 
 /**
  * Filter options response (camera makes and lenses)
  */
-export type FilterOptionsResponse = Schemas["handler.OptionsResponse"];
+export type FilterOptionsResponse = Schemas["dto.OptionsResponseDTO"];
 
 /**
  * Update asset request
  */
-export type UpdateAssetRequest = Schemas["handler.UpdateAssetRequest"];
+export type UpdateAssetRequest = Schemas["dto.UpdateAssetRequestDTO"];
 
 /**
  * Update rating request
  */
-export type UpdateRatingRequest = Schemas["handler.UpdateRatingRequest"];
+export type UpdateRatingRequest = Schemas["dto.UpdateRatingRequestDTO"];
 
 /**
  * Update like request
  */
-export type UpdateLikeRequest = Schemas["handler.UpdateLikeRequest"];
+export type UpdateLikeRequest = Schemas["dto.UpdateLikeRequestDTO"];
 
 /**
  * Update rating and like request
  */
 export type UpdateRatingAndLikeRequest =
-  Schemas["handler.UpdateRatingAndLikeRequest"];
+  Schemas["dto.UpdateRatingAndLikeRequestDTO"];
 
 /**
  * Update description request
  */
 export type UpdateDescriptionRequest =
-  Schemas["handler.UpdateDescriptionRequest"];
+  Schemas["dto.UpdateDescriptionRequestDTO"];
 
 /**
  * List assets query parameters - extracted directly from paths

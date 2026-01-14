@@ -15,38 +15,38 @@ type Paths = paths;
 /**
  * Album response object
  */
-export type Album = Schemas["handler.GetAlbumResponse"];
+export type Album = Schemas["dto.GetAlbumResponseDTO"];
 
 /**
  * List albums response with pagination
  */
-export type ListAlbumsResponse = Schemas["handler.ListAlbumsResponse"];
+export type ListAlbumsResponse = Schemas["dto.ListAlbumsResponseDTO"];
 
 /**
  * Create album request
  */
-export type CreateAlbumRequest = Schemas["handler.CreateAlbumRequest"];
+export type CreateAlbumRequest = Schemas["dto.CreateAlbumRequestDTO"];
 
 /**
  * Update album request
  */
-export type UpdateAlbumRequest = Schemas["handler.UpdateAlbumRequest"];
+export type UpdateAlbumRequest = Schemas["dto.UpdateAlbumRequestDTO"];
 
 /**
  * Add asset to album request
  */
-export type AddAssetToAlbumRequest = Schemas["handler.AddAssetToAlbumRequest"];
+export type AddAssetToAlbumRequest = Schemas["dto.AddAssetToAlbumRequestDTO"];
 
 /**
  * Update asset position request
  */
 export type UpdateAssetPositionRequest =
-  Schemas["handler.UpdateAssetPositionRequest"];
+  Schemas["dto.UpdateAssetPositionRequestDTO"];
 
 /**
  * Message response
  */
-export type MessageResponse = Schemas["handler.MessageResponse"];
+export type MessageResponse = Schemas["dto.MessageResponseDTO"];
 
 /**
  * List albums query parameters - extracted directly from paths

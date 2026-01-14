@@ -2,6 +2,8 @@
  * Utility functions for media type detection and classification
  */
 
+import type { Asset } from "@/lib/http-commons";
+
 /**
  * Determines if an asset is a video based on MIME type or legacy type
  */

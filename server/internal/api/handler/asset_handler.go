@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"server/internal/api"
+	"server/internal/api/dto"
 	"server/internal/db/dbtypes"
 	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
@@ -33,255 +34,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
-
-type UploadAssetRequest struct {
-	RepositoryID string `form:"repository_id" binding:"omitempty,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
-}
-
-type BatchUploadRequest struct {
-	RepositoryID string `form:"repository_id" binding:"omitempty,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
-}
-
-// ReprocessAssetRequest represents the request structure for asset reprocessing
-type ReprocessAssetRequest struct {
-	Tasks          []string `json:"tasks" binding:"omitempty" example:"thumbnail_small,thumbnail_medium,transcode_1080p"`
-	ForceFullRetry bool     `json:"force_full_retry,omitempty" example:"false"`
-}
-
-// ReprocessAssetResponse represents the response structure for asset reprocessing
-type ReprocessAssetResponse struct {
-	AssetID     string   `json:"asset_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Status      string   `json:"status" example:"queued"`
-	Message     string   `json:"message" example:"Reprocessing job queued successfully"`
-	FailedTasks []string `json:"failed_tasks,omitempty" example:"thumbnail_small,transcode_1080p"`
-	RetryTasks  []string `json:"retry_tasks,omitempty" example:"thumbnail_small,transcode_1080p"`
-}
-
-// UploadResponse represents the response structure for file upload
-type UploadResponse struct {
-	TaskID      int64  `json:"task_id" example:"12345"`
-	Status      string `json:"status" example:"processing"`
-	FileName    string `json:"file_name" example:"photo.jpg"`
-	Size        int64  `json:"size" example:"1048576"`
-	ContentHash string `json:"content_hash" example:"abcd1234567890"`
-	Message     string `json:"message" example:"File received and queued for processing"`
-}
-
-// BatchUploadResponse represents the response structure for batch upload
-type BatchUploadResponse struct {
-	Results []BatchUploadResult `json:"results"`
-}
-
-type BatchUploadResult struct {
-	Success     bool    `json:"success"`             // Whether the file was successfully queued
-	FileName    string  `json:"file_name,omitempty"` // Original filename
-	ContentHash string  `json:"content_hash"`        // MLService-provided content hash
-	TaskID      *int64  `json:"task_id,omitempty"`   // Only present for successful uploads
-	Status      *string `json:"status,omitempty"`    // Only present for successful uploads
-	Size        *int64  `json:"size,omitempty"`      // Only present for successful uploads
-	Message     *string `json:"message,omitempty"`   // Status message
-	Error       *string `json:"error,omitempty"`     // Only present for failed uploads
-}
-
-// UploadConfigResponse represents the response structure for upload configuration
-type UploadConfigResponse struct {
-	ChunkSize     int64 `json:"chunk_size"`     // in bytes
-	MaxConcurrent int   `json:"max_concurrent"` // maximum concurrent uploads
-	MemoryBuffer  int64 `json:"memory_buffer"`  // safety buffer in bytes
-}
-
-// SessionProgress represents progress information for an upload session
-type SessionProgress struct {
-	SessionID    string    `json:"session_id"`
-	Filename     string    `json:"filename"`
-	Status       string    `json:"status"`   // pending, uploading, merging, completed, failed
-	Progress     float64   `json:"progress"` // 0-1
-	Received     int       `json:"received_chunks"`
-	Total        int       `json:"total_chunks"`
-	BytesDone    int64     `json:"bytes_done"`
-	BytesTotal   int64     `json:"bytes_total"`
-	LastActivity time.Time `json:"last_activity"`
-}
-
-// ProgressSummary represents summary information for all upload sessions
-type ProgressSummary struct {
-	TotalSessions   int     `json:"total_sessions"`
-	ActiveSessions  int     `json:"active_sessions"`
-	CompletedFiles  int     `json:"completed_files"`
-	FailedSessions  int     `json:"failed_sessions"`
-	OverallProgress float64 `json:"overall_progress"`
-}
-
-// UploadProgressResponse represents the response structure for upload progress
-type UploadProgressResponse struct {
-	Sessions []SessionProgress `json:"sessions"`
-	Summary  ProgressSummary   `json:"summary"`
-}
-
-// AssetListResponse represents the response structure for asset listing
-type AssetListResponse struct {
-	Assets []AssetDTO `json:"assets"`
-	Limit  int        `json:"limit" example:"20"`
-	Offset int        `json:"offset" example:"0"`
-}
-
-// AssetDTO represents a simplified asset payload for APIs and docs
-type AssetDTO struct {
-	AssetID          string                   `json:"asset_id"`
-	OwnerID          *int32                   `json:"owner_id"`
-	RepositoryID     *string                  `json:"repository_id,omitempty"`
-	Type             string                   `json:"type"`
-	OriginalFilename string                   `json:"original_filename"`
-	StoragePath      string                   `json:"storage_path"`
-	MimeType         string                   `json:"mime_type"`
-	FileSize         int64                    `json:"file_size"`
-	Hash             *string                  `json:"hash"`
-	Width            *int32                   `json:"width"`
-	Height           *int32                   `json:"height"`
-	Duration         *float64                 `json:"duration"`
-	UploadTime       time.Time                `json:"upload_time"`
-	TakenTime        *time.Time               `json:"taken_time,omitempty"`
-	Rating           *int32                   `json:"rating,omitempty"`
-	Liked            *bool                    `json:"liked,omitempty"`
-	IsDeleted        *bool                    `json:"is_deleted"`
-	DeletedAt        *time.Time               `json:"deleted_at,omitempty"`
-	Metadata         dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object"`
-	Status           []byte                   `json:"status"`
-}
-
-// toAssetDTO maps repo.Asset to AssetDTO
-func toAssetDTO(a repo.Asset) AssetDTO {
-	var id string
-	if a.AssetID.Valid {
-		id = uuid.UUID(a.AssetID.Bytes).String()
-	}
-	var uploadTime time.Time
-	if a.UploadTime.Valid {
-		uploadTime = a.UploadTime.Time
-	}
-	var deletedAt *time.Time
-	if a.DeletedAt.Valid {
-		t := a.DeletedAt.Time
-		deletedAt = &t
-	}
-	var repositoryID *string
-	if a.RepositoryID.Valid {
-		repoUUID := uuid.UUID(a.RepositoryID.Bytes).String()
-		repositoryID = &repoUUID
-	}
-	var takenTime *time.Time
-	if a.TakenTime.Valid {
-		t := a.TakenTime.Time
-		takenTime = &t
-	}
-	return AssetDTO{
-		AssetID:          id,
-		OwnerID:          a.OwnerID,
-		RepositoryID:     repositoryID,
-		Type:             a.Type,
-		OriginalFilename: a.OriginalFilename,
-		StoragePath:      *a.StoragePath,
-		MimeType:         a.MimeType,
-		FileSize:         a.FileSize,
-		Hash:             a.Hash,
-		Width:            a.Width,
-		Height:           a.Height,
-		Duration:         a.Duration,
-		UploadTime:       uploadTime,
-		TakenTime:        takenTime,
-		Rating:           a.Rating,
-		Liked:            a.Liked,
-		IsDeleted:        a.IsDeleted,
-		DeletedAt:        deletedAt,
-		Metadata:         a.SpecificMetadata,
-		Status:           a.Status,
-	}
-}
-
-// UpdateAssetRequest represents the request structure for updating asset metadata
-type UpdateAssetRequest struct {
-	Metadata dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object"`
-}
-
-// UpdateRatingRequest represents the request structure for updating asset rating
-type UpdateRatingRequest struct {
-	Rating int `json:"rating" example:"5" validate:"min=0,max=5"`
-}
-
-// UpdateLikeRequest represents the request structure for updating asset like status
-type UpdateLikeRequest struct {
-	Liked bool `json:"liked" example:"true"`
-}
-
-// UpdateRatingAndLikeRequest represents the request structure for updating both rating and like status
-type UpdateRatingAndLikeRequest struct {
-	Rating int  `json:"rating" example:"5" validate:"min=0,max=5"`
-	Liked  bool `json:"liked" example:"true"`
-}
-
-// UpdateDescriptionRequest represents the request structure for updating asset description
-type UpdateDescriptionRequest struct {
-	Description string `json:"description" example:"A beautiful sunset photo"`
-}
-
-// MessageResponse represents a simple message response
-type MessageResponse struct {
-	Message string `json:"message" example:"Operation completed successfully"`
-}
-
-// AssetTypesResponse represents the response structure for asset types
-type AssetTypesResponse struct {
-	Types []dbtypes.AssetType `json:"types"`
-}
-
-// FilenameFilter represents filename filtering options
-type FilenameFilter struct {
-	Value string `json:"value" example:"IMG_"`
-	Mode  string `json:"mode" example:"startswith" enums:"contains,matches,startswith,endswith"`
-}
-
-// DateRange represents a date range filter
-type DateRange struct {
-	From *time.Time `json:"from,omitempty"`
-	To   *time.Time `json:"to,omitempty"`
-}
-
-// AssetFilter represents comprehensive filtering options
-type AssetFilter struct {
-	RepositoryID *string         `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Type         *string         `json:"type,omitempty" example:"PHOTO" enums:"PHOTO,VIDEO,AUDIO"`
-	OwnerID      *int32          `json:"owner_id,omitempty" example:"123"`
-	RAW          *bool           `json:"raw,omitempty" example:"true"`
-	Rating       *int            `json:"rating,omitempty" example:"5" minimum:"0" maximum:"5"`
-	Liked        *bool           `json:"liked,omitempty" example:"true"`
-	Filename     *FilenameFilter `json:"filename,omitempty"`
-	Date         *DateRange      `json:"date,omitempty"`
-	CameraMake   *string         `json:"camera_make,omitempty" example:"Canon"`
-	Lens         *string         `json:"lens,omitempty" example:"EF 50mm f/1.8"`
-}
-
-// FilterAssetsRequest represents the request structure for filtering assets
-type FilterAssetsRequest struct {
-	Filter AssetFilter `json:"filter"`
-	Limit  int         `json:"limit" example:"20" minimum:"1" maximum:"100"`
-	Offset int         `json:"offset" example:"0" minimum:"0"`
-}
-
-// SearchAssetsRequest represents the request structure for searching assets
-type SearchAssetsRequest struct {
-	Query      string `json:"query" binding:"required" example:"red bird on branch"`
-	SearchType string `json:"search_type" binding:"required" example:"filename" enums:"filename,semantic"`
-
-	Filter AssetFilter `json:"filter,omitempty"`
-	Limit  int         `json:"limit" example:"20" minimum:"1" maximum:"100"`
-	Offset int         `json:"offset" example:"0" minimum:"0"`
-}
-
-// OptionsResponse represents the response for filter options
-type OptionsResponse struct {
-	CameraMakes []string `json:"camera_makes"`
-	Lenses      []string `json:"lenses"`
-}
 
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
@@ -333,14 +85,14 @@ func NewAssetHandler(
 // @Param file formData file true "Asset file to upload"
 // @Param repository_id formData string false "Repository UUID (uses default repository if not provided)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param X-Content-Hash header string false "Client-calculated BLAKE3 hash of the file"
-// @Success 200 {object} api.Result{data=UploadResponse} "Upload successful"
+// @Success 200 {object} api.Result{data=dto.UploadResponseDTO} "Upload successful"
 // @Failure 400 {object} api.Result "Bad request - no file provided or parse error"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets [post]
 func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	var req UploadAssetRequest
+	var req dto.UploadAssetRequestDTO
 	if err := c.ShouldBind(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request")
 		return
@@ -474,7 +226,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	jobId := jobInsetResult.Job.ID
 	log.Printf("Task %d enqueued for processing file %s in repository %s", jobId, header.Filename, repository.Name)
 
-	response := UploadResponse{
+	response := dto.UploadResponseDTO{
 		TaskID:      jobId,
 		Status:      "processing",
 		FileName:    header.Filename,
@@ -494,14 +246,14 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 // @Param repository_id formData string false "Repository UUID (uses default repository if not provided)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param file formData file false "Single file upload - use format: single_{session_id}" example("single_123e4567-e89b-12d3-a456-426614174000")
 // @Param file formData file false "Chunked file upload - use format: chunk_{session_id}_{index}_{total}" example("chunk_123e4567-e89b-12d3-a456-426614174000_1_10")
-// @Success 200 {object} api.Result{data=BatchUploadResponse} "Batch upload completed"
+// @Success 200 {object} api.Result{data=dto.BatchUploadResponseDTO} "Batch upload completed"
 // @Failure 400 {object} api.Result "Bad request - no files provided or parse error"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/batch [post]
 func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	var req BatchUploadRequest
+	var req dto.BatchUploadRequestDTO
 	if err := c.ShouldBind(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request")
 		return
@@ -549,7 +301,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 
 	// Group files by session
 	sessionGroups := h.groupFilesBySession(form.File)
-	var results []BatchUploadResult
+	var results []dto.BatchUploadResultDTO
 
 	// Process each session
 	for sessionID, files := range sessionGroups {
@@ -557,7 +309,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		if err != nil {
 			// Handle session-level errors
 			errMsg := err.Error()
-			results = append(results, BatchUploadResult{
+			results = append(results, dto.BatchUploadResultDTO{
 				Success:  false,
 				FileName: sessionID,
 				Error:    &errMsg,
@@ -572,7 +324,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		go h.cleanupExpiredSessions()
 	}
 
-	api.GinSuccess(c, BatchUploadResponse{Results: results})
+	api.GinSuccess(c, dto.BatchUploadResponseDTO{Results: results})
 }
 
 // GetUploadConfig returns current upload configuration
@@ -581,7 +333,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.Result{data=UploadConfigResponse} "Upload configuration retrieved"
+// @Success 200 {object} api.Result{data=dto.UploadConfigResponseDTO} "Upload configuration"
 // @Router /assets/batch/config [get]
 func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
 	config, err := h.memoryMonitor.GetOptimalChunkConfig()
@@ -595,7 +347,7 @@ func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
 		}
 	}
 
-	response := UploadConfigResponse{
+	response := dto.UploadConfigResponseDTO{
 		ChunkSize:     config.ChunkSize,
 		MaxConcurrent: config.MaxConcurrent,
 		MemoryBuffer:  config.MemoryBuffer,
@@ -611,7 +363,7 @@ func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param session_ids query string false "Comma-separated session IDs (optional)"
-// @Success 200 {object} api.Result{data=UploadProgressResponse} "Upload progress details"
+// @Success 200 {object} api.Result{data=dto.UploadProgressResponseDTO} "Upload progress details"
 // @Router /assets/batch/progress [get]
 func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 	sessionIDsParam := c.Query("session_ids")
@@ -634,14 +386,14 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 		targetSessions = h.sessionManager.GetSessionsByUser(userID)
 	}
 
-	var sessionsProgress []SessionProgress
 	var totalBytesDone, totalBytesTotal int64
 	var completedFiles int
 
-	for _, session := range targetSessions {
+	sessionsProgress := make([]dto.SessionProgressDTO, len(targetSessions))
+	for i, session := range targetSessions {
 		progress, _ := h.sessionManager.GetSessionProgress(session.SessionID)
 
-		sessionProgress := SessionProgress{
+		sessionsProgress[i] = dto.SessionProgressDTO{
 			SessionID:    session.SessionID,
 			Filename:     session.Filename,
 			Status:       session.Status,
@@ -653,7 +405,6 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 			LastActivity: session.LastActivity,
 		}
 
-		sessionsProgress = append(sessionsProgress, sessionProgress)
 		totalBytesDone += session.BytesReceived
 		totalBytesTotal += session.TotalSize
 
@@ -667,7 +418,7 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 		overallProgress = float64(totalBytesDone) / float64(totalBytesTotal)
 	}
 
-	summary := ProgressSummary{
+	summary := dto.ProgressSummaryDTO{
 		TotalSessions:   len(targetSessions),
 		ActiveSessions:  h.sessionManager.GetActiveSessionCount(),
 		CompletedFiles:  completedFiles,
@@ -675,7 +426,7 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 		OverallProgress: overallProgress,
 	}
 
-	response := UploadProgressResponse{
+	response := dto.UploadProgressResponseDTO{
 		Sessions: sessionsProgress,
 		Summary:  summary,
 	}
@@ -697,7 +448,7 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 // @Param include_ocr query bool false "Include OCR results" default(false)
 // @Param include_faces query bool false "Include face recognition" default(false)
 // @Param include_ai_descriptions query bool false "Include AI descriptions" default(false)
-// @Success 200 {object} api.Result{data=AssetDTO} "Asset details with optional relationships"
+// @Success 200 {object} api.Result{data=dto.AssetDTO} "Asset details with optional relationships"
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 404 {object} api.Result "Asset not found"
 // @Router /assets/{id} [get]
@@ -751,7 +502,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 // @Param limit query int false "Maximum number of results (max 100)" default(20) example(20)
 // @Param offset query int false "Number of results to skip for pagination" default(0) example(0)
 // @Param sort_order query string false "Sort order by taken_time" Enums(asc,desc) default("desc") example("desc")
-// @Success 200 {object} api.Result{data=AssetListResponse} "Assets retrieved successfully"
+// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid parameters"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets [get]
@@ -831,11 +582,11 @@ func (h *AssetHandler) ListAssets(c *gin.Context) {
 		return
 	}
 
-	dtos := make([]AssetDTO, len(assets))
+	dtos := make([]dto.AssetDTO, len(assets))
 	for i, a := range assets {
-		dtos[i] = toAssetDTO(a)
+		dtos[i] = dto.ToAssetDTO(a)
 	}
-	response := AssetListResponse{
+	response := dto.AssetListResponseDTO{
 		Assets: dtos,
 		Limit:  limit,
 		Offset: offset,
@@ -1172,8 +923,8 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Param metadata body UpdateAssetRequest true "Updated metadata"
-// @Success 200 {object} api.Result{data=MessageResponse} "Asset updated successfully"
+// @Param request body dto.UpdateAssetRequestDTO true "Asset metadata"
+// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Asset updated successfully"
 // @Failure 400 {object} api.Result "Invalid asset ID or request body"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/{id} [put]
@@ -1185,7 +936,7 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 		return
 	}
 
-	var updateData UpdateAssetRequest
+	var updateData dto.UpdateAssetRequestDTO
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		api.GinBadRequest(c, err, "Invalid request body")
 		return
@@ -1198,7 +949,7 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, MessageResponse{Message: "Asset updated successfully"})
+	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Asset updated successfully"})
 }
 
 // DeleteAsset deletes an asset
@@ -1208,7 +959,7 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
-// @Success 200 {object} api.Result{data=MessageResponse} "Asset deleted successfully"
+// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Asset deleted successfully"
 // @Failure 400 {object} api.Result "Invalid asset ID format"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/{id} [delete]
@@ -1227,7 +978,7 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, MessageResponse{Message: "Asset deleted successfully"})
+	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Asset deleted successfully"})
 }
 
 // AddAssetToAlbum adds an asset to an album
@@ -1238,7 +989,7 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 // @Produce json
 // @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
 // @Param albumId path int true "Album ID" example(123)
-// @Success 200 {object} api.Result{data=MessageResponse} "Asset added to album successfully"
+// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Asset added to album successfully"
 // @Failure 400 {object} api.Result "Invalid asset ID or album ID"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/{id}/albums/{albumId} [post]
@@ -1262,7 +1013,7 @@ func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, MessageResponse{Message: "Asset added to album successfully"})
+	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Asset added to album successfully"})
 }
 
 // GetAssetTypes returns available asset types
@@ -1271,7 +1022,7 @@ func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.Result{data=AssetTypesResponse} "Asset types retrieved successfully"
+// @Success 200 {object} api.Result{data=dto.AssetTypesResponseDTO} "Asset types retrieved successfully"
 // @Router /assets/types [get]
 func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 	types := []dbtypes.AssetType{
@@ -1280,7 +1031,7 @@ func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 		dbtypes.AssetTypeAudio,
 	}
 
-	api.GinSuccess(c, AssetTypesResponse{Types: types})
+	api.GinSuccess(c, dto.AssetTypesResponseDTO{Types: types})
 }
 
 // FilterAssets handles asset filtering with complex filters
@@ -1289,13 +1040,13 @@ func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Param request body FilterAssetsRequest true "Filter criteria"
-// @Success 200 {object} api.Result{data=AssetListResponse} "Assets filtered successfully"
+// @Param request body dto.FilterAssetsRequestDTO true "Filter criteria"
+// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets filtered successfully"
 // @Failure 400 {object} api.Result "Invalid request parameters"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/filter [post]
 func (h *AssetHandler) FilterAssets(c *gin.Context) {
-	var req FilterAssetsRequest
+	var req dto.FilterAssetsRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
@@ -1341,12 +1092,12 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 		return
 	}
 
-	dtos := make([]AssetDTO, len(assets))
+	dtos := make([]dto.AssetDTO, len(assets))
 	for i, a := range assets {
-		dtos[i] = toAssetDTO(a)
+		dtos[i] = dto.ToAssetDTO(a)
 	}
 
-	response := AssetListResponse{
+	response := dto.AssetListResponseDTO{
 		Assets: dtos,
 		Limit:  req.Limit,
 		Offset: req.Offset,
@@ -1360,13 +1111,13 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Param request body SearchAssetsRequest true "Search criteria"
-// @Success 200 {object} api.Result{data=AssetListResponse} "Assets found successfully"
+// @Param request body dto.SearchAssetsRequestDTO true "Search criteria"
+// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets found successfully"
 // @Failure 400 {object} api.Result "Invalid request parameters"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/search [post]
 func (h *AssetHandler) SearchAssets(c *gin.Context) {
-	var req SearchAssetsRequest
+	var req dto.SearchAssetsRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
@@ -1428,12 +1179,12 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		return
 	}
 
-	dtos := make([]AssetDTO, len(assets))
+	dtos := make([]dto.AssetDTO, len(assets))
 	for i, a := range assets {
-		dtos[i] = toAssetDTO(a)
+		dtos[i] = dto.ToAssetDTO(a)
 	}
 
-	response := AssetListResponse{
+	response := dto.AssetListResponseDTO{
 		Assets: dtos,
 		Limit:  req.Limit,
 		Offset: req.Offset,
@@ -1447,7 +1198,7 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Success 200 {object} api.Result{data=OptionsResponse} "Filter options retrieved successfully"
+// @Success 200 {object} api.Result{data=dto.OptionsResponseDTO} "Filter options retrieved successfully"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/filter-options [get]
 func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
@@ -1467,7 +1218,7 @@ func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 		return
 	}
 
-	response := OptionsResponse{
+	response := dto.OptionsResponseDTO{
 		CameraMakes: cameraMakes,
 		Lenses:      lenses,
 	}
@@ -1483,8 +1234,8 @@ func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID"
-// @Param rating body UpdateRatingRequest true "Rating data"
-// @Success 200 {object} api.Result{data=MessageResponse} "Rating updated successfully"
+// @Param rating body dto.UpdateRatingRequestDTO true "Rating data"
+// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Rating updated successfully"
 // @Failure 400 {object} api.Result "Bad request"
 // @Failure 404 {object} api.Result "Asset not found"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -1497,7 +1248,7 @@ func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 		return
 	}
 
-	var req UpdateRatingRequest
+	var req dto.UpdateRatingRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request body")
 		return
@@ -1515,7 +1266,7 @@ func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, MessageResponse{Message: "Rating updated successfully"})
+	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Rating updated successfully"})
 }
 
 // UpdateAssetLike updates the like status of an asset
@@ -1525,8 +1276,8 @@ func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID"
-// @Param like body UpdateLikeRequest true "Like data"
-// @Success 200 {object} api.Result{data=MessageResponse} "Like status updated successfully"
+// @Param like body dto.UpdateLikeRequestDTO true "Like data"
+// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Like status updated successfully"
 // @Failure 400 {object} api.Result "Bad request"
 // @Failure 404 {object} api.Result "Asset not found"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -1539,7 +1290,7 @@ func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 		return
 	}
 
-	var req UpdateLikeRequest
+	var req dto.UpdateLikeRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request body")
 		return
@@ -1552,7 +1303,7 @@ func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, MessageResponse{Message: "Like status updated successfully"})
+	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Like status updated successfully"})
 }
 
 // UpdateAssetRatingAndLike updates both rating and like status of an asset
@@ -1562,8 +1313,8 @@ func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID"
-// @Param data body UpdateRatingAndLikeRequest true "Rating and like data"
-// @Success 200 {object} api.Result{data=MessageResponse} "Rating and like status updated successfully"
+// @Param data body dto.UpdateRatingAndLikeRequestDTO true "Rating and like data"
+// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Rating and like status updated successfully"
 // @Failure 400 {object} api.Result "Bad request"
 // @Failure 404 {object} api.Result "Asset not found"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -1576,7 +1327,7 @@ func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
 		return
 	}
 
-	var req UpdateRatingAndLikeRequest
+	var req dto.UpdateRatingAndLikeRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request body")
 		return
@@ -1594,18 +1345,18 @@ func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, MessageResponse{Message: "Rating and like status updated successfully"})
+	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Rating and like status updated successfully"})
 }
 
 // UpdateAssetDescription updates the description of an asset
 // @Summary Update asset description
-// @Description Update the description/comment of a specific asset
+// @Description Update the description metadata of an asset
 // @Tags assets
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID"
-// @Param description body UpdateDescriptionRequest true "Description data"
-// @Success 200 {object} api.Result{data=MessageResponse} "Description updated successfully"
+// @Param description body dto.UpdateDescriptionRequestDTO true "Description data"
+// @Success 200 {object} api.Result{data=dto.MessageResponseDTO} "Description updated successfully"
 // @Failure 400 {object} api.Result "Bad request"
 // @Failure 404 {object} api.Result "Asset not found"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -1618,7 +1369,7 @@ func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 		return
 	}
 
-	var req UpdateDescriptionRequest
+	var req dto.UpdateDescriptionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request body")
 		return
@@ -1631,7 +1382,7 @@ func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, MessageResponse{Message: "Description updated successfully"})
+	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Description updated successfully"})
 }
 
 // GetAssetsByRating gets assets filtered by rating
@@ -1643,7 +1394,7 @@ func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 // @Param rating path int true "Rating (0-5)"
 // @Param limit query int false "Number of assets to return" default(20)
 // @Param offset query int false "Number of assets to skip" default(0)
-// @Success 200 {object} api.Result{data=AssetListResponse} "Assets retrieved successfully"
+// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets retrieved successfully"
 // @Failure 400 {object} api.Result "Bad request"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/rating/{rating} [get]
@@ -1682,12 +1433,12 @@ func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
 		return
 	}
 
-	assetDTOs := make([]AssetDTO, len(assets))
+	assetDTOs := make([]dto.AssetDTO, len(assets))
 	for i, asset := range assets {
-		assetDTOs[i] = toAssetDTO(asset)
+		assetDTOs[i] = dto.ToAssetDTO(asset)
 	}
 
-	response := AssetListResponse{
+	response := dto.AssetListResponseDTO{
 		Assets: assetDTOs,
 		Limit:  limit,
 		Offset: offset,
@@ -1704,7 +1455,7 @@ func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
 // @Produce json
 // @Param limit query int false "Number of assets to return" default(20)
 // @Param offset query int false "Number of assets to skip" default(0)
-// @Success 200 {object} api.Result{data=AssetListResponse} "Liked assets retrieved successfully"
+// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Liked assets retrieved successfully"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/liked [get]
 func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
@@ -1731,12 +1482,12 @@ func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
 		return
 	}
 
-	assetDTOs := make([]AssetDTO, len(assets))
+	assetDTOs := make([]dto.AssetDTO, len(assets))
 	for i, asset := range assets {
-		assetDTOs[i] = toAssetDTO(asset)
+		assetDTOs[i] = dto.ToAssetDTO(asset)
 	}
 
-	response := AssetListResponse{
+	response := dto.AssetListResponseDTO{
 		Assets: assetDTOs,
 		Limit:  limit,
 		Offset: offset,
@@ -1891,7 +1642,7 @@ func (h *AssetHandler) groupFilesBySession(formFiles map[string][]*multipart.Fil
 }
 
 // processUploadSession processes a complete upload session (single file or chunks)
-func (h *AssetHandler) processUploadSession(ctx context.Context, sessionID string, files map[string]*multipart.FileHeader, repository repo.Repository, userID string) (*BatchUploadResult, error) {
+func (h *AssetHandler) processUploadSession(ctx context.Context, sessionID string, files map[string]*multipart.FileHeader, repository repo.Repository, userID string) (*dto.BatchUploadResultDTO, error) {
 	// Get first file to determine session type
 	var firstFileInfo *upload.FileFieldInfo
 	for fieldName := range files {
@@ -1927,25 +1678,21 @@ func (h *AssetHandler) processUploadSession(ctx context.Context, sessionID strin
 	// Process based on session type
 	if firstFileInfo.Type == "single" {
 		log.Printf("processUploadSession: processing as single file session")
-		return h.processSingleFileSession(ctx, sessionID, files, repository, userID)
+		// Get the single file header
+		var header *multipart.FileHeader
+		for _, h := range files {
+			header = h
+			break
+		}
+		return h.processSingleFileSession(ctx, header, repository, userID)
 	} else {
 		log.Printf("processUploadSession: processing as chunked file session with %d total chunks", firstFileInfo.TotalChunks)
 		return h.processChunkedFileSession(ctx, sessionID, files, firstFileInfo.TotalChunks, repository, userID)
 	}
 }
 
-// processSingleFileSession processes a single file upload session
-func (h *AssetHandler) processSingleFileSession(ctx context.Context, sessionID string, files map[string]*multipart.FileHeader, repository repo.Repository, userID string) (*BatchUploadResult, error) {
-	if len(files) != 1 {
-		return nil, fmt.Errorf("single file session should have exactly 1 file, got %d", len(files))
-	}
-
-	var header *multipart.FileHeader
-	for _, h := range files {
-		header = h
-		break
-	}
-
+// processSingleFileSession processes a single file upload
+func (h *AssetHandler) processSingleFileSession(ctx context.Context, header *multipart.FileHeader, repository repo.Repository, userID string) (*dto.BatchUploadResultDTO, error) {
 	// Validate file type
 	contentType := header.Header.Get("Content-Type")
 	validationResult := filevalidator.ValidateFile(header.Filename, contentType)
@@ -1955,14 +1702,14 @@ func (h *AssetHandler) processSingleFileSession(ctx context.Context, sessionID s
 
 	// Create session for tracking
 	session := h.sessionManager.CreateSession("", header.Filename, header.Size, 1, contentType, repository.Path, userID)
-	h.sessionManager.UpdateSessionStatus(sessionID, "uploading")
+	h.sessionManager.UpdateSessionStatus(session.SessionID, "uploading")
 
 	// Process the single file
 	return h.processCompletedUpload(ctx, header, session, repository, "")
 }
 
 // processChunkedFileSession processes a chunked file upload session
-func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID string, files map[string]*multipart.FileHeader, totalChunks int, repository repo.Repository, userID string) (*BatchUploadResult, error) {
+func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID string, files map[string]*multipart.FileHeader, totalChunks int, repository repo.Repository, userID string) (*dto.BatchUploadResultDTO, error) {
 	// Get filename from first chunk
 	var filename string
 	for _, header := range files {
@@ -2071,7 +1818,7 @@ func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID 
 		message := fmt.Sprintf("Upload in progress: %.1f%% complete", progress*100)
 		log.Printf("processChunkedFileSession: returning progress: %s", message)
 
-		result := &BatchUploadResult{
+		result := &dto.BatchUploadResultDTO{
 			Success:  true,
 			FileName: filename,
 			Status:   &status,
@@ -2124,7 +1871,7 @@ func (h *AssetHandler) processChunkedFileSession(ctx context.Context, sessionID 
 }
 
 // processCompletedUpload processes a completed upload (single file or merged chunks)
-func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multipart.FileHeader, session *upload.UploadSession, repository repo.Repository, mergedFilePath string) (*BatchUploadResult, error) {
+func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multipart.FileHeader, session *upload.UploadSession, repository repo.Repository, mergedFilePath string) (*dto.BatchUploadResultDTO, error) {
 	var stagingFilePath string
 	log.Printf("processCompletedUpload: mergedFilePath=%s, filename=%s", mergedFilePath, header.Filename)
 
@@ -2199,7 +1946,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 		} else {
 			os.Remove(stagingFilePath)
 		}
-		return &BatchUploadResult{
+		return &dto.BatchUploadResultDTO{
 			Success:     false,
 			FileName:    header.Filename,
 			ContentHash: finalHash,
@@ -2245,7 +1992,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 
 	log.Printf("Task %d enqueued for processing file %s in repository %s (staged path: %s)", taskID, header.Filename, repository.Name, stagingFilePath)
 
-	return &BatchUploadResult{
+	return &dto.BatchUploadResultDTO{
 		Success:     true,
 		FileName:    header.Filename,
 		ContentHash: finalHash,
@@ -2295,8 +2042,8 @@ func (h *AssetHandler) checkHashCollisionBeforeEnqueue(ctx context.Context, hash
 // @Accept json
 // @Produce json
 // @Param id path string true "Asset ID"
-// @Param request body ReprocessAssetRequest false "Reprocessing tasks (optional)"
-// @Success 200 {object} ReprocessAssetResponse
+// @Param request body dto.ReprocessAssetRequestDTO false "Reprocessing tasks (optional)"
+// @Success 200 {object} dto.ReprocessAssetResponseDTO
 // @Failure 400 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Failure 500 {object} map[string]string
@@ -2313,10 +2060,10 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	}
 
 	// Parse request body
-	var req ReprocessAssetRequest
+	var req dto.ReprocessAssetRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
 		// Allow empty body
-		req = ReprocessAssetRequest{}
+		req = dto.ReprocessAssetRequestDTO{}
 	}
 
 	// Validate requested tasks
@@ -2474,7 +2221,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		log.Printf("Full reprocessing jobs enqueued for asset %s", assetID.String())
 
 		// Return success response
-		response := ReprocessAssetResponse{
+		response := dto.ReprocessAssetResponseDTO{
 			AssetID:    assetID.String(),
 			Status:     "queued",
 			Message:    "Full reprocessing job queued successfully",
@@ -2504,7 +2251,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		log.Printf("Selective retry job %d enqueued for asset %s, tasks: %v", jobResult.Job.ID, assetID.String(), req.Tasks)
 
 		// Return success response
-		response := ReprocessAssetResponse{
+		response := dto.ReprocessAssetResponseDTO{
 			AssetID:    assetID.String(),
 			Status:     "queued",
 			Message:    "Selective retry job queued successfully",

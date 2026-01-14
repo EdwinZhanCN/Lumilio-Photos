@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { 
-  usePerformancePreferences, 
-  PerformanceProfile, 
-  PerformancePreferences 
+import { useState, useEffect } from "react";
+import {
+  usePerformancePreferences,
+  PerformanceProfile,
+  PerformancePreferences,
 } from "@/utils/performancePreferences";
 import { detectDeviceCapabilities } from "@/utils/smartBatchSizing";
 
 export default function PerformanceSettings() {
-  const { preferences, updatePreferences, resetToDefaults } = usePerformancePreferences();
-  const [localPreferences, setLocalPreferences] = useState<PerformancePreferences>(preferences);
-  const [deviceInfo, setDeviceInfo] = useState(detectDeviceCapabilities());
+  const { preferences, updatePreferences, resetToDefaults } =
+    usePerformancePreferences();
+  const [localPreferences, setLocalPreferences] =
+    useState<PerformancePreferences>(preferences);
+  const deviceInfo = detectDeviceCapabilities();
 
   useEffect(() => {
     setLocalPreferences(preferences);
@@ -21,13 +23,19 @@ export default function PerformanceSettings() {
     updatePreferences(updated);
   };
 
-  const handleToggleChange = (key: keyof PerformancePreferences, value: boolean) => {
+  const handleToggleChange = (
+    key: keyof PerformancePreferences,
+    value: boolean,
+  ) => {
     const updated = { ...localPreferences, [key]: value };
     setLocalPreferences(updated);
     updatePreferences(updated);
   };
 
-  const handleNumberChange = (key: keyof PerformancePreferences, value: number) => {
+  const handleNumberChange = (
+    key: keyof PerformancePreferences,
+    value: number,
+  ) => {
     const updated = { ...localPreferences, [key]: value };
     setLocalPreferences(updated);
     updatePreferences(updated);
@@ -42,8 +50,8 @@ export default function PerformanceSettings() {
       <div>
         <h1 className="text-2xl font-bold mb-2">Performance Settings</h1>
         <p className="text-base-content/70">
-          Configure how Lumilio processes images to balance memory usage and speed
-          based on your device capabilities and preferences.
+          Configure how Lumilio processes images to balance memory usage and
+          speed based on your device capabilities and preferences.
         </p>
       </div>
 
@@ -53,18 +61,21 @@ export default function PerformanceSettings() {
           <h2 className="card-title text-lg">Device Information</h2>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="font-medium">CPU Cores:</span> {deviceInfo.cpuCores}
+              <span className="font-medium">CPU Cores:</span>{" "}
+              {deviceInfo.cpuCores}
             </div>
             <div>
-              <span className="font-medium">Available Memory:</span> ~{deviceInfo.availableMemoryMB}MB
+              <span className="font-medium">Available Memory:</span> ~
+              {deviceInfo.availableMemoryMB}MB
             </div>
             <div>
-              <span className="font-medium">Device Type:</span> 
+              <span className="font-medium">Device Type:</span>
               {deviceInfo.isMobile ? " Mobile" : " Desktop"}
               {deviceInfo.isLowEndDevice && " (Low-end)"}
             </div>
             <div>
-              <span className="font-medium">Max Concurrency:</span> {deviceInfo.maxConcurrency}
+              <span className="font-medium">Max Concurrency:</span>{" "}
+              {deviceInfo.maxConcurrency}
             </div>
           </div>
         </div>
@@ -77,15 +88,19 @@ export default function PerformanceSettings() {
           <p className="text-sm text-base-content/70 mb-4">
             Choose how to balance memory usage and processing speed
           </p>
-          
+
           <div className="space-y-3">
             <label className="flex items-center gap-3">
               <input
                 type="radio"
                 name="performance-profile"
                 className="radio radio-primary"
-                checked={localPreferences.profile === PerformanceProfile.MEMORY_SAVER}
-                onChange={() => handleProfileChange(PerformanceProfile.MEMORY_SAVER)}
+                checked={
+                  localPreferences.profile === PerformanceProfile.MEMORY_SAVER
+                }
+                onChange={() =>
+                  handleProfileChange(PerformanceProfile.MEMORY_SAVER)
+                }
               />
               <div>
                 <div className="font-medium">Memory Saver</div>
@@ -100,8 +115,12 @@ export default function PerformanceSettings() {
                 type="radio"
                 name="performance-profile"
                 className="radio radio-primary"
-                checked={localPreferences.profile === PerformanceProfile.BALANCED}
-                onChange={() => handleProfileChange(PerformanceProfile.BALANCED)}
+                checked={
+                  localPreferences.profile === PerformanceProfile.BALANCED
+                }
+                onChange={() =>
+                  handleProfileChange(PerformanceProfile.BALANCED)
+                }
               />
               <div>
                 <div className="font-medium">Balanced</div>
@@ -116,8 +135,13 @@ export default function PerformanceSettings() {
                 type="radio"
                 name="performance-profile"
                 className="radio radio-primary"
-                checked={localPreferences.profile === PerformanceProfile.SPEED_OPTIMIZED}
-                onChange={() => handleProfileChange(PerformanceProfile.SPEED_OPTIMIZED)}
+                checked={
+                  localPreferences.profile ===
+                  PerformanceProfile.SPEED_OPTIMIZED
+                }
+                onChange={() =>
+                  handleProfileChange(PerformanceProfile.SPEED_OPTIMIZED)
+                }
               />
               <div>
                 <div className="font-medium">Speed Optimized</div>
@@ -132,8 +156,12 @@ export default function PerformanceSettings() {
                 type="radio"
                 name="performance-profile"
                 className="radio radio-primary"
-                checked={localPreferences.profile === PerformanceProfile.ADAPTIVE}
-                onChange={() => handleProfileChange(PerformanceProfile.ADAPTIVE)}
+                checked={
+                  localPreferences.profile === PerformanceProfile.ADAPTIVE
+                }
+                onChange={() =>
+                  handleProfileChange(PerformanceProfile.ADAPTIVE)
+                }
               />
               <div>
                 <div className="font-medium">Adaptive (Recommended)</div>
@@ -150,7 +178,7 @@ export default function PerformanceSettings() {
       <div className="card bg-base-100 shadow-sm">
         <div className="card-body">
           <h2 className="card-title text-lg">Advanced Settings</h2>
-          
+
           <div className="space-y-4">
             <div className="form-control">
               <label className="label cursor-pointer">
@@ -164,7 +192,9 @@ export default function PerformanceSettings() {
                   type="checkbox"
                   className="toggle toggle-primary"
                   checked={localPreferences.respectMemoryLimits}
-                  onChange={(e) => handleToggleChange('respectMemoryLimits', e.target.checked)}
+                  onChange={(e) =>
+                    handleToggleChange("respectMemoryLimits", e.target.checked)
+                  }
                 />
               </label>
             </div>
@@ -181,7 +211,12 @@ export default function PerformanceSettings() {
                   type="checkbox"
                   className="toggle toggle-primary"
                   checked={localPreferences.prioritizeUserOperations}
-                  onChange={(e) => handleToggleChange('prioritizeUserOperations', e.target.checked)}
+                  onChange={(e) =>
+                    handleToggleChange(
+                      "prioritizeUserOperations",
+                      e.target.checked,
+                    )
+                  }
                 />
               </label>
             </div>
@@ -201,7 +236,12 @@ export default function PerformanceSettings() {
                   min={1}
                   max={8}
                   value={localPreferences.maxConcurrentOperations}
-                  onChange={(e) => handleNumberChange('maxConcurrentOperations', parseInt(e.target.value))}
+                  onChange={(e) =>
+                    handleNumberChange(
+                      "maxConcurrentOperations",
+                      parseInt(e.target.value),
+                    )
+                  }
                   className="range range-primary flex-1"
                 />
                 <span className="w-8 text-center font-mono">
@@ -219,10 +259,21 @@ export default function PerformanceSettings() {
           <h3 className="font-bold">Performance Tips</h3>
           <div className="text-sm mt-1">
             <ul className="list-disc list-inside space-y-1">
-              <li><strong>Memory Saver:</strong> Best for older devices or when running many apps</li>
-              <li><strong>Speed Optimized:</strong> Best for high-end devices with plenty of RAM</li>
-              <li><strong>Adaptive:</strong> Automatically adjusts to your device capabilities</li>
-              <li>Changes take effect immediately for new processing operations</li>
+              <li>
+                <strong>Memory Saver:</strong> Best for older devices or when
+                running many apps
+              </li>
+              <li>
+                <strong>Speed Optimized:</strong> Best for high-end devices with
+                plenty of RAM
+              </li>
+              <li>
+                <strong>Adaptive:</strong> Automatically adjusts to your device
+                capabilities
+              </li>
+              <li>
+                Changes take effect immediately for new processing operations
+              </li>
             </ul>
           </div>
         </div>
@@ -230,10 +281,7 @@ export default function PerformanceSettings() {
 
       {/* Reset Button */}
       <div className="flex justify-end">
-        <button 
-          className="btn btn-outline"
-          onClick={handleReset}
-        >
+        <button className="btn btn-outline" onClick={handleReset}>
           Reset to Defaults
         </button>
       </div>

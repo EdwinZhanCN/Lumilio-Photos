@@ -130,6 +130,7 @@ func main() {
 	aiDescrptionService := service.NewAIDescriptionService(queries, lumenService)
 	ocrService := service.NewOCRService(queries)
 	faceService := service.NewFaceService(queries)
+	speciesService := service.NewSpeciesService(queries)
 
 	// Initialize Queue and run migrations
 	workers := river.NewWorkers()
@@ -149,7 +150,7 @@ func main() {
 		river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
 			LumenService:     lumenService,
 			EmbeddingService: embeddingService,
-			AssetService:     assetService,
+			SpeciesService:   speciesService,
 		})
 	}
 

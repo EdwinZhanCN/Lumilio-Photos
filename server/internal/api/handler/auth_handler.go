@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"server/internal/api"
+	"server/internal/api/dto"
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -29,20 +30,24 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body service.RegisterRequest true "Registration data"
-// @Success 201 {object} api.Result{data=service.AuthResponse} "User registered successfully"
+// @Param request body dto.RegisterRequestDTO true "Registration data"
+// @Success 201 {object} api.Result{data=dto.AuthResponseDTO} "User registered successfully"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 409 {object} api.Result "User already exists"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
-	var req service.RegisterRequest
+	var req dto.RegisterRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
 	}
 
-	authResponse, err := h.authService.Register(req)
+	authResponse, err := h.authService.Register(service.RegisterRequest{
+		Username: req.Username,
+		Email:    req.Email,
+		Password: req.Password,
+	})
 	if err != nil {
 		if errors.Is(err, service.ErrUserAlreadyExists) {
 			api.GinError(c, 409, err, http.StatusConflict, "User already exists")
@@ -61,20 +66,23 @@ func (h *AuthHandler) Register(c *gin.Context) {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body service.LoginRequest true "Login credentials"
-// @Success 200 {object} api.Result{data=service.AuthResponse} "Login successful"
+// @Param request body dto.LoginRequestDTO true "Login credentials"
+// @Success 200 {object} api.Result{data=dto.AuthResponseDTO} "Login successful"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Invalid credentials"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
-	var req service.LoginRequest
+	var req dto.LoginRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
 	}
 
-	authResponse, err := h.authService.Login(req)
+	authResponse, err := h.authService.Login(service.LoginRequest{
+		Username: req.Username,
+		Password: req.Password,
+	})
 	if err != nil {
 		if errors.Is(err, service.ErrUserNotFound) || errors.Is(err, service.ErrInvalidPassword) {
 			api.GinUnauthorized(c, errors.New("Username or password is incorrect"), "Invalid credentials")
@@ -93,14 +101,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body service.RefreshTokenRequest true "Refresh token"
-// @Success 200 {object} api.Result{data=service.AuthResponse} "Token refreshed successfully"
+// @Param request body dto.RefreshTokenRequestDTO true "Refresh token"
+// @Success 200 {object} api.Result{data=dto.AuthResponseDTO} "Token refreshed successfully"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Invalid or expired refresh token"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
-	var req service.RefreshTokenRequest
+	var req dto.RefreshTokenRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
@@ -127,14 +135,14 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body service.RefreshTokenRequest true "Refresh token to revoke"
+// @Param request body dto.RefreshTokenRequestDTO true "Refresh token to revoke"
 // @Success 200 {object} api.Result "Logout successful"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Invalid refresh token"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
-	var req service.RefreshTokenRequest
+	var req dto.RefreshTokenRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
@@ -160,7 +168,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} api.Result{data=service.UserResponse} "User information retrieved successfully"
+// @Success 200 {object} api.Result{data=dto.UserDTO} "User information retrieved successfully"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /auth/me [get]
@@ -174,7 +182,7 @@ func (h *AuthHandler) Me(c *gin.Context) {
 
 	// Get user information
 	// This would typically come from a user service
-	user := service.UserResponse{
+	user := dto.UserDTO{
 		UserID:   userID.(int),
 		Username: c.GetString("username"),
 		// Other fields would be fetched from database

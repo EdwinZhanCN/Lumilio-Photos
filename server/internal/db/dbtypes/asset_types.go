@@ -28,7 +28,7 @@ func (at AssetType) Valid() bool {
 	return false
 }
 
-type SpecificMetadata = json.RawMessage
+type SpecificMetadata []byte
 
 // PhotoSpecificMetadata ----- 各类具体的 metadata 结构（仅用于 JSON 编解码；与持久化解耦）-----
 type PhotoSpecificMetadata struct {
@@ -46,11 +46,6 @@ type PhotoSpecificMetadata struct {
 	GPSLongitude float64    `json:"gps_longitude,omitempty"`
 	Description  string     `json:"description,omitempty"`
 	IsRAW        bool       `json:"is_raw,omitempty"`
-}
-
-type SpeciesPredictionMeta struct {
-	Label string  `json:"label"`
-	Score float32 `json:"score"`
 }
 
 type VideoSpecificMetadata struct {
@@ -91,49 +86,44 @@ func MarshalMeta(v any) (SpecificMetadata, error) {
 
 // 如果你已有 []byte -> 可以直接转：SpecificMetadata(b)
 
-// 解码为具体类型（按需使用）
-func UnmarshalPhoto(b []byte) (PhotoSpecificMetadata, error) {
+// UnmarshalTo 解码到指定类型
+func (s SpecificMetadata) UnmarshalTo(v any) error {
+	if len(s) == 0 {
+		return nil
+	}
+	return json.Unmarshal(s, v)
+}
+
+// UnmarshalPhoto 按照 Photo 类型解码
+func (s SpecificMetadata) UnmarshalPhoto() (PhotoSpecificMetadata, error) {
 	var m PhotoSpecificMetadata
-	if len(b) == 0 {
-		return m, nil
-	}
-	if err := json.Unmarshal(b, &m); err != nil {
-		return m, err
-	}
-	return m, nil
+	err := s.UnmarshalTo(&m)
+	return m, err
 }
 
-func UnmarshalVideo(b []byte) (VideoSpecificMetadata, error) {
+// UnmarshalVideo 按照 Video 类型解码
+func (s SpecificMetadata) UnmarshalVideo() (VideoSpecificMetadata, error) {
 	var m VideoSpecificMetadata
-	if len(b) == 0 {
-		return m, nil
-	}
-	if err := json.Unmarshal(b, &m); err != nil {
-		return m, err
-	}
-	return m, nil
+	err := s.UnmarshalTo(&m)
+	return m, err
 }
 
-func UnmarshalAudio(b []byte) (AudioSpecificMetadata, error) {
+// UnmarshalAudio 按照 Audio 类型解码
+func (s SpecificMetadata) UnmarshalAudio() (AudioSpecificMetadata, error) {
 	var m AudioSpecificMetadata
-	if len(b) == 0 {
-		return m, nil
-	}
-	if err := json.Unmarshal(b, &m); err != nil {
-		return m, err
-	}
-	return m, nil
+	err := s.UnmarshalTo(&m)
+	return m, err
 }
 
-// 按资产类型分发解码（返回 any，调用方断言或使用类型开关）
-func UnmarshalByType(t AssetType, b []byte) (any, error) {
+// UnmarshalByType 按资产类型分发解码（返回 any，调用方断言或使用类型开关）
+func (s SpecificMetadata) UnmarshalByType(t AssetType) (any, error) {
 	switch t {
 	case AssetTypePhoto:
-		return UnmarshalPhoto(b)
+		return s.UnmarshalPhoto()
 	case AssetTypeVideo:
-		return UnmarshalVideo(b)
+		return s.UnmarshalVideo()
 	case AssetTypeAudio:
-		return UnmarshalAudio(b)
+		return s.UnmarshalAudio()
 	default:
 		return nil, errors.New("unknown asset type")
 	}

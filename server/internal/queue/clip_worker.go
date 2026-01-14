@@ -17,10 +17,9 @@ type ProcessClipArgs = jobs.ProcessClipArgs
 // ProcessClipWorker handles CLIP embedding generation for assets
 type ProcessClipWorker struct {
 	river.WorkerDefaults[ProcessClipArgs]
-
-	AssetService     service.AssetService
 	EmbeddingService service.EmbeddingService
 	LumenService     service.LumenService
+	SpeciesService   service.SpeciesService
 }
 
 func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClipArgs]) error {
@@ -49,7 +48,7 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 		return fmt.Errorf("failed to classify image: %w", err)
 	}
 
-	// Also save species predictions if available
+	// Save species predictions to ML metadata if available
 	if labels != nil && len(labels) > 0 {
 		predictions := make([]dbtypes.SpeciesPredictionMeta, len(labels))
 		for i, pred := range labels {
@@ -59,7 +58,8 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 			}
 		}
 
-		err = w.AssetService.SaveNewSpeciesPredictions(ctx, pgUUID, predictions)
+		// Save species predictions to database
+		err = w.SpeciesService.SaveSpeciesPredictions(ctx, pgUUID, predictions)
 		if err != nil {
 			// Log error but don't fail the job
 			fmt.Printf("Failed to save species predictions: %v\n", err)

@@ -24,20 +24,115 @@ components:
     data:
       properties:
         data:
-          $ref: '#/components/schemas/service.UserResponse'
+          $ref: '#/components/schemas/dto.UserDTO'
       type: object
     dbtypes.AssetType:
+      enum:
+      - PHOTO
+      - VIDEO
+      - AUDIO
       type: string
       x-enum-varnames:
       - AssetTypePhoto
       - AssetTypeVideo
       - AssetTypeAudio
-    handler.AddAssetToAlbumRequest:
+    dbtypes.AudioSpecificMetadata:
+      properties:
+        album:
+          example: Album Title
+          type: string
+        artist:
+          example: John Doe
+          type: string
+        bitrate:
+          example: 128000
+          type: integer
+        channels:
+          example: 2
+          type: integer
+        codec:
+          example: AAC
+          type: string
+        description:
+          example: Song Description
+          type: string
+        genre:
+          example: Pop
+          type: string
+        sample_rate:
+          example: 44100
+          type: integer
+        title:
+          example: Song Title
+          type: string
+        year:
+          example: 2023
+          type: integer
+      type: object
+    dbtypes.PhotoSpecificMetadata:
+      properties:
+        camera_model:
+          type: string
+        description:
+          type: string
+        dimensions:
+          type: string
+        exposure:
+          type: number
+        exposure_time:
+          type: string
+        f_number:
+          type: number
+        focal_length:
+          type: number
+        gps_latitude:
+          type: number
+        gps_longitude:
+          type: number
+        is_raw:
+          type: boolean
+        iso_speed:
+          type: integer
+        lens_model:
+          type: string
+        resolution:
+          type: string
+        taken_time:
+          type: string
+      type: object
+    dbtypes.VideoSpecificMetadata:
+      properties:
+        bitrate:
+          example: 1000000
+          type: integer
+        camera_model:
+          example: Canon EOS 5D Mark IV
+          type: string
+        codec:
+          example: H.264
+          type: string
+        description:
+          example: A beautiful sunset over the ocean
+          type: string
+        frame_rate:
+          example: 30
+          type: number
+        gps_latitude:
+          example: 37.7749
+          type: number
+        gps_longitude:
+          example: -122.4194
+          type: number
+        recorded_time:
+          example: "2023-01-01T00:00:00Z"
+          type: string
+      type: object
+    dto.AddAssetToAlbumRequestDTO:
       properties:
         position:
           type: integer
       type: object
-    handler.AssetDTO:
+    dto.AssetDTO:
       properties:
         asset_id:
           type: string
@@ -66,6 +161,10 @@ components:
         repository_id:
           type: string
         specific_metadata:
+          oneOf:
+          - $ref: '#/components/schemas/dbtypes.PhotoSpecificMetadata'
+          - $ref: '#/components/schemas/dbtypes.VideoSpecificMetadata'
+          - $ref: '#/components/schemas/dbtypes.AudioSpecificMetadata'
           type: object
         status:
           items:
@@ -83,15 +182,15 @@ components:
         width:
           type: integer
       type: object
-    handler.AssetFilter:
+    dto.AssetFilterDTO:
       properties:
         camera_make:
           example: Canon
           type: string
         date:
-          $ref: '#/components/schemas/handler.DateRange'
+          $ref: '#/components/schemas/dto.DateRangeDTO'
         filename:
-          $ref: '#/components/schemas/handler.FilenameFilter'
+          $ref: '#/components/schemas/dto.FilenameFilterDTO'
         lens:
           example: EF 50mm f/1.8
           type: string
@@ -120,11 +219,11 @@ components:
           example: PHOTO
           type: string
       type: object
-    handler.AssetListResponse:
+    dto.AssetListResponseDTO:
       properties:
         assets:
           items:
-            $ref: '#/components/schemas/handler.AssetDTO'
+            $ref: '#/components/schemas/dto.AssetDTO'
           type: array
           uniqueItems: false
         limit:
@@ -134,7 +233,7 @@ components:
           example: 0
           type: integer
       type: object
-    handler.AssetTypesResponse:
+    dto.AssetTypesResponseDTO:
       properties:
         types:
           items:
@@ -142,42 +241,45 @@ components:
           type: array
           uniqueItems: false
       type: object
-    handler.BatchUploadResponse:
+    dto.AuthResponseDTO:
+      properties:
+        expiresAt:
+          type: string
+        refreshToken:
+          type: string
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/dto.UserDTO'
+      type: object
+    dto.BatchUploadResponseDTO:
       properties:
         results:
           items:
-            $ref: '#/components/schemas/handler.BatchUploadResult'
+            $ref: '#/components/schemas/dto.BatchUploadResultDTO'
           type: array
           uniqueItems: false
       type: object
-    handler.BatchUploadResult:
+    dto.BatchUploadResultDTO:
       properties:
         content_hash:
-          description: MLService-provided content hash
           type: string
         error:
-          description: Only present for failed uploads
           type: string
         file_name:
-          description: Original filename
           type: string
         message:
-          description: Status message
           type: string
         size:
-          description: Only present for successful uploads
           type: integer
         status:
-          description: Only present for successful uploads
           type: string
         success:
-          description: Whether the file was successfully queued
           type: boolean
         task_id:
-          description: Only present for successful uploads
           type: integer
       type: object
-    handler.CreateAlbumRequest:
+    dto.CreateAlbumRequestDTO:
       properties:
         album_name:
           type: string
@@ -189,14 +291,14 @@ components:
       - album_name
       - cover_asset_id
       type: object
-    handler.DateRange:
+    dto.DateRangeDTO:
       properties:
         from:
           type: string
         to:
           type: string
       type: object
-    handler.FilenameFilter:
+    dto.FilenameFilterDTO:
       properties:
         mode:
           enum:
@@ -210,10 +312,10 @@ components:
           example: IMG_
           type: string
       type: object
-    handler.FilterAssetsRequest:
+    dto.FilterAssetsRequestDTO:
       properties:
         filter:
-          $ref: '#/components/schemas/handler.AssetFilter'
+          $ref: '#/components/schemas/dto.AssetFilterDTO'
         limit:
           example: 20
           maximum: 100
@@ -224,7 +326,7 @@ components:
           minimum: 0
           type: integer
       type: object
-    handler.GetAlbumResponse:
+    dto.GetAlbumResponseDTO:
       properties:
         album_id:
           type: integer
@@ -243,11 +345,11 @@ components:
         user_id:
           type: integer
       type: object
-    handler.ListAlbumsResponse:
+    dto.ListAlbumsResponseDTO:
       properties:
         albums:
           items:
-            $ref: '#/components/schemas/handler.GetAlbumResponse'
+            $ref: '#/components/schemas/dto.GetAlbumResponseDTO'
           type: array
           uniqueItems: false
         limit:
@@ -257,13 +359,23 @@ components:
         total:
           type: integer
       type: object
-    handler.MessageResponse:
+    dto.LoginRequestDTO:
+      properties:
+        password:
+          type: string
+        username:
+          type: string
+      required:
+      - password
+      - username
+      type: object
+    dto.MessageResponseDTO:
       properties:
         message:
           example: Operation completed successfully
           type: string
       type: object
-    handler.OptionsResponse:
+    dto.OptionsResponseDTO:
       properties:
         camera_makes:
           items:
@@ -276,7 +388,7 @@ components:
           type: array
           uniqueItems: false
       type: object
-    handler.ProgressSummary:
+    dto.ProgressSummaryDTO:
       properties:
         active_sessions:
           type: integer
@@ -289,7 +401,30 @@ components:
         total_sessions:
           type: integer
       type: object
-    handler.ReprocessAssetRequest:
+    dto.RefreshTokenRequestDTO:
+      properties:
+        refreshToken:
+          type: string
+      required:
+      - refreshToken
+      type: object
+    dto.RegisterRequestDTO:
+      properties:
+        email:
+          type: string
+        password:
+          minLength: 6
+          type: string
+        username:
+          maxLength: 50
+          minLength: 3
+          type: string
+      required:
+      - email
+      - password
+      - username
+      type: object
+    dto.ReprocessAssetRequestDTO:
       properties:
         force_full_retry:
           example: false
@@ -304,7 +439,7 @@ components:
           type: array
           uniqueItems: false
       type: object
-    handler.ReprocessAssetResponse:
+    dto.ReprocessAssetResponseDTO:
       properties:
         asset_id:
           example: 550e8400-e29b-41d4-a716-446655440000
@@ -332,10 +467,10 @@ components:
           example: queued
           type: string
       type: object
-    handler.SearchAssetsRequest:
+    dto.SearchAssetsRequestDTO:
       properties:
         filter:
-          $ref: '#/components/schemas/handler.AssetFilter'
+          $ref: '#/components/schemas/dto.AssetFilterDTO'
         limit:
           example: 20
           maximum: 100
@@ -358,7 +493,7 @@ components:
       - query
       - search_type
       type: object
-    handler.SessionProgress:
+    dto.SessionProgressDTO:
       properties:
         bytes_done:
           type: integer
@@ -369,19 +504,17 @@ components:
         last_activity:
           type: string
         progress:
-          description: 0-1
           type: number
         received_chunks:
           type: integer
         session_id:
           type: string
         status:
-          description: pending, uploading, merging, completed, failed
           type: string
         total_chunks:
           type: integer
       type: object
-    handler.UpdateAlbumRequest:
+    dto.UpdateAlbumRequestDTO:
       properties:
         album_name:
           type: string
@@ -390,31 +523,35 @@ components:
         description:
           type: string
       type: object
-    handler.UpdateAssetPositionRequest:
+    dto.UpdateAssetPositionRequestDTO:
       properties:
         position:
           type: integer
       required:
       - position
       type: object
-    handler.UpdateAssetRequest:
+    dto.UpdateAssetRequestDTO:
       properties:
         specific_metadata:
+          oneOf:
+          - $ref: '#/components/schemas/dbtypes.PhotoSpecificMetadata'
+          - $ref: '#/components/schemas/dbtypes.VideoSpecificMetadata'
+          - $ref: '#/components/schemas/dbtypes.AudioSpecificMetadata'
           type: object
       type: object
-    handler.UpdateDescriptionRequest:
+    dto.UpdateDescriptionRequestDTO:
       properties:
         description:
           example: A beautiful sunset photo
           type: string
       type: object
-    handler.UpdateLikeRequest:
+    dto.UpdateLikeRequestDTO:
       properties:
         liked:
           example: true
           type: boolean
       type: object
-    handler.UpdateRatingAndLikeRequest:
+    dto.UpdateRatingAndLikeRequestDTO:
       properties:
         liked:
           example: true
@@ -425,7 +562,7 @@ components:
           minimum: 0
           type: integer
       type: object
-    handler.UpdateRatingRequest:
+    dto.UpdateRatingRequestDTO:
       properties:
         rating:
           example: 5
@@ -433,29 +570,26 @@ components:
           minimum: 0
           type: integer
       type: object
-    handler.UploadConfigResponse:
+    dto.UploadConfigResponseDTO:
       properties:
         chunk_size:
-          description: in bytes
           type: integer
         max_concurrent:
-          description: maximum concurrent uploads
           type: integer
         memory_buffer:
-          description: safety buffer in bytes
           type: integer
       type: object
-    handler.UploadProgressResponse:
+    dto.UploadProgressResponseDTO:
       properties:
         sessions:
           items:
-            $ref: '#/components/schemas/handler.SessionProgress'
+            $ref: '#/components/schemas/dto.SessionProgressDTO'
           type: array
           uniqueItems: false
         summary:
-          $ref: '#/components/schemas/handler.ProgressSummary'
+          $ref: '#/components/schemas/dto.ProgressSummaryDTO'
       type: object
-    handler.UploadResponse:
+    dto.UploadResponseDTO:
       properties:
         content_hash:
           example: abcd1234567890
@@ -476,51 +610,7 @@ components:
           example: 12345
           type: integer
       type: object
-    service.AuthResponse:
-      properties:
-        expiresAt:
-          type: string
-        refreshToken:
-          type: string
-        token:
-          type: string
-        user:
-          $ref: '#/components/schemas/service.UserResponse'
-      type: object
-    service.LoginRequest:
-      properties:
-        password:
-          type: string
-        username:
-          type: string
-      required:
-      - password
-      - username
-      type: object
-    service.RefreshTokenRequest:
-      properties:
-        refreshToken:
-          type: string
-      required:
-      - refreshToken
-      type: object
-    service.RegisterRequest:
-      properties:
-        email:
-          type: string
-        password:
-          minLength: 6
-          type: string
-        username:
-          maxLength: 50
-          minLength: 3
-          type: string
-      required:
-      - email
-      - password
-      - username
-      type: object
-    service.UserResponse:
+    dto.UserDTO:
       properties:
         created_at:
           type: string
@@ -634,7 +724,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.CreateAlbumRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.CreateAlbumRequestDTO'
+                description: Album creation data
+                summary: request
         description: Album creation data
         required: true
       responses:
@@ -815,7 +909,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.UpdateAlbumRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateAlbumRequestDTO'
+                description: Album update data
+                summary: request
         description: Album update data
         required: true
       responses:
@@ -989,7 +1087,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.AddAssetToAlbumRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.AddAssetToAlbumRequestDTO'
+                description: Asset position in album
+                summary: request
         description: Asset position in album
       responses:
         "200":
@@ -1041,8 +1143,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.UpdateAssetPositionRequest'
-        description: New position for the asset
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateAssetPositionRequestDTO'
+                description: New position data
+                summary: request
+        description: New position data
         required: true
       responses:
         "200":
@@ -1179,11 +1285,19 @@ paths:
           type: string
       requestBody:
         content:
+          application/x-www-form-urlencoded:
+            schema:
+              oneOf:
+              - title: file
+                type: file
+              - example: '"550e8400-e29b-41d4-a716-446655440000"'
+                title: repository_id
+                type: string
           multipart/form-data:
             schema:
-              example: '"550e8400-e29b-41d4-a716-446655440000"'
-              type: string
-        description: Repository UUID (uses default repository if not provided)
+              type: object
+        description: Asset file to upload | Repository UUID (uses default repository
+          if not provided)
       responses:
         "200":
           content:
@@ -1287,7 +1401,8 @@ paths:
       - assets
     get:
       description: Retrieve detailed information about a specific asset. Optionally
-        include thumbnails, tags, albums, and species predictions.
+        include thumbnails, tags, albums, species predictions, OCR results, face recognition,
+        and AI descriptions.
       parameters:
       - description: Asset ID (UUID format)
         example: '"550e8400-e29b-41d4-a716-446655440000"'
@@ -1319,6 +1434,24 @@ paths:
         name: include_species
         schema:
           default: true
+          type: boolean
+      - description: Include OCR results
+        in: query
+        name: include_ocr
+        schema:
+          default: false
+          type: boolean
+      - description: Include face recognition
+        in: query
+        name: include_faces
+        schema:
+          default: false
+          type: boolean
+      - description: Include AI descriptions
+        in: query
+        name: include_ai_descriptions
+        schema:
+          default: false
           type: boolean
       requestBody:
         content:
@@ -1382,8 +1515,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.UpdateAssetRequest'
-        description: Updated metadata
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateAssetRequestDTO'
+                description: Asset metadata
+                summary: request
+        description: Asset metadata
         required: true
       responses:
         "200":
@@ -1547,28 +1684,25 @@ paths:
       responses:
         "200":
           content:
-            application/json:
-              schema:
-                type: file
             audio/mpeg:
               schema:
-                type: string
+                type: file
           description: Web-optimized audio file
         "400":
           content:
-            application/json:
+            audio/mpeg:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID
         "404":
           content:
-            application/json:
+            audio/mpeg:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Asset not found or not audio
         "500":
           content:
-            application/json:
+            audio/mpeg:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Internal server error
@@ -1577,7 +1711,7 @@ paths:
       - assets
   /assets/{id}/description:
     put:
-      description: Update the description/comment of a specific asset
+      description: Update the description metadata of an asset
       parameters:
       - description: Asset ID
         in: path
@@ -1589,7 +1723,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.UpdateDescriptionRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateDescriptionRequestDTO'
+                description: Description data
+                summary: description
         description: Description data
         required: true
       responses:
@@ -1654,7 +1792,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.UpdateLikeRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateLikeRequestDTO'
+                description: Like data
+                summary: like
         description: Like data
         required: true
       responses:
@@ -1720,29 +1862,25 @@ paths:
       responses:
         "200":
           content:
-            application/json:
-              schema:
-                type: file
             application/octet-stream:
               schema:
-                format: binary
-                type: string
+                type: file
           description: Original file content
         "400":
           content:
-            application/json:
+            application/octet-stream:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID
         "404":
           content:
-            application/json:
+            application/octet-stream:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Asset not found
         "500":
           content:
-            application/json:
+            application/octet-stream:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Internal server error
@@ -1763,7 +1901,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.UpdateRatingRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateRatingRequestDTO'
+                description: Rating data
+                summary: rating
         description: Rating data
         required: true
       responses:
@@ -1829,7 +1971,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.UpdateRatingAndLikeRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateRatingAndLikeRequestDTO'
+                description: Rating and like data
+                summary: data
         description: Rating and like data
         required: true
       responses:
@@ -1895,14 +2041,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.ReprocessAssetRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.ReprocessAssetRequestDTO'
+                description: Reprocessing tasks (optional)
+                summary: request
         description: Reprocessing tasks (optional)
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/handler.ReprocessAssetResponse'
+                $ref: '#/components/schemas/dto.ReprocessAssetResponseDTO'
           description: OK
         "400":
           content:
@@ -1956,29 +2106,25 @@ paths:
       responses:
         "200":
           content:
-            application/json:
-              schema:
-                type: file
             image/jpeg:
               schema:
-                format: binary
-                type: string
+                type: file
           description: Thumbnail image file
         "400":
           content:
-            application/json:
+            image/jpeg:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID or size parameter
         "404":
           content:
-            application/json:
+            image/jpeg:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Asset or thumbnail not found
         "500":
           content:
-            application/json:
+            image/jpeg:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Internal server error
@@ -2000,28 +2146,25 @@ paths:
       responses:
         "200":
           content:
-            application/json:
-              schema:
-                type: file
             video/mp4:
               schema:
-                type: string
+                type: file
           description: Web-optimized video file
         "400":
           content:
-            application/json:
+            video/mp4:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID
         "404":
           content:
-            application/json:
+            video/mp4:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Asset not found or not a video
         "500":
           content:
-            application/json:
+            video/mp4:
               schema:
                 $ref: '#/components/schemas/api.Result'
           description: Internal server error
@@ -2035,10 +2178,22 @@ paths:
         for single files or chunk_{session_id}_{index}_{total} for chunks.'
       requestBody:
         content:
+          application/x-www-form-urlencoded:
+            schema:
+              oneOf:
+              - example: '"550e8400-e29b-41d4-a716-446655440000"'
+                title: repository_id
+                type: string
+              - title: file
+                type: file
+              - title: file
+                type: file
           multipart/form-data:
             schema:
-              type: file
-        description: 'Chunked file upload - use format: chunk_{session_id}_{index}_{total}'
+              type: object
+        description: 'Repository UUID (uses default repository if not provided) |
+          Single file upload - use format: single_{session_id} | Chunked file upload
+          - use format: chunk_{session_id}_{index}_{total}'
       responses:
         "200":
           content:
@@ -2116,7 +2271,7 @@ paths:
                     example: success
                     type: string
                 type: object
-          description: Upload configuration retrieved
+          description: Upload configuration
       summary: Get upload configuration
       tags:
       - assets
@@ -2173,7 +2328,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.FilterAssetsRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.FilterAssetsRequestDTO'
+                description: Filter criteria
+                summary: request
         description: Filter criteria
         required: true
       responses:
@@ -2396,7 +2555,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/handler.SearchAssetsRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.SearchAssetsRequestDTO'
+                description: Search criteria
+                summary: request
         description: Search criteria
         required: true
       responses:
@@ -2486,7 +2649,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/service.LoginRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.LoginRequestDTO'
+                description: Login credentials
+                summary: request
         description: Login credentials
         required: true
       responses:
@@ -2544,7 +2711,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/service.RefreshTokenRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.RefreshTokenRequestDTO'
+                description: Refresh token to revoke
+                summary: request
         description: Refresh token to revoke
         required: true
       responses:
@@ -2634,7 +2805,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/service.RefreshTokenRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.RefreshTokenRequestDTO'
+                description: Refresh token
+                summary: request
         description: Refresh token
         required: true
       responses:
@@ -2692,7 +2867,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/service.RegisterRequest'
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.RegisterRequestDTO'
+                description: Registration data
+                summary: request
         description: Registration data
         required: true
       responses:

@@ -18,32 +18,32 @@ export type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
 /**
  * Single file upload response
  */
-export type UploadResponse = Schemas["handler.UploadResponse"];
+export type UploadResponse = Schemas["dto.UploadResponseDTO"];
 
 /**
  * Batch upload response containing results array
  */
-export type BatchUploadResponse = Schemas["handler.BatchUploadResponse"];
+export type BatchUploadResponse = Schemas["dto.BatchUploadResponseDTO"];
 
 /**
  * Individual file result within batch upload
  */
-export type BatchUploadResult = Schemas["handler.BatchUploadResult"];
+export type BatchUploadResult = Schemas["dto.BatchUploadResultDTO"];
 
 /**
  * Upload configuration response
  */
-export type UploadConfigResponse = Schemas["handler.UploadConfigResponse"];
+export type UploadConfigResponse = Schemas["dto.UploadConfigResponseDTO"];
 
 /**
  * Upload progress response
  */
-export type UploadProgressResponse = Schemas["handler.UploadProgressResponse"];
+export type UploadProgressResponse = Schemas["dto.UploadProgressResponseDTO"];
 
 /**
  * Session progress information
  */
-export type SessionProgress = Schemas["handler.SessionProgress"];
+export type SessionProgress = Schemas["dto.SessionProgressDTO"];
 
 // ============================================================================
 // Upload Service

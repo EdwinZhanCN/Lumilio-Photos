@@ -104,7 +104,7 @@ export interface paths {
             /** @description Album creation data */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["handler.CreateAlbumRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.CreateAlbumRequestDTO"];
                 };
             };
             responses: {
@@ -261,7 +261,7 @@ export interface paths {
             /** @description Album update data */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["handler.UpdateAlbumRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateAlbumRequestDTO"];
                 };
             };
             responses: {
@@ -522,7 +522,7 @@ export interface paths {
             /** @description Asset position in album */
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["handler.AddAssetToAlbumRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.AddAssetToAlbumRequestDTO"];
                 };
             };
             responses: {
@@ -644,10 +644,10 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            /** @description New position for the asset */
+            /** @description New position data */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["handler.UpdateAssetPositionRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateAssetPositionRequestDTO"];
                 };
             };
             responses: {
@@ -804,10 +804,11 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description Repository UUID (uses default repository if not provided) */
+            /** @description Asset file to upload | Repository UUID (uses default repository if not provided) */
             requestBody?: {
                 content: {
-                    "multipart/form-data": string;
+                    "application/x-www-form-urlencoded": Record<string, never> | string;
+                    "multipart/form-data": Record<string, never>;
                 };
             };
             responses: {
@@ -873,7 +874,7 @@ export interface paths {
         };
         /**
          * Get asset by ID
-         * @description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, and species predictions.
+         * @description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and AI descriptions.
          */
         get: {
             parameters: {
@@ -886,6 +887,12 @@ export interface paths {
                     include_albums?: boolean;
                     /** @description Include species predictions */
                     include_species?: boolean;
+                    /** @description Include OCR results */
+                    include_ocr?: boolean;
+                    /** @description Include face recognition */
+                    include_faces?: boolean;
+                    /** @description Include AI descriptions */
+                    include_ai_descriptions?: boolean;
                 };
                 header?: never;
                 path: {
@@ -967,10 +974,10 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            /** @description Updated metadata */
+            /** @description Asset metadata */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["handler.UpdateAssetRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateAssetRequestDTO"];
                 };
             };
             responses: {
@@ -1283,8 +1290,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
-                        "audio/mpeg": string;
+                        "audio/mpeg": Record<string, never>;
                     };
                 };
                 /** @description Invalid asset ID */
@@ -1293,7 +1299,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "audio/mpeg": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Asset not found or not audio */
@@ -1302,7 +1308,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "audio/mpeg": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Internal server error */
@@ -1311,7 +1317,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "audio/mpeg": components["schemas"]["api.Result"];
                     };
                 };
             };
@@ -1334,7 +1340,7 @@ export interface paths {
         get?: never;
         /**
          * Update asset description
-         * @description Update the description/comment of a specific asset
+         * @description Update the description metadata of an asset
          */
         put: {
             parameters: {
@@ -1349,7 +1355,7 @@ export interface paths {
             /** @description Description data */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["handler.UpdateDescriptionRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateDescriptionRequestDTO"];
                 };
             };
             responses: {
@@ -1441,7 +1447,7 @@ export interface paths {
             /** @description Like data */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["handler.UpdateLikeRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateLikeRequestDTO"];
                 };
             };
             responses: {
@@ -1540,8 +1546,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
-                        "application/octet-stream": string;
+                        "application/octet-stream": Record<string, never>;
                     };
                 };
                 /** @description Invalid asset ID */
@@ -1550,7 +1555,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/octet-stream": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Asset not found */
@@ -1559,7 +1564,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/octet-stream": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Internal server error */
@@ -1568,7 +1573,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "application/octet-stream": components["schemas"]["api.Result"];
                     };
                 };
             };
@@ -1606,7 +1611,7 @@ export interface paths {
             /** @description Rating data */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["handler.UpdateRatingRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateRatingRequestDTO"];
                 };
             };
             responses: {
@@ -1698,7 +1703,7 @@ export interface paths {
             /** @description Rating and like data */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["handler.UpdateRatingAndLikeRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateRatingAndLikeRequestDTO"];
                 };
             };
             responses: {
@@ -1791,7 +1796,7 @@ export interface paths {
             /** @description Reprocessing tasks (optional) */
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["handler.ReprocessAssetRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.ReprocessAssetRequestDTO"];
                 };
             };
             responses: {
@@ -1801,7 +1806,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["handler.ReprocessAssetResponse"];
+                        "application/json": components["schemas"]["dto.ReprocessAssetResponseDTO"];
                     };
                 };
                 /** @description Bad Request */
@@ -1880,8 +1885,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
-                        "image/jpeg": string;
+                        "image/jpeg": Record<string, never>;
                     };
                 };
                 /** @description Invalid asset ID or size parameter */
@@ -1890,7 +1894,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Asset or thumbnail not found */
@@ -1899,7 +1903,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Internal server error */
@@ -1908,7 +1912,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "image/jpeg": components["schemas"]["api.Result"];
                     };
                 };
             };
@@ -1953,8 +1957,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": Record<string, never>;
-                        "video/mp4": string;
+                        "video/mp4": Record<string, never>;
                     };
                 };
                 /** @description Invalid asset ID */
@@ -1963,7 +1966,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "video/mp4": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Asset not found or not a video */
@@ -1972,7 +1975,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "video/mp4": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Internal server error */
@@ -1981,7 +1984,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["api.Result"];
+                        "video/mp4": components["schemas"]["api.Result"];
                     };
                 };
             };
@@ -2014,9 +2017,10 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description Chunked file upload - use format: chunk_{session_id}_{index}_{total} */
+            /** @description Repository UUID (uses default repository if not provided) | Single file upload - use format: single_{session_id} | Chunked file upload - use format: chunk_{session_id}_{index}_{total} */
             requestBody?: {
                 content: {
+                    "application/x-www-form-urlencoded": string | Record<string, never> | Record<string, never>;
                     "multipart/form-data": Record<string, never>;
                 };
             };
@@ -2098,7 +2102,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Upload configuration retrieved */
+                /** @description Upload configuration */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2222,7 +2226,7 @@ export interface paths {
             /** @description Filter criteria */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["handler.FilterAssetsRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.FilterAssetsRequestDTO"];
                 };
             };
             responses: {
@@ -2534,7 +2538,7 @@ export interface paths {
             /** @description Search criteria */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["handler.SearchAssetsRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.SearchAssetsRequestDTO"];
                 };
             };
             responses: {
@@ -2675,7 +2679,7 @@ export interface paths {
             /** @description Login credentials */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["service.LoginRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.LoginRequestDTO"];
                 };
             };
             responses: {
@@ -2764,7 +2768,7 @@ export interface paths {
             /** @description Refresh token to revoke */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["service.RefreshTokenRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.RefreshTokenRequestDTO"];
                 };
             };
             responses: {
@@ -2914,7 +2918,7 @@ export interface paths {
             /** @description Refresh token */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["service.RefreshTokenRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.RefreshTokenRequestDTO"];
                 };
             };
             responses: {
@@ -3003,7 +3007,7 @@ export interface paths {
             /** @description Registration data */
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["service.RegisterRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.RegisterRequestDTO"];
                 };
             };
             responses: {
@@ -3094,13 +3098,70 @@ export interface components {
             message?: string;
         } & components["schemas"]["data"];
         data: {
-            data?: components["schemas"]["service.UserResponse"];
+            data?: components["schemas"]["dto.UserDTO"];
         };
-        "dbtypes.AssetType": string;
-        "handler.AddAssetToAlbumRequest": {
+        /** @enum {string} */
+        "dbtypes.AssetType": "PHOTO" | "VIDEO" | "AUDIO";
+        "dbtypes.AudioSpecificMetadata": {
+            /** @example Album Title */
+            album?: string;
+            /** @example John Doe */
+            artist?: string;
+            /** @example 128000 */
+            bitrate?: number;
+            /** @example 2 */
+            channels?: number;
+            /** @example AAC */
+            codec?: string;
+            /** @example Song Description */
+            description?: string;
+            /** @example Pop */
+            genre?: string;
+            /** @example 44100 */
+            sample_rate?: number;
+            /** @example Song Title */
+            title?: string;
+            /** @example 2023 */
+            year?: number;
+        };
+        "dbtypes.PhotoSpecificMetadata": {
+            camera_model?: string;
+            description?: string;
+            dimensions?: string;
+            exposure?: number;
+            exposure_time?: string;
+            f_number?: number;
+            focal_length?: number;
+            gps_latitude?: number;
+            gps_longitude?: number;
+            is_raw?: boolean;
+            iso_speed?: number;
+            lens_model?: string;
+            resolution?: string;
+            taken_time?: string;
+        };
+        "dbtypes.VideoSpecificMetadata": {
+            /** @example 1000000 */
+            bitrate?: number;
+            /** @example Canon EOS 5D Mark IV */
+            camera_model?: string;
+            /** @example H.264 */
+            codec?: string;
+            /** @example A beautiful sunset over the ocean */
+            description?: string;
+            /** @example 30 */
+            frame_rate?: number;
+            /** @example 37.7749 */
+            gps_latitude?: number;
+            /** @example -122.4194 */
+            gps_longitude?: number;
+            /** @example 2023-01-01T00:00:00Z */
+            recorded_time?: string;
+        };
+        "dto.AddAssetToAlbumRequestDTO": {
             position?: number;
         };
-        "handler.AssetDTO": {
+        "dto.AssetDTO": {
             asset_id?: string;
             deleted_at?: string;
             duration?: number;
@@ -3114,7 +3175,7 @@ export interface components {
             owner_id?: number;
             rating?: number;
             repository_id?: string;
-            specific_metadata?: Record<string, never>;
+            specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             status?: number[];
             storage_path?: string;
             taken_time?: string;
@@ -3122,11 +3183,11 @@ export interface components {
             upload_time?: string;
             width?: number;
         };
-        "handler.AssetFilter": {
+        "dto.AssetFilterDTO": {
             /** @example Canon */
             camera_make?: string;
-            date?: components["schemas"]["handler.DateRange"];
-            filename?: components["schemas"]["handler.FilenameFilter"];
+            date?: components["schemas"]["dto.DateRangeDTO"];
+            filename?: components["schemas"]["dto.FilenameFilterDTO"];
             /** @example EF 50mm f/1.8 */
             lens?: string;
             /** @example true */
@@ -3145,47 +3206,45 @@ export interface components {
              */
             type?: "PHOTO" | "VIDEO" | "AUDIO";
         };
-        "handler.AssetListResponse": {
-            assets?: components["schemas"]["handler.AssetDTO"][];
+        "dto.AssetListResponseDTO": {
+            assets?: components["schemas"]["dto.AssetDTO"][];
             /** @example 20 */
             limit?: number;
             /** @example 0 */
             offset?: number;
         };
-        "handler.AssetTypesResponse": {
+        "dto.AssetTypesResponseDTO": {
             types?: components["schemas"]["dbtypes.AssetType"][];
         };
-        "handler.BatchUploadResponse": {
-            results?: components["schemas"]["handler.BatchUploadResult"][];
+        "dto.AuthResponseDTO": {
+            expiresAt?: string;
+            refreshToken?: string;
+            token?: string;
+            user?: components["schemas"]["dto.UserDTO"];
         };
-        "handler.BatchUploadResult": {
-            /** @description MLService-provided content hash */
+        "dto.BatchUploadResponseDTO": {
+            results?: components["schemas"]["dto.BatchUploadResultDTO"][];
+        };
+        "dto.BatchUploadResultDTO": {
             content_hash?: string;
-            /** @description Only present for failed uploads */
             error?: string;
-            /** @description Original filename */
             file_name?: string;
-            /** @description Status message */
             message?: string;
-            /** @description Only present for successful uploads */
             size?: number;
-            /** @description Only present for successful uploads */
             status?: string;
-            /** @description Whether the file was successfully queued */
             success?: boolean;
-            /** @description Only present for successful uploads */
             task_id?: number;
         };
-        "handler.CreateAlbumRequest": {
+        "dto.CreateAlbumRequestDTO": {
             album_name: string;
             cover_asset_id: string;
             description?: string;
         };
-        "handler.DateRange": {
+        "dto.DateRangeDTO": {
             from?: string;
             to?: string;
         };
-        "handler.FilenameFilter": {
+        "dto.FilenameFilterDTO": {
             /**
              * @example startswith
              * @enum {string}
@@ -3194,14 +3253,14 @@ export interface components {
             /** @example IMG_ */
             value?: string;
         };
-        "handler.FilterAssetsRequest": {
-            filter?: components["schemas"]["handler.AssetFilter"];
+        "dto.FilterAssetsRequestDTO": {
+            filter?: components["schemas"]["dto.AssetFilterDTO"];
             /** @example 20 */
             limit?: number;
             /** @example 0 */
             offset?: number;
         };
-        "handler.GetAlbumResponse": {
+        "dto.GetAlbumResponseDTO": {
             album_id?: number;
             album_name?: string;
             asset_count?: number;
@@ -3211,57 +3270,75 @@ export interface components {
             updated_at?: string;
             user_id?: number;
         };
-        "handler.ListAlbumsResponse": {
-            albums?: components["schemas"]["handler.GetAlbumResponse"][];
+        "dto.ListAlbumsResponseDTO": {
+            albums?: components["schemas"]["dto.GetAlbumResponseDTO"][];
             limit?: number;
             offset?: number;
             total?: number;
         };
-        "handler.MessageResponse": {
+        "dto.LoginRequestDTO": {
+            password: string;
+            username: string;
+        };
+        "dto.MessageResponseDTO": {
             /** @example Operation completed successfully */
             message?: string;
         };
-        "handler.OptionsResponse": {
+        "dto.OptionsResponseDTO": {
             camera_makes?: string[];
             lenses?: string[];
         };
-        "handler.ProgressSummary": {
+        "dto.ProgressSummaryDTO": {
             active_sessions?: number;
             completed_files?: number;
             failed_sessions?: number;
             overall_progress?: number;
             total_sessions?: number;
         };
-        "handler.ReprocessAssetRequest": {
+        "dto.RefreshTokenRequestDTO": {
+            refreshToken: string;
+        };
+        "dto.RegisterRequestDTO": {
+            email: string;
+            password: string;
+            username: string;
+        };
+        "dto.ReprocessAssetRequestDTO": {
             /** @example false */
             force_full_retry?: boolean;
-            /** @example [
+            /**
+             * @example [
              *       "thumbnail_small",
              *       "thumbnail_medium",
              *       "transcode_1080p"
-             *     ] */
+             *     ]
+             */
             tasks?: string[];
         };
-        "handler.ReprocessAssetResponse": {
+        "dto.ReprocessAssetResponseDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             asset_id?: string;
-            /** @example [
+            /**
+             * @example [
              *       "thumbnail_small",
              *       "transcode_1080p"
-             *     ] */
+             *     ]
+             */
             failed_tasks?: string[];
             /** @example Reprocessing job queued successfully */
             message?: string;
-            /** @example [
+            /**
+             * @example [
              *       "thumbnail_small",
              *       "transcode_1080p"
-             *     ] */
+             *     ]
+             */
             retry_tasks?: string[];
             /** @example queued */
             status?: string;
         };
-        "handler.SearchAssetsRequest": {
-            filter?: components["schemas"]["handler.AssetFilter"];
+        "dto.SearchAssetsRequestDTO": {
+            filter?: components["schemas"]["dto.AssetFilterDTO"];
             /** @example 20 */
             limit?: number;
             /** @example 0 */
@@ -3274,61 +3351,56 @@ export interface components {
              */
             search_type: "filename" | "semantic";
         };
-        "handler.SessionProgress": {
+        "dto.SessionProgressDTO": {
             bytes_done?: number;
             bytes_total?: number;
             filename?: string;
             last_activity?: string;
-            /** @description 0-1 */
             progress?: number;
             received_chunks?: number;
             session_id?: string;
-            /** @description pending, uploading, merging, completed, failed */
             status?: string;
             total_chunks?: number;
         };
-        "handler.UpdateAlbumRequest": {
+        "dto.UpdateAlbumRequestDTO": {
             album_name?: string;
             cover_asset_id?: string;
             description?: string;
         };
-        "handler.UpdateAssetPositionRequest": {
+        "dto.UpdateAssetPositionRequestDTO": {
             position: number;
         };
-        "handler.UpdateAssetRequest": {
-            specific_metadata?: Record<string, never>;
+        "dto.UpdateAssetRequestDTO": {
+            specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
         };
-        "handler.UpdateDescriptionRequest": {
+        "dto.UpdateDescriptionRequestDTO": {
             /** @example A beautiful sunset photo */
             description?: string;
         };
-        "handler.UpdateLikeRequest": {
+        "dto.UpdateLikeRequestDTO": {
             /** @example true */
             liked?: boolean;
         };
-        "handler.UpdateRatingAndLikeRequest": {
+        "dto.UpdateRatingAndLikeRequestDTO": {
             /** @example true */
             liked?: boolean;
             /** @example 5 */
             rating?: number;
         };
-        "handler.UpdateRatingRequest": {
+        "dto.UpdateRatingRequestDTO": {
             /** @example 5 */
             rating?: number;
         };
-        "handler.UploadConfigResponse": {
-            /** @description in bytes */
+        "dto.UploadConfigResponseDTO": {
             chunk_size?: number;
-            /** @description maximum concurrent uploads */
             max_concurrent?: number;
-            /** @description safety buffer in bytes */
             memory_buffer?: number;
         };
-        "handler.UploadProgressResponse": {
-            sessions?: components["schemas"]["handler.SessionProgress"][];
-            summary?: components["schemas"]["handler.ProgressSummary"];
+        "dto.UploadProgressResponseDTO": {
+            sessions?: components["schemas"]["dto.SessionProgressDTO"][];
+            summary?: components["schemas"]["dto.ProgressSummaryDTO"];
         };
-        "handler.UploadResponse": {
+        "dto.UploadResponseDTO": {
             /** @example abcd1234567890 */
             content_hash?: string;
             /** @example photo.jpg */
@@ -3342,25 +3414,7 @@ export interface components {
             /** @example 12345 */
             task_id?: number;
         };
-        "service.AuthResponse": {
-            expiresAt?: string;
-            refreshToken?: string;
-            token?: string;
-            user?: components["schemas"]["service.UserResponse"];
-        };
-        "service.LoginRequest": {
-            password: string;
-            username: string;
-        };
-        "service.RefreshTokenRequest": {
-            refreshToken: string;
-        };
-        "service.RegisterRequest": {
-            email: string;
-            password: string;
-            username: string;
-        };
-        "service.UserResponse": {
+        "dto.UserDTO": {
             created_at?: string;
             email?: string;
             is_active?: boolean;

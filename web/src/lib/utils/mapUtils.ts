@@ -4,8 +4,8 @@ import {
   needsCoordinateConversion,
   type Coordinate,
 } from "./coordinateConversion";
-import type { Asset } from "@/lib/http-commons/schema-extensions";
-import { isPhotoMetadata } from "@/lib/http-commons/metadata-types";
+import type { Asset } from "@/lib/http-commons";
+import { isPhotoMetadata } from "@/lib/http-commons";
 
 /**
  * Convert an Asset with GPS coordinates to PhotoLocation format
