@@ -6,12 +6,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
 	"server/internal/api"
 	"server/internal/api/handler"
 	"server/internal/db"
+	"server/internal/db/repo"
 	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/service"
@@ -94,94 +96,55 @@ func main() {
 		log.Fatalf("Failed to initialize zap logger: %v", err)
 	}
 
-	// Initialize lumen service
-	var lumenService service.LumenService
-	lumenService, err = service.NewLumenService(nil, zapLogger)
+	workers := river.NewWorkers()
+	queueClient, err := queue.New(pgxPool, workers, appConfig.MLConfig)
 	if err != nil {
-		log.Fatalf("Failed to initialize lumen service: %v", err)
+		log.Fatalf("Failed to Initialize Queue: %v", err)
 	}
-	err = lumenService.Start(ctx)
+
+	lumenService, embeddingService, err := initMLServices(ctx, appConfig.MLConfig, queries, workers, zapLogger)
 	if err != nil {
-		log.Fatalf("Failed to start lumen service: %v", err)
+		log.Fatalf("Failed to initialize ML services: %v", err)
 	}
+
+	if lumenService != nil {
+		warmupTasks := []string{"clip_image_embed", "ocr", "vlm_generate", "face_detect_and_embed"}
+		lumenService.WarmupTasks(ctx, warmupTasks)
+		go func() {
+			ticker := time.NewTicker(30 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					lumenService.WarmupTasks(context.Background(), warmupTasks)
+				}
+			}
+		}()
+	}
+
 	defer func() {
-		err := lumenService.Close()
-		if err != nil {
-			log.Fatalf("Failed to close lumen service: %v", err)
+		if lumenService != nil {
+			if err := lumenService.Close(); err != nil {
+				log.Printf("⚠️  Failed to close lumen service: %v", err)
+			}
 		}
 	}()
-	log.Println("✅ Lumen Service Initialized")
 
-	var embeddingService service.EmbeddingService
-	embeddingService = service.NewEmbeddingService(queries)
-	log.Println("✅ Embedding Service Initialized")
-
-	// Initialize Service (AssetService optionally ML-enabled)
 	assetService, err := service.NewAssetService(queries, lumenService, &repoManager, embeddingService)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
-	// llmService, err := service.NewLLMService(llmConfig)
-	// if err != nil {
-	// 	log.Fatalf("Failed to initialize llm service: %v", err)
-	// }
 	authService := service.NewAuthService(queries)
 	albumService := service.NewAlbumService(queries)
-	aiDescrptionService := service.NewAIDescriptionService(queries, lumenService)
-	ocrService := service.NewOCRService(queries)
-	faceService := service.NewFaceService(queries)
-	speciesService := service.NewSpeciesService(queries)
 
-	// Initialize Queue and run migrations
-	workers := river.NewWorkers()
-
-	// Create River client
-	queueClient, err := queue.New(pgxPool, workers)
-	// Add Workers
-	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, appConfig)
+	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, appConfig, lumenService)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.MetadataArgs](workers, &queue.MetadataWorker{Process: assetProcessor.ProcessMetadataTask})
 	river.AddWorker[queue.ThumbnailArgs](workers, &queue.ThumbnailWorker{Process: assetProcessor.ProcessThumbnailTask})
 	river.AddWorker[queue.TranscodeArgs](workers, &queue.TranscodeWorker{Process: assetProcessor.ProcessTranscodeTask})
 	river.AddWorker[queue.AssetRetryArgs](workers, &queue.AssetRetryWorker{ProcessRetry: assetProcessor.ProcessRetryTask})
-
-	if appConfig.MLConfig.CLIPEnabled {
-		// Register CLIP batch worker
-		river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
-			LumenService:     lumenService,
-			EmbeddingService: embeddingService,
-			SpeciesService:   speciesService,
-		})
-	}
-
-	if appConfig.MLConfig.CaptionEnabled {
-		// Register Caption batch worker
-		river.AddWorker[queue.ProcessCaptionArgs](workers, &queue.ProcessCaptionWorker{
-			AIDescriptionService: aiDescrptionService,
-			LumenService:         lumenService,
-		})
-	}
-
-	if appConfig.MLConfig.OCREnabled {
-		// Register OCR batch worker
-		river.AddWorker[queue.ProcessOcrArgs](workers, &queue.ProcessOcrWorker{
-			OCRService:   ocrService,
-			LumenService: lumenService,
-		})
-	}
-
-	if appConfig.MLConfig.FaceEnabled {
-		// Register Face Recognition batch worker
-		river.AddWorker[queue.ProcessFaceArgs](workers, &queue.ProcessFaceWorker{
-			FaceService:  faceService,
-			LumenService: lumenService,
-		})
-		log.Println("✅ Face Worker Registered")
-	}
-
-	if err != nil {
-		log.Fatalf("Failed to Initialize Queue: %v", err)
-	}
 
 	go func() {
 		if err := queueClient.Start(context.Background()); err != nil {
@@ -216,6 +179,85 @@ func main() {
 	if err := http.ListenAndServe(":"+appConfig.ServerConfig.Port, router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func initMLServices(
+	ctx context.Context,
+	mlConfig config.MLConfig,
+	queries *repo.Queries,
+	workers *river.Workers,
+	zapLogger *zap.Logger,
+) (service.LumenService, service.EmbeddingService, error) {
+	mlEnabled := mlConfig.CLIPEnabled || mlConfig.OCREnabled || mlConfig.CaptionEnabled || mlConfig.FaceEnabled
+
+	if !mlEnabled {
+		log.Println("ℹ️  ML features disabled, skipping Lumen and ML service initialization")
+		return nil, nil, nil
+	}
+
+	log.Println("🤖 Initializing ML services...")
+
+	lumenService, err := service.NewLumenService(nil, zapLogger)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = lumenService.Start(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	log.Println("✅ Lumen Service Initialized")
+
+	var embeddingService service.EmbeddingService
+	var speciesService service.SpeciesService
+	var aiDescriptionService service.AIDescriptionService
+	var ocrService service.OCRService
+	var faceService service.FaceService
+
+	if mlConfig.CLIPEnabled {
+		embeddingService = service.NewEmbeddingService(queries)
+		speciesService = service.NewSpeciesService(queries)
+
+		river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
+			LumenService:     lumenService,
+			EmbeddingService: embeddingService,
+			SpeciesService:   speciesService,
+		})
+		log.Println("✅ CLIP Service and Worker Registered")
+	}
+
+	if mlConfig.CaptionEnabled {
+		aiDescriptionService = service.NewAIDescriptionService(queries, lumenService)
+
+		river.AddWorker[queue.ProcessCaptionArgs](workers, &queue.ProcessCaptionWorker{
+			AIDescriptionService: aiDescriptionService,
+			LumenService:         lumenService,
+		})
+		log.Println("✅ Caption Service and Worker Registered")
+	}
+
+	if mlConfig.OCREnabled {
+		ocrService = service.NewOCRService(queries)
+
+		river.AddWorker[queue.ProcessOcrArgs](workers, &queue.ProcessOcrWorker{
+			OCRService:   ocrService,
+			LumenService: lumenService,
+		})
+		log.Println("✅ OCR Service and Worker Registered")
+	}
+
+	if mlConfig.FaceEnabled {
+		faceService = service.NewFaceService(queries)
+
+		river.AddWorker[queue.ProcessFaceArgs](workers, &queue.ProcessFaceWorker{
+			FaceService:  faceService,
+			LumenService: lumenService,
+		})
+		log.Println("✅ Face Service and Worker Registered")
+	}
+
+	log.Println("✅ ML Services Initialization Complete")
+	return lumenService, embeddingService, nil
 }
 
 func initPrimaryStorage(repoManager storage.RepositoryManager) error {

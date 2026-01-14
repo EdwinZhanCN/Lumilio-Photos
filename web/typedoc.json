@@ -6,6 +6,16 @@
         "src/utils/*.ts",
         "src/contexts/*.tsx"
     ],
+    "exclude": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.test.js",
+        "**/*.test.jsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "**/*.spec.js",
+        "**/*.spec.jsx"
+    ],
     "out": "docs",
     "sidebar": {
         "autoConfiguration": true,

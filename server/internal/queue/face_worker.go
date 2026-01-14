@@ -18,7 +18,7 @@ type ProcessFaceArgs = jobs.ProcessFaceArgs
 type ProcessFaceWorker struct {
 	river.WorkerDefaults[ProcessFaceArgs]
 
-	FaceService service.FaceService
+	FaceService  service.FaceService
 	LumenService service.LumenService
 }
 
@@ -30,6 +30,11 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(assetID.String()); err != nil {
 		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	// If task temporarily unavailable, snooze
+	if !w.LumenService.IsTaskAvailable("face_detect_and_embed") {
+		return river.JobSnooze(30 * time.Second)
 	}
 
 	// Start timing the face processing
@@ -57,7 +62,7 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 			bgCtx := context.Background()
 
 			for i, face := range faceV1.Faces {
-				if face.Embedding != nil && len(face.Embedding) > 0 {
+				if len(face.Embedding) > 0 {
 					// Find similar faces for clustering/recognition
 					// Note: We use a temporary face ID based on index since we don't have database IDs yet
 					tempFaceID := int32(i + 1000) // Use offset to avoid conflicts
