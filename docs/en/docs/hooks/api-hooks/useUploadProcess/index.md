@@ -4,6 +4,7 @@
 
 ## Interfaces
 
+- [FileUploadProgress](interfaces/FileUploadProgress.md)
 - [useUploadProcessReturn](interfaces/useUploadProcessReturn.md)
 
 ## Functions

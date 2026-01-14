@@ -4,7 +4,7 @@
 
 > **BorderParams** = `object`
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:9](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useGenerateBorder.tsx#L9)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useGenerateBorder.tsx#L12)
 
 ## Properties
 
@@ -12,7 +12,7 @@ Defined in: [hooks/util-hooks/useGenerateBorder.tsx:9](https://github.com/EdwinZ
 
 > **COLORED**: `object`
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useGenerateBorder.tsx#L10)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useGenerateBorder.tsx#L13)
 
 #### b
 
@@ -40,7 +40,7 @@ Defined in: [hooks/util-hooks/useGenerateBorder.tsx:10](https://github.com/Edwin
 
 > **FROSTED**: `object`
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useGenerateBorder.tsx#L17)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useGenerateBorder.tsx#L20)
 
 #### blur\_sigma
 
@@ -64,7 +64,7 @@ Defined in: [hooks/util-hooks/useGenerateBorder.tsx:17](https://github.com/Edwin
 
 > **VIGNETTE**: `object`
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useGenerateBorder.tsx#L23)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useGenerateBorder.tsx#L26)
 
 #### jpeg\_quality
 
