@@ -451,7 +451,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		RepositoryID: uuid.UUID(repository.RepoID.Bytes).String(),
 	}
 
-	jobInsetResult, err := h.queueClient.Insert(ctx, jobs.ProcessAssetArgs{
+	jobInsetResult, err := h.queueClient.Insert(ctx, jobs.IngestAssetArgs{
 		ClientHash:   payload.ClientHash,
 		StagedPath:   payload.StagedPath,
 		UserID:       payload.UserID,
@@ -459,7 +459,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		ContentType:  payload.ContentType,
 		FileName:     payload.FileName,
 		RepositoryID: payload.RepositoryID,
-	}, &river.InsertOpts{Queue: "process_asset"})
+	}, &river.InsertOpts{Queue: "ingest_asset"})
 
 	if err != nil {
 		log.Printf("Failed to enqueue task: %v", err)
@@ -2209,7 +2209,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 
 	// Enqueue for processing
 	log.Printf("Enqueuing processing job for file: %s (hash: %s)", stagingFilePath, finalHash)
-	jobResult, err := h.queueClient.Insert(ctx, jobs.ProcessAssetArgs{
+	jobResult, err := h.queueClient.Insert(ctx, jobs.IngestAssetArgs{
 		ClientHash:   finalHash,
 		StagedPath:   stagingFilePath,
 		UserID:       session.UserID,
@@ -2217,7 +2217,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 		ContentType:  session.ContentType,
 		FileName:     session.Filename,
 		RepositoryID: uuid.UUID(repository.RepoID.Bytes).String(),
-	}, &river.InsertOpts{Queue: "process_asset"})
+	}, &river.InsertOpts{Queue: "ingest_asset"})
 
 	if err != nil {
 		if mergedFilePath == "" {
@@ -2412,37 +2412,66 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		}
 
 		// Create a new processing job
-		// Handle nil pointers for Hash and OwnerID
-		clientHash := ""
-		if updatedAsset.Hash != nil {
-			clientHash = *updatedAsset.Hash
-		}
+		storagePath := *updatedAsset.StoragePath
+		assetType := dbtypes.AssetType(updatedAsset.Type)
 
-		userID := ""
-		if updatedAsset.OwnerID != nil {
-			userID = fmt.Sprintf("%d", *updatedAsset.OwnerID)
+		metaArgs := jobs.MetadataArgs{
+			AssetID:          updatedAsset.AssetID,
+			RepoPath:         repository.Path,
+			StoragePath:      storagePath,
+			AssetType:        assetType,
+			OriginalFilename: updatedAsset.OriginalFilename,
+			FileSize:         updatedAsset.FileSize,
+			MimeType:         updatedAsset.MimeType,
 		}
-
-		jobArgs := jobs.ProcessAssetArgs{
-			ClientHash:   clientHash,
-			StagedPath:   assetPath, // Use the actual asset path for reprocessing
-			UserID:       userID,
-			Timestamp:    time.Now(),
-			ContentType:  updatedAsset.MimeType,
-			FileName:     updatedAsset.OriginalFilename,
-			RepositoryID: repository.RepoID.String(),
-		}
-
-		// Enqueue the reprocessing job
-		jobResult, err := h.queueClient.Insert(ctx, jobArgs, &river.InsertOpts{
-			Queue: "process_asset",
-		})
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue reprocessing job"})
+		if _, err := h.queueClient.Insert(ctx, metaArgs, &river.InsertOpts{Queue: "metadata_asset"}); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue metadata job"})
 			return
 		}
 
-		log.Printf("Full reprocessing job %d enqueued for asset %s", jobResult.Job.ID, assetID.String())
+		switch assetType {
+		case dbtypes.AssetTypePhoto:
+			if _, err := h.queueClient.Insert(ctx, jobs.ThumbnailArgs{
+				AssetID:     updatedAsset.AssetID,
+				RepoPath:    repository.Path,
+				StoragePath: storagePath,
+				AssetType:   assetType,
+			}, &river.InsertOpts{Queue: "thumbnail_asset"}); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue thumbnail job"})
+				return
+			}
+		case dbtypes.AssetTypeVideo:
+			if _, err := h.queueClient.Insert(ctx, jobs.ThumbnailArgs{
+				AssetID:     updatedAsset.AssetID,
+				RepoPath:    repository.Path,
+				StoragePath: storagePath,
+				AssetType:   assetType,
+			}, &river.InsertOpts{Queue: "thumbnail_asset"}); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue thumbnail job"})
+				return
+			}
+			if _, err := h.queueClient.Insert(ctx, jobs.TranscodeArgs{
+				AssetID:     updatedAsset.AssetID,
+				RepoPath:    repository.Path,
+				StoragePath: storagePath,
+				AssetType:   assetType,
+			}, &river.InsertOpts{Queue: "transcode_asset"}); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue transcode job"})
+				return
+			}
+		case dbtypes.AssetTypeAudio:
+			if _, err := h.queueClient.Insert(ctx, jobs.TranscodeArgs{
+				AssetID:     updatedAsset.AssetID,
+				RepoPath:    repository.Path,
+				StoragePath: storagePath,
+				AssetType:   assetType,
+			}, &river.InsertOpts{Queue: "transcode_asset"}); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to enqueue transcode job"})
+				return
+			}
+		}
+
+		log.Printf("Full reprocessing jobs enqueued for asset %s", assetID.String())
 
 		// Return success response
 		response := ReprocessAssetResponse{
@@ -2457,7 +2486,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 	} else {
 		// Selective retry - enqueue selective retry job
 		// Create selective retry job payload
-		retryArgs := processors.AssetRetryPayload{
+		retryArgs := jobs.AssetRetryPayload{
 			AssetID:        assetID.String(),
 			RetryTasks:     req.Tasks,
 			ForceFullRetry: req.ForceFullRetry,
