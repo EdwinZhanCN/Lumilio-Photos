@@ -2,7 +2,7 @@
 
 # Interface: useExportImageReturn
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useExportImage.tsx#L20)
+Defined in: [hooks/util-hooks/useExportImage.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useExportImage.tsx#L26)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:20](https://github.com/EdwinZha
 
 > **cancelExport**: () => `void`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useExportImage.tsx#L26)
+Defined in: [hooks/util-hooks/useExportImage.tsx:36](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useExportImage.tsx#L36)
 
 #### Returns
 
@@ -22,13 +22,91 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:26](https://github.com/EdwinZha
 
 > **downloadOriginal**: (`asset`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useExportImage.tsx#L23)
+Defined in: [hooks/util-hooks/useExportImage.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useExportImage.tsx#L29)
 
 #### Parameters
 
 ##### asset
 
-`Asset`
+###### asset_id?
+
+`string`
+
+###### deleted_at?
+
+`string`
+
+###### duration?
+
+`number`
+
+###### file_size?
+
+`number`
+
+###### hash?
+
+`string`
+
+###### height?
+
+`number`
+
+###### is_deleted?
+
+`boolean`
+
+###### liked?
+
+`boolean`
+
+###### mime_type?
+
+`string`
+
+###### original_filename?
+
+`string`
+
+###### owner_id?
+
+`number`
+
+###### rating?
+
+`number`
+
+###### repository_id?
+
+`string`
+
+###### specific_metadata?
+
+\{ `camera_model?`: `string`; `description?`: `string`; `dimensions?`: `string`; `exposure?`: `number`; `exposure_time?`: `string`; `f_number?`: `number`; `focal_length?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `is_raw?`: `boolean`; `iso_speed?`: `number`; `lens_model?`: `string`; `resolution?`: `string`; `taken_time?`: `string`; \} \| \{ `bitrate?`: `number`; `camera_model?`: `string`; `codec?`: `string`; `description?`: `string`; `frame_rate?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `recorded_time?`: `string`; \} \| \{ `album?`: `string`; `artist?`: `string`; `bitrate?`: `number`; `channels?`: `number`; `codec?`: `string`; `description?`: `string`; `genre?`: `string`; `sample_rate?`: `number`; `title?`: `string`; `year?`: `number`; \}
+
+###### status?
+
+`number`[]
+
+###### storage_path?
+
+`string`
+
+###### taken_time?
+
+`string`
+
+###### type?
+
+`string`
+
+###### upload_time?
+
+`string`
+
+###### width?
+
+`number`
 
 #### Returns
 
@@ -40,13 +118,91 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:23](https://github.com/EdwinZha
 
 > **exportImage**: (`asset`, `options`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:24](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useExportImage.tsx#L24)
+Defined in: [hooks/util-hooks/useExportImage.tsx:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useExportImage.tsx#L30)
 
 #### Parameters
 
 ##### asset
 
-`Asset`
+###### asset_id?
+
+`string`
+
+###### deleted_at?
+
+`string`
+
+###### duration?
+
+`number`
+
+###### file_size?
+
+`number`
+
+###### hash?
+
+`string`
+
+###### height?
+
+`number`
+
+###### is_deleted?
+
+`boolean`
+
+###### liked?
+
+`boolean`
+
+###### mime_type?
+
+`string`
+
+###### original_filename?
+
+`string`
+
+###### owner_id?
+
+`number`
+
+###### rating?
+
+`number`
+
+###### repository_id?
+
+`string`
+
+###### specific_metadata?
+
+\{ `camera_model?`: `string`; `description?`: `string`; `dimensions?`: `string`; `exposure?`: `number`; `exposure_time?`: `string`; `f_number?`: `number`; `focal_length?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `is_raw?`: `boolean`; `iso_speed?`: `number`; `lens_model?`: `string`; `resolution?`: `string`; `taken_time?`: `string`; \} \| \{ `bitrate?`: `number`; `camera_model?`: `string`; `codec?`: `string`; `description?`: `string`; `frame_rate?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `recorded_time?`: `string`; \} \| \{ `album?`: `string`; `artist?`: `string`; `bitrate?`: `number`; `channels?`: `number`; `codec?`: `string`; `description?`: `string`; `genre?`: `string`; `sample_rate?`: `number`; `title?`: `string`; `year?`: `number`; \}
+
+###### status?
+
+`number`[]
+
+###### storage_path?
+
+`string`
+
+###### taken_time?
+
+`string`
+
+###### type?
+
+`string`
+
+###### upload_time?
+
+`string`
+
+###### width?
+
+`number`
 
 ##### options
 
@@ -60,19 +216,23 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:24](https://github.com/EdwinZha
 
 ### exportMultiple()
 
-> **exportMultiple**: (`assets`, `options`) => `Promise`\<`void`\>
+> **exportMultiple**: (`assets`, `options`, `priority?`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:25](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useExportImage.tsx#L25)
+Defined in: [hooks/util-hooks/useExportImage.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useExportImage.tsx#L31)
 
 #### Parameters
 
 ##### assets
 
-`Asset`[]
+`object`[]
 
 ##### options
 
 [`ExportOptions`](ExportOptions.md)
+
+##### priority?
+
+[`ProcessingPriority`](../../../../utils/smartBatchSizing/enumerations/ProcessingPriority.md)
 
 #### Returns
 
@@ -84,7 +244,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:25](https://github.com/EdwinZha
 
 > **exportProgress**: `null` \| [`ExportProgress`](ExportProgress.md)
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useExportImage.tsx#L22)
+Defined in: [hooks/util-hooks/useExportImage.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useExportImage.tsx#L28)
 
 ***
 
@@ -92,4 +252,4 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:22](https://github.com/EdwinZha
 
 > **isExporting**: `boolean`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useExportImage.tsx#L21)
+Defined in: [hooks/util-hooks/useExportImage.tsx:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useExportImage.tsx#L27)

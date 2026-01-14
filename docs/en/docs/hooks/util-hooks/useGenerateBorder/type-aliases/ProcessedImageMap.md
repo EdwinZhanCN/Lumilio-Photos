@@ -4,7 +4,7 @@
 
 > **ProcessedImageMap** = `object`
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/bdb61d82271cd56f7d31e6f3e50cded728e37cea/web/src/hooks/util-hooks/useGenerateBorder.tsx#L29)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/67c9aa6e9757c27514a72920fc1c7730f5f2ba78/web/src/hooks/util-hooks/useGenerateBorder.tsx#L32)
 
 ## Index Signature
 
