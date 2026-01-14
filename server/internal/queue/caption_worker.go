@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
@@ -29,6 +30,10 @@ func (w *ProcessCaptionWorker) Work(ctx context.Context, job *river.Job[ProcessC
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(assetID.String()); err != nil {
 		return fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	if !w.LumenService.IsTaskAvailable("vlm_generate") {
+		return river.JobSnooze(30 * time.Second)
 	}
 
 	// Save AI description using AIDescriptionService
