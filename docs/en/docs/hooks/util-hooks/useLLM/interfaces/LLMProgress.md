@@ -2,7 +2,7 @@
 
 # Interface: LLMProgress
 
-Defined in: [hooks/util-hooks/useLLM.tsx:7](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/hooks/util-hooks/useLLM.tsx#L7)
+Defined in: [hooks/util-hooks/useLLM.tsx:7](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/hooks/util-hooks/useLLM.tsx#L7)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useLLM.tsx:7](https://github.com/EdwinZhanCN/Lumil
 
 > `optional` **error**: `string`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/hooks/util-hooks/useLLM.tsx#L14)
+Defined in: [hooks/util-hooks/useLLM.tsx:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/hooks/util-hooks/useLLM.tsx#L14)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [hooks/util-hooks/useLLM.tsx:14](https://github.com/EdwinZhanCN/Lumi
 
 > `optional` **failedAt**: `null` \| `number`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:15](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/hooks/util-hooks/useLLM.tsx#L15)
+Defined in: [hooks/util-hooks/useLLM.tsx:15](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/hooks/util-hooks/useLLM.tsx#L15)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [hooks/util-hooks/useLLM.tsx:15](https://github.com/EdwinZhanCN/Lumi
 
 > `optional` **initProgress**: `number`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/hooks/util-hooks/useLLM.tsx#L13)
+Defined in: [hooks/util-hooks/useLLM.tsx:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/hooks/util-hooks/useLLM.tsx#L13)
 
 ***
 
@@ -34,7 +34,7 @@ Defined in: [hooks/util-hooks/useLLM.tsx:13](https://github.com/EdwinZhanCN/Lumi
 
 > `optional` **initStatus**: `string`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/hooks/util-hooks/useLLM.tsx#L11)
+Defined in: [hooks/util-hooks/useLLM.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/hooks/util-hooks/useLLM.tsx#L11)
 
 ***
 
@@ -42,7 +42,7 @@ Defined in: [hooks/util-hooks/useLLM.tsx:11](https://github.com/EdwinZhanCN/Lumi
 
 > `optional` **initTime**: `number`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/hooks/util-hooks/useLLM.tsx#L12)
+Defined in: [hooks/util-hooks/useLLM.tsx:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/hooks/util-hooks/useLLM.tsx#L12)
 
 ***
 
@@ -50,7 +50,7 @@ Defined in: [hooks/util-hooks/useLLM.tsx:12](https://github.com/EdwinZhanCN/Lumi
 
 > **isGenerating**: `boolean`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:9](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/hooks/util-hooks/useLLM.tsx#L9)
+Defined in: [hooks/util-hooks/useLLM.tsx:9](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/hooks/util-hooks/useLLM.tsx#L9)
 
 ***
 
@@ -58,7 +58,7 @@ Defined in: [hooks/util-hooks/useLLM.tsx:9](https://github.com/EdwinZhanCN/Lumil
 
 > **isInitializing**: `boolean`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:8](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/hooks/util-hooks/useLLM.tsx#L8)
+Defined in: [hooks/util-hooks/useLLM.tsx:8](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/hooks/util-hooks/useLLM.tsx#L8)
 
 ***
 
@@ -66,4 +66,4 @@ Defined in: [hooks/util-hooks/useLLM.tsx:8](https://github.com/EdwinZhanCN/Lumil
 
 > **tokensGenerated**: `number`
 
-Defined in: [hooks/util-hooks/useLLM.tsx:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/hooks/util-hooks/useLLM.tsx#L10)
+Defined in: [hooks/util-hooks/useLLM.tsx:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/hooks/util-hooks/useLLM.tsx#L10)
