@@ -1,514 +1,639 @@
-basePath: /api/v1
-definitions:
-  api.Result:
-    description: Standard API response wrapper
-    properties:
-      code:
-        description: Business status code (0 for success, non-zero for errors)
-        example: 0
-        type: integer
-      data:
-        description: Business data, ignore empty values
-        type: object
-      error:
-        description: Debug error message, ignore empty values
-        example: error details
-        type: string
-      message:
-        description: User readable message
-        example: success
-        type: string
-    type: object
-  dbtypes.AssetType:
-    enum:
-    - PHOTO
-    - VIDEO
-    - AUDIO
-    type: string
-    x-enum-varnames:
-    - AssetTypePhoto
-    - AssetTypeVideo
-    - AssetTypeAudio
-  dto.AddAssetToAlbumRequestDTO:
-    properties:
-      position:
-        type: integer
-    type: object
-  dto.AssetDTO:
-    properties:
-      asset_id:
-        type: string
-      deleted_at:
-        type: string
-      duration:
-        type: number
-      file_size:
-        type: integer
-      hash:
-        type: string
-      height:
-        type: integer
-      is_deleted:
-        type: boolean
-      liked:
-        type: boolean
-      mime_type:
-        type: string
-      original_filename:
-        type: string
-      owner_id:
-        type: integer
-      rating:
-        type: integer
-      repository_id:
-        type: string
-      specific_metadata:
-        type: object
-      status:
-        items:
+components:
+  schemas:
+    api.Result:
+      allOf:
+      - $ref: '#/components/schemas/data'
+      description: Standard API response wrapper
+      properties:
+        code:
+          description: Business status code (0 for success, non-zero for errors)
+          example: 0
           type: integer
-        type: array
-      storage_path:
-        type: string
-      taken_time:
-        type: string
-      type:
-        type: string
-      upload_time:
-        type: string
-      width:
-        type: integer
-    type: object
-  dto.AssetFilterDTO:
-    properties:
-      camera_make:
-        example: Canon
-        type: string
-      date:
-        $ref: '#/definitions/dto.DateRangeDTO'
-      filename:
-        $ref: '#/definitions/dto.FilenameFilterDTO'
-      lens:
-        example: EF 50mm f/1.8
-        type: string
-      liked:
-        example: true
-        type: boolean
-      owner_id:
-        example: 123
-        type: integer
-      rating:
-        example: 5
-        maximum: 5
-        minimum: 0
-        type: integer
-      raw:
-        example: true
-        type: boolean
-      repository_id:
-        example: 550e8400-e29b-41d4-a716-446655440000
-        type: string
-      type:
-        enum:
-        - PHOTO
-        - VIDEO
-        - AUDIO
-        example: PHOTO
-        type: string
-    type: object
-  dto.AssetListResponseDTO:
-    properties:
-      assets:
-        items:
-          $ref: '#/definitions/dto.AssetDTO'
-        type: array
-      limit:
-        example: 20
-        type: integer
-      offset:
-        example: 0
-        type: integer
-    type: object
-  dto.AssetTypesResponseDTO:
-    properties:
-      types:
-        items:
-          $ref: '#/definitions/dbtypes.AssetType'
-        type: array
-    type: object
-  dto.AuthResponseDTO:
-    properties:
-      expiresAt:
-        type: string
-      refreshToken:
-        type: string
-      token:
-        type: string
-      user:
-        $ref: '#/definitions/dto.UserDTO'
-    type: object
-  dto.BatchUploadResponseDTO:
-    properties:
-      results:
-        items:
-          $ref: '#/definitions/dto.BatchUploadResultDTO'
-        type: array
-    type: object
-  dto.BatchUploadResultDTO:
-    properties:
-      content_hash:
-        type: string
-      error:
-        type: string
-      file_name:
-        type: string
-      message:
-        type: string
-      size:
-        type: integer
-      status:
-        type: string
-      success:
-        type: boolean
-      task_id:
-        type: integer
-    type: object
-  dto.CreateAlbumRequestDTO:
-    properties:
-      album_name:
-        type: string
-      cover_asset_id:
-        type: string
-      description:
-        type: string
-    required:
-    - album_name
-    - cover_asset_id
-    type: object
-  dto.DateRangeDTO:
-    properties:
-      from:
-        type: string
-      to:
-        type: string
-    type: object
-  dto.FilenameFilterDTO:
-    properties:
-      mode:
-        enum:
-        - contains
-        - matches
-        - startswith
-        - endswith
-        example: startswith
-        type: string
-      value:
-        example: IMG_
-        type: string
-    type: object
-  dto.FilterAssetsRequestDTO:
-    properties:
-      filter:
-        $ref: '#/definitions/dto.AssetFilterDTO'
-      limit:
-        example: 20
-        maximum: 100
-        minimum: 1
-        type: integer
-      offset:
-        example: 0
-        minimum: 0
-        type: integer
-    type: object
-  dto.GetAlbumResponseDTO:
-    properties:
-      album_id:
-        type: integer
-      album_name:
-        type: string
-      asset_count:
-        type: integer
-      cover_asset_id:
-        type: string
-      created_at:
-        type: string
-      description:
-        type: string
-      updated_at:
-        type: string
-      user_id:
-        type: integer
-    type: object
-  dto.ListAlbumsResponseDTO:
-    properties:
-      albums:
-        items:
-          $ref: '#/definitions/dto.GetAlbumResponseDTO'
-        type: array
-      limit:
-        type: integer
-      offset:
-        type: integer
-      total:
-        type: integer
-    type: object
-  dto.LoginRequestDTO:
-    properties:
-      password:
-        type: string
-      username:
-        type: string
-    required:
-    - password
-    - username
-    type: object
-  dto.MessageResponseDTO:
-    properties:
-      message:
-        example: Operation completed successfully
-        type: string
-    type: object
-  dto.OptionsResponseDTO:
-    properties:
-      camera_makes:
-        items:
+        data:
+          description: Business data, ignore empty values
+          type: object
+        error:
+          description: Debug error message, ignore empty values
+          example: error details
           type: string
-        type: array
-      lenses:
-        items:
+        message:
+          description: User readable message
+          example: success
           type: string
-        type: array
-    type: object
-  dto.ProgressSummaryDTO:
-    properties:
-      active_sessions:
-        type: integer
-      completed_files:
-        type: integer
-      failed_sessions:
-        type: integer
-      overall_progress:
-        type: number
-      total_sessions:
-        type: integer
-    type: object
-  dto.RefreshTokenRequestDTO:
-    properties:
-      refreshToken:
-        type: string
-    required:
-    - refreshToken
-    type: object
-  dto.RegisterRequestDTO:
-    properties:
-      email:
-        type: string
-      password:
-        minLength: 6
-        type: string
-      username:
-        maxLength: 50
-        minLength: 3
-        type: string
-    required:
-    - email
-    - password
-    - username
-    type: object
-  dto.ReprocessAssetRequestDTO:
-    properties:
-      force_full_retry:
-        example: false
-        type: boolean
-      tasks:
-        example:
-        - thumbnail_small
-        - thumbnail_medium
-        - transcode_1080p
-        items:
+      type: object
+    data:
+      properties:
+        data:
+          $ref: '#/components/schemas/dto.UserDTO'
+      type: object
+    dbtypes.AssetType:
+      enum:
+      - PHOTO
+      - VIDEO
+      - AUDIO
+      type: string
+      x-enum-varnames:
+      - AssetTypePhoto
+      - AssetTypeVideo
+      - AssetTypeAudio
+    dbtypes.AudioSpecificMetadata:
+      properties:
+        album:
+          example: Album Title
           type: string
-        type: array
-    type: object
-  dto.ReprocessAssetResponseDTO:
-    properties:
-      asset_id:
-        example: 550e8400-e29b-41d4-a716-446655440000
-        type: string
-      failed_tasks:
-        example:
-        - thumbnail_small
-        - transcode_1080p
-        items:
+        artist:
+          example: John Doe
           type: string
-        type: array
-      message:
-        example: Reprocessing job queued successfully
-        type: string
-      retry_tasks:
-        example:
-        - thumbnail_small
-        - transcode_1080p
-        items:
+        bitrate:
+          example: 128000
+          type: integer
+        channels:
+          example: 2
+          type: integer
+        codec:
+          example: AAC
           type: string
-        type: array
-      status:
-        example: queued
-        type: string
-    type: object
-  dto.SearchAssetsRequestDTO:
-    properties:
-      filter:
-        $ref: '#/definitions/dto.AssetFilterDTO'
-      limit:
-        example: 20
-        maximum: 100
-        minimum: 1
-        type: integer
-      offset:
-        example: 0
-        minimum: 0
-        type: integer
-      query:
-        example: red bird on branch
-        type: string
-      search_type:
-        enum:
-        - filename
-        - semantic
-        example: filename
-        type: string
-    required:
-    - query
-    - search_type
-    type: object
-  dto.SessionProgressDTO:
-    properties:
-      bytes_done:
-        type: integer
-      bytes_total:
-        type: integer
-      filename:
-        type: string
-      last_activity:
-        type: string
-      progress:
-        type: number
-      received_chunks:
-        type: integer
-      session_id:
-        type: string
-      status:
-        type: string
-      total_chunks:
-        type: integer
-    type: object
-  dto.UpdateAlbumRequestDTO:
-    properties:
-      album_name:
-        type: string
-      cover_asset_id:
-        type: string
-      description:
-        type: string
-    type: object
-  dto.UpdateAssetPositionRequestDTO:
-    properties:
-      position:
-        type: integer
-    required:
-    - position
-    type: object
-  dto.UpdateAssetRequestDTO:
-    properties:
-      specific_metadata:
-        type: object
-    type: object
-  dto.UpdateDescriptionRequestDTO:
-    properties:
-      description:
-        example: A beautiful sunset photo
-        type: string
-    type: object
-  dto.UpdateLikeRequestDTO:
-    properties:
-      liked:
-        example: true
-        type: boolean
-    type: object
-  dto.UpdateRatingAndLikeRequestDTO:
-    properties:
-      liked:
-        example: true
-        type: boolean
-      rating:
-        example: 5
-        maximum: 5
-        minimum: 0
-        type: integer
-    type: object
-  dto.UpdateRatingRequestDTO:
-    properties:
-      rating:
-        example: 5
-        maximum: 5
-        minimum: 0
-        type: integer
-    type: object
-  dto.UploadConfigResponseDTO:
-    properties:
-      chunk_size:
-        type: integer
-      max_concurrent:
-        type: integer
-      memory_buffer:
-        type: integer
-    type: object
-  dto.UploadProgressResponseDTO:
-    properties:
-      sessions:
-        items:
-          $ref: '#/definitions/dto.SessionProgressDTO'
-        type: array
-      summary:
-        $ref: '#/definitions/dto.ProgressSummaryDTO'
-    type: object
-  dto.UploadResponseDTO:
-    properties:
-      content_hash:
-        example: abcd1234567890
-        type: string
-      file_name:
-        example: photo.jpg
-        type: string
-      message:
-        example: File received and queued for processing
-        type: string
-      size:
-        example: 1048576
-        type: integer
-      status:
-        example: processing
-        type: string
-      task_id:
-        example: 12345
-        type: integer
-    type: object
-  dto.UserDTO:
-    properties:
-      created_at:
-        type: string
-      email:
-        type: string
-      is_active:
-        type: boolean
-      last_login:
-        type: string
-      user_id:
-        type: integer
-      username:
-        type: string
-    type: object
-host: localhost:3001
+        description:
+          example: Song Description
+          type: string
+        genre:
+          example: Pop
+          type: string
+        sample_rate:
+          example: 44100
+          type: integer
+        title:
+          example: Song Title
+          type: string
+        year:
+          example: 2023
+          type: integer
+      type: object
+    dbtypes.PhotoSpecificMetadata:
+      properties:
+        camera_model:
+          type: string
+        description:
+          type: string
+        dimensions:
+          type: string
+        exposure:
+          type: number
+        exposure_time:
+          type: string
+        f_number:
+          type: number
+        focal_length:
+          type: number
+        gps_latitude:
+          type: number
+        gps_longitude:
+          type: number
+        is_raw:
+          type: boolean
+        iso_speed:
+          type: integer
+        lens_model:
+          type: string
+        resolution:
+          type: string
+        taken_time:
+          type: string
+      type: object
+    dbtypes.VideoSpecificMetadata:
+      properties:
+        bitrate:
+          example: 1000000
+          type: integer
+        camera_model:
+          example: Canon EOS 5D Mark IV
+          type: string
+        codec:
+          example: H.264
+          type: string
+        description:
+          example: A beautiful sunset over the ocean
+          type: string
+        frame_rate:
+          example: 30
+          type: number
+        gps_latitude:
+          example: 37.7749
+          type: number
+        gps_longitude:
+          example: -122.4194
+          type: number
+        recorded_time:
+          example: "2023-01-01T00:00:00Z"
+          type: string
+      type: object
+    dto.AddAssetToAlbumRequestDTO:
+      properties:
+        position:
+          type: integer
+      type: object
+    dto.AssetDTO:
+      properties:
+        asset_id:
+          type: string
+        deleted_at:
+          type: string
+        duration:
+          type: number
+        file_size:
+          type: integer
+        hash:
+          type: string
+        height:
+          type: integer
+        is_deleted:
+          type: boolean
+        liked:
+          type: boolean
+        mime_type:
+          type: string
+        original_filename:
+          type: string
+        owner_id:
+          type: integer
+        rating:
+          type: integer
+        repository_id:
+          type: string
+        specific_metadata:
+          oneOf:
+          - $ref: '#/components/schemas/dbtypes.PhotoSpecificMetadata'
+          - $ref: '#/components/schemas/dbtypes.VideoSpecificMetadata'
+          - $ref: '#/components/schemas/dbtypes.AudioSpecificMetadata'
+          type: object
+        status:
+          items:
+            type: integer
+          type: array
+          uniqueItems: false
+        storage_path:
+          type: string
+        taken_time:
+          type: string
+        type:
+          type: string
+        upload_time:
+          type: string
+        width:
+          type: integer
+      type: object
+    dto.AssetFilterDTO:
+      properties:
+        camera_make:
+          example: Canon
+          type: string
+        date:
+          $ref: '#/components/schemas/dto.DateRangeDTO'
+        filename:
+          $ref: '#/components/schemas/dto.FilenameFilterDTO'
+        lens:
+          example: EF 50mm f/1.8
+          type: string
+        liked:
+          example: true
+          type: boolean
+        owner_id:
+          example: 123
+          type: integer
+        rating:
+          example: 5
+          maximum: 5
+          minimum: 0
+          type: integer
+        raw:
+          example: true
+          type: boolean
+        repository_id:
+          example: 550e8400-e29b-41d4-a716-446655440000
+          type: string
+        type:
+          enum:
+          - PHOTO
+          - VIDEO
+          - AUDIO
+          example: PHOTO
+          type: string
+      type: object
+    dto.AssetListResponseDTO:
+      properties:
+        assets:
+          items:
+            $ref: '#/components/schemas/dto.AssetDTO'
+          type: array
+          uniqueItems: false
+        limit:
+          example: 20
+          type: integer
+        offset:
+          example: 0
+          type: integer
+      type: object
+    dto.AssetTypesResponseDTO:
+      properties:
+        types:
+          items:
+            $ref: '#/components/schemas/dbtypes.AssetType'
+          type: array
+          uniqueItems: false
+      type: object
+    dto.AuthResponseDTO:
+      properties:
+        expiresAt:
+          type: string
+        refreshToken:
+          type: string
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/dto.UserDTO'
+      type: object
+    dto.BatchUploadResponseDTO:
+      properties:
+        results:
+          items:
+            $ref: '#/components/schemas/dto.BatchUploadResultDTO'
+          type: array
+          uniqueItems: false
+      type: object
+    dto.BatchUploadResultDTO:
+      properties:
+        content_hash:
+          type: string
+        error:
+          type: string
+        file_name:
+          type: string
+        message:
+          type: string
+        size:
+          type: integer
+        status:
+          type: string
+        success:
+          type: boolean
+        task_id:
+          type: integer
+      type: object
+    dto.CreateAlbumRequestDTO:
+      properties:
+        album_name:
+          type: string
+        cover_asset_id:
+          type: string
+        description:
+          type: string
+      required:
+      - album_name
+      - cover_asset_id
+      type: object
+    dto.DateRangeDTO:
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+      type: object
+    dto.FilenameFilterDTO:
+      properties:
+        mode:
+          enum:
+          - contains
+          - matches
+          - startswith
+          - endswith
+          example: startswith
+          type: string
+        value:
+          example: IMG_
+          type: string
+      type: object
+    dto.FilterAssetsRequestDTO:
+      properties:
+        filter:
+          $ref: '#/components/schemas/dto.AssetFilterDTO'
+        limit:
+          example: 20
+          maximum: 100
+          minimum: 1
+          type: integer
+        offset:
+          example: 0
+          minimum: 0
+          type: integer
+      type: object
+    dto.GetAlbumResponseDTO:
+      properties:
+        album_id:
+          type: integer
+        album_name:
+          type: string
+        asset_count:
+          type: integer
+        cover_asset_id:
+          type: string
+        created_at:
+          type: string
+        description:
+          type: string
+        updated_at:
+          type: string
+        user_id:
+          type: integer
+      type: object
+    dto.ListAlbumsResponseDTO:
+      properties:
+        albums:
+          items:
+            $ref: '#/components/schemas/dto.GetAlbumResponseDTO'
+          type: array
+          uniqueItems: false
+        limit:
+          type: integer
+        offset:
+          type: integer
+        total:
+          type: integer
+      type: object
+    dto.LoginRequestDTO:
+      properties:
+        password:
+          type: string
+        username:
+          type: string
+      required:
+      - password
+      - username
+      type: object
+    dto.MessageResponseDTO:
+      properties:
+        message:
+          example: Operation completed successfully
+          type: string
+      type: object
+    dto.OptionsResponseDTO:
+      properties:
+        camera_makes:
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        lenses:
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+      type: object
+    dto.ProgressSummaryDTO:
+      properties:
+        active_sessions:
+          type: integer
+        completed_files:
+          type: integer
+        failed_sessions:
+          type: integer
+        overall_progress:
+          type: number
+        total_sessions:
+          type: integer
+      type: object
+    dto.RefreshTokenRequestDTO:
+      properties:
+        refreshToken:
+          type: string
+      required:
+      - refreshToken
+      type: object
+    dto.RegisterRequestDTO:
+      properties:
+        email:
+          type: string
+        password:
+          minLength: 6
+          type: string
+        username:
+          maxLength: 50
+          minLength: 3
+          type: string
+      required:
+      - email
+      - password
+      - username
+      type: object
+    dto.ReprocessAssetRequestDTO:
+      properties:
+        force_full_retry:
+          example: false
+          type: boolean
+        tasks:
+          example:
+          - thumbnail_small
+          - thumbnail_medium
+          - transcode_1080p
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+      type: object
+    dto.ReprocessAssetResponseDTO:
+      properties:
+        asset_id:
+          example: 550e8400-e29b-41d4-a716-446655440000
+          type: string
+        failed_tasks:
+          example:
+          - thumbnail_small
+          - transcode_1080p
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        message:
+          example: Reprocessing job queued successfully
+          type: string
+        retry_tasks:
+          example:
+          - thumbnail_small
+          - transcode_1080p
+          items:
+            type: string
+          type: array
+          uniqueItems: false
+        status:
+          example: queued
+          type: string
+      type: object
+    dto.SearchAssetsRequestDTO:
+      properties:
+        filter:
+          $ref: '#/components/schemas/dto.AssetFilterDTO'
+        limit:
+          example: 20
+          maximum: 100
+          minimum: 1
+          type: integer
+        offset:
+          example: 0
+          minimum: 0
+          type: integer
+        query:
+          example: red bird on branch
+          type: string
+        search_type:
+          enum:
+          - filename
+          - semantic
+          example: filename
+          type: string
+      required:
+      - query
+      - search_type
+      type: object
+    dto.SessionProgressDTO:
+      properties:
+        bytes_done:
+          type: integer
+        bytes_total:
+          type: integer
+        filename:
+          type: string
+        last_activity:
+          type: string
+        progress:
+          type: number
+        received_chunks:
+          type: integer
+        session_id:
+          type: string
+        status:
+          type: string
+        total_chunks:
+          type: integer
+      type: object
+    dto.UpdateAlbumRequestDTO:
+      properties:
+        album_name:
+          type: string
+        cover_asset_id:
+          type: string
+        description:
+          type: string
+      type: object
+    dto.UpdateAssetPositionRequestDTO:
+      properties:
+        position:
+          type: integer
+      required:
+      - position
+      type: object
+    dto.UpdateAssetRequestDTO:
+      properties:
+        specific_metadata:
+          oneOf:
+          - $ref: '#/components/schemas/dbtypes.PhotoSpecificMetadata'
+          - $ref: '#/components/schemas/dbtypes.VideoSpecificMetadata'
+          - $ref: '#/components/schemas/dbtypes.AudioSpecificMetadata'
+          type: object
+      type: object
+    dto.UpdateDescriptionRequestDTO:
+      properties:
+        description:
+          example: A beautiful sunset photo
+          type: string
+      type: object
+    dto.UpdateLikeRequestDTO:
+      properties:
+        liked:
+          example: true
+          type: boolean
+      type: object
+    dto.UpdateRatingAndLikeRequestDTO:
+      properties:
+        liked:
+          example: true
+          type: boolean
+        rating:
+          example: 5
+          maximum: 5
+          minimum: 0
+          type: integer
+      type: object
+    dto.UpdateRatingRequestDTO:
+      properties:
+        rating:
+          example: 5
+          maximum: 5
+          minimum: 0
+          type: integer
+      type: object
+    dto.UploadConfigResponseDTO:
+      properties:
+        chunk_size:
+          type: integer
+        max_concurrent:
+          type: integer
+        memory_buffer:
+          type: integer
+      type: object
+    dto.UploadProgressResponseDTO:
+      properties:
+        sessions:
+          items:
+            $ref: '#/components/schemas/dto.SessionProgressDTO'
+          type: array
+          uniqueItems: false
+        summary:
+          $ref: '#/components/schemas/dto.ProgressSummaryDTO'
+      type: object
+    dto.UploadResponseDTO:
+      properties:
+        content_hash:
+          example: abcd1234567890
+          type: string
+        file_name:
+          example: photo.jpg
+          type: string
+        message:
+          example: File received and queued for processing
+          type: string
+        size:
+          example: 1048576
+          type: integer
+        status:
+          example: processing
+          type: string
+        task_id:
+          example: 12345
+          type: integer
+      type: object
+    dto.UserDTO:
+      properties:
+        created_at:
+          type: string
+        email:
+          type: string
+        is_active:
+          type: boolean
+        last_login:
+          type: string
+        user_id:
+          type: integer
+        username:
+          type: string
+      type: object
+  securitySchemes:
+    BearerAuth:
+      description: Type "Bearer" followed by a space and JWT token.
+      in: header
+      name: Authorization
+      type: apiKey
+externalDocs:
+  description: ""
+  url: ""
 info:
   contact:
     name: API Support
@@ -520,87 +645,137 @@ info:
     url: https://opensource.org/licenses/GPL-3.0
   title: Lumilio-Photos Manager API
   version: "1.0"
+openapi: 3.1.0
 paths:
   /albums:
     get:
-      consumes:
-      - application/json
       description: Retrieve a paginated list of albums for the authenticated user
       parameters:
-      - default: 20
-        description: Maximum number of results (max 100)
+      - description: Maximum number of results (max 100)
         in: query
         name: limit
-        type: integer
-      - default: 0
-        description: Number of results to skip for pagination
+        schema:
+          default: 20
+          type: integer
+      - description: Number of results to skip for pagination
         in: query
         name: offset
-        type: integer
-      produces:
-      - application/json
+        schema:
+          default: 0
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Albums retrieved successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.ListAlbumsResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid parameters
-          schema:
-            $ref: '#/definitions/api.Result'
         "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Failed to retrieve albums
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: List albums
       tags:
       - albums
     post:
-      consumes:
-      - application/json
       description: Create a new album for the authenticated user
-      parameters:
-      - description: Album creation data
-        in: body
-        name: request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.CreateAlbumRequestDTO'
+                description: Album creation data
+                summary: request
+        description: Album creation data
         required: true
-        schema:
-          $ref: '#/definitions/dto.CreateAlbumRequestDTO'
-      produces:
-      - application/json
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Album created successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.GetAlbumResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid request data
-          schema:
-            $ref: '#/definitions/api.Result'
         "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Failed to create album
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: Create a new album
@@ -608,130 +783,196 @@ paths:
       - albums
   /albums/{id}:
     delete:
-      consumes:
-      - application/json
       description: Delete an album by its ID
       parameters:
       - description: Album ID
         in: path
         name: id
         required: true
-        type: integer
-      produces:
-      - application/json
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Album deleted successfully
-          schema:
-            $ref: '#/definitions/api.Result'
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid album ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.Result'
         "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Forbidden
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Album not found
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Failed to delete album
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: Delete album
       tags:
       - albums
     get:
-      consumes:
-      - application/json
       description: Retrieve a specific album by its ID
       parameters:
       - description: Album ID
         in: path
         name: id
         required: true
-        type: integer
-      produces:
-      - application/json
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Album retrieved successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.GetAlbumResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid album ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Album not found
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: Get album by ID
       tags:
       - albums
     put:
-      consumes:
-      - application/json
       description: Update an existing album's information
       parameters:
       - description: Album ID
         in: path
         name: id
         required: true
-        type: integer
-      - description: Album update data
-        in: body
-        name: request
-        required: true
         schema:
-          $ref: '#/definitions/dto.UpdateAlbumRequestDTO'
-      produces:
-      - application/json
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateAlbumRequestDTO'
+                description: Album update data
+                summary: request
+        description: Album update data
+        required: true
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Album updated successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.GetAlbumResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid album ID or request data
-          schema:
-            $ref: '#/definitions/api.Result'
         "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.Result'
         "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Forbidden
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Album not found
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Failed to update album
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: Update album
@@ -739,34 +980,44 @@ paths:
       - albums
   /albums/{id}/assets:
     get:
-      consumes:
-      - application/json
       description: Retrieve all assets in a specific album
       parameters:
       - description: Album ID
         in: path
         name: id
         required: true
-        type: integer
-      produces:
-      - application/json
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Assets retrieved successfully
-          schema:
-            $ref: '#/definitions/api.Result'
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid album ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Album not found
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Failed to retrieve album assets
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: Get assets in album
@@ -774,79 +1025,99 @@ paths:
       - albums
   /albums/{id}/assets/{assetId}:
     delete:
-      consumes:
-      - application/json
       description: Remove an asset from a specific album
       parameters:
       - description: Album ID
         in: path
         name: id
         required: true
-        type: integer
+        schema:
+          type: integer
       - description: Asset ID (UUID format)
         in: path
         name: assetId
         required: true
-        type: string
-      produces:
-      - application/json
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset removed from album successfully
-          schema:
-            $ref: '#/definitions/api.Result'
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid album ID or asset ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Failed to remove asset from album
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: Remove asset from album
       tags:
       - albums
     post:
-      consumes:
-      - application/json
       description: Add an asset to a specific album
       parameters:
       - description: Album ID
         in: path
         name: id
         required: true
-        type: integer
+        schema:
+          type: integer
       - description: Asset ID (UUID format)
         in: path
         name: assetId
         required: true
-        type: string
-      - description: Asset position in album
-        in: body
-        name: request
         schema:
-          $ref: '#/definitions/dto.AddAssetToAlbumRequestDTO'
-      produces:
-      - application/json
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.AddAssetToAlbumRequestDTO'
+                description: Asset position in album
+                summary: request
+        description: Asset position in album
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset added to album successfully
-          schema:
-            $ref: '#/definitions/api.Result'
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid album ID or asset ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Album not found
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Failed to add asset to album
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: Add asset to album
@@ -854,41 +1125,50 @@ paths:
       - albums
   /albums/{id}/assets/{assetId}/position:
     put:
-      consumes:
-      - application/json
       description: Update the position of an asset within a specific album
       parameters:
       - description: Album ID
         in: path
         name: id
         required: true
-        type: integer
+        schema:
+          type: integer
       - description: Asset ID (UUID format)
         in: path
         name: assetId
         required: true
-        type: string
-      - description: New position data
-        in: body
-        name: request
-        required: true
         schema:
-          $ref: '#/definitions/dto.UpdateAssetPositionRequestDTO'
-      produces:
-      - application/json
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateAssetPositionRequestDTO'
+                description: New position data
+                summary: request
+        description: New position data
+        required: true
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset position updated successfully
-          schema:
-            $ref: '#/definitions/api.Result'
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid album ID or asset ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Failed to update asset position
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: Update asset position in album
@@ -896,123 +1176,172 @@ paths:
       - albums
   /assets:
     get:
-      consumes:
-      - application/json
       description: Retrieve a paginated list of assets. Filter by type(s) or owner.
         Assets are sorted by taken_time (photo capture time or video record time).
         At least one filter parameter is required.
       parameters:
       - description: Single asset type filter
-        enum:
-        - PHOTO
-        - VIDEO
-        - AUDIO
-        - DOCUMENT
         example: '"PHOTO"'
         in: query
         name: type
-        type: string
+        schema:
+          enum:
+          - PHOTO
+          - VIDEO
+          - AUDIO
+          - DOCUMENT
+          type: string
       - description: Multiple asset types filter (comma-separated)
         example: '"PHOTO,VIDEO"'
         in: query
         name: types
-        type: string
+        schema:
+          type: string
       - description: Filter by owner ID
         example: 123
         in: query
         name: owner_id
-        type: integer
-      - default: 20
-        description: Maximum number of results (max 100)
+        schema:
+          type: integer
+      - description: Maximum number of results (max 100)
         example: 20
         in: query
         name: limit
-        type: integer
-      - default: 0
-        description: Number of results to skip for pagination
+        schema:
+          default: 20
+          type: integer
+      - description: Number of results to skip for pagination
         example: 0
         in: query
         name: offset
-        type: integer
-      - default: '"desc"'
-        description: Sort order by taken_time
-        enum:
-        - asc
-        - desc
+        schema:
+          default: 0
+          type: integer
+      - description: Sort order by taken_time
         example: '"desc"'
         in: query
         name: sort_order
-        type: string
-      produces:
-      - application/json
+        schema:
+          default: '"desc"'
+          enum:
+          - asc
+          - desc
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Assets retrieved successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.AssetListResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid parameters
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: List assets
       tags:
       - assets
     post:
-      consumes:
-      - multipart/form-data
       description: Upload a single photo, video, audio file, or document to the system.
         The file is staged in a repository and queued for processing.
       parameters:
-      - description: Asset file to upload
-        in: formData
-        name: file
-        required: true
-        type: file
-      - description: Repository UUID (uses default repository if not provided)
-        example: '"550e8400-e29b-41d4-a716-446655440000"'
-        in: formData
-        name: repository_id
-        type: string
       - description: Client-calculated BLAKE3 hash of the file
         in: header
         name: X-Content-Hash
-        type: string
-      produces:
-      - application/json
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              oneOf:
+              - title: file
+                type: file
+              - example: '"550e8400-e29b-41d4-a716-446655440000"'
+                title: repository_id
+                type: string
+          multipart/form-data:
+            schema:
+              type: object
+        description: Asset file to upload | Repository UUID (uses default repository
+          if not provided)
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Upload successful
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.UploadResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Bad request - no file provided or parse error
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Upload a single asset
       tags:
       - assets
   /assets/{id}:
     delete:
-      consumes:
-      - application/json
       description: Soft delete an asset by marking it as deleted. The physical file
         is not removed.
       parameters:
@@ -1021,33 +1350,56 @@ paths:
         in: path
         name: id
         required: true
-        type: string
-      produces:
-      - application/json
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Asset deleted successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.MessageResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID format
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Delete asset
       tags:
       - assets
     get:
-      consumes:
-      - application/json
       description: Retrieve detailed information about a specific asset. Optionally
         include thumbnails, tags, albums, species predictions, OCR results, face recognition,
         and AI descriptions.
@@ -1057,68 +1409,98 @@ paths:
         in: path
         name: id
         required: true
-        type: string
-      - default: true
-        description: Include thumbnails
+        schema:
+          type: string
+      - description: Include thumbnails
         in: query
         name: include_thumbnails
-        type: boolean
-      - default: true
-        description: Include tags
+        schema:
+          default: true
+          type: boolean
+      - description: Include tags
         in: query
         name: include_tags
-        type: boolean
-      - default: true
-        description: Include albums
+        schema:
+          default: true
+          type: boolean
+      - description: Include albums
         in: query
         name: include_albums
-        type: boolean
-      - default: true
-        description: Include species predictions
+        schema:
+          default: true
+          type: boolean
+      - description: Include species predictions
         in: query
         name: include_species
-        type: boolean
-      - default: false
-        description: Include OCR results
+        schema:
+          default: true
+          type: boolean
+      - description: Include OCR results
         in: query
         name: include_ocr
-        type: boolean
-      - default: false
-        description: Include face recognition
+        schema:
+          default: false
+          type: boolean
+      - description: Include face recognition
         in: query
         name: include_faces
-        type: boolean
-      - default: false
-        description: Include AI descriptions
+        schema:
+          default: false
+          type: boolean
+      - description: Include AI descriptions
         in: query
         name: include_ai_descriptions
-        type: boolean
-      produces:
-      - application/json
+        schema:
+          default: false
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Asset details with optional relationships
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.AssetDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset not found
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Get asset by ID
       tags:
       - assets
     put:
-      consumes:
-      - application/json
       description: Update the specific metadata of an asset (e.g., photo EXIF data,
         video metadata).
       parameters:
@@ -1127,62 +1509,95 @@ paths:
         in: path
         name: id
         required: true
-        type: string
-      - description: Asset metadata
-        in: body
-        name: request
-        required: true
         schema:
-          $ref: '#/definitions/dto.UpdateAssetRequestDTO'
-      produces:
-      - application/json
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateAssetRequestDTO'
+                description: Asset metadata
+                summary: request
+        description: Asset metadata
+        required: true
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Asset updated successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.MessageResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID or request body
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Update asset metadata
       tags:
       - assets
   /assets/{id}/albums:
     get:
-      consumes:
-      - application/json
       description: Retrieve all albums that contain a specific asset
       parameters:
       - description: Asset ID (UUID format)
         in: path
         name: id
         required: true
-        type: string
-      produces:
-      - application/json
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Albums retrieved successfully
-          schema:
-            $ref: '#/definitions/api.Result'
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Failed to retrieve asset albums
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: Get albums containing asset
@@ -1190,8 +1605,6 @@ paths:
       - albums
   /assets/{id}/albums/{albumId}:
     post:
-      consumes:
-      - application/json
       description: Associate an asset with a specific album by asset ID and album
         ID.
       parameters:
@@ -1200,33 +1613,59 @@ paths:
         in: path
         name: id
         required: true
-        type: string
+        schema:
+          type: string
       - description: Album ID
         example: 123
         in: path
         name: albumId
         required: true
-        type: integer
-      produces:
-      - application/json
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Asset added to album successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.MessageResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID or album ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Add asset to album
       tags:
       - assets
@@ -1240,114 +1679,171 @@ paths:
         in: path
         name: id
         required: true
-        type: string
-      produces:
-      - audio/mpeg
+        schema:
+          type: string
       responses:
         "200":
+          content:
+            audio/mpeg:
+              schema:
+                type: file
           description: Web-optimized audio file
-          schema:
-            type: file
         "400":
+          content:
+            audio/mpeg:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            audio/mpeg:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset not found or not audio
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            audio/mpeg:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Get web-optimized audio
       tags:
       - assets
   /assets/{id}/description:
     put:
-      consumes:
-      - application/json
       description: Update the description metadata of an asset
       parameters:
       - description: Asset ID
         in: path
         name: id
         required: true
-        type: string
-      - description: Description data
-        in: body
-        name: description
-        required: true
         schema:
-          $ref: '#/definitions/dto.UpdateDescriptionRequestDTO'
-      produces:
-      - application/json
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateDescriptionRequestDTO'
+                description: Description data
+                summary: description
+        description: Description data
+        required: true
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Description updated successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.MessageResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Bad request
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset not found
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Update asset description
       tags:
       - assets
   /assets/{id}/like:
     put:
-      consumes:
-      - application/json
       description: Update the like/favorite status of a specific asset
       parameters:
       - description: Asset ID
         in: path
         name: id
         required: true
-        type: string
-      - description: Like data
-        in: body
-        name: like
-        required: true
         schema:
-          $ref: '#/definitions/dto.UpdateLikeRequestDTO'
-      produces:
-      - application/json
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateLikeRequestDTO'
+                description: Like data
+                summary: like
+        description: Like data
+        required: true
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Like status updated successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.MessageResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Bad request
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset not found
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Update asset like status
       tags:
       - assets
@@ -1361,77 +1857,107 @@ paths:
         in: path
         name: id
         required: true
-        type: string
-      produces:
-      - application/octet-stream
+        schema:
+          type: string
       responses:
         "200":
+          content:
+            application/octet-stream:
+              schema:
+                type: file
           description: Original file content
-          schema:
-            type: file
         "400":
+          content:
+            application/octet-stream:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/octet-stream:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset not found
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/octet-stream:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Get original file
       tags:
       - assets
   /assets/{id}/rating:
     put:
-      consumes:
-      - application/json
       description: Update the rating (0-5) of a specific asset
       parameters:
       - description: Asset ID
         in: path
         name: id
         required: true
-        type: string
-      - description: Rating data
-        in: body
-        name: rating
-        required: true
         schema:
-          $ref: '#/definitions/dto.UpdateRatingRequestDTO'
-      produces:
-      - application/json
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateRatingRequestDTO'
+                description: Rating data
+                summary: rating
+        description: Rating data
+        required: true
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Rating updated successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.MessageResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Bad request
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset not found
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Update asset rating
       tags:
       - assets
   /assets/{id}/rating-and-like:
     put:
-      consumes:
-      - application/json
       description: Update both the rating (0-5) and like/favorite status of a specific
         asset
       parameters:
@@ -1439,44 +1965,69 @@ paths:
         in: path
         name: id
         required: true
-        type: string
-      - description: Rating and like data
-        in: body
-        name: data
-        required: true
         schema:
-          $ref: '#/definitions/dto.UpdateRatingAndLikeRequestDTO'
-      produces:
-      - application/json
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.UpdateRatingAndLikeRequestDTO'
+                description: Rating and like data
+                summary: data
+        description: Rating and like data
+        required: true
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Rating and like status updated successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.MessageResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Bad request
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset not found
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Update asset rating and like status
       tags:
       - assets
   /assets/{id}/reprocess:
     post:
-      consumes:
-      - application/json
       description: Reprocess a failed or warning asset by resetting its status and
         re-enqueuing for processing
       parameters:
@@ -1484,37 +2035,49 @@ paths:
         in: path
         name: id
         required: true
-        type: string
-      - description: Reprocessing tasks (optional)
-        in: body
-        name: request
         schema:
-          $ref: '#/definitions/dto.ReprocessAssetRequestDTO'
-      produces:
-      - application/json
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.ReprocessAssetRequestDTO'
+                description: Reprocessing tasks (optional)
+                summary: request
+        description: Reprocessing tasks (optional)
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/dto.ReprocessAssetResponseDTO'
           description: OK
-          schema:
-            $ref: '#/definitions/dto.ReprocessAssetResponseDTO'
         "400":
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
           description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
         "404":
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
           description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
         "500":
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
           description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
       summary: Reprocess asset
       tags:
       - assets
@@ -1528,35 +2091,43 @@ paths:
         in: path
         name: id
         required: true
-        type: string
-      - default: medium
-        description: Thumbnail size
-        enum:
-        - small
-        - medium
-        - large
+        schema:
+          type: string
+      - description: Thumbnail size
         in: query
         name: size
-        type: string
-      produces:
-      - image/jpeg
+        schema:
+          default: medium
+          enum:
+          - small
+          - medium
+          - large
+          type: string
       responses:
         "200":
+          content:
+            image/jpeg:
+              schema:
+                type: file
           description: Thumbnail image file
-          schema:
-            type: file
         "400":
+          content:
+            image/jpeg:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID or size parameter
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            image/jpeg:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset or thumbnail not found
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            image/jpeg:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Get asset thumbnail
       tags:
       - assets
@@ -1570,417 +2141,664 @@ paths:
         in: path
         name: id
         required: true
-        type: string
-      produces:
-      - video/mp4
+        schema:
+          type: string
       responses:
         "200":
+          content:
+            video/mp4:
+              schema:
+                type: file
           description: Web-optimized video file
-          schema:
-            type: file
         "400":
+          content:
+            video/mp4:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid asset ID
-          schema:
-            $ref: '#/definitions/api.Result'
         "404":
+          content:
+            video/mp4:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Asset not found or not a video
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            video/mp4:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Get web-optimized video
       tags:
       - assets
   /assets/batch:
     post:
-      consumes:
-      - multipart/form-data
       description: 'Unified batch upload endpoint that supports both small files and
         chunked large files. Field names should follow format: single_{session_id}
         for single files or chunk_{session_id}_{index}_{total} for chunks.'
-      parameters:
-      - description: Repository UUID (uses default repository if not provided)
-        example: '"550e8400-e29b-41d4-a716-446655440000"'
-        in: formData
-        name: repository_id
-        type: string
-      - description: 'Single file upload - use format: single_{session_id}'
-        in: formData
-        name: file
-        type: file
-      - description: 'Chunked file upload - use format: chunk_{session_id}_{index}_{total}'
-        in: formData
-        name: file
-        type: file
-      produces:
-      - application/json
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              oneOf:
+              - example: '"550e8400-e29b-41d4-a716-446655440000"'
+                title: repository_id
+                type: string
+              - title: file
+                type: file
+              - title: file
+                type: file
+          multipart/form-data:
+            schema:
+              type: object
+        description: 'Repository UUID (uses default repository if not provided) |
+          Single file upload - use format: single_{session_id} | Chunked file upload
+          - use format: chunk_{session_id}_{index}_{total}'
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Batch upload completed
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.BatchUploadResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Bad request - no files provided or parse error
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Batch upload assets with chunk support
       tags:
       - assets
   /assets/batch/config:
     get:
-      consumes:
-      - application/json
       description: Get current upload configuration including chunk size and concurrency
         limits based on system memory
-      produces:
-      - application/json
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Upload configuration
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.UploadConfigResponseDTO'
-              type: object
       summary: Get upload configuration
       tags:
       - assets
   /assets/batch/progress:
     get:
-      consumes:
-      - application/json
       description: Get detailed progress information for upload sessions
       parameters:
       - description: Comma-separated session IDs (optional)
         in: query
         name: session_ids
-        type: string
-      produces:
-      - application/json
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Upload progress details
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.UploadProgressResponseDTO'
-              type: object
       summary: Get upload progress
       tags:
       - assets
   /assets/filter:
     post:
-      consumes:
-      - application/json
       description: Filter assets using comprehensive filtering options including repository
         selection, RAW, rating, liked status, filename patterns, date ranges, camera
         make, and lens
-      parameters:
-      - description: Filter criteria
-        in: body
-        name: request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.FilterAssetsRequestDTO'
+                description: Filter criteria
+                summary: request
+        description: Filter criteria
         required: true
-        schema:
-          $ref: '#/definitions/dto.FilterAssetsRequestDTO'
-      produces:
-      - application/json
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Assets filtered successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.AssetListResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid request parameters
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Filter assets
       tags:
       - assets
   /assets/filter-options:
     get:
-      consumes:
-      - application/json
       description: Get available camera makes and lenses for filter dropdowns
-      produces:
-      - application/json
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Filter options retrieved successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.OptionsResponseDTO'
-              type: object
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Get filter options
       tags:
       - assets
   /assets/liked:
     get:
-      consumes:
-      - application/json
       description: Get all assets that have been liked/favorited
       parameters:
-      - default: 20
-        description: Number of assets to return
+      - description: Number of assets to return
         in: query
         name: limit
-        type: integer
-      - default: 0
-        description: Number of assets to skip
+        schema:
+          default: 20
+          type: integer
+      - description: Number of assets to skip
         in: query
         name: offset
-        type: integer
-      produces:
-      - application/json
+        schema:
+          default: 0
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Liked assets retrieved successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.AssetListResponseDTO'
-              type: object
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Get liked assets
       tags:
       - assets
   /assets/rating/{rating}:
     get:
-      consumes:
-      - application/json
       description: Get assets with a specific rating (0-5)
       parameters:
       - description: Rating (0-5)
         in: path
         name: rating
         required: true
-        type: integer
-      - default: 20
-        description: Number of assets to return
+        schema:
+          type: integer
+      - description: Number of assets to return
         in: query
         name: limit
-        type: integer
-      - default: 0
-        description: Number of assets to skip
+        schema:
+          default: 20
+          type: integer
+      - description: Number of assets to skip
         in: query
         name: offset
-        type: integer
-      produces:
-      - application/json
+        schema:
+          default: 0
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Assets retrieved successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.AssetListResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Bad request
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Get assets by rating
       tags:
       - assets
   /assets/search:
     post:
-      consumes:
-      - application/json
       description: Search assets using either filename matching or semantic vector
         search. Can be combined with comprehensive filters including repository selection.
-      parameters:
-      - description: Search criteria
-        in: body
-        name: request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.SearchAssetsRequestDTO'
+                description: Search criteria
+                summary: request
+        description: Search criteria
         required: true
-        schema:
-          $ref: '#/definitions/dto.SearchAssetsRequestDTO'
-      produces:
-      - application/json
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Assets found successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.AssetListResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid request parameters
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
         "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Semantic search unavailable
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Search assets
       tags:
       - assets
   /assets/types:
     get:
-      consumes:
-      - application/json
       description: Retrieve a list of all supported asset types in the system.
-      produces:
-      - application/json
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Asset types retrieved successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.AssetTypesResponseDTO'
-              type: object
       summary: Get supported asset types
       tags:
       - assets
   /auth/login:
     post:
-      consumes:
-      - application/json
       description: Authenticate user with username and password
-      parameters:
-      - description: Login credentials
-        in: body
-        name: request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.LoginRequestDTO'
+                description: Login credentials
+                summary: request
+        description: Login credentials
         required: true
-        schema:
-          $ref: '#/definitions/dto.LoginRequestDTO'
-      produces:
-      - application/json
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Login successful
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.AuthResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid request data
-          schema:
-            $ref: '#/definitions/api.Result'
         "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid credentials
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Login user
       tags:
       - auth
   /auth/logout:
     post:
-      consumes:
-      - application/json
       description: Revoke the user's refresh token
-      parameters:
-      - description: Refresh token to revoke
-        in: body
-        name: request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.RefreshTokenRequestDTO'
+                description: Refresh token to revoke
+                summary: request
+        description: Refresh token to revoke
         required: true
-        schema:
-          $ref: '#/definitions/dto.RefreshTokenRequestDTO'
-      produces:
-      - application/json
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Logout successful
-          schema:
-            $ref: '#/definitions/api.Result'
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid request data
-          schema:
-            $ref: '#/definitions/api.Result'
         "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid refresh token
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Logout user
       tags:
       - auth
   /auth/me:
     get:
-      consumes:
-      - application/json
       description: Get information about the currently authenticated user
-      produces:
-      - application/json
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: User information retrieved successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.UserDTO'
-              type: object
         "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       security:
       - BearerAuth: []
       summary: Get current user
@@ -1988,86 +2806,127 @@ paths:
       - auth
   /auth/refresh:
     post:
-      consumes:
-      - application/json
       description: Generate a new access token using a valid refresh token
-      parameters:
-      - description: Refresh token
-        in: body
-        name: request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.RefreshTokenRequestDTO'
+                description: Refresh token
+                summary: request
+        description: Refresh token
         required: true
-        schema:
-          $ref: '#/definitions/dto.RefreshTokenRequestDTO'
-      produces:
-      - application/json
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: Token refreshed successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.AuthResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid request data
-          schema:
-            $ref: '#/definitions/api.Result'
         "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid or expired refresh token
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Refresh access token
       tags:
       - auth
   /auth/register:
     post:
-      consumes:
-      - application/json
       description: Create a new user account with username, email, and password
-      parameters:
-      - description: Registration data
-        in: body
-        name: request
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.RegisterRequestDTO'
+                description: Registration data
+                summary: request
+        description: Registration data
         required: true
-        schema:
-          $ref: '#/definitions/dto.RegisterRequestDTO'
-      produces:
-      - application/json
       responses:
         "201":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
           description: User registered successfully
-          schema:
-            allOf:
-            - $ref: '#/definitions/api.Result'
-            - properties:
-                data:
-                  $ref: '#/definitions/dto.AuthResponseDTO'
-              type: object
         "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Invalid request data
-          schema:
-            $ref: '#/definitions/api.Result'
         "409":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: User already exists
-          schema:
-            $ref: '#/definitions/api.Result'
         "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
           description: Internal server error
-          schema:
-            $ref: '#/definitions/api.Result'
       summary: Register a new user
       tags:
       - auth
-securityDefinitions:
-  BearerAuth:
-    description: Type "Bearer" followed by a space and JWT token.
-    in: header
-    name: Authorization
-    type: apiKey
-swagger: "2.0"
+servers:
+- url: localhost:3001/api/v1
