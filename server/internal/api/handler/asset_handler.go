@@ -1114,6 +1114,7 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 // @Param request body dto.SearchAssetsRequestDTO true "Search criteria"
 // @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets found successfully"
 // @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 503 {object} api.Result "Semantic search unavailable"
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/search [post]
 func (h *AssetHandler) SearchAssets(c *gin.Context) {
@@ -1171,6 +1172,10 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 			filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
+		if err != nil && errors.Is(err, service.ErrSemanticSearchUnavailable) {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Semantic search unavailable"})
+			return
+		}
 	}
 
 	if err != nil {

@@ -30,10 +30,11 @@ const (
 
 // Error constants for asset service
 var (
-	ErrInvalidAssetType     = errors.New("invalid asset type")
-	ErrAssetFileTooLarge    = errors.New("file too large: maximum file size exceeded")
-	ErrUnsupportedAssetType = errors.New("unsupported asset type")
-	ErrAssetNotFound        = errors.New("asset not found")
+	ErrInvalidAssetType          = errors.New("invalid asset type")
+	ErrAssetFileTooLarge         = errors.New("file too large: maximum file size exceeded")
+	ErrUnsupportedAssetType      = errors.New("unsupported asset type")
+	ErrAssetNotFound             = errors.New("asset not found")
+	ErrSemanticSearchUnavailable = errors.New("semantic search unavailable")
 )
 
 // AssetService defines the interface for asset-related operations
@@ -803,7 +804,10 @@ func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, r
 
 func (s *assetService) SearchAssetsVector(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
 	if s.lumen == nil {
-		return nil, fmt.Errorf("lumen service not available for semantic search")
+		return nil, fmt.Errorf("%w: lumen service not available for semantic search", ErrSemanticSearchUnavailable)
+	}
+	if !s.lumen.IsTaskAvailable("clip_text_embed") {
+		return nil, fmt.Errorf("%w: clip_text_embed task not available", ErrSemanticSearchUnavailable)
 	}
 
 	// 1. Get text embedding using LumenService
