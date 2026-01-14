@@ -9,17 +9,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"server/internal/db/dbtypes"
-	"server/internal/db/repo"
-	"server/internal/utils/exif"
 	"strconv"
 	"strings"
 	"time"
 
-	"server/internal/utils/errgroup"
+	"server/internal/db/dbtypes"
+	"server/internal/db/repo"
+	"server/internal/utils/exif"
 )
 
-// AudioInfo holds audio metadata
+// AudioInfo holds audio metadata.
 type AudioInfo struct {
 	Duration   float64
 	SampleRate int
@@ -29,81 +28,23 @@ type AudioInfo struct {
 	Format     string
 }
 
-func (ap *AssetProcessor) processAudioAsset(
-	ctx context.Context,
-	repository repo.Repository,
-	asset *repo.Asset,
-	fileReader io.Reader,
-) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
-	defer cancel()
-
-	// Create temporary file for ffmpeg processing
-	tempFile, err := os.CreateTemp("", "audio_processing_*.tmp")
-	if err != nil {
-		return fmt.Errorf("create temp file: %w", err)
-	}
-	defer os.Remove(tempFile.Name())
-	defer tempFile.Close()
-
-	// Copy input to temp file
-	if _, err := io.Copy(tempFile, fileReader); err != nil {
-		return fmt.Errorf("copy to temp file: %w", err)
-	}
-	tempFile.Close()
-
-	// Get audio info first
-	audioInfo, err := ap.getAudioInfo(tempFile.Name())
-	if err != nil {
-		return fmt.Errorf("get audio info: %w", err)
-	}
-
-	g := errgroup.NewFaultTolerant()
-
-	// Goroutine 1: Extract metadata
-	g.Go(func() error {
-		return ap.extractAudioMetadata(timeoutCtx, asset, tempFile.Name(), audioInfo)
-	})
-
-	// Goroutine 2: Transcode audio (smart strategy)
-	g.Go(func() error {
-		return ap.transcodeAudioSmart(timeoutCtx, repository.Path, asset, tempFile.Name(), audioInfo)
-	})
-
-	// Goroutine 3: Generate waveform visualization (optional)
-	g.Go(func() error {
-		return ap.generateWaveform(timeoutCtx, repository.Path, asset, tempFile.Name())
-	})
-
-	// Wait for all tasks to complete, but don't fail the entire process if some tasks fail
-	errors := g.Wait()
-	if len(errors) > 0 {
-		// Log individual errors but don't fail the entire process
-		for _, err := range errors {
-			fmt.Printf("Audio processing partial failure: %v\n", err)
-		}
-		// Return success even if some tasks failed, as partial processing is acceptable
-	}
-
-	return nil
-}
-
+// extractAudioMetadata updates the asset with ffprobe/EXIF-derived metadata.
 func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.Asset, audioPath string, audioInfo *AudioInfo) error {
-	// Use existing exif extractor for audio metadata
 	file, err := os.Open(audioPath)
 	if err != nil {
 		return fmt.Errorf("open audio file: %w", err)
 	}
 	defer file.Close()
 
-	// Configure extractor with optimized settings for audio, including fast mode
 	config := &exif.Config{
 		MaxFileSize: 2 * 1024 * 1024 * 1024, // 2GB
 		Timeout:     60 * time.Second,
 		BufferSize:  128 * 1024,
-		FastMode:    true, // Use fast mode for audio to avoid full file scan
+		FastMode:    true,
 	}
 	extractor := exif.NewExtractor(config)
+	defer extractor.Close()
+
 	req := &exif.StreamingExtractRequest{
 		Reader:    file,
 		AssetType: dbtypes.AssetTypeAudio,
@@ -117,7 +58,6 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 	}
 
 	if meta, ok := result.Metadata.(*dbtypes.AudioSpecificMetadata); ok {
-		// Add duration info to asset record
 		if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID.Bytes, audioInfo.Duration); err != nil {
 			return fmt.Errorf("update duration: %w", err)
 		}
@@ -135,48 +75,44 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 	return nil
 }
 
+// transcodeAudioSmart applies a best-effort, resource-aware transcoding strategy.
 func (ap *AssetProcessor) transcodeAudioSmart(ctx context.Context, repoPath string, asset *repo.Asset, audioPath string, audioInfo *AudioInfo) error {
-	// Smart transcoding strategy for web compatibility
 	if strings.ToLower(audioInfo.Format) == "mp3" && audioInfo.Bitrate >= 128 && audioInfo.Bitrate <= 320 {
-		// Audio is already MP3 with good bitrate, just copy to storage
 		return ap.copyAudioForWeb(ctx, repoPath, asset, audioPath, "web")
 	}
 
-	// Need to transcode to MP3
 	outputPath, err := ap.transcodeAudioToMP3(ctx, audioPath, audioInfo)
 	if err != nil {
 		return fmt.Errorf("transcode to mp3: %w", err)
 	}
 	defer os.Remove(outputPath)
 
-	// Just save the MP3 version
 	return ap.saveTranscodedAudio(ctx, repoPath, asset, outputPath, "web")
 }
 
+// transcodeAudioToMP3 runs ffmpeg to produce an MP3 at a reasonable bitrate.
 func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath string, audioInfo *AudioInfo) (string, error) {
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("transcoded_mp3_%s.mp3", filepath.Base(inputPath)))
 
-	// Determine optimal bitrate
 	targetBitrate := "192k"
 	if audioInfo.Bitrate > 0 && audioInfo.Bitrate < 192 {
-		targetBitrate = "128k" // Don't artificially increase bitrate
+		targetBitrate = "128k"
 	}
 
 	cmd := exec.CommandContext(ctx, "ffmpeg",
 		"-i", inputPath,
-		"-c:a", "libmp3lame", // MP3 encoder
-		"-b:a", targetBitrate, // Target bitrate
-		"-q:a", "2", // High quality VBR
-		"-ar", "44100", // Standard sample rate for web
-		"-ac", "2", // Stereo (or mono if source is mono)
+		"-c:a", "libmp3lame",
+		"-b:a", targetBitrate,
+		"-q:a", "2",
+		"-ar", "44100",
+		"-ac", "2",
 		"-f", "mp3",
-		"-y", // Overwrite output file
+		"-y",
 		outputPath,
 	)
 
-	// If source is mono, keep it mono
 	if audioInfo.Channels == 1 {
-		cmd.Args[len(cmd.Args)-4] = "1" // Replace "-ac", "2" with "1"
+		cmd.Args[len(cmd.Args)-4] = "1" // keep mono if source is mono
 	}
 
 	if err := cmd.Run(); err != nil {
@@ -186,6 +122,7 @@ func (ap *AssetProcessor) transcodeAudioToMP3(ctx context.Context, inputPath str
 	return outputPath, nil
 }
 
+// copyAudioForWeb saves the provided audio file as the web version.
 func (ap *AssetProcessor) copyAudioForWeb(ctx context.Context, repoPath string, asset *repo.Asset, audioPath, version string) error {
 	audioFile, err := os.Open(audioPath)
 	if err != nil {
@@ -196,6 +133,7 @@ func (ap *AssetProcessor) copyAudioForWeb(ctx context.Context, repoPath string, 
 	return ap.assetService.SaveAudioVersion(ctx, repoPath, audioFile, asset, version)
 }
 
+// saveTranscodedAudio saves a transcoded output as the web version.
 func (ap *AssetProcessor) saveTranscodedAudio(ctx context.Context, repoPath string, asset *repo.Asset, outputPath, version string) error {
 	transcodedFile, err := os.Open(outputPath)
 	if err != nil {
@@ -206,8 +144,8 @@ func (ap *AssetProcessor) saveTranscodedAudio(ctx context.Context, repoPath stri
 	return ap.assetService.SaveAudioVersion(ctx, repoPath, transcodedFile, asset, version)
 }
 
+// generateWaveform produces a waveform thumbnail image (best-effort; non-fatal).
 func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string, asset *repo.Asset, audioPath string) error {
-	// Generate waveform visualization image
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("waveform_%s.png", asset.AssetID))
 	defer os.Remove(outputPath)
 
@@ -217,39 +155,36 @@ func (ap *AssetProcessor) generateWaveform(ctx context.Context, repoPath string,
 		"-map", "[v]",
 		"-frames:v", "1",
 		"-f", "image2",
-		"-y", // Overwrite
+		"-y",
 		outputPath,
 	)
 
 	if err := cmd.Run(); err != nil {
-		// Waveform generation is optional, don't fail the entire process
-		return nil
+		return nil // optional: ignore errors
 	}
 
-	// Save waveform as a special thumbnail
 	waveformFile, err := os.Open(outputPath)
 	if err != nil {
-		return nil // Optional feature, don't fail
+		return nil // optional: ignore errors
 	}
 	defer waveformFile.Close()
 
 	buf := &bytes.Buffer{}
 	if _, err := io.Copy(buf, waveformFile); err != nil {
-		return nil
+		return nil // optional: ignore errors
 	}
 
-	// Save as a special "waveform" thumbnail
 	return ap.assetService.SaveNewThumbnail(ctx, repoPath, buf, asset, "waveform")
 }
 
+// getAudioInfo probes the audio using ffprobe to collect duration, bitrate, codec, and format.
 func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
-	// Get audio information using ffprobe with JSON output
 	cmd := exec.Command("ffprobe",
 		"-v", "quiet",
 		"-print_format", "json",
 		"-show_format",
 		"-show_streams",
-		"-select_streams", "a:0", // First audio stream
+		"-select_streams", "a:0",
 		audioPath,
 	)
 
@@ -258,10 +193,19 @@ func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
 		return nil, fmt.Errorf("ffprobe failed: %w", err)
 	}
 
-	// Parse JSON output
 	var probeData struct {
-		Format  map[string]interface{}   `json:"format"`
-		Streams []map[string]interface{} `json:"streams"`
+		Streams []struct {
+			SampleRate string `json:"sample_rate"`
+			Channels   int    `json:"channels"`
+			CodecName  string `json:"codec_name"`
+			BitRate    string `json:"bit_rate"`
+			Duration   string `json:"duration"`
+		} `json:"streams"`
+		Format struct {
+			FormatName string `json:"format_name"`
+			Duration   string `json:"duration"`
+			BitRate    string `json:"bit_rate"`
+		} `json:"format"`
 	}
 
 	if err := json.Unmarshal(output, &probeData); err != nil {
@@ -270,55 +214,32 @@ func (ap *AssetProcessor) getAudioInfo(audioPath string) (*AudioInfo, error) {
 
 	info := &AudioInfo{}
 
-	// Extract from streams (first audio stream)
 	if len(probeData.Streams) > 0 {
 		stream := probeData.Streams[0]
-
-		if codec, ok := stream["codec_name"].(string); ok {
-			info.Codec = codec
+		if sr, err := strconv.Atoi(stream.SampleRate); err == nil {
+			info.SampleRate = sr
 		}
-
-		if sampleRate, ok := stream["sample_rate"].(string); ok {
-			if rate, err := strconv.Atoi(sampleRate); err == nil {
-				info.SampleRate = rate
-			}
+		info.Channels = stream.Channels
+		info.Codec = stream.CodecName
+		if br, err := strconv.Atoi(stream.BitRate); err == nil {
+			info.Bitrate = br / 1000 // convert to kbps
 		}
-
-		if channels, ok := stream["channels"].(float64); ok {
-			info.Channels = int(channels)
-		}
-
-		if bitrate, ok := stream["bit_rate"].(string); ok {
-			if rate, err := strconv.Atoi(bitrate); err == nil {
-				info.Bitrate = rate / 1000 // Convert to kbps
-			}
-		}
-
-		if duration, ok := stream["duration"].(string); ok {
-			if dur, err := strconv.ParseFloat(duration, 64); err == nil {
+		if stream.Duration != "" {
+			if dur, err := strconv.ParseFloat(stream.Duration, 64); err == nil {
 				info.Duration = dur
 			}
 		}
 	}
 
-	// Extract from format
-	if format, ok := probeData.Format["format_name"].(string); ok {
-		info.Format = format
-	}
-
-	if info.Duration == 0 {
-		if duration, ok := probeData.Format["duration"].(string); ok {
-			if dur, err := strconv.ParseFloat(duration, 64); err == nil {
-				info.Duration = dur
-			}
+	info.Format = probeData.Format.FormatName
+	if info.Bitrate == 0 && probeData.Format.BitRate != "" {
+		if br, err := strconv.Atoi(probeData.Format.BitRate); err == nil {
+			info.Bitrate = br / 1000
 		}
 	}
-
-	if info.Bitrate == 0 {
-		if bitrate, ok := probeData.Format["bit_rate"].(string); ok {
-			if rate, err := strconv.Atoi(bitrate); err == nil {
-				info.Bitrate = rate / 1000 // Convert to kbps
-			}
+	if info.Duration == 0 && probeData.Format.Duration != "" {
+		if dur, err := strconv.ParseFloat(probeData.Format.Duration, 64); err == nil {
+			info.Duration = dur
 		}
 	}
 
