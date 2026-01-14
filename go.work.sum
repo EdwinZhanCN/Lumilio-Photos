@@ -183,8 +183,8 @@ github.com/go-jose/go-jose/v4 v4.1.2 h1:TK/7NqRQZfgAh+Td8AlsrvtPoUyiHh0LqVvokh+1
 github.com/go-jose/go-jose/v4 v4.1.2/go.mod h1:22cg9HWM1pOlnRiY+9cQYJ9XHmya1bYW8OeDM6Ku6Oo=
 github.com/go-openapi/inflect v0.21.0 h1:FoBjBTQEcbg2cJUWX6uwL9OyIW8eqc9k4KhN4lfbeYk=
 github.com/go-openapi/inflect v0.21.0/go.mod h1:INezMuUu7SJQc2AyR3WO0DqqYUJSj8Kb4hBd7WtjlAw=
+github.com/go-openapi/swag v0.19.15 h1:D2NRCBzS9/pEY3gP9Nl8aDqGUcPFrwG2p+CNFrLyrCM=
 github.com/go-openapi/swag v0.19.15/go.mod h1:QYRuS/SOXUCsnplDa677K7+DxSOj6IPNl/eQntq43wQ=
-github.com/go-openapi/swag v0.22.3 h1:yMBqmnQ0gyZvEb/+KzuWZOXgllrXT4SADYbvDaXHv/g=
 github.com/go-openapi/swag v0.22.3/go.mod h1:UzaqsxGiab7freDnrUUra0MwWfN/q7tE4j+VcZ0yl14=
 github.com/go-openapi/swag v0.25.1 h1:6uwVsx+/OuvFVPqfQmOOPsqTcm5/GkBhNwLqIR916n8=
 github.com/go-openapi/swag v0.25.1/go.mod h1:bzONdGlT0fkStgGPd3bhZf1MnuPkf2YAys6h+jZipOo=
@@ -357,8 +357,6 @@ github.com/spf13/pflag v1.0.10/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3A
 github.com/spiffe/go-spiffe/v2 v2.5.0 h1:N2I01KCUkv1FAjZXJMwh95KK1ZIQLYbPfhaxw8WS0hE=
 github.com/spiffe/go-spiffe/v2 v2.5.0/go.mod h1:P+NxobPc6wXhVtINNtFjNWGBTreew1GBUCwT2wPmb7g=
 github.com/stretchr/objx v0.5.2 h1:xuMeJ0Sdp5ZMRXx/aWO6RZxdr3beISkG5/G/aIRr3pY=
-github.com/sv-tools/openapi v0.4.0/go.mod h1:kD/dG+KP0+Fom1r6nvcj/ORtLus8d8enXT6dyRZDirE=
-github.com/swaggo/swag/v2 v2.0.0-rc5/go.mod h1:kCL8Fu4Zl8d5tB2Bgj96b8wRowwrwk175bZHXfuGVFI=
 github.com/ugorji/go v1.2.7 h1:qYhyWUUd6WbiM+C6JZAUkIJt/1WrjzNHY9+KCIjVqTo=
 github.com/urfave/cli/v2 v2.3.0 h1:qph92Y649prgesehzOrQjdWyxFOp/QVM+6imKHad91M=
 github.com/urfave/cli/v2 v2.3.0/go.mod h1:LJmUH05zAU44vOAcrfzZQKsZbVcdbOG8rtL3/XcUArI=
