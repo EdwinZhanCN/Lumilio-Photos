@@ -23,10 +23,10 @@ jobs:
               with:
                   go-version: "1.23"
             - name: Install Swag CLI
-              run: go install github.com/swaggo/swag/cmd/swag@latest
+              run: go install github.com/swaggo/swag/v2/cmd/swag@latest
 
             - name: Generate OpenAPI Spec
-              run: ~/go/bin/swag init -g server/cmd/main.go -o server/docs/
+              run: ~/go/bin/swag init --v3.1 -g server/cmd/main.go -o server/docs/
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
