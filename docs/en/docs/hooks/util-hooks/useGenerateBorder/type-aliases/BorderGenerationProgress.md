@@ -4,4 +4,4 @@
 
 > **BorderGenerationProgress** = \{ `error?`: `string`; `failedAt?`: `number` \| `null`; `processed`: `number`; `total`: `number`; \} \| `null`
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:41](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/hooks/util-hooks/useGenerateBorder.tsx#L41)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:41](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/hooks/util-hooks/useGenerateBorder.tsx#L41)

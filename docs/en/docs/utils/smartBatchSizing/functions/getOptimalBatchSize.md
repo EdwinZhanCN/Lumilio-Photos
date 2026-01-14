@@ -4,7 +4,7 @@
 
 > **getOptimalBatchSize**(`operationType`, `totalItems`, `priority`): `number`
 
-Defined in: [utils/smartBatchSizing.ts:382](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2b82469e35f05bd0a6f84f5b5214775da7893f65/web/src/utils/smartBatchSizing.ts#L382)
+Defined in: [utils/smartBatchSizing.ts:382](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a1e668df4214942756ee5b246e79ddcc4607c48e/web/src/utils/smartBatchSizing.ts#L382)
 
 Hook-friendly utility for getting optimal batch size
 
