@@ -6,13 +6,4523 @@ import "github.com/swaggo/swag/v2"
 
 const docTemplate = `{
     "schemes": {{ marshal .Schemes }},
-    "components": {"schemas":{"api.Result":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"},"data":{"properties":{"data":{"$ref":"#/components/schemas/service.UserResponse"}},"type":"object"},"dbtypes.AssetType":{"type":"string","x-enum-varnames":["AssetTypePhoto","AssetTypeVideo","AssetTypeAudio"]},"handler.AddAssetToAlbumRequest":{"properties":{"position":{"type":"integer"}},"type":"object"},"handler.AssetDTO":{"properties":{"asset_id":{"type":"string"},"deleted_at":{"type":"string"},"duration":{"type":"number"},"file_size":{"type":"integer"},"hash":{"type":"string"},"height":{"type":"integer"},"is_deleted":{"type":"boolean"},"liked":{"type":"boolean"},"mime_type":{"type":"string"},"original_filename":{"type":"string"},"owner_id":{"type":"integer"},"rating":{"type":"integer"},"repository_id":{"type":"string"},"specific_metadata":{"type":"object"},"status":{"items":{"type":"integer"},"type":"array","uniqueItems":false},"storage_path":{"type":"string"},"taken_time":{"type":"string"},"type":{"type":"string"},"upload_time":{"type":"string"},"width":{"type":"integer"}},"type":"object"},"handler.AssetFilter":{"properties":{"camera_make":{"example":"Canon","type":"string"},"date":{"$ref":"#/components/schemas/handler.DateRange"},"filename":{"$ref":"#/components/schemas/handler.FilenameFilter"},"lens":{"example":"EF 50mm f/1.8","type":"string"},"liked":{"example":true,"type":"boolean"},"owner_id":{"example":123,"type":"integer"},"rating":{"example":5,"maximum":5,"minimum":0,"type":"integer"},"raw":{"example":true,"type":"boolean"},"repository_id":{"example":"550e8400-e29b-41d4-a716-446655440000","type":"string"},"type":{"enum":["PHOTO","VIDEO","AUDIO"],"example":"PHOTO","type":"string"}},"type":"object"},"handler.AssetListResponse":{"properties":{"assets":{"items":{"$ref":"#/components/schemas/handler.AssetDTO"},"type":"array","uniqueItems":false},"limit":{"example":20,"type":"integer"},"offset":{"example":0,"type":"integer"}},"type":"object"},"handler.AssetTypesResponse":{"properties":{"types":{"items":{"$ref":"#/components/schemas/dbtypes.AssetType"},"type":"array","uniqueItems":false}},"type":"object"},"handler.BatchUploadResponse":{"properties":{"results":{"items":{"$ref":"#/components/schemas/handler.BatchUploadResult"},"type":"array","uniqueItems":false}},"type":"object"},"handler.BatchUploadResult":{"properties":{"content_hash":{"description":"MLService-provided content hash","type":"string"},"error":{"description":"Only present for failed uploads","type":"string"},"file_name":{"description":"Original filename","type":"string"},"message":{"description":"Status message","type":"string"},"size":{"description":"Only present for successful uploads","type":"integer"},"status":{"description":"Only present for successful uploads","type":"string"},"success":{"description":"Whether the file was successfully queued","type":"boolean"},"task_id":{"description":"Only present for successful uploads","type":"integer"}},"type":"object"},"handler.CreateAlbumRequest":{"properties":{"album_name":{"type":"string"},"cover_asset_id":{"type":"string"},"description":{"type":"string"}},"required":["album_name","cover_asset_id"],"type":"object"},"handler.DateRange":{"properties":{"from":{"type":"string"},"to":{"type":"string"}},"type":"object"},"handler.FilenameFilter":{"properties":{"mode":{"enum":["contains","matches","startswith","endswith"],"example":"startswith","type":"string"},"value":{"example":"IMG_","type":"string"}},"type":"object"},"handler.FilterAssetsRequest":{"properties":{"filter":{"$ref":"#/components/schemas/handler.AssetFilter"},"limit":{"example":20,"maximum":100,"minimum":1,"type":"integer"},"offset":{"example":0,"minimum":0,"type":"integer"}},"type":"object"},"handler.GetAlbumResponse":{"properties":{"album_id":{"type":"integer"},"album_name":{"type":"string"},"asset_count":{"type":"integer"},"cover_asset_id":{"type":"string"},"created_at":{"type":"string"},"description":{"type":"string"},"updated_at":{"type":"string"},"user_id":{"type":"integer"}},"type":"object"},"handler.ListAlbumsResponse":{"properties":{"albums":{"items":{"$ref":"#/components/schemas/handler.GetAlbumResponse"},"type":"array","uniqueItems":false},"limit":{"type":"integer"},"offset":{"type":"integer"},"total":{"type":"integer"}},"type":"object"},"handler.MessageResponse":{"properties":{"message":{"example":"Operation completed successfully","type":"string"}},"type":"object"},"handler.OptionsResponse":{"properties":{"camera_makes":{"items":{"type":"string"},"type":"array","uniqueItems":false},"lenses":{"items":{"type":"string"},"type":"array","uniqueItems":false}},"type":"object"},"handler.ProgressSummary":{"properties":{"active_sessions":{"type":"integer"},"completed_files":{"type":"integer"},"failed_sessions":{"type":"integer"},"overall_progress":{"type":"number"},"total_sessions":{"type":"integer"}},"type":"object"},"handler.ReprocessAssetRequest":{"properties":{"force_full_retry":{"example":false,"type":"boolean"},"tasks":{"example":["thumbnail_small","thumbnail_medium","transcode_1080p"],"items":{"type":"string"},"type":"array","uniqueItems":false}},"type":"object"},"handler.ReprocessAssetResponse":{"properties":{"asset_id":{"example":"550e8400-e29b-41d4-a716-446655440000","type":"string"},"failed_tasks":{"example":["thumbnail_small","transcode_1080p"],"items":{"type":"string"},"type":"array","uniqueItems":false},"message":{"example":"Reprocessing job queued successfully","type":"string"},"retry_tasks":{"example":["thumbnail_small","transcode_1080p"],"items":{"type":"string"},"type":"array","uniqueItems":false},"status":{"example":"queued","type":"string"}},"type":"object"},"handler.SearchAssetsRequest":{"properties":{"filter":{"$ref":"#/components/schemas/handler.AssetFilter"},"limit":{"example":20,"maximum":100,"minimum":1,"type":"integer"},"offset":{"example":0,"minimum":0,"type":"integer"},"query":{"example":"red bird on branch","type":"string"},"search_type":{"enum":["filename","semantic"],"example":"filename","type":"string"}},"required":["query","search_type"],"type":"object"},"handler.SessionProgress":{"properties":{"bytes_done":{"type":"integer"},"bytes_total":{"type":"integer"},"filename":{"type":"string"},"last_activity":{"type":"string"},"progress":{"description":"0-1","type":"number"},"received_chunks":{"type":"integer"},"session_id":{"type":"string"},"status":{"description":"pending, uploading, merging, completed, failed","type":"string"},"total_chunks":{"type":"integer"}},"type":"object"},"handler.UpdateAlbumRequest":{"properties":{"album_name":{"type":"string"},"cover_asset_id":{"type":"string"},"description":{"type":"string"}},"type":"object"},"handler.UpdateAssetPositionRequest":{"properties":{"position":{"type":"integer"}},"required":["position"],"type":"object"},"handler.UpdateAssetRequest":{"properties":{"specific_metadata":{"type":"object"}},"type":"object"},"handler.UpdateDescriptionRequest":{"properties":{"description":{"example":"A beautiful sunset photo","type":"string"}},"type":"object"},"handler.UpdateLikeRequest":{"properties":{"liked":{"example":true,"type":"boolean"}},"type":"object"},"handler.UpdateRatingAndLikeRequest":{"properties":{"liked":{"example":true,"type":"boolean"},"rating":{"example":5,"maximum":5,"minimum":0,"type":"integer"}},"type":"object"},"handler.UpdateRatingRequest":{"properties":{"rating":{"example":5,"maximum":5,"minimum":0,"type":"integer"}},"type":"object"},"handler.UploadConfigResponse":{"properties":{"chunk_size":{"description":"in bytes","type":"integer"},"max_concurrent":{"description":"maximum concurrent uploads","type":"integer"},"memory_buffer":{"description":"safety buffer in bytes","type":"integer"}},"type":"object"},"handler.UploadProgressResponse":{"properties":{"sessions":{"items":{"$ref":"#/components/schemas/handler.SessionProgress"},"type":"array","uniqueItems":false},"summary":{"$ref":"#/components/schemas/handler.ProgressSummary"}},"type":"object"},"handler.UploadResponse":{"properties":{"content_hash":{"example":"abcd1234567890","type":"string"},"file_name":{"example":"photo.jpg","type":"string"},"message":{"example":"File received and queued for processing","type":"string"},"size":{"example":1048576,"type":"integer"},"status":{"example":"processing","type":"string"},"task_id":{"example":12345,"type":"integer"}},"type":"object"},"service.AuthResponse":{"properties":{"expiresAt":{"type":"string"},"refreshToken":{"type":"string"},"token":{"type":"string"},"user":{"$ref":"#/components/schemas/service.UserResponse"}},"type":"object"},"service.LoginRequest":{"properties":{"password":{"type":"string"},"username":{"type":"string"}},"required":["password","username"],"type":"object"},"service.RefreshTokenRequest":{"properties":{"refreshToken":{"type":"string"}},"required":["refreshToken"],"type":"object"},"service.RegisterRequest":{"properties":{"email":{"type":"string"},"password":{"minLength":6,"type":"string"},"username":{"maxLength":50,"minLength":3,"type":"string"}},"required":["email","password","username"],"type":"object"},"service.UserResponse":{"properties":{"created_at":{"type":"string"},"email":{"type":"string"},"is_active":{"type":"boolean"},"last_login":{"type":"string"},"user_id":{"type":"integer"},"username":{"type":"string"}},"type":"object"}},"securitySchemes":{"BearerAuth":{"description":"Type \"Bearer\" followed by a space and JWT token.","in":"header","name":"Authorization","type":"apiKey"}}},
-    "info": {"contact":{"name":"API Support","url":"http://www.github.com/EdwinZhanCN/Lumilio-Photos"},"description":"{{escape .Description}}","license":{"name":"GPLv3.0","url":"https://opensource.org/licenses/GPL-3.0"},"title":"{{.Title}}","version":"{{.Version}}"},
-    "externalDocs": {"description":"","url":""},
-    "paths": {"/albums":{"get":{"description":"Retrieve a paginated list of albums for the authenticated user","parameters":[{"description":"Maximum number of results (max 100)","in":"query","name":"limit","schema":{"default":20,"type":"integer"}},{"description":"Number of results to skip for pagination","in":"query","name":"offset","schema":{"default":0,"type":"integer"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Albums retrieved successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid parameters"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Unauthorized"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Failed to retrieve albums"}},"security":[{"BearerAuth":[]}],"summary":"List albums","tags":["albums"]},"post":{"description":"Create a new album for the authenticated user","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.CreateAlbumRequest"}}},"description":"Album creation data","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Album created successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid request data"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Unauthorized"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Failed to create album"}},"security":[{"BearerAuth":[]}],"summary":"Create a new album","tags":["albums"]}},"/albums/{id}":{"delete":{"description":"Delete an album by its ID","parameters":[{"description":"Album ID","in":"path","name":"id","required":true,"schema":{"type":"integer"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Album deleted successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid album ID"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Unauthorized"},"403":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Forbidden"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Album not found"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Failed to delete album"}},"security":[{"BearerAuth":[]}],"summary":"Delete album","tags":["albums"]},"get":{"description":"Retrieve a specific album by its ID","parameters":[{"description":"Album ID","in":"path","name":"id","required":true,"schema":{"type":"integer"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Album retrieved successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid album ID"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Album not found"}},"security":[{"BearerAuth":[]}],"summary":"Get album by ID","tags":["albums"]},"put":{"description":"Update an existing album's information","parameters":[{"description":"Album ID","in":"path","name":"id","required":true,"schema":{"type":"integer"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.UpdateAlbumRequest"}}},"description":"Album update data","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Album updated successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid album ID or request data"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Unauthorized"},"403":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Forbidden"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Album not found"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Failed to update album"}},"security":[{"BearerAuth":[]}],"summary":"Update album","tags":["albums"]}},"/albums/{id}/assets":{"get":{"description":"Retrieve all assets in a specific album","parameters":[{"description":"Album ID","in":"path","name":"id","required":true,"schema":{"type":"integer"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Assets retrieved successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid album ID"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Album not found"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Failed to retrieve album assets"}},"security":[{"BearerAuth":[]}],"summary":"Get assets in album","tags":["albums"]}},"/albums/{id}/assets/{assetId}":{"delete":{"description":"Remove an asset from a specific album","parameters":[{"description":"Album ID","in":"path","name":"id","required":true,"schema":{"type":"integer"}},{"description":"Asset ID (UUID format)","in":"path","name":"assetId","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset removed from album successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid album ID or asset ID"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Failed to remove asset from album"}},"security":[{"BearerAuth":[]}],"summary":"Remove asset from album","tags":["albums"]},"post":{"description":"Add an asset to a specific album","parameters":[{"description":"Album ID","in":"path","name":"id","required":true,"schema":{"type":"integer"}},{"description":"Asset ID (UUID format)","in":"path","name":"assetId","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.AddAssetToAlbumRequest"}}},"description":"Asset position in album"},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset added to album successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid album ID or asset ID"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Album not found"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Failed to add asset to album"}},"security":[{"BearerAuth":[]}],"summary":"Add asset to album","tags":["albums"]}},"/albums/{id}/assets/{assetId}/position":{"put":{"description":"Update the position of an asset within a specific album","parameters":[{"description":"Album ID","in":"path","name":"id","required":true,"schema":{"type":"integer"}},{"description":"Asset ID (UUID format)","in":"path","name":"assetId","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.UpdateAssetPositionRequest"}}},"description":"New position for the asset","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset position updated successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid album ID or asset ID"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Failed to update asset position"}},"security":[{"BearerAuth":[]}],"summary":"Update asset position in album","tags":["albums"]}},"/assets":{"get":{"description":"Retrieve a paginated list of assets. Filter by type(s) or owner. Assets are sorted by taken_time (photo capture time or video record time). At least one filter parameter is required.","parameters":[{"description":"Single asset type filter","example":"\"PHOTO\"","in":"query","name":"type","schema":{"enum":["PHOTO","VIDEO","AUDIO","DOCUMENT"],"type":"string"}},{"description":"Multiple asset types filter (comma-separated)","example":"\"PHOTO,VIDEO\"","in":"query","name":"types","schema":{"type":"string"}},{"description":"Filter by owner ID","example":123,"in":"query","name":"owner_id","schema":{"type":"integer"}},{"description":"Maximum number of results (max 100)","example":20,"in":"query","name":"limit","schema":{"default":20,"type":"integer"}},{"description":"Number of results to skip for pagination","example":0,"in":"query","name":"offset","schema":{"default":0,"type":"integer"}},{"description":"Sort order by taken_time","example":"\"desc\"","in":"query","name":"sort_order","schema":{"default":"\"desc\"","enum":["asc","desc"],"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Assets retrieved successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid parameters"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"List assets","tags":["assets"]},"post":{"description":"Upload a single photo, video, audio file, or document to the system. The file is staged in a repository and queued for processing.","parameters":[{"description":"Client-calculated BLAKE3 hash of the file","in":"header","name":"X-Content-Hash","schema":{"type":"string"}}],"requestBody":{"content":{"multipart/form-data":{"schema":{"example":"\"550e8400-e29b-41d4-a716-446655440000\"","type":"string"}}},"description":"Repository UUID (uses default repository if not provided)"},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Upload successful"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Bad request - no file provided or parse error"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Upload a single asset","tags":["assets"]}},"/assets/batch":{"post":{"description":"Unified batch upload endpoint that supports both small files and chunked large files. Field names should follow format: single_{session_id} for single files or chunk_{session_id}_{index}_{total} for chunks.","requestBody":{"content":{"multipart/form-data":{"schema":{"type":"file"}}},"description":"Chunked file upload - use format: chunk_{session_id}_{index}_{total}"},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Batch upload completed"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Bad request - no files provided or parse error"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Batch upload assets with chunk support","tags":["assets"]}},"/assets/batch/config":{"get":{"description":"Get current upload configuration including chunk size and concurrency limits based on system memory","requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Upload configuration retrieved"}},"summary":"Get upload configuration","tags":["assets"]}},"/assets/batch/progress":{"get":{"description":"Get detailed progress information for upload sessions","parameters":[{"description":"Comma-separated session IDs (optional)","in":"query","name":"session_ids","schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Upload progress details"}},"summary":"Get upload progress","tags":["assets"]}},"/assets/filter":{"post":{"description":"Filter assets using comprehensive filtering options including repository selection, RAW, rating, liked status, filename patterns, date ranges, camera make, and lens","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.FilterAssetsRequest"}}},"description":"Filter criteria","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Assets filtered successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid request parameters"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Filter assets","tags":["assets"]}},"/assets/filter-options":{"get":{"description":"Get available camera makes and lenses for filter dropdowns","requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Filter options retrieved successfully"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Get filter options","tags":["assets"]}},"/assets/liked":{"get":{"description":"Get all assets that have been liked/favorited","parameters":[{"description":"Number of assets to return","in":"query","name":"limit","schema":{"default":20,"type":"integer"}},{"description":"Number of assets to skip","in":"query","name":"offset","schema":{"default":0,"type":"integer"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Liked assets retrieved successfully"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Get liked assets","tags":["assets"]}},"/assets/rating/{rating}":{"get":{"description":"Get assets with a specific rating (0-5)","parameters":[{"description":"Rating (0-5)","in":"path","name":"rating","required":true,"schema":{"type":"integer"}},{"description":"Number of assets to return","in":"query","name":"limit","schema":{"default":20,"type":"integer"}},{"description":"Number of assets to skip","in":"query","name":"offset","schema":{"default":0,"type":"integer"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Assets retrieved successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Bad request"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Get assets by rating","tags":["assets"]}},"/assets/search":{"post":{"description":"Search assets using either filename matching or semantic vector search. Can be combined with comprehensive filters including repository selection.","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.SearchAssetsRequest"}}},"description":"Search criteria","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Assets found successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid request parameters"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Search assets","tags":["assets"]}},"/assets/types":{"get":{"description":"Retrieve a list of all supported asset types in the system.","requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Asset types retrieved successfully"}},"summary":"Get supported asset types","tags":["assets"]}},"/assets/{id}":{"delete":{"description":"Soft delete an asset by marking it as deleted. The physical file is not removed.","parameters":[{"description":"Asset ID (UUID format)","example":"\"550e8400-e29b-41d4-a716-446655440000\"","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Asset deleted successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid asset ID format"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Delete asset","tags":["assets"]},"get":{"description":"Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, and species predictions.","parameters":[{"description":"Asset ID (UUID format)","example":"\"550e8400-e29b-41d4-a716-446655440000\"","in":"path","name":"id","required":true,"schema":{"type":"string"}},{"description":"Include thumbnails","in":"query","name":"include_thumbnails","schema":{"default":true,"type":"boolean"}},{"description":"Include tags","in":"query","name":"include_tags","schema":{"default":true,"type":"boolean"}},{"description":"Include albums","in":"query","name":"include_albums","schema":{"default":true,"type":"boolean"}},{"description":"Include species predictions","in":"query","name":"include_species","schema":{"default":true,"type":"boolean"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Asset details with optional relationships"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid asset ID"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset not found"}},"summary":"Get asset by ID","tags":["assets"]},"put":{"description":"Update the specific metadata of an asset (e.g., photo EXIF data, video metadata).","parameters":[{"description":"Asset ID (UUID format)","example":"\"550e8400-e29b-41d4-a716-446655440000\"","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.UpdateAssetRequest"}}},"description":"Updated metadata","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Asset updated successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid asset ID or request body"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Update asset metadata","tags":["assets"]}},"/assets/{id}/albums":{"get":{"description":"Retrieve all albums that contain a specific asset","parameters":[{"description":"Asset ID (UUID format)","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Albums retrieved successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid asset ID"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Failed to retrieve asset albums"}},"security":[{"BearerAuth":[]}],"summary":"Get albums containing asset","tags":["albums"]}},"/assets/{id}/albums/{albumId}":{"post":{"description":"Associate an asset with a specific album by asset ID and album ID.","parameters":[{"description":"Asset ID (UUID format)","example":"\"550e8400-e29b-41d4-a716-446655440000\"","in":"path","name":"id","required":true,"schema":{"type":"string"}},{"description":"Album ID","example":123,"in":"path","name":"albumId","required":true,"schema":{"type":"integer"}}],"requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Asset added to album successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid asset ID or album ID"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Add asset to album","tags":["assets"]}},"/assets/{id}/audio/web":{"get":{"description":"Serve the web-optimized MP3 audio version for an asset by asset ID.","parameters":[{"description":"Asset ID (UUID format)","example":"\"550e8400-e29b-41d4-a716-446655440000\"","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"type":"file"}},"audio/mpeg":{"schema":{"type":"string"}}},"description":"Web-optimized audio file"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid asset ID"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset not found or not audio"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Get web-optimized audio","tags":["assets"]}},"/assets/{id}/description":{"put":{"description":"Update the description/comment of a specific asset","parameters":[{"description":"Asset ID","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.UpdateDescriptionRequest"}}},"description":"Description data","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Description updated successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Bad request"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset not found"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Update asset description","tags":["assets"]}},"/assets/{id}/like":{"put":{"description":"Update the like/favorite status of a specific asset","parameters":[{"description":"Asset ID","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.UpdateLikeRequest"}}},"description":"Like data","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Like status updated successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Bad request"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset not found"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Update asset like status","tags":["assets"]}},"/assets/{id}/original":{"get":{"description":"Serve the original file content for an asset by asset ID. Returns the file as an octet-stream.","parameters":[{"description":"Asset ID (UUID format)","example":"\"550e8400-e29b-41d4-a716-446655440000\"","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"type":"file"}},"application/octet-stream":{"schema":{"format":"binary","type":"string"}}},"description":"Original file content"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid asset ID"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset not found"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Get original file","tags":["assets"]}},"/assets/{id}/rating":{"put":{"description":"Update the rating (0-5) of a specific asset","parameters":[{"description":"Asset ID","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.UpdateRatingRequest"}}},"description":"Rating data","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Rating updated successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Bad request"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset not found"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Update asset rating","tags":["assets"]}},"/assets/{id}/rating-and-like":{"put":{"description":"Update both the rating (0-5) and like/favorite status of a specific asset","parameters":[{"description":"Asset ID","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.UpdateRatingAndLikeRequest"}}},"description":"Rating and like data","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Rating and like status updated successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Bad request"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset not found"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Update asset rating and like status","tags":["assets"]}},"/assets/{id}/reprocess":{"post":{"description":"Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing","parameters":[{"description":"Asset ID","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.ReprocessAssetRequest"}}},"description":"Reprocessing tasks (optional)"},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/handler.ReprocessAssetResponse"}}},"description":"OK"},"400":{"content":{"application/json":{"schema":{"additionalProperties":{"type":"string"},"type":"object"}}},"description":"Bad Request"},"404":{"content":{"application/json":{"schema":{"additionalProperties":{"type":"string"},"type":"object"}}},"description":"Not Found"},"500":{"content":{"application/json":{"schema":{"additionalProperties":{"type":"string"},"type":"object"}}},"description":"Internal Server Error"}},"summary":"Reprocess asset","tags":["assets"]}},"/assets/{id}/thumbnail":{"get":{"description":"Retrieve a specific thumbnail image for an asset by asset ID and size parameter. Returns the image file directly.","parameters":[{"description":"Asset ID (UUID format)","example":"\"550e8400-e29b-41d4-a716-446655440000\"","in":"path","name":"id","required":true,"schema":{"type":"string"}},{"description":"Thumbnail size","in":"query","name":"size","schema":{"default":"medium","enum":["small","medium","large"],"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"type":"file"}},"image/jpeg":{"schema":{"format":"binary","type":"string"}}},"description":"Thumbnail image file"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid asset ID or size parameter"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset or thumbnail not found"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Get asset thumbnail","tags":["assets"]}},"/assets/{id}/video/web":{"get":{"description":"Serve the web-optimized MP4 video version for an asset by asset ID.","parameters":[{"description":"Asset ID (UUID format)","example":"\"550e8400-e29b-41d4-a716-446655440000\"","in":"path","name":"id","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"type":"file"}},"video/mp4":{"schema":{"type":"string"}}},"description":"Web-optimized video file"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid asset ID"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Asset not found or not a video"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Get web-optimized video","tags":["assets"]}},"/auth/login":{"post":{"description":"Authenticate user with username and password","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/service.LoginRequest"}}},"description":"Login credentials","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Login successful"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid request data"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid credentials"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Login user","tags":["auth"]}},"/auth/logout":{"post":{"description":"Revoke the user's refresh token","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/service.RefreshTokenRequest"}}},"description":"Refresh token to revoke","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Logout successful"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid request data"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid refresh token"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Logout user","tags":["auth"]}},"/auth/me":{"get":{"description":"Get information about the currently authenticated user","requestBody":{"content":{"application/json":{"schema":{"type":"object"}}}},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"User information retrieved successfully"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Unauthorized"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"security":[{"BearerAuth":[]}],"summary":"Get current user","tags":["auth"]}},"/auth/refresh":{"post":{"description":"Generate a new access token using a valid refresh token","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/service.RefreshTokenRequest"}}},"description":"Refresh token","required":true},"responses":{"200":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"Token refreshed successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid request data"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid or expired refresh token"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Refresh access token","tags":["auth"]}},"/auth/register":{"post":{"description":"Create a new user account with username, email, and password","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/service.RegisterRequest"}}},"description":"Registration data","required":true},"responses":{"201":{"content":{"application/json":{"schema":{"allOf":[{"$ref":"#/components/schemas/data"}],"description":"Standard API response wrapper","properties":{"code":{"description":"Business status code (0 for success, non-zero for errors)","example":0,"type":"integer"},"data":{"description":"Business data, ignore empty values","type":"object"},"error":{"description":"Debug error message, ignore empty values","example":"error details","type":"string"},"message":{"description":"User readable message","example":"success","type":"string"}},"type":"object"}}},"description":"User registered successfully"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Invalid request data"},"409":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"User already exists"},"500":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/api.Result"}}},"description":"Internal server error"}},"summary":"Register a new user","tags":["auth"]}}},
+    "components": {
+        "schemas": {
+            "api.Result": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/data"
+                    }
+                ],
+                "description": "Standard API response wrapper",
+                "properties": {
+                    "code": {
+                        "description": "Business status code (0 for success, non-zero for errors)",
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "data": {
+                        "description": "Business data, ignore empty values",
+                        "type": "object"
+                    },
+                    "error": {
+                        "description": "Debug error message, ignore empty values",
+                        "example": "error details",
+                        "type": "string"
+                    },
+                    "message": {
+                        "description": "User readable message",
+                        "example": "success",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "data": {
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/dto.UserDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dbtypes.AssetType": {
+                "enum": [
+                    "PHOTO",
+                    "VIDEO",
+                    "AUDIO"
+                ],
+                "type": "string",
+                "x-enum-varnames": [
+                    "AssetTypePhoto",
+                    "AssetTypeVideo",
+                    "AssetTypeAudio"
+                ]
+            },
+            "dbtypes.AudioSpecificMetadata": {
+                "properties": {
+                    "album": {
+                        "example": "Album Title",
+                        "type": "string"
+                    },
+                    "artist": {
+                        "example": "John Doe",
+                        "type": "string"
+                    },
+                    "bitrate": {
+                        "example": 128000,
+                        "type": "integer"
+                    },
+                    "channels": {
+                        "example": 2,
+                        "type": "integer"
+                    },
+                    "codec": {
+                        "example": "AAC",
+                        "type": "string"
+                    },
+                    "description": {
+                        "example": "Song Description",
+                        "type": "string"
+                    },
+                    "genre": {
+                        "example": "Pop",
+                        "type": "string"
+                    },
+                    "sample_rate": {
+                        "example": 44100,
+                        "type": "integer"
+                    },
+                    "title": {
+                        "example": "Song Title",
+                        "type": "string"
+                    },
+                    "year": {
+                        "example": 2023,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dbtypes.PhotoSpecificMetadata": {
+                "properties": {
+                    "camera_model": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "dimensions": {
+                        "type": "string"
+                    },
+                    "exposure": {
+                        "type": "number"
+                    },
+                    "exposure_time": {
+                        "type": "string"
+                    },
+                    "f_number": {
+                        "type": "number"
+                    },
+                    "focal_length": {
+                        "type": "number"
+                    },
+                    "gps_latitude": {
+                        "type": "number"
+                    },
+                    "gps_longitude": {
+                        "type": "number"
+                    },
+                    "is_raw": {
+                        "type": "boolean"
+                    },
+                    "iso_speed": {
+                        "type": "integer"
+                    },
+                    "lens_model": {
+                        "type": "string"
+                    },
+                    "resolution": {
+                        "type": "string"
+                    },
+                    "taken_time": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dbtypes.VideoSpecificMetadata": {
+                "properties": {
+                    "bitrate": {
+                        "example": 1000000,
+                        "type": "integer"
+                    },
+                    "camera_model": {
+                        "example": "Canon EOS 5D Mark IV",
+                        "type": "string"
+                    },
+                    "codec": {
+                        "example": "H.264",
+                        "type": "string"
+                    },
+                    "description": {
+                        "example": "A beautiful sunset over the ocean",
+                        "type": "string"
+                    },
+                    "frame_rate": {
+                        "example": 30,
+                        "type": "number"
+                    },
+                    "gps_latitude": {
+                        "example": 37.7749,
+                        "type": "number"
+                    },
+                    "gps_longitude": {
+                        "example": -122.4194,
+                        "type": "number"
+                    },
+                    "recorded_time": {
+                        "example": "2023-01-01T00:00:00Z",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AddAssetToAlbumRequestDTO": {
+                "properties": {
+                    "position": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetDTO": {
+                "properties": {
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "deleted_at": {
+                        "type": "string"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "file_size": {
+                        "type": "integer"
+                    },
+                    "hash": {
+                        "type": "string"
+                    },
+                    "height": {
+                        "type": "integer"
+                    },
+                    "is_deleted": {
+                        "type": "boolean"
+                    },
+                    "liked": {
+                        "type": "boolean"
+                    },
+                    "mime_type": {
+                        "type": "string"
+                    },
+                    "original_filename": {
+                        "type": "string"
+                    },
+                    "owner_id": {
+                        "type": "integer"
+                    },
+                    "rating": {
+                        "type": "integer"
+                    },
+                    "repository_id": {
+                        "type": "string"
+                    },
+                    "specific_metadata": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/dbtypes.PhotoSpecificMetadata"
+                            },
+                            {
+                                "$ref": "#/components/schemas/dbtypes.VideoSpecificMetadata"
+                            },
+                            {
+                                "$ref": "#/components/schemas/dbtypes.AudioSpecificMetadata"
+                            }
+                        ],
+                        "type": "object"
+                    },
+                    "status": {
+                        "items": {
+                            "type": "integer"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "storage_path": {
+                        "type": "string"
+                    },
+                    "taken_time": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "upload_time": {
+                        "type": "string"
+                    },
+                    "width": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetFilterDTO": {
+                "properties": {
+                    "camera_make": {
+                        "example": "Canon",
+                        "type": "string"
+                    },
+                    "date": {
+                        "$ref": "#/components/schemas/dto.DateRangeDTO"
+                    },
+                    "filename": {
+                        "$ref": "#/components/schemas/dto.FilenameFilterDTO"
+                    },
+                    "lens": {
+                        "example": "EF 50mm f/1.8",
+                        "type": "string"
+                    },
+                    "liked": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "owner_id": {
+                        "example": 123,
+                        "type": "integer"
+                    },
+                    "rating": {
+                        "example": 5,
+                        "maximum": 5,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "raw": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "type": {
+                        "enum": [
+                            "PHOTO",
+                            "VIDEO",
+                            "AUDIO"
+                        ],
+                        "example": "PHOTO",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetListResponseDTO": {
+                "properties": {
+                    "assets": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "example": 20,
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "example": 0,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetTypesResponseDTO": {
+                "properties": {
+                    "types": {
+                        "items": {
+                            "$ref": "#/components/schemas/dbtypes.AssetType"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AuthResponseDTO": {
+                "properties": {
+                    "expiresAt": {
+                        "type": "string"
+                    },
+                    "refreshToken": {
+                        "type": "string"
+                    },
+                    "token": {
+                        "type": "string"
+                    },
+                    "user": {
+                        "$ref": "#/components/schemas/dto.UserDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.BatchUploadResponseDTO": {
+                "properties": {
+                    "results": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.BatchUploadResultDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.BatchUploadResultDTO": {
+                "properties": {
+                    "content_hash": {
+                        "type": "string"
+                    },
+                    "error": {
+                        "type": "string"
+                    },
+                    "file_name": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "size": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "task_id": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.CreateAlbumRequestDTO": {
+                "properties": {
+                    "album_name": {
+                        "type": "string"
+                    },
+                    "cover_asset_id": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "album_name",
+                    "cover_asset_id"
+                ],
+                "type": "object"
+            },
+            "dto.DateRangeDTO": {
+                "properties": {
+                    "from": {
+                        "type": "string"
+                    },
+                    "to": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.FilenameFilterDTO": {
+                "properties": {
+                    "mode": {
+                        "enum": [
+                            "contains",
+                            "matches",
+                            "startswith",
+                            "endswith"
+                        ],
+                        "example": "startswith",
+                        "type": "string"
+                    },
+                    "value": {
+                        "example": "IMG_",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.FilterAssetsRequestDTO": {
+                "properties": {
+                    "filter": {
+                        "$ref": "#/components/schemas/dto.AssetFilterDTO"
+                    },
+                    "limit": {
+                        "example": 20,
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "example": 0,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.GetAlbumResponseDTO": {
+                "properties": {
+                    "album_id": {
+                        "type": "integer"
+                    },
+                    "album_name": {
+                        "type": "string"
+                    },
+                    "asset_count": {
+                        "type": "integer"
+                    },
+                    "cover_asset_id": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "user_id": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ListAlbumsResponseDTO": {
+                "properties": {
+                    "albums": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.GetAlbumResponseDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LoginRequestDTO": {
+                "properties": {
+                    "password": {
+                        "type": "string"
+                    },
+                    "username": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "password",
+                    "username"
+                ],
+                "type": "object"
+            },
+            "dto.MessageResponseDTO": {
+                "properties": {
+                    "message": {
+                        "example": "Operation completed successfully",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.OptionsResponseDTO": {
+                "properties": {
+                    "camera_makes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "lenses": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ProgressSummaryDTO": {
+                "properties": {
+                    "active_sessions": {
+                        "type": "integer"
+                    },
+                    "completed_files": {
+                        "type": "integer"
+                    },
+                    "failed_sessions": {
+                        "type": "integer"
+                    },
+                    "overall_progress": {
+                        "type": "number"
+                    },
+                    "total_sessions": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RefreshTokenRequestDTO": {
+                "properties": {
+                    "refreshToken": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "refreshToken"
+                ],
+                "type": "object"
+            },
+            "dto.RegisterRequestDTO": {
+                "properties": {
+                    "email": {
+                        "type": "string"
+                    },
+                    "password": {
+                        "minLength": 6,
+                        "type": "string"
+                    },
+                    "username": {
+                        "maxLength": 50,
+                        "minLength": 3,
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "email",
+                    "password",
+                    "username"
+                ],
+                "type": "object"
+            },
+            "dto.ReprocessAssetRequestDTO": {
+                "properties": {
+                    "force_full_retry": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "tasks": {
+                        "example": [
+                            "thumbnail_small",
+                            "thumbnail_medium",
+                            "transcode_1080p"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ReprocessAssetResponseDTO": {
+                "properties": {
+                    "asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "failed_tasks": {
+                        "example": [
+                            "thumbnail_small",
+                            "transcode_1080p"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "message": {
+                        "example": "Reprocessing job queued successfully",
+                        "type": "string"
+                    },
+                    "retry_tasks": {
+                        "example": [
+                            "thumbnail_small",
+                            "transcode_1080p"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "status": {
+                        "example": "queued",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.SearchAssetsRequestDTO": {
+                "properties": {
+                    "filter": {
+                        "$ref": "#/components/schemas/dto.AssetFilterDTO"
+                    },
+                    "limit": {
+                        "example": 20,
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "example": 0,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "query": {
+                        "example": "red bird on branch",
+                        "type": "string"
+                    },
+                    "search_type": {
+                        "enum": [
+                            "filename",
+                            "semantic"
+                        ],
+                        "example": "filename",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "query",
+                    "search_type"
+                ],
+                "type": "object"
+            },
+            "dto.SessionProgressDTO": {
+                "properties": {
+                    "bytes_done": {
+                        "type": "integer"
+                    },
+                    "bytes_total": {
+                        "type": "integer"
+                    },
+                    "filename": {
+                        "type": "string"
+                    },
+                    "last_activity": {
+                        "type": "string"
+                    },
+                    "progress": {
+                        "type": "number"
+                    },
+                    "received_chunks": {
+                        "type": "integer"
+                    },
+                    "session_id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "total_chunks": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateAlbumRequestDTO": {
+                "properties": {
+                    "album_name": {
+                        "type": "string"
+                    },
+                    "cover_asset_id": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateAssetPositionRequestDTO": {
+                "properties": {
+                    "position": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "position"
+                ],
+                "type": "object"
+            },
+            "dto.UpdateAssetRequestDTO": {
+                "properties": {
+                    "specific_metadata": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/dbtypes.PhotoSpecificMetadata"
+                            },
+                            {
+                                "$ref": "#/components/schemas/dbtypes.VideoSpecificMetadata"
+                            },
+                            {
+                                "$ref": "#/components/schemas/dbtypes.AudioSpecificMetadata"
+                            }
+                        ],
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateDescriptionRequestDTO": {
+                "properties": {
+                    "description": {
+                        "example": "A beautiful sunset photo",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateLikeRequestDTO": {
+                "properties": {
+                    "liked": {
+                        "example": true,
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateRatingAndLikeRequestDTO": {
+                "properties": {
+                    "liked": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "rating": {
+                        "example": 5,
+                        "maximum": 5,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateRatingRequestDTO": {
+                "properties": {
+                    "rating": {
+                        "example": 5,
+                        "maximum": 5,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UploadConfigResponseDTO": {
+                "properties": {
+                    "chunk_size": {
+                        "type": "integer"
+                    },
+                    "max_concurrent": {
+                        "type": "integer"
+                    },
+                    "memory_buffer": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UploadProgressResponseDTO": {
+                "properties": {
+                    "sessions": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.SessionProgressDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "summary": {
+                        "$ref": "#/components/schemas/dto.ProgressSummaryDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UploadResponseDTO": {
+                "properties": {
+                    "content_hash": {
+                        "example": "abcd1234567890",
+                        "type": "string"
+                    },
+                    "file_name": {
+                        "example": "photo.jpg",
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "File received and queued for processing",
+                        "type": "string"
+                    },
+                    "size": {
+                        "example": 1048576,
+                        "type": "integer"
+                    },
+                    "status": {
+                        "example": "processing",
+                        "type": "string"
+                    },
+                    "task_id": {
+                        "example": 12345,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UserDTO": {
+                "properties": {
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "last_login": {
+                        "type": "string"
+                    },
+                    "user_id": {
+                        "type": "integer"
+                    },
+                    "username": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "BearerAuth": {
+                "description": "Type \"Bearer\" followed by a space and JWT token.",
+                "in": "header",
+                "name": "Authorization",
+                "type": "apiKey"
+            }
+        }
+    },
+    "info": {
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.github.com/EdwinZhanCN/Lumilio-Photos"
+        },
+        "description": "{{escape .Description}}",
+        "license": {
+            "name": "GPLv3.0",
+            "url": "https://opensource.org/licenses/GPL-3.0"
+        },
+        "title": "{{.Title}}",
+        "version": "{{.Version}}"
+    },
+    "externalDocs": {
+        "description": "",
+        "url": ""
+    },
+    "paths": {
+        "/albums": {
+            "get": {
+                "description": "Retrieve a paginated list of albums for the authenticated user",
+                "parameters": [
+                    {
+                        "description": "Maximum number of results (max 100)",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 20,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip for pagination",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "default": 0,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Albums retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid parameters"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Failed to retrieve albums"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List albums",
+                "tags": [
+                    "albums"
+                ]
+            },
+            "post": {
+                "description": "Create a new album for the authenticated user",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.CreateAlbumRequestDTO",
+                                        "summary": "request",
+                                        "description": "Album creation data"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Album creation data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Album created successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Failed to create album"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create a new album",
+                "tags": [
+                    "albums"
+                ]
+            }
+        },
+        "/albums/{id}": {
+            "delete": {
+                "description": "Delete an album by its ID",
+                "parameters": [
+                    {
+                        "description": "Album ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Album deleted successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid album ID"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Album not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Failed to delete album"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete album",
+                "tags": [
+                    "albums"
+                ]
+            },
+            "get": {
+                "description": "Retrieve a specific album by its ID",
+                "parameters": [
+                    {
+                        "description": "Album ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Album retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid album ID"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Album not found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get album by ID",
+                "tags": [
+                    "albums"
+                ]
+            },
+            "put": {
+                "description": "Update an existing album's information",
+                "parameters": [
+                    {
+                        "description": "Album ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateAlbumRequestDTO",
+                                        "summary": "request",
+                                        "description": "Album update data"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Album update data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Album updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid album ID or request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Album not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Failed to update album"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update album",
+                "tags": [
+                    "albums"
+                ]
+            }
+        },
+        "/albums/{id}/assets": {
+            "get": {
+                "description": "Retrieve all assets in a specific album",
+                "parameters": [
+                    {
+                        "description": "Album ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Assets retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid album ID"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Album not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Failed to retrieve album assets"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get assets in album",
+                "tags": [
+                    "albums"
+                ]
+            }
+        },
+        "/albums/{id}/assets/{assetId}": {
+            "delete": {
+                "description": "Remove an asset from a specific album",
+                "parameters": [
+                    {
+                        "description": "Album ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "in": "path",
+                        "name": "assetId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset removed from album successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid album ID or asset ID"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Failed to remove asset from album"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Remove asset from album",
+                "tags": [
+                    "albums"
+                ]
+            },
+            "post": {
+                "description": "Add an asset to a specific album",
+                "parameters": [
+                    {
+                        "description": "Album ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "in": "path",
+                        "name": "assetId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AddAssetToAlbumRequestDTO",
+                                        "summary": "request",
+                                        "description": "Asset position in album"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Asset position in album"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset added to album successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid album ID or asset ID"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Album not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Failed to add asset to album"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Add asset to album",
+                "tags": [
+                    "albums"
+                ]
+            }
+        },
+        "/albums/{id}/assets/{assetId}/position": {
+            "put": {
+                "description": "Update the position of an asset within a specific album",
+                "parameters": [
+                    {
+                        "description": "Album ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "in": "path",
+                        "name": "assetId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateAssetPositionRequestDTO",
+                                        "summary": "request",
+                                        "description": "New position data"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "New position data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset position updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid album ID or asset ID"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Failed to update asset position"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update asset position in album",
+                "tags": [
+                    "albums"
+                ]
+            }
+        },
+        "/assets": {
+            "get": {
+                "description": "Retrieve a paginated list of assets. Filter by type(s) or owner. Assets are sorted by taken_time (photo capture time or video record time). At least one filter parameter is required.",
+                "parameters": [
+                    {
+                        "description": "Single asset type filter",
+                        "example": "\"PHOTO\"",
+                        "in": "query",
+                        "name": "type",
+                        "schema": {
+                            "enum": [
+                                "PHOTO",
+                                "VIDEO",
+                                "AUDIO",
+                                "DOCUMENT"
+                            ],
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Multiple asset types filter (comma-separated)",
+                        "example": "\"PHOTO,VIDEO\"",
+                        "in": "query",
+                        "name": "types",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Filter by owner ID",
+                        "example": 123,
+                        "in": "query",
+                        "name": "owner_id",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Maximum number of results (max 100)",
+                        "example": 20,
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 20,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip for pagination",
+                        "example": 0,
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "default": 0,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Sort order by taken_time",
+                        "example": "\"desc\"",
+                        "in": "query",
+                        "name": "sort_order",
+                        "schema": {
+                            "default": "\"desc\"",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ],
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Assets retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "List assets",
+                "tags": [
+                    "assets"
+                ]
+            },
+            "post": {
+                "description": "Upload a single photo, video, audio file, or document to the system. The file is staged in a repository and queued for processing.",
+                "parameters": [
+                    {
+                        "description": "Client-calculated BLAKE3 hash of the file",
+                        "in": "header",
+                        "name": "X-Content-Hash",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "title": "file",
+                                        "type": "file"
+                                    },
+                                    {
+                                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                                        "title": "repository_id",
+                                        "type": "string"
+                                    }
+                                ]
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "description": "Asset file to upload | Repository UUID (uses default repository if not provided)"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Upload successful"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad request - no file provided or parse error"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Upload a single asset",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/batch": {
+            "post": {
+                "description": "Unified batch upload endpoint that supports both small files and chunked large files. Field names should follow format: single_{session_id} for single files or chunk_{session_id}_{index}_{total} for chunks.",
+                "requestBody": {
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                                        "title": "repository_id",
+                                        "type": "string"
+                                    },
+                                    {
+                                        "title": "file",
+                                        "type": "file"
+                                    },
+                                    {
+                                        "title": "file",
+                                        "type": "file"
+                                    }
+                                ]
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "description": "Repository UUID (uses default repository if not provided) | Single file upload - use format: single_{session_id} | Chunked file upload - use format: chunk_{session_id}_{index}_{total}"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Batch upload completed"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad request - no files provided or parse error"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Batch upload assets with chunk support",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/batch/config": {
+            "get": {
+                "description": "Get current upload configuration including chunk size and concurrency limits based on system memory",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Upload configuration"
+                    }
+                },
+                "summary": "Get upload configuration",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/batch/progress": {
+            "get": {
+                "description": "Get detailed progress information for upload sessions",
+                "parameters": [
+                    {
+                        "description": "Comma-separated session IDs (optional)",
+                        "in": "query",
+                        "name": "session_ids",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Upload progress details"
+                    }
+                },
+                "summary": "Get upload progress",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/filter": {
+            "post": {
+                "description": "Filter assets using comprehensive filtering options including repository selection, RAW, rating, liked status, filename patterns, date ranges, camera make, and lens",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.FilterAssetsRequestDTO",
+                                        "summary": "request",
+                                        "description": "Filter criteria"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Filter criteria",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Assets filtered successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Filter assets",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/filter-options": {
+            "get": {
+                "description": "Get available camera makes and lenses for filter dropdowns",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Filter options retrieved successfully"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get filter options",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/liked": {
+            "get": {
+                "description": "Get all assets that have been liked/favorited",
+                "parameters": [
+                    {
+                        "description": "Number of assets to return",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 20,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of assets to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "default": 0,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Liked assets retrieved successfully"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get liked assets",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/rating/{rating}": {
+            "get": {
+                "description": "Get assets with a specific rating (0-5)",
+                "parameters": [
+                    {
+                        "description": "Rating (0-5)",
+                        "in": "path",
+                        "name": "rating",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of assets to return",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 20,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of assets to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "default": 0,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Assets retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get assets by rating",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/search": {
+            "post": {
+                "description": "Search assets using either filename matching or semantic vector search. Can be combined with comprehensive filters including repository selection.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.SearchAssetsRequestDTO",
+                                        "summary": "request",
+                                        "description": "Search criteria"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Search criteria",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Assets found successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Search assets",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/types": {
+            "get": {
+                "description": "Retrieve a list of all supported asset types in the system.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Asset types retrieved successfully"
+                    }
+                },
+                "summary": "Get supported asset types",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}": {
+            "delete": {
+                "description": "Soft delete an asset by marking it as deleted. The physical file is not removed.",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Asset deleted successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID format"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Delete asset",
+                "tags": [
+                    "assets"
+                ]
+            },
+            "get": {
+                "description": "Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and AI descriptions.",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Include thumbnails",
+                        "in": "query",
+                        "name": "include_thumbnails",
+                        "schema": {
+                            "default": true,
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Include tags",
+                        "in": "query",
+                        "name": "include_tags",
+                        "schema": {
+                            "default": true,
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Include albums",
+                        "in": "query",
+                        "name": "include_albums",
+                        "schema": {
+                            "default": true,
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Include species predictions",
+                        "in": "query",
+                        "name": "include_species",
+                        "schema": {
+                            "default": true,
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Include OCR results",
+                        "in": "query",
+                        "name": "include_ocr",
+                        "schema": {
+                            "default": false,
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Include face recognition",
+                        "in": "query",
+                        "name": "include_faces",
+                        "schema": {
+                            "default": false,
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "description": "Include AI descriptions",
+                        "in": "query",
+                        "name": "include_ai_descriptions",
+                        "schema": {
+                            "default": false,
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Asset details with optional relationships"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset not found"
+                    }
+                },
+                "summary": "Get asset by ID",
+                "tags": [
+                    "assets"
+                ]
+            },
+            "put": {
+                "description": "Update the specific metadata of an asset (e.g., photo EXIF data, video metadata).",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateAssetRequestDTO",
+                                        "summary": "request",
+                                        "description": "Asset metadata"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Asset metadata",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Asset updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID or request body"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Update asset metadata",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}/albums": {
+            "get": {
+                "description": "Retrieve all albums that contain a specific asset",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Albums retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Failed to retrieve asset albums"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get albums containing asset",
+                "tags": [
+                    "albums"
+                ]
+            }
+        },
+        "/assets/{id}/albums/{albumId}": {
+            "post": {
+                "description": "Associate an asset with a specific album by asset ID and album ID.",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Album ID",
+                        "example": 123,
+                        "in": "path",
+                        "name": "albumId",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Asset added to album successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID or album ID"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Add asset to album",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}/audio/web": {
+            "get": {
+                "description": "Serve the web-optimized MP3 audio version for an asset by asset ID.",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "audio/mpeg": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Web-optimized audio file"
+                    },
+                    "400": {
+                        "content": {
+                            "audio/mpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID"
+                    },
+                    "404": {
+                        "content": {
+                            "audio/mpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset not found or not audio"
+                    },
+                    "500": {
+                        "content": {
+                            "audio/mpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get web-optimized audio",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}/description": {
+            "put": {
+                "description": "Update the description metadata of an asset",
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateDescriptionRequestDTO",
+                                        "summary": "description",
+                                        "description": "Description data"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Description data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Description updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Update asset description",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}/like": {
+            "put": {
+                "description": "Update the like/favorite status of a specific asset",
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateLikeRequestDTO",
+                                        "summary": "like",
+                                        "description": "Like data"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Like data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Like status updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Update asset like status",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}/original": {
+            "get": {
+                "description": "Serve the original file content for an asset by asset ID. Returns the file as an octet-stream.",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Original file content"
+                    },
+                    "400": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID"
+                    },
+                    "404": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get original file",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}/rating": {
+            "put": {
+                "description": "Update the rating (0-5) of a specific asset",
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateRatingRequestDTO",
+                                        "summary": "rating",
+                                        "description": "Rating data"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Rating data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Rating updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Update asset rating",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}/rating-and-like": {
+            "put": {
+                "description": "Update both the rating (0-5) and like/favorite status of a specific asset",
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateRatingAndLikeRequestDTO",
+                                        "summary": "data",
+                                        "description": "Rating and like data"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Rating and like data",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Rating and like status updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Update asset rating and like status",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}/reprocess": {
+            "post": {
+                "description": "Reprocess a failed or warning asset by resetting its status and re-enqueuing for processing",
+                "parameters": [
+                    {
+                        "description": "Asset ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.ReprocessAssetRequestDTO",
+                                        "summary": "request",
+                                        "description": "Reprocessing tasks (optional)"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Reprocessing tasks (optional)"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/dto.ReprocessAssetResponseDTO"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "Reprocess asset",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}/thumbnail": {
+            "get": {
+                "description": "Retrieve a specific thumbnail image for an asset by asset ID and size parameter. Returns the image file directly.",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Thumbnail size",
+                        "in": "query",
+                        "name": "size",
+                        "schema": {
+                            "default": "medium",
+                            "enum": [
+                                "small",
+                                "medium",
+                                "large"
+                            ],
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Thumbnail image file"
+                    },
+                    "400": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID or size parameter"
+                    },
+                    "404": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset or thumbnail not found"
+                    },
+                    "500": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get asset thumbnail",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/assets/{id}/video/web": {
+            "get": {
+                "description": "Serve the web-optimized MP4 video version for an asset by asset ID.",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "video/mp4": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Web-optimized video file"
+                    },
+                    "400": {
+                        "content": {
+                            "video/mp4": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID"
+                    },
+                    "404": {
+                        "content": {
+                            "video/mp4": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset not found or not a video"
+                    },
+                    "500": {
+                        "content": {
+                            "video/mp4": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get web-optimized video",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "description": "Authenticate user with username and password",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.LoginRequestDTO",
+                                        "summary": "request",
+                                        "description": "Login credentials"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Login credentials",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Login successful"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid credentials"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Login user",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "description": "Revoke the user's refresh token",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RefreshTokenRequestDTO",
+                                        "summary": "request",
+                                        "description": "Refresh token to revoke"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Refresh token to revoke",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Logout successful"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid refresh token"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Logout user",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/auth/me": {
+            "get": {
+                "description": "Get information about the currently authenticated user",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "User information retrieved successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get current user",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/auth/refresh": {
+            "post": {
+                "description": "Generate a new access token using a valid refresh token",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RefreshTokenRequestDTO",
+                                        "summary": "request",
+                                        "description": "Refresh token"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Refresh token",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Token refreshed successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid or expired refresh token"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Refresh access token",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "description": "Create a new user account with username, email, and password",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RegisterRequestDTO",
+                                        "summary": "request",
+                                        "description": "Registration data"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Registration data",
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "User registered successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "User already exists"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Register a new user",
+                "tags": [
+                    "auth"
+                ]
+            }
+        }
+    },
     "openapi": "3.1.0",
     "servers": [
-        {"url":"localhost:3001/api/v1"}
+        {
+            "url": "localhost:3001/api/v1"
+        }
     ]
 }`
 

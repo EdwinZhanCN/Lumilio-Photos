@@ -6,12 +6,12 @@ import { assetService } from "@/services/assetsService";
 import { AxiosError } from "axios";
 import { useI18n } from "@/lib/i18n.tsx";
 import { ExifDataDisplay } from "@/features/studio/components/panels/ExifDataDisplay";
-import type { Asset } from "@/lib/http-commons/schema-extensions";
+import type { Asset } from "@/lib/http-commons";
 import {
   isPhotoMetadata,
   isVideoMetadata,
   isAudioMetadata,
-} from "@/lib/http-commons/metadata-types";
+} from "@/lib/http-commons";
 import PhotoInfoView from "./PhotoInfoView";
 import VideoInfoView from "./VideoInfoView";
 import AudioInfoView from "./AudioInfoView";

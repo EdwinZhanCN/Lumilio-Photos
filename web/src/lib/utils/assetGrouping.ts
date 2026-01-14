@@ -77,29 +77,34 @@ const groupAssetsByType = (assets: Asset[]): Record<string, Asset[]> => {
 
 /**
  * Groups assets by album
+ * TODO: Enable once albums property is added to AssetDTO in backend schema
  */
 const groupAssetsByAlbum = (assets: Asset[]): Record<string, Asset[]> => {
   const grouped: Record<string, Asset[]> = {};
 
-  assets.forEach((asset) => {
-    if (asset.albums && asset.albums.length > 0) {
-      // Asset can be in multiple albums, add to each
-      asset.albums.forEach((album) => {
-        const groupKey = album.album_name || `Album ${album.album_id}`;
-        if (!grouped[groupKey]) {
-          grouped[groupKey] = [];
-        }
-        grouped[groupKey].push(asset);
-      });
-    } else {
-      // Assets not in any album
-      const groupKey = "No Album";
-      if (!grouped[groupKey]) {
-        grouped[groupKey] = [];
-      }
-      grouped[groupKey].push(asset);
-    }
-  });
+  // TODO: Uncomment once backend schema includes albums property
+  // assets.forEach((asset) => {
+  //   if (asset.albums && asset.albums.length > 0) {
+  //     // Asset can be in multiple albums, add to each
+  //     asset.albums.forEach((album: any) => {
+  //       const groupKey = album.album_name || `Album ${album.album_id}`;
+  //       if (!grouped[groupKey]) {
+  //         grouped[groupKey] = [];
+  //       }
+  //       grouped[groupKey].push(asset);
+  //     });
+  //   } else {
+  //     // Assets not in any album
+  //     const groupKey = "No Album";
+  //     if (!grouped[groupKey]) {
+  //       grouped[groupKey] = [];
+  //     }
+  //     grouped[groupKey].push(asset);
+  //   }
+  // });
+
+  // Temporary: Return empty grouping until albums property is available
+  grouped["All Assets"] = assets;
 
   return grouped;
 };

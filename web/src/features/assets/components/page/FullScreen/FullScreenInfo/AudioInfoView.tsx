@@ -5,9 +5,8 @@ import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { assetService } from "@/services/assetsService";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
-import type { Asset } from "@/lib/http-commons/schema-extensions";
-import type { AudioSpecificMetadata } from "@/lib/http-commons/metadata-types";
-import { isAudioMetadata } from "@/lib/http-commons/metadata-types";
+import type { Asset, AudioSpecificMetadata } from "@/lib/http-commons";
+import { isAudioMetadata } from "@/lib/http-commons";
 
 interface AudioInfoViewProps {
   asset: Asset;

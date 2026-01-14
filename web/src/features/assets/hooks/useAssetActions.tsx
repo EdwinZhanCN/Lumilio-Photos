@@ -48,10 +48,7 @@ export const useAssetActions = (): AssetActionsResult => {
 
       // Optimistic update
       const optimisticUpdate = {
-        specific_metadata: {
-          ...currentAsset.specific_metadata,
-          rating,
-        },
+        rating,
       };
 
       dispatch({
@@ -85,7 +82,7 @@ export const useAssetActions = (): AssetActionsResult => {
           payload: {
             assetId,
             updates: {
-              specific_metadata: currentAsset.specific_metadata,
+              rating: currentAsset.rating,
             },
             meta: { isOptimistic: false },
           },
@@ -109,15 +106,12 @@ export const useAssetActions = (): AssetActionsResult => {
         throw new Error("Asset not found");
       }
 
-      const currentLiked = currentAsset.specific_metadata?.liked || false;
+      const currentLiked = currentAsset.liked || false;
       const newLiked = !currentLiked;
 
       // Optimistic update
       const optimisticUpdate = {
-        specific_metadata: {
-          ...currentAsset.specific_metadata,
-          liked: newLiked,
-        },
+        liked: newLiked,
       };
 
       dispatch({
@@ -151,7 +145,7 @@ export const useAssetActions = (): AssetActionsResult => {
           payload: {
             assetId,
             updates: {
-              specific_metadata: currentAsset.specific_metadata,
+              liked: currentAsset.liked,
             },
             meta: { isOptimistic: false },
           },
@@ -291,17 +285,14 @@ export const useAssetActions = (): AssetActionsResult => {
         await Promise.all(
           updates.map(async ({ assetId, updates: assetUpdates }) => {
             // Implement specific API calls based on update type
-            if (assetUpdates.specific_metadata?.rating !== undefined) {
+            if (assetUpdates.rating !== undefined) {
               await assetService.updateAssetRating(
                 assetId,
-                assetUpdates.specific_metadata.rating,
+                assetUpdates.rating,
               );
             }
-            if (assetUpdates.specific_metadata?.liked !== undefined) {
-              await assetService.updateAssetLike(
-                assetId,
-                assetUpdates.specific_metadata.liked,
-              );
+            if (assetUpdates.liked !== undefined) {
+              await assetService.updateAssetLike(assetId, assetUpdates.liked);
             }
             if (assetUpdates.specific_metadata?.description !== undefined) {
               await assetService.updateAssetDescription(
@@ -410,7 +401,7 @@ export const useAssetActionsSimple = () => {
           payload: {
             assetId,
             updates: {
-              specific_metadata: { rating },
+              rating,
             },
           },
         });

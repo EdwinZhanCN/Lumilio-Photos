@@ -6,13 +6,15 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        "lint": "eslint .",
+        "lint": "oxlint",
+        "lint:fix": "oxlint --fix",
+        "type-check": "tsc -p tsconfig.app.json --noEmit",
         "preview": "vite preview",
         "test": "vitest",
         "test:coverage": "vitest run --coverage",
         "test:watch": "vitest --watch",
-        "docs": "typedoc",
-        "ui": "vitest --ui"
+        "test:ui": "vitest --ui",
+        "docs": "typedoc"
     },
     "dependencies": {
         "@happy-dom/global-registrator": "^18.0.1",
@@ -78,6 +80,7 @@
         "globals": "^15.14.0",
         "happy-dom": "^18.0.1",
         "jsdom": "^26.1.0",
+        "oxlint": "^1.39.0",
         "rolldown-vite": "^7.0.12",
         "typedoc": "^0.28.7",
         "typedoc-plugin-markdown": "^4.7.0",

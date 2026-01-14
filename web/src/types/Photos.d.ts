@@ -5,7 +5,7 @@
  * @since 1.0.0
  */
 
-import { Asset } from "@/lib/http-commons/schema-extensions";
+import { Asset } from "@/lib/http-commons";
 
 /**
  * Defines the shape of the state for the Photos page.

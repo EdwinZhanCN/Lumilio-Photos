@@ -9,9 +9,8 @@ import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
 import MapComponent from "@/components/MapComponent";
 import { assetToPhotoLocation } from "@/lib/utils/mapUtils";
-import type { Asset } from "@/lib/http-commons/schema-extensions";
-import type { PhotoSpecificMetadata } from "@/lib/http-commons/metadata-types";
-import { isPhotoMetadata } from "@/lib/http-commons/metadata-types";
+import type { Asset, PhotoSpecificMetadata } from "@/lib/http-commons";
+import { isPhotoMetadata } from "@/lib/http-commons";
 
 interface PhotoInfoViewProps {
   asset: Asset;
@@ -257,8 +256,8 @@ export default function PhotoInfoView({
             </div>
           </div>
 
-          {/* Species Prediction */}
-          {metadata.species_prediction &&
+          {/* Species Prediction - TODO: Add species_prediction to backend schema */}
+          {/* {metadata.species_prediction &&
             metadata.species_prediction.length > 0 && (
               <div className="rounded bg-base-200 p-2">
                 <div className="text-xs text-base-content/70 mb-1">
@@ -267,7 +266,7 @@ export default function PhotoInfoView({
                 <div className="flex flex-wrap gap-1">
                   {metadata.species_prediction
                     .slice(0, 3)
-                    .map((species, index) => (
+                    .map((species: any, index: number) => (
                       <div key={index} className="badge badge-xs badge-info">
                         {species.label}{" "}
                         {species.score &&
@@ -276,7 +275,7 @@ export default function PhotoInfoView({
                     ))}
                 </div>
               </div>
-            )}
+            )} */}
 
           {/* Description */}
           <div className="rounded bg-base-200 p-2">

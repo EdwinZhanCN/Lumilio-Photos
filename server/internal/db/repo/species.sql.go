@@ -98,6 +98,27 @@ func (q *Queries) GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeci
 	return items, nil
 }
 
+const getSpeciesStats = `-- name: GetSpeciesStats :one
+SELECT
+    COUNT(DISTINCT asset_id) as total_assets,
+    COUNT(*) as total_predictions,
+    AVG(score) as avg_score
+FROM species_predictions
+`
+
+type GetSpeciesStatsRow struct {
+	TotalAssets      int64   `db:"total_assets" json:"total_assets"`
+	TotalPredictions int64   `db:"total_predictions" json:"total_predictions"`
+	AvgScore         float64 `db:"avg_score" json:"avg_score"`
+}
+
+func (q *Queries) GetSpeciesStats(ctx context.Context) (GetSpeciesStatsRow, error) {
+	row := q.db.QueryRow(ctx, getSpeciesStats)
+	var i GetSpeciesStatsRow
+	err := row.Scan(&i.TotalAssets, &i.TotalPredictions, &i.AvgScore)
+	return i, err
+}
+
 const getTopSpeciesForAsset = `-- name: GetTopSpeciesForAsset :many
 SELECT asset_id, label, score FROM species_predictions
 WHERE asset_id = $1 AND score >= $2
@@ -121,6 +142,96 @@ func (q *Queries) GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesFo
 	for rows.Next() {
 		var i SpeciesPrediction
 		if err := rows.Scan(&i.AssetID, &i.Label, &i.Score); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTopSpeciesLabels = `-- name: GetTopSpeciesLabels :many
+SELECT label, COUNT(DISTINCT asset_id) as asset_count, AVG(score) as avg_score
+FROM species_predictions
+GROUP BY label
+ORDER BY asset_count DESC
+LIMIT $1
+`
+
+type GetTopSpeciesLabelsRow struct {
+	Label      string  `db:"label" json:"label"`
+	AssetCount int64   `db:"asset_count" json:"asset_count"`
+	AvgScore   float64 `db:"avg_score" json:"avg_score"`
+}
+
+func (q *Queries) GetTopSpeciesLabels(ctx context.Context, limit int32) ([]GetTopSpeciesLabelsRow, error) {
+	rows, err := q.db.Query(ctx, getTopSpeciesLabels, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetTopSpeciesLabelsRow
+	for rows.Next() {
+		var i GetTopSpeciesLabelsRow
+		if err := rows.Scan(&i.Label, &i.AssetCount, &i.AvgScore); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchAssetsBySpecies = `-- name: SearchAssetsBySpecies :many
+SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status FROM assets a
+JOIN species_predictions sp ON a.asset_id = sp.asset_id
+WHERE sp.label ILIKE '%' || $1 || '%'
+AND a.is_deleted = false
+ORDER BY sp.score DESC
+LIMIT $3 OFFSET $2
+`
+
+type SearchAssetsBySpeciesParams struct {
+	Column1 *string `db:"column_1" json:"column_1"`
+	Offset  int32   `db:"offset" json:"offset"`
+	Limit   int32   `db:"limit" json:"limit"`
+}
+
+func (q *Queries) SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, searchAssetsBySpecies, arg.Column1, arg.Offset, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -47,7 +47,7 @@ type AssetService interface {
 	GetAssetsByOwnerAndTypes(ctx context.Context, ownerID int, assetTypes []string, sortOrder string, limit, offset int) ([]repo.Asset, error)
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
 
-	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata []byte) error
+	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error
 
 	// Rating management methods
 	UpdateAssetRating(ctx context.Context, id uuid.UUID, rating int) error
@@ -74,7 +74,6 @@ type AssetService interface {
 
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, hash string) (string, error)
 	SaveNewThumbnail(ctx context.Context, repoPath string, buffers io.Reader, asset *repo.Asset, size string) error
-	SaveNewSpeciesPredictions(ctx context.Context, pgUUID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
 
 	// New filtering and search methods
 	FilterAssets(ctx context.Context, repositoryID *string, assetType *string, ownerID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
@@ -345,7 +344,7 @@ func (s *assetService) DetectDuplicates(ctx context.Context, hash string) ([]rep
 }
 
 // UpdateAssetMetadata updates the specific metadata of an asset and extracts taken_time
-func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata []byte) error {
+func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
 		return fmt.Errorf("invalid UUID: %w", err)
@@ -363,11 +362,11 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 
 	switch assetType {
 	case dbtypes.AssetTypePhoto:
-		if photoMeta, err := dbtypes.UnmarshalPhoto(metadata); err == nil {
+		if photoMeta, err := metadata.UnmarshalPhoto(); err == nil {
 			takenTime = photoMeta.TakenTime
 		}
 	case dbtypes.AssetTypeVideo:
-		if videoMeta, err := dbtypes.UnmarshalVideo(metadata); err == nil {
+		if videoMeta, err := metadata.UnmarshalVideo(); err == nil {
 			takenTime = videoMeta.RecordedTime
 		}
 	case dbtypes.AssetTypeAudio:
@@ -641,32 +640,6 @@ func (s *assetService) SaveNewThumbnail(ctx context.Context, repoPath string, bu
 	}
 
 	return nil
-}
-
-// ================================
-// ML CRUD Operations
-// ================================
-
-func (s *assetService) SaveNewSpeciesPredictions(ctx context.Context, pgUUID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error {
-	// First, delete existing predictions for the asset
-	if err := s.queries.DeleteSpeciesPredictionsByAsset(ctx, pgUUID); err != nil {
-		return fmt.Errorf("failed to delete existing species predictions: %w", err)
-	}
-
-	// Insert new predictions
-	for _, pred := range predictions {
-		params := repo.CreateSpeciesPredictionParams{
-			AssetID: pgUUID,
-			Label:   pred.Label,
-			Score:   pred.Score,
-		}
-		if _, err := s.queries.CreateSpeciesPrediction(ctx, params); err != nil {
-			return fmt.Errorf("failed to create species prediction: %w", err)
-		}
-	}
-
-	return nil
-
 }
 
 // TODO: SaveNewDescription (VLM)

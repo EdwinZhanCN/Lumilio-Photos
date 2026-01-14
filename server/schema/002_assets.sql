@@ -51,14 +51,6 @@ CREATE TABLE thumbnails (
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Species predictions table
-CREATE TABLE species_predictions (
-    asset_id UUID NOT NULL REFERENCES assets(asset_id),
-    label VARCHAR(255) NOT NULL,
-    score REAL NOT NULL,
-    PRIMARY KEY (asset_id, label)
-);
-
 -- Unified embeddings table for all embedding types and models
 CREATE TABLE embeddings (
     id SERIAL PRIMARY KEY,
@@ -92,7 +84,6 @@ CREATE INDEX idx_assets_liked ON assets(liked) WHERE liked = true;
 CREATE INDEX idx_assets_rating_liked ON assets(rating, liked) WHERE rating IS NOT NULL OR liked = true;
 
 CREATE INDEX idx_thumbnails_asset_id ON thumbnails(asset_id);
-CREATE INDEX idx_species_predictions_asset_id ON species_predictions(asset_id);
 
 -- Embeddings table indexes
 CREATE INDEX embeddings_asset_type_idx ON embeddings(asset_id, embedding_type);

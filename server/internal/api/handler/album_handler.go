@@ -4,9 +4,9 @@ import (
 	"errors"
 	"log"
 	"strconv"
-	"time"
 
 	"server/internal/api"
+	"server/internal/api/dto"
 	"server/internal/db/repo"
 	"server/internal/service"
 
@@ -28,83 +28,14 @@ func NewAlbumHandler(albumService *service.AlbumService, queries *repo.Queries) 
 	}
 }
 
-// Request/Response types
-type CreateAlbumRequest struct {
-	AlbumName    string  `json:"album_name" binding:"required"`
-	Description  *string `json:"description"`
-	CoverAssetID string  `json:"cover_asset_id" binding:"required,uuid4"`
-}
-
-type UpdateAlbumRequest struct {
-	AlbumName    *string `json:"album_name"`
-	Description  *string `json:"description"`
-	CoverAssetID *string `json:"cover_asset_id" binding:"omitempty,uuid4"`
-}
-
-type AlbumDTO struct {
-	AlbumID      int32     `json:"album_id"`
-	UserID       int32     `json:"user_id"`
-	AlbumName    string    `json:"album_name"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Description  *string   `json:"description"`
-	CoverAssetID *string   `json:"cover_asset_id"`
-}
-
-type GetAlbumResponse struct {
-	AlbumDTO
-	AssetCount int64 `json:"asset_count"`
-}
-
-type ListAlbumsResponse struct {
-	Albums []GetAlbumResponse `json:"albums"`
-	Total  int                `json:"total"`
-	Limit  int                `json:"limit"`
-	Offset int                `json:"offset"`
-}
-
-type AddAssetToAlbumRequest struct {
-	Position *int32 `json:"position"`
-}
-
-type UpdateAssetPositionRequest struct {
-	Position *int32 `json:"position" binding:"required"`
-}
-
-func toAlbumDTO(a repo.Album) AlbumDTO {
-	var createdAt time.Time
-	if a.CreatedAt.Valid {
-		createdAt = a.CreatedAt.Time
-	}
-	var updatedAt time.Time
-	if a.UpdatedAt.Valid {
-		updatedAt = a.UpdatedAt.Time
-	}
-	var coverID *string
-	if a.CoverAssetID.Valid {
-		s := uuid.UUID(a.CoverAssetID.Bytes).String()
-		coverID = &s
-	}
-
-	return AlbumDTO{
-		AlbumID:      a.AlbumID,
-		UserID:       a.UserID,
-		AlbumName:    a.AlbumName,
-		CreatedAt:    createdAt,
-		UpdatedAt:    updatedAt,
-		Description:  a.Description,
-		CoverAssetID: coverID,
-	}
-}
-
 // NewAlbum creates a new album
 // @Summary Create a new album
 // @Description Create a new album for the authenticated user
 // @Tags albums
 // @Accept json
 // @Produce json
-// @Param request body CreateAlbumRequest true "Album creation data"
-// @Success 200 {object} api.Result{data=GetAlbumResponse} "Album created successfully"
+// @Param request body dto.CreateAlbumRequestDTO true "Album creation data"
+// @Success 200 {object} api.Result{data=dto.GetAlbumResponseDTO} "Album created successfully"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Failed to create album"
@@ -118,7 +49,7 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 		return
 	}
 
-	var req CreateAlbumRequest
+	var req dto.CreateAlbumRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
@@ -149,8 +80,8 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 	// Get asset count for the new album (should be 0 for new album)
 	count, _ := h.queries.GetAlbumAssetCount(c.Request.Context(), album.AlbumID)
 
-	response := GetAlbumResponse{
-		AlbumDTO:   toAlbumDTO(album),
+	response := dto.GetAlbumResponseDTO{
+		AlbumDTO:   dto.ToAlbumDTO(album),
 		AssetCount: count,
 	}
 
@@ -164,7 +95,7 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Album ID"
-// @Success 200 {object} api.Result{data=GetAlbumResponse} "Album retrieved successfully"
+// @Success 200 {object} api.Result{data=dto.GetAlbumResponseDTO} "Album retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid album ID"
 // @Failure 404 {object} api.Result "Album not found"
 // @Router /albums/{id} [get]
@@ -190,8 +121,8 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 		count = 0 // Default to 0 if count fails
 	}
 
-	response := GetAlbumResponse{
-		AlbumDTO:   toAlbumDTO(album),
+	response := dto.GetAlbumResponseDTO{
+		AlbumDTO:   dto.ToAlbumDTO(album),
 		AssetCount: count,
 	}
 
@@ -206,7 +137,7 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 // @Produce json
 // @Param limit query int false "Maximum number of results (max 100)" default(20)
 // @Param offset query int false "Number of results to skip for pagination" default(0)
-// @Success 200 {object} api.Result{data=ListAlbumsResponse} "Albums retrieved successfully"
+// @Success 200 {object} api.Result{data=dto.ListAlbumsResponseDTO} "Albums retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid parameters"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Failed to retrieve albums"
@@ -251,7 +182,7 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 	}
 
 	// Get asset counts for each album
-	albumResponses := make([]GetAlbumResponse, len(albums))
+	albumResponses := make([]dto.GetAlbumResponseDTO, len(albums))
 	for i, album := range albums {
 		count, err := h.queries.GetAlbumAssetCount(c.Request.Context(), album.AlbumID)
 		if err != nil {
@@ -259,13 +190,13 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 			count = 0
 		}
 
-		albumResponses[i] = GetAlbumResponse{
-			AlbumDTO:   toAlbumDTO(album),
+		albumResponses[i] = dto.GetAlbumResponseDTO{
+			AlbumDTO:   dto.ToAlbumDTO(album),
 			AssetCount: count,
 		}
 	}
 
-	response := ListAlbumsResponse{
+	response := dto.ListAlbumsResponseDTO{
 		Albums: albumResponses,
 		Total:  len(albumResponses),
 		Limit:  int(limit),
@@ -282,8 +213,8 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Album ID"
-// @Param request body UpdateAlbumRequest true "Album update data"
-// @Success 200 {object} api.Result{data=GetAlbumResponse} "Album updated successfully"
+// @Param request body dto.UpdateAlbumRequestDTO true "Album update data"
+// @Success 200 {object} api.Result{data=dto.GetAlbumResponseDTO} "Album updated successfully"
 // @Failure 400 {object} api.Result "Invalid album ID or request data"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 403 {object} api.Result "Forbidden"
@@ -299,7 +230,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		return
 	}
 
-	var req UpdateAlbumRequest
+	var req dto.UpdateAlbumRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
@@ -357,8 +288,8 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		count = 0
 	}
 
-	response := GetAlbumResponse{
-		AlbumDTO:   toAlbumDTO(updatedAlbum),
+	response := dto.GetAlbumResponseDTO{
+		AlbumDTO:   dto.ToAlbumDTO(updatedAlbum),
 		AssetCount: count,
 	}
 
@@ -462,7 +393,7 @@ func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Album ID"
 // @Param assetId path string true "Asset ID (UUID format)"
-// @Param request body AddAssetToAlbumRequest false "Asset position in album"
+// @Param request body dto.AddAssetToAlbumRequestDTO false "Asset position in album"
 // @Success 200 {object} api.Result "Asset added to album successfully"
 // @Failure 400 {object} api.Result "Invalid album ID or asset ID"
 // @Failure 404 {object} api.Result "Album not found"
@@ -484,7 +415,7 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 		return
 	}
 
-	var req AddAssetToAlbumRequest
+	var req dto.AddAssetToAlbumRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
@@ -564,7 +495,7 @@ func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 // @Produce json
 // @Param id path int true "Album ID"
 // @Param assetId path string true "Asset ID (UUID format)"
-// @Param request body UpdateAssetPositionRequest true "New position for the asset"
+// @Param request body dto.UpdateAssetPositionRequestDTO true "New position data"
 // @Success 200 {object} api.Result "Asset position updated successfully"
 // @Failure 400 {object} api.Result "Invalid album ID or asset ID"
 // @Failure 500 {object} api.Result "Failed to update asset position"
@@ -585,7 +516,7 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 		return
 	}
 
-	var req UpdateAssetPositionRequest
+	var req dto.UpdateAssetPositionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return

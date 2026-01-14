@@ -3,28 +3,27 @@ import pluginJs from "@eslint/js";
 import tseslint from "typescript-eslint";
 import pluginReactConfig from "eslint-plugin-react/configs/recommended.js";
 
-
 export default [
-  {languageOptions: { globals: globals.browser }},
-  pluginJs.configs.recommended,
-  ...tseslint.configs.recommended,
-  {
-    ...pluginReactConfig,
-    settings: {
-        react: {
-            version: "detect",
+    { languageOptions: { globals: globals.browser } },
+    pluginJs.configs.recommended,
+    ...tseslint.configs.recommended,
+    {
+        ...pluginReactConfig,
+        settings: {
+            react: {
+                version: "detect",
+            },
+        },
+        rules: {
+            ...pluginReactConfig.rules,
+            "react/react-in-jsx-scope": "off",
+            "@typescript-eslint/no-explicit-any": "off",
+            "react/prop-types": "off",
+            "react/display-name": "off",
+            "prefer-const": "off",
         },
     },
-    rules: {
-        ...pluginReactConfig.rules,
-        "react/react-in-jsx-scope": "off",
-        "@typescript-eslint/no-explicit-any": "off",
-        "react/prop-types": "off",
-        "react/display-name": "off",
-        "prefer-const": "off",
-    }
-  },
-  {
-    ignores: ["dist/**"]
-  }
+    {
+        ignores: ["dist/**", "src/wasm/**"],
+    },
 ];

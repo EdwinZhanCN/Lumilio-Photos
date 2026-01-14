@@ -14,27 +14,27 @@ type Schemas = components["schemas"];
 /**
  * User response object
  */
-export type User = Schemas["service.UserResponse"];
+export type User = Schemas["dto.UserDTO"];
 
 /**
  * Authentication response (login/register/refresh)
  */
-export type AuthResponse = Schemas["service.AuthResponse"];
+export type AuthResponse = Schemas["dto.AuthResponseDTO"];
 
 /**
  * Login request
  */
-export type LoginRequest = Schemas["service.LoginRequest"];
+export type LoginRequest = Schemas["dto.LoginRequestDTO"];
 
 /**
  * Register request
  */
-export type RegisterRequest = Schemas["service.RegisterRequest"];
+export type RegisterRequest = Schemas["dto.RegisterRequestDTO"];
 
 /**
  * Refresh token request
  */
-export type RefreshTokenRequest = Schemas["service.RefreshTokenRequest"];
+export type RefreshTokenRequest = Schemas["dto.RefreshTokenRequestDTO"];
 
 // ============================================================================
 // Auth Service

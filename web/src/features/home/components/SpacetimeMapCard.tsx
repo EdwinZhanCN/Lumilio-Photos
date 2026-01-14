@@ -1,6 +1,7 @@
 import React from "react";
 import { MapIcon } from "@heroicons/react/24/outline";
 import PhotoMapView from "@/components/PhotoMapView";
+import type { Asset } from "@/lib/http-commons";
 
 export interface SpacetimeMapCardProps {
   /**

@@ -1,6 +1,6 @@
 import { init, JustifiedLayout } from "@immich/justified-layout-wasm";
-import type { Asset } from "@/lib/http-commons/schema-extensions";
-import { isPhotoMetadata } from "@/lib/http-commons/metadata-types";
+import type { Asset } from "@/lib/http-commons";
+import { isPhotoMetadata } from "@/lib/http-commons";
 export interface LayoutPosition {
   top: number;
   left: number;

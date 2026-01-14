@@ -13,7 +13,7 @@ import FullScreenBasicInfo from "../FullScreenInfo/FullScreenBasicInfo";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";
 import MediaViewer from "../../../shared/MediaViewer";
-import type { Asset } from "@/lib/http-commons/schema-extensions";
+import type { Asset } from "@/lib/http-commons";
 
 interface FullScreenCarouselProps {
   photos: Asset[];

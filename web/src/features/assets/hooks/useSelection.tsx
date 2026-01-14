@@ -424,7 +424,7 @@ export const useBulkAssetOperations = () => {
       const updates = Array.from(selection.selectedIds).map((assetId) => ({
         assetId,
         updates: {
-          specific_metadata: { rating },
+          rating,
         },
       }));
 
