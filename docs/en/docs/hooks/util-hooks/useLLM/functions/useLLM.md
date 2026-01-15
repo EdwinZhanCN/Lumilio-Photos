@@ -4,7 +4,7 @@
 
 > **useLLM**(): [`UseLLMReturn`](../interfaces/UseLLMReturn.md)
 
-Defined in: [hooks/util-hooks/useLLM.tsx:55](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/fc7235ea377566f4cc2f62016aec0acb0e31f77b/web/src/hooks/util-hooks/useLLM.tsx#L55)
+Defined in: [hooks/util-hooks/useLLM.tsx:55](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e96f14d2e30dda991d150e201f9d9c02cdaa5fd7/web/src/hooks/util-hooks/useLLM.tsx#L55)
 
 Custom hook for LLM interactions using the shared web worker client.
 It manages conversation state, streaming responses, and progress tracking.
