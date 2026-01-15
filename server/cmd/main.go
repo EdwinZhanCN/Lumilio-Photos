@@ -33,9 +33,9 @@ func init() {
 	config.LoadEnvironment()
 }
 
-// @title Lumilio-Photos Manager API
+// @title Lumilio-Photos API
 // @version 1.0
-// @description Photo management system API with asset upload, processing, and organization features
+// @description Media management system API with asset upload, processing, and organization features
 
 // @contact.name API Support
 // @contact.url http://www.github.com/EdwinZhanCN/Lumilio-Photos
@@ -43,7 +43,7 @@ func init() {
 // @license.name GPLv3.0
 // @license.url https://opensource.org/licenses/GPL-3.0
 
-// @host localhost:3001
+// @host localhost:8080
 // @BasePath /api/v1
 
 // @securityDefinitions.apikey BearerAuth

@@ -1,13 +1,10 @@
 package raw
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log"
-	"os"
-	"os/exec"
 	"time"
 
 	"github.com/h2non/bimg"
@@ -51,17 +48,19 @@ func DefaultProcessingOptions() ProcessingOptions {
 	}
 }
 
-// Processor handles RAW file processing
+// Processor handles RAW file processing using LibRaw
 type Processor struct {
-	detector *Detector
-	options  ProcessingOptions
+	detector        *Detector
+	librawProcessor *LibRawProcessor
+	options         ProcessingOptions
 }
 
 // NewProcessor creates a new RAW processor
 func NewProcessor(opts ProcessingOptions) *Processor {
 	return &Processor{
-		detector: NewDetector(),
-		options:  opts,
+		detector:        NewDetector(),
+		librawProcessor: NewLibRawProcessor(opts),
+		options:         opts,
 	}
 }
 
@@ -101,14 +100,33 @@ func (p *Processor) ProcessRAW(ctx context.Context, reader io.ReadSeeker, filena
 		return result, result.Error
 	}
 
-	// Reset reader to beginning
-	_, err = reader.Seek(0, io.SeekStart)
-	if err != nil {
+	// Reset reader to beginning and load RAW data once
+	if _, err := reader.Seek(0, io.SeekStart); err != nil {
 		result.Error = fmt.Errorf("failed to reset reader: %w", err)
 		return result, result.Error
 	}
+	rawData, err := io.ReadAll(reader)
+	if err != nil {
+		result.Error = fmt.Errorf("failed to read RAW: %w", err)
+		return result, result.Error
+	}
 
-	// Choose processing strategy
+	// Try fast embedded preview via LibRaw first (more modern, better camera support)
+	if preview, err := p.librawProcessor.ExtractEmbeddedWithLibRaw(ctx, rawData, filename); err == nil && len(preview) > 0 {
+		result.Strategy = StrategyEmbeddedPreview
+		result.UsedEmbedded = true
+		result.PreviewData = preview
+		result.ProcessingTime = time.Since(start)
+		if img := bimg.NewImage(preview); img != nil {
+			if size, err := img.Size(); err == nil {
+				result.Width = size.Width
+				result.Height = size.Height
+			}
+		}
+		return result, nil
+	}
+
+	// Fallback to full LibRaw rendering
 	strategy := p.chooseStrategy(detection)
 	result.Strategy = strategy
 
@@ -116,18 +134,18 @@ func (p *Processor) ProcessRAW(ctx context.Context, reader io.ReadSeeker, filena
 
 	switch strategy {
 	case StrategyEmbeddedPreview:
-		previewData, err = p.processEmbeddedPreview(reader, detection)
+		previewData, err = p.processEmbeddedPreview(rawData, detection)
 		if err != nil {
 			// Fallback to full render if embedded preview fails
 			log.Printf("Embedded preview failed, falling back to full render: %v", err)
-			previewData, err = p.processFullRender(ctx, reader, filename)
+			previewData, err = p.processFullRender(ctx, rawData, filename)
 			result.UsedEmbedded = false
 		} else {
 			result.UsedEmbedded = true
 		}
 
 	case StrategyFullRender:
-		previewData, err = p.processFullRender(ctx, reader, filename)
+		previewData, err = p.processFullRender(ctx, rawData, filename)
 		result.UsedEmbedded = false
 
 	default:
@@ -178,8 +196,10 @@ func (p *Processor) chooseStrategy(detection *DetectionResult) ProcessingStrateg
 }
 
 // processEmbeddedPreview extracts and validates embedded preview
-func (p *Processor) processEmbeddedPreview(reader io.ReadSeeker, detection *DetectionResult) ([]byte, error) {
-	previewData, err := p.detector.ExtractEmbeddedPreview(reader, detection)
+func (p *Processor) processEmbeddedPreview(rawData []byte, detection *DetectionResult) ([]byte, error) {
+	// This is a fallback - we already tried LibRaw embedded preview in ProcessRAW
+	// If we get here, it means the fast path failed, so try with full context
+	previewData, err := p.detector.ExtractEmbeddedPreview(nil, detection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract embedded preview: %w", err)
 	}
@@ -211,182 +231,23 @@ func (p *Processor) processEmbeddedPreview(reader io.ReadSeeker, detection *Dete
 	return previewData, nil
 }
 
-// processFullRender performs full RAW decoding using external tools
-func (p *Processor) processFullRender(ctx context.Context, reader io.ReadSeeker, filename string) ([]byte, error) {
+// processFullRender performs full RAW decoding using LibRaw
+func (p *Processor) processFullRender(ctx context.Context, rawData []byte, filename string) ([]byte, error) {
 	// Create a timeout context
 	timeoutCtx, cancel := context.WithTimeout(ctx, p.options.FullRenderTimeout)
 	defer cancel()
 
-	// Reset reader to beginning
-	_, err := reader.Seek(0, io.SeekStart)
+	// Use LibRaw for full RAW rendering
+	previewData, err := p.librawProcessor.ProcessWithLibRaw(timeoutCtx, rawData, filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to reset reader: %w", err)
+		return nil, fmt.Errorf("LibRaw processing failed: %w", err)
 	}
 
-	// Read all data (we need it for external processing)
-	rawData, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read RAW data: %w", err)
+	if len(previewData) == 0 {
+		return nil, fmt.Errorf("LibRaw produced no output")
 	}
 
-	// Try different RAW processing tools in order of preference
-	processors := []func(context.Context, []byte, string) ([]byte, error){
-		p.processWithDcraw,
-		p.processWithLibRaw,
-		p.processWithImageMagick,
-	}
-
-	var lastErr error
-	for _, processor := range processors {
-		result, err := processor(timeoutCtx, rawData, filename)
-		if err == nil {
-			return result, nil
-		}
-		lastErr = err
-		log.Printf("RAW processor failed, trying next: %v", err)
-	}
-
-	return nil, fmt.Errorf("all RAW processors failed, last error: %w", lastErr)
-}
-
-// processWithDcraw uses dcraw for RAW processing
-func (p *Processor) processWithDcraw(ctx context.Context, rawData []byte, filename string) ([]byte, error) {
-	// Check if dcraw is available
-	if _, err := exec.LookPath("dcraw"); err != nil {
-		return nil, fmt.Errorf("dcraw not found: %w", err)
-	}
-
-	// Write RAW data to a temp file because some dcraw builds don't accept '-' stdin
-	tmpFile, err := os.CreateTemp("", "dcraw-*.raw")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file for dcraw: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-	if _, err := tmpFile.Write(rawData); err != nil {
-		tmpFile.Close()
-		return nil, fmt.Errorf("failed to write RAW data to temp file: %w", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close temp RAW file: %w", err)
-	}
-
-	// dcraw command: -c (stdout), -q 3 (high quality), -w (auto white balance)
-	cmd := exec.CommandContext(ctx, "dcraw", "-c", "-q", "3", "-w", tmpFile.Name())
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("dcraw failed: %w, stderr: %s", err, stderr.String())
-	}
-
-	ppmData := stdout.Bytes()
-	if len(ppmData) == 0 {
-		return nil, fmt.Errorf("dcraw produced no output")
-	}
-
-	// Convert PPM to JPEG using bimg
-	img := bimg.NewImage(ppmData)
-	jpegData, err := img.Process(bimg.Options{
-		Quality: p.options.Quality,
-		Type:    bimg.JPEG,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert PPM to JPEG: %w", err)
-	}
-
-	return jpegData, nil
-}
-
-// processWithLibRaw uses libraw for RAW processing
-func (p *Processor) processWithLibRaw(ctx context.Context, rawData []byte, filename string) ([]byte, error) {
-	// Check if libraw tools are available
-	if _, err := exec.LookPath("unprocessed_raw"); err != nil {
-		return nil, fmt.Errorf("libraw tools not found: %w", err)
-	}
-
-	// This is a simplified implementation - in practice you might use libraw directly via cgo
-	// Write RAW data to a temp file because some libraw tools don't accept '-' stdin
-	tmpFile, err := os.CreateTemp("", "libraw-*.raw")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file for libraw: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-	if _, err := tmpFile.Write(rawData); err != nil {
-		tmpFile.Close()
-		return nil, fmt.Errorf("failed to write RAW data to temp file: %w", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close temp RAW file: %w", err)
-	}
-
-	// This is a simplified implementation - in practice you might use libraw directly via cgo
-	cmd := exec.CommandContext(ctx, "unprocessed_raw", "-T", tmpFile.Name())
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("libraw failed: %w, stderr: %s", err, stderr.String())
-	}
-
-	tiffData := stdout.Bytes()
-	if len(tiffData) == 0 {
-		return nil, fmt.Errorf("libraw produced no output")
-	}
-
-	// Convert TIFF to JPEG using bimg
-	img := bimg.NewImage(tiffData)
-	jpegData, err := img.Process(bimg.Options{
-		Quality: p.options.Quality,
-		Type:    bimg.JPEG,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert TIFF to JPEG: %w", err)
-	}
-
-	return jpegData, nil
-}
-
-// processWithImageMagick uses ImageMagick for RAW processing
-func (p *Processor) processWithImageMagick(ctx context.Context, rawData []byte, filename string) ([]byte, error) {
-	// Check if convert is available
-	if _, err := exec.LookPath("convert"); err != nil {
-		return nil, fmt.Errorf("ImageMagick convert not found: %w", err)
-	}
-
-	// ImageMagick command to convert RAW to JPEG
-	// Write RAW data to a temp file to avoid stdin '-' issues on some builds
-	tmpFile, err := os.CreateTemp("", "imagemagick-*.raw")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp file for ImageMagick: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-	if _, err := tmpFile.Write(rawData); err != nil {
-		tmpFile.Close()
-		return nil, fmt.Errorf("failed to write RAW data to temp file: %w", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close temp RAW file: %w", err)
-	}
-	cmd := exec.CommandContext(ctx, "convert", tmpFile.Name(), "-quality", fmt.Sprintf("%d", p.options.Quality), "jpeg:-")
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("ImageMagick failed: %w, stderr: %s", err, stderr.String())
-	}
-
-	jpegData := stdout.Bytes()
-	if len(jpegData) == 0 {
-		return nil, fmt.Errorf("ImageMagick produced no output")
-	}
-
-	return jpegData, nil
+	return previewData, nil
 }
 
 // GenerateThumbnails creates various sized thumbnails from the processed preview

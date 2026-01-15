@@ -45,6 +45,7 @@ type AssetHandler struct {
 	memoryMonitor  *memory.MemoryMonitor
 	sessionManager *upload.SessionManager
 	chunkMerger    *upload.ChunkMerger
+	uploadLimiter  chan struct{}
 }
 
 // NewAssetHandler creates a new AssetHandler instance
@@ -58,6 +59,7 @@ func NewAssetHandler(
 	memoryMonitor := memory.NewMemoryMonitor()
 	sessionManager := upload.NewSessionManager(30 * time.Minute) // 30 minute timeout
 	chunkMerger := upload.NewChunkMerger(storage.NewDirectoryManager())
+	uploadLimiter := make(chan struct{}, 3) // limit concurrent uploads
 
 	handler := &AssetHandler{
 		assetService:   assetService,
@@ -68,6 +70,7 @@ func NewAssetHandler(
 		memoryMonitor:  memoryMonitor,
 		sessionManager: sessionManager,
 		chunkMerger:    chunkMerger,
+		uploadLimiter:  uploadLimiter,
 	}
 
 	// Start background cleanup tasks
@@ -90,6 +93,9 @@ func NewAssetHandler(
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets [post]
 func (h *AssetHandler) UploadAsset(c *gin.Context) {
+	h.uploadLimiter <- struct{}{}
+	defer func() { <-h.uploadLimiter }()
+
 	ctx := c.Request.Context()
 
 	var req dto.UploadAssetRequestDTO
@@ -251,47 +257,46 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /assets/batch [post]
 func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
+	h.uploadLimiter <- struct{}{}
+	defer func() { <-h.uploadLimiter }()
+
 	ctx := c.Request.Context()
 
-	var req dto.BatchUploadRequestDTO
-	if err := c.ShouldBind(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request")
-		return
-	}
-
-	err := c.Request.ParseMultipartForm(256 << 20)
-	if err != nil {
-		api.GinBadRequest(c, err, "Failed to parse form")
-		return
-	}
-
-	form := c.Request.MultipartForm
-	if form == nil || len(form.File) == 0 {
-		api.GinBadRequest(c, errors.New("no files provided"), "No files provided")
-		return
-	}
-
-	repositoryID := req.RepositoryID
+	repositoryID := strings.TrimSpace(c.Query("repository_id"))
 	var repository repo.Repository
-	if repositoryID != "" {
-		repoUUID, err := uuid.Parse(repositoryID)
-		if err != nil {
-			api.GinBadRequest(c, err, "Invalid repository ID")
-			return
+	repositoryResolved := false
+	resolveRepository := func() bool {
+		if repositoryResolved {
+			return true
 		}
-		repository, err = h.queries.GetRepository(ctx, pgtype.UUID{Bytes: repoUUID, Valid: true})
-		if err != nil {
-			api.GinNotFound(c, err, "Repository not found")
-			return
+		if repositoryID != "" {
+			repoUUID, err := uuid.Parse(repositoryID)
+			if err != nil {
+				api.GinBadRequest(c, err, "Invalid repository ID")
+				return false
+			}
+			repository, err = h.queries.GetRepository(ctx, pgtype.UUID{Bytes: repoUUID, Valid: true})
+			if err != nil {
+				api.GinNotFound(c, err, "Repository not found")
+				return false
+			}
+		} else {
+			// Use first available repository as default
+			repositories, err := h.queries.ListRepositories(ctx)
+			if err != nil || len(repositories) == 0 {
+				api.GinBadRequest(c, errors.New("no repository available"), "Please specify a repository_id or create a repository first")
+				return false
+			}
+			repository = repositories[0]
 		}
-	} else {
-		// Use first available repository as default
-		repositories, err := h.queries.ListRepositories(ctx)
-		if err != nil || len(repositories) == 0 {
-			api.GinBadRequest(c, errors.New("no repository available"), "Please specify a repository_id or create a repository first")
-			return
-		}
-		repository = repositories[0]
+		repositoryResolved = true
+		return true
+	}
+
+	mr, err := c.Request.MultipartReader()
+	if err != nil {
+		api.GinBadRequest(c, err, "Failed to read multipart data")
+		return
 	}
 
 	userID := c.GetString("user_id")
@@ -299,28 +304,197 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		userID = "anonymous"
 	}
 
-	// Group files by session
-	sessionGroups := h.groupFilesBySession(form.File)
-	var results []dto.BatchUploadResultDTO
-
-	// Process each session
-	for sessionID, files := range sessionGroups {
-		result, err := h.processUploadSession(ctx, sessionID, files, repository, userID)
-		if err != nil {
-			// Handle session-level errors
-			errMsg := err.Error()
-			results = append(results, dto.BatchUploadResultDTO{
-				Success:  false,
-				FileName: sessionID,
-				Error:    &errMsg,
-			})
-		} else {
-			results = append(results, *result)
-		}
+	type sessionState struct {
+		info        *upload.FileFieldInfo
+		filename    string
+		contentType string
+		chunkInfos  []upload.ChunkInfo
 	}
 
-	// Clean up expired sessions periodically
-	if len(sessionGroups) > 0 {
+	sessions := make(map[string]*sessionState)
+	buf := make([]byte, 1<<20) // 1MiB shared buffer for streaming copy
+
+	for {
+		part, perr := mr.NextPart()
+		if perr == io.EOF {
+			break
+		}
+		if perr != nil {
+			api.GinBadRequest(c, perr, "Failed to read multipart data")
+			return
+		}
+		if part.FileName() == "" {
+			if part.FormName() == "repository_id" {
+				data, _ := io.ReadAll(part)
+				repositoryID = strings.TrimSpace(string(data))
+				repositoryResolved = false
+			}
+			part.Close()
+			continue
+		}
+
+		fieldName := part.FormName()
+		fileInfo, err := upload.ParseFileField(fieldName)
+		if err != nil {
+			part.Close()
+			api.GinBadRequest(c, err, "Invalid file field name")
+			return
+		}
+
+		filename := part.FileName()
+		contentType := part.Header.Get("Content-Type")
+
+		state := sessions[fileInfo.SessionID]
+		if state == nil {
+			state = &sessionState{
+				info:        fileInfo,
+				filename:    filename,
+				contentType: contentType,
+			}
+			sessions[fileInfo.SessionID] = state
+		}
+
+		if !repositoryResolved {
+			if !resolveRepository() {
+				return
+			}
+		}
+
+		if _, exists := h.sessionManager.GetSession(fileInfo.SessionID); !exists {
+			h.sessionManager.CreateSession(fileInfo.SessionID, filename, 0, fileInfo.TotalChunks, contentType, repository.Path, userID)
+		}
+		h.sessionManager.UpdateSessionStatus(fileInfo.SessionID, "uploading")
+
+		targetName := filename
+		if fileInfo.Type == "chunk" {
+			targetName = fmt.Sprintf("chunk_%s_%d", fileInfo.SessionID, fileInfo.ChunkIndex)
+		}
+
+		stagingFile, err := h.stagingManager.CreateStagingFile(repository.Path, targetName)
+		if err != nil {
+			part.Close()
+			api.GinInternalError(c, err, "Failed to create staging file")
+			return
+		}
+
+		dst, err := os.Create(stagingFile.Path)
+		if err != nil {
+			part.Close()
+			api.GinInternalError(c, err, "Failed to open staging file")
+			return
+		}
+
+		written, err := io.CopyBuffer(dst, part, buf)
+		dst.Close()
+		part.Close()
+		if err != nil {
+			api.GinInternalError(c, err, "Failed to save upload data")
+			return
+		}
+
+		h.sessionManager.UpdateSessionChunk(fileInfo.SessionID, fileInfo.ChunkIndex, written)
+
+		state.chunkInfos = append(state.chunkInfos, upload.ChunkInfo{
+			SessionID:  fileInfo.SessionID,
+			ChunkIndex: fileInfo.ChunkIndex,
+			FilePath:   stagingFile.Path,
+			Size:       written,
+		})
+	}
+
+	if len(sessions) == 0 {
+		api.GinBadRequest(c, errors.New("no files provided"), "No files provided")
+		return
+	}
+
+	var results []dto.BatchUploadResultDTO
+
+	for sessionID, state := range sessions {
+		if state.info.Type == "single" {
+			session, _ := h.sessionManager.GetSession(sessionID)
+			header := &multipart.FileHeader{
+				Filename: state.filename,
+				Size:     state.chunkInfos[0].Size,
+				Header:   map[string][]string{},
+			}
+			header.Header.Set("Content-Type", state.contentType)
+
+			result, err := h.processCompletedUpload(ctx, header, session, repository, state.chunkInfos[0].FilePath)
+			if err != nil {
+				errMsg := err.Error()
+				results = append(results, dto.BatchUploadResultDTO{
+					Success:  false,
+					FileName: state.filename,
+					Error:    &errMsg,
+				})
+				continue
+			}
+
+			h.sessionManager.UpdateSessionStatus(sessionID, "completed")
+			results = append(results, *result)
+			continue
+		}
+
+		h.chunkMerger.AddChunks(sessionID, state.chunkInfos)
+
+		if !h.sessionManager.IsSessionComplete(sessionID) {
+			progress, _ := h.sessionManager.GetSessionProgress(sessionID)
+			status := "uploading"
+			message := fmt.Sprintf("Upload in progress: %.1f%% complete", progress*100)
+			results = append(results, dto.BatchUploadResultDTO{
+				Success:  true,
+				FileName: state.filename,
+				Status:   &status,
+				Message:  &message,
+			})
+			continue
+		}
+
+		h.sessionManager.UpdateSessionStatus(sessionID, "merging")
+		mergeResult, err := h.chunkMerger.MergeChunks(sessionID, state.info.TotalChunks, repository.Path)
+		if err != nil {
+			errMsg := err.Error()
+			h.sessionManager.SetSessionError(sessionID, errMsg)
+			h.chunkMerger.CleanupChunks(sessionID)
+			results = append(results, dto.BatchUploadResultDTO{
+				Success:  false,
+				FileName: state.filename,
+				Error:    &errMsg,
+			})
+			continue
+		}
+
+		header := &multipart.FileHeader{
+			Filename: state.filename,
+			Size:     mergeResult.TotalSize,
+			Header:   map[string][]string{},
+		}
+		header.Header.Set("Content-Type", state.contentType)
+
+		session, _ := h.sessionManager.GetSession(sessionID)
+		result, err := h.processCompletedUpload(ctx, header, session, repository, mergeResult.MergedFilePath)
+
+		h.chunkMerger.CleanupChunks(sessionID)
+
+		if err != nil {
+			if mergeResult.MergedFilePath != "" {
+				h.chunkMerger.CleanupMergedFile(mergeResult.MergedFilePath)
+			}
+			errMsg := err.Error()
+			h.sessionManager.SetSessionError(sessionID, errMsg)
+			results = append(results, dto.BatchUploadResultDTO{
+				Success:  false,
+				FileName: state.filename,
+				Error:    &errMsg,
+			})
+			continue
+		}
+
+		h.sessionManager.UpdateSessionStatus(sessionID, "completed")
+		results = append(results, *result)
+	}
+
+	if len(sessions) > 0 {
 		go h.cleanupExpiredSessions()
 	}
 
@@ -340,17 +514,21 @@ func (h *AssetHandler) GetUploadConfig(c *gin.Context) {
 	if err != nil {
 		// Fallback to default config
 		config = &memory.ChunkConfig{
-			ChunkSize:      5 * 1024 * 1024,
-			MaxConcurrent:  3,
-			MemoryBuffer:   100 * 1024 * 1024,
-			UpdateInterval: 30,
+			ChunkSize:           5 * 1024 * 1024,
+			MaxConcurrent:       3,
+			MemoryBuffer:        100 * 1024 * 1024,
+			UpdateInterval:      30,
+			MergeConcurrency:    2,
+			MaxInFlightRequests: 3,
 		}
 	}
 
 	response := dto.UploadConfigResponseDTO{
-		ChunkSize:     config.ChunkSize,
-		MaxConcurrent: config.MaxConcurrent,
-		MemoryBuffer:  config.MemoryBuffer,
+		ChunkSize:           config.ChunkSize,
+		MaxConcurrent:       config.MaxConcurrent,
+		MemoryBuffer:        config.MemoryBuffer,
+		MergeConcurrency:    config.MergeConcurrency,
+		MaxInFlightRequests: config.MaxInFlightRequests,
 	}
 
 	api.GinSuccess(c, response)
@@ -1079,6 +1257,15 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 	if filter.Date != nil {
 		dateFrom = filter.Date.From
 		dateTo = filter.Date.To
+
+		// Normalize date-only inputs to inclusive end-of-day
+		if dateFrom != nil && dateTo == nil {
+			end := time.Date(dateFrom.Year(), dateFrom.Month(), dateFrom.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), dateFrom.Location())
+			dateTo = &end
+		} else if dateTo != nil {
+			end := time.Date(dateTo.Year(), dateTo.Month(), dateTo.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), dateTo.Location())
+			dateTo = &end
+		}
 	}
 
 	assets, err := h.assetService.FilterAssets(ctx,
