@@ -86,7 +86,8 @@ export const uploadService = {
    */
   batchUploadFiles: async (
     files: Array<{
-      file: File;
+      file: Blob;
+      fileName?: string;
       sessionId: string;
       isChunk?: boolean;
       chunkIndex?: number;
@@ -118,7 +119,9 @@ export const uploadService = {
         fieldName = `single_${fileObj.sessionId}`;
       }
 
-      formData.append(fieldName, fileObj.file, fileObj.file.name);
+      const filename =
+        fileObj.fileName || (fileObj.file as File).name || "upload";
+      formData.append(fieldName, fileObj.file, filename);
     });
 
     return api.post<ApiResult<BatchUploadResponse>>(
@@ -146,15 +149,17 @@ export const uploadService = {
   uploadFileInChunks: async (
     file: File,
     sessionId: string,
-    chunkSize: number = 5 * 1024 * 1024, // 5MB default
+    chunkSize: number = 24 * 1024 * 1024, // 24MB default to reduce chunk count
     repositoryId?: string,
     onProgress?: (progress: number) => void,
+    options?: { maxConcurrent?: number; chunkSize?: number },
   ): Promise<AxiosResponse<ApiResult<BatchUploadResponse>>> => {
-    const totalChunks = Math.ceil(file.size / chunkSize);
+    const effectiveChunkSize = options?.chunkSize ?? chunkSize;
+    const totalChunks = Math.ceil(file.size / effectiveChunkSize);
     const uploadPromises: Array<
       Promise<AxiosResponse<ApiResult<BatchUploadResponse>>>
     > = [];
-    const maxConcurrent = 3; // Limit concurrent uploads
+    const maxConcurrent = options?.maxConcurrent ?? 2; // Lower concurrency for low-power mode
 
     // Upload chunks sequentially with concurrency control
     for (
@@ -166,12 +171,13 @@ export const uploadService = {
 
       for (let i = 0; i < maxConcurrent && chunkIndex + i < totalChunks; i++) {
         const currentChunkIndex = chunkIndex + i;
-        const start = currentChunkIndex * chunkSize;
-        const end = Math.min(start + chunkSize, file.size);
+        const start = currentChunkIndex * effectiveChunkSize;
+        const end = Math.min(start + effectiveChunkSize, file.size);
         const chunk = file.slice(start, end);
 
         chunkBatch.push({
-          file: new File([chunk], file.name, { type: file.type }),
+          file: chunk,
+          fileName: file.name,
           sessionId,
           isChunk: true,
           chunkIndex: currentChunkIndex,

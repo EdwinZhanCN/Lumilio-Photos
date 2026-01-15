@@ -51,6 +51,10 @@ export const initialState: SettingsState = {
     upload: {
       max_preview_count: 30, // 默认生成30个预览图
       max_total_files: 100, // 默认最多上传100个文件
+      low_power_mode: true, // 默认开启低功耗上传
+      chunk_size_mb: 24, // 默认分片大小 24MB
+      max_concurrent_chunks: 2, // 默认分片并发 2
+      use_server_config: true, // 默认读取后端上传配置
     },
   },
   server: {
