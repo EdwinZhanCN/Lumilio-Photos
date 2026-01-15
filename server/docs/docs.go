@@ -852,7 +852,13 @@ const docTemplate = `{
                     "max_concurrent": {
                         "type": "integer"
                     },
+                    "max_in_flight_requests": {
+                        "type": "integer"
+                    },
                     "memory_buffer": {
+                        "type": "integer"
+                    },
+                    "merge_concurrency": {
                         "type": "integer"
                     }
                 },
@@ -4531,7 +4537,7 @@ const docTemplate = `{
     "openapi": "3.1.0",
     "servers": [
         {
-            "url": "localhost:3001/api/v1"
+            "url": "localhost:8080/api/v1"
         }
     ]
 }`
@@ -4539,8 +4545,8 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Title:            "Lumilio-Photos Manager API",
-	Description:      "Photo management system API with asset upload, processing, and organization features",
+	Title:            "Lumilio-Photos API",
+	Description:      "Media management system API with asset upload, processing, and organization features",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

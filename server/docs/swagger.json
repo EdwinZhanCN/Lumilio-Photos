@@ -845,7 +845,13 @@
                     "max_concurrent": {
                         "type": "integer"
                     },
+                    "max_in_flight_requests": {
+                        "type": "integer"
+                    },
                     "memory_buffer": {
+                        "type": "integer"
+                    },
+                    "merge_concurrency": {
                         "type": "integer"
                     }
                 },
@@ -933,12 +939,12 @@
             "name": "API Support",
             "url": "http://www.github.com/EdwinZhanCN/Lumilio-Photos"
         },
-        "description": "Photo management system API with asset upload, processing, and organization features",
+        "description": "Media management system API with asset upload, processing, and organization features",
         "license": {
             "name": "GPLv3.0",
             "url": "https://opensource.org/licenses/GPL-3.0"
         },
-        "title": "Lumilio-Photos Manager API",
+        "title": "Lumilio-Photos API",
         "version": "1.0"
     },
     "externalDocs": {
@@ -4524,7 +4530,7 @@
     "openapi": "3.1.0",
     "servers": [
         {
-            "url": "localhost:3001/api/v1"
+            "url": "localhost:8080/api/v1"
         }
     ]
 }

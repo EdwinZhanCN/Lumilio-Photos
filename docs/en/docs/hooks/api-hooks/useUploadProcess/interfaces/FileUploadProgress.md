@@ -2,7 +2,7 @@
 
 # Interface: FileUploadProgress
 
-Defined in: [hooks/api-hooks/useUploadProcess.tsx:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e96f14d2e30dda991d150e201f9d9c02cdaa5fd7/web/src/hooks/api-hooks/useUploadProcess.tsx#L30)
+Defined in: [hooks/api-hooks/useUploadProcess.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/hooks/api-hooks/useUploadProcess.tsx#L31)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/api-hooks/useUploadProcess.tsx:30](https://github.com/EdwinZh
 
 > `optional` **error**: `string`
 
-Defined in: [hooks/api-hooks/useUploadProcess.tsx:36](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e96f14d2e30dda991d150e201f9d9c02cdaa5fd7/web/src/hooks/api-hooks/useUploadProcess.tsx#L36)
+Defined in: [hooks/api-hooks/useUploadProcess.tsx:37](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/hooks/api-hooks/useUploadProcess.tsx#L37)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [hooks/api-hooks/useUploadProcess.tsx:36](https://github.com/EdwinZh
 
 > **fileName**: `string`
 
-Defined in: [hooks/api-hooks/useUploadProcess.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e96f14d2e30dda991d150e201f9d9c02cdaa5fd7/web/src/hooks/api-hooks/useUploadProcess.tsx#L31)
+Defined in: [hooks/api-hooks/useUploadProcess.tsx:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/hooks/api-hooks/useUploadProcess.tsx#L32)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [hooks/api-hooks/useUploadProcess.tsx:31](https://github.com/EdwinZh
 
 > **isChunked**: `boolean`
 
-Defined in: [hooks/api-hooks/useUploadProcess.tsx:35](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e96f14d2e30dda991d150e201f9d9c02cdaa5fd7/web/src/hooks/api-hooks/useUploadProcess.tsx#L35)
+Defined in: [hooks/api-hooks/useUploadProcess.tsx:36](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/hooks/api-hooks/useUploadProcess.tsx#L36)
 
 ***
 
@@ -34,7 +34,7 @@ Defined in: [hooks/api-hooks/useUploadProcess.tsx:35](https://github.com/EdwinZh
 
 > **progress**: `number`
 
-Defined in: [hooks/api-hooks/useUploadProcess.tsx:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e96f14d2e30dda991d150e201f9d9c02cdaa5fd7/web/src/hooks/api-hooks/useUploadProcess.tsx#L32)
+Defined in: [hooks/api-hooks/useUploadProcess.tsx:33](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/hooks/api-hooks/useUploadProcess.tsx#L33)
 
 ***
 
@@ -42,7 +42,7 @@ Defined in: [hooks/api-hooks/useUploadProcess.tsx:32](https://github.com/EdwinZh
 
 > **sessionId**: `string`
 
-Defined in: [hooks/api-hooks/useUploadProcess.tsx:34](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e96f14d2e30dda991d150e201f9d9c02cdaa5fd7/web/src/hooks/api-hooks/useUploadProcess.tsx#L34)
+Defined in: [hooks/api-hooks/useUploadProcess.tsx:35](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/hooks/api-hooks/useUploadProcess.tsx#L35)
 
 ***
 
@@ -50,4 +50,4 @@ Defined in: [hooks/api-hooks/useUploadProcess.tsx:34](https://github.com/EdwinZh
 
 > **status**: `"pending"` \| `"uploading"` \| `"completed"` \| `"failed"`
 
-Defined in: [hooks/api-hooks/useUploadProcess.tsx:33](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e96f14d2e30dda991d150e201f9d9c02cdaa5fd7/web/src/hooks/api-hooks/useUploadProcess.tsx#L33)
+Defined in: [hooks/api-hooks/useUploadProcess.tsx:34](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/hooks/api-hooks/useUploadProcess.tsx#L34)
