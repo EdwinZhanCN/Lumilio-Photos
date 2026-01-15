@@ -1,6 +1,8 @@
 package dto
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"server/internal/db/dbtypes"
@@ -63,9 +65,11 @@ type BatchUploadResultDTO struct {
 
 // UploadConfigResponseDTO represents the response structure for upload configuration
 type UploadConfigResponseDTO struct {
-	ChunkSize     int64 `json:"chunk_size"`
-	MaxConcurrent int   `json:"max_concurrent"`
-	MemoryBuffer  int64 `json:"memory_buffer"`
+	ChunkSize           int64 `json:"chunk_size"`
+	MaxConcurrent       int   `json:"max_concurrent"`
+	MemoryBuffer        int64 `json:"memory_buffer"`
+	MergeConcurrency    int   `json:"merge_concurrency"`
+	MaxInFlightRequests int   `json:"max_in_flight_requests"`
 }
 
 // SessionProgressDTO represents progress information for an upload session
@@ -222,6 +226,45 @@ type FilenameFilterDTO struct {
 type DateRangeDTO struct {
 	From *time.Time `json:"from,omitempty"`
 	To   *time.Time `json:"to,omitempty"`
+}
+
+// UnmarshalJSON supports parsing both date-only (YYYY-MM-DD) and RFC3339 timestamps.
+func (d *DateRangeDTO) UnmarshalJSON(data []byte) error {
+	type alias struct {
+		From *string `json:"from"`
+		To   *string `json:"to"`
+	}
+
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+
+	parse := func(val *string) (*time.Time, error) {
+		if val == nil || *val == "" {
+			return nil, nil
+		}
+		layouts := []string{
+			"2006-01-02",
+			time.RFC3339,
+			"2006-01-02T15:04:05Z07:00",
+		}
+		for _, layout := range layouts {
+			if t, err := time.Parse(layout, *val); err == nil {
+				return &t, nil
+			}
+		}
+		return nil, fmt.Errorf("invalid date format: %s", *val)
+	}
+
+	var err error
+	if d.From, err = parse(a.From); err != nil {
+		return err
+	}
+	if d.To, err = parse(a.To); err != nil {
+		return err
+	}
+	return nil
 }
 
 // AssetFilterDTO represents comprehensive filtering options
