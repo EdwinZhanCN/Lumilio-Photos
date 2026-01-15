@@ -109,48 +109,65 @@ func (cm *ChunkMerger) MergeChunks(sessionID string, totalChunks int, repoPath s
 		return nil, fmt.Errorf("no chunks provided for session %s", sessionID)
 	}
 
-	// Verify we have all chunks
 	if !cm.HasAllChunks(sessionID, totalChunks) {
 		return nil, fmt.Errorf("not all chunks received for session %s: have %d, need %d",
 			sessionID, len(chunks), totalChunks)
 	}
 
-	// Sort chunks by index to ensure correct order
 	sort.Slice(chunks, func(i, j int) bool {
 		return chunks[i].ChunkIndex < chunks[j].ChunkIndex
 	})
 
-	// Validate chunk sequence
 	if err := cm.validateChunkSequence(chunks, totalChunks); err != nil {
 		return nil, fmt.Errorf("invalid chunk sequence for session %s: %w", sessionID, err)
 	}
 
-	// Create temporary merged file using DirectoryManager
 	tempFile, err := cm.directoryManager.CreateTempFile(repoPath, "merged_chunks")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create merged file: %w", err)
 	}
 
+	dst, err := os.Create(tempFile.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open merged file: %w", err)
+	}
+	defer dst.Close()
+
+	buf := make([]byte, 1<<20) // 1MiB shared buffer
 	var totalSize int64
 
-	// Merge chunks sequentially to ensure correct order
 	for _, chunk := range chunks {
-		err := cm.appendChunkToFile(tempFile.Path, chunk, chunks)
+		chunkFile, err := os.Open(chunk.FilePath)
 		if err != nil {
-			// Clean up the incomplete merged file
 			cm.CleanupMergedFile(tempFile.Path)
-			return nil, fmt.Errorf("failed to append chunk %d: %w", chunk.ChunkIndex, err)
+			return nil, fmt.Errorf("failed to open chunk file %s: %w", chunk.FilePath, err)
 		}
-		totalSize += chunk.Size
+
+		bytesWritten, err := io.CopyBuffer(dst, chunkFile, buf)
+		chunkFile.Close()
+		if err != nil {
+			cm.CleanupMergedFile(tempFile.Path)
+			return nil, fmt.Errorf("failed to copy chunk %d: %w", chunk.ChunkIndex, err)
+		}
+
+		if bytesWritten != chunk.Size {
+			cm.CleanupMergedFile(tempFile.Path)
+			return nil, fmt.Errorf("chunk size mismatch: expected %d, wrote %d", chunk.Size, bytesWritten)
+		}
+
+		totalSize += bytesWritten
 	}
 
-	// Verify the final file size matches expected total
+	if err := dst.Sync(); err != nil {
+		cm.CleanupMergedFile(tempFile.Path)
+		return nil, fmt.Errorf("failed to sync merged file: %w", err)
+	}
+
 	if err := cm.verifyFileSize(tempFile.Path, totalSize); err != nil {
 		cm.CleanupMergedFile(tempFile.Path)
 		return nil, fmt.Errorf("file size verification failed: %w", err)
 	}
 
-	// Clean up the chunk tracking for this session
 	cm.ClearSession(sessionID)
 
 	return &MergeResult{
@@ -160,58 +177,8 @@ func (cm *ChunkMerger) MergeChunks(sessionID string, totalChunks int, repoPath s
 }
 
 // appendChunkToFile appends a chunk to the merged file at the correct position
-func (cm *ChunkMerger) appendChunkToFile(mergedFilePath string, chunk ChunkInfo, chunks []ChunkInfo) error {
-	// Open chunk file
-	chunkFile, err := os.Open(chunk.FilePath)
-	if err != nil {
-		return fmt.Errorf("failed to open chunk file %s: %w", chunk.FilePath, err)
-	}
-	defer chunkFile.Close()
-
-	// Calculate the position in the merged file
-	position, err := cm.calculateChunkPosition(chunk.ChunkIndex, chunks)
-	if err != nil {
-		return err
-	}
-
-	// Open merged file for appending
-	mergedFile, err := os.OpenFile(mergedFilePath, os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open merged file: %w", err)
-	}
-	defer mergedFile.Close()
-
-	// Seek to the correct position in the merged file
-	if _, err := mergedFile.Seek(position, io.SeekStart); err != nil {
-		return fmt.Errorf("failed to seek in merged file: %w", err)
-	}
-
-	// Copy chunk data to merged file
-	bytesWritten, err := io.Copy(mergedFile, chunkFile)
-	if err != nil {
-		return fmt.Errorf("failed to copy chunk data: %w", err)
-	}
-
-	if bytesWritten != chunk.Size {
-		return fmt.Errorf("chunk size mismatch: expected %d, wrote %d", chunk.Size, bytesWritten)
-	}
-
-	return nil
-}
 
 // calculateChunkPosition calculates the file position for a chunk based on previous chunks
-func (cm *ChunkMerger) calculateChunkPosition(chunkIndex int, chunks []ChunkInfo) (int64, error) {
-	if chunkIndex == 0 {
-		return 0, nil
-	}
-
-	var position int64
-	for i := 0; i < chunkIndex; i++ {
-		position += chunks[i].Size
-	}
-
-	return position, nil
-}
 
 // validateChunkSequence validates that chunks form a complete sequence
 func (cm *ChunkMerger) validateChunkSequence(chunks []ChunkInfo, totalChunks int) error {

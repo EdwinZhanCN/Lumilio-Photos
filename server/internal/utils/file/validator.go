@@ -169,8 +169,8 @@ func (v *Validator) ValidateFile(filename, contentType string) *ValidationResult
 	result.AssetType = assetType
 	result.IsRAW = supportedRAWExts[result.Extension]
 
-	// Validate MIME type if provided
-	if result.MimeType != "" {
+	// Validate MIME type if provided and not the generic octet-stream
+	if result.MimeType != "" && result.MimeType != "application/octet-stream" {
 		if !v.IsValidMimeType(result.MimeType, assetType) {
 			result.Valid = false
 			result.ErrorReason = fmt.Sprintf("MIME type '%s' does not match file extension '%s'", result.MimeType, result.Extension)

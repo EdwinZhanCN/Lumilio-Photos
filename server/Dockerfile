@@ -8,11 +8,12 @@ FROM golang:1.24.5-bookworm AS builder
 ENV CGO_ENABLED=1 \
     GO111MODULE=on
 
-# System deps for CGO & libvips (used by bimg)
+# System deps for CGO & libvips (used by bimg) & libraw (for modern RAW support)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     libvips-dev \
+    libraw-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -35,13 +36,13 @@ RUN go build -o /out/server ./cmd
 ############################################
 FROM debian:bookworm-slim AS runtime
 
-# Runtime dependencies: ffmpeg stack, exiftool, dcraw, libvips runtime
+# Runtime dependencies: ffmpeg stack, exiftool, libvips runtime, libraw runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     ffmpeg \
     exiftool \
-    dcraw \
     libvips42 \
+    libraw20 \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
 

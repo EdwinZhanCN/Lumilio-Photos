@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatBytes } from "@/lib/utils/formatters.ts";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { useSettingsContext } from "@/features/settings";
 import {
   HashcodeProgress,
   useGenerateHashcode,
@@ -53,6 +54,7 @@ export interface useUploadProcessReturn {
 export function useUploadProcess(): useUploadProcessReturn {
   const queryClient = useQueryClient();
   const showMessage = useMessage();
+  const { state: settings } = useSettingsContext();
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [fileProgress, setFileProgress] = useState<FileUploadProgress[]>([]);
 
@@ -83,7 +85,13 @@ export function useUploadProcess(): useUploadProcessReturn {
   };
 
   const uploadMutation = useMutation({
-    mutationFn: async (uploadSessions: FileUploadSession[]) => {
+    mutationFn: async ({
+      uploadSessions,
+      chunkOptions,
+    }: {
+      uploadSessions: FileUploadSession[];
+      chunkOptions?: { chunkSize?: number; maxConcurrent?: number };
+    }) => {
       // Initialize file progress tracking
       const initialProgress: FileUploadProgress[] = uploadSessions.map(
         (session) => ({
@@ -164,12 +172,16 @@ export function useUploadProcess(): useUploadProcessReturn {
           const chunkResponse = await uploadService.uploadFileInChunks(
             session.file,
             session.sessionId,
-            undefined, // Use default chunk size
+            chunkOptions?.chunkSize,
             undefined, // Use default repository
             (progress) => {
               // Update progress for individual chunked file
               setUploadProgress(progress);
               updateFileProgress(session.file.name, { progress });
+            },
+            {
+              maxConcurrent: chunkOptions?.maxConcurrent,
+              chunkSize: chunkOptions?.chunkSize,
             },
           );
 
@@ -224,6 +236,48 @@ export function useUploadProcess(): useUploadProcessReturn {
     }
 
     try {
+      let effectiveChunkSize = settings.ui.upload?.low_power_mode
+        ? 24 * 1024 * 1024
+        : undefined;
+      let effectiveMaxConcurrent = settings.ui.upload?.low_power_mode
+        ? 2
+        : undefined;
+
+      if (settings.ui.upload?.chunk_size_mb) {
+        effectiveChunkSize = settings.ui.upload.chunk_size_mb * 1024 * 1024;
+      }
+      if (settings.ui.upload?.max_concurrent_chunks) {
+        effectiveMaxConcurrent = settings.ui.upload.max_concurrent_chunks;
+      }
+
+      if (settings.ui.upload?.use_server_config) {
+        try {
+          const serverResp = await uploadService.getUploadConfig();
+          const serverCfg = serverResp.data?.data as any;
+          const serverChunkSize =
+            serverCfg?.chunkSize ??
+            serverCfg?.ChunkSize ??
+            serverCfg?.chunk_size;
+          const serverMaxConcurrent =
+            serverCfg?.maxConcurrent ??
+            serverCfg?.MaxConcurrent ??
+            serverCfg?.max_concurrent;
+          if (serverChunkSize) {
+            effectiveChunkSize = serverChunkSize;
+          }
+          if (serverMaxConcurrent) {
+            effectiveMaxConcurrent = serverMaxConcurrent;
+          }
+        } catch (configError) {
+          console.warn("Failed to load server upload config", configError);
+        }
+      }
+
+      const runtimeChunkOptions = {
+        chunkSize: effectiveChunkSize,
+        maxConcurrent: effectiveMaxConcurrent,
+      };
+
       const hashResults = await generateHashCodes(files);
       if (!hashResults) throw new Error("Failed to generate hash codes");
 
@@ -248,7 +302,10 @@ export function useUploadProcess(): useUploadProcessReturn {
       );
 
       // Upload files using the new chunk strategy
-      const response = await uploadMutation.mutateAsync(uploadSessions);
+      const response = await uploadMutation.mutateAsync({
+        uploadSessions,
+        chunkOptions: runtimeChunkOptions,
+      });
 
       const results: BatchUploadResult[] = response.results || [];
 

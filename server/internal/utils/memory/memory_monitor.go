@@ -10,10 +10,12 @@ import (
 
 // ChunkConfig represents the dynamic chunk configuration based on system memory
 type ChunkConfig struct {
-	ChunkSize      int64 `json:"chunk_size"`      // in bytes
-	MaxConcurrent  int   `json:"max_concurrent"`  // maximum concurrent uploads
-	MemoryBuffer   int64 `json:"memory_buffer"`   // safety buffer in bytes
-	UpdateInterval int   `json:"update_interval"` // config cache duration in seconds
+	ChunkSize           int64 `json:"chunk_size"`             // in bytes
+	MaxConcurrent       int   `json:"max_concurrent"`         // maximum concurrent uploads
+	MemoryBuffer        int64 `json:"memory_buffer"`          // safety buffer in bytes
+	UpdateInterval      int   `json:"update_interval"`        // config cache duration in seconds
+	MergeConcurrency    int   `json:"merge_concurrency"`      // merge workers
+	MaxInFlightRequests int   `json:"max_in_flight_requests"` // inbound upload limiter
 }
 
 // MemoryMonitor handles memory-aware configuration management
@@ -70,10 +72,12 @@ func (m *MemoryMonitor) GetOptimalChunkConfig() (*ChunkConfig, error) {
 	memoryBuffer := int64(float64(vm.Available) * 0.1)
 
 	config := &ChunkConfig{
-		ChunkSize:      chunkSize,
-		MaxConcurrent:  maxConcurrent,
-		MemoryBuffer:   memoryBuffer,
-		UpdateInterval: 30,
+		ChunkSize:           chunkSize,
+		MaxConcurrent:       maxConcurrent,
+		MemoryBuffer:        memoryBuffer,
+		UpdateInterval:      30,
+		MergeConcurrency:    2,
+		MaxInFlightRequests: 3,
 	}
 
 	// Update cache
@@ -121,10 +125,12 @@ func (m *MemoryMonitor) GetMemoryInfo() (*mem.VirtualMemoryStat, error) {
 // getDefaultConfig returns a safe default configuration
 func (m *MemoryMonitor) getDefaultConfig() *ChunkConfig {
 	return &ChunkConfig{
-		ChunkSize:      5 * 1024 * 1024,   // 5MB
-		MaxConcurrent:  3,                 // 3 concurrent uploads
-		MemoryBuffer:   100 * 1024 * 1024, // 100MB buffer
-		UpdateInterval: 30,                // 30 seconds
+		ChunkSize:           5 * 1024 * 1024,   // 5MB
+		MaxConcurrent:       3,                 // 3 concurrent uploads
+		MemoryBuffer:        100 * 1024 * 1024, // 100MB buffer
+		UpdateInterval:      30,                // 30 seconds
+		MergeConcurrency:    2,
+		MaxInFlightRequests: 3,
 	}
 }
 
