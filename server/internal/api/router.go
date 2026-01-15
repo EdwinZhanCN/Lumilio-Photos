@@ -64,12 +64,6 @@ type AlbumControllerInterface interface {
 	GetAssetAlbums(c *gin.Context)
 }
 
-// NewRouter creates and configures a new router with asset, album and auth endpoints
-// @title RKPhoto Manager API
-// @version 1.0
-// @description Photo management system API with asset upload, processing, and organization features
-// @host localhost:3001
-// @BasePath /api/v1
 func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface) *gin.Engine {
 	r := gin.Default()
 

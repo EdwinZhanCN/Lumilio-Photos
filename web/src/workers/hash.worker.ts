@@ -15,14 +15,14 @@ export interface WorkerHashResult {
 }
 
 // --- Initialization Control ---
-const initializationPromise: Promise<void> | null = null;
+let initializationPromise: Promise<void> | null = null;
 
 function initialize(): Promise<void> {
   if (initializationPromise) {
     return initializationPromise;
   }
 
-  return new Promise((resolve, reject) => {
+  initializationPromise = new Promise((resolve, reject) => {
     init()
       .then(() => {
         self.postMessage({ type: "WASM_READY" });
@@ -35,7 +35,15 @@ function initialize(): Promise<void> {
         reject(new Error(errMsg));
       });
   });
+
+  return initializationPromise;
 }
+
+// --- Concurrency Tuning ---
+const HW_CONCURRENCY = Math.max(1, self.navigator?.hardwareConcurrency ?? 4);
+const DEFAULT_CONCURRENCY = Math.min(HW_CONCURRENCY, 4); // cap to avoid oversubscription
+const LARGE_FILE_BYTES = 20_000_000; // 20MB
+const MAX_LARGE_FILE_CONCURRENCY = 2;
 
 // --- Abort Control ---
 let abortController = new AbortController();
@@ -63,8 +71,15 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         }
 
         const assets = data;
+        const firstSize = assets[0]?.size ?? 0;
         const CONCURRENCY =
-          assets.length > 0 && assets[0].size > 100_000_000 ? 10 : 100;
+          firstSize > LARGE_FILE_BYTES
+            ? Math.max(
+                1,
+                Math.min(DEFAULT_CONCURRENCY, MAX_LARGE_FILE_CONCURRENCY),
+              )
+            : DEFAULT_CONCURRENCY;
+
         const allResults: WorkerHashResult[] = [];
 
         for (let i = 0; i < assets.length; i += CONCURRENCY) {

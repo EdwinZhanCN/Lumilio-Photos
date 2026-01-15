@@ -21,7 +21,7 @@ jobs:
             - name: Setup Go
               uses: actions/setup-go@v5
               with:
-                  go-version: "1.23"
+                  go-version: "1.24"
             - name: Install Swag CLI
               run: go install github.com/swaggo/swag/v2/cmd/swag@latest
 
@@ -50,7 +50,7 @@ jobs:
                   # 检查是否有文件变更
                   if [[ -n $(git status -s) ]]; then
                     git add .
-                    git commit -m "[Docs] auto-generate OpenAPI spec"
+                    git commit -m "docs: auto-generate OpenAPI spec and TypeDoc"
                     git push
                   else
                     echo "No changes to commit."
