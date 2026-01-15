@@ -138,6 +138,88 @@ export default function UISettings() {
               Maximum number of files that can be uploaded at once
             </span>
           </div>
+
+          <div className="flex items-center gap-3">
+            <label className="font-semibold min-w-40">Low Power Mode</label>
+            <input
+              type="checkbox"
+              className="toggle"
+              checked={state.ui.upload?.low_power_mode ?? false}
+              onChange={(e) =>
+                dispatch({
+                  type: "SET_UPLOAD_LOW_POWER_MODE",
+                  payload: e.target.checked,
+                })
+              }
+            />
+            <span className="text-sm text-base-content/70">
+              Reduce CPU by larger chunks + lower concurrency
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="font-semibold min-w-40">Chunk Size (MB)</label>
+            <input
+              type="number"
+              className="input input-bordered w-32"
+              min="1"
+              max="128"
+              value={state.ui.upload?.chunk_size_mb ?? 24}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 1;
+                dispatch({
+                  type: "SET_UPLOAD_CHUNK_SIZE_MB",
+                  payload: value,
+                });
+              }}
+            />
+            <span className="text-sm text-base-content/70">
+              Default 24 MB when low power mode is on
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="font-semibold min-w-40">
+              Max Concurrent Chunks
+            </label>
+            <input
+              type="number"
+              className="input input-bordered w-32"
+              min="1"
+              max="6"
+              value={state.ui.upload?.max_concurrent_chunks ?? 2}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 1;
+                dispatch({
+                  type: "SET_UPLOAD_MAX_CONCURRENT_CHUNKS",
+                  payload: value,
+                });
+              }}
+            />
+            <span className="text-sm text-base-content/70">
+              Concurrent uploads per file
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="font-semibold min-w-40">
+              Use Server Upload Config
+            </label>
+            <input
+              type="checkbox"
+              className="toggle"
+              checked={state.ui.upload?.use_server_config ?? true}
+              onChange={(e) =>
+                dispatch({
+                  type: "SET_UPLOAD_USE_SERVER_CONFIG",
+                  payload: e.target.checked,
+                })
+              }
+            />
+            <span className="text-sm text-base-content/70">
+              Auto-apply backend chunk size/concurrency hints
+            </span>
+          </div>
         </div>
       </section>
     </div>
