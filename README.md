@@ -2,15 +2,15 @@
 
 # Lumilio Photos
 
->[!WARNING]
->🚧 This Project is Under Development. 🚧
-
 [![Go](https://img.shields.io/badge/Go-1.24-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql)](https://www.postgresql.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge&logo=gnu)](LICENSE)
 
 </div>
+
+>[!WARNING]
+>🚧 This Project is Under Active Development. 🚧
 
 ## Tech Stack
 
