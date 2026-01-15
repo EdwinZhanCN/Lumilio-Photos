@@ -34,17 +34,16 @@ func NewMigrationConfig(dbConfig config.DatabaseConfig) *MigrationConfig {
 	}
 }
 
-// buildURL constructs a Postgres connection URL with explicit ssl and channel binding options.
+// buildURL constructs a Postgres connection URL with explicit ssl options.
 func (m *MigrationConfig) buildURL() string {
 	return fmt.Sprintf(
-		"postgresql://%s:%s@%s:%s/%s?sslmode=%s&channel_binding=%s&search_path=public",
+		"postgresql://%s:%s@%s:%s/%s?sslmode=%s&search_path=public",
 		m.DatabaseConfig.User,
 		m.DatabaseConfig.Password,
 		m.DatabaseConfig.Host,
 		m.DatabaseConfig.Port,
 		m.DatabaseConfig.DBName,
 		m.DatabaseConfig.SSL,
-		m.DatabaseConfig.ChannelBinding,
 	)
 }
 
