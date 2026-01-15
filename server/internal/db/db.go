@@ -18,14 +18,13 @@ type DB struct {
 
 // New creates a new database connection with the given configuration
 func New(cfg config.DatabaseConfig) (*DB, error) {
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s&channel_binding=%s",
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		cfg.User,
 		cfg.Password,
 		cfg.Host,
 		cfg.Port,
 		cfg.DBName,
 		cfg.SSL,
-		cfg.ChannelBinding,
 	)
 
 	pool, err := pgxpool.New(context.Background(), dsn)

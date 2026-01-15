@@ -28,7 +28,22 @@ func (at AssetType) Valid() bool {
 	return false
 }
 
-type SpecificMetadata []byte
+type SpecificMetadata json.RawMessage
+
+func (s *SpecificMetadata) UnmarshalJSON(b []byte) error {
+	if s == nil {
+		return errors.New("SpecificMetadata: nil receiver")
+	}
+	*s = SpecificMetadata(append([]byte(nil), b...))
+	return nil
+}
+
+func (s SpecificMetadata) MarshalJSON() ([]byte, error) {
+	if s == nil {
+		return []byte("null"), nil
+	}
+	return []byte(s), nil
+}
 
 // PhotoSpecificMetadata ----- 各类具体的 metadata 结构（仅用于 JSON 编解码；与持久化解耦）-----
 type PhotoSpecificMetadata struct {

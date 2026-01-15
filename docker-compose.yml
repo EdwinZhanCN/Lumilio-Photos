@@ -1,0 +1,69 @@
+version: "3.9"
+
+services:
+    db:
+        image: pgvector/pgvector:pg16
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: lumiliophotos
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+        ports:
+            - "5432:5432"
+        volumes:
+            - db_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+
+    server:
+        build:
+            context: .
+            dockerfile: server/Dockerfile
+        depends_on:
+            db:
+                condition: service_healthy
+        environment:
+            SERVER_PORT: 8080
+            SERVER_ENV: development
+            SERVER_LOG_LEVEL: debug
+            DB_HOST: db
+            DB_PORT: 5432
+            DB_USER: postgres
+            DB_PASSWORD: postgres
+            DB_NAME: lumiliophotos
+            DB_SSL: disable
+            STORAGE_PATH: /data/storage
+            STORAGE_STRATEGY: date
+            STORAGE_PRESERVE_FILENAME: "true"
+            STORAGE_DUPLICATE_HANDLING: rename
+            ML_CLIP_ENABLED: "false"
+            ML_OCR_ENABLED: "false"
+            ML_CAPTION_ENABLED: "false"
+            ML_FACE_ENABLED: "false"
+            LLM_AGENT_ENABLED: "false"
+            LLM_PROVIDER: your-llm-provider
+            LLM_API_KEY: your-api-key-here
+            LLM_MODEL_NAME: your-model-name
+            LLM_BASE_URL: your-openai-compatiable-base-url
+        volumes:
+            - server_storage:/data/storage
+        ports:
+            - "8080:8080"
+
+    web:
+        build:
+            context: .
+            dockerfile: web/Dockerfile
+        depends_on:
+            - server
+        environment:
+            API_URL: http://server:8080
+        ports:
+            - "6657:80"
+
+volumes:
+    db_data:
+    server_storage:
