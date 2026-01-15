@@ -10,13 +10,12 @@ import (
 
 // DatabaseConfig holds all the configuration for the database connection.
 type DatabaseConfig struct {
-	Host           string
-	Port           string
-	User           string
-	Password       string
-	DBName         string
-	SSL            string
-	ChannelBinding string
+	Host     string
+	Port     string
+	User     string
+	Password string
+	DBName   string
+	SSL      string
 }
 
 // AppConfig holds general application configuration
@@ -88,24 +87,22 @@ func LoadDBConfig() DatabaseConfig {
 	if isDev {
 		// Development defaults - connect to localhost
 		cfg = DatabaseConfig{
-			Host:           "localhost",
-			Port:           "5432",
-			User:           "postgres",
-			Password:       "postgres",
-			DBName:         "lumiliophotos",
-			SSL:            "disable",
-			ChannelBinding: "disable",
+			Host:     "localhost",
+			Port:     "5432",
+			User:     "postgres",
+			Password: "postgres",
+			DBName:   "lumiliophotos",
+			SSL:      "disable",
 		}
 	} else {
 		// Production/Docker defaults
 		cfg = DatabaseConfig{
-			Host:           "db",
-			Port:           "5432",
-			User:           "postgres",
-			Password:       "postgres",
-			DBName:         "lumiliophotos",
-			SSL:            "disable",
-			ChannelBinding: "disable",
+			Host:     "db",
+			Port:     "5432",
+			User:     "postgres",
+			Password: "postgres",
+			DBName:   "lumiliophotos",
+			SSL:      "disable",
 		}
 	}
 
@@ -127,9 +124,6 @@ func LoadDBConfig() DatabaseConfig {
 	}
 	if ssl := os.Getenv("DB_SSL"); ssl != "" {
 		cfg.SSL = ssl
-	}
-	if cb := os.Getenv("DB_CHANNEL_BINDING"); cb != "" {
-		cfg.ChannelBinding = cb
 	}
 
 	return cfg
