@@ -34,7 +34,7 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 	}
 
 	// Parse LensModel
-	for _, field := range []string{"LensModel", "LensInfo", "LensType", "Lens"} {
+	for _, field := range []string{"LensModel", "LensID", "LensInfo", "LensType", "Lens"} {
 		if lens, exists := rawData[field]; exists {
 			normalized := normalizeString(lens)
 			if normalized != "" {
