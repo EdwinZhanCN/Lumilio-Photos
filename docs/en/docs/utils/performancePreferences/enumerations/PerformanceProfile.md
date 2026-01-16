@@ -2,7 +2,7 @@
 
 # Enumeration: PerformanceProfile
 
-Defined in: [utils/performancePreferences.ts:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/utils/performancePreferences.ts#L10)
+Defined in: [utils/performancePreferences.ts:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L10)
 
 Performance Preferences System
 
@@ -22,7 +22,7 @@ Edwin Zhan
 
 > **ADAPTIVE**: `"adaptive"`
 
-Defined in: [utils/performancePreferences.ts:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/utils/performancePreferences.ts#L14)
+Defined in: [utils/performancePreferences.ts:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L14)
 
 ***
 
@@ -30,7 +30,7 @@ Defined in: [utils/performancePreferences.ts:14](https://github.com/EdwinZhanCN/
 
 > **BALANCED**: `"balanced"`
 
-Defined in: [utils/performancePreferences.ts:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/utils/performancePreferences.ts#L12)
+Defined in: [utils/performancePreferences.ts:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L12)
 
 ***
 
@@ -38,7 +38,7 @@ Defined in: [utils/performancePreferences.ts:12](https://github.com/EdwinZhanCN/
 
 > **MEMORY\_SAVER**: `"memory_saver"`
 
-Defined in: [utils/performancePreferences.ts:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/utils/performancePreferences.ts#L11)
+Defined in: [utils/performancePreferences.ts:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L11)
 
 ***
 
@@ -46,4 +46,4 @@ Defined in: [utils/performancePreferences.ts:11](https://github.com/EdwinZhanCN/
 
 > **SPEED\_OPTIMIZED**: `"speed"`
 
-Defined in: [utils/performancePreferences.ts:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/115107d5b68e6366a48209868054d501ca599eda/web/src/utils/performancePreferences.ts#L13)
+Defined in: [utils/performancePreferences.ts:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L13)
