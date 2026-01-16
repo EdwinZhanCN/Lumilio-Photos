@@ -70,7 +70,7 @@ function ImgStackGrid({
           onClick={() => onAlbumClick?.(album)}
         >
           <div className="mb-2">
-            <ImgStackView />
+            <ImgStackView coverImages={album.coverImages} />
           </div>
           <div className="space-y-1 w-full">
             <h3 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
