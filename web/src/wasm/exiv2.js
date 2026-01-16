@@ -4442,3 +4442,4 @@ if (typeof exports === "object" && typeof module === "object") {
     module.exports.default = createExiv2Module;
 } else if (typeof define === "function" && define["amd"])
     define([], () => createExiv2Module);
+export default createExiv2Module;
