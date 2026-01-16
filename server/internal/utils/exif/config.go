@@ -61,6 +61,7 @@ func DefaultTagConfig() *TagConfig {
 			"CameraModelName",
 			"UniqueCameraModel",
 			"LensModel",
+			"LensID",
 			"LensInfo",
 			"LensType",
 			"Lens",

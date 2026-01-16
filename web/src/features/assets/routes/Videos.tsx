@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
@@ -10,6 +10,7 @@ import {
 } from "@/features/assets/hooks/useAssetsContext";
 import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
+import { selectView } from "@/features/assets/reducers/views.reducer";
 import {
   groupAssets,
   getFlatAssetsFromGrouped,
@@ -39,6 +40,7 @@ function Videos() {
     fetchMore: fetchNextPage,
     hasMore: hasNextPage,
     error,
+    viewKey,
   } = useCurrentTabAssets({
     withGroups: true,
     groupBy,
@@ -49,6 +51,9 @@ function Videos() {
       fetchNextPage();
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const viewState = selectView(state.views, viewKey);
+  const hasFetchedOnce = (viewState?.lastFetchAt ?? 0) > 0;
 
   // Use grouped assets if available, otherwise group manually
   const finalGroupedVideos = useMemo(() => {
@@ -69,13 +74,65 @@ function Videos() {
     });
   }, [finalGroupedVideos, updatedAssets]);
 
-  const currentAssetIndex = useMemo(() => {
-    if (!assetId || flatAssets.length === 0) {
-      return -1;
+  // Track the slide index for controlled carousel navigation
+  const [slideIndex, setSlideIndex] = useState<number>(-1);
+  const [isLocatingAsset, setIsLocatingAsset] = useState(false);
+
+  // Unified effect for asset location and auto-fetching
+  useEffect(() => {
+    if (!isCarouselOpen) return;
+
+    // If we have a valid assetId and data is loaded
+    if (assetId && hasFetchedOnce) {
+      const index = findAssetIndex(flatAssets, assetId);
+
+      if (index >= 0) {
+        // Asset found in current data
+        setSlideIndex(index);
+        setIsLocatingAsset(false);
+        return;
+      }
+
+      // Asset not found in current data
+      setIsLocatingAsset(true);
+
+      // Try to fetch more pages if available
+      if (hasNextPage && !isFetching && !isFetchingNextPage) {
+        fetchNextPage();
+        return;
+      }
+
+      // No more pages and not loading - asset doesn't exist in current view
+      if (!hasNextPage && !isFetching && !isFetchingNextPage) {
+        // Give a small delay before closing to show feedback
+        const timer = setTimeout(() => {
+          closeCarousel();
+        }, 500);
+        return () => clearTimeout(timer);
+      }
     }
-    const index = findAssetIndex(flatAssets, assetId);
-    return index;
-  }, [flatAssets, assetId]);
+  }, [
+    assetId,
+    flatAssets,
+    isCarouselOpen,
+    hasFetchedOnce,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    fetchNextPage,
+    closeCarousel,
+  ]);
+
+  // Update slideIndex when asset is found in flatAssets
+  useEffect(() => {
+    if (assetId && flatAssets.length > 0) {
+      const index = findAssetIndex(flatAssets, assetId);
+      if (index >= 0) {
+        setSlideIndex(index);
+        setIsLocatingAsset(false);
+      }
+    }
+  }, [assetId, flatAssets]);
 
   if (error) {
     throw new Error(error);
@@ -132,20 +189,48 @@ function Videos() {
         <div className="text-center p-4 text-gray-500">End of results.</div>
       )}
 
-      {isCarouselOpen && flatAssets.length > 0 && (
-        <FullScreenCarousel
-          photos={flatAssets}
-          initialSlide={currentAssetIndex >= 0 ? currentAssetIndex : 0}
-          onClose={() => {
-            closeCarousel();
-          }}
-          onNavigate={(id: string) => {
-            openCarousel(id);
-          }}
-          onAssetUpdate={handleAssetUpdate}
-          onAssetDelete={handleAssetDelete}
-        />
-      )}
+      {isCarouselOpen &&
+        (flatAssets.length > 0 ? (
+          <>
+            <FullScreenCarousel
+              photos={flatAssets}
+              initialSlide={slideIndex >= 0 ? slideIndex : 0}
+              slideIndex={slideIndex >= 0 ? slideIndex : undefined}
+              onClose={() => {
+                closeCarousel();
+              }}
+              onNavigate={(id: string) => {
+                openCarousel(id);
+              }}
+              onAssetUpdate={handleAssetUpdate}
+              onAssetDelete={handleAssetDelete}
+            />
+            {isLocatingAsset && (
+              <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center">
+                <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
+                  <div className="loading loading-spinner loading-lg mb-4"></div>
+                  <p className="text-lg font-medium mb-2">Locating asset...</p>
+                  {hasNextPage && !isFetching && !isFetchingNextPage ? (
+                    <p className="text-sm text-gray-300">
+                      Loading more data to find the asset...
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-300">
+                      Asset may not be available in the current view.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+            <div className="text-white text-center">
+              <div className="loading loading-spinner loading-lg mb-4"></div>
+              <p>Loading assets...</p>
+            </div>
+          </div>
+        ))}
     </div>
   );
 }

@@ -100,7 +100,7 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 }
 
 // enqueueRetryTasks re-enqueues specific tasks to their respective queues.
-// Task names are queue names (bijection): metadata_asset, thumbnail_asset, transcode_asset, process_clip, etc.
+// tasksToRetry uses queue names directly (bijection: queue name = task identifier).
 func (ap *AssetProcessor) enqueueRetryTasks(
 	ctx context.Context,
 	asset *repo.Asset,
@@ -108,10 +108,10 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	assetType dbtypes.AssetType,
 	tasksToRetry []string,
 ) error {
-	// Build task set for efficient lookup
-	taskSet := make(map[string]bool)
-	for _, task := range tasksToRetry {
-		taskSet[task] = true
+	// Build queue set from task/queue names (they are the same in our bijection)
+	queueSet := make(map[string]bool)
+	for _, queueName := range tasksToRetry {
+		queueSet[queueName] = true
 	}
 
 	// Prepare common job arguments
@@ -137,11 +137,11 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 		AssetType:   assetType,
 	}
 
-	// Enqueue tasks based on queue names (canonical task names)
-	// Tasks to enqueue: metadata_asset, thumbnail_asset, transcode_asset, process_clip, process_ocr, process_caption, process_face
+	// Enqueue tasks based on queue names (bijection: queue name = task name)
+	// Available queues: metadata_asset, thumbnail_asset, transcode_asset, process_clip, process_ocr, process_caption, process_face
 
 	// Enqueue metadata_asset if requested
-	if taskSet["metadata_asset"] {
+	if queueSet["metadata_asset"] {
 		_, err := ap.queueClient.Insert(ctx, commonMeta, &river.InsertOpts{Queue: "metadata_asset"})
 		if err != nil {
 			return fmt.Errorf("enqueue metadata_asset retry: %w", err)
@@ -149,7 +149,7 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	}
 
 	// Enqueue thumbnail_asset if requested
-	if taskSet["thumbnail_asset"] {
+	if queueSet["thumbnail_asset"] {
 		_, err := ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
 		if err != nil {
 			return fmt.Errorf("enqueue thumbnail_asset retry: %w", err)
@@ -157,7 +157,7 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	}
 
 	// Enqueue transcode_asset if requested
-	if taskSet["transcode_asset"] {
+	if queueSet["transcode_asset"] {
 		_, err := ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
 		if err != nil {
 			return fmt.Errorf("enqueue transcode_asset retry: %w", err)
@@ -170,10 +170,10 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 		fullPath := filepath.Join(repository.Path, *asset.StoragePath)
 
 		// Check each ML task queue name
-		if taskSet["process_clip"] || taskSet["process_ocr"] || taskSet["process_caption"] || taskSet["process_face"] {
+		if queueSet["process_clip"] || queueSet["process_ocr"] || queueSet["process_caption"] || queueSet["process_face"] {
 			// Re-enqueue ML jobs based on which ones failed
 			// We need to pass which specific ML tasks to retry
-			err := ap.retryMLJobs(ctx, asset, fullPath, taskSet)
+			err := ap.retryMLJobs(ctx, asset, fullPath, queueSet)
 			if err != nil {
 				return fmt.Errorf("enqueue ML retry: %w", err)
 			}

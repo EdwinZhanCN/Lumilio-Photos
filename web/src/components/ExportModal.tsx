@@ -5,6 +5,8 @@ import {
   Link,
   SquareArrowOutUpRight,
   X,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -14,6 +16,8 @@ import {
 import { assetService } from "@/services/assetsService";
 import { PaintBrushIcon } from "@heroicons/react/24/outline";
 import { Asset } from "@/services";
+import { RETRY_TASKS_BY_CATEGORY } from "@/config/retryTasks";
+
 type ExportFormat = "png" | "jpeg" | "webp";
 
 interface ExportModalProps {
@@ -44,6 +48,11 @@ export default function ExportModal({
   } = useExportImage();
 
   const [format, setFormat] = useState<ExportFormat>("png");
+
+  // Retry-related state
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  const [forceFullRetry, setForceFullRetry] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const originalUrl = useMemo(() => {
     if (!asset?.asset_id) return "";
@@ -111,6 +120,36 @@ export default function ExportModal({
     ) as HTMLDialogElement | null;
     modal?.close();
   }, [asset, buildExportOptions, exportImage, onExport]);
+
+  const handleRetry = useCallback(async () => {
+    if (!asset?.asset_id || selectedTasks.length === 0) return;
+
+    setIsRetrying(true);
+    try {
+      await assetService.reprocessAsset(asset.asset_id, {
+        tasks: selectedTasks,
+        force_full_retry: forceFullRetry,
+      });
+
+      // Close retry modal on success
+      const retryModal = document.getElementById(
+        "retry_modal",
+      ) as HTMLDialogElement | null;
+      retryModal?.close();
+
+      // Reset state
+      setSelectedTasks([]);
+      setForceFullRetry(false);
+
+      // TODO: Show success toast
+      console.log("Retry job submitted successfully for tasks:", selectedTasks);
+    } catch (err) {
+      console.error("Failed to submit retry job:", err);
+      // TODO: Show error toast
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [asset, selectedTasks, forceFullRetry]);
 
   return (
     <dialog id="export_modal" className="modal">
@@ -180,6 +219,21 @@ export default function ExportModal({
               <SquareArrowOutUpRight />
             </button>
           </div>
+
+          <div className="tooltip tooltip-bottom" data-tip="Retry Processing">
+            <button
+              className="btn btn-soft btn-circle"
+              disabled={!asset}
+              onClick={() => {
+                const retryModal = document.getElementById(
+                  "retry_modal",
+                ) as HTMLDialogElement | null;
+                retryModal?.showModal();
+              }}
+            >
+              <RefreshCw className="size-5" />
+            </button>
+          </div>
         </div>
 
         <fieldset className="fieldset">
@@ -219,6 +273,184 @@ export default function ExportModal({
           </div>
         )}
       </div>
+
+      {/* Retry Modal */}
+      <dialog id="retry_modal" className="modal">
+        <div className="modal-box">
+          <form method="dialog">
+            <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">
+              <X />
+            </button>
+          </form>
+
+          <h3 className="font-semibold text-lg mb-4">Retry Processing Tasks</h3>
+
+          <div className="space-y-4">
+            <div className="form-control w-full">
+              <label className="label">
+                <span className="label-text">Select Tasks to Retry</span>
+                <span className="label-text-alt">
+                  {selectedTasks.length} selected
+                </span>
+              </label>
+
+              {/* Metadata Tasks */}
+              <div className="mb-3">
+                <div className="text-xs font-semibold opacity-60 uppercase mb-2">
+                  Metadata
+                </div>
+                <div className="space-y-2">
+                  {RETRY_TASKS_BY_CATEGORY.metadata.map((task) => (
+                    <label
+                      key={task.key}
+                      className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded px-2"
+                    >
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={selectedTasks.includes(task.key)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTasks([...selectedTasks, task.key]);
+                          } else {
+                            setSelectedTasks(
+                              selectedTasks.filter((t) => t !== task.key),
+                            );
+                          }
+                        }}
+                        disabled={isRetrying}
+                      />
+                      <div className="flex-1">
+                        <span className="label-text font-medium">
+                          {task.label}
+                        </span>
+                        <p className="text-xs opacity-60">{task.description}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Media Tasks */}
+              <div className="mb-3">
+                <div className="text-xs font-semibold opacity-60 uppercase mb-2">
+                  Media Processing
+                </div>
+                <div className="space-y-2">
+                  {RETRY_TASKS_BY_CATEGORY.media.map((task) => (
+                    <label
+                      key={task.key}
+                      className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded px-2"
+                    >
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={selectedTasks.includes(task.key)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTasks([...selectedTasks, task.key]);
+                          } else {
+                            setSelectedTasks(
+                              selectedTasks.filter((t) => t !== task.key),
+                            );
+                          }
+                        }}
+                        disabled={isRetrying}
+                      />
+                      <div className="flex-1">
+                        <span className="label-text font-medium">
+                          {task.label}
+                        </span>
+                        <p className="text-xs opacity-60">{task.description}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* ML Tasks */}
+              <div className="mb-3">
+                <div className="text-xs font-semibold opacity-60 uppercase mb-2">
+                  Machine Learning
+                </div>
+                <div className="space-y-2">
+                  {RETRY_TASKS_BY_CATEGORY.ml.map((task) => (
+                    <label
+                      key={task.key}
+                      className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded px-2"
+                    >
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={selectedTasks.includes(task.key)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTasks([...selectedTasks, task.key]);
+                          } else {
+                            setSelectedTasks(
+                              selectedTasks.filter((t) => t !== task.key),
+                            );
+                          }
+                        }}
+                        disabled={isRetrying}
+                      />
+                      <div className="flex-1">
+                        <span className="label-text font-medium">
+                          {task.label}
+                        </span>
+                        <p className="text-xs opacity-60">{task.description}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="form-control">
+              <label className="label cursor-pointer justify-start gap-3">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={forceFullRetry}
+                  onChange={(e) => setForceFullRetry(e.target.checked)}
+                  disabled={isRetrying}
+                />
+                <span className="label-text">Force full retry</span>
+              </label>
+              <label className="label">
+                <span className="label-text-alt opacity-70">
+                  Re-run all processing tasks regardless of previous status
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="modal-action">
+            <form method="dialog">
+              <button className="btn btn-ghost" disabled={isRetrying}>
+                Cancel
+              </button>
+            </form>
+            <button
+              className="btn btn-primary"
+              disabled={selectedTasks.length === 0 || isRetrying}
+              onClick={handleRetry}
+            >
+              {isRetrying ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="size-4" />
+                  Submit Retry
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </dialog>
     </dialog>
   );
 }

@@ -2258,23 +2258,21 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		req = dto.ReprocessAssetRequestDTO{}
 	}
 
-	// Validate requested tasks
+	// Validate requested tasks (using queue names as canonical task identifiers)
 	if len(req.Tasks) > 0 {
-		validTasks := map[string]bool{
-			"extract_exif":         true,
-			"extract_metadata":     true,
-			"generate_thumbnails":  true,
-			"save_thumbnails":      true,
-			"transcode_video":      true,
-			"transcode_audio":      true,
-			"generate_web_version": true,
-			"clip_processing":      true,
-			"raw_processing":       true,
+		validQueues := map[string]bool{
+			"metadata_asset":  true,
+			"thumbnail_asset": true,
+			"transcode_asset": true,
+			"process_clip":    true,
+			"process_ocr":     true,
+			"process_caption": true,
+			"process_face":    true,
 		}
 
 		for _, task := range req.Tasks {
-			if !validTasks[task] {
-				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid task name: %s", task)})
+			if !validQueues[task] {
+				c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid queue name: %s", task)})
 				return
 			}
 		}
@@ -2307,13 +2305,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		}
 	}
 
-	// Check if asset is retryable
-	if !currentStatus.IsRetryable() {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Asset is not in a retryable state"})
-		return
-	}
-
-	// Check for fatal errors
+	// Check for fatal errors (skip state check to allow retry on any state)
 	if currentStatus.HasFatalErrors() {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Asset has fatal errors that prevent reprocessing"})
 		return

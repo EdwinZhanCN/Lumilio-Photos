@@ -97,8 +97,9 @@ func FromJSONB(data []byte) (AssetStatus, error) {
 }
 
 // IsRetryable returns true if the asset can be retried
+// Allows retry for warning, failed, and complete states (not processing)
 func (s AssetStatus) IsRetryable() bool {
-	return s.State == StateWarning || s.State == StateFailed
+	return s.State == StateWarning || s.State == StateFailed || s.State == StateComplete
 }
 
 // HasFatalErrors returns true if there are fatal errors that prevent retry
