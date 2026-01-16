@@ -28,7 +28,7 @@ const UploadHeader: React.FC = () => {
         icon={<ArrowUpTrayIcon className="w-6 h-6 text-primary" />}
       >
         <button
-          className="btn btn-sm btn-ghost gap-2"
+          className="btn btn-sm btn-soft btn-info"
           onClick={() => setShowFormatsModal(true)}
         >
           <DocumentTextIcon className="w-4 h-4" />
