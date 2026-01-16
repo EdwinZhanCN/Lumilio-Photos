@@ -2,7 +2,7 @@
 
 # Interface: PerformancePreferences
 
-Defined in: [utils/performancePreferences.ts:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/001ab38fa17e95bfd94631c19af859c7e7a3185a/web/src/utils/performancePreferences.ts#L17)
+Defined in: [utils/performancePreferences.ts:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/utils/performancePreferences.ts#L17)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [utils/performancePreferences.ts:17](https://github.com/EdwinZhanCN/
 
 > `optional` **customBatchSizeMultiplier**: `number`
 
-Defined in: [utils/performancePreferences.ts:19](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/001ab38fa17e95bfd94631c19af859c7e7a3185a/web/src/utils/performancePreferences.ts#L19)
+Defined in: [utils/performancePreferences.ts:19](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/utils/performancePreferences.ts#L19)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [utils/performancePreferences.ts:19](https://github.com/EdwinZhanCN/
 
 > **maxConcurrentOperations**: `number`
 
-Defined in: [utils/performancePreferences.ts:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/001ab38fa17e95bfd94631c19af859c7e7a3185a/web/src/utils/performancePreferences.ts#L22)
+Defined in: [utils/performancePreferences.ts:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/utils/performancePreferences.ts#L22)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [utils/performancePreferences.ts:22](https://github.com/EdwinZhanCN/
 
 > **prioritizeUserOperations**: `boolean`
 
-Defined in: [utils/performancePreferences.ts:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/001ab38fa17e95bfd94631c19af859c7e7a3185a/web/src/utils/performancePreferences.ts#L21)
+Defined in: [utils/performancePreferences.ts:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/utils/performancePreferences.ts#L21)
 
 ***
 
@@ -34,7 +34,7 @@ Defined in: [utils/performancePreferences.ts:21](https://github.com/EdwinZhanCN/
 
 > **profile**: [`PerformanceProfile`](../enumerations/PerformanceProfile.md)
 
-Defined in: [utils/performancePreferences.ts:18](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/001ab38fa17e95bfd94631c19af859c7e7a3185a/web/src/utils/performancePreferences.ts#L18)
+Defined in: [utils/performancePreferences.ts:18](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/utils/performancePreferences.ts#L18)
 
 ***
 
@@ -42,4 +42,4 @@ Defined in: [utils/performancePreferences.ts:18](https://github.com/EdwinZhanCN/
 
 > **respectMemoryLimits**: `boolean`
 
-Defined in: [utils/performancePreferences.ts:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/001ab38fa17e95bfd94631c19af859c7e7a3185a/web/src/utils/performancePreferences.ts#L20)
+Defined in: [utils/performancePreferences.ts:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/utils/performancePreferences.ts#L20)
