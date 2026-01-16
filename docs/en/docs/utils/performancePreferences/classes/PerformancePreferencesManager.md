@@ -2,7 +2,7 @@
 
 # Class: PerformancePreferencesManager
 
-Defined in: [utils/performancePreferences.ts:37](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L37)
+Defined in: [utils/performancePreferences.ts:37](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/utils/performancePreferences.ts#L37)
 
 Performance Preferences Manager
 
@@ -12,7 +12,7 @@ Performance Preferences Manager
 
 > **new PerformancePreferencesManager**(): `PerformancePreferencesManager`
 
-Defined in: [utils/performancePreferences.ts:41](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L41)
+Defined in: [utils/performancePreferences.ts:41](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/utils/performancePreferences.ts#L41)
 
 #### Returns
 
@@ -24,7 +24,7 @@ Defined in: [utils/performancePreferences.ts:41](https://github.com/EdwinZhanCN/
 
 > **addListener**(`listener`): () => `void`
 
-Defined in: [utils/performancePreferences.ts:132](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L132)
+Defined in: [utils/performancePreferences.ts:132](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/utils/performancePreferences.ts#L132)
 
 Adds a listener for preference changes
 
@@ -48,7 +48,7 @@ Adds a listener for preference changes
 
 > **getBatchSizeMultiplier**(): `number`
 
-Defined in: [utils/performancePreferences.ts:64](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L64)
+Defined in: [utils/performancePreferences.ts:64](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/utils/performancePreferences.ts#L64)
 
 Gets batch size multiplier based on current profile
 
@@ -62,7 +62,7 @@ Gets batch size multiplier based on current profile
 
 > **getMaxConcurrentOperations**(): `number`
 
-Defined in: [utils/performancePreferences.ts:116](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L116)
+Defined in: [utils/performancePreferences.ts:116](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/utils/performancePreferences.ts#L116)
 
 Gets maximum concurrent operations allowed
 
@@ -76,7 +76,7 @@ Gets maximum concurrent operations allowed
 
 > **getMemoryConstraintMultiplier**(): `number`
 
-Defined in: [utils/performancePreferences.ts:87](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L87)
+Defined in: [utils/performancePreferences.ts:87](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/utils/performancePreferences.ts#L87)
 
 Gets memory constraint multiplier
 
@@ -90,7 +90,7 @@ Gets memory constraint multiplier
 
 > **getPreferences**(): [`PerformancePreferences`](../interfaces/PerformancePreferences.md)
 
-Defined in: [utils/performancePreferences.ts:48](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L48)
+Defined in: [utils/performancePreferences.ts:48](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/utils/performancePreferences.ts#L48)
 
 Gets current performance preferences
 
@@ -104,7 +104,7 @@ Gets current performance preferences
 
 > **resetToDefaults**(): `void`
 
-Defined in: [utils/performancePreferences.ts:123](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L123)
+Defined in: [utils/performancePreferences.ts:123](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/utils/performancePreferences.ts#L123)
 
 Resets preferences to defaults
 
@@ -118,7 +118,7 @@ Resets preferences to defaults
 
 > **shouldPrioritizeUserOperations**(): `boolean`
 
-Defined in: [utils/performancePreferences.ts:109](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L109)
+Defined in: [utils/performancePreferences.ts:109](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/utils/performancePreferences.ts#L109)
 
 Checks if priority operations should be enhanced
 
@@ -132,7 +132,7 @@ Checks if priority operations should be enhanced
 
 > **updatePreferences**(`updates`): `void`
 
-Defined in: [utils/performancePreferences.ts:55](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/utils/performancePreferences.ts#L55)
+Defined in: [utils/performancePreferences.ts:55](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/utils/performancePreferences.ts#L55)
 
 Updates performance preferences
 
