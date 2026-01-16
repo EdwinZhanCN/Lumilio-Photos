@@ -23,36 +23,41 @@ setup:
 	@echo "==> Setup complete"
 
 env-dev:
-	@echo "==> Writing $(SERVER_DIR)/.env.development"
 	@mkdir -p $(SERVER_DIR)/data/storage
-	@printf '%s\n' \
-	"SERVER_ENV=development" \
-	"SERVER_PORT=8080" \
-	"SERVER_LOG_LEVEL=debug" \
-	"" \
-	"DB_HOST=localhost" \
-	"DB_PORT=5433" \
-	"DB_USER=postgres" \
-	"DB_PASSWORD=postgres" \
-	"DB_NAME=lumiliophotos" \
-	"DB_SSL=disable" \
-	"" \
-	"STORAGE_PATH=./data/storage" \
-	"STORAGE_STRATEGY=date" \
-	"STORAGE_PRESERVE_FILENAME=true" \
-	"STORAGE_DUPLICATE_HANDLING=rename" \
-	"" \
-	"ML_CLIP_ENABLED=false" \
-	"ML_OCR_ENABLED=false" \
-	"ML_CAPTION_ENABLED=false" \
-	"ML_FACE_ENABLED=false" \
-	"" \
-	"LLM_AGENT_ENABLED=false" \
-	"LLM_PROVIDER=" \
-	"LLM_API_KEY=" \
-	"LLM_MODEL_NAME=" \
-	"LLM_BASE_URL=" \
-	> $(SERVER_DIR)/.env.development
+	@if [ ! -f $(SERVER_DIR)/.env.development ]; then \
+		echo "==> Creating $(SERVER_DIR)/.env.development"; \
+		printf '%s\n' \
+		"SERVER_ENV=development" \
+		"SERVER_PORT=8080" \
+		"SERVER_LOG_LEVEL=debug" \
+		"" \
+		"DB_HOST=localhost" \
+		"DB_PORT=5433" \
+		"DB_USER=postgres" \
+		"DB_PASSWORD=postgres" \
+		"DB_NAME=lumiliophotos" \
+		"DB_SSL=disable" \
+		"" \
+		"STORAGE_PATH=./data/storage" \
+		"STORAGE_STRATEGY=date" \
+		"STORAGE_PRESERVE_FILENAME=true" \
+		"STORAGE_DUPLICATE_HANDLING=rename" \
+		"" \
+		"ML_CLIP_ENABLED=false" \
+		"ML_OCR_ENABLED=false" \
+		"ML_CAPTION_ENABLED=false" \
+		"ML_FACE_ENABLED=false" \
+		"" \
+		"LLM_AGENT_ENABLED=false" \
+		"LLM_PROVIDER=" \
+		"LLM_API_KEY=" \
+		"LLM_MODEL_NAME=" \
+		"LLM_BASE_URL=" \
+		> $(SERVER_DIR)/.env.development; \
+		echo "==> Created $(SERVER_DIR)/.env.development"; \
+	else \
+		echo "==> $(SERVER_DIR)/.env.development already exists, skipping..."; \
+	fi
 	@echo "==> Created storage directory at $(SERVER_DIR)/data/storage"
 
 env-web-dev:
