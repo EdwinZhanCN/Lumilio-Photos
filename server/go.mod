@@ -19,6 +19,7 @@ require (
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/riverqueue/river v0.24.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.24.0
+	github.com/riverqueue/river/rivertype v0.24.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
@@ -67,7 +68,6 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/riverqueue/river/riverdriver v0.24.0 // indirect
 	github.com/riverqueue/river/rivershared v0.24.0 // indirect
-	github.com/riverqueue/river/rivertype v0.24.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect

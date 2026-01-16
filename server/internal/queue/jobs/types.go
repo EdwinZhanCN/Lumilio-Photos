@@ -31,8 +31,10 @@ func (AssetRetryPayload) Kind() string { return "retry_asset" }
 // InsertOpts implements JobArgsWithInsertOpts. Uniqueness is disabled to allow
 // multiple retry jobs per asset; processors must handle any dedupe logic.
 func (AssetRetryPayload) InsertOpts() river.InsertOpts {
-	// Uniqueness disabled so users can enqueue multiple retry jobs for the same asset.
-	return river.InsertOpts{}
+	// Uniqueness biased by the time period, to avoid duplicate retry jobs in quick succession.
+	return river.InsertOpts{UniqueOpts: river.UniqueOpts{
+		ByPeriod: 1 * time.Minute,
+	}}
 }
 
 // ProcessOcrArgs is the River job payload for OCR text extraction.
