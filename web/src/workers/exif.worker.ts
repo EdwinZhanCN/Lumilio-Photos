@@ -1,13 +1,13 @@
 import createExiv2Module, { type Exiv2Module } from "@/wasm/exiv2";
-
+import wasmUrl from "@/wasm/exiv2.wasm?url";
 let abortController = new AbortController();
 let exiv2ModulePromise: Promise<Exiv2Module> | null = null;
 
 const getExiv2Module = () => {
   if (!exiv2ModulePromise) {
     exiv2ModulePromise = createExiv2Module({
-      locateFile: (path: string) =>
-        new URL(`../wasm/${path}`, import.meta.url).href,
+      // 3. 这里的 path 参数无视掉，直接返回 Vite 给我们的正确 URL
+      locateFile: () => wasmUrl,
     });
   }
   return exiv2ModulePromise;
