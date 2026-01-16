@@ -72,7 +72,16 @@ type QueueControllerInterface interface {
 	GetJobStats(c *gin.Context)
 }
 
-func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface, queueController QueueControllerInterface) *gin.Engine {
+// StatsControllerInterface defines the interface for statistics controllers
+type StatsControllerInterface interface {
+	GetFocalLengthDistribution(c *gin.Context) // GET /stats/focal-length - Get focal length distribution
+	GetCameraLensStats(c *gin.Context)         // GET /stats/camera-lens - Get camera+lens combination stats
+	GetTimeDistribution(c *gin.Context)        // GET /stats/time-distribution - Get time distribution
+	GetDailyActivityHeatmap(c *gin.Context)    // GET /stats/daily-activity - Get daily activity heatmap
+	GetAvailableYears(c *gin.Context)          // GET /stats/available-years - Get available years
+}
+
+func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface, queueController QueueControllerInterface, statsController StatsControllerInterface) *gin.Engine {
 	r := gin.Default()
 
 	// Add CORS middleware
@@ -159,6 +168,17 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 				river.GET("/queues", queueController.ListQueues)
 				river.GET("/stats", queueController.GetJobStats)
 			}
+		}
+
+		// Stats routes - with optional authentication
+		stats := v1.Group("/stats")
+		stats.Use(authController.OptionalAuthMiddleware())
+		{
+			stats.GET("/focal-length", statsController.GetFocalLengthDistribution)
+			stats.GET("/camera-lens", statsController.GetCameraLensStats)
+			stats.GET("/time-distribution", statsController.GetTimeDistribution)
+			stats.GET("/daily-activity", statsController.GetDailyActivityHeatmap)
+			stats.GET("/available-years", statsController.GetAvailableYears)
 		}
 	}
 

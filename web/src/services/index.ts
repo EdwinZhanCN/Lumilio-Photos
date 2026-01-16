@@ -44,6 +44,19 @@ export {
 export * from "./healthService";
 export * from "./geoService";
 export * from "./justifiedLayoutService";
+export {
+  statsService,
+  type FocalLengthBucket,
+  type FocalLengthDistributionResponse,
+  type CameraLensCombination,
+  type CameraLensStatsResponse,
+  type TimeBucket,
+  type TimeDistributionResponse,
+  type TimeDistributionType,
+  type HeatmapValue,
+  type HeatmapResponse,
+  type AvailableYearsResponse,
+} from "./statsService";
 
 // Re-export health service functions
 export {

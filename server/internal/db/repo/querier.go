@@ -89,8 +89,14 @@ type Querier interface {
 	GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error)
 	GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErrorsParams) ([]Asset, error)
 	GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWarningsParams) ([]Asset, error)
+	// 获取所有有照片的年份列表
+	GetAvailableYears(ctx context.Context) ([]int32, error)
+	// 获取相机+镜头组合统计
+	GetCameraLensStats(ctx context.Context, limit int32) ([]GetCameraLensStatsRow, error)
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
 	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
+	// 获取每日拍摄活跃度热力图数据
+	GetDailyActivityHeatmap(ctx context.Context, arg GetDailyActivityHeatmapParams) ([]GetDailyActivityHeatmapRow, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
 	GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (Embedding, error)
@@ -109,6 +115,8 @@ type Querier interface {
 	GetFaceStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetFaceStatsByAssetRow, error)
 	GetFaceStatsByModel(ctx context.Context) ([]GetFaceStatsByModelRow, error)
 	GetFacesByExpression(ctx context.Context, arg GetFacesByExpressionParams) ([]FaceItem, error)
+	// 获取焦距分布统计
+	GetFocalLengthDistribution(ctx context.Context) ([]GetFocalLengthDistributionRow, error)
 	GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
@@ -136,6 +144,10 @@ type Querier interface {
 	GetThumbnailByAssetAndSize(ctx context.Context, arg GetThumbnailByAssetAndSizeParams) (Thumbnail, error)
 	GetThumbnailByID(ctx context.Context, thumbnailID int32) (Thumbnail, error)
 	GetThumbnailsByAsset(ctx context.Context, assetID pgtype.UUID) ([]Thumbnail, error)
+	// 获取按小时的拍摄时间分布
+	GetTimeDistributionHourly(ctx context.Context) ([]GetTimeDistributionHourlyRow, error)
+	// 获取按月的拍摄时间分布
+	GetTimeDistributionMonthly(ctx context.Context) ([]GetTimeDistributionMonthlyRow, error)
 	GetTopAIDescriptionsByTokens(ctx context.Context, limit int32) ([]AiDescription, error)
 	GetTopFacesByQuality(ctx context.Context, arg GetTopFacesByQualityParams) ([]FaceItem, error)
 	GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsParams) ([]Asset, error)
