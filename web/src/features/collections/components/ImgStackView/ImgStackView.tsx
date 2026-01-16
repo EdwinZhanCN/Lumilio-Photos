@@ -1,6 +1,12 @@
 import { GalleryVerticalEnd } from "lucide-react";
 
-function ImgStackView() {
+interface ImgStackViewProps {
+  coverImages?: string[];
+}
+
+function ImgStackView({ coverImages }: ImgStackViewProps) {
+  const hasCover = coverImages && coverImages.length > 0;
+
   return (
     <div className="group relative inline-block size-50">
       {/* Back card */}
@@ -15,7 +21,16 @@ function ImgStackView() {
         <div className="pointer-events-none absolute -left-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br from-primary/30 to-transparent blur-2xl opacity-70" />
         <div className="pointer-events-none absolute -right-8 -bottom-10 h-28 w-28 rounded-full bg-gradient-to-tr from-secondary/30 to-transparent blur-2xl opacity-70" />
 
-        <GalleryVerticalEnd className="size-10 text-base-content/80" />
+        {hasCover ? (
+          <img
+            src={coverImages[0]}
+            alt="Album cover"
+            className="size-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <GalleryVerticalEnd className="size-10 text-base-content/80" />
+        )}
 
         {/* Subtle floating animation on hover */}
         <div className="pointer-events-none absolute inset-0 transition-transform duration-300 ease-out group-hover:-translate-y-0.5" />
