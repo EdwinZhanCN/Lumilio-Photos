@@ -41,14 +41,12 @@ export function useAlbums(t: (key: string, options?: any) => string) {
       });
 
       const payload = response.data?.data;
+      const total = payload?.total ?? 0;
 
       return {
         albums: (payload?.albums ?? []).map((album) => mapAlbumToUI(album, t)),
-        total: payload?.total ?? 0,
-        nextOffset:
-          (payload?.albums?.length ?? 0) === PAGE_SIZE
-            ? pageParam + PAGE_SIZE
-            : null,
+        total,
+        nextOffset: pageParam + PAGE_SIZE < total ? pageParam + PAGE_SIZE : null,
       };
     },
     getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,

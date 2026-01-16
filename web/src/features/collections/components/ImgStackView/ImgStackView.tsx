@@ -2,9 +2,10 @@ import { GalleryVerticalEnd } from "lucide-react";
 
 interface ImgStackViewProps {
   coverImages?: string[];
+  albumName?: string;
 }
 
-function ImgStackView({ coverImages }: ImgStackViewProps) {
+function ImgStackView({ coverImages, albumName }: ImgStackViewProps) {
   const hasCover = coverImages && coverImages.length > 0;
 
   return (
@@ -24,7 +25,7 @@ function ImgStackView({ coverImages }: ImgStackViewProps) {
         {hasCover ? (
           <img
             src={coverImages[0]}
-            alt="Album cover"
+            alt={albumName ? `Cover image for ${albumName} album` : "Album cover image"}
             className="size-full object-cover"
             loading="lazy"
           />
