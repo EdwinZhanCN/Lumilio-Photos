@@ -5,7 +5,7 @@
 
 [![Go](https://img.shields.io/badge/Go-1.24-00ADD8?style=for-the-badge&logo=go)](https://go.dev/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=f5f5f5)](https://www.postgresql.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge&logo=gnu)](LICENSE)
 
 </div>
@@ -18,17 +18,18 @@
 ### Web
 [![React](https://img.shields.io/badge/React-19.0-61DAFB?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![Vite](https://img.shields.io/badge/Vite-6.1-646CFF?logo=vite)](https://vitejs.dev/)
+[![Vite](https://img.shields.io/badge/Vite-6.1-646CFF?logo=vite&logoColor=f5f5f5)](https://vitejs.dev/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.0-06B6D4?logo=tailwind-css)](https://tailwindcss.com/)
-[![Redux](https://img.shields.io/badge/Redux_Toolkit-2.6-764ABC?logo=redux)](https://redux-toolkit.js.org/)
+[![DaisyUI](https://img.shields.io/badge/DaisyUI-5.1-5A0EF8?logo=daisyui)](https://daisyui.com/)
 [![React Query](https://img.shields.io/badge/React_Query-5.74-FF4154?logo=tanstack)](https://tanstack.com/query/latest)
+[![Rust](https://img.shields.io/badge/Rust-1.82-000000?logo=rust)](https://www.rust-lang.org/)
+[![WebAssembly](https://img.shields.io/badge/WebAssembly-1.0-654FF0?logo=webassembly&logoColor=f5f5f5)](https://webassembly.org/)
 
 ### Server
 [![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go)](https://go.dev/)
 [![Gin](https://img.shields.io/badge/Gin-1.10-00ADD8?logo=gin)](https://gin-gonic.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql)](https://www.postgresql.org/)
-[![pgvector](https://img.shields.io/badge/pgvector-0.3-4169E1?logo=postgresql)](https://github.com/pgvector/pgvector)
-[![River](https://img.shields.io/badge/River-0.24-5D3F6A?logo=river)](https://riverqueue.com/)
+[![pgvector](https://img.shields.io/badge/pgvector-0.3-4169E1?logo=postgresql&logoColor=f5f5f5)](https://github.com/pgvector/pgvector)
+[![River](https://img.shields.io/badge/River-0.24-5D3F6A?logo=riverqueue)](https://riverqueue.com/)
 [![LibRaw](https://img.shields.io/badge/LibRaw-0.20-FF5722?logo=libraw)](https://www.libraw.org/)
 
 ## Quick Start

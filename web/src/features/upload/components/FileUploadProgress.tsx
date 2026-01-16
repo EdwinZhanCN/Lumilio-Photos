@@ -1,102 +1,167 @@
-import React from 'react';
-import type { FileUploadProgress } from '@/hooks/api-hooks/useUploadProcess';
+import React from "react";
+import type { FileUploadProgress } from "@/hooks/api-hooks/useUploadProcess";
+import {
+  CheckCircleIcon,
+  XCircleIcon,
+  ArrowPathIcon,
+  ClockIcon,
+} from "@heroicons/react/24/outline";
 
 interface FileUploadProgressProps {
   fileProgress: FileUploadProgress[];
 }
 
-const FileUploadProgress: React.FC<FileUploadProgressProps> = ({ fileProgress }) => {
+const FileUploadProgress: React.FC<FileUploadProgressProps> = ({
+  fileProgress,
+}) => {
   if (fileProgress.length === 0) {
     return null;
   }
 
-  const getStatusColor = (status: FileUploadProgress['status']) => {
+  const getStatusColor = (status: FileUploadProgress["status"]) => {
     switch (status) {
-      case 'completed':
-        return 'text-success';
-      case 'uploading':
-        return 'text-primary';
-      case 'failed':
-        return 'text-error';
-      case 'pending':
+      case "completed":
+        return "text-success";
+      case "uploading":
+        return "text-primary";
+      case "failed":
+        return "text-error";
+      case "pending":
       default:
-        return 'text-base-content/70';
+        return "text-base-content/50";
     }
   };
 
-  const getStatusIcon = (status: FileUploadProgress['status']) => {
+  const getStatusIcon = (status: FileUploadProgress["status"]) => {
     switch (status) {
-      case 'completed':
-        return '✓';
-      case 'uploading':
-        return '↻';
-      case 'failed':
-        return '✗';
-      case 'pending':
+      case "completed":
+        return <CheckCircleIcon className="w-5 h-5 text-success" />;
+      case "uploading":
+        return <ArrowPathIcon className="w-5 h-5 text-primary animate-spin" />;
+      case "failed":
+        return <XCircleIcon className="w-5 h-5 text-error" />;
+      case "pending":
       default:
-        return '⋯';
+        return <ClockIcon className="w-5 h-5 text-base-content/50" />;
     }
   };
 
-  const getProgressBarColor = (status: FileUploadProgress['status']) => {
+  const getProgressBarColor = (status: FileUploadProgress["status"]) => {
     switch (status) {
-      case 'completed':
-        return 'progress-success';
-      case 'uploading':
-        return 'progress-primary';
-      case 'failed':
-        return 'progress-error';
-      case 'pending':
+      case "completed":
+        return "progress-success";
+      case "uploading":
+        return "progress-primary";
+      case "failed":
+        return "progress-error";
+      case "pending":
       default:
-        return 'progress-base-300';
+        return "progress-base-300";
+    }
+  };
+
+  const getStatusText = (status: FileUploadProgress["status"]) => {
+    switch (status) {
+      case "completed":
+        return "Completed";
+      case "uploading":
+        return "Uploading";
+      case "failed":
+        return "Failed";
+      case "pending":
+      default:
+        return "Pending";
     }
   };
 
   return (
-    <div className="mt-6 p-4 bg-base-200 rounded-lg">
-      <h3 className="font-semibold mb-3">Upload Progress</h3>
-      <div className="space-y-3 max-h-80 overflow-y-auto">
-        {fileProgress.map((file, index) => (
-          <div key={index} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <span className={`text-sm font-medium ${getStatusColor(file.status)}`}>
-                  {getStatusIcon(file.status)}
-                </span>
-                <span className="text-sm truncate flex-1" title={file.fileName}>
-                  {file.fileName}
-                </span>
-                {file.isChunked && (
-                  <span className="text-xs text-base-content/50 bg-base-300 px-2 py-1 rounded">
-                    chunked
-                  </span>
-                )}
-              </div>
-              <span className="text-sm text-base-content/70 ml-2 whitespace-nowrap">
-                {file.progress.toFixed(0)}%
-              </span>
-            </div>
+    <div className="card bg-base-200 shadow-lg">
+      <div className="card-body p-4">
+        <h3 className="card-title text-base mb-2">
+          Upload Progress
+          <div className="badge badge-primary badge-sm">
+            {fileProgress.length}
+          </div>
+        </h3>
 
-            <div className="flex items-center gap-2">
+        <div className="space-y-3 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+          {fileProgress.map((file, index) => (
+            <div
+              key={index}
+              className="p-3 bg-base-100 rounded-lg hover:bg-base-300/50 transition-colors"
+            >
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-2">
+                {/* Status Icon */}
+                <div className="flex-shrink-0">
+                  {getStatusIcon(file.status)}
+                </div>
+
+                {/* File Info */}
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-sm font-medium truncate"
+                    title={file.fileName}
+                  >
+                    {file.fileName}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-xs ${getStatusColor(file.status)}`}>
+                      {getStatusText(file.status)}
+                    </span>
+                    {file.isChunked && (
+                      <span className="badge badge-xs badge-outline">
+                        Chunked
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Progress Percentage */}
+                <div className="flex-shrink-0">
+                  <div
+                    className={`text-sm font-bold ${getStatusColor(file.status)}`}
+                  >
+                    {file.progress.toFixed(0)}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
               <progress
-                className={`progress w-full ${getProgressBarColor(file.status)}`}
+                className={`progress w-full h-2 ${getProgressBarColor(file.status)}`}
                 value={file.progress}
                 max="100"
               />
+
+              {/* Error Message */}
+              {file.error && (
+                <div className="mt-2 alert alert-error py-2 px-3">
+                  <XCircleIcon className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs">{file.error}</span>
+                </div>
+              )}
             </div>
-
-            {file.error && (
-              <div className="text-xs text-error bg-error/10 px-2 py-1 rounded">
-                {file.error}
-              </div>
-            )}
-
-            {index < fileProgress.length - 1 && (
-              <div className="border-t border-base-300 pt-2" />
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+
+      {/* Custom scrollbar styles */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: hsl(var(--bc) / 0.2);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: hsl(var(--bc) / 0.3);
+        }
+      `}</style>
     </div>
   );
 };

@@ -64,7 +64,15 @@ type AlbumControllerInterface interface {
 	GetAssetAlbums(c *gin.Context)
 }
 
-func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface) *gin.Engine {
+// QueueControllerInterface defines the interface for queue monitoring controllers
+type QueueControllerInterface interface {
+	ListJobs(c *gin.Context)
+	GetJob(c *gin.Context)
+	ListQueues(c *gin.Context)
+	GetJobStats(c *gin.Context)
+}
+
+func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface, queueController QueueControllerInterface) *gin.Engine {
 	r := gin.Default()
 
 	// Add CORS middleware
@@ -138,6 +146,19 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			albums.POST("/:id/assets/:assetId", albumController.AddAssetToAlbum)
 			albums.DELETE("/:id/assets/:assetId", albumController.RemoveAssetFromAlbum)
 			albums.PUT("/:id/assets/:assetId/position", albumController.UpdateAssetPositionInAlbum)
+		}
+
+		// Admin routes for queue monitoring (read-only)
+		admin := v1.Group("/admin")
+		admin.Use(authController.OptionalAuthMiddleware())
+		{
+			river := admin.Group("/river")
+			{
+				river.GET("/jobs", queueController.ListJobs)
+				river.GET("/jobs/:id", queueController.GetJob)
+				river.GET("/queues", queueController.ListQueues)
+				river.GET("/stats", queueController.GetJobStats)
+			}
 		}
 	}
 

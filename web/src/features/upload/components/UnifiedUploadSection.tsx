@@ -1,12 +1,24 @@
-import React, { useRef, useEffect, ChangeEvent } from "react";
+import React, { useRef, useEffect, ChangeEvent, useState } from "react";
 import FileDropZone from "./FileDropZone";
 import ProgressIndicator from "./ProgressIndicator";
 import ImagePreviewGrid from "./ImagePreviewGrid";
 import FileUploadProgress from "./FileUploadProgress";
+
 import { useUploadContext } from "@/features/upload";
-import ValidateFile from "@/lib/utils/validate-file.ts";
-import { acceptFileExtensions } from "@/lib/utils/accept-file-extensions.ts";
+import {
+  validateFile,
+  getValidationErrorMessage,
+} from "@/lib/utils/validate-file.ts";
+import { getAcceptString } from "@/lib/utils/accept-file-extensions.ts";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
+import {
+  ArrowUpTrayIcon,
+  XMarkIcon,
+  InformationCircleIcon,
+  FolderPlusIcon,
+  EyeIcon,
+  EyeSlashIcon,
+} from "@heroicons/react/24/outline";
 
 function UnifiedUploadSection(): React.JSX.Element {
   const {
@@ -31,6 +43,9 @@ function UnifiedUploadSection(): React.JSX.Element {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Preview toggle state
+  const [previewEnabled, setPreviewEnabled] = useState(true);
+
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -51,11 +66,12 @@ function UnifiedUploadSection(): React.JSX.Element {
     }
 
     const validFiles = Array.from(selectedFiles).filter((file) => {
-      const isValid = ValidateFile(file);
-      if (!isValid) {
-        showMessage("error", `Invalid file: ${file.name}`);
+      const result = validateFile(file);
+      if (!result.valid) {
+        const errorMsg = getValidationErrorMessage(result);
+        showMessage("error", `${file.name}: ${errorMsg}`);
       }
-      return isValid;
+      return result.valid;
     });
 
     if (validFiles.length === 0) {
@@ -63,7 +79,8 @@ function UnifiedUploadSection(): React.JSX.Element {
       return;
     }
 
-    await addFiles(validFiles, shouldGeneratePreviews);
+    // Only generate previews if preview is enabled
+    await addFiles(validFiles, shouldGeneratePreviews && previewEnabled);
   };
 
   const handleClear = () => {
@@ -86,47 +103,67 @@ function UnifiedUploadSection(): React.JSX.Element {
   };
 
   return (
-    <section id="unified-upload-section" className="max-w-3xl mx-auto">
-      <h2 className="text-2xl font-semibold mb-4">Upload Assets</h2>
+    <section
+      id="unified-upload-section"
+      className="container mx-auto px-4 py-8 max-w-5xl"
+    >
+      {/* Main Drop Zone with integrated info */}
+      <div className="relative">
+        <FileDropZone
+          fileInputRef={fileInputRef}
+          onFilesDropped={(files) => handleFiles(files, true)}
+        >
+          <div className="space-y-4">
+            <ArrowUpTrayIcon className="mx-auto h-16 w-16 text-base-content/30" />
+            <div>
+              <p className="text-xl font-medium text-base-content/80">
+                Drag & Drop or Click to Upload
+              </p>
+              <p className="text-sm text-base-content/50 mt-2">
+                Supports images, RAW formats, videos, and audio files
+              </p>
+            </div>
+          </div>
+        </FileDropZone>
 
-      <div className="mb-6 p-4 bg-base-200 rounded-lg">
-        <div className="space-y-2 text-sm">
-          <p>
-            <span className="font-semibold">Total files:</span> {fileCount} /{" "}
-            {maxTotalFiles}
-          </p>
-          <p>
-            <span className="font-semibold">Files with previews:</span>{" "}
-            {previewCount} / {maxPreviewCount}
-          </p>
-          <p className="text-base-content/70">
-            The first {maxPreviewCount} files will have thumbnail previews
-            generated. You can change these limits in Settings → UI Settings.
-          </p>
+        {/* Info Button (Tooltip) */}
+        <div className="absolute top-4 right-4">
+          <div className="dropdown dropdown-end">
+            <label tabIndex={0} className="btn btn-circle btn-ghost btn-sm">
+              <InformationCircleIcon className="w-5 h-5" />
+            </label>
+            <div
+              tabIndex={0}
+              className="dropdown-content z-10 card card-compact w-80 p-4 shadow-lg bg-base-200 text-base-content"
+            >
+              <div className="space-y-2 text-sm">
+                <h3 className="font-semibold text-base">Upload Information</h3>
+                <p>
+                  <span className="font-medium">Max files:</span>{" "}
+                  {maxTotalFiles}
+                </p>
+                <p>
+                  <span className="font-medium">Preview limit:</span>{" "}
+                  {maxPreviewCount} files
+                </p>
+                <p className="text-base-content/70 text-xs mt-2">
+                  The first {maxPreviewCount} files will have thumbnail previews
+                  generated when preview is enabled. Change limits in Settings →
+                  UI Settings.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-        <progress
-          className="progress progress-primary w-full mt-3"
-          value={fileCount}
-          max={maxTotalFiles}
-        />
       </div>
 
-      {/* Drop Zone */}
-      <FileDropZone
-        fileInputRef={fileInputRef}
-        onFilesDropped={(files) => handleFiles(files, true)}
-      >
-        <p className="font-medium">Drag or Click Here to Upload</p>
-        <p className="text-sm">Supports JPEG, PNG, RAW, Video, and more</p>
-      </FileDropZone>
-
-      {/* Click Zone */}
+      {/* Hidden file input */}
       <input
         type="file"
         ref={fileInputRef}
         className="hidden"
         multiple
-        accept={`image/*,video/*,${acceptFileExtensions.join(",")}`}
+        accept={getAcceptString()}
         onChange={(e: ChangeEvent<HTMLInputElement>) => {
           if (e.target.files) {
             handleFiles(e.target.files, true);
@@ -135,127 +172,200 @@ function UnifiedUploadSection(): React.JSX.Element {
         }}
       />
 
-      {/* Quick upload buttons */}
-      <div className="flex gap-4 mb-6">
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="btn btn-outline btn-sm"
-          disabled={isProcessing || fileCount >= maxTotalFiles}
-        >
-          Add More Files
-        </button>
-        <button
-          onClick={() => {
-            const input = document.createElement("input");
-            input.type = "file";
-            input.multiple = true;
-            input.accept = `image/*,video/*,${acceptFileExtensions.join(",")}`;
-            input.onchange = (e) => {
-              const target = e.target as HTMLInputElement;
-              if (target.files) {
-                handleFiles(target.files, false); // Don't generate previews
-              }
-            };
-            input.click();
-          }}
-          className="btn btn-outline btn-sm"
-          disabled={isProcessing || fileCount >= maxTotalFiles}
-        >
-          Add Files (No Preview)
-        </button>
+      {/* Control Bar */}
+      <div className="flex items-center justify-between gap-4 mt-6">
+        {/* Left side - Add Files & Preview Toggle */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="btn btn-outline btn-sm gap-2"
+            disabled={isProcessing || fileCount >= maxTotalFiles}
+          >
+            <FolderPlusIcon className="w-4 h-4" />
+            Add Files
+          </button>
+
+          {/* Preview Toggle */}
+          <div className="form-control">
+            <label className="label cursor-pointer gap-2">
+              <span className="label-text text-sm">Preview</span>
+              <input
+                type="checkbox"
+                className="toggle toggle-sm toggle-primary"
+                checked={previewEnabled}
+                onChange={(e) => setPreviewEnabled(e.target.checked)}
+                disabled={isProcessing}
+              />
+              {previewEnabled ? (
+                <EyeIcon className="w-4 h-4 text-primary" />
+              ) : (
+                <EyeSlashIcon className="w-4 h-4 text-base-content/40" />
+              )}
+            </label>
+          </div>
+        </div>
+
+        {/* Right side - Action Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleClear}
+            disabled={fileCount === 0 || isProcessing}
+            className="btn btn-ghost btn-sm gap-2"
+          >
+            <XMarkIcon className="w-4 h-4" />
+            Clear
+          </button>
+          <button
+            onClick={handleUpload}
+            className="btn btn-primary btn-sm gap-2"
+            disabled={fileCount === 0 || isProcessing}
+          >
+            <ArrowUpTrayIcon className="w-4 h-4" />
+            {isProcessing
+              ? "Uploading..."
+              : `Upload ${fileCount > 0 ? `(${fileCount})` : ""}`}
+          </button>
+        </div>
       </div>
 
       {/* Preview generation progress */}
       {isGeneratingPreviews && previewProgress && (
-        <div className="mb-6">
-          <div className="flex items-center gap-4">
+        <div className="mt-6 alert alert-info">
+          <div className="flex items-center gap-4 w-full">
+            <span className="loading loading-spinner loading-sm" />
             <ProgressIndicator
               processed={previewProgress.numberProcessed}
               total={previewProgress.total}
               label="Generating thumbnails"
             />
-            <span className="loading loading-dots loading-md" />
           </div>
         </div>
       )}
 
-      {/* Preview Grid */}
-      {previews.length > 0 && (
-        <>
-          <h3 className="text-lg font-semibold mb-3">Preview</h3>
+      {/* Preview Grid - Only show if preview is enabled and has previews */}
+      {previewEnabled && previews.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-sm font-semibold mb-3 text-base-content/70">
+            Preview ({previewCount} of {fileCount})
+          </h3>
           <ImagePreviewGrid previews={previews} />
-        </>
+        </div>
       )}
 
-      {/* File List */}
+      {/* File List - Floating Card Style */}
       {fileCount > 0 && (
-        <div className="mt-6 p-4 bg-base-200 rounded-lg">
-          <h3 className="font-semibold mb-3">Selected Files ({fileCount})</h3>
-          <div className="space-y-1 max-h-60 overflow-y-auto">
-            {files.slice(0, 10).map((file, index) => (
-              <div
-                key={index}
-                className="text-sm flex justify-between items-center"
-              >
-                <span className="truncate flex-1">{file.name}</span>
-                <span className="text-base-content/70 ml-2">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                  {previews[index] && " (preview)"}
-                </span>
+        <div className="mt-6">
+          <div className="card bg-base-200 shadow-xl">
+            <div className="card-body p-4">
+              <h3 className="card-title text-base">
+                Selected Files
+                <div className="badge badge-primary badge-sm">{fileCount}</div>
+              </h3>
+
+              {/* Progress bar */}
+              <progress
+                className="progress progress-primary w-full h-1"
+                value={fileCount}
+                max={maxTotalFiles}
+              />
+
+              {/* File list with smooth scrolling */}
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+                {files.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-base-100 rounded-lg hover:bg-base-300 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {/* File icon/preview indicator */}
+                      <div className="avatar placeholder">
+                        <div className="bg-neutral text-neutral-content rounded w-10 h-10">
+                          {previews[index] ? (
+                            <img
+                              src={previews[index]!}
+                              alt=""
+                              className="w-full h-full object-cover rounded"
+                            />
+                          ) : (
+                            <span className="text-xs">
+                              {file.name
+                                .split(".")
+                                .pop()
+                                ?.toUpperCase()
+                                .slice(0, 3)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* File info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-base-content/60">
+                          {(file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Status indicator */}
+                    {previews[index] && previewEnabled && (
+                      <div className="badge badge-success badge-sm gap-1">
+                        <EyeIcon className="w-3 h-3" />
+                        Preview
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-            {fileCount > 10 && (
-              <div className="text-sm text-base-content/70 pt-2 border-t border-base-300">
-                ... and {fileCount - 10} more files
-              </div>
-            )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Individual File Upload Progress */}
       {fileProgress.length > 0 && (
-        <FileUploadProgress fileProgress={fileProgress} />
+        <div className="mt-6">
+          <FileUploadProgress fileProgress={fileProgress} />
+        </div>
       )}
 
       {/* Overall Upload Progress */}
       {uploadProgress > 0 && (
-        <div className="mt-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-sm font-medium">Overall Progress:</span>
-            <span className="text-sm text-base-content/70">
-              {uploadProgress.toFixed(1)}%
-            </span>
+        <div className="mt-6 card bg-base-200 shadow-lg">
+          <div className="card-body p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Overall Progress</span>
+              <span className="text-sm font-bold text-primary">
+                {uploadProgress.toFixed(1)}%
+              </span>
+            </div>
+            <progress
+              className="progress progress-primary w-full"
+              value={uploadProgress}
+              max="100"
+            />
           </div>
-          <progress
-            className="progress progress-success w-full"
-            value={uploadProgress}
-            max="100"
-          >
-            {uploadProgress}%
-          </progress>
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="flex justify-end gap-4 mt-6">
-        <button
-          onClick={handleClear}
-          disabled={fileCount === 0 || isProcessing}
-          className="btn btn-ghost"
-        >
-          Clear All
-        </button>
-        <button
-          onClick={handleUpload}
-          className="btn btn-primary"
-          disabled={fileCount === 0 || isProcessing}
-        >
-          {isProcessing
-            ? "Processing..."
-            : `Upload ${fileCount} File${fileCount !== 1 ? "s" : ""}`}
-        </button>
-      </div>
+      {/* Custom scrollbar styles */}
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: hsl(var(--bc) / 0.2);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: hsl(var(--bc) / 0.3);
+        }
+      `}</style>
     </section>
   );
 }
