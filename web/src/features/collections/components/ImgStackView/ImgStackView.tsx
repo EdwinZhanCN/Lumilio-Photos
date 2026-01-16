@@ -1,4 +1,5 @@
 import { GalleryVerticalEnd } from "lucide-react";
+import { useState } from "react";
 
 interface ImgStackViewProps {
   coverImages?: string[];
@@ -7,6 +8,7 @@ interface ImgStackViewProps {
 
 function ImgStackView({ coverImages, albumName }: ImgStackViewProps) {
   const hasCover = coverImages && coverImages.length > 0;
+  const [imageError, setImageError] = useState(false);
 
   return (
     <div className="group relative inline-block size-50">
@@ -22,12 +24,13 @@ function ImgStackView({ coverImages, albumName }: ImgStackViewProps) {
         <div className="pointer-events-none absolute -left-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br from-primary/30 to-transparent blur-2xl opacity-70" />
         <div className="pointer-events-none absolute -right-8 -bottom-10 h-28 w-28 rounded-full bg-gradient-to-tr from-secondary/30 to-transparent blur-2xl opacity-70" />
 
-        {hasCover ? (
+        {hasCover && !imageError ? (
           <img
             src={coverImages[0]}
             alt={albumName ? `Cover image for ${albumName} album` : "Album cover image"}
             className="size-full object-cover"
             loading="lazy"
+            onError={() => setImageError(true)}
           />
         ) : (
           <GalleryVerticalEnd className="size-10 text-base-content/80" />
