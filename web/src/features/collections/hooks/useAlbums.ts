@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { albumService } from "@/services/albumService";
+import { albumService, Album as AlbumDTO } from "@/services/albumService";
 import { assetService } from "@/services/assetsService";
 import type { Album as ImgStackAlbum } from "../components/ImgStackGrid/ImgStackGrid";
 
@@ -9,7 +9,7 @@ const PAGE_SIZE = 60;
  * Maps a backend album DTO to the ImgStackGrid Album interface
  */
 export const mapAlbumToUI = (
-  album: any,
+  album: AlbumDTO,
   t: (key: string, options?: any) => string
 ): ImgStackAlbum => {
   return {
