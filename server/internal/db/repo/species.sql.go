@@ -14,7 +14,7 @@ import (
 const createSpeciesPrediction = `-- name: CreateSpeciesPrediction :one
 INSERT INTO species_predictions (asset_id, label, score)
 VALUES ($1, $2, $3)
-RETURNING asset_id, label, score
+RETURNING prediction_id, asset_id, label, score, created_at
 `
 
 type CreateSpeciesPredictionParams struct {
@@ -26,7 +26,13 @@ type CreateSpeciesPredictionParams struct {
 func (q *Queries) CreateSpeciesPrediction(ctx context.Context, arg CreateSpeciesPredictionParams) (SpeciesPrediction, error) {
 	row := q.db.QueryRow(ctx, createSpeciesPrediction, arg.AssetID, arg.Label, arg.Score)
 	var i SpeciesPrediction
-	err := row.Scan(&i.AssetID, &i.Label, &i.Score)
+	err := row.Scan(
+		&i.PredictionID,
+		&i.AssetID,
+		&i.Label,
+		&i.Score,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 
@@ -40,7 +46,7 @@ func (q *Queries) DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID p
 }
 
 const getSpeciesPredictionsByAsset = `-- name: GetSpeciesPredictionsByAsset :many
-SELECT asset_id, label, score FROM species_predictions
+SELECT prediction_id, asset_id, label, score, created_at FROM species_predictions
 WHERE asset_id = $1
 ORDER BY score DESC
 `
@@ -54,7 +60,13 @@ func (q *Queries) GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgty
 	var items []SpeciesPrediction
 	for rows.Next() {
 		var i SpeciesPrediction
-		if err := rows.Scan(&i.AssetID, &i.Label, &i.Score); err != nil {
+		if err := rows.Scan(
+			&i.PredictionID,
+			&i.AssetID,
+			&i.Label,
+			&i.Score,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -66,7 +78,7 @@ func (q *Queries) GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgty
 }
 
 const getSpeciesPredictionsByLabel = `-- name: GetSpeciesPredictionsByLabel :many
-SELECT asset_id, label, score FROM species_predictions
+SELECT prediction_id, asset_id, label, score, created_at FROM species_predictions
 WHERE label = $1
 ORDER BY score DESC
 LIMIT $2 OFFSET $3
@@ -87,7 +99,13 @@ func (q *Queries) GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeci
 	var items []SpeciesPrediction
 	for rows.Next() {
 		var i SpeciesPrediction
-		if err := rows.Scan(&i.AssetID, &i.Label, &i.Score); err != nil {
+		if err := rows.Scan(
+			&i.PredictionID,
+			&i.AssetID,
+			&i.Label,
+			&i.Score,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -120,7 +138,7 @@ func (q *Queries) GetSpeciesStats(ctx context.Context) (GetSpeciesStatsRow, erro
 }
 
 const getTopSpeciesForAsset = `-- name: GetTopSpeciesForAsset :many
-SELECT asset_id, label, score FROM species_predictions
+SELECT prediction_id, asset_id, label, score, created_at FROM species_predictions
 WHERE asset_id = $1 AND score >= $2
 ORDER BY score DESC
 LIMIT $3
@@ -141,7 +159,13 @@ func (q *Queries) GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesFo
 	var items []SpeciesPrediction
 	for rows.Next() {
 		var i SpeciesPrediction
-		if err := rows.Scan(&i.AssetID, &i.Label, &i.Score); err != nil {
+		if err := rows.Scan(
+			&i.PredictionID,
+			&i.AssetID,
+			&i.Label,
+			&i.Score,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
