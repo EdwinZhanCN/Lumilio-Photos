@@ -4,7 +4,7 @@
 
 > **useUploadProcess**(): [`useUploadProcessReturn`](../interfaces/useUploadProcessReturn.md)
 
-Defined in: [hooks/api-hooks/useUploadProcess.tsx:54](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/a7aef6035d4ec85d126436b63a0810fa5cfd946b/web/src/hooks/api-hooks/useUploadProcess.tsx#L54)
+Defined in: [hooks/api-hooks/useUploadProcess.tsx:54](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/96695ff97a9c30bb49d2a37326e8e3aec3dc4c19/web/src/hooks/api-hooks/useUploadProcess.tsx#L54)
 
 Custom hook for handling file upload process with individual file progress tracking.
 
