@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/riverqueue/river"
 
 	"server/internal/db/dbtypes"
 )
@@ -26,6 +27,13 @@ type AssetRetryPayload struct {
 }
 
 func (AssetRetryPayload) Kind() string { return "retry_asset" }
+
+// InsertOpts implements JobArgsWithInsertOpts. Uniqueness is disabled to allow
+// multiple retry jobs per asset; processors must handle any dedupe logic.
+func (AssetRetryPayload) InsertOpts() river.InsertOpts {
+	// Uniqueness disabled so users can enqueue multiple retry jobs for the same asset.
+	return river.InsertOpts{}
+}
 
 // ProcessOcrArgs is the River job payload for OCR text extraction.
 // Duplicated here (instead of importing processors) to avoid import cycles.

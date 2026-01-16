@@ -7,13 +7,208 @@ import (
 	"strings"
 )
 
+// Field priority definitions
+// Higher priority fields are checked first
+var (
+	// TakenTime priority fields - from most specific to most generic
+	takenTimeFields = []string{
+		"DateTimeOriginal",       // Original capture time - highest priority
+		"CreateDate",             // File creation time
+		"DateTime",               // General datetime
+		"ModifyDate",             // Last modification time
+		"FileModifyDate",         // File system modification time
+		"DateTimeDigitized",      // Digitization time
+		"SubSecDateTimeOriginal", // High precision original time
+		"GPSDateTime",            // GPS timestamp
+	}
+
+	// CameraModel priority fields - from specific to generic
+	cameraModelFields = []string{
+		"Model",             // Standard camera model field
+		"CameraModelName",   // More specific model name
+		"UniqueCameraModel", // Unique model identifier
+	}
+
+	// LensModel priority fields
+	lensModelFields = []string{
+		"LensModel", // Standard lens model
+		"LensID",    // Lens identifier
+		"LensInfo",  // Lens information
+		"LensType",  // Lens type
+		"Lens",      // Generic lens field
+	}
+
+	// ExposureTime priority fields
+	exposureTimeFields = []string{
+		"ExposureTime",      // Direct exposure time
+		"ShutterSpeedValue", // Shutter speed value
+		"ShutterSpeed",      // Generic shutter speed
+	}
+
+	// FNumber priority fields
+	fNumberFields = []string{
+		"FNumber",       // Standard f-number
+		"Aperture",      // Generic aperture
+		"ApertureValue", // Aperture value
+	}
+
+	// ISO priority fields
+	isoFields = []string{
+		"ISO",                      // Standard ISO
+		"ISOSpeedRatings",          // ISO speed ratings
+		"RecommendedExposureIndex", // Recommended exposure index
+	}
+
+	// FocalLength priority fields
+	focalLengthFields = []string{
+		"FocalLength",             // Standard focal length
+		"FocalLengthIn35mmFilm",   // 35mm equivalent
+		"FocalLengthIn35mmFormat", // 35mm format equivalent
+	}
+
+	// Description priority fields
+	descriptionFields = []string{
+		"ImageDescription", // Specific image description
+		"UserComment",      // User comment
+		"XPComment",        // Windows XP comment
+		"Caption",          // Caption field
+		"Description",      // Generic description
+	}
+
+	// Exposure bias priority fields
+	exposureBiasFields = []string{
+		"ExposureCompensation", // Exposure compensation
+	}
+
+	// Codec priority fields for videos
+	videoCodecFields = []string{
+		"VideoCodec",   // Video-specific codec
+		"CompressorID", // Compressor identifier
+		"AudioCodec",   // Audio codec (fallback)
+		"VideoFormat",  // Video format
+	}
+
+	// Bitrate priority fields for videos
+	videoBitrateFields = []string{
+		"VideoBitrate",   // Video-specific bitrate
+		"Bitrate",        // General bitrate
+		"AudioBitrate",   // Audio bitrate (fallback)
+		"OverallBitrate", // Overall bitrate
+	}
+
+	// FrameRate priority fields
+	frameRateFields = []string{
+		"VideoFrameRate",   // Video-specific frame rate
+		"FrameRate",        // General frame rate
+		"NominalFrameRate", // Nominal frame rate
+	}
+
+	// RecordedTime priority fields for videos
+	recordedTimeFields = []string{
+		"CreateDate",        // Creation date
+		"DateTimeOriginal",  // Original datetime
+		"MediaCreateDate",   // Media creation date
+		"TrackCreateDate",   // Track creation date
+		"ModifyDate",        // Modification date
+		"FileModifyDate",    // File system modification date
+		"DateTimeDigitized", // Digitization date
+	}
+
+	// VideoCameraModel priority fields
+	videoCameraModelFields = []string{
+		"Model",           // Standard model
+		"Make",            // Make of the device
+		"CameraModelName", // Camera model name
+		"RecorderModel",   // Recorder model (for videos)
+	}
+
+	// VideoDescription priority fields
+	videoDescriptionFields = []string{
+		"Description", // Generic description
+		"Comment",     // Comment
+		"Title",       // Title
+		"Synopsis",    // Synopsis
+	}
+
+	// AudioCodec priority fields
+	audioCodecFields = []string{
+		"AudioCodec",        // Standard audio codec
+		"AudioFormat",       // Audio format
+		"FileTypeExtension", // File extension
+		"AudioEncoding",     // Audio encoding
+	}
+
+	// AudioBitrate priority fields
+	audioBitrateFields = []string{
+		"AudioBitrate",   // Audio-specific bitrate
+		"Bitrate",        // General bitrate
+		"NominalBitrate", // Nominal bitrate
+	}
+
+	// SampleRate priority fields
+	sampleRateFields = []string{
+		"SampleRate",      // Standard sample rate
+		"AudioSampleRate", // Audio-specific sample rate
+		"SamplingRate",    // Generic sampling rate
+	}
+
+	// Channels priority fields
+	channelsFields = []string{
+		"AudioChannels", // Audio-specific channels
+		"Channels",      // General channels
+		"ChannelCount",  // Channel count
+	}
+
+	// Artist priority fields
+	artistFields = []string{
+		"Artist",      // Standard artist field
+		"AlbumArtist", // Album artist
+		"Performer",   // Performer
+		"Author",      // Author
+	}
+
+	// Album priority fields
+	albumFields = []string{
+		"Album",      // Standard album
+		"AlbumTitle", // Album title
+	}
+
+	// Title priority fields for audio
+	audioTitleFields = []string{
+		"Title",      // Standard title
+		"SongTitle",  // Song title
+		"TrackTitle", // Track title
+	}
+
+	// Genre priority fields
+	genreFields = []string{
+		"Genre",       // Standard genre
+		"ContentType", // Content type
+	}
+
+	// Year priority fields
+	yearFields = []string{
+		"Year",          // Standard year
+		"Date",          // Date field
+		"ReleaseDate",   // Release date
+		"RecordingDate", // Recording date
+	}
+
+	// AudioDescription priority fields
+	audioDescriptionFields = []string{
+		"Comment",     // Comment
+		"Description", // Description
+		"Lyrics",      // Lyrics
+		"Synopsis",    // Synopsis
+	}
+)
+
 // parsePhotoMetadata parses raw EXIF data into PhotoSpecificMetadata
 func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadata {
-
 	metadata := &dbtypes.PhotoSpecificMetadata{}
 
-	// Parse TakenTime from various datetime fields with expanded fallback options
-	for _, field := range []string{"DateTimeOriginal", "CreateDate", "DateTime", "ModifyDate", "FileModifyDate", "DateTimeDigitized", "SubSecDateTimeOriginal", "GPSDateTime"} {
+	// Parse TakenTime using priority-based field list
+	for _, field := range takenTimeFields {
 		if dateStr, exists := rawData[field]; exists && dateStr != "" {
 			if parsedTime, err := parseDateTime(dateStr); err == nil {
 				metadata.TakenTime = &parsedTime
@@ -22,8 +217,8 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse CameraModel
-	for _, field := range []string{"Model", "CameraModelName", "UniqueCameraModel"} {
+	// Parse CameraModel using priority-based field list
+	for _, field := range cameraModelFields {
 		if model, exists := rawData[field]; exists {
 			normalized := normalizeString(model)
 			if normalized != "" {
@@ -33,8 +228,8 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse LensModel
-	for _, field := range []string{"LensModel", "LensID", "LensInfo", "LensType", "Lens"} {
+	// Parse LensModel using priority-based field list
+	for _, field := range lensModelFields {
 		if lens, exists := rawData[field]; exists {
 			normalized := normalizeString(lens)
 			if normalized != "" {
@@ -44,8 +239,8 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse ExposureTime
-	for _, field := range []string{"ExposureTime", "ShutterSpeedValue", "ShutterSpeed"} {
+	// Parse ExposureTime using priority-based field list
+	for _, field := range exposureTimeFields {
 		if exposure, exists := rawData[field]; exists {
 			normalized := normalizeString(exposure)
 			if normalized != "" {
@@ -55,8 +250,8 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse FNumber
-	for _, field := range []string{"FNumber", "Aperture", "ApertureValue"} {
+	// Parse FNumber using priority-based field list
+	for _, field := range fNumberFields {
 		if fNum, exists := rawData[field]; exists {
 			if val, err := strconv.ParseFloat(fNum, 32); err == nil {
 				metadata.FNumber = float32(val)
@@ -65,8 +260,8 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse ISO
-	for _, field := range []string{"ISO", "ISOSpeedRatings", "RecommendedExposureIndex"} {
+	// Parse ISO using priority-based field list
+	for _, field := range isoFields {
 		if iso, exists := rawData[field]; exists {
 			if val, err := strconv.Atoi(iso); err == nil {
 				metadata.IsoSpeed = val
@@ -75,8 +270,8 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse FocalLength
-	for _, field := range []string{"FocalLength", "FocalLengthIn35mmFilm", "FocalLengthIn35mmFormat"} {
+	// Parse FocalLength using priority-based field list
+	for _, field := range focalLengthFields {
 		if focalLength, exists := rawData[field]; exists {
 			// Remove "mm" suffix and other common units
 			cleanFL := normalizeString(focalLength)
@@ -105,8 +300,8 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse Description from various fields
-	for _, field := range []string{"ImageDescription", "UserComment", "XPComment", "Caption", "Description"} {
+	// Parse Description using priority-based field list
+	for _, field := range descriptionFields {
 		if desc, exists := rawData[field]; exists {
 			normalized := normalizeString(desc)
 			if normalized != "" {
@@ -165,8 +360,8 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse Exposure bias
-	for _, field := range []string{"ExposureCompensation"} {
+	// Parse Exposure bias using priority-based field list
+	for _, field := range exposureBiasFields {
 		if ebStr, exists := rawData[field]; exists {
 			if val, err := strconv.ParseFloat(ebStr, 32); err == nil {
 				metadata.Exposure = float32(val)
@@ -192,8 +387,8 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadata {
 	metadata := &dbtypes.VideoSpecificMetadata{}
 
-	// Parse Codec from various fields
-	for _, field := range []string{"VideoCodec", "CompressorID", "AudioCodec", "VideoFormat"} {
+	// Parse Codec using priority-based field list
+	for _, field := range videoCodecFields {
 		if codec, exists := rawData[field]; exists {
 			normalized := normalizeString(codec)
 			if normalized != "" {
@@ -203,8 +398,8 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 		}
 	}
 
-	// Parse Bitrate (prefer video bitrate over audio)
-	for _, field := range []string{"VideoBitrate", "Bitrate", "AudioBitrate", "OverallBitrate"} {
+	// Parse Bitrate using priority-based field list
+	for _, field := range videoBitrateFields {
 		if bitrate, exists := rawData[field]; exists {
 			if val, err := parseBitrate(bitrate); err == nil {
 				metadata.Bitrate = val
@@ -213,8 +408,8 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 		}
 	}
 
-	// Parse FrameRate
-	for _, field := range []string{"VideoFrameRate", "FrameRate", "NominalFrameRate"} {
+	// Parse FrameRate using priority-based field list
+	for _, field := range frameRateFields {
 		if frameRate, exists := rawData[field]; exists {
 			if val, err := parseFrameRate(frameRate); err == nil {
 				metadata.FrameRate = val
@@ -223,8 +418,8 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 		}
 	}
 
-	// Parse RecordedTime with expanded fallback options
-	for _, field := range []string{"CreateDate", "DateTimeOriginal", "MediaCreateDate", "TrackCreateDate", "ModifyDate", "FileModifyDate", "DateTimeDigitized"} {
+	// Parse RecordedTime using priority-based field list
+	for _, field := range recordedTimeFields {
 		if dateStr, exists := rawData[field]; exists && dateStr != "" {
 			if parsedTime, err := parseDateTime(dateStr); err == nil {
 				metadata.RecordedTime = &parsedTime
@@ -233,8 +428,8 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 		}
 	}
 
-	// Parse CameraModel
-	for _, field := range []string{"Model", "Make", "CameraModelName", "RecorderModel"} {
+	// Parse CameraModel using priority-based field list
+	for _, field := range videoCameraModelFields {
 		if model, exists := rawData[field]; exists {
 			normalized := normalizeString(model)
 			if normalized != "" {
@@ -258,8 +453,8 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 		}
 	}
 
-	// Parse Description
-	for _, field := range []string{"Description", "Comment", "Title", "Synopsis"} {
+	// Parse Description using priority-based field list
+	for _, field := range videoDescriptionFields {
 		if desc, exists := rawData[field]; exists {
 			normalized := normalizeString(desc)
 			if normalized != "" {
@@ -276,8 +471,8 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadata {
 	metadata := &dbtypes.AudioSpecificMetadata{}
 
-	// Parse Codec
-	for _, field := range []string{"AudioCodec", "AudioFormat", "FileTypeExtension", "AudioEncoding"} {
+	// Parse Codec using priority-based field list
+	for _, field := range audioCodecFields {
 		if codec, exists := rawData[field]; exists {
 			normalized := normalizeString(codec)
 			if normalized != "" {
@@ -291,8 +486,8 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 		}
 	}
 
-	// Parse Bitrate
-	for _, field := range []string{"AudioBitrate", "Bitrate", "NominalBitrate"} {
+	// Parse Bitrate using priority-based field list
+	for _, field := range audioBitrateFields {
 		if bitrate, exists := rawData[field]; exists {
 			if val, err := parseBitrate(bitrate); err == nil {
 				metadata.Bitrate = val
@@ -301,8 +496,8 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 		}
 	}
 
-	// Parse SampleRate
-	for _, field := range []string{"SampleRate", "AudioSampleRate", "SamplingRate"} {
+	// Parse SampleRate using priority-based field list
+	for _, field := range sampleRateFields {
 		if sampleRate, exists := rawData[field]; exists {
 			if val, err := parseSampleRate(sampleRate); err == nil {
 				metadata.SampleRate = val
@@ -311,8 +506,8 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 		}
 	}
 
-	// Parse Channels
-	for _, field := range []string{"AudioChannels", "Channels", "ChannelCount"} {
+	// Parse Channels using priority-based field list
+	for _, field := range channelsFields {
 		if channels, exists := rawData[field]; exists {
 			if val, err := strconv.Atoi(channels); err == nil {
 				metadata.Channels = val
@@ -321,8 +516,8 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 		}
 	}
 
-	// Parse Artist
-	for _, field := range []string{"Artist", "AlbumArtist", "Performer", "Author"} {
+	// Parse Artist using priority-based field list
+	for _, field := range artistFields {
 		if artist, exists := rawData[field]; exists {
 			normalized := normalizeString(artist)
 			if normalized != "" {
@@ -332,8 +527,8 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 		}
 	}
 
-	// Parse Album
-	for _, field := range []string{"Album", "AlbumTitle"} {
+	// Parse Album using priority-based field list
+	for _, field := range albumFields {
 		if album, exists := rawData[field]; exists {
 			normalized := normalizeString(album)
 			if normalized != "" {
@@ -343,8 +538,8 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 		}
 	}
 
-	// Parse Title
-	for _, field := range []string{"Title", "SongTitle", "TrackTitle"} {
+	// Parse Title using priority-based field list
+	for _, field := range audioTitleFields {
 		if title, exists := rawData[field]; exists {
 			normalized := normalizeString(title)
 			if normalized != "" {
@@ -354,8 +549,8 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 		}
 	}
 
-	// Parse Genre
-	for _, field := range []string{"Genre", "ContentType"} {
+	// Parse Genre using priority-based field list
+	for _, field := range genreFields {
 		if genre, exists := rawData[field]; exists {
 			normalized := normalizeString(genre)
 			if normalized != "" {
@@ -365,8 +560,8 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 		}
 	}
 
-	// Parse Year
-	for _, field := range []string{"Year", "Date", "ReleaseDate", "RecordingDate"} {
+	// Parse Year using priority-based field list
+	for _, field := range yearFields {
 		if yearStr, exists := rawData[field]; exists {
 			if year, err := parseYear(yearStr); err == nil {
 				metadata.Year = year
@@ -375,8 +570,8 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 		}
 	}
 
-	// Parse Description
-	for _, field := range []string{"Comment", "Description", "Lyrics", "Synopsis"} {
+	// Parse Description using priority-based field list
+	for _, field := range audioDescriptionFields {
 		if desc, exists := rawData[field]; exists {
 			normalized := normalizeString(desc)
 			if normalized != "" {

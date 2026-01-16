@@ -90,6 +90,16 @@ export type UpdateDescriptionRequest =
   Schemas["dto.UpdateDescriptionRequestDTO"];
 
 /**
+ * Reprocess asset request
+ */
+export type ReprocessAssetRequest = Schemas["dto.ReprocessAssetRequestDTO"];
+
+/**
+ * Reprocess asset response
+ */
+export type ReprocessAssetResponse = Schemas["dto.ReprocessAssetResponseDTO"];
+
+/**
  * List assets query parameters - extracted directly from paths
  */
 export type ListAssetsParams = NonNullable<
@@ -468,5 +478,24 @@ export const assetService = {
     config?: AxiosRequestConfig,
   ): Promise<AxiosResponse<ApiResult<any>>> => {
     return api.get<ApiResult<any>>(`/api/v1/assets/${id}/albums`, config);
+  },
+
+  /**
+   * Reprocess/retry asset processing tasks.
+   * @param {string} id - The UUID of the asset.
+   * @param {ReprocessAssetRequest} request - The reprocess request containing tasks and options.
+   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
+   * @returns {Promise<AxiosResponse<ApiResult<ReprocessAssetResponse>>>} A promise resolving to the reprocess response.
+   */
+  reprocessAsset: async (
+    id: string,
+    request: ReprocessAssetRequest,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<ReprocessAssetResponse>>> => {
+    return api.post<ApiResult<ReprocessAssetResponse>>(
+      `/api/v1/assets/${id}/reprocess`,
+      request,
+      config,
+    );
   },
 };

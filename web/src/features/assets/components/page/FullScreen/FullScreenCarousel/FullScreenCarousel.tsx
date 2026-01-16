@@ -18,6 +18,7 @@ import type { Asset } from "@/lib/http-commons";
 interface FullScreenCarouselProps {
   photos: Asset[];
   initialSlide: number;
+  slideIndex?: number;
   onClose: () => void;
   onNavigate: (assetId: string) => void;
   onAssetUpdate?: (updatedAsset: Asset) => void;
@@ -27,6 +28,7 @@ interface FullScreenCarouselProps {
 const FullScreenCarousel = ({
   photos,
   initialSlide,
+  slideIndex,
   onClose,
   onNavigate,
   onAssetUpdate,
@@ -35,7 +37,10 @@ const FullScreenCarousel = ({
   const swiperRef = useRef<any>(null),
     closingRef = useRef(false);
   const [showInfo, setShowInfo] = useState(false);
-  const [currentAsset, setCurrentAsset] = useState(photos[initialSlide]);
+  const [currentAsset, setCurrentAsset] = useState(() => {
+    const index = slideIndex !== undefined ? slideIndex : initialSlide;
+    return photos[index] || photos[0] || null;
+  });
   const [isDeleting, setIsDeleting] = useState(false);
   const showMessage = useMessage();
   const { t } = useI18n();
@@ -63,6 +68,24 @@ const FullScreenCarousel = ({
     onClose();
   };
   //
+
+  // Sync swiper to external slideIndex when it changes
+  useEffect(() => {
+    if (slideIndex !== undefined && swiperRef.current) {
+      const swiper = swiperRef.current.swiper;
+      if (swiper && swiper.activeIndex !== slideIndex) {
+        swiper.slideTo(slideIndex);
+      }
+    }
+  }, [slideIndex]);
+
+  // Update currentAsset when photos or slideIndex/initialSlide changes
+  useEffect(() => {
+    const index = slideIndex !== undefined ? slideIndex : initialSlide;
+    if (photos[index] && photos[index] !== currentAsset) {
+      setCurrentAsset(photos[index]);
+    }
+  }, [photos, slideIndex, initialSlide, currentAsset]);
 
   useEffect(() => {
     const handler = () => setShowInfo((s) => !s);
@@ -162,7 +185,7 @@ const FullScreenCarousel = ({
         navigation
         pagination={{ clickable: true }}
         onSlideChange={onSlideChange}
-        initialSlide={initialSlide}
+        initialSlide={slideIndex !== undefined ? slideIndex : initialSlide}
         className="fullscreen-swiper"
       >
         {slides.map((slide, index) => (
