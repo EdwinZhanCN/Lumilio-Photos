@@ -241,10 +241,11 @@ class JustifiedLayoutService {
 
   /**
    * Create responsive configuration based on container width with better column handling
+   * Note: containerWidth should be the actual available width for content (after padding)
    */
   createResponsiveConfig(containerWidth: number): LayoutConfig {
-    // Use the full container width (no padding subtraction since component handles its own padding)
-    const availableWidth = containerWidth;
+    // Use the provided width directly (component should pass width after padding)
+    const availableWidth = Math.max(containerWidth, 300); // Minimum 300px
 
     // Define responsive breakpoints for columns based on available space
     let targetColumns: number;
@@ -253,27 +254,35 @@ class JustifiedLayoutService {
     if (availableWidth < 480) {
       // Very small containers: 2 columns
       targetColumns = 2;
-      rowHeight = 150;
-    } else if (availableWidth < 768) {
+      rowHeight = 140;
+    } else if (availableWidth < 640) {
       // Small containers: 3 columns
+      targetColumns = 3;
+      rowHeight = 160;
+    } else if (availableWidth < 768) {
+      // Small-medium containers: 3-4 columns
       targetColumns = 3;
       rowHeight = 180;
     } else if (availableWidth < 1024) {
       // Medium containers: 4 columns
       targetColumns = 4;
-      rowHeight = 220;
+      rowHeight = 200;
     } else if (availableWidth < 1280) {
       // Large containers: 5 columns
       targetColumns = 5;
-      rowHeight = 250;
-    } else {
+      rowHeight = 220;
+    } else if (availableWidth < 1536) {
       // Extra large containers: 6 columns
       targetColumns = 6;
-      rowHeight = 280;
+      rowHeight = 240;
+    } else {
+      // Ultra large containers: 7+ columns
+      targetColumns = Math.min(Math.floor(availableWidth / 220), 8);
+      rowHeight = 240;
     }
 
     // Calculate optimal row width for justified layout
-    const minItemWidth = 150; // Minimum width per item
+    const minItemWidth = 140; // Minimum width per item
     const spacing = 4;
     const minRowWidth =
       targetColumns * minItemWidth + (targetColumns - 1) * spacing;
@@ -285,7 +294,8 @@ class JustifiedLayoutService {
       rowHeight,
       rowWidth,
       spacing,
-      heightTolerance: availableWidth < 480 ? 0.35 : 0.25, // More tolerance for small containers
+      heightTolerance:
+        availableWidth < 480 ? 0.4 : availableWidth < 768 ? 0.3 : 0.25,
     };
   }
 

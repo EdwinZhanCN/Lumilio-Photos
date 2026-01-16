@@ -5,54 +5,43 @@ import ErrorFallBack from "@/components/ErrorFallBack";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import PageHeader from "@/components/PageHeader";
 import { useUploadContext } from "@/features/upload";
-import React from "react";
-import { ArrowUpTrayIcon } from "@heroicons/react/24/outline";
+import React, { useState } from "react";
+import { ArrowUpTrayIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
+import SupportedFormatsModal from "../components/SupportedFormatsModal";
 
 const UploadHeader: React.FC = () => {
-  const {
-    state,
-    isProcessing,
-    uploadFiles,
-    clearFiles,
-    uploadProgress,
-    hashcodeProgress,
-    isGeneratingHashCodes,
-    previewCount,
-  } = useUploadContext();
+  const { state, isProcessing } = useUploadContext();
+  const [showFormatsModal, setShowFormatsModal] = useState(false);
 
   const total = state.files.length;
   const subtitle =
-    isGeneratingHashCodes && hashcodeProgress?.total
-      ? `Hashing ${hashcodeProgress.numberProcessed ?? 0}/${hashcodeProgress.total}`
-      : isProcessing && uploadProgress > 0
-        ? `Uploading ${uploadProgress.toFixed(1)}%`
-        : total > 0
-          ? `${total} files selected (${previewCount} with previews)`
-          : "No files selected";
+    isProcessing && total > 0
+      ? `Processing ${total} file${total !== 1 ? "s" : ""}...`
+      : total > 0
+        ? `${total} file${total !== 1 ? "s" : ""} ready to upload`
+        : "No files selected";
 
   return (
-    <PageHeader
-      title="Upload Assets"
-      icon={<ArrowUpTrayIcon className="w-6 h-6 text-primary" />}
-    >
-      <button
-        className="btn btn-sm btn-ghost"
-        onClick={() => {
-          clearFiles();
-        }}
-        disabled={isProcessing || total === 0}
+    <>
+      <PageHeader
+        title="Upload Assets"
+        icon={<ArrowUpTrayIcon className="w-6 h-6 text-primary" />}
       >
-        Clear All
-      </button>
-      <button
-        className="btn btn-sm btn-primary"
-        onClick={() => uploadFiles()}
-        disabled={isProcessing || total === 0}
-      >
-        {isProcessing ? "Processing..." : "Upload All"}
-      </button>
-      <small>{subtitle}</small>
-    </PageHeader>
+        <button
+          className="btn btn-sm btn-ghost gap-2"
+          onClick={() => setShowFormatsModal(true)}
+        >
+          <DocumentTextIcon className="w-4 h-4" />
+          Supported Formats
+        </button>
+        <small>{subtitle}</small>
+      </PageHeader>
+
+      <SupportedFormatsModal
+        isOpen={showFormatsModal}
+        onClose={() => setShowFormatsModal(false)}
+      />
+    </>
   );
 };
 
@@ -60,7 +49,7 @@ const UploadAssets = () => {
   return (
     <WorkerProvider preload={["hash", "thumbnail"]}>
       <UploadProvider>
-        <div className="min-h-screen">
+        <div className="min-h-screen bg-base-100">
           <UploadHeader />
           <ErrorBoundary
             FallbackComponent={(props) => (

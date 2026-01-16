@@ -30,13 +30,13 @@ const AssetTabs = ({ isCarouselOpen }: AssetTabsProps) => {
 
   return (
     <div
-      className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
+      className={`fixed bottom-6 right-6 z-50 transition-all duration-300 ${
         isCarouselOpen
           ? "animate-fade-out-y opacity-0 pointer-events-none"
           : "animate-fade-in-y opacity-100 pointer-events-auto"
       }`}
     >
-      <ul className="menu menu-horizontal glass rounded-box shadow-lg">
+      <ul className="menu menu-vertical glass rounded-box shadow-lg">
         <li>
           <Link
             to="/assets/photos"

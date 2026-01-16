@@ -3,7 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import {
   AdjustmentsHorizontalIcon,
   ArrowUpTrayIcon,
-  ServerStackIcon,
   HomeIcon,
   InformationCircleIcon,
   PhotoIcon,
@@ -11,7 +10,7 @@ import {
   BookOpenIcon,
 } from "@heroicons/react/24/outline/index.js";
 
-import { Album } from "lucide-react";
+import { Album, Activity } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useGlobal } from "@/contexts/GlobalContext";
 
@@ -92,7 +91,7 @@ function SideBar() {
           <Link to="/server-monitor">
             {isOnline ? (
               <div className="flex items-center justify-center gap-2 text-success">
-                <ServerStackIcon className="size-5" />
+                <Activity className="size-5" />
                 {t("sidebar.status.online")}
                 <div className="inline-grid *:[grid-area:1/1]">
                   <div className="status status-success animate-ping"></div>
@@ -101,7 +100,7 @@ function SideBar() {
               </div>
             ) : (
               <div className="flex items-center justify-center gap-2 text-error">
-                <ServerStackIcon className="size-5" />
+                <Activity className="size-5" />
                 {t("sidebar.status.offline")}
                 <div className="inline-grid *:[grid-area:1/1]">
                   <div className="status status-error animate-ping"></div>

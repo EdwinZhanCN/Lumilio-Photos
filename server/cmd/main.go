@@ -158,6 +158,7 @@ func main() {
 	assetController := handler.NewAssetHandler(assetService, queries, repoManager, stagingManager, queueClient)
 	authController := handler.NewAuthHandler(authService)
 	albumController := handler.NewAlbumHandler(&albumService, queries)
+	queueController := handler.NewQueueHandler(queueClient, pgxPool)
 
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
@@ -167,7 +168,7 @@ func main() {
 	docs.SwaggerInfo.BasePath = "/api/v1"
 
 	// Set up router with new asset, album and auth endpoints
-	router := api.NewRouter(assetController, authController, albumController)
+	router := api.NewRouter(assetController, authController, albumController, queueController)
 
 	// Add Swagger documentation endpoint
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
