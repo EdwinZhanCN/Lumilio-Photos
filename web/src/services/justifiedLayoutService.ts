@@ -84,9 +84,20 @@ class JustifiedLayoutService {
     const width = box.width || 1;
     const height = box.height || 1;
 
-    // Ensure reasonable aspect ratio bounds
+    // Debug: log actual dimensions and calculated ratio
+    if (process.env.NODE_ENV === "development") {
+      const ratio = width / height;
+      // Only log a few samples to avoid console spam
+      if (Math.random() < 0.05) {
+        console.log(
+          `JustifiedLayout: dimensions ${width}x${height}, ratio: ${ratio.toFixed(2)}`,
+        );
+      }
+    }
+
+    // Ensure reasonable aspect ratio bounds - expanded range to better accommodate diverse photo formats
     const ratio = width / height;
-    return Math.max(0.2, Math.min(5.0, ratio)); // clamp between 0.2 and 5.0
+    return Math.max(0.1, Math.min(10.0, ratio)); // clamp between 0.1 and 10.0
   }
 
   /**
@@ -126,7 +137,7 @@ class JustifiedLayoutService {
         rowHeight: config.rowHeight,
         rowWidth: config.rowWidth,
         spacing: config.spacing,
-        heightTolerance: config.heightTolerance,
+        heightTolerance: config.heightTolerance * 1.5, // Increase tolerance to preserve original ratios
       });
 
       // Extract positions
@@ -254,35 +265,35 @@ class JustifiedLayoutService {
     if (availableWidth < 480) {
       // Very small containers: 2 columns
       targetColumns = 2;
-      rowHeight = 140;
+      rowHeight = 120; // Slightly reduced to preserve ratios better
     } else if (availableWidth < 640) {
       // Small containers: 3 columns
       targetColumns = 3;
-      rowHeight = 160;
+      rowHeight = 140;
     } else if (availableWidth < 768) {
       // Small-medium containers: 3-4 columns
       targetColumns = 3;
-      rowHeight = 180;
+      rowHeight = 160;
     } else if (availableWidth < 1024) {
       // Medium containers: 4 columns
       targetColumns = 4;
-      rowHeight = 200;
+      rowHeight = 180;
     } else if (availableWidth < 1280) {
       // Large containers: 5 columns
       targetColumns = 5;
-      rowHeight = 220;
+      rowHeight = 200;
     } else if (availableWidth < 1536) {
       // Extra large containers: 6 columns
       targetColumns = 6;
-      rowHeight = 240;
+      rowHeight = 220;
     } else {
       // Ultra large containers: 7+ columns
       targetColumns = Math.min(Math.floor(availableWidth / 220), 8);
-      rowHeight = 240;
+      rowHeight = 220;
     }
 
     // Calculate optimal row width for justified layout
-    const minItemWidth = 140; // Minimum width per item
+    const minItemWidth = 120; // Reduced minimum width to accommodate diverse ratios
     const spacing = 4;
     const minRowWidth =
       targetColumns * minItemWidth + (targetColumns - 1) * spacing;
@@ -295,7 +306,7 @@ class JustifiedLayoutService {
       rowWidth,
       spacing,
       heightTolerance:
-        availableWidth < 480 ? 0.4 : availableWidth < 768 ? 0.3 : 0.25,
+        availableWidth < 480 ? 0.6 : availableWidth < 768 ? 0.5 : 0.4, // Increased tolerance for better ratio preservation
     };
   }
 
@@ -320,8 +331,8 @@ class JustifiedLayoutService {
 
     // Use fallback dimensions if still missing
     return {
-      width: width || 4, // Default 4:3 aspect ratio
-      height: height || 3,
+      width: width || 3, // Default 3:2 aspect ratio (more common for photos)
+      height: height || 2,
     };
   }
 
