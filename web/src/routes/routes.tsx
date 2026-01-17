@@ -3,7 +3,6 @@ import Assets from "@/features/assets/routes/Assets";
 import { Studio } from "@/features/studio/routes/Studio";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { Lumen } from "@/features/lumen/routes/Lumen";
-import { LumenWikiExample } from "@/features/lumen/components/LumenWiki/LumenWikiExample";
 import Settings from "@/features/settings/routes/Settings";
 import Monitor from "@/features/monitor/routes/Monitor";
 import UploadAssets from "@/features/upload/routes/UploadAssets";
@@ -79,13 +78,5 @@ export const routes = [
   {
     path: "/portfolio",
     element: <Portfolio />,
-  },
-  {
-    path: "/test-lumen",
-    element: (
-      <WorkerProvider preload={["llm"]}>
-        <LumenWikiExample />
-      </WorkerProvider>
-    ),
   },
 ];
