@@ -347,13 +347,16 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 
 			if w, ok1 := parseInt(widthStr); ok1 {
 				if h, ok2 := parseInt(heightStr); ok2 && w > 0 && h > 0 {
+					// Check orientation and correct dimensions if needed
+					correctedWidth, correctedHeight := correctDimensionsByOrientation(w, h, rawData["Orientation"])
+
 					// Keep Resolution as an integer number of megapixels (rounded)
 					pixels := w * h
 					mpInt := (pixels + 500_000) / 1_000_000
 					metadata.Resolution = fmt.Sprintf("%dMP", mpInt)
 					// Also set Dimensions if not already set from ImageSize
 					if metadata.Dimensions == "" {
-						metadata.Dimensions = fmt.Sprintf("%dx%d", w, h)
+						metadata.Dimensions = fmt.Sprintf("%dx%d", correctedWidth, correctedHeight)
 					}
 				}
 			}
@@ -370,17 +373,71 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
-	// Parse Dimensions from ImageSize or fallback to width x height
-	if sizeStr, exists := rawData["ImageSize"]; exists {
-		d := normalizeString(sizeStr)
-		if d != "" {
-			// Normalize common separators (e.g., "4032x3024" or "4032 x 3024")
-			d = strings.ReplaceAll(d, " ", "")
-			metadata.Dimensions = d
+	return metadata
+}
+
+// correctDimensionsByOrientation corrects width and height based on EXIF Orientation
+// Returns corrected width and height that match the actual display orientation
+func correctDimensionsByOrientation(width, height int, orientation string) (int, int) {
+	if orientation == "" {
+		return width, height
+	}
+
+	// Check for orientation values that require swapping dimensions
+	// Orientation values that require 90° or 270° rotation
+	orientationLower := strings.ToLower(orientation)
+
+	// These orientations indicate the photo was taken in portrait mode
+	// and needs to be rotated 90° or 270° for correct display
+	// In these cases, the sensor width/height are swapped
+	rotateOrientations := []string{
+		"rotate 90 cw",                        // Orientation 6
+		"rotate 90",                           // Orientation 6 (short form)
+		"rotate 270 cw",                       // Orientation 8
+		"rotate 270",                          // Orientation 8 (short form)
+		"rotate 90 ccw",                       // Orientation 8 (alternative description)
+		"rotate 270 ccw",                      // Orientation 6 (alternative description)
+		"mirror horizontal and rotate 270 cw", // Orientation 5
+		"mirror horizontal and rotate 90 cw",  // Orientation 7
+		"mirror horizontal and rotate 270",    // Orientation 5 (short form)
+		"mirror horizontal and rotate 90",     // Orientation 7 (short form)
+	}
+
+	// Also check for numeric orientation codes (1-8)
+	if len(orientationLower) == 1 && orientationLower >= "1" && orientationLower <= "8" {
+		// Orientation codes 5, 6, 7, 8 require swapping dimensions
+		if orientationLower == "5" || orientationLower == "6" || orientationLower == "7" || orientationLower == "8" {
+			return height, width
+		}
+		return width, height
+	}
+
+	// Check for text descriptions
+	for _, rot := range rotateOrientations {
+		if strings.Contains(orientationLower, rot) {
+			// Swap width and height for rotated orientations
+			return height, width
 		}
 	}
 
-	return metadata
+	// Check for common orientation descriptions that don't require swapping
+	noSwapOrientations := []string{
+		"horizontal (normal)", // Orientation 1
+		"mirror horizontal",   // Orientation 2
+		"rotate 180",          // Orientation 3
+		"mirror vertical",     // Orientation 4
+		"normal",              // Orientation 1 (short form)
+		"horizontal",          // Orientation 1 (short form)
+	}
+
+	for _, noSwap := range noSwapOrientations {
+		if strings.Contains(orientationLower, noSwap) {
+			return width, height
+		}
+	}
+
+	// Default: no swap needed
+	return width, height
 }
 
 // parseVideoMetadata parses raw EXIF data into VideoSpecificMetadata
