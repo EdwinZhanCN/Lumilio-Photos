@@ -88,7 +88,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   if (audioAsset) {
     return (
       <div
-        className={`w-full h-full bg-gradient-to-br from-purple-500 to-pink-500 flex flex-col items-center justify-center text-white cursor-pointer hover:from-purple-600 hover:to-pink-600 transition-colors ${className}`}
+        className={`relative w-full h-full flex flex-col items-center justify-center gap-2 text-center text-white cursor-pointer bg-gradient-to-b from-black/10 via-black/5 to-transparent px-4 py-3 rounded overflow-hidden transition-colors ${className}`}
         onClick={onClick}
         role="button"
         tabIndex={0}

@@ -349,7 +349,7 @@ const JustifiedGallery = ({
   if (Object.keys(groupedPhotos).length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="text-gray-400 text-lg mb-2">No photos found</div>
+        <div className="text-gray-400 text-lg mb-2">No assets found</div>
         <div className="text-gray-500 text-sm">
           Try adjusting your filters or search query
         </div>
