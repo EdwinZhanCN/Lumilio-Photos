@@ -4,7 +4,7 @@
 
 > **default**(`__namedParameters`): `Element`
 
-Defined in: [contexts/GlobalContext.tsx:47](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/contexts/GlobalContext.tsx#L47)
+Defined in: [contexts/GlobalContext.tsx:47](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/432b0417d593dbe534fb8fb1fc1703513592423a/web/src/contexts/GlobalContext.tsx#L47)
 
 ## Parameters
 
