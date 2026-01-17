@@ -72,7 +72,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessageEvent>) => {
         const results = await generatePreview(
           files,
           startIndex,
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           (_processedInBatch) => {
             // Progress callback
             numberOfFilesProcessed++;
@@ -140,7 +140,9 @@ async function generatePreview(
         const arrayBuffer = await file.arrayBuffer();
         if (signal.aborted) break;
         const result = generate_thumbnail(new Uint8Array(arrayBuffer), 300);
-        const blob = new Blob([result], { type: "image/jpeg" });
+        const blob = new Blob([result.buffer as ArrayBuffer], {
+          type: "image/jpeg",
+        });
         url = URL.createObjectURL(blob);
       } catch (err) {
         console.error("Error generating thumbnail:", err);
