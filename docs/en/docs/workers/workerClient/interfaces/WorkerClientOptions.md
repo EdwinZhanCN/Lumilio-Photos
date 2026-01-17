@@ -2,7 +2,7 @@
 
 # Interface: WorkerClientOptions
 
-Defined in: [workers/workerClient.ts:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/432b0417d593dbe534fb8fb1fc1703513592423a/web/src/workers/workerClient.ts#L28)
+Defined in: [workers/workerClient.ts:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/700e54a9fc9657147393b731855c580bfadc21f3/web/src/workers/workerClient.ts#L28)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [workers/workerClient.ts:28](https://github.com/EdwinZhanCN/Lumilio-
 
 > `optional` **preload**: [`WorkerType`](../type-aliases/WorkerType.md)[]
 
-Defined in: [workers/workerClient.ts:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/432b0417d593dbe534fb8fb1fc1703513592423a/web/src/workers/workerClient.ts#L29)
+Defined in: [workers/workerClient.ts:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/700e54a9fc9657147393b731855c580bfadc21f3/web/src/workers/workerClient.ts#L29)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [workers/workerClient.ts:29](https://github.com/EdwinZhanCN/Lumilio-
 
 > `optional` **webllmConfig**: `object`
 
-Defined in: [workers/workerClient.ts:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/432b0417d593dbe534fb8fb1fc1703513592423a/web/src/workers/workerClient.ts#L30)
+Defined in: [workers/workerClient.ts:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/700e54a9fc9657147393b731855c580bfadc21f3/web/src/workers/workerClient.ts#L30)
 
 #### modelId
 

@@ -4,7 +4,7 @@
 
 > **detectDeviceCapabilities**(): [`DeviceCapabilities`](../interfaces/DeviceCapabilities.md)
 
-Defined in: [utils/smartBatchSizing.ts:102](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/432b0417d593dbe534fb8fb1fc1703513592423a/web/src/utils/smartBatchSizing.ts#L102)
+Defined in: [utils/smartBatchSizing.ts:102](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/700e54a9fc9657147393b731855c580bfadc21f3/web/src/utils/smartBatchSizing.ts#L102)
 
 Detects device capabilities for batch sizing optimization
 
