@@ -2,6 +2,7 @@
 @plugin "daisyui" {
     themes: all;
 }
+@import "tw-animate-css";
 
 :root:has(
     :is(

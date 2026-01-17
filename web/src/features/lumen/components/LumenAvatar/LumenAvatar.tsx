@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "@/styles/pyramid.css";
 
 interface LumenAvatarProps {
@@ -64,6 +64,21 @@ export const LumenAvatar: React.FC<LumenAvatarProps> = ({
   style = {},
 }) => {
   const axisRef = useRef<HTMLDivElement>(null);
+  const animationStartTimeRef = useRef<number | null>(null);
+  const stopRequestedRef = useRef<boolean>(false);
+  const [isSpinning, setIsSpinning] = useState(false);
+
+  // Animation duration in milliseconds
+  const ANIMATION_DURATION = 2000;
+
+  // 计算剩余动画时间
+  const getRemainingTime = (
+    startTime: number,
+    duration: number = ANIMATION_DURATION,
+  ) => {
+    const elapsed = Date.now() - startTime;
+    return Math.max(0, duration - (elapsed % duration));
+  };
 
   // 监听 start 变化，执行平滑开始/停止
   useEffect(() => {
@@ -71,22 +86,53 @@ export const LumenAvatar: React.FC<LumenAvatarProps> = ({
     if (!el) return;
 
     if (start) {
-      // → true：清理内联样式，恢复 spinning
-      el.style.transition = "";
-      el.style.webkitTransition = "";
-      el.style.animation = "";
-      el.style.webkitAnimation = "";
-      el.style.transform = "";
+      // 清除停止请求标志
+      stopRequestedRef.current = false;
+
+      // 如果当前没有在旋转，开始动画
+      if (!isSpinning) {
+        setIsSpinning(true);
+        animationStartTimeRef.current = Date.now();
+      }
+    } else {
+      // 设置停止请求标志，但不立即停止
+      stopRequestedRef.current = true;
+
+      // 只有在旋转时才需要处理停止逻辑
+      if (isSpinning && animationStartTimeRef.current) {
+        const remainingTime = getRemainingTime(animationStartTimeRef.current);
+
+        // 设置定时器，在当前动画循环结束后停止
+        const stopTimeout = setTimeout(() => {
+          if (stopRequestedRef.current && el) {
+            // 只有在没有重新启动的情况下才执行停止
+            if (!start) {
+              el.classList.remove("spinning");
+              requestAnimationFrame(() => {
+                smoothReset(el);
+              });
+              setIsSpinning(false);
+              animationStartTimeRef.current = null;
+            }
+          }
+        }, remainingTime);
+
+        return () => clearTimeout(stopTimeout);
+      }
+    }
+  }, [start, isSpinning]);
+
+  // 更新 DOM 类名
+  useEffect(() => {
+    const el = axisRef.current;
+    if (!el) return;
+
+    if (isSpinning) {
       el.classList.add("spinning");
     } else {
-      // → false：移除 spinning，再平滑回滚
       el.classList.remove("spinning");
-      // 使用 requestAnimationFrame 确保类名移除后再执行平滑重置
-      requestAnimationFrame(() => {
-        smoothReset(el);
-      });
     }
-  }, [start]);
+  }, [isSpinning]);
 
   const containerStyle: React.CSSProperties = {
     fontSize: `${size}rem`,
@@ -97,10 +143,7 @@ export const LumenAvatar: React.FC<LumenAvatarProps> = ({
     <div className={`lumen-avatar ${className}`.trim()} style={containerStyle}>
       <div className="pyramid">
         <div className="pyramid-gyro">
-          <div
-            ref={axisRef}
-            className={`pyramid-axis${start ? " spinning" : ""}`}
-          >
+          <div ref={axisRef} className="pyramid-axis">
             <div className="pyramid-wall front" />
             <div className="pyramid-wall back" />
             <div className="pyramid-wall left" />

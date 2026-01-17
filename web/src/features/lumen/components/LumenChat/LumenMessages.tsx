@@ -65,10 +65,70 @@ export function LumenMessages({
   }, [conversation]);
 
   if (conversation.length === 0 && !isGenerating && !isInitializing) {
+    // Beautiful welcome interface
     return (
-      <div className="flex flex-1 overflow-y-auto p-4 space-y-4">
-        <div className="text-center text-base-content/60 py-8">
-          <div>Start a conversation with the Lumen!</div>
+      <div className="flex flex-col p-8 overflow-y-auto">
+        {/* Animated Lumen Avatar */}
+        <div className="flex justify-center h-auto mb-8">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-400 to-purple-600 opacity-20 blur-3xl scale-150 animate-pulse"></div>
+            <div className="relative">
+              <LumenAvatar start={true} size={0.5} />
+            </div>
+          </div>
+        </div>
+
+        {/* Side-by-side content */}
+        <div className="flex flex-col md:flex-row gap-8 max-w-5xl mx-auto w-full animate-fade-in">
+          {/* Welcome Text */}
+          <div className="flex-1 space-y-4">
+            <h1 className="text-3xl font-bold text-base-content">
+              Welcome to{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
+                Lumen
+              </span>
+            </h1>
+            <p className="text-base-content/70 text-lg">
+              Your intelligent photo assistant. Ask me anything about your
+              photos, from finding specific moments to organizing your
+              collection.
+            </p>
+          </div>
+
+          {/* Conversation Starters */}
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-base-content/60 mb-3">
+              Try asking:
+            </h3>
+            <div className="space-y-2">
+              {[
+                "Find photos from my last vacation",
+                "Show me pictures with my family",
+                "What are my best photos from this year?",
+                "Organize photos by location",
+                "Find pictures of sunsets",
+              ].map((prompt, index) => (
+                <button
+                  key={index}
+                  className="block w-full text-left p-3 rounded-lg bg-base-200 hover:bg-base-300 transition-colors duration-200"
+                  onClick={() => {
+                    // This will need to be connected to the input component
+                    const inputElement = document.querySelector(
+                      "textarea",
+                    ) as HTMLTextAreaElement;
+                    if (inputElement) {
+                      inputElement.value = prompt;
+                      // Trigger onChange event to update React state
+                      const event = new Event("input", { bubbles: true });
+                      inputElement.dispatchEvent(event);
+                    }
+                  }}
+                >
+                  <span className="text-sm text-base-content">{prompt}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         <div ref={messagesEndRef} />
       </div>
@@ -76,7 +136,7 @@ export function LumenMessages({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-gradient-to-b from-base-100 to-base-200/30">
       {conversation
         .filter((message) => message.role !== "system")
         .map((message, index) => {
@@ -87,43 +147,59 @@ export function LumenMessages({
           return (
             <div
               key={index}
-              className={`chat ${
-                message.role === "user" ? "chat-end" : "chat-start"
-              }`}
+              className={`flex ${message.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}
             >
-              <div className="chat-image avatar">
-                <div className="w-10 rounded-full">
+              <div
+                className={`flex gap-3 max-w-[80%] ${message.role === "user" ? "flex-row-reverse" : ""}`}
+              >
+                {/* Avatar */}
+                <div className="flex-shrink-0">
                   {message.role === "user" ? (
-                    <div className="w-full h-full flex items-center justify-center text-white font-bold rounded-full bg-primary">
-                      U
-                    </div>
+                    <div></div>
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <LumenAvatar start={isStreamingHere} size={0.1} />
-                    </div>
+                    <LumenAvatar start={isStreamingHere} size={0.2} />
                   )}
                 </div>
-              </div>
-              <div className="chat-header">
-                {message.role === "user" ? "You" : "Lumen"}
-                <time className="text-xs opacity-50 ml-1">
-                  {new Date(message.timestamp).toLocaleTimeString()}
-                </time>
-              </div>
-              <div
-                className={`chat-bubble ${
-                  message.role === "user"
-                    ? "chat-bubble-primary"
-                    : "bg-base-200"
-                }`}
-              >
-                {message.role === "assistant" ? (
-                  <Markdown
-                    content={processThinkTags(message.content, isStreamingHere)}
-                  />
-                ) : (
-                  <div className="whitespace-pre-wrap">{message.content}</div>
-                )}
+
+                {/* Message Content */}
+                <div
+                  className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}
+                >
+                  {/* Header with name and timestamp */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-base-content/80">
+                      {message.role === "user" ? "You" : "Lumen"}
+                    </span>
+                    <time className="text-xs opacity-60">
+                      {new Date(message.timestamp).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                  </div>
+
+                  {/* Message Bubble */}
+                  <div
+                    className={`relative px-4 py-3 rounded-2xl shadow-sm ${
+                      message.role === "user"
+                        ? "bg-base-200"
+                        : "bg-base-100 rounded-bl-none border border-base-300"
+                    }`}
+                  >
+                    {message.role === "assistant" ? (
+                      <Markdown
+                        content={processThinkTags(
+                          message.content,
+                          isStreamingHere,
+                        )}
+                      />
+                    ) : (
+                      <div className="whitespace-pre-wrap">
+                        {message.content}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           );
@@ -133,3 +209,5 @@ export function LumenMessages({
     </div>
   );
 }
+
+export default LumenMessages;

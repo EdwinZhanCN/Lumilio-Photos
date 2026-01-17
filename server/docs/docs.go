@@ -931,6 +931,24 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "handler.AgentChatRequest": {
+                "properties": {
+                    "query": {
+                        "type": "string"
+                    },
+                    "tool_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "required": [
+                    "query"
+                ],
+                "type": "object"
+            },
             "handler.AvailableYearsResponse": {
                 "properties": {
                     "years": {
@@ -1160,6 +1178,21 @@ const docTemplate = `{
                         "uniqueItems": false
                     },
                     "type": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handler.ToolInfoResponse": {
+                "properties": {
+                    "desc": {
+                        "type": "string"
+                    },
+                    "extra": {
+                        "additionalProperties": {},
+                        "type": "object"
+                    },
+                    "name": {
                         "type": "string"
                     }
                 },
@@ -1507,6 +1540,115 @@ const docTemplate = `{
                 "summary": "Get job statistics",
                 "tags": [
                     "Queue"
+                ]
+            }
+        },
+        "/agent/chat": {
+            "post": {
+                "description": "Send a query to the agent and receive streaming responses via SSE",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/handler.AgentChatRequest",
+                                        "summary": "request",
+                                        "description": "Chat request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Chat request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "SSE stream"
+                    },
+                    "400": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "500": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Chat with Agent",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
+        "/agent/tools": {
+            "get": {
+                "description": "Get the list of all registered agent tools",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Get Available Tools",
+                "tags": [
+                    "agent"
                 ]
             }
         },

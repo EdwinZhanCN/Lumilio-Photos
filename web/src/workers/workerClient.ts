@@ -7,31 +7,10 @@
  * @since 1.1.0
  */
 
-import {
-  ChatCompletionMessageParam,
-  CreateWebWorkerMLCEngine,
-  ModelRecord,
-  AppConfig,
-  MLCEngineConfig,
-  prebuiltAppConfig,
-  InitProgressReport,
-} from "@mlc-ai/web-llm";
-
-export type WorkerType =
-  | "thumbnail"
-  | "hash"
-  | "border"
-  | "export"
-  | "exif"
-  | "llm";
+export type WorkerType = "thumbnail" | "hash" | "border" | "export" | "exif";
 
 export interface WorkerClientOptions {
   preload?: WorkerType[];
-  webllmConfig?: {
-    modelRecords?: ModelRecord[];
-    useIndexedDBCache?: boolean;
-    modelId: string;
-  };
 }
 
 export class AppWorkerClient {
@@ -40,38 +19,11 @@ export class AppWorkerClient {
   private generateBorderworker: Worker | null = null;
   private exportWorker: Worker | null = null;
   private extractExifWorker: Worker | null = null;
-  private WebLLMWorker: Worker | null = null;
-  private webLLMEngine: any = null;
-  private webllmAppConfig: AppConfig = {
-    useIndexedDBCache: true,
-    model_list: [],
-  };
-  private currentModelId: string | null = null;
-  private targetModelId: string = "Qwen3-1.7B-q4f16_1-MLC";
 
   private eventTarget: EventTarget;
 
   constructor(options: WorkerClientOptions = {}) {
     this.eventTarget = new EventTarget();
-
-    // Set up WebLLM configuration if provided
-    if (options.webllmConfig) {
-      // Validate that modelRecords exist and are not empty
-      if (
-        !options.webllmConfig.modelRecords ||
-        options.webllmConfig.modelRecords.length === 0
-      ) {
-        console.warn(
-          "WebLLM config provided but modelRecords is empty or undefined",
-        );
-      }
-
-      this.webllmAppConfig = {
-        model_list: options.webllmConfig.modelRecords || [],
-        useIndexedDBCache: options.webllmConfig.useIndexedDBCache ?? true,
-      };
-      this.targetModelId = options.webllmConfig.modelId;
-    }
 
     // Pre-load specified workers
     if (options.preload) {
@@ -130,15 +82,6 @@ export class AppWorkerClient {
           );
         }
         return this.extractExifWorker;
-
-      case "llm":
-        if (!this.WebLLMWorker) {
-          this.WebLLMWorker = new Worker(
-            new URL("./webllm.worker.ts", import.meta.url),
-            { type: "module" },
-          );
-        }
-        return this.WebLLMWorker;
 
       default:
         throw new Error(`Unknown worker type: ${type}`);
@@ -394,127 +337,6 @@ export class AppWorkerClient {
     }
   }
 
-  /**
-   * Initialize the WebLLM engine that communicates with the worker
-   */
-  public async initializeWebLLMEngine(
-    modelId: string = this.targetModelId,
-  ): Promise<void> {
-    if (!this.WebLLMWorker) {
-      throw new Error("WebLLM worker is not available");
-    }
-
-    // Validate that we have models available
-    if (
-      !this.webllmAppConfig.model_list ||
-      this.webllmAppConfig.model_list.length === 0
-    ) {
-      throw new Error("No models configured in webllmAppConfig.model_list");
-    }
-
-    // Validate that the requested model exists in our model list
-    const modelExists = this.webllmAppConfig.model_list.some(
-      (model) => model.model_id === modelId,
-    );
-    if (!modelExists) {
-      throw new Error(
-        `Model '${modelId}' not found in configured model list. Available models: ${this.webllmAppConfig.model_list.map((m) => m.model_id).join(", ")}`,
-      );
-    }
-
-    // Reset engine if model changes
-    if (this.webLLMEngine && this.currentModelId !== modelId) {
-      this.webLLMEngine = null;
-    }
-
-    if (this.webLLMEngine) return;
-
-    const engineConfig: MLCEngineConfig = {
-      initProgressCallback: (report: InitProgressReport) => {
-        // report is exactly { progress, timeElapsed, text }
-        this.eventTarget.dispatchEvent(
-          new CustomEvent("progress", { detail: report }),
-        );
-      },
-      appConfig: this.webllmAppConfig ?? prebuiltAppConfig,
-    };
-
-    // Add custom app config if provided
-    if (this.webllmAppConfig) {
-      engineConfig.appConfig = this.webllmAppConfig;
-    }
-
-    try {
-      this.webLLMEngine = await CreateWebWorkerMLCEngine(
-        this.WebLLMWorker,
-        modelId,
-        engineConfig,
-      );
-
-      this.currentModelId = modelId;
-    } catch (error) {
-      console.error("Failed to initialize WebLLM engine:", error);
-      throw new Error(
-        `WebLLM engine initialization failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-
-  /**
-   * Ask the LLM a question with streaming response
-   */
-  async askLLM(
-    messages: ChatCompletionMessageParam[],
-    options: {
-      temperature?: number;
-      stream?: boolean;
-      onChunk?: (chunk: string) => void;
-    } = {},
-  ): Promise<string> {
-    // Ensure engine initialized or reinitialized if model changed
-    if (!this.webLLMEngine || this.currentModelId !== this.targetModelId) {
-      await this.initializeWebLLMEngine(this.targetModelId);
-    }
-
-    const { temperature = 1, stream = true, onChunk } = options;
-
-    if (stream) {
-      // Streaming response
-      const chunks = await this.webLLMEngine.chat.completions.create({
-        messages,
-        temperature,
-        stream: true,
-        stream_options: { include_usage: true },
-      });
-
-      let reply = "";
-      for await (const chunk of chunks) {
-        const content = chunk.choices[0]?.delta.content || "";
-        reply += content;
-
-        // Call the chunk callback if provided
-        if (onChunk && content) {
-          onChunk(content);
-        }
-
-        if (chunk.usage) {
-          console.log("Usage:", chunk.usage);
-        }
-      }
-
-      return reply;
-    } else {
-      // Non-streaming response
-      const response = await this.webLLMEngine.chat.completions.create({
-        messages,
-        temperature,
-        stream: false,
-      });
-
-      return response.choices[0]?.message?.content || "";
-    }
-  }
-
   // --- Lifecycle Management ---
   /**
    * Terminates all active workers to clean up resources.
@@ -540,12 +362,6 @@ export class AppWorkerClient {
     if (this.extractExifWorker) {
       this.extractExifWorker.terminate();
       this.extractExifWorker = null;
-    }
-    if (this.WebLLMWorker) {
-      this.WebLLMWorker.terminate();
-      this.WebLLMWorker = null;
-      this.webLLMEngine = null;
-      this.currentModelId = null;
     }
     console.log("All workers terminated.");
   }
