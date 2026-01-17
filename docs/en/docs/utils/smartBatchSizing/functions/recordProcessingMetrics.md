@@ -4,7 +4,7 @@
 
 > **recordProcessingMetrics**(`metrics`): `void`
 
-Defined in: [utils/smartBatchSizing.ts:397](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/432b0417d593dbe534fb8fb1fc1703513592423a/web/src/utils/smartBatchSizing.ts#L397)
+Defined in: [utils/smartBatchSizing.ts:397](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/700e54a9fc9657147393b731855c580bfadc21f3/web/src/utils/smartBatchSizing.ts#L397)
 
 Hook-friendly utility for recording processing metrics
 
