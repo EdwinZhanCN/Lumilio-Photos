@@ -9,7 +9,7 @@ NPM := npm
 API_URL ?= http://localhost:8080
 VITE_API_URL ?= $(API_URL)
 
-.PHONY: setup env-dev env-web-dev db-up db-down db-reset db-logs db-shell db-wait server-dev server-test server-build web-dev dev clean
+.PHONY: setup env-dev env-web-dev db-up db-down db-reset db-logs db-shell db-wait server-dev server-test server-build web-dev dev clean dto
 
 setup:
 	@echo "==> Installing Go dependencies"
@@ -123,3 +123,13 @@ clean:
 	rm -f $(WEB_DIR)/.env.development
 	rm -rf $(SERVER_DIR)/data
 	@echo "==> Clean complete"
+
+dto:
+	@echo "==> Generating OpenAPI spec and TypeScript types..."
+	@echo "==> Step 1: Generating OpenAPI spec from Go code..."
+	cd $(SERVER_DIR) && swag init --v3.1 -g cmd/main.go -o docs/
+	@echo "==> Step 2: Generating TypeScript types from OpenAPI spec..."
+	cd $(WEB_DIR) && npx openapi-typescript ../server/docs/swagger.yaml -o ./src/lib/http-commons/schema.d.ts
+	@echo "==> DTO synchronization complete!"
+	@echo "==> Backend: $(SERVER_DIR)/docs/swagger.yaml"
+	@echo "==> Frontend: $(WEB_DIR)/src/lib/http-commons/schema.d.ts"

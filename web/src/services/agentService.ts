@@ -46,7 +46,12 @@ export interface AgentEvent {
 /**
  * SSE event type
  */
-export type AgentEventType = "message" | "done" | "error";
+export type AgentEventType =
+  | "message"
+  | "done"
+  | "error"
+  | "command"
+  | "ui_event";
 
 /**
  * SSE stream event
@@ -126,28 +131,8 @@ export const agentService = {
         for (const line of lines) {
           if (!line.trim()) continue;
 
-          // Debug logging for troubleshooting
-          // console.log(
-          //   "[DEBUG] Raw SSE line:",
-          //   line.substring(0, 200) + (line.length > 200 ? "..." : ""),
-          // );
-
           const event = this.parseSSEEvent(line);
           if (event) {
-            // Debug logging for troubleshooting
-            // console.log("[DEBUG] Parsed event:", {
-            //   type: event.type,
-            //   data: event.data,
-            //   dataType: typeof event.data,
-            //   outputLength:
-            //     event.data &&
-            //     typeof event.data === "object" &&
-            //     "output" in event.data
-            //       ? typeof event.data.output === "string"
-            //         ? event.data.output.length
-            //         : "not string"
-            //       : "no output",
-            // });
             yield event;
           }
         }
@@ -223,9 +208,45 @@ export const agentService = {
    * @returns Promise resolving to array of tool info
    */
   async getAvailableTools(): Promise<ToolInfoResponse[]> {
-    const response =
-      await api.get<ApiResult<ToolInfoResponse[]>>("/agent/tools");
-    return response.data.data;
+    const response = await api.get<{ tools: ToolInfoResponse[] }>(
+      "/api/v1/agent/tools",
+    );
+    return response.data.tools || [];
+  },
+
+  /**
+   * Gets tools formatted for slash commands
+   *
+   * @returns Promise resolving to array of command objects
+   */
+  async getSlashCommands(): Promise<
+    Array<{
+      id: string;
+      label: string;
+      type: "command";
+      meta: string;
+      description?: string;
+    }>
+  > {
+    try {
+      const tools = await this.getAvailableTools();
+
+      if (!tools || !Array.isArray(tools)) {
+        console.warn("Invalid tools response:", tools);
+        return [];
+      }
+
+      return tools.map((tool) => ({
+        id: `tool-${tool.name}`,
+        label: `/${tool.name}`,
+        type: "command" as const,
+        meta: tool.desc || "No description available",
+        description: tool.desc,
+      }));
+    } catch (error) {
+      console.error("Error fetching slash commands:", error);
+      return [];
+    }
   },
 };
 

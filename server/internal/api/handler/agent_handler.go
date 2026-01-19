@@ -6,10 +6,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
-	pkgagent "server/internal/agent"
 	"server/internal/agent/core"
 	"server/internal/api"
+	"server/internal/api/dto"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/gin-gonic/gin"
@@ -27,7 +28,7 @@ func NewAgentHandler(agentService core.AgentService) *AgentHandler {
 	}
 }
 
-// AgentChatRequest represents the request body for agent chat
+// AgentChatRequest represents request body for agent chat
 type AgentChatRequest struct {
 	Query     string   `json:"query" binding:"required"`
 	ToolNames []string `json:"tool_names,omitempty"`
@@ -35,7 +36,7 @@ type AgentChatRequest struct {
 
 // Chat handles agent chat requests with SSE streaming
 // @Summary Chat with Agent
-// @Description Send a query to the agent and receive streaming responses via SSE
+// @Description Send a query to agent and receive streaming responses via SSE
 // @Tags agent
 // @Accept json
 // @Produce text/event-stream
@@ -65,16 +66,69 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 		return
 	}
 
-	// Create agent iterator
-	iter := h.agentService.AskAgent(c.Request.Context(), req.Query, req.ToolNames)
+	// Create UI side channel for tool-generated UI events
+	// 增加缓冲区容量以防止工具发送事件时阻塞
+	uiChannel := make(chan *core.SideChannelEvent, 100)
+
+	// Create agent iterator with UI channel
+	iter := h.agentService.AskAgent(c.Request.Context(), req.Query, req.ToolNames, uiChannel)
+
+	// 用于通知 goroutine 退出（防止 goroutine 泄漏）
+	done := make(chan struct{})
+	defer close(done)
+
+	// Start goroutine to handle UI events from tools
+	go func() {
+		defer close(uiChannel)
+		for {
+			select {
+			case <-done:
+				// 请求结束，立即退出
+				return
+
+			case <-c.Request.Context().Done():
+				// Client disconnected, stop listening
+				return
+
+			case event, ok := <-uiChannel:
+				if !ok {
+					// Channel closed
+					return
+				}
+
+				// 非阻塞发送（防止客户端断开后阻塞）
+				select {
+				case <-c.Request.Context().Done():
+					return
+				default:
+					// Send UI event through SSE
+					h.sendSSE(c, flusher, "ui_event", event)
+				}
+			}
+		}
+	}()
+
+	// 创建心跳定时器（每 30 秒发送一次心跳，保持连接活跃）
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 
 	// Stream events
 	for {
-		// Check if client disconnected
+		// Check if client disconnected or heartbeat tick
 		select {
 		case <-c.Request.Context().Done():
+			// Client disconnected
 			return
+
+		case <-ticker.C:
+			// Send heartbeat to keep connection alive
+			h.sendSSE(c, flusher, "heartbeat", map[string]interface{}{
+				"timestamp": time.Now().Unix(),
+			})
+			continue
+
 		default:
+			// Continue to process events
 		}
 
 		// Get next event
@@ -152,7 +206,7 @@ func (h *AgentHandler) formatAgentEvent(event *adk.AgentEvent) map[string]interf
 					result["reasoning"] = message.ReasoningContent
 				}
 
-				// First, try to use the Content field (plain text)
+				// First, try to use Content field (plain text)
 				if message.Content != "" {
 					result["output"] = message.Content
 				} else if len(message.AssistantGenMultiContent) > 0 {
@@ -202,7 +256,7 @@ func (h *AgentHandler) handleStreamingOutput(c *gin.Context, flusher http.Flushe
 		return
 	}
 
-	// Process all messages from the stream
+	// Process all messages from stream
 	for {
 		msg, err := messageVariant.MessageStream.Recv()
 		if err != nil {
@@ -271,22 +325,22 @@ func (h *AgentHandler) handleStreamingOutput(c *gin.Context, flusher http.Flushe
 	}
 }
 
-// ToolInfoResponse represents the tool information response
+// ToolInfoResponse represents tool information response
 type ToolInfoResponse struct {
 	Name  string                 `json:"name"`
 	Desc  string                 `json:"desc"`
 	Extra map[string]interface{} `json:"extra,omitempty"`
 }
 
-// GetTools returns the list of available tools
+// GetTools returns list of available tools
 // @Summary Get Available Tools
-// @Description Get the list of all registered agent tools
+// @Description Get list of all registered agent tools
 // @Tags agent
 // @Produce json
 // @Success 200 {object} api.Result{data=[]ToolInfoResponse}
 // @Router /agent/tools [get]
 func (h *AgentHandler) GetTools(c *gin.Context) {
-	registry := pkgagent.GetRegistry()
+	registry := core.GetRegistry()
 	tools := registry.GetAllToolInfos()
 
 	// Convert ToolInfo to a serializable format
@@ -306,4 +360,35 @@ func (h *AgentHandler) GetTools(c *gin.Context) {
 	}
 
 	api.GinSuccess(c, result)
+}
+
+// ToolSchemaResponse represents the schema response structure
+type ToolSchemaResponse struct {
+	BulkLikeUpdate dto.BulkLikeUpdateDTO `json:"bulk_like_update_example"`
+}
+
+// GetToolSchemas returns DTO schemas used by agent tools
+// @Summary Get Agent Tool DTO Schemas
+// @Description Get all DTO schemas used by agent tools for type reference
+// @Tags agent
+// @Produce json
+// @Success 200 {object} api.Result{data=ToolSchemaResponse}
+// @Router /agent/schemas [get]
+func (h *AgentHandler) GetToolSchemas(c *gin.Context) {
+	// This endpoint exists solely to register DTOs with Swagger
+	// These DTOs are used in agent tool SideChannel events
+	schema := ToolSchemaResponse{
+		BulkLikeUpdate: dto.BulkLikeUpdateDTO{
+			Total:          100,
+			Success:        98,
+			Failed:         2,
+			FailedAssetIDs: []string{"550e8400-e29b-41d4-a716-446655440000", "660e8400-e29b-41d4-a716-446655440001"},
+			Liked:          true,
+			Action:         "like",
+			Description:    "Bulk like: 98/100 successful",
+			Timestamp:      time.Now().Format(time.RFC3339),
+		},
+	}
+
+	api.GinSuccess(c, schema)
 }

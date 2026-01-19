@@ -10,7 +10,6 @@ import (
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
-	pkgagent "server/internal/agent"
 	"server/internal/agent/core"
 	"server/internal/agent/tools"
 	"server/internal/api"
@@ -143,17 +142,12 @@ func main() {
 	albumService := service.NewAlbumService(queries)
 
 	// Initialize Agent Service
-	agentToolDeps := &pkgagent.ToolDependencies{
-		Queries: queries,
-	}
-	agentService, err := core.NewLLMService(llmConfig, agentToolDeps)
-	if err != nil {
-		log.Fatalf("Failed to initialize agent service: %v", err)
-	}
+	agentService := core.NewAgentService(queries, llmConfig)
 	log.Println("✅ Agent Service Initialized")
 
 	// Register agent tools
 	tools.RegisterFilterAsset()
+	tools.RegisterBulkLikeTool()
 	log.Println("✅ Agent Tools Registered")
 
 	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, appConfig, lumenService)

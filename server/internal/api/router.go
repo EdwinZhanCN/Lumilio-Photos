@@ -83,8 +83,9 @@ type StatsControllerInterface interface {
 
 // AgentControllerInterface defines the interface for agent controllers
 type AgentControllerInterface interface {
-	Chat(c *gin.Context)     // POST /agent/chat - Chat with agent via SSE
-	GetTools(c *gin.Context) // GET /agent/tools - Get available tools
+	Chat(c *gin.Context)           // POST /agent/chat - Chat with agent via SSE
+	GetTools(c *gin.Context)       // GET /agent/tools - Get available tools
+	GetToolSchemas(c *gin.Context) // GET /agent/schemas - Get tool DTO schemas
 }
 
 func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface, queueController QueueControllerInterface, statsController StatsControllerInterface, agentController AgentControllerInterface) *gin.Engine {
@@ -193,6 +194,7 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 		{
 			agent.POST("/chat", agentController.Chat)
 			agent.GET("/tools", agentController.GetTools)
+			agent.GET("/schemas", agentController.GetToolSchemas)
 		}
 	}
 

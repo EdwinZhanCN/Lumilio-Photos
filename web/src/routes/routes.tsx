@@ -1,5 +1,6 @@
 import Home from "@/features/home/routes/Home";
 import Assets from "@/features/assets/routes/Assets";
+import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import { Studio } from "@/features/studio/routes/Studio";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { Lumen } from "@/features/lumen/routes/Lumen";
@@ -73,7 +74,11 @@ export const routes = [
   },
   {
     path: "/lumen",
-    element: <Lumen />,
+    element: (
+      <AssetsProvider>
+        <Lumen />
+      </AssetsProvider>
+    ),
   },
   {
     path: "/portfolio",
