@@ -289,7 +289,7 @@ export interface paths {
         put?: never;
         /**
          * Chat with Agent
-         * @description Send a query to the agent and receive streaming responses via SSE
+         * @description Send a query to agent and receive streaming responses via SSE
          */
         post: {
             parameters: {
@@ -340,6 +340,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agent/schemas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agent Tool DTO Schemas
+         * @description Get all DTO schemas used by agent tools for type reference
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agent/tools": {
         parameters: {
             query?: never;
@@ -349,7 +406,7 @@ export interface paths {
         };
         /**
          * Get Available Tools
-         * @description Get the list of all registered agent tools
+         * @description Get list of all registered agent tools
          */
         get: {
             parameters: {
@@ -4003,6 +4060,57 @@ export interface components {
             success?: boolean;
             task_id?: number;
         };
+        "dto.BulkLikeUpdateDTO": {
+            /**
+             * @description Action performed: "like" or "unlike"
+             * @example like
+             * @enum {string}
+             */
+            action?: "like" | "unlike";
+            /**
+             * @description Human-readable description
+             * @example Bulk like: 98/100 successful
+             */
+            description?: string;
+            /**
+             * @description Number of failed updates
+             * @example 2
+             */
+            failed?: number;
+            /**
+             * @description List of asset IDs that failed to update (only present when Failed > 0)
+             * @example [
+             *       "550e8400-e29b-41d4-a716-446655440000",
+             *       "660e8400-e29b-41d4-a716-446655440001"
+             *     ]
+             */
+            failed_asset_ids?: string[];
+            /**
+             * @description The like status that was applied (true = liked, false = unliked)
+             * @example true
+             */
+            liked?: boolean;
+            /**
+             * @description Reference ID for this result (can be used in subsequent tool calls)
+             * @example ref_1234567890
+             */
+            ref_id?: string;
+            /**
+             * @description Number of successfully updated assets
+             * @example 98
+             */
+            success?: number;
+            /**
+             * @description Timestamp when the operation completed
+             * @example 2026-01-18T19:34:00Z
+             */
+            timestamp?: string;
+            /**
+             * @description Total number of assets in the batch
+             * @example 100
+             */
+            total?: number;
+        };
         "dto.CreateAlbumRequestDTO": {
             album_name: string;
             cover_asset_id: string;
@@ -4276,6 +4384,9 @@ export interface components {
                 [key: string]: unknown;
             };
             name?: string;
+        };
+        "handler.ToolSchemaResponse": {
+            bulk_like_update_example?: components["schemas"]["dto.BulkLikeUpdateDTO"];
         };
     };
     responses: never;

@@ -37,6 +37,7 @@ export interface RuntimeState {
   messages: Message[];
   isRunning: boolean;
   error: string | null;
+  commandData?: any; // Store the latest command data from side channel
 }
 
 export interface RuntimeActions {
@@ -96,6 +97,7 @@ export function AgentRuntimeProvider({
     messages: [],
     isRunning: false,
     error: null,
+    commandData: null,
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -128,6 +130,15 @@ export function AgentRuntimeProvider({
           .map((part) => part.text)
           .join("\n");
 
+        // Check if the message contains a command (starts with /)
+        const toolNames = [];
+        if (textContent.startsWith("/")) {
+          const commandMatch = textContent.match(/^\/(\w+)/);
+          if (commandMatch) {
+            toolNames.push(commandMatch[1]);
+          }
+        }
+
         // Create an assistant message to stream the response into
         const assistantId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         let assistantMessage: Message = {
@@ -149,7 +160,7 @@ export function AgentRuntimeProvider({
         let showReasoning = false;
 
         for await (const event of agentService.streamAgentChat(
-          { query: textContent },
+          { query: textContent, tool_names: toolNames },
           abortControllerRef.current.signal,
         )) {
           if (event.type === "message") {
@@ -301,6 +312,78 @@ export function AgentRuntimeProvider({
                 }
               }
             }
+          } else if (event.type === "ui_event") {
+            // Handle UI event from side channel (filter_view, etc.)
+            const uiEventData = event.data as any;
+
+            // Update assistant message to indicate UI update
+            let uiText = "🖼️ **视图更新**: " + (uiEventData.type || "未知视图");
+            if (
+              uiEventData.params &&
+              Object.keys(uiEventData.params).length > 0
+            ) {
+              uiText += `\n\`\`\`json\n${JSON.stringify(uiEventData.params, null, 2)}\n\`\`\``;
+            }
+
+            // Add UI visualization to the accumulated content
+            accumulatedContent += (accumulatedContent ? "\n\n" : "") + uiText;
+
+            // Create combined content with reasoning using think tags
+            let combinedContent = "";
+            if (showReasoning && reasoningContent) {
+              combinedContent += `<think>${reasoningContent}</think>\n\n`;
+            }
+            combinedContent += accumulatedContent;
+
+            // Update the assistant message
+            assistantMessage = {
+              ...assistantMessage,
+              content: [{ type: "text", text: combinedContent }],
+            };
+
+            setState((prevState) => ({
+              ...prevState,
+              messages: [...prevState.messages.slice(0, -1), assistantMessage],
+              commandData: uiEventData, // Store the UI event data for parent components
+            }));
+            continue;
+          } else if (event.type === "command") {
+            // Handle UI command from side channel
+            const commandData = event.data as any;
+
+            // Update assistant message to indicate command execution
+            let commandText =
+              "✅ **执行命令**: " + (commandData.type || "未知命令");
+            if (
+              commandData.params &&
+              Object.keys(commandData.params).length > 0
+            ) {
+              commandText += `\n\`\`\`json\n${JSON.stringify(commandData.params, null, 2)}\n\`\`\``;
+            }
+
+            // Add command visualization to the accumulated content
+            accumulatedContent +=
+              (accumulatedContent ? "\n\n" : "") + commandText;
+
+            // Create combined content with reasoning using think tags
+            let combinedContent = "";
+            if (showReasoning && reasoningContent) {
+              combinedContent += `</think>${reasoningContent}</think>\n\n`;
+            }
+            combinedContent += accumulatedContent;
+
+            // Update the assistant message
+            assistantMessage = {
+              ...assistantMessage,
+              content: [{ type: "text", text: combinedContent }],
+            };
+
+            setState((prevState) => ({
+              ...prevState,
+              messages: [...prevState.messages.slice(0, -1), assistantMessage],
+              commandData: commandData, // Store the command data
+            }));
+            continue;
           } else if (event.type === "error") {
             const errorMsg =
               typeof event.data === "object" && "error" in event.data

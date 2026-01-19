@@ -3,9 +3,11 @@ package core
 import (
 	"context"
 	"fmt"
-	"server/config"
-	pkgagent "server/internal/agent"
 	"strings"
+	"time"
+
+	"server/config"
+	"server/internal/db/repo"
 
 	"github.com/cloudwego/eino-ext/components/model/ark"
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
@@ -23,20 +25,37 @@ const (
 )
 
 type AgentService interface {
+	// AskAgent 执行 Agent 查询
+	// uiChannel: 可选，用于接收工具产生的 UI 指令/数据
+	AskAgent(ctx context.Context, query string, toolNames []string, uiChannel ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
+
+	// GetAvailableTools 列出所有可用工具
+	GetAvailableTools() []*schema.ToolInfo
+
+	// AskLLM 直接与 LLM 交互，不使用任何工具
 	AskLLM(ctx context.Context, query string) (resp string, err error)
-	AskAgent(ctx context.Context, query string, toolNames []string) *adk.AsyncIterator[*adk.AgentEvent]
 }
 
 type agentService struct {
-	config config.LLMConfig
-	deps   *pkgagent.ToolDependencies
+	queries  *repo.Queries
+	registry *ToolRegistry
+	config   config.LLMConfig
 }
 
-func NewLLMService(llmConfig config.LLMConfig, deps *pkgagent.ToolDependencies) (*agentService, error) {
+func NewAgentService(queries *repo.Queries, llmConfig config.LLMConfig) AgentService {
+	// 注册核心工具
+	// 注意：在实际启动时应该统一注册，这里为了 demo 确保注册
+	// tools.RegisterFilterAsset() // 假设在 main 或 init 中已调用
+
 	return &agentService{
-		config: llmConfig,
-		deps:   deps,
-	}, nil
+		queries:  queries,
+		registry: GetRegistry(),
+		config:   llmConfig,
+	}
+}
+
+func (s *agentService) GetAvailableTools() []*schema.ToolInfo {
+	return s.registry.GetAllToolInfos()
 }
 
 func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatModel, error) {
@@ -65,48 +84,7 @@ func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatM
 	}
 }
 
-func (s *agentService) newDefaultChatModelAgent(ctx context.Context) (adk.Agent, error) {
-	// 获取所有已注册的工具名称
-	registry := pkgagent.GetRegistry()
-	toolNames := registry.GetAllToolNames()
-
-	// 从 Registry 构建所有工具
-	tools, err := registry.BuildTools(ctx, toolNames, s.deps)
-	if err != nil {
-		return nil, fmt.Errorf("build tools error: %w", err)
-	}
-
-	// 创建 ChatModel
-	chatModel, err := s.newChatModel(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("create chat model error: %w", err)
-	}
-
-	// 构建默认 Agent,包含所有工具
-	agent, err := adk.NewChatModelAgent(
-		ctx,
-		&adk.ChatModelAgentConfig{
-			Name:        "Default",
-			Description: "Default Agent with all available tools",
-			Instruction: "You are a helpful assistant for managing photo assets. You have access to various tools to filter, search, and manage photo assets. Use these tools to help users with their requests.",
-			Model:       chatModel,
-			ToolsConfig: adk.ToolsConfig{
-				ToolsNodeConfig: compose.ToolsNodeConfig{
-					Tools: tools,
-				},
-			},
-		},
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("create agent error: %w", err)
-	}
-
-	return agent, nil
-}
-
 func (s *agentService) AskLLM(ctx context.Context, query string) (resp string, err error) {
-
 	cm, err := s.newChatModel(ctx)
 	if err != nil {
 		return "", fmt.Errorf("create chat model error: %w", err)
@@ -124,28 +102,50 @@ func (s *agentService) AskLLM(ctx context.Context, query string) (resp string, e
 	return response.Content, nil
 }
 
-func (s *agentService) newAgentWithTools(ctx context.Context, toolNames []string) (adk.Agent, error) {
-	registry := pkgagent.GetRegistry()
-
-	// 从 Registry 构建指定的工具
-	tools, err := registry.BuildTools(ctx, toolNames, s.deps)
-	if err != nil {
-		return nil, fmt.Errorf("build tools error: %w", err)
+func (s *agentService) AskAgent(ctx context.Context, query string, toolNames []string, uiChannel ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
+	// 1. 准备工具依赖
+	// Handle optional uiChannel parameter
+	var sideChannel chan<- *SideChannelEvent
+	if len(uiChannel) > 0 && uiChannel[0] != nil {
+		sideChannel = uiChannel[0]
 	}
 
-	// 创建 ChatModel
+	// 2. 创建 ReferenceManager（用于跨工具存储和引用数据）
+	deps := &ToolDependencies{
+		Queries:     s.queries,
+		SideChannel: sideChannel,
+	}
+	deps.ReferenceManager = NewReferenceManager(deps)
+
+	// 3. 创建 ToolInputExtractor（用于自动转换 ref_id）
+	deps.InputExtractor = NewToolInputExtractor(deps.ReferenceManager)
+
+	// 2. 默认使用所有工具，或者根据请求过滤
+	if len(toolNames) == 0 {
+		// 默认加载常用工具
+		toolNames = []string{"filter_assets"}
+	}
+
+	// 3. 获取工具实例 (请求级隔离)
+	tools, err := s.registry.GetTools(ctx, toolNames, deps)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get tools: %v", err))
+	}
+
+	// 4. 创建 ChatModel
 	chatModel, err := s.newChatModel(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("create chat model error: %w", err)
+		panic(fmt.Sprintf("failed to create chat model: %v", err))
 	}
 
-	// 构建自定义 Agent,只包含指定的工具
+	// 5. 构建 Agent
+	today := time.Now().Format("2006-01-02")
 	agent, err := adk.NewChatModelAgent(
 		ctx,
 		&adk.ChatModelAgentConfig{
-			Name:        "Custom",
-			Description: "Custom Agent with selected tools",
-			Instruction: "You are a helpful assistant for managing photo assets. Use the available tools to help users with their requests.",
+			Name:        "Photo Asset Assistant",
+			Description: "Agent for managing photo assets with filtering and search capabilities",
+			Instruction: fmt.Sprintf("You are a helpful assistant for managing photo assets. Today is %s", today),
 			Model:       chatModel,
 			ToolsConfig: adk.ToolsConfig{
 				ToolsNodeConfig: compose.ToolsNodeConfig{
@@ -154,52 +154,16 @@ func (s *agentService) newAgentWithTools(ctx context.Context, toolNames []string
 			},
 		},
 	)
-
 	if err != nil {
-		return nil, fmt.Errorf("create agent error: %w", err)
+		panic(fmt.Sprintf("failed to create agent: %v", err))
 	}
 
-	return agent, nil
-}
-
-func (s *agentService) newAgentRunner(ctx context.Context, toolNames []string) (*adk.Runner, error) {
-	var agent adk.Agent
-	var err error
-
-	// 如果没有指定工具列表，使用默认 Agent(包含所有工具)
-	if len(toolNames) == 0 {
-		agent, err = s.newDefaultChatModelAgent(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("create default agent: %w", err)
-		}
-	} else {
-		// 使用指定的工具列表创建 Agent
-		agent, err = s.newAgentWithTools(ctx, toolNames)
-		if err != nil {
-			return nil, fmt.Errorf("create agent with tools: %w", err)
-		}
-	}
-
-	// 创建 Runner
+	// 6. 创建 Runner
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{
 		Agent:           agent,
 		EnableStreaming: true,
 	})
 
-	return runner, nil
-}
-
-func (s *agentService) AskAgent(ctx context.Context, query string, toolNames []string) *adk.AsyncIterator[*adk.AgentEvent] {
-	// 创建 Runner
-	// 注意: 这里如果失败会 panic,因为 AskAgent 接口无法返回 error
-	// 调用方应该确保配置正确,或者在调用前先验证配置
-	runner, err := s.newAgentRunner(ctx, toolNames)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create agent runner: %v", err))
-	}
-
-	// 使用 Query 方法运行 Agent (接受字符串查询)
-	// Query 会立即返回 AsyncIterator,事件会异步生成
-	// 错误会通过 AgentEvent.Err 字段传递
+	// 7. 执行查询
 	return runner.Query(ctx, query)
 }
