@@ -1,4 +1,5 @@
 // Lumilio-Photos/web/src/features/lumilio/rich-input/utils.ts
+import ReactDOMServer from "react-dom/server";
 
 /**
  * 解析 contentEditable 容器的内容为结构化的 payload 字符串
@@ -70,6 +71,35 @@ export const parseContentToPayload = (container: HTMLDivElement): string => {
  * });
  * ```
  */
+/**
+ * 获取根据类型生成的默认图标 SVG
+ *
+ * @param type - 提及类型
+ * @returns 图标 HTML 字符串
+ */
+const getDefaultIconByType = (): string => {
+  const iconStyle = "width: 12px; height: 12px; margin-right: 4px;";
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="${iconStyle}"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></svg>`;
+};
+
+/**
+ * 创建一个胶囊（Pill）元素
+ *
+ * 提及元素使用 contentEditable="false"，不可编辑
+ *
+ * @param entity - 要插入的提及实体
+ * @returns 创建的 HTMLSpanElement
+ *
+ * @example
+ * ```tsx
+ * const pill = createPillElement({
+ *   id: "123",
+ *   label: "Summer Trip",
+ *   type: "album",
+ *   icon: <IconAlbum />
+ * });
+ * ```
+ */
 export const createPillElement = (entity: {
   id: string;
   label: string;
@@ -86,28 +116,12 @@ export const createPillElement = (entity: {
   span.setAttribute("data-mention-type", entity.type);
   span.setAttribute("data-mention-label", entity.label);
 
-  // 生成图标 SVG（根据类型）
-  let iconSvg = "";
-  if (entity.type === "album")
-    iconSvg =
-      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
-  else if (entity.type === "tag")
-    iconSvg =
-      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>';
-  else if (entity.type === "camera")
-    iconSvg =
-      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
-  else if (entity.type === "lens")
-    iconSvg =
-      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>';
-  else if (entity.type === "location")
-    iconSvg =
-      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
-  else if (entity.type === "command")
-    iconSvg =
-      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>';
+  // 使用传入的 icon，如果没有则根据 type 生成默认图标
+  const iconHtml = entity.icon
+    ? ReactDOMServer.renderToString(entity.icon)
+    : getDefaultIconByType();
 
-  span.innerHTML = `${iconSvg}${entity.label}`;
+  span.innerHTML = `${iconHtml}${entity.label}`;
 
   return span;
 };
