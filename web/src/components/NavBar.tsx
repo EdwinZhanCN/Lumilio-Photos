@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
-import { LumenAvatar } from "@/features/lumen";
+import { LumenAvatar } from "@/features/lumilio";
 
 // Extend Window interface for our observer
 declare global {

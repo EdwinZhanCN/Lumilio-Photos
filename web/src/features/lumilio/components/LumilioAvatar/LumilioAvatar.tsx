@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import "@/styles/pyramid.css";
 
-interface LumenAvatarProps {
+interface LumilioAvatarProps {
   /** When true, the pyramid will spin. */
   start?: boolean;
   /** Size in rem units. Default is 1 (20rem base size). */
@@ -57,7 +57,7 @@ function smoothReset(
   el.addEventListener("webkitTransitionEnd", clean);
 }
 
-export const LumenAvatar: React.FC<LumenAvatarProps> = ({
+export const LumilioAvatar: React.FC<LumilioAvatarProps> = ({
   start = false,
   size = 1,
   className = "",
