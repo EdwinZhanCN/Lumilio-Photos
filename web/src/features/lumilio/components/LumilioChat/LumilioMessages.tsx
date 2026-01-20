@@ -132,15 +132,11 @@ export function LumilioMessages({
               message.role === "user" ? "chat-end" : "chat-start"
             }`}
           >
-            <div className="chat-image avatar">
+            <div className="chat-image">
               <div className="w-10 rounded-full">
-                {message.role === "user" ? (
-                  <div className="w-full h-full flex items-center justify-center text-white font-bold rounded-full bg-primary">
-                    U
-                  </div>
-                ) : (
+                {message.role === "assistant" && (
                   <div className="w-full h-full flex items-center justify-center">
-                    <LumilioAvatar start={isStreamingHere} size={0.1} />
+                    <LumilioAvatar start={isStreamingHere} size={0.2} />
                   </div>
                 )}
               </div>

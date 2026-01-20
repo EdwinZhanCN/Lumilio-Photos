@@ -47,7 +47,8 @@ func RegisterBulkLikeTool() {
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
-		return utils.NewTool(info, func(ctx context.Context, input *BulkLikeInput) (*BulkLikeOutput, error) {
+		// Use InferTool to automatically generate the parameter schema from BulkLikeInput's struct tags.
+		t, err := utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *BulkLikeInput) (*BulkLikeOutput, error) {
 			startTime := time.Now()
 
 			// =====================================================
@@ -418,6 +419,10 @@ func RegisterBulkLikeTool() {
 				Duration:  duration,
 				Timestamp: startTime.Format(time.RFC3339),
 			}, nil
-		}), nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return t, nil
 	})
 }
