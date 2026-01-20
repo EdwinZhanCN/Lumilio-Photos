@@ -1,24 +1,21 @@
 // Lumilio-Photos/web/src/features/lumilio/rich-input/utils.ts
 import ReactDOMServer from "react-dom/server";
 
-/**
- * 解析 contentEditable 容器的内容为结构化的 payload 字符串
- *
- * 将文本节点和提及元素（带有 data-mention-* 属性的元素）组合成格式化字符串。
- * 提及元素会被转换为格式: @[Label](Type:ID)
- *
- * @param container - contentEditable 的容器元素
- * @returns 解析后的 payload 字符串
- *
- * @example
- * ```tsx
- * // HTML 内容：
- * // "Hello @[Summer Trip](album:123)!"
- * //
- * // 返回：
- * // "Hello @[Summer Trip](album:123)"
- * ```
- */
+/** Parses contentEditable container content into a structured payload string.
+
+  Combines text nodes and mention elements (with data-mention-* attributes) into
+  a formatted string. Mention elements are converted to format: @[Label](Type:ID).
+
+  Args:
+    container: The contentEditable container element.
+
+  Returns:
+    The parsed payload string.
+
+  Example:
+    HTML content: "Hello @[Summer Trip](album:123)!"
+    Returns: "Hello @[Summer Trip](album:123)"
+*/
 export const parseContentToPayload = (container: HTMLDivElement): string => {
   let text = "";
 
@@ -53,30 +50,14 @@ export const parseContentToPayload = (container: HTMLDivElement): string => {
     .trim();
 };
 
-/**
- * 创建一个胶囊（Pill）元素
- *
- * 提及元素使用 contentEditable="false"，不可编辑
- *
- * @param entity - 要插入的提及实体
- * @returns 创建的 HTMLSpanElement
- *
- * @example
- * ```tsx
- * const pill = createPillElement({
- *   id: "123",
- *   label: "Summer Trip",
- *   type: "album",
- *   icon: <IconAlbum />
- * });
- * ```
- */
-/**
- * 获取根据类型生成的默认图标 SVG
- *
- * @param type - 提及类型
- * @returns 图标 HTML 字符串
- */
+/** Gets the default icon SVG based on type.
+
+  Args:
+    type: The mention type.
+
+  Returns:
+    The icon HTML string.
+*/
 const getDefaultIconByType = (type: string): string => {
   const iconStyle =
     "width: 12px; height: 12px; margin-right: 4px; display: inline-block; vertical-align: middle;";
@@ -88,24 +69,27 @@ const getDefaultIconByType = (type: string): string => {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="${iconStyle}"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></svg>`;
 };
 
-/**
- * 创建一个胶囊（Pill）元素
- *
- * 提及元素使用 contentEditable="false"，不可编辑
- *
- * @param entity - 要插入的提及实体
- * @returns 创建的 HTMLSpanElement
- *
- * @example
- * ```tsx
- * const pill = createPillElement({
- *   id: "123",
- *   label: "Summer Trip",
- *   type: "album",
- *   icon: <IconAlbum />
- * });
- * ```
- */
+/** Creates a pill (capsule) element for mentions.
+
+  Mention elements use contentEditable="false", making them non-editable.
+
+  Args:
+    entity: The mention entity to create a pill for, containing id, label, type,
+            and optional icon.
+
+  Returns:
+    The created HTMLSpanElement representing the pill.
+
+  Example:
+    ```tsx
+    const pill = createPillElement({
+      id: "123",
+      label: "Summer Trip",
+      type: "album",
+      icon: <IconAlbum />
+    });
+    ```
+*/
 export const createPillElement = (entity: {
   id: string;
   label: string;
@@ -134,15 +118,18 @@ export const createPillElement = (entity: {
   return span;
 };
 
-/**
- * 计算菜单的显示位置
- *
- * 根据光标位置和编辑器位置，计算出悬浮菜单应该显示的位置
- *
- * @param range - 当前选中的 Range
- * @param editorRef - 编辑器的 ref
- * @returns 菜单位置 { top, left }
- */
+/** Calculates the menu display position.
+
+  Computes the position where the floating menu should be displayed based on
+  the cursor position and editor position.
+
+  Args:
+    range: The currently selected Range.
+    editorRef: Reference to the editor element.
+
+  Returns:
+    The menu position as { top, left } or null if calculation fails.
+*/
 export const calculateMenuPosition = (
   range: Range,
   editorRef: React.RefObject<HTMLDivElement | null>,
@@ -160,13 +147,16 @@ export const calculateMenuPosition = (
   return { top: top + 20, left };
 };
 
-/**
- * 查找文本节点中最后一个触发符（@ 或 /）的位置
- *
- * @param textNode - 文本节点
- * @param offset - 光标偏移量
- * @returns 最后一个触发符的索引，如果没有则返回 -1
- */
+/** Finds the position of the last trigger character (@ or /) in a text node.
+
+  Args:
+    textNode: The text node to search.
+    offset: The cursor offset position.
+
+  Returns:
+    An object containing the index and character of the last trigger,
+    or null if no trigger character is found.
+*/
 export const findLastTriggerChar = (
   textNode: Text,
   offset: number,
@@ -188,17 +178,17 @@ export const findLastTriggerChar = (
   return null;
 };
 
-/**
- * 将胶囊元素插入到编辑器中
- *
- * 此函数会：
- * 1. 删除触发符（@ 或 /）
- * 2. 创建并插入胶囊元素
- * 3. 将光标移动到胶囊后面并插入空格
- *
- * @param entity - 要插入的提及实体
- * @param onInsert - 插入后的回调函数
- */
+/** Inserts a pill element into the editor.
+
+  This function performs the following steps:
+  1. Deletes the trigger character (@ or /)
+  2. Creates and inserts the pill element
+  3. Moves the cursor after the pill and inserts a space
+
+  Args:
+    entity: The mention entity to insert.
+    onInsert: Optional callback function to execute after insertion.
+*/
 export const insertPill = (
   entity: {
     id: string;
@@ -256,11 +246,11 @@ export const insertPill = (
   onInsert?.();
 };
 
-/**
- * 清空编辑器内容
- *
- * @param editorRef - 编辑器的 ref
- */
+/** Clears the editor content.
+
+  Args:
+    editorRef: Reference to the editor element to clear.
+*/
 export const clearEditor = (
   editorRef: React.RefObject<HTMLDivElement | null>,
 ): void => {
