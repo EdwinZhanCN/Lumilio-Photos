@@ -1000,6 +1000,9 @@ const docTemplate = `{
                     "query": {
                         "type": "string"
                     },
+                    "thread_id": {
+                        "type": "string"
+                    },
                     "tool_names": {
                         "items": {
                             "type": "string"
@@ -1010,6 +1013,22 @@ const docTemplate = `{
                 },
                 "required": [
                     "query"
+                ],
+                "type": "object"
+            },
+            "handler.AgentResumeRequest": {
+                "properties": {
+                    "targets": {
+                        "additionalProperties": {},
+                        "type": "object"
+                    },
+                    "thread_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "targets",
+                    "thread_id"
                 ],
                 "type": "object"
             },
@@ -1617,7 +1636,7 @@ const docTemplate = `{
         },
         "/agent/chat": {
             "post": {
-                "description": "Send a query to agent and receive streaming responses via SSE",
+                "description": "Send a query to agent and receive streaming responses via SSE. Manages conversation threads.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -1671,6 +1690,67 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Chat with Agent",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
+        "/agent/chat/resume": {
+            "post": {
+                "description": "Resume a conversation from an interrupt point (e.g., user confirmation for a tool call)",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/handler.AgentResumeRequest",
+                                        "summary": "request",
+                                        "description": "Resume request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Resume request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "SSE stream"
+                    },
+                    "400": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "500": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Resume Agent Chat",
                 "tags": [
                     "agent"
                 ]

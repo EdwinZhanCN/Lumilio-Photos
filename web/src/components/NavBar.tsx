@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
-import { LumenAvatar } from "@/features/lumilio";
+import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/LumilioAvatar";
 
 // Extend Window interface for our observer
 declare global {
@@ -105,12 +105,12 @@ function NavBar() {
         {(() => {
           const [start, setStart] = useState(false);
           return (
-            <Link to={"/lumen"}>
+            <Link to={"/lumilio"}>
               <div
                 onMouseEnter={() => setStart(true)}
                 onMouseLeave={() => setStart(false)}
               >
-                <LumenAvatar
+                <LumilioAvatar
                   className="mb-2 pointer-cursor"
                   size={0.2}
                   start={start}

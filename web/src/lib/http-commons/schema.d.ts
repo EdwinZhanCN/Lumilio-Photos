@@ -289,7 +289,7 @@ export interface paths {
         put?: never;
         /**
          * Chat with Agent
-         * @description Send a query to agent and receive streaming responses via SSE
+         * @description Send a query to agent and receive streaming responses via SSE. Manages conversation threads.
          */
         post: {
             parameters: {
@@ -302,6 +302,68 @@ export interface paths {
             requestBody: {
                 content: {
                     "application/json": Record<string, never> | components["schemas"]["handler.AgentChatRequest"];
+                };
+            };
+            responses: {
+                /** @description SSE stream */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/chat/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Agent Chat
+         * @description Resume a conversation from an interrupt point (e.g., user confirmation for a tool call)
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Resume request */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["handler.AgentResumeRequest"];
                 };
             };
             responses: {
@@ -4302,7 +4364,14 @@ export interface components {
         };
         "handler.AgentChatRequest": {
             query: string;
+            thread_id?: string;
             tool_names?: string[];
+        };
+        "handler.AgentResumeRequest": {
+            targets: {
+                [key: string]: unknown;
+            };
+            thread_id: string;
         };
         "handler.AvailableYearsResponse": {
             years?: number[];

@@ -14,6 +14,7 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // AgentHandler handles agent-related HTTP requests
@@ -30,13 +31,20 @@ func NewAgentHandler(agentService core.AgentService) *AgentHandler {
 
 // AgentChatRequest represents request body for agent chat
 type AgentChatRequest struct {
+	ThreadID  string   `json:"thread_id,omitempty"`
 	Query     string   `json:"query" binding:"required"`
 	ToolNames []string `json:"tool_names,omitempty"`
 }
 
+// AgentResumeRequest represents request body for resuming agent chat
+type AgentResumeRequest struct {
+	ThreadID string         `json:"thread_id" binding:"required"`
+	Targets  map[string]any `json:"targets" binding:"required"`
+}
+
 // Chat handles agent chat requests with SSE streaming
 // @Summary Chat with Agent
-// @Description Send a query to agent and receive streaming responses via SSE
+// @Description Send a query to agent and receive streaming responses via SSE. Manages conversation threads.
 // @Tags agent
 // @Accept json
 // @Produce text/event-stream
@@ -52,116 +60,155 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 		return
 	}
 
-	// Set SSE headers
+	// 准备 SSE
+	flusher, err := h.prepareSSE(c)
+	if err != nil {
+		api.GinInternalError(c, err)
+		return
+	}
+
+	// 管理会话 ID
+	threadID := req.ThreadID
+	if threadID == "" {
+		threadID = uuid.NewString()
+	}
+
+	// 创建 UI 侧信道
+	uiChannel := make(chan *core.SideChannelEvent, 100)
+
+	// 获取 Agent 迭代器
+	iter := h.agentService.AskAgent(c.Request.Context(), threadID, req.Query, req.ToolNames, uiChannel)
+
+	// 发送会话信息事件
+	h.sendSSE(c, flusher, "session_info", map[string]string{"thread_id": threadID})
+
+	// 开始流式传输事件
+	h.streamAgentEvents(c, flusher, iter, uiChannel)
+}
+
+// ResumeChat handles resuming an interrupted agent execution
+// @Summary Resume Agent Chat
+// @Description Resume a conversation from an interrupt point (e.g., user confirmation for a tool call)
+// @Tags agent
+// @Accept json
+// @Produce text/event-stream
+// @Param request body AgentResumeRequest true "Resume request"
+// @Success 200 {string} string "SSE stream"
+// @Failure 400 {object} api.Result "Invalid request"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /agent/chat/resume [post]
+func (h *AgentHandler) ResumeChat(c *gin.Context) {
+	var req AgentResumeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	flusher, err := h.prepareSSE(c)
+	if err != nil {
+		api.GinInternalError(c, err)
+		return
+	}
+
+	uiChannel := make(chan *core.SideChannelEvent, 100)
+
+	// 构建 Resume 参数
+	params := &adk.ResumeParams{
+		Targets: req.Targets,
+	}
+
+	iter, err := h.agentService.ResumeAgent(c.Request.Context(), req.ThreadID, params, uiChannel)
+	if err != nil {
+		h.sendSSE(c, flusher, "error", map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	h.sendSSE(c, flusher, "session_info", map[string]string{"thread_id": req.ThreadID})
+	h.streamAgentEvents(c, flusher, iter, uiChannel)
+}
+
+// prepareSSE sets the necessary headers for Server-Sent Events.
+func (h *AgentHandler) prepareSSE(c *gin.Context) (http.Flusher, error) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.Header().Set("Transfer-Encoding", "chunked")
 	c.Writer.Header().Set("X-Accel-Buffering", "no") // Disable Nginx buffering
 
-	// Get flush writer
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
-		api.GinInternalError(c, fmt.Errorf("streaming not supported"))
-		return
+		return nil, fmt.Errorf("streaming not supported")
 	}
+	return flusher, nil
+}
 
-	// Create UI side channel for tool-generated UI events
-	// 增加缓冲区容量以防止工具发送事件时阻塞
-	uiChannel := make(chan *core.SideChannelEvent, 100)
-
-	// Create agent iterator with UI channel
-	iter := h.agentService.AskAgent(c.Request.Context(), req.Query, req.ToolNames, uiChannel)
-
-	// 用于通知 goroutine 退出（防止 goroutine 泄漏）
+// streamAgentEvents handles the main loop for streaming agent and UI events via SSE.
+func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, iter *adk.AsyncIterator[*adk.AgentEvent], uiChannel chan *core.SideChannelEvent) {
 	done := make(chan struct{})
 	defer close(done)
 
-	// Start goroutine to handle UI events from tools
+	// Goroutine to handle UI events from tools
 	go func() {
 		defer close(uiChannel)
 		for {
 			select {
 			case <-done:
-				// 请求结束，立即退出
 				return
-
 			case <-c.Request.Context().Done():
-				// Client disconnected, stop listening
 				return
-
 			case event, ok := <-uiChannel:
 				if !ok {
-					// Channel closed
 					return
 				}
-
-				// 非阻塞发送（防止客户端断开后阻塞）
-				select {
-				case <-c.Request.Context().Done():
-					return
-				default:
-					// Send UI event through SSE
-					h.sendSSE(c, flusher, "ui_event", event)
-				}
+				h.sendSSE(c, flusher, "ui_event", event)
 			}
 		}
 	}()
 
-	// 创建心跳定时器（每 30 秒发送一次心跳，保持连接活跃）
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	// Stream events
 	for {
-		// Check if client disconnected or heartbeat tick
 		select {
 		case <-c.Request.Context().Done():
-			// Client disconnected
 			return
-
 		case <-ticker.C:
-			// Send heartbeat to keep connection alive
-			h.sendSSE(c, flusher, "heartbeat", map[string]interface{}{
-				"timestamp": time.Now().Unix(),
-			})
+			h.sendSSE(c, flusher, "heartbeat", map[string]interface{}{"timestamp": time.Now().Unix()})
 			continue
-
 		default:
-			// Continue to process events
 		}
 
-		// Get next event
 		event, ok := iter.Next()
 		if !ok {
-			// Stream ended
 			h.sendSSE(c, flusher, "done", nil)
 			return
 		}
 
-		// Check for errors
+		// Guardrail: Skip internal-only events that are not meant for the user.
+		// An event with only `CustomizedOutput` is a raw tool result intended for the next LLM reasoning step.
+		if event.Output != nil && event.Output.MessageOutput == nil && event.Output.CustomizedOutput != nil {
+			continue
+		}
+
 		if event.Err != nil {
-			h.sendSSE(c, flusher, "error", map[string]interface{}{
-				"error": event.Err.Error(),
-			})
+			h.sendSSE(c, flusher, "error", map[string]interface{}{"error": event.Err.Error()})
 			return
 		}
 
-		// Handle streaming output specially
 		if event.Output != nil && event.Output.MessageOutput != nil && event.Output.MessageOutput.IsStreaming {
-			// Process streaming messages
 			h.handleStreamingOutput(c, flusher, event)
 		} else {
-			// Send regular event data
 			eventData := h.formatAgentEvent(event)
 			h.sendSSE(c, flusher, "message", eventData)
 		}
-
 	}
 }
 
 // sendSSE sends a Server-Sent Event
 func (h *AgentHandler) sendSSE(c *gin.Context, flusher http.Flusher, eventType string, data interface{}) {
+	if c.Request.Context().Err() != nil {
+		return // 客户端已断开，不发送
+	}
 	var jsonData []byte
 	var err error
 
@@ -170,14 +217,12 @@ func (h *AgentHandler) sendSSE(c *gin.Context, flusher http.Flusher, eventType s
 	} else {
 		jsonData, err = json.Marshal(data)
 		if err != nil {
-			// Send error event
 			fmt.Fprintf(c.Writer, "event: error\ndata: {\"error\":\"failed to marshal data\"}\n\n")
 			flusher.Flush()
 			return
 		}
 	}
 
-	// Format: event: <type>\ndata: <json>\n\n
 	fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", eventType, jsonData)
 	flusher.Flush()
 }
@@ -185,38 +230,28 @@ func (h *AgentHandler) sendSSE(c *gin.Context, flusher http.Flusher, eventType s
 // formatAgentEvent formats an AgentEvent for JSON serialization
 func (h *AgentHandler) formatAgentEvent(event *adk.AgentEvent) map[string]interface{} {
 	result := make(map[string]interface{})
-
 	result["agent_name"] = event.AgentName
-
 	if len(event.RunPath) > 0 {
 		result["run_path"] = event.RunPath
 	}
 
 	if event.Output != nil {
-		// Extract text content from AgentOutput
-		// AgentOutput contains MessageOutput which may be streaming
 		if event.Output.MessageOutput != nil {
-			messageVariant := event.Output.MessageOutput
-
-			// Handle non-streaming output
-			message := messageVariant.Message
-			if message != nil {
-				// Check for reasoning content first
+			message := event.Output.MessageOutput.Message
+			// Guardrail: Only process messages with the 'assistant' role as user-facing output.
+			// Messages with a 'tool' role are internal results for the LLM and should not be displayed.
+			if message != nil && message.Role == "assistant" {
 				if message.ReasoningContent != "" {
 					result["reasoning"] = message.ReasoningContent
 				}
-
-				// First, try to use Content field (plain text)
 				if message.Content != "" {
 					result["output"] = message.Content
 				} else if len(message.AssistantGenMultiContent) > 0 {
-					// If Content is empty, try AssistantGenMultiContent (multimodal output)
 					var textParts []string
 					for _, part := range message.AssistantGenMultiContent {
 						if part.Type == "text" {
 							textParts = append(textParts, part.Text)
 						}
-						// Ignore other types like image/tool calls for streaming output
 					}
 					if len(textParts) > 0 {
 						result["output"] = strings.Join(textParts, "")
@@ -224,20 +259,15 @@ func (h *AgentHandler) formatAgentEvent(event *adk.AgentEvent) map[string]interf
 				}
 			}
 		} else if event.Output.CustomizedOutput != nil {
-			// Handle custom output
-			outputData, err := json.Marshal(event.Output.CustomizedOutput)
-			if err != nil {
-				result["output"] = fmt.Sprintf("%v", event.Output.CustomizedOutput)
-			} else {
-				result["output"] = string(outputData)
-			}
+			// This block handles outputs that are not from the LLM. Based on our analysis,
+			// these are internal data and should not be sent to the user.
+			// By not processing this, we filter out raw tool results.
 		}
 	}
 
 	if event.Action != nil {
 		result["action"] = event.Action
 	}
-
 	if event.Err != nil {
 		result["error"] = event.Err.Error()
 	}
@@ -250,44 +280,30 @@ func (h *AgentHandler) handleStreamingOutput(c *gin.Context, flusher http.Flushe
 	if event.Output == nil || event.Output.MessageOutput == nil || !event.Output.MessageOutput.IsStreaming {
 		return
 	}
-
 	messageVariant := event.Output.MessageOutput
 	if messageVariant.MessageStream == nil {
 		return
 	}
 
-	// Process all messages from stream
 	for {
 		msg, err := messageVariant.MessageStream.Recv()
 		if err != nil {
-			if err == io.EOF {
-				// Stream ended
-				break
+			if err != io.EOF {
+				h.sendSSE(c, flusher, "error", map[string]interface{}{"error": err.Error()})
 			}
-			// Send error event
-			h.sendSSE(c, flusher, "error", map[string]interface{}{
-				"error": err.Error(),
-			})
 			return
 		}
-
 		if msg == nil {
 			continue
 		}
 
-		// Extract text content and reasoning
-		var outputText string
-		var reasoningText string
-
-		// Check for reasoning content first
+		var outputText, reasoningText string
 		if msg.ReasoningContent != "" {
 			reasoningText = msg.ReasoningContent
 		}
-
 		if msg.Content != "" {
 			outputText = msg.Content
 		} else if len(msg.AssistantGenMultiContent) > 0 {
-			// Extract text from multimodal content
 			var textParts []string
 			for _, part := range msg.AssistantGenMultiContent {
 				if part.Type == "text" {
@@ -299,29 +315,19 @@ func (h *AgentHandler) handleStreamingOutput(c *gin.Context, flusher http.Flushe
 			}
 		}
 
-		// Send event if we have either reasoning or text content
 		if reasoningText != "" || outputText != "" {
-			eventData := map[string]interface{}{
-				"agent_name": event.AgentName,
-			}
-
-			// Include reasoning content if present
+			eventData := map[string]interface{}{"agent_name": event.AgentName}
 			if reasoningText != "" {
 				eventData["reasoning"] = reasoningText
 			}
-
-			// Include regular output text if present
 			if outputText != "" {
 				eventData["output"] = outputText
 			}
-
 			if len(event.RunPath) > 0 {
 				eventData["run_path"] = event.RunPath
 			}
-
 			h.sendSSE(c, flusher, "message", eventData)
 		}
-
 	}
 }
 
@@ -343,22 +349,17 @@ func (h *AgentHandler) GetTools(c *gin.Context) {
 	registry := core.GetRegistry()
 	tools := registry.GetAllToolInfos()
 
-	// Convert ToolInfo to a serializable format
 	result := make([]ToolInfoResponse, 0, len(tools))
 	for _, tool := range tools {
 		toolData := ToolInfoResponse{
 			Name: tool.Name,
 			Desc: tool.Desc,
 		}
-
-		// Include extra information if present
 		if len(tool.Extra) > 0 {
 			toolData.Extra = tool.Extra
 		}
-
 		result = append(result, toolData)
 	}
-
 	api.GinSuccess(c, result)
 }
 
@@ -375,8 +376,6 @@ type ToolSchemaResponse struct {
 // @Success 200 {object} api.Result{data=ToolSchemaResponse}
 // @Router /agent/schemas [get]
 func (h *AgentHandler) GetToolSchemas(c *gin.Context) {
-	// This endpoint exists solely to register DTOs with Swagger
-	// These DTOs are used in agent tool SideChannel events
 	schema := ToolSchemaResponse{
 		BulkLikeUpdate: dto.BulkLikeUpdateDTO{
 			Total:          100,
@@ -389,6 +388,5 @@ func (h *AgentHandler) GetToolSchemas(c *gin.Context) {
 			Timestamp:      time.Now().Format(time.RFC3339),
 		},
 	}
-
 	api.GinSuccess(c, schema)
 }

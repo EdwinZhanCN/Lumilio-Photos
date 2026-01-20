@@ -1,15 +1,14 @@
 import Home from "@/features/home/routes/Home";
 import Assets from "@/features/assets/routes/Assets";
-import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import { Studio } from "@/features/studio/routes/Studio";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { Lumen } from "@/features/lumilio/routes/Lumen";
 import Settings from "@/features/settings/routes/Settings";
 import Monitor from "@/features/monitor/routes/Monitor";
 import UploadAssets from "@/features/upload/routes/UploadAssets";
 import { Portfolio } from "@/features/portfolio";
 import Collections from "@/features/collections/routes/Collections";
 import Updates from "@/features/updates/routes/Updates";
+import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
 
 export const routes = [
   {
@@ -73,12 +72,8 @@ export const routes = [
     element: <Monitor />,
   },
   {
-    path: "/lumen",
-    element: (
-      <AssetsProvider>
-        <Lumen />
-      </AssetsProvider>
-    ),
+    path: "/lumilio",
+    element: <LumilioChatPage />,
   },
   {
     path: "/portfolio",

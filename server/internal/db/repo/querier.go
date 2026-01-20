@@ -93,6 +93,7 @@ type Querier interface {
 	GetAvailableYears(ctx context.Context) ([]int32, error)
 	// 获取相机+镜头组合统计
 	GetCameraLensStats(ctx context.Context, limit int32) ([]GetCameraLensStatsRow, error)
+	GetCheckpoint(ctx context.Context, id string) ([]byte, error)
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
 	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
 	// 获取每日拍摄活跃度热力图数据
@@ -209,6 +210,7 @@ type Querier interface {
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UpsertCheckpoint(ctx context.Context, arg UpsertCheckpointParams) error
 	// Unified embeddings table queries
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
 }

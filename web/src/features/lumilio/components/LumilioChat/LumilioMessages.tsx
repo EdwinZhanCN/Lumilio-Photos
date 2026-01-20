@@ -1,133 +1,188 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Markdown } from "../LumilioMarkdown/Markdown";
+import { LumilioTool } from "../LumilioTool";
 import { LumilioAvatar } from "../LumilioAvatar/LumilioAvatar";
+import type { ChatMessage } from "@/features/lumilio/lumilio.types";
+import { GalleryThumbnails } from "lucide-react";
 
-// Function to process think tags based on whether thinking is in progress
+import { SideChannelEvent } from "../../schema";
+import type { AssetDTO } from "@/lib/http-commons";
+import { assetService } from "@/services";
+
+const DynamicUIComponent: React.FC<{ event: SideChannelEvent }> = ({
+  event,
+}) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const shouldShowGalleryButton =
+    event.data?.rendering?.component === "justified_gallery";
+  const assets: AssetDTO[] = shouldShowGalleryButton
+    ? (event.data?.payload as AssetDTO[])
+    : [];
+
+  return (
+    <>
+      {/* 1. Always render the tool status UI */}
+      <LumilioTool event={event} />
+
+      {/* 2. Conditionally render the button to open the modal */}
+      {shouldShowGalleryButton && assets.length > 0 && (
+        <div className="mt-2">
+          <button
+            className="btn btn-sm btn-outline btn-primary"
+            onClick={() => setIsModalOpen(true)}
+          >
+            <GalleryThumbnails className="h-4 w-4 mr-2" />
+            View Gallery ({assets.length})
+          </button>
+        </div>
+      )}
+
+      {/* 3. The Modal dialog itself, using DaisyUI classes */}
+      <div className={`modal ${isModalOpen ? "modal-open" : ""}`}>
+        <div className="modal-box w-11/12 max-w-5xl">
+          <h3 className="font-bold text-lg">Asset Gallery</h3>
+          <p className="py-4 text-sm">{event.execution.message}</p>
+
+          <div className="bg-base-200 rounded-lg p-2 max-h-[60vh] overflow-y-auto">
+            <div className="flex flex-wrap gap-2 justify-center">
+              {assets.map((asset) => (
+                <img
+                  key={asset.asset_id}
+                  src={assetService.getThumbnailUrl(
+                    asset.asset_id ?? "",
+                    "small",
+                  )}
+                  alt={`Asset ${asset.asset_id}`}
+                  className="h-28 w-28 object-cover rounded-md shadow-md hover:scale-105 transition-transform"
+                  loading="lazy"
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="modal-action">
+            <button className="btn" onClick={() => setIsModalOpen(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+        <div
+          className="modal-backdrop"
+          onClick={() => setIsModalOpen(false)}
+        ></div>
+      </div>
+    </>
+  );
+};
+
 function processThinkTags(
   content: string,
   isStreaming: boolean = false,
 ): string {
-  // Count open and closed think tags
   const openTags = (content.match(/<think>/g) || []).length;
   const closeTags = (content.match(/<\/think>/g) || []).length;
-
-  // Check if we're currently in a thinking state (more open than close tags)
   const isCurrentlyThinking = openTags > closeTags;
 
   let processed = content;
-
-  // Replace think tags with details tags
   if (isCurrentlyThinking && isStreaming) {
-    // If currently thinking during streaming, make the last unclosed think tag open
     let openTagsReplaced = 0;
     processed = processed.replace(/<think>/g, () => {
       openTagsReplaced++;
-      // Make the last think tag (the currently active one) open
       return openTagsReplaced === openTags
         ? "<details open><summary> Thinking...</summary>"
         : "<details><summary> Thinking...</summary>";
     });
   } else {
-    // All thinking is finished, close all details
     processed = processed.replace(
       /<think>/g,
       "<details><summary> Thinking...</summary>",
     );
   }
-
   processed = processed.replace(/<\/think>/g, "</details>");
-
   return processed;
 }
 
-interface LLMMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-  timestamp: number;
-}
-
 interface LumilioMessagesProps {
-  conversation: LLMMessage[];
+  conversation: ChatMessage[];
   isGenerating: boolean;
-  isInitializing: boolean;
 }
 
 export function LumilioMessages({
   conversation,
   isGenerating,
-  isInitializing,
 }: LumilioMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
 
-  if (conversation.length === 0 && !isGenerating && !isInitializing) {
-    return (
-      <div className="flex flex-1 overflow-y-auto p-4 space-y-4">
-        <div className="text-center text-base-content/60 py-8">
-          <div>Start a conversation with the Lumilio!</div>
-        </div>
-        <div ref={messagesEndRef} />
-      </div>
-    );
-  }
-
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-      {conversation
-        .filter((message) => message.role !== "system")
-        .map((message, index) => {
-          const isLast = index === conversation.length - 1;
-          const isStreamingHere =
-            message.role === "assistant" && isGenerating && isLast;
+    <div className="p-4 space-y-4">
+      {conversation.map((message, index) => {
+        const isLast = index === conversation.length - 1;
+        const isStreamingHere =
+          message.role === "assistant" && isGenerating && isLast;
 
-          return (
-            <div
-              key={index}
-              className={`chat ${
-                message.role === "user" ? "chat-end" : "chat-start"
-              }`}
-            >
-              <div className="chat-image avatar">
-                <div className="w-10 rounded-full">
-                  {message.role === "user" ? (
-                    <div className="w-full h-full flex items-center justify-center text-white font-bold rounded-full bg-primary">
-                      U
-                    </div>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <LumilioAvatar start={isStreamingHere} size={0.1} />
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="chat-header">
-                {message.role === "user" ? "You" : "Lumilio"}
-                <time className="text-xs opacity-50 ml-1">
-                  {new Date(message.timestamp).toLocaleTimeString()}
-                </time>
-              </div>
-              <div
-                className={`chat-bubble ${
-                  message.role === "user"
-                    ? "chat-bubble-primary"
-                    : "bg-base-200"
-                }`}
-              >
-                {message.role === "assistant" ? (
-                  <Markdown
-                    content={processThinkTags(message.content, isStreamingHere)}
-                  />
+        return (
+          <div
+            key={message.id}
+            className={`chat ${
+              message.role === "user" ? "chat-end" : "chat-start"
+            }`}
+          >
+            <div className="chat-image avatar">
+              <div className="w-10 rounded-full">
+                {message.role === "user" ? (
+                  <div className="w-full h-full flex items-center justify-center text-white font-bold rounded-full bg-primary">
+                    U
+                  </div>
                 ) : (
-                  <div className="whitespace-pre-wrap">{message.content}</div>
+                  <div className="w-full h-full flex items-center justify-center">
+                    <LumilioAvatar start={isStreamingHere} size={0.1} />
+                  </div>
                 )}
               </div>
             </div>
-          );
-        })}
+            <div className="chat-header">
+              {message.role === "user" ? "You" : "Lumilio"}
+            </div>
+            <div
+              className={`chat-bubble ${
+                message.role === "user" ? "chat-bubble-primary" : "bg-base-200"
+              }`}
+            >
+              {message.content && (
+                <Markdown
+                  content={processThinkTags(message.content, isStreamingHere)}
+                />
+              )}
+              {message.uiEvents.map((uiEvent) => (
+                <DynamicUIComponent
+                  key={uiEvent.tool.executionId}
+                  event={uiEvent}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {isGenerating &&
+        conversation.length > 0 &&
+        conversation[conversation.length - 1]?.role === "user" && (
+          <div className="chat chat-start">
+            <div className="chat-image avatar">
+              <div className="w-10 rounded-full flex items-center justify-center">
+                <LumilioAvatar start={true} size={0.1} />
+              </div>
+            </div>
+            <div className="chat-bubble bg-base-200">
+              <span className="loading loading-dots loading-md"></span>
+            </div>
+          </div>
+        )}
 
       <div ref={messagesEndRef} />
     </div>
