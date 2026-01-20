@@ -30,12 +30,7 @@ function HealthPoller(): React.ReactNode {
 }
 
 function App(): React.ReactNode {
-  const theme: string = localStorage.getItem("theme") || "light";
   const { t } = useI18n();
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
 
   return (
     <SettingsProvider>

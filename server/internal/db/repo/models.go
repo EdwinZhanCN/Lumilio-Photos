@@ -11,6 +11,12 @@ import (
 	"server/internal/storage/repocfg"
 )
 
+type AgentCheckpoint struct {
+	ID        string             `db:"id" json:"id"`
+	Data      []byte             `db:"data" json:"data"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 // AI-generated image descriptions table, storing detailed descriptions and metadata
 type AiDescription struct {
 	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`

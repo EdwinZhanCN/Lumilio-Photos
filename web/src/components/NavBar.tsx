@@ -1,10 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
-import { LumenAvatar } from "@/features/lumen";
+import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/LumilioAvatar";
+
+// Extend Window interface for our observer
+declare global {
+  interface Window {
+    shadcnThemeObserver?: MutationObserver;
+  }
+}
+
 function NavBar() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { t } = useI18n();
+  const observerRef = useRef<MutationObserver | null>(null);
 
   // Initialize theme on component mount
   useEffect(() => {
@@ -16,12 +25,67 @@ function NavBar() {
       localStorage.setItem("theme", "latte");
       document.documentElement.setAttribute("data-theme", "latte");
       setIsDarkMode(false);
+      updateShadcnScopeTheme(false);
     } else {
       // Apply the saved theme
       document.documentElement.setAttribute("data-theme", savedTheme);
       setIsDarkMode(isDark);
+      updateShadcnScopeTheme(isDark);
     }
   }, []);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Function to update shadcn-scope elements with dark class
+  const updateShadcnScopeTheme = (isDark: boolean) => {
+    // Function to apply theme to a single element
+    const applyThemeToElement = (element: Element) => {
+      if (isDark) {
+        element.classList.add("dark");
+      } else {
+        element.classList.remove("dark");
+      }
+    };
+
+    // Update existing elements
+    const shadcnScopes = document.querySelectorAll(".shadcn-scope");
+    shadcnScopes.forEach(applyThemeToElement);
+
+    // Set up MutationObserver to handle dynamically added elements
+    if (!observerRef.current) {
+      observerRef.current = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === "childList") {
+            mutation.addedNodes.forEach((node) => {
+              if (node instanceof Element) {
+                // Check the node itself
+                if (node.classList.contains("shadcn-scope")) {
+                  applyThemeToElement(node);
+                }
+                // Check descendants
+                const scopes = node.querySelectorAll(".shadcn-scope");
+                scopes.forEach(applyThemeToElement);
+              }
+            });
+          }
+        });
+      });
+
+      // Start observing the entire document
+      observerRef.current.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    }
+  };
 
   return (
     <div className="navbar bg-base-100 px-4 py-2 justify-between">
@@ -41,12 +105,12 @@ function NavBar() {
         {(() => {
           const [start, setStart] = useState(false);
           return (
-            <Link to={"/lumen"}>
+            <Link to={"/lumilio"}>
               <div
                 onMouseEnter={() => setStart(true)}
                 onMouseLeave={() => setStart(false)}
               >
-                <LumenAvatar
+                <LumilioAvatar
                   className="mb-2 pointer-cursor"
                   size={0.2}
                   start={start}
@@ -70,6 +134,7 @@ function NavBar() {
             localStorage.setItem("theme", newTheme);
             document.documentElement.setAttribute("data-theme", newTheme);
             setIsDarkMode(e.target.checked);
+            updateShadcnScopeTheme(e.target.checked);
           }}
         />
 

@@ -10,6 +10,8 @@ import (
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
+	"server/internal/agent/core"
+	"server/internal/agent/tools"
 	"server/internal/api"
 	"server/internal/api/handler"
 	"server/internal/db"
@@ -55,7 +57,7 @@ func main() {
 	// Load configurations
 	dbConfig := config.LoadDBConfig()
 	appConfig := config.LoadAppConfig()
-	// llmConfig := config.LoadLLMConfig()
+	llmConfig := config.LoadLLMConfig()
 
 	log.Println("🚀 Starting Lumilio Photos API...")
 	log.Printf("📊 Database configuration: %s:%s/%s", dbConfig.Host, dbConfig.Port, dbConfig.DBName)
@@ -139,6 +141,15 @@ func main() {
 	authService := service.NewAuthService(queries)
 	albumService := service.NewAlbumService(queries)
 
+	// Initialize Agent Service
+	agentService := core.NewAgentService(queries, llmConfig)
+	log.Println("✅ Agent Service Initialized")
+
+	// Register agent tools
+	tools.RegisterFilterAsset()
+	tools.RegisterBulkLikeTool()
+	log.Println("✅ Agent Tools Registered")
+
 	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, appConfig, lumenService)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.MetadataArgs](workers, &queue.MetadataWorker{Process: assetProcessor.ProcessMetadataTask})
@@ -160,6 +171,7 @@ func main() {
 	albumController := handler.NewAlbumHandler(&albumService, queries)
 	queueController := handler.NewQueueHandler(queueClient, pgxPool)
 	statsController := handler.NewStatsHandler(queries)
+	agentController := handler.NewAgentHandler(agentService)
 
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
@@ -168,8 +180,8 @@ func main() {
 	docs.SwaggerInfo.Host = "localhost:" + appConfig.ServerConfig.Port
 	docs.SwaggerInfo.BasePath = "/api/v1"
 
-	// Set up router with new asset, album, auth and stats endpoints
-	router := api.NewRouter(assetController, authController, albumController, queueController, statsController)
+	// Set up router with new asset, album, auth, stats and agent endpoints
+	router := api.NewRouter(assetController, authController, albumController, queueController, statsController, agentController)
 
 	// Add Swagger documentation endpoint
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

@@ -416,6 +416,70 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.BulkLikeUpdateDTO": {
+                "properties": {
+                    "action": {
+                        "description": "Action performed: \"like\" or \"unlike\"",
+                        "enum": [
+                            "like",
+                            "unlike"
+                        ],
+                        "example": "like",
+                        "type": "string"
+                    },
+                    "description": {
+                        "description": "Human-readable description",
+                        "example": "Bulk like: 98/100 successful",
+                        "type": "string"
+                    },
+                    "failed": {
+                        "description": "Number of failed updates",
+                        "example": 2,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "failed_asset_ids": {
+                        "description": "List of asset IDs that failed to update (only present when Failed \u003e 0)",
+                        "example": [
+                            "550e8400-e29b-41d4-a716-446655440000",
+                            "660e8400-e29b-41d4-a716-446655440001"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "liked": {
+                        "description": "The like status that was applied (true = liked, false = unliked)",
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "ref_id": {
+                        "description": "Reference ID for this result (can be used in subsequent tool calls)",
+                        "example": "ref_1234567890",
+                        "type": "string"
+                    },
+                    "success": {
+                        "description": "Number of successfully updated assets",
+                        "example": 98,
+                        "minimum": 0,
+                        "type": "integer"
+                    },
+                    "timestamp": {
+                        "description": "Timestamp when the operation completed",
+                        "example": "2026-01-18T19:34:00Z",
+                        "type": "string"
+                    },
+                    "total": {
+                        "description": "Total number of assets in the batch",
+                        "example": 100,
+                        "minimum": 0,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.CreateAlbumRequestDTO": {
                 "properties": {
                     "album_name": {
@@ -931,6 +995,43 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "handler.AgentChatRequest": {
+                "properties": {
+                    "query": {
+                        "type": "string"
+                    },
+                    "thread_id": {
+                        "type": "string"
+                    },
+                    "tool_names": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "required": [
+                    "query"
+                ],
+                "type": "object"
+            },
+            "handler.AgentResumeRequest": {
+                "properties": {
+                    "targets": {
+                        "additionalProperties": {},
+                        "type": "object"
+                    },
+                    "thread_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "targets",
+                    "thread_id"
+                ],
+                "type": "object"
+            },
             "handler.AvailableYearsResponse": {
                 "properties": {
                     "years": {
@@ -1161,6 +1262,29 @@ const docTemplate = `{
                     },
                     "type": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handler.ToolInfoResponse": {
+                "properties": {
+                    "desc": {
+                        "type": "string"
+                    },
+                    "extra": {
+                        "additionalProperties": {},
+                        "type": "object"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "handler.ToolSchemaResponse": {
+                "properties": {
+                    "bulk_like_update_example": {
+                        "$ref": "#/components/schemas/dto.BulkLikeUpdateDTO"
                     }
                 },
                 "type": "object"
@@ -1507,6 +1631,224 @@ const docTemplate = `{
                 "summary": "Get job statistics",
                 "tags": [
                     "Queue"
+                ]
+            }
+        },
+        "/agent/chat": {
+            "post": {
+                "description": "Send a query to agent and receive streaming responses via SSE. Manages conversation threads.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/handler.AgentChatRequest",
+                                        "summary": "request",
+                                        "description": "Chat request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Chat request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "SSE stream"
+                    },
+                    "400": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "500": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Chat with Agent",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
+        "/agent/chat/resume": {
+            "post": {
+                "description": "Resume a conversation from an interrupt point (e.g., user confirmation for a tool call)",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/handler.AgentResumeRequest",
+                                        "summary": "request",
+                                        "description": "Resume request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Resume request",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "description": "SSE stream"
+                    },
+                    "400": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "500": {
+                        "content": {
+                            "text/event-stream": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Resume Agent Chat",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
+        "/agent/schemas": {
+            "get": {
+                "description": "Get all DTO schemas used by agent tools for type reference",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Get Agent Tool DTO Schemas",
+                "tags": [
+                    "agent"
+                ]
+            }
+        },
+        "/agent/tools": {
+            "get": {
+                "description": "Get list of all registered agent tools",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    }
+                },
+                "summary": "Get Available Tools",
+                "tags": [
+                    "agent"
                 ]
             }
         },
