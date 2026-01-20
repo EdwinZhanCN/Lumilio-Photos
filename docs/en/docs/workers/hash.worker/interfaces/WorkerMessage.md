@@ -2,7 +2,7 @@
 
 # Interface: WorkerMessage
 
-Defined in: [workers/hash.worker.ts:6](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/workers/hash.worker.ts#L6)
+Defined in: [workers/hash.worker.ts:6](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/workers/hash.worker.ts#L6)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [workers/hash.worker.ts:6](https://github.com/EdwinZhanCN/Lumilio-Ph
 
 > `optional` **data**: `File`[]
 
-Defined in: [workers/hash.worker.ts:8](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/workers/hash.worker.ts#L8)
+Defined in: [workers/hash.worker.ts:8](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/workers/hash.worker.ts#L8)
 
 ***
 
@@ -18,4 +18,4 @@ Defined in: [workers/hash.worker.ts:8](https://github.com/EdwinZhanCN/Lumilio-Ph
 
 > **type**: `"ABORT"` \| `"GENERATE_HASH"`
 
-Defined in: [workers/hash.worker.ts:7](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/workers/hash.worker.ts#L7)
+Defined in: [workers/hash.worker.ts:7](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/workers/hash.worker.ts#L7)

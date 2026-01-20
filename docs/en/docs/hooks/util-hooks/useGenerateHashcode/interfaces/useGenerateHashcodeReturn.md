@@ -2,7 +2,7 @@
 
 # Interface: useGenerateHashcodeReturn
 
-Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L31)
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L31)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:31](https://github.com/Edw
 
 > **cancelGeneration**: () => `void`
 
-Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:38](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L38)
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:38](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L38)
 
 #### Returns
 
@@ -20,9 +20,9 @@ Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:38](https://github.com/Edw
 
 ### generateHashCodes()
 
-> **generateHashCodes**: (`files`, `priority?`) => `Promise`\<`undefined` \| `HashcodeResult`[]\>
+> **generateHashCodes**: (`files`, `priority?`) => `Promise`\<`HashcodeResult`[] \| `undefined`\>
 
-Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:34](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L34)
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:34](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L34)
 
 #### Parameters
 
@@ -36,7 +36,7 @@ Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:34](https://github.com/Edw
 
 #### Returns
 
-`Promise`\<`undefined` \| `HashcodeResult`[]\>
+`Promise`\<`HashcodeResult`[] \| `undefined`\>
 
 ***
 
@@ -44,12 +44,12 @@ Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:34](https://github.com/Edw
 
 > **isGenerating**: `boolean`
 
-Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L32)
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L32)
 
 ***
 
 ### progress
 
-> **progress**: `null` \| [`HashcodeProgress`](HashcodeProgress.md)
+> **progress**: [`HashcodeProgress`](HashcodeProgress.md) \| `null`
 
-Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:33](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L33)
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:33](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L33)

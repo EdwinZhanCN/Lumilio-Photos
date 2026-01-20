@@ -87,6 +87,7 @@ func DefaultTagConfig() *TagConfig {
 			"Comment",
 			"ImageWidth",
 			"ImageHeight",
+			"Orientation",
 			"ExposureCompensation",
 			"ExposureBiasValue",
 			"ImageSize",

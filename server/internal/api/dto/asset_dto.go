@@ -302,3 +302,35 @@ type OptionsResponseDTO struct {
 	CameraMakes []string `json:"camera_makes"`
 	Lenses      []string `json:"lenses"`
 }
+
+// BulkLikeUpdateDTO represents the result of a bulk like/unlike operation
+// This DTO is returned by the bulk_like_assets tool and contains the summary
+// of the operation, including success/failure counts and affected asset IDs.
+type BulkLikeUpdateDTO struct {
+	// Total number of assets in the batch
+	Total int `json:"total" example:"100" minimum:"0"`
+
+	// Number of successfully updated assets
+	Success int `json:"success" example:"98" minimum:"0"`
+
+	// Number of failed updates
+	Failed int `json:"failed" example:"2" minimum:"0"`
+
+	// List of asset IDs that failed to update (only present when Failed > 0)
+	FailedAssetIDs []string `json:"failed_asset_ids,omitempty" example:"550e8400-e29b-41d4-a716-446655440000,660e8400-e29b-41d4-a716-446655440001"`
+
+	// The like status that was applied (true = liked, false = unliked)
+	Liked bool `json:"liked" example:"true"`
+
+	// Action performed: "like" or "unlike"
+	Action string `json:"action" example:"like" enums:"like,unlike"`
+
+	// Reference ID for this result (can be used in subsequent tool calls)
+	RefID string `json:"ref_id,omitempty" example:"ref_1234567890"`
+
+	// Human-readable description
+	Description string `json:"description" example:"Bulk like: 98/100 successful"`
+
+	// Timestamp when the operation completed
+	Timestamp string `json:"timestamp" example:"2026-01-18T19:34:00Z"`
+}

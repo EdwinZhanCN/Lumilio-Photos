@@ -147,7 +147,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
                 }
               }
 
-              const blob = new Blob([borderedImageBytes]);
+              const blob = new Blob([borderedImageBytes.buffer as ArrayBuffer]);
               const borderedFileURL = URL.createObjectURL(blob);
 
               return { uuid, originalFileName, borderedFileURL };

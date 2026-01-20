@@ -75,6 +75,7 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 		meta.IsRAW = raw.IsRAWFile(asset.OriginalFilename)
 
 		// Parse dimensions and update asset
+		// The dimensions in meta.Dimensions are already corrected by orientation
 		re := regexp.MustCompile(`(\d+)\D+(\d+)`)
 		if matches := re.FindStringSubmatch(meta.Dimensions); len(matches) == 3 {
 			width, _ := strconv.ParseInt(matches[1], 10, 32)

@@ -4,7 +4,7 @@
 
 > **useGenerateBorders**(): [`UseGenerateBordersReturn`](../interfaces/UseGenerateBordersReturn.md)
 
-Defined in: [hooks/util-hooks/useGenerateBorder.tsx:71](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/hooks/util-hooks/useGenerateBorder.tsx#L71)
+Defined in: [hooks/util-hooks/useGenerateBorder.tsx:71](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/hooks/util-hooks/useGenerateBorder.tsx#L71)
 
 Custom hook to generate images with borders using the shared web worker client.
 It encapsulates all state related to the generation process.

@@ -2,7 +2,7 @@
 
 # Interface: WorkerClientOptions
 
-Defined in: [workers/workerClient.ts:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/workers/workerClient.ts#L28)
+Defined in: [workers/workerClient.ts:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/workers/workerClient.ts#L12)
 
 ## Properties
 
@@ -10,24 +10,4 @@ Defined in: [workers/workerClient.ts:28](https://github.com/EdwinZhanCN/Lumilio-
 
 > `optional` **preload**: [`WorkerType`](../type-aliases/WorkerType.md)[]
 
-Defined in: [workers/workerClient.ts:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/workers/workerClient.ts#L29)
-
-***
-
-### webllmConfig?
-
-> `optional` **webllmConfig**: `object`
-
-Defined in: [workers/workerClient.ts:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/workers/workerClient.ts#L30)
-
-#### modelId
-
-> **modelId**: `string`
-
-#### modelRecords?
-
-> `optional` **modelRecords**: `ModelRecord`[]
-
-#### useIndexedDBCache?
-
-> `optional` **useIndexedDBCache**: `boolean`
+Defined in: [workers/workerClient.ts:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/workers/workerClient.ts#L13)
