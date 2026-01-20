@@ -15,6 +15,11 @@ type Schemas = components["schemas"];
 export type AgentChatRequest = Schemas["handler.AgentChatRequest"];
 
 /**
+ * Agent resume request
+ */
+export type AgentResumeRequest = Schemas["handler.AgentResumeRequest"];
+
+/**
  * Tool info response
  */
 export type ToolInfoResponse = Schemas["handler.ToolInfoResponse"];
@@ -39,6 +44,7 @@ export interface AgentEvent {
   action?: {
     name: string;
     input: unknown;
+    interrupted?: unknown;
   };
   error?: string;
 }
@@ -47,18 +53,19 @@ export interface AgentEvent {
  * SSE event type
  */
 export type AgentEventType =
+  | "session_info"
   | "message"
+  | "action"
+  | "ui_event"
   | "done"
-  | "error"
-  | "command"
-  | "ui_event";
+  | "error";
 
 /**
  * SSE stream event
  */
 export interface AgentStreamEvent {
   type: AgentEventType;
-  data: AgentEvent | { error: string };
+  data: any; // Data can be of any type based on the event
 }
 
 // ============================================================================
@@ -81,25 +88,20 @@ export const agentService = {
   },
 
   /**
-   * Sends a chat request to the agent and returns a stream of events
-   *
-   * @param request - Chat request with query and optional tool names
-   * @param signal - Optional abort signal to cancel the request
-   * @returns Async generator that yields stream events
+   * Private method to handle SSE streaming for both chat and resume
    */
-  async *streamAgentChat(
-    request: AgentChatRequest,
+  async *_streamer(
+    url: string,
+    body: object,
     signal?: AbortSignal,
   ): AsyncGenerator<AgentStreamEvent> {
-    const url = `${this.getBaseUrl()}/api/v1/agent/chat`;
-
     try {
       const response = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify(body),
         signal,
       });
 
@@ -125,13 +127,13 @@ export const agentService = {
         buffer += decoder.decode(value, { stream: true });
 
         // Process SSE messages
-        const lines = buffer.split("\n\n");
-        buffer = lines.pop() || ""; // Keep incomplete message in buffer
+        const messages = buffer.split("\n\n");
+        buffer = messages.pop() || ""; // Keep incomplete message in buffer
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
+        for (const message of messages) {
+          if (!message.trim()) continue;
 
-          const event = this.parseSSEEvent(line);
+          const event = this.parseSSEEvent(message);
           if (event) {
             yield event;
           }
@@ -139,79 +141,71 @@ export const agentService = {
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        // Request was aborted, this is expected
-        return;
+        return; // Request was aborted, this is expected
       }
-
       throw error;
     }
   },
 
   /**
-   * Parses an SSE event string into an AgentStreamEvent
-   *
-   * @param line - Raw SSE event string
-   * @returns Parsed event or null if invalid
+   * Sends a chat request to the agent and returns a stream of events
    */
-  parseSSEEvent(line: string): AgentStreamEvent | null {
-    const eventMatch = line.match(/^event:\s*(.+)$/m);
-    const dataMatch = line.match(/^data:\s*(.+)$/m);
+  async *streamAgentChat(
+    request: AgentChatRequest,
+    signal?: AbortSignal,
+  ): AsyncGenerator<AgentStreamEvent> {
+    const url = `${this.getBaseUrl()}/api/v1/agent/chat`;
+    yield* this._streamer(url, request, signal);
+  },
 
-    if (!eventMatch || !dataMatch) {
-      // console.log("[DEBUG] Failed to parse SSE line - missing event or data");
+  /**
+   * Sends a resume request to the agent and returns a stream of events
+   */
+  async *streamAgentResume(
+    request: AgentResumeRequest,
+    signal?: AbortSignal,
+  ): AsyncGenerator<AgentStreamEvent> {
+    const url = `${this.getBaseUrl()}/api/v1/agent/chat/resume`;
+    yield* this._streamer(url, request, signal);
+  },
+
+  /**
+   * Parses an SSE event string into an AgentStreamEvent
+   */
+  parseSSEEvent(message: string): AgentStreamEvent | null {
+    const eventLine = message
+      .split("\n")
+      .find((line) => line.startsWith("event:"));
+    const dataLine = message
+      .split("\n")
+      .find((line) => line.startsWith("data:"));
+
+    if (!eventLine || !dataLine) {
       return null;
     }
 
-    const eventType = eventMatch[1].trim() as AgentEventType;
-    const dataStr = dataMatch[1].trim();
-
-    // console.log(
-    //   "[DEBUG] Parsing SSE - event:",
-    //   eventType,
-    //   "data length:",
-    //   dataStr.length,
-    // );
+    const eventType = eventLine
+      .substring("event: ".length)
+      .trim() as AgentEventType;
+    const dataStr = dataLine.substring("data: ".length).trim();
 
     try {
       const data = JSON.parse(dataStr);
-
-      // Handle done event (data is {})
-      if (eventType === "done") {
-        // console.log("[DEBUG] Done event received");
-        return { type: "done", data: {} as AgentEvent };
-      }
-
-      // console.log("[DEBUG] Parsed data keys:", Object.keys(data));
-      // if (data.output && typeof data.output === "string") {
-      //   console.log(
-      //     "[DEBUG] Output text preview:",
-      //     data.output.substring(0, 100) +
-      //       (data.output.length > 100 ? "..." : ""),
-      //   );
-      // }
-
       return { type: eventType, data };
     } catch (error) {
-      console.error(
-        "Failed to parse SSE data:",
-        error,
-        "Data string:",
-        dataStr.substring(0, 200),
-      );
+      console.error("Failed to parse SSE data:", error, "Data:", dataStr);
       return null;
     }
   },
 
   /**
    * Gets the list of available tools
-   *
-   * @returns Promise resolving to array of tool info
    */
   async getAvailableTools(): Promise<ToolInfoResponse[]> {
-    const response = await api.get<{ tools: ToolInfoResponse[] }>(
+    const response = await api.get<ApiResult<ToolInfoResponse[]>>(
       "/api/v1/agent/tools",
     );
-    return response.data.tools || [];
+    return response.data.data || [];
   },
 
   /**
@@ -236,13 +230,15 @@ export const agentService = {
         return [];
       }
 
-      return tools.map((tool) => ({
-        id: `tool-${tool.name}`,
-        label: `/${tool.name}`,
-        type: "command" as const,
-        meta: tool.desc || "No description available",
-        description: tool.desc,
-      }));
+      return tools
+        .filter((tool) => tool.name)
+        .map((tool) => ({
+          id: tool.name!, // Use tool name as ID
+          label: tool.name!, // Label is just the name, without slash
+          type: "command" as const,
+          meta: tool.desc || "No description available",
+          description: tool.desc,
+        }));
     } catch (error) {
       console.error("Error fetching slash commands:", error);
       return [];

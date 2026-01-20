@@ -84,6 +84,7 @@ type StatsControllerInterface interface {
 // AgentControllerInterface defines the interface for agent controllers
 type AgentControllerInterface interface {
 	Chat(c *gin.Context)           // POST /agent/chat - Chat with agent via SSE
+	ResumeChat(c *gin.Context)     // POST /agent/chat/resume - Resume an interrupted agent execution
 	GetTools(c *gin.Context)       // GET /agent/tools - Get available tools
 	GetToolSchemas(c *gin.Context) // GET /agent/schemas - Get tool DTO schemas
 }
@@ -193,6 +194,7 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 		agent.Use(authController.OptionalAuthMiddleware())
 		{
 			agent.POST("/chat", agentController.Chat)
+			agent.POST("/chat/resume", agentController.ResumeChat)
 			agent.GET("/tools", agentController.GetTools)
 			agent.GET("/schemas", agentController.GetToolSchemas)
 		}

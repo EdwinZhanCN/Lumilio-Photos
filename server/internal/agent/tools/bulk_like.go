@@ -309,6 +309,7 @@ func RegisterBulkLikeTool() {
 			refID := ""
 			if deps.ReferenceManager != nil {
 				refID = deps.ReferenceManager.StoreWithID(
+					ctx,
 					resultSummary,
 					resultSummary.Description,
 				)

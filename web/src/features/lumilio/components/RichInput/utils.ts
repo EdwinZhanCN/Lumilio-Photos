@@ -77,8 +77,14 @@ export const parseContentToPayload = (container: HTMLDivElement): string => {
  * @param type - 提及类型
  * @returns 图标 HTML 字符串
  */
-const getDefaultIconByType = (): string => {
-  const iconStyle = "width: 12px; height: 12px; margin-right: 4px;";
+const getDefaultIconByType = (type: string): string => {
+  const iconStyle =
+    "width: 12px; height: 12px; margin-right: 4px; display: inline-block; vertical-align: middle;";
+  if (type === "command") {
+    // Return a slash icon SVG
+    return ``;
+  }
+  // Return the default at-symbol icon SVG
   return `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="${iconStyle}"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/></svg>`;
 };
 
@@ -119,9 +125,11 @@ export const createPillElement = (entity: {
   // 使用传入的 icon，如果没有则根据 type 生成默认图标
   const iconHtml = entity.icon
     ? ReactDOMServer.renderToString(entity.icon)
-    : getDefaultIconByType();
+    : getDefaultIconByType(entity.type);
 
-  span.innerHTML = `${iconHtml}${entity.label}`;
+  const displayLabel =
+    entity.type === "command" ? `/${entity.label}` : entity.label;
+  span.innerHTML = `${iconHtml}${displayLabel}`;
 
   return span;
 };

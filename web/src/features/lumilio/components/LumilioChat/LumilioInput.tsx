@@ -1,50 +1,58 @@
+import { RichInput, RichInputProvider } from "../RichInput";
+import {
+  MentionEntity,
+  MentionType,
+  MentionTypeOption,
+} from "../RichInput/types";
+
 interface LumilioInputProps {
-  inputMessage: string;
   isGenerating: boolean;
   isInitializing: boolean;
-  onInputChange: (value: string) => void;
-  onSendMessage: () => void;
-  onKeyPress: (e: React.KeyboardEvent) => void;
+  onSubmit: (value: string) => void;
+  commands?: MentionEntity[];
 }
 
 export function LumilioInput({
-  inputMessage,
   isGenerating,
   isInitializing,
-  onInputChange,
-  onSendMessage,
-  onKeyPress,
+  onSubmit,
+  commands = [],
 }: LumilioInputProps) {
-  return (
-    <div className="p-4 border-t border-base-300">
-      <div className="flex gap-2">
-        <textarea
-          className="textarea textarea-bordered flex-1 resize-none"
-          placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
-          value={inputMessage}
-          onChange={(e) => onInputChange(e.target.value)}
-          onKeyPress={onKeyPress}
-          disabled={isGenerating}
-          rows={1}
-        />
-        <button
-          className="btn btn-primary"
-          onClick={onSendMessage}
-          disabled={!inputMessage.trim() || isGenerating || isInitializing}
-        >
-          {isGenerating ? (
-            <span className="loading loading-spinner loading-sm"></span>
-          ) : (
-            "Send"
-          )}
-        </button>
-      </div>
+  // Mention feature remains a placeholder for now
+  const mentionTypes: MentionTypeOption[] = [
+    { type: "placeholder", label: "Placeholder" },
+  ];
 
-      {/* Status info */}
-      <div className="text-xs text-base-content/60 mt-2">
-        {isInitializing && "Initializing model..."}
-        {isGenerating && "Generating response..."}
+  const getEntitiesByType = (type: MentionType) => {
+    const entities: Record<MentionType, MentionEntity[]> = {
+      placeholder: [
+        {
+          id: "placeholder-123",
+          label: "Placeholder Label",
+          type: "placeholder",
+        },
+      ],
+    };
+    return entities[type] || [];
+  };
+
+  return (
+    <RichInputProvider>
+      <div className="p-4 border-t border-base-300">
+        <RichInput
+          placeholder="Ask Lumilio Agent... (Type @ or /)"
+          onSubmit={onSubmit}
+          mentionTypes={mentionTypes}
+          getEntitiesByType={getEntitiesByType}
+          commands={commands}
+          isSubmitting={isGenerating || isInitializing}
+        />
+
+        {/* Status info */}
+        <div className="text-xs text-base-content/60 mt-2">
+          {isGenerating && "Generating response..."}
+        </div>
       </div>
-    </div>
+    </RichInputProvider>
   );
 }

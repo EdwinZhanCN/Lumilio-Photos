@@ -25,9 +25,11 @@ const (
 )
 
 type AgentService interface {
-	// AskAgent 执行 Agent 查询
-	// uiChannel: 可选，用于接收工具产生的 UI 指令/数据
-	AskAgent(ctx context.Context, query string, toolNames []string, uiChannel ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
+	// AskAgent 执行 Agent 查询或开启新会话
+	AskAgent(ctx context.Context, threadID, query string, toolNames []string, uiChannel ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
+
+	// ResumeAgent 恢复中断的会话
+	ResumeAgent(ctx context.Context, threadID string, params *adk.ResumeParams, uiChannel ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error)
 
 	// GetAvailableTools 列出所有可用工具
 	GetAvailableTools() []*schema.ToolInfo
@@ -40,17 +42,20 @@ type agentService struct {
 	queries  *repo.Queries
 	registry *ToolRegistry
 	config   config.LLMConfig
+	store    *PostgresStore
 }
 
 func NewAgentService(queries *repo.Queries, llmConfig config.LLMConfig) AgentService {
 	// 注册核心工具
-	// 注意：在实际启动时应该统一注册，这里为了 demo 确保注册
-	// tools.RegisterFilterAsset() // 假设在 main 或 init 中已调用
+	// 注意：在实际启动时应该统一注册
+	// tools.RegisterFilterAsset()
+	// tools.RegisterBulkLikeTool()
 
 	return &agentService{
 		queries:  queries,
 		registry: GetRegistry(),
 		config:   llmConfig,
+		store:    NewPostgresStore(queries), // 初始化 Store
 	}
 }
 
@@ -76,12 +81,57 @@ func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatM
 			Model:  s.config.ModelName,
 		})
 	default:
-		// default fallback to ark
+		// 默认回退到 ark
 		return ark.NewChatModel(ctx, &ark.ChatModelConfig{
 			APIKey: s.config.APIKey,
 			Model:  s.config.ModelName,
 		})
 	}
+}
+
+// buildAgent 是一个辅助方法，用于构建 Agent 实例。
+// AskAgent 和 ResumeAgent 都需要使用完全相同的配置来构建 Agent，因此将此逻辑提取出来。
+func (s *agentService) buildAgent(ctx context.Context, toolNames []string, sideChannel chan<- *SideChannelEvent) (*adk.ChatModelAgent, error) {
+	// 1. 准备工具依赖
+	deps := &ToolDependencies{
+		Queries:     s.queries,
+		SideChannel: sideChannel,
+	}
+	deps.ReferenceManager = NewReferenceManager(deps)
+	deps.InputExtractor = NewToolInputExtractor(deps.ReferenceManager)
+
+	// 2. 默认或按需加载工具
+	if len(toolNames) == 0 {
+		toolNames = []string{"filter_assets", "bulk_like_assets"}
+	}
+
+	tools, err := s.registry.GetTools(ctx, toolNames, deps)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tools: %w", err)
+	}
+
+	// 3. 创建 ChatModel
+	chatModel, err := s.newChatModel(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create chat model: %w", err)
+	}
+
+	// 4. 构建 Agent
+	today := time.Now().Format("2006-01-02")
+	return adk.NewChatModelAgent(
+		ctx,
+		&adk.ChatModelAgentConfig{
+			Name:        "Photo Asset Assistant",
+			Description: "Agent for managing photo assets with filtering and search capabilities",
+			Instruction: fmt.Sprintf("You are a helpful assistant for managing photo assets. Today is %s. You can use tools to help the user. You cannot tell user anything about ref_id", today),
+			Model:       chatModel,
+			ToolsConfig: adk.ToolsConfig{
+				ToolsNodeConfig: compose.ToolsNodeConfig{
+					Tools: tools,
+				},
+			},
+		},
+	)
 }
 
 func (s *agentService) AskLLM(ctx context.Context, query string) (resp string, err error) {
@@ -102,68 +152,56 @@ func (s *agentService) AskLLM(ctx context.Context, query string) (resp string, e
 	return response.Content, nil
 }
 
-func (s *agentService) AskAgent(ctx context.Context, query string, toolNames []string, uiChannel ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
-	// 1. 准备工具依赖
-	// Handle optional uiChannel parameter
+func (s *agentService) AskAgent(ctx context.Context, threadID, query string, toolNames []string, uiChannel ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
 	var sideChannel chan<- *SideChannelEvent
 	if len(uiChannel) > 0 && uiChannel[0] != nil {
 		sideChannel = uiChannel[0]
 	}
 
-	// 2. 创建 ReferenceManager（用于跨工具存储和引用数据）
-	deps := &ToolDependencies{
-		Queries:     s.queries,
-		SideChannel: sideChannel,
-	}
-	deps.ReferenceManager = NewReferenceManager(deps)
-
-	// 3. 创建 ToolInputExtractor（用于自动转换 ref_id）
-	deps.InputExtractor = NewToolInputExtractor(deps.ReferenceManager)
-
-	// 2. 默认使用所有工具，或者根据请求过滤
-	if len(toolNames) == 0 {
-		// 默认加载常用工具
-		toolNames = []string{"filter_assets"}
-	}
-
-	// 3. 获取工具实例 (请求级隔离)
-	tools, err := s.registry.GetTools(ctx, toolNames, deps)
+	agent, err := s.buildAgent(ctx, toolNames, sideChannel)
 	if err != nil {
-		panic(fmt.Sprintf("failed to get tools: %v", err))
+		// 在异步迭代器中返回错误
+		iter, gen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
+		gen.Send(&adk.AgentEvent{Err: err})
+		gen.Close()
+		return iter
 	}
 
-	// 4. 创建 ChatModel
-	chatModel, err := s.newChatModel(ctx)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create chat model: %v", err))
-	}
-
-	// 5. 构建 Agent
-	today := time.Now().Format("2006-01-02")
-	agent, err := adk.NewChatModelAgent(
-		ctx,
-		&adk.ChatModelAgentConfig{
-			Name:        "Photo Asset Assistant",
-			Description: "Agent for managing photo assets with filtering and search capabilities",
-			Instruction: fmt.Sprintf("You are a helpful assistant for managing photo assets. Today is %s", today),
-			Model:       chatModel,
-			ToolsConfig: adk.ToolsConfig{
-				ToolsNodeConfig: compose.ToolsNodeConfig{
-					Tools: tools,
-				},
-			},
-		},
-	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create agent: %v", err))
-	}
-
-	// 6. 创建 Runner
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{
 		Agent:           agent,
 		EnableStreaming: true,
+		CheckPointStore: s.store, // 注入 Store，开启自动存档
 	})
 
-	// 7. 执行查询
-	return runner.Query(ctx, query)
+	// 执行时绑定 threadID (即 CheckPointID)
+	return runner.Query(ctx, query, adk.WithCheckPointID(threadID))
+}
+
+func (s *agentService) ResumeAgent(ctx context.Context, threadID string, params *adk.ResumeParams, uiChannel ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error) {
+	var sideChannel chan<- *SideChannelEvent
+	if len(uiChannel) > 0 && uiChannel[0] != nil {
+		sideChannel = uiChannel[0]
+	}
+
+	// 1. 重建 Agent (配置必须与 AskAgent 完全一致！)
+	// 注意：toolNames 必须为空，以便 buildAgent 加载所有默认工具，确保与原始会话的工具集匹配
+	agent, err := s.buildAgent(ctx, []string{}, sideChannel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build agent for resume: %w", err)
+	}
+
+	// 2. 创建 Runner
+	runner := adk.NewRunner(ctx, adk.RunnerConfig{
+		Agent:           agent,
+		EnableStreaming: true,
+		CheckPointStore: s.store,
+	})
+
+	// 3. 调用 Resume
+	// Eino 会自动从 Postgres 加载 data -> 反序列化 -> 填充 Session
+	iter, err := runner.ResumeWithParams(ctx, threadID, params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resume agent: %w", err)
+	}
+	return iter, nil
 }

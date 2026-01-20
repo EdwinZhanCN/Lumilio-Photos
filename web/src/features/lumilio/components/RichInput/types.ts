@@ -3,7 +3,7 @@
 // ==================== 基础类型 ====================
 
 /** 可提及的类型 */
-export type MentionType = "album" | "tag" | "camera" | "lens" | "location";
+export type MentionType = "placeholder";
 
 /** 输入触发阶段 */
 export type TriggerPhase = "IDLE" | "SELECT_TYPE" | "SELECT_ENTITY" | "COMMAND";

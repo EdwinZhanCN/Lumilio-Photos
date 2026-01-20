@@ -104,6 +104,21 @@ type ExtraInfo struct {
 	Data      interface{} `json:"data"`       // Extra data structure
 }
 
+// FilterConfirmationInfo is the information sent to the user when a tool interrupt occurs
+type FilterConfirmationInfo struct {
+	Count          int    `json:"count"`
+	ConfirmationID string `json:"confirmationId"` // Used on resume to identify the confirmation
+	Message        string `json:"message"`
+}
+
+// FilterInterruptState is the state saved during a tool interrupt
+type FilterInterruptState struct {
+	RefID       string `json:"ref_id"`
+	Count       int    `json:"count"`
+	ExecutionID string `json:"execution_id"`
+	StartTime   int64  `json:"start_time"`
+}
+
 // ToolDependencies Defines the dependencies like database queries that tool execution needs
 type ToolDependencies struct {
 	Queries          *repo.Queries

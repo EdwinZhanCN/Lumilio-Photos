@@ -5,36 +5,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/cloudwego/eino/adk"
 	"github.com/jinzhu/copier"
 )
 
 // ReferenceMeta 存储引用的元数据信息
 type ReferenceMeta struct {
 	ID          string
-	Type        reflect.Type
+	TypeName    string
 	Description string
 	CreatedAt   time.Time
 }
 
 // ReferenceManager 统一的存储容器，支持类型转换
+// 该实现是无状态的，它将所有数据和元数据存储在 Eino ADK 的会话（Session）中。
+// 这使得 Agent 的状态可以被框架自动持久化和恢复。
 type ReferenceManager struct {
-	mu         sync.RWMutex
-	vault      map[string]interface{}
 	converters []TypeConverter
 	deps       *ToolDependencies
-	meta       map[string]*ReferenceMeta // 每个引用的元数据
 }
 
 // NewReferenceManager 创建新的 ReferenceManager 实例
 func NewReferenceManager(deps *ToolDependencies) *ReferenceManager {
 	rm := &ReferenceManager{
-		vault: make(map[string]interface{}),
-		meta:  make(map[string]*ReferenceMeta),
-		deps:  deps,
+		deps: deps,
 	}
 
 	// 注册默认转换器
@@ -47,9 +43,6 @@ func NewReferenceManager(deps *ToolDependencies) *ReferenceManager {
 // RegisterConverter 注册转换器
 // 转换器会按照 Priority() 返回值进行排序，数字越小优先级越高
 func (rm *ReferenceManager) RegisterConverter(converter TypeConverter) {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-
 	// 添加转换器
 	rm.converters = append(rm.converters, converter)
 
@@ -66,86 +59,50 @@ func (rm *ReferenceManager) RegisterConverter(converter TypeConverter) {
 	}
 }
 
-// Store 存储数据并返回引用 ID
-func (rm *ReferenceManager) Store(id string, data interface{}, description string) string {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
+// StoreWithID 存储数据，自动生成引用 ID，并将其存入 Eino session
+func (rm *ReferenceManager) StoreWithID(ctx context.Context, data interface{}, description string) string {
+	id := fmt.Sprintf("ref_%x", time.Now().UnixNano())
 
-	rm.vault[id] = data
-	rm.meta[id] = &ReferenceMeta{
+	// 为了避免和其他 Session 变量冲突，加个前缀
+	sessionKey := "ref_val:" + id
+	metaKey := "ref_meta:" + id
+
+	// 存入 Eino Session
+	// 只要开启了 CheckPointStore，这里的数据就会自动被持久化
+	adk.AddSessionValue(ctx, sessionKey, data)
+
+	// 存储元数据（可选，用于调试或 LLM 上下文）
+	meta := &ReferenceMeta{
 		ID:          id,
-		Type:        reflect.TypeOf(data),
+		TypeName:    reflect.TypeOf(data).String(),
 		Description: description,
 		CreatedAt:   time.Now(),
 	}
+	adk.AddSessionValue(ctx, metaKey, meta)
 
 	return id
 }
 
-// StoreWithID 存储数据，自动生成引用 ID
-// 使用纳秒级时间戳生成 ID，如果冲突则重试（最多 10 次）
-// 极端情况下回退到 UUID 以保证唯一性
-func (rm *ReferenceManager) StoreWithID(data interface{}, description string) string {
-	maxAttempts := 10 // 最大重试次数
+// Get 尝试从 Eino session 获取原始数据
+func (rm *ReferenceManager) Get(ctx context.Context, id string) (interface{}, error) {
+	sessionKey := "ref_val:" + id
 
-	for i := 0; i < maxAttempts; i++ {
-		id := fmt.Sprintf("ref_%x", time.Now().UnixNano())
-
-		rm.mu.Lock()
-		if _, exists := rm.vault[id]; !exists {
-			// ID 不存在，可以使用
-			rm.vault[id] = data
-			rm.meta[id] = &ReferenceMeta{
-				ID:          id,
-				Type:        reflect.TypeOf(data),
-				Description: description,
-				CreatedAt:   time.Now(),
-			}
-			rm.mu.Unlock()
-			return id
-		}
-		rm.mu.Unlock()
-
-		// ID 冲突，短暂等待后重试
-		time.Sleep(time.Microsecond)
-	}
-
-	// 极端情况：使用 UUID 保证唯一性
-	id := fmt.Sprintf("ref_%s", uuid.New().String())
-	rm.mu.Lock()
-	rm.vault[id] = data
-	rm.meta[id] = &ReferenceMeta{
-		ID:          id,
-		Type:        reflect.TypeOf(data),
-		Description: description,
-		CreatedAt:   time.Now(),
-	}
-	rm.mu.Unlock()
-	return id
-}
-
-// Get 尝试获取原始数据
-func (rm *ReferenceManager) Get(id string) (interface{}, error) {
-	rm.mu.RLock()
-	defer rm.mu.RUnlock()
-
-	data, ok := rm.vault[id]
+	// 从 Session 中恢复数据
+	// 无论是刚存进去的，还是 Resume 后从 Postgres 加载的，都能取到
+	val, ok := adk.GetSessionValue(ctx, sessionKey)
 	if !ok {
-		return nil, fmt.Errorf("reference not found: %s", id)
+		return nil, fmt.Errorf("reference not found in session: %s", id)
 	}
 
-	return data, nil
+	return val, nil
 }
 
 // GetAs 尝试获取并转换为目标类型
 func (rm *ReferenceManager) GetAs(ctx context.Context, id string, target interface{}) error {
-	rm.mu.RLock()
-	defer rm.mu.RUnlock()
-
 	// 1. 获取原始数据
-	data, ok := rm.vault[id]
-	if !ok {
-		return fmt.Errorf("reference not found: %s", id)
+	data, err := rm.Get(ctx, id)
+	if err != nil {
+		return err
 	}
 
 	// 2. 获取目标类型
@@ -177,58 +134,19 @@ func (rm *ReferenceManager) GetAs(ctx context.Context, id string, target interfa
 }
 
 // GetMeta 获取引用的元数据
-func (rm *ReferenceManager) GetMeta(id string) (*ReferenceMeta, error) {
-	rm.mu.RLock()
-	defer rm.mu.RUnlock()
-
-	meta, ok := rm.meta[id]
+func (rm *ReferenceManager) GetMeta(ctx context.Context, id string) (*ReferenceMeta, error) {
+	metaKey := "ref_meta:" + id
+	metaVal, ok := adk.GetSessionValue(ctx, metaKey)
 	if !ok {
-		return nil, fmt.Errorf("reference not found: %s", id)
+		return nil, fmt.Errorf("reference metadata not found in session: %s", id)
 	}
+
+	meta, ok := metaVal.(*ReferenceMeta)
+	if !ok {
+		return nil, fmt.Errorf("invalid metadata type in session for ref: %s", id)
+	}
+
 	return meta, nil
-}
-
-// ListRefs 列出所有引用（用于调试或 LLM 上下文）
-func (rm *ReferenceManager) ListRefs() []*ReferenceMeta {
-	rm.mu.RLock()
-	defer rm.mu.RUnlock()
-
-	list := make([]*ReferenceMeta, 0, len(rm.meta))
-	for _, meta := range rm.meta {
-		list = append(list, meta)
-	}
-	return list
-}
-
-// Delete 删除引用
-func (rm *ReferenceManager) Delete(id string) error {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-
-	if _, ok := rm.vault[id]; !ok {
-		return fmt.Errorf("reference not found: %s", id)
-	}
-
-	delete(rm.vault, id)
-	delete(rm.meta, id)
-	return nil
-}
-
-// Clear 清空所有引用
-func (rm *ReferenceManager) Clear() {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-
-	rm.vault = make(map[string]interface{})
-	rm.meta = make(map[string]*ReferenceMeta)
-}
-
-// Size 返回引用数量
-func (rm *ReferenceManager) Size() int {
-	rm.mu.RLock()
-	defer rm.mu.RUnlock()
-
-	return len(rm.vault)
 }
 
 // Reference 是一个泛型容器，解决了 JSON string -> Go Struct 的桥接问题
