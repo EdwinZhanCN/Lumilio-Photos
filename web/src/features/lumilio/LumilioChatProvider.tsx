@@ -20,7 +20,6 @@ export const LumilioChatContext = createContext<
 export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(lumilioReducer, initialState);
 
-  // --- Side Effects: Fetch available tools on mount ---
   useEffect(() => {
     const fetchTools = async () => {
       try {
@@ -29,13 +28,24 @@ export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
         dispatch({ type: "FETCH_TOOLS_SUCCESS", payload: commands });
       } catch (error) {
         console.error("Failed to fetch agent tools:", error);
-        // dispatch({ type: 'FETCH_TOOLS_ERROR', ... });
       }
     };
     fetchTools();
   }, []);
 
-  // --- Async Actions ---
+  /** Processes the SSE stream and dispatches appropriate actions.
+
+  Iterates through the stream of events from the agent and dispatches corresponding
+  actions to update the chat state. Handles session info, messages, UI events,
+  actions, completion, and errors.
+
+  Args:
+    stream: Async generator yielding SSE events from the agent.
+    dispatch: React dispatch function to update the chat state.
+
+  Raises:
+    No explicit exceptions are raised; errors are handled via dispatch.
+  */
   const processStream = useCallback(
     async (stream: AsyncGenerator<any>, dispatch: React.Dispatch<any>) => {
       for await (const event of stream) {
@@ -98,6 +108,18 @@ export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
+  /** Sends a message to the agent and initiates a conversation.
+
+  Dispatches actions to add the user message, start the chat connection,
+  and processes the streaming response from the agent.
+
+  Args:
+    query: The text content of the user's message.
+    toolNames: Optional list of tool names to invoke for this message.
+
+  Raises:
+    Error: If the streaming request fails, an error action is dispatched.
+  */
   const sendMessage = useCallback(
     async (query: string, toolNames: string[] = []) => {
       dispatch({ type: "ADD_USER_MESSAGE", payload: { content: query } });
@@ -122,6 +144,17 @@ export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
     [state.threadId, processStream],
   );
 
+  /** Resumes a conversation that was interrupted.
+
+  Resumes an existing conversation thread with the specified targets,
+  typically used after an interrupt requires user confirmation or action.
+
+  Args:
+    targets: A record containing target data for resuming the conversation.
+
+  Raises:
+    Error: If there is no active thread ID or if the resume request fails.
+  */
   const resumeConversation = useCallback(
     async (targets: Record<string, any>) => {
       if (!state.threadId) {

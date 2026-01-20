@@ -21,18 +21,30 @@ export const initialState: LumilioChatState = {
   interrupt: null,
 };
 
+/** Reducer for managing the Lumilio chat state.
+
+  Handles all state transitions for the chat feature, including connection status,
+  message management, streaming content processing, UI events, interrupts,
+  and tool management.
+
+  Args:
+    state: The current Lumilio chat state.
+    action: The action to dispatch for state update.
+
+  Returns:
+    The updated Lumilio chat state based on the dispatched action.
+  */
 export const lumilioReducer = (
   state: LumilioChatState,
   action: LumilioChatAction,
 ): LumilioChatState => {
   switch (action.type) {
-    // --- Connection ---
     case "CHAT_START":
       return {
         ...state,
         connection: { status: "connecting" },
         isGenerating: true,
-        streamingBlock: null, // Reset streaming block on new chat
+        streamingBlock: null,
       };
 
     case "RESUME_START":
@@ -47,7 +59,7 @@ export const lumilioReducer = (
         ...state,
         connection: { status: "connected" },
         threadId: action.payload.threadId,
-        isGenerating: false, // Connected, but not yet generating a response
+        isGenerating: false,
       };
     case "CHAT_CONNECT_ERROR":
       return {
@@ -62,7 +74,6 @@ export const lumilioReducer = (
         isGenerating: false,
       };
 
-    // --- Messages ---
     case "ADD_USER_MESSAGE": {
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -70,7 +81,6 @@ export const lumilioReducer = (
         content: action.payload.content,
         uiEvents: [],
       };
-      // When user sends a message, create a new empty assistant message placeholder
       const assistantPlaceholder: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
@@ -93,7 +103,6 @@ export const lumilioReducer = (
       const lastMsg = state.conversation[lastMsgIndex];
 
       if (!lastMsg || lastMsg.role !== "assistant") {
-        // Should not happen if ADD_USER_MESSAGE is used correctly
         return state;
       }
 
@@ -136,7 +145,6 @@ export const lumilioReducer = (
       const lastMsg = state.conversation[lastMsgIndex];
       let finalConversation = state.conversation;
 
-      // Ensure any open <think> tag is closed
       if (
         state.streamingBlock === "reasoning" &&
         lastMsg?.role === "assistant"
@@ -156,7 +164,6 @@ export const lumilioReducer = (
       };
     }
 
-    // --- Side-channel & Interrupts ---
     case "RECEIVE_UI_EVENT": {
       if (import.meta.env.DEV) {
         console.log(
@@ -184,19 +191,23 @@ export const lumilioReducer = (
         );
 
         let newUiEvents;
+        let newContent = lastAsstMsg.content;
+
         if (existingEventIndex !== -1) {
-          // Update existing event
           newUiEvents = [...lastAsstMsg.uiEvents];
           newUiEvents[existingEventIndex] = newUiEvent;
         } else {
-          // Add new event
           newUiEvents = [...lastAsstMsg.uiEvents, newUiEvent];
+
+          const toolTag = `\n\n<lumilio-tool id="${newUiEvent.tool.executionId}"></lumilio-tool>\n\n`;
+          newContent += toolTag;
         }
 
         const newConversation = [...state.conversation];
         newConversation[lastAsstMsgIndex] = {
           ...lastAsstMsg,
           uiEvents: newUiEvents,
+          content: newContent,
         };
         return { ...state, conversation: newConversation };
       }
@@ -208,7 +219,6 @@ export const lumilioReducer = (
     case "CLEAR_INTERRUPT":
       return { ...state, interrupt: null };
 
-    // --- Tools ---
     case "FETCH_TOOLS_START":
       return { ...state, tools: { ...state.tools, isLoading: true } };
     case "FETCH_TOOLS_SUCCESS":
