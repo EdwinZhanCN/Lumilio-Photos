@@ -98,7 +98,6 @@ func (s *agentService) buildAgent(ctx context.Context, toolNames []string, sideC
 		SideChannel: sideChannel,
 	}
 	deps.ReferenceManager = NewReferenceManager(deps)
-	deps.InputExtractor = NewToolInputExtractor(deps.ReferenceManager)
 
 	// 2. 默认或按需加载工具
 	if len(toolNames) == 0 {
