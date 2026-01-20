@@ -1,3 +1,4 @@
+import { Brain } from "lucide-react";
 import React, { useState } from "react";
 
 interface ThinkBlockProps {
@@ -42,22 +43,10 @@ export const ThinkBlock: React.FC<ThinkBlockProps> = ({
     >
       <button
         onClick={toggleOpen}
-        className="w-full px-4 py-3 text-left bg-base-200 hover:bg-base-300 transition-colors duration-200 flex items-center justify-between cursor-pointer"
+        className="w-full px-2 py-3 text-left bg-base-200 hover:bg-base-300 transition-colors duration-200 flex items-center gap-5 cursor-pointer"
       >
         <span className="font-medium text-base-content flex items-center">
-          <svg
-            className="w-4 h-4 mr-2 text-primary"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-            />
-          </svg>
+          <Brain className="mx-1.5 text-primary" strokeWidth={1.25} />
           {summaryText}
         </span>
         <svg

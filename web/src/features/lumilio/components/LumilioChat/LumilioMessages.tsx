@@ -128,30 +128,31 @@ export function LumilioMessages({
         return (
           <div
             key={message.id}
-            className={`chat ${
-              message.role === "user" ? "chat-end" : "chat-start"
-            }`}
+            className={`chat ${message.role === "user" ? "chat-end" : "chat-start"}`}
           >
-            <div className="chat-image">
+            <div className="">
               <div className="w-10 rounded-full">
                 {message.role === "assistant" && (
-                  <div className="w-full h-full flex items-center justify-center">
+                  <div className="w-full h-full flex items-center">
                     <LumilioAvatar start={isStreamingHere} size={0.2} />
                   </div>
                 )}
               </div>
             </div>
-            <div className="chat-header">
+            {/*<div className="chat-header">
               {message.role === "user" ? "You" : "Lumilio"}
-            </div>
+            </div>*/}
             <div
-              className={`chat-bubble ${
-                message.role === "user" ? "chat-bubble-primary" : "bg-base-200"
+              className={` ${
+                message.role === "user"
+                  ? "chat-bubble chat-bubble-primary"
+                  : "rounded-2xl bg-base-200 w-full fadeIn"
               }`}
             >
               {message.content && (
                 <Markdown
                   content={processThinkTags(message.content, isStreamingHere)}
+                  className={`${message.role === "user" ? "" : "mx-6 my-4"}`}
                 />
               )}
               {message.uiEvents.map((uiEvent) => (
