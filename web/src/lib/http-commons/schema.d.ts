@@ -4,6 +4,518 @@
  */
 
 export interface paths {
+    "/admin/river/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List jobs with filters
+         * @description Get a paginated list of jobs with optional state, queue, kind, and time range filters
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Job state filter (available,scheduled,running,retryable,completed,cancelled,discarded) */
+                    state?: string;
+                    /** @description Queue name filter */
+                    queue?: string;
+                    /** @description Job kind filter */
+                    kind?: string;
+                    /** @description Number of jobs to return (default: 50, max: 200) */
+                    limit?: number;
+                    /** @description Pagination cursor for next page */
+                    cursor?: string;
+                    /** @description Time range filter (1h, 24h, 30d) - filters by created_at */
+                    time_range?: string;
+                    /** @description Include total count of matching jobs (may be slower) */
+                    include_count?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/river/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get job by ID
+         * @description Get detailed information about a specific job
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Job ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Job not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/river/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all queues
+         * @description Get a list of all active queues with their metadata
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Number of queues to return (default: 100) */
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/river/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get job statistics
+         * @description Get aggregated statistics about jobs by state
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chat with Agent
+         * @description Send a query to agent and receive streaming responses via SSE. Manages conversation threads.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Chat request */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["handler.AgentChatRequest"];
+                };
+            };
+            responses: {
+                /** @description SSE stream */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/chat/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Agent Chat
+         * @description Resume a conversation from an interrupt point (e.g., user confirmation for a tool call)
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Resume request */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["handler.AgentResumeRequest"];
+                };
+            };
+            responses: {
+                /** @description SSE stream */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/schemas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Agent Tool DTO Schemas
+         * @description Get all DTO schemas used by agent tools for type reference
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/agent/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Available Tools
+         * @description Get list of all registered agent tools
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/albums": {
         parameters: {
             query?: never;
@@ -680,6 +1192,372 @@ export interface paths {
                 };
             };
         };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/available-years": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get available years
+         * @description Get list of years that have photo data
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/camera-lens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get camera lens combination stats
+         * @description Get top N camera+lens combinations
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Number of results to return */
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/daily-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get daily activity heatmap
+         * @description Get daily shooting activity heatmap data for the past year
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Number of days to look back */
+                    days?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/focal-length": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get focal length distribution
+         * @description Get distribution of commonly used focal lengths
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stats/time-distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get time distribution
+         * @description Get shooting time distribution by hour or month
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Distribution type: hourly or monthly */
+                    type?: "hourly" | "monthly";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -3107,7 +3985,7 @@ export interface components {
             message?: string;
         } & components["schemas"]["data"];
         data: {
-            data?: components["schemas"]["dto.UserDTO"];
+            data?: components["schemas"]["handler.AvailableYearsResponse"];
         };
         /** @enum {string} */
         "dbtypes.AssetType": "PHOTO" | "VIDEO" | "AUDIO";
@@ -3243,6 +4121,57 @@ export interface components {
             status?: string;
             success?: boolean;
             task_id?: number;
+        };
+        "dto.BulkLikeUpdateDTO": {
+            /**
+             * @description Action performed: "like" or "unlike"
+             * @example like
+             * @enum {string}
+             */
+            action?: "like" | "unlike";
+            /**
+             * @description Human-readable description
+             * @example Bulk like: 98/100 successful
+             */
+            description?: string;
+            /**
+             * @description Number of failed updates
+             * @example 2
+             */
+            failed?: number;
+            /**
+             * @description List of asset IDs that failed to update (only present when Failed > 0)
+             * @example [
+             *       "550e8400-e29b-41d4-a716-446655440000",
+             *       "660e8400-e29b-41d4-a716-446655440001"
+             *     ]
+             */
+            failed_asset_ids?: string[];
+            /**
+             * @description The like status that was applied (true = liked, false = unliked)
+             * @example true
+             */
+            liked?: boolean;
+            /**
+             * @description Reference ID for this result (can be used in subsequent tool calls)
+             * @example ref_1234567890
+             */
+            ref_id?: string;
+            /**
+             * @description Number of successfully updated assets
+             * @example 98
+             */
+            success?: number;
+            /**
+             * @description Timestamp when the operation completed
+             * @example 2026-01-18T19:34:00Z
+             */
+            timestamp?: string;
+            /**
+             * @description Total number of assets in the batch
+             * @example 100
+             */
+            total?: number;
         };
         "dto.CreateAlbumRequestDTO": {
             album_name: string;
@@ -3403,7 +4332,9 @@ export interface components {
         "dto.UploadConfigResponseDTO": {
             chunk_size?: number;
             max_concurrent?: number;
+            max_in_flight_requests?: number;
             memory_buffer?: number;
+            merge_concurrency?: number;
         };
         "dto.UploadProgressResponseDTO": {
             sessions?: components["schemas"]["dto.SessionProgressDTO"][];
@@ -3430,6 +4361,101 @@ export interface components {
             last_login?: string;
             user_id?: number;
             username?: string;
+        };
+        "handler.AgentChatRequest": {
+            query: string;
+            thread_id?: string;
+            tool_names?: string[];
+        };
+        "handler.AgentResumeRequest": {
+            targets: {
+                [key: string]: unknown;
+            };
+            thread_id: string;
+        };
+        "handler.AvailableYearsResponse": {
+            years?: number[];
+        };
+        "handler.CameraLensCombination": {
+            camera_model?: string;
+            count?: number;
+            lens_model?: string;
+        };
+        "handler.CameraLensStatsResponse": {
+            data?: components["schemas"]["handler.CameraLensCombination"][];
+            total?: number;
+        };
+        "handler.FocalLengthBucket": {
+            count?: number;
+            focal_length?: number;
+        };
+        "handler.FocalLengthDistributionResponse": {
+            data?: components["schemas"]["handler.FocalLengthBucket"][];
+            total?: number;
+        };
+        "handler.HeatmapResponse": {
+            data?: components["schemas"]["handler.HeatmapValue"][];
+        };
+        "handler.HeatmapValue": {
+            count?: number;
+            date?: string;
+        };
+        "handler.JobDTO": {
+            args?: unknown;
+            attempt?: number;
+            attempted_at?: string;
+            created_at?: string;
+            errors?: string[];
+            finalized_at?: string;
+            id?: number;
+            kind?: string;
+            max_attempts?: number;
+            metadata?: unknown;
+            priority?: number;
+            queue?: string;
+            scheduled_at?: string;
+            state?: string;
+        };
+        "handler.JobListResponse": {
+            cursor?: string;
+            jobs?: components["schemas"]["handler.JobDTO"][];
+            total_count?: number;
+        };
+        "handler.JobStatsResponse": {
+            available?: number;
+            cancelled?: number;
+            completed?: number;
+            discarded?: number;
+            retryable?: number;
+            running?: number;
+            scheduled?: number;
+        };
+        "handler.QueueStatsDTO": {
+            metadata?: unknown;
+            name?: string;
+            updated_at?: string;
+        };
+        "handler.QueueStatsResponse": {
+            queues?: components["schemas"]["handler.QueueStatsDTO"][];
+        };
+        "handler.TimeBucket": {
+            count?: number;
+            label?: string;
+            value?: number;
+        };
+        "handler.TimeDistributionResponse": {
+            data?: components["schemas"]["handler.TimeBucket"][];
+            type?: string;
+        };
+        "handler.ToolInfoResponse": {
+            desc?: string;
+            extra?: {
+                [key: string]: unknown;
+            };
+            name?: string;
+        };
+        "handler.ToolSchemaResponse": {
+            bulk_like_update_example?: components["schemas"]["dto.BulkLikeUpdateDTO"];
         };
     };
     responses: never;
