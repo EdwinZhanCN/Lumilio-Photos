@@ -40,11 +40,12 @@ type AssetFilterOutput struct {
 func RegisterFilterAsset() {
 	info := &schema.ToolInfo{
 		Name: "filter_assets",
-		Desc: "Search and filter assets. Use this to show photos to the user based on criteria like date, type, or content.",
+		Desc: "Search and filter assets.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
-		return utils.NewTool(info, func(ctx context.Context, input *AssetFilterInput) (*AssetFilterOutput, error) {
+		// Use InferTool to automatically generate the parameter schema from AssetFilterInput's struct tags.
+		t, err := utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *AssetFilterInput) (*AssetFilterOutput, error) {
 			// Correct Interrupt/Resume Flow:
 			// 1. Check if the tool's state was saved from a *previous* interrupt in this run.
 			wasInterrupted, hasState, state := compose.GetInterruptState[*core.FilterInterruptState](ctx)
@@ -108,7 +109,11 @@ func RegisterFilterAsset() {
 			// No confirmation needed, proceed directly.
 			refID := storeAssets(ctx, deps, assets, input)
 			return handleFilterResult(ctx, deps, input, refID, count, executionID, startTime.UnixMilli())
-		}), nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		return t, nil
 	})
 }
 
