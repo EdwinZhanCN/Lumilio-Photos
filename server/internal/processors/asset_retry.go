@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -96,6 +97,7 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 
 	// Re-enqueue tasks based on failed task names (using queue names as canonical task names)
 	assetType := dbtypes.AssetType(asset.Type)
+	log.Printf("Retrying %d tasks for %s asset %s: %v", len(tasksToRetry), assetType, asset.AssetID.String(), tasksToRetry)
 	return ap.enqueueRetryTasks(ctx, &asset, repository, assetType, tasksToRetry)
 }
 
@@ -140,27 +142,59 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	// Enqueue tasks based on queue names (bijection: queue name = task name)
 	// Available queues: metadata_asset, thumbnail_asset, transcode_asset, process_clip, process_ocr, process_caption, process_face
 
-	// Enqueue metadata_asset if requested
+	// Enqueue metadata_asset if requested (all asset types support metadata)
 	if queueSet["metadata_asset"] {
 		_, err := ap.queueClient.Insert(ctx, commonMeta, &river.InsertOpts{Queue: "metadata_asset"})
 		if err != nil {
 			return fmt.Errorf("enqueue metadata_asset retry: %w", err)
 		}
+		log.Printf("Enqueued metadata task for %s asset %s", assetType, asset.AssetID.String())
 	}
 
-	// Enqueue thumbnail_asset if requested
+	// Enqueue thumbnail_asset if requested AND asset type supports it
 	if queueSet["thumbnail_asset"] {
-		_, err := ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
-		if err != nil {
-			return fmt.Errorf("enqueue thumbnail_asset retry: %w", err)
+		switch assetType {
+		case dbtypes.AssetTypePhoto:
+			_, err := ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
+			if err != nil {
+				return fmt.Errorf("enqueue thumbnail_asset retry for photo: %w", err)
+			}
+			log.Printf("Enqueued thumbnail task for photo asset %s", asset.AssetID.String())
+		case dbtypes.AssetTypeVideo:
+			_, err := ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
+			if err != nil {
+				return fmt.Errorf("enqueue thumbnail_asset retry for video: %w", err)
+			}
+			log.Printf("Enqueued thumbnail task for video asset %s", asset.AssetID.String())
+		case dbtypes.AssetTypeAudio:
+			// Skip thumbnail for audio - they use waveform instead
+			log.Printf("Skipped thumbnail task for audio asset %s (audio uses waveform instead)", asset.AssetID.String())
+		default:
+			return fmt.Errorf("unsupported asset type for thumbnail: %s", assetType)
 		}
 	}
 
-	// Enqueue transcode_asset if requested
+	// Enqueue transcode_asset if requested AND asset type supports it
 	if queueSet["transcode_asset"] {
-		_, err := ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
-		if err != nil {
-			return fmt.Errorf("enqueue transcode_asset retry: %w", err)
+		switch assetType {
+		case dbtypes.AssetTypeVideo:
+			_, err := ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
+			if err != nil {
+				return fmt.Errorf("enqueue transcode_asset retry for video: %w", err)
+			}
+			log.Printf("Enqueued transcode task for video asset %s", asset.AssetID.String())
+		case dbtypes.AssetTypeAudio:
+			_, err := ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
+			if err != nil {
+				return fmt.Errorf("enqueue transcode_asset retry for audio: %w", err)
+			}
+			log.Printf("Enqueued transcode task for audio asset %s", asset.AssetID.String())
+		case dbtypes.AssetTypePhoto:
+			// Skip transcode for photos - they don't need transcoding
+			// This prevents photos from being incorrectly added to the transcode queue
+			log.Printf("Skipped transcode task for photo asset %s (photos don't need transcoding)", asset.AssetID.String())
+		default:
+			return fmt.Errorf("unsupported asset type for transcode: %s", assetType)
 		}
 	}
 
@@ -180,6 +214,7 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 		}
 	}
 
+	log.Printf("Completed retry task enqueueing for asset %s", asset.AssetID.String())
 	return nil
 }
 

@@ -2,6 +2,18 @@
 
 # Type Alias: WorkerType
 
-> **WorkerType** = `"thumbnail"` \| `"hash"` \| `"border"` \| `"export"` \| `"exif"` \| `"llm"`
+> **WorkerType** = `"thumbnail"` \| `"hash"` \| `"border"` \| `"export"` \| `"exif"`
 
-Defined in: [workers/workerClient.ts:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/812aa196f3ffee01184cb77b598610e0c075412a/web/src/workers/workerClient.ts#L20)
+Defined in: [workers/workerClient.ts:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/7a82081bf9fc00044785b3bff4727efe730d6ec5/web/src/workers/workerClient.ts#L10)
+
+A unified client to manage and interact with all web workers in the application.
+This class provides a clean, promise-based API for computationally expensive tasks,
+abstracting away the underlying `postMessage` communication.
+
+## Author
+
+Edwin Zhan
+
+## Since
+
+1.1.0

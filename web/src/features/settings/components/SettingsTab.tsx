@@ -1,10 +1,8 @@
 import {
   CursorArrowRippleIcon,
   ServerStackIcon,
-  SparklesIcon,
   CpuChipIcon,
 } from "@heroicons/react/24/solid";
-import LumenSettings from "./Tabs/LumenSettings";
 import UISettings from "./Tabs/UISettings";
 import ServerSettings from "./Tabs/ServerSettings";
 import PerformanceSettings from "./Tabs/PerformanceSettings";
@@ -41,15 +39,6 @@ export default function SettingsTab() {
         </label>
         <div className="tab-content bg-base-100 border-base-300 p-6">
           <ServerSettings />
-        </div>
-
-        <label className="tab gap-1 cursor-pointer">
-          <input type="radio" name="my_tabs_4" />
-          <SparklesIcon className="size-4" />
-          {t("settings.lumen")}
-        </label>
-        <div className="tab-content bg-base-100 border-base-300 p-6">
-          <LumenSettings />
         </div>
       </div>
     </div>
