@@ -124,7 +124,6 @@ type ToolDependencies struct {
 	Queries          *repo.Queries
 	SideChannel      chan<- *SideChannelEvent // SideChannel sends DTO data to frontend, bypassing LLM
 	ReferenceManager *ReferenceManager        // ReferenceManager stores and manages tool outputs across session
-	InputExtractor   *ToolInputExtractor      // InputExtractor automatically converts ref_id to target types
 }
 
 type ToolFactory func(ctx context.Context, deps *ToolDependencies) (tool.BaseTool, error)
@@ -175,13 +174,8 @@ func (r *ToolRegistry) GetTools(ctx context.Context, toolNames []string, deps *T
 				return nil, fmt.Errorf("failed to create tool %s: %w", name, err)
 			}
 
-			// 自动包装工具以应用中间件（Reference[T] 解析）
-			if deps.InputExtractor != nil {
-				wrapped := NewToolWrapper(t, deps.InputExtractor)
-				tools = append(tools, wrapped)
-			} else {
-				tools = append(tools, t)
-			}
+			tools = append(tools, t)
+
 		}
 	}
 	return tools, nil

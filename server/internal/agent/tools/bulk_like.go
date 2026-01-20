@@ -51,6 +51,19 @@ func RegisterBulkLikeTool() {
 		t, err := utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *BulkLikeInput) (*BulkLikeOutput, error) {
 			startTime := time.Now()
 
+			// 1. 检查 ID 是否存在但 Data 为空
+			if input.Assets.ID != "" && len(input.Assets.Data) == 0 { // 假设 T 是切片，或者根据 T 具体类型判断 nil
+				// 2. 使用 deps 中的 ReferenceManager 加载数据
+				// 注意：这里利用了 Go 的泛型引用传递
+				err := deps.ReferenceManager.GetAs(ctx, input.Assets.ID, &input.Assets.Data)
+				if err != nil {
+					// 处理加载失败的情况，比如 ID 过期或无效
+					return &BulkLikeOutput{
+						Message: fmt.Sprintf("Failed to resolve reference %s: %v", input.Assets.ID, err),
+					}, nil
+				}
+			}
+
 			// =====================================================
 			// 阶段 1: 发送 pending 事件
 			// =====================================================
