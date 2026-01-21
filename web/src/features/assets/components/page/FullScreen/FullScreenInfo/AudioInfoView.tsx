@@ -2,7 +2,7 @@ import { useOptimistic, useTransition } from "react";
 import { SquarePen, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { assetService } from "@/services/assetsService";
+import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
 import type { Asset, AudioSpecificMetadata } from "@/lib/http-commons";
@@ -22,25 +22,22 @@ export default function AudioInfoView({
   const { t } = useI18n();
   const showMessage = useMessage();
   const [isPending, startTransition] = useTransition();
+  const { updateRating, updateDescription } = useAssetActions();
 
   // Use React 19's useOptimistic for better UX
-  const [optimisticMetadata, setOptimisticMetadata] = useOptimistic(
-    asset?.specific_metadata || {},
-    (
-      currentMetadata,
-      optimisticValue: {
-        rating?: number;
-        description?: string;
-      },
-    ) => ({
-      ...currentMetadata,
-      ...optimisticValue,
-    }),
+  const [optimisticRating, setOptimisticRating] = useOptimistic(
+    asset?.rating || 0,
+    (_, v: number) => v,
+  );
+
+  const [optimisticDescription, setOptimisticDescription] = useOptimistic(
+    asset?.specific_metadata?.description || "",
+    (_, v: string) => v,
   );
 
   // Type guard to ensure we have audio metadata
-  const metadata = isAudioMetadata(asset.type, optimisticMetadata)
-    ? optimisticMetadata
+  const metadata = isAudioMetadata(asset.type, asset.specific_metadata)
+    ? (asset.specific_metadata as AudioSpecificMetadata)
     : ({} as AudioSpecificMetadata);
 
   const fmt = (v: any, fallback = "-") =>
@@ -85,16 +82,16 @@ export default function AudioInfoView({
   const genre = fmt(metadata.genre);
   const year = fmt(metadata.year);
 
-  const currentRating = (asset as any).rating || 0;
+  const currentRating = optimisticRating;
 
   const handleRatingChange = (newRating: number) => {
     if (!asset?.asset_id || isPending) return;
 
     startTransition(async () => {
-      setOptimisticMetadata({ rating: newRating });
+      setOptimisticRating(newRating);
 
       try {
-        await assetService.updateAssetRating(asset.asset_id!, newRating);
+        await updateRating(asset.asset_id!, newRating);
 
         if (onAssetUpdate && asset) {
           const updatedAsset = {
@@ -103,11 +100,8 @@ export default function AudioInfoView({
           } as Asset;
           onAssetUpdate(updatedAsset);
         }
-
-        showMessage("success", t("rating.updateSuccess"));
       } catch (error) {
         console.error("Failed to update rating:", error);
-        showMessage("error", t("rating.updateError"));
       }
     });
   };
@@ -116,13 +110,10 @@ export default function AudioInfoView({
     if (!asset?.asset_id || isPending) return;
 
     startTransition(async () => {
-      setOptimisticMetadata({ description: newDescription });
+      setOptimisticDescription(newDescription);
 
       try {
-        await assetService.updateAssetDescription(
-          asset.asset_id!,
-          newDescription,
-        );
+        await updateDescription(asset.asset_id!, newDescription);
 
         if (onAssetUpdate && asset) {
           const updatedAsset = {
@@ -134,106 +125,111 @@ export default function AudioInfoView({
           };
           onAssetUpdate(updatedAsset);
         }
-
-        showMessage("success", t("assets.basicInfo.descriptionUpdated"));
       } catch (error) {
         console.error("Failed to update description:", error);
-        showMessage("error", t("assets.basicInfo.descriptionUpdateError"));
       }
     });
   };
 
   return (
     <div className="absolute top-5 right-5 z-10 font-mono">
-      <div className="card bg-base-100 w-max shadow-sm">
-        <div className="card-body">
-          <div className="card-actions justify-end">
-            <h1 className="font-sans font-bold">
-              {t("assets.basicInfo.title")}
-            </h1>
-            <div className="badge badge-soft badge-warning">AUDIO</div>
-            <button className="btn btn-circle btn-xs" disabled>
-              <SquarePen className="w-4 h-4" />
-            </button>
-            <button className="btn btn-circle btn-xs" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Basic Information */}
-          <div className="px-2">
-            <div className="flex gap-2 items-center">
-              <p>{uploadDisplay}</p>
-              <div className="text-sm text-info">{mimeDisplay}</div>
+      <div className="card bg-base-100 w-[380px] max-h-[calc(100vh-40px)] shadow-sm overflow-hidden flex flex-col">
+        <div className="card-body p-0 flex flex-col overflow-hidden">
+          {/* Header - Fixed */}
+          <div className="p-4 pb-2 flex items-center justify-between border-b border-base-200">
+            <div className="flex items-center gap-2">
+              <h1 className="font-sans font-bold">
+                {t("assets.basicInfo.title")}
+              </h1>
+              <div className="badge badge-soft badge-warning">AUDIO</div>
             </div>
-            <div className="flex gap-2 items-center mt-2">
-              <RatingComponent
-                rating={currentRating}
-                onRatingChange={handleRatingChange}
-                disabled={isPending}
-                size="sm"
-                showUnratedButton={true}
-              />
-            </div>
-            <div className="flex">
-              <p>{filename}</p>
+            <div className="flex gap-1">
+              <button className="btn btn-circle btn-xs" disabled>
+                <SquarePen className="w-4 h-4" />
+              </button>
+              <button className="btn btn-circle btn-xs" onClick={onClose}>
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
 
-          {/* Music Metadata */}
-          {(title !== "-" || artist !== "-" || album !== "-") && (
-            <div className="rounded bg-base-300">
-              <div className="px-2 py-0.5">
-                {title !== "-" && <p className="font-semibold">{title}</p>}
-                {artist !== "-" && <p>{artist}</p>}
-                {album !== "-" && <p className="text-sm">{album}</p>}
-                <div className="flex gap-2 text-xs text-base-content/70">
-                  {genre !== "-" && <span>{genre}</span>}
-                  {year !== "-" && <span>{year}</span>}
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+            {/* Basic Information */}
+            <div className="px-2">
+              <div className="flex flex-wrap gap-2 items-center">
+                <p className="text-sm">{uploadDisplay}</p>
+                <div className="text-xs text-info">{mimeDisplay}</div>
+              </div>
+              <div className="flex gap-2 items-center mt-2">
+                <RatingComponent
+                  rating={currentRating}
+                  onRatingChange={handleRatingChange}
+                  disabled={isPending}
+                  size="sm"
+                  showUnratedButton={true}
+                />
+              </div>
+              <div className="mt-2">
+                <p className="text-sm break-all font-medium">{filename}</p>
+              </div>
+            </div>
+
+            {/* Music Metadata */}
+            {(title !== "-" || artist !== "-" || album !== "-") && (
+              <div className="rounded bg-base-300 overflow-hidden">
+                <div className="px-3 py-2 space-y-1">
+                  {title !== "-" && <p className="text-sm font-bold leading-tight">{title}</p>}
+                  {artist !== "-" && <p className="text-xs font-medium">{artist}</p>}
+                  {album !== "-" && <p className="text-xs opacity-70">{album}</p>}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] opacity-60 uppercase tracking-wider">
+                    {genre !== "-" && <span>{genre}</span>}
+                    {year !== "-" && <span>{year}</span>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Audio Technical Info */}
+            <div className="rounded bg-base-300 overflow-hidden">
+              <div className="px-3 py-2 space-y-1">
+                <p className="text-xs opacity-70">Codec: {codec}</p>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-60">
+                  <span>{duration}</span>
+                  <span>{sizeM}</span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 p-3 pt-0">
+                <div className="px-2 py-0.5 rounded-full bg-base-100 text-[10px] font-bold">
+                  {bitrate}
+                </div>
+                <div className="px-2 py-0.5 rounded-full bg-base-100 text-[10px] font-bold">
+                  {sampleRate}
+                </div>
+                <div className="px-2 py-0.5 rounded-full bg-base-100 text-[10px] font-bold">
+                  {channels}
                 </div>
               </div>
             </div>
-          )}
 
-          {/* Audio Technical Info */}
-          <div className="rounded bg-base-300">
-            <div className="px-2 py-0.5">
-              <p>Codec: {codec}</p>
-              <div className="flex gap-2">
-                <span>{duration}</span>
-                <span>{sizeM}</span>
+            {/* Description */}
+            <div className="rounded bg-base-200 p-3">
+              <div className="text-[10px] uppercase tracking-wider font-bold text-base-content/50 mb-2">
+                {t("assets.basicInfo.description")}
               </div>
+              <InlineTextEditor
+                value={optimisticDescription || ""}
+                onSave={handleDescriptionChange}
+                placeholder={t("assets.basicInfo.descriptionPlaceholder")}
+                emptyStateText={t("assets.basicInfo.noDescription")}
+                editHint={t("assets.basicInfo.clickToEdit")}
+                disabled={isPending}
+                saving={isPending}
+                multiline={true}
+                maxLength={500}
+                className="text-sm min-h-[1.5rem]"
+              />
             </div>
-            <div className="flex flex-wrap gap-2 p-2">
-              <div className="px-2 py-0.5 rounded-full bg-base-100 text-xs">
-                {bitrate}
-              </div>
-              <div className="px-2 py-0.5 rounded-full bg-base-100 text-xs">
-                {sampleRate}
-              </div>
-              <div className="px-2 py-0.5 rounded-full bg-base-100 text-xs">
-                {channels}
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="rounded bg-base-200 p-2">
-            <div className="text-xs text-base-content/70 mb-1">
-              {t("assets.basicInfo.description")}
-            </div>
-            <InlineTextEditor
-              value={metadata.description || ""}
-              onSave={handleDescriptionChange}
-              placeholder={t("assets.basicInfo.descriptionPlaceholder")}
-              emptyStateText={t("assets.basicInfo.noDescription")}
-              editHint={t("assets.basicInfo.clickToEdit")}
-              disabled={isPending}
-              saving={isPending}
-              multiline={true}
-              maxLength={500}
-              className="min-h-[1.5rem]"
-            />
           </div>
         </div>
       </div>

@@ -53,6 +53,8 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect })
       <AssetsPageHeader
         groupBy={groupBy}
         onGroupByChange={(v) => dispatch({ type: "SET_GROUP_BY", payload: v })}
+        title="Select Cover Photo"
+        icon={<ImageIcon className="w-6 h-6 text-primary" />}
       />
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <JustifiedGallery

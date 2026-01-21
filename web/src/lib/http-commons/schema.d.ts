@@ -1199,6 +1199,89 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/albums/{id}/filter": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Filter assets in album
+         * @description Filter assets within a specific album using comprehensive filtering options
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Album ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            /** @description Filter criteria */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.FilterAssetsRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Assets filtered successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stats/available-years": {
         parameters: {
             query?: never;
@@ -4071,6 +4154,8 @@ export interface components {
             width?: number;
         };
         "dto.AssetFilterDTO": {
+            /** @example 123 */
+            album_id?: number;
             /** @example Canon */
             camera_make?: string;
             date?: components["schemas"]["dto.DateRangeDTO"];
@@ -4175,7 +4260,7 @@ export interface components {
         };
         "dto.CreateAlbumRequestDTO": {
             album_name: string;
-            cover_asset_id: string;
+            cover_asset_id?: string;
             description?: string;
         };
         "dto.DateRangeDTO": {

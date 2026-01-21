@@ -14,7 +14,7 @@ func New(dbpool *pgxpool.Pool, workers *river.Workers, mlConfig config.MLConfig)
 	queues := map[string]river.QueueConfig{
 		"ingest_asset":    {MaxWorkers: 50},
 		"metadata_asset":  {MaxWorkers: 20},
-		"thumbnail_asset": {MaxWorkers: runtime.NumCPU()},
+		"thumbnail_asset": {MaxWorkers: runtime.NumCPU() / 2},
 		"transcode_asset": {MaxWorkers: 1},
 		"retry_asset":     {MaxWorkers: 2},
 	}

@@ -278,6 +278,10 @@ const docTemplate = `{
             },
             "dto.AssetFilterDTO": {
                 "properties": {
+                    "album_id": {
+                        "example": 123,
+                        "type": "integer"
+                    },
                     "camera_make": {
                         "example": "Canon",
                         "type": "string"
@@ -493,8 +497,7 @@ const docTemplate = `{
                     }
                 },
                 "required": [
-                    "album_name",
-                    "cover_asset_id"
+                    "album_name"
                 ],
                 "type": "object"
             },
@@ -2709,6 +2712,110 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Update asset position in album",
+                "tags": [
+                    "albums"
+                ]
+            }
+        },
+        "/albums/{id}/filter": {
+            "post": {
+                "description": "Filter assets within a specific album using comprehensive filtering options",
+                "parameters": [
+                    {
+                        "description": "Album ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.FilterAssetsRequestDTO",
+                                        "summary": "request",
+                                        "description": "Filter criteria"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Filter criteria",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Assets filtered successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Filter assets in album",
                 "tags": [
                     "albums"
                 ]

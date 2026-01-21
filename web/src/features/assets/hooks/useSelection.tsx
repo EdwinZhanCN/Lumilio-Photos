@@ -12,6 +12,8 @@ import {
   selectSelectedAsArray,
 } from "../reducers/selection.reducer";
 import { useAssetActions } from "./useAssetActions";
+import { albumService } from "@/services/albumService";
+import { assetService } from "@/services/assetsService";
 
 /**
  * Hook for managing asset selection state and operations.
@@ -19,46 +21,6 @@ import { useAssetActions } from "./useAssetActions";
  * bulk operations, and selection persistence.
  *
  * @returns SelectionResult with selection state and operations
- *
- * @example
- * ```tsx
- * function AssetGrid({ assetIds }: { assetIds: string[] }) {
- *   const selection = useSelection();
- *
- *   return (
- *     <div>
- *       <button onClick={() => selection.setEnabled(!selection.enabled)}>
- *         {selection.enabled ? 'Exit Selection' : 'Select Items'}
- *       </button>
- *
- *       {selection.enabled && (
- *         <button onClick={() => selection.selectAll(assetIds)}>
- *           Select All ({assetIds.length})
- *         </button>
- *       )}
- *
- *       <div className="grid">
- *         {assetIds.map(id => (
- *           <AssetCard
- *             key={id}
- *             assetId={id}
- *             selected={selection.isSelected(id)}
- *             onSelect={() => selection.toggle(id)}
- *             selectionEnabled={selection.enabled}
- *           />
- *         ))}
- *       </div>
- *
- *       {selection.selectedCount > 0 && (
- *         <div className="selection-toolbar">
- *           <span>{selection.selectedCount} selected</span>
- *           <button onClick={selection.clear}>Clear</button>
- *         </div>
- *       )}
- *     </div>
- *   );
- * }
- * ```
  */
 export const useSelection = (): SelectionResult => {
   const { state, dispatch } = useAssetsContext();
@@ -143,7 +105,6 @@ export const useSelection = (): SelectionResult => {
       if (!enabled) return;
 
       // If no specific asset IDs provided, we can't select all
-      // This requires the caller to provide the assets they want to select
       if (!assetIds || assetIds.length === 0) {
         console.warn("selectAll called without asset IDs");
         return;
@@ -292,33 +253,6 @@ export const useSelection = (): SelectionResult => {
 
 /**
  * Hook for keyboard-enhanced selection operations.
- * Provides handlers for common keyboard shortcuts in selection interfaces.
- *
- * @param assetIds Array of all available asset IDs for range operations
- * @returns Selection result with keyboard handlers
- *
- * @example
- * ```tsx
- * function AssetGrid({ assetIds }: { assetIds: string[] }) {
- *   const selection = useKeyboardSelection(assetIds);
- *
- *   const handleAssetClick = (assetId: string, event: MouseEvent) => {
- *     selection.handleClick(assetId, event);
- *   };
- *
- *   return (
- *     <div onKeyDown={selection.handleKeyDown}>
- *       {assetIds.map(id => (
- *         <AssetCard
- *           key={id}
- *           assetId={id}
- *           onClick={(e) => handleAssetClick(id, e)}
- *         />
- *       ))}
- *     </div>
- *   );
- * }
- * ```
  */
 export const useKeyboardSelection = (assetIds: string[]) => {
   const selection = useSelection();
@@ -370,8 +304,6 @@ export const useKeyboardSelection = (assetIds: string[]) => {
           break;
         case "Delete":
         case "Backspace":
-          // This could trigger deletion of selected items
-          // Implementation depends on whether you want to handle this here
           event.preventDefault();
           break;
       }
@@ -388,9 +320,6 @@ export const useKeyboardSelection = (assetIds: string[]) => {
 
 /**
  * Hook for selection state without operations.
- * Useful for read-only components that need to know about selection state.
- *
- * @returns Read-only selection state
  */
 export const useSelectionState = () => {
   const { state } = useAssetsContext();
@@ -411,9 +340,6 @@ export const useSelectionState = () => {
 
 /**
  * Hook for bulk operations on selected assets.
- * Provides convenience methods for common bulk operations.
- *
- * @returns Bulk operation functions
  */
 export const useBulkAssetOperations = () => {
   const selection = useSelection();
@@ -446,10 +372,52 @@ export const useBulkAssetOperations = () => {
     selection.clear();
   }, [selection.selectedIds, selection.clear, deleteAsset]);
 
+  const bulkDownload = useCallback(async (): Promise<void> => {
+    const ids = Array.from(selection.selectedIds);
+    if (ids.length === 0) return;
+
+    for (const id of ids) {
+      try {
+        const response = await assetService.getOriginalFile(id);
+        const blob = response.data;
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Try to get filename from content-disposition or use a fallback
+        const contentDisposition = response.headers['content-disposition'];
+        let filename = `asset-${id}`;
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+          if (filenameMatch) filename = filenameMatch[1];
+        }
+        
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error(`Failed to download asset ${id}:`, error);
+      }
+      // Small delay to prevent browser from blocking multiple downloads
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+  }, [selection.selectedIds]);
+
+  const bulkAddToAlbum = useCallback(async (albumId: number): Promise<void> => {
+    const ids = Array.from(selection.selectedIds);
+    await Promise.all(
+      ids.map(assetId => albumService.addAssetToAlbum(albumId, assetId, {}))
+    );
+  }, [selection.selectedIds]);
+
   return {
     bulkUpdateRating,
     bulkToggleLike,
     bulkDelete,
+    bulkDownload,
+    bulkAddToAlbum,
     selectedCount: selection.selectedCount,
     hasSelection: selection.selectedCount > 0,
   };

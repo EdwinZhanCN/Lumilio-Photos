@@ -82,7 +82,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
             load="visible"
             viewType="audio"
             streamType="on-demand"
-            crossOrigin
+            crossOrigin = "use-credentials"
             onError={(error) => console.error("Audio player error:", error)}
           >
             <MediaProvider />
