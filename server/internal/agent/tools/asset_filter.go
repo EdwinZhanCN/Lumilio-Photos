@@ -16,7 +16,7 @@ import (
 type AssetFilterInput struct {
 	DateFrom string `json:"date_from,omitempty" jsonschema:"description=Start date in YYYY-MM-DD format"`
 	DateTo   string `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format"`
-	Type     string `json:"type,omitempty" jsonschema:"description=Asset type (PHOTO, VIDEO, AUDIO)"`
+	Type     string `json:"type,omitempty" jsonschema:"description=Asset type (PHOTO | VIDEO | AUDIO)"`
 	Filename string `json:"filename,omitempty" jsonschema:"description=Filename pattern to search for"`
 	Raw      *bool  `json:"raw,omitempty" jsonschema:"description=Filter for RAW photos only"`
 	Rating   *int   `json:"rating,omitempty" jsonschema:"description=Filter by rating (0-5)"`
