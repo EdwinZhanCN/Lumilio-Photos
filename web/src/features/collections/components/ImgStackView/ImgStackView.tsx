@@ -12,7 +12,6 @@ function ImgStackView({ coverImages, albumName, isSelected = false }: ImgStackVi
   const [imageError, setImageError] = useState(false);
 
   // Selection styles
-  const selectionRing = isSelected ? "ring-4 ring-primary ring-offset-4 ring-offset-base-100" : "";
   const selectionOpacity = isSelected ? "opacity-100" : "opacity-70";
 
   return (
