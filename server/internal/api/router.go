@@ -62,6 +62,7 @@ type AlbumControllerInterface interface {
 	RemoveAssetFromAlbum(c *gin.Context)
 	UpdateAssetPositionInAlbum(c *gin.Context)
 	GetAssetAlbums(c *gin.Context)
+	FilterAlbumAssets(c *gin.Context)
 }
 
 // QueueControllerInterface defines the interface for queue monitoring controllers
@@ -163,6 +164,7 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			albums.POST("/:id/assets/:assetId", albumController.AddAssetToAlbum)
 			albums.DELETE("/:id/assets/:assetId", albumController.RemoveAssetFromAlbum)
 			albums.PUT("/:id/assets/:assetId/position", albumController.UpdateAssetPositionInAlbum)
+			albums.POST("/:id/filter", albumController.FilterAlbumAssets)
 		}
 
 		// Admin routes for queue monitoring (read-only)

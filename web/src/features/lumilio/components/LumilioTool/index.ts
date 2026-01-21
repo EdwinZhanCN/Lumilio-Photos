@@ -1,1 +1,0 @@
-export { LumilioTool } from "./LumilioTool";

@@ -3,19 +3,17 @@ import React, { createContext, useReducer, ReactNode } from "react";
 import { RichInputContextValue } from "./types";
 import { RichInputReducer, initialState } from "./rich.reducer";
 
-/**
- * RichInput Context
- *
- * 提供 RichInput 组件的状态和 dispatch 方法
- */
 export const RichInputContext = createContext<
   RichInputContextValue | undefined
 >(undefined);
 
-/**
- * RichInputProvider 组件
+/** Context provider component for RichInput state management.
  *
- * 为 RichInput 及其子组件提供状态管理
+ * Provides the RichInput state and dispatch function to all child components.
+ * Uses a reducer pattern to manage the complex state of the rich input editor,
+ * including mention/type selection, menu positioning, and payload parsing.
+ *
+ * @param children - React nodes to be wrapped by the provider.
  *
  * @example
  * ```tsx
@@ -39,22 +37,25 @@ export const RichInputProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-/**
- * useRichInput Hook
+/** Custom hook to access RichInput context state and dispatch.
  *
- * 用于在组件中访问 RichInput 的状态和 dispatch 方法
+ * Provides access to the RichInput editor state including the current phase,
+ * active mention type, menu position, selected index, available options,
+ * and parsed payload. Also provides the dispatch function to trigger state
+ * updates.
  *
- * @throws 如果在 RichInputProvider 外部使用会抛出错误
+ * @returns The RichInputContextValue containing state and dispatch.
+ * @throws Error if the hook is used outside of a RichInputProvider.
  *
  * @example
  * ```tsx
  * const { state, dispatch } = useRichInput();
  *
- * // 访问状态
+ * // Access state
  * console.log(state.phase);
  * console.log(state.payload);
  *
- * // 分发 action
+ * // Dispatch actions
  * dispatch({ type: "SET_PHASE", payload: "SELECT_TYPE" });
  * ```
  */

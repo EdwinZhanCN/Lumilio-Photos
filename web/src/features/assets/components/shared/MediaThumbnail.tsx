@@ -1,5 +1,5 @@
 import React from "react";
-import { Play, Music, Video, Headphones } from "lucide-react";
+import { Play, Music, Video, Headphones, CheckCircle2, Circle } from "lucide-react";
 import {
   isVideo,
   isAudio,
@@ -12,7 +12,9 @@ interface MediaThumbnailProps {
   asset: Asset;
   thumbnailUrl?: string;
   className?: string;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
+  isSelected?: boolean;
+  isSelectionMode?: boolean;
 }
 
 /**
@@ -23,17 +25,31 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   thumbnailUrl,
   className = "",
   onClick,
+  isSelected = false,
+  isSelectionMode = false,
 }) => {
   const videoAsset = isVideo(asset);
   const audioAsset = isAudio(asset);
   const duration = asset.duration;
   const ariaLabel = getAssetAriaLabel(asset);
 
+  const selectionOverlay = isSelectionMode && (
+    <div className="absolute top-2 right-2 z-10">
+      {isSelected ? (
+        <CheckCircle2 className="text-primary fill-base-100" size={24} />
+      ) : (
+        <Circle className="text-white/50" size={24} />
+      )}
+    </div>
+  );
+
+  const selectionClass = isSelected ? "ring-4 ring-primary ring-inset" : "";
+
   // Photo or thumbnail available - render image with potential overlays
   if (thumbnailUrl && !audioAsset) {
     return (
       <div
-        className={`relative w-full h-full ${className}`}
+        className={`relative w-full h-full overflow-hidden ${selectionClass} ${className}`}
         onClick={onClick}
         role="button"
         tabIndex={0}
@@ -41,14 +57,15 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            onClick?.();
+            onClick?.(e as any);
           }
         }}
       >
+        {selectionOverlay}
         <img
           src={thumbnailUrl}
           alt={asset.original_filename || "Asset"}
-          className="w-full h-full object-cover transition-transform duration-200 hover:scale-105"
+          className={`w-full h-full object-cover transition-transform duration-200 ${isSelected ? '' : 'hover:scale-105'}`}
           loading="lazy"
         />
 
@@ -63,7 +80,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
         )}
 
         {/* Video play overlay */}
-        {videoAsset && (
+        {videoAsset && !isSelectionMode && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div
               className="bg-black/60 rounded-full p-3 hover:bg-black/80 transition-colors"
@@ -80,6 +97,8 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
             {formatDuration(duration)}
           </div>
         )}
+        
+        {isSelected && <div className="absolute inset-0 bg-primary/10 pointer-events-none" />}
       </div>
     );
   }
@@ -88,7 +107,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   if (audioAsset) {
     return (
       <div
-        className={`relative w-full h-full flex flex-col items-center justify-center gap-2 text-center text-white cursor-pointer bg-gradient-to-b from-black/10 via-black/5 to-transparent px-4 py-3 rounded overflow-hidden transition-colors ${className}`}
+        className={`relative w-full h-full flex flex-col items-center justify-center gap-2 text-center text-white cursor-pointer bg-gradient-to-b from-black/10 via-black/5 to-transparent px-4 py-3 rounded overflow-hidden transition-colors ${selectionClass} ${className}`}
         onClick={onClick}
         role="button"
         tabIndex={0}
@@ -96,10 +115,11 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            onClick?.();
+            onClick?.(e as any);
           }
         }}
       >
+        {selectionOverlay}
         {/* Audio type indicator */}
         <div className="absolute top-2 left-2">
           <div className="bg-black/30 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
@@ -119,6 +139,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
             </div>
           )}
         </div>
+        {isSelected && <div className="absolute inset-0 bg-primary/10 pointer-events-none" />}
       </div>
     );
   }
@@ -126,7 +147,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   // Fallback for no preview available
   return (
     <div
-      className={`w-full h-full bg-base-300 flex items-center justify-center text-base-content/50 cursor-pointer hover:bg-base-200 transition-colors ${className}`}
+      className={`relative w-full h-full bg-base-300 flex items-center justify-center text-base-content/50 cursor-pointer hover:bg-base-200 transition-colors ${selectionClass} ${className}`}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -134,16 +155,18 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onClick?.();
+          onClick?.(e as any);
         }
       }}
     >
+      {selectionOverlay}
       <div className="text-center">
         <div className="text-xs">No Preview</div>
         <div className="text-xs opacity-60">
           {asset.mime_type || asset.type || "Unknown MIME"}
         </div>
       </div>
+      {isSelected && <div className="absolute inset-0 bg-primary/10 pointer-events-none" />}
     </div>
   );
 };

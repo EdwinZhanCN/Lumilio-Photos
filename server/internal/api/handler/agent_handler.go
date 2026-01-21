@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -132,7 +133,7 @@ func (h *AgentHandler) prepareSSE(c *gin.Context) (http.Flusher, error) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
-	c.Writer.Header().Set("Transfer-Encoding", "chunked")
+	// c.Writer.Header().Set("Transfer-Encoding", "chunked") // Removed to prevent ERR_INVALID_CHUNKED_ENCODING
 	c.Writer.Header().Set("X-Accel-Buffering", "no") // Disable Nginx buffering
 
 	flusher, ok := c.Writer.(http.Flusher)
@@ -187,19 +188,27 @@ func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, i
 		// Guardrail: Skip internal-only events that are not meant for the user.
 		// An event with only `CustomizedOutput` is a raw tool result intended for the next LLM reasoning step.
 		if event.Output != nil && event.Output.MessageOutput == nil && event.Output.CustomizedOutput != nil {
+			log.Printf("[AgentHandler] Skipping internal tool output event")
 			continue
 		}
 
 		if event.Err != nil {
+			log.Printf("[AgentHandler] Error event: %v", event.Err)
 			h.sendSSE(c, flusher, "error", map[string]interface{}{"error": event.Err.Error()})
 			return
 		}
 
 		if event.Output != nil && event.Output.MessageOutput != nil && event.Output.MessageOutput.IsStreaming {
+			log.Printf("[AgentHandler] Handling streaming output")
 			h.handleStreamingOutput(c, flusher, event)
 		} else {
+			log.Printf("[AgentHandler] Handling non-streaming output")
 			eventData := h.formatAgentEvent(event)
-			h.sendSSE(c, flusher, "message", eventData)
+			if len(eventData) > 0 {
+				h.sendSSE(c, flusher, "message", eventData)
+			} else {
+				log.Printf("[AgentHandler] Skipped empty event data")
+			}
 		}
 	}
 }
@@ -257,11 +266,14 @@ func (h *AgentHandler) formatAgentEvent(event *adk.AgentEvent) map[string]interf
 						result["output"] = strings.Join(textParts, "")
 					}
 				}
+			} else if message != nil {
+				log.Printf("[AgentHandler] Skipped message with role: %s", message.Role)
 			}
 		} else if event.Output.CustomizedOutput != nil {
 			// This block handles outputs that are not from the LLM. Based on our analysis,
 			// these are internal data and should not be sent to the user.
 			// By not processing this, we filter out raw tool results.
+			log.Printf("[AgentHandler] Skipped CustomizedOutput")
 		}
 	}
 

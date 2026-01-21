@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"strconv"
+	"time"
 
 	"server/internal/api"
 	"server/internal/api/dto"
@@ -55,19 +56,21 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 		return
 	}
 
-	// Parse and validate cover asset ID
-	coverAssetUUID, err := uuid.Parse(req.CoverAssetID)
-	if err != nil {
-		api.GinBadRequest(c, err, "Invalid cover asset ID")
-		return
-	}
-
 	// Create album parameters
 	params := repo.CreateAlbumParams{
-		UserID:       userID.(int32),
-		AlbumName:    req.AlbumName,
-		Description:  req.Description,
-		CoverAssetID: pgtype.UUID{Bytes: coverAssetUUID, Valid: true},
+		UserID:      int32(userID.(int)),
+		AlbumName:   req.AlbumName,
+		Description: req.Description,
+	}
+
+	// Handle optional cover asset ID
+	if req.CoverAssetID != nil && *req.CoverAssetID != "" {
+		coverAssetUUID, err := uuid.Parse(*req.CoverAssetID)
+		if err != nil {
+			api.GinBadRequest(c, err, "Invalid cover asset ID")
+			return
+		}
+		params.CoverAssetID = pgtype.UUID{Bytes: coverAssetUUID, Valid: true}
 	}
 
 	album, err := (*h.albumService).CreateNewAlbum(c.Request.Context(), params)
@@ -169,14 +172,14 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 	}
 
 	params := repo.GetAlbumsByUserParams{
-		UserID: userID.(int32),
+		UserID: int32(userID.(int)),
 		Limit:  int32(limit),
 		Offset: int32(offset),
 	}
 
 	albums, err := h.queries.GetAlbumsByUser(c.Request.Context(), params)
 	if err != nil {
-		log.Printf("Failed to retrieve albums for user %d: %v", userID.(int32), err)
+		log.Printf("Failed to retrieve albums for user %d: %v", userID.(int), err)
 		api.GinInternalError(c, err, "Failed to retrieve albums")
 		return
 	}
@@ -245,7 +248,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 
 	// Verify ownership (if user context is available)
 	userID, exists := c.Get("user_id")
-	if exists && existingAlbum.UserID != userID.(int32) {
+	if exists && existingAlbum.UserID != int32(userID.(int)) {
 		api.GinForbidden(c, errors.New("access denied"), "You don't have permission to update this album")
 		return
 	}
@@ -328,7 +331,7 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 
 	// Verify ownership (if user context is available)
 	userID, exists := c.Get("user_id")
-	if exists && existingAlbum.UserID != userID.(int32) {
+	if exists && existingAlbum.UserID != int32(userID.(int)) {
 		api.GinForbidden(c, errors.New("access denied"), "You don't have permission to delete this album")
 		return
 	}
@@ -570,4 +573,112 @@ func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 		"albums":   albums,
 		"count":    len(albums),
 	})
+}
+
+// FilterAlbumAssets filters assets within a specific album
+// @Summary Filter assets in album
+// @Description Filter assets within a specific album using comprehensive filtering options
+// @Tags albums
+// @Accept json
+// @Produce json
+// @Param id path int true "Album ID"
+// @Param request body dto.FilterAssetsRequestDTO true "Filter criteria"
+// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets filtered successfully"
+// @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /albums/{id}/filter [post]
+// @Security BearerAuth
+func (h *AlbumHandler) FilterAlbumAssets(c *gin.Context) {
+	albumIDStr := c.Param("id")
+	albumID, err := strconv.ParseInt(albumIDStr, 10, 32)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid album ID")
+		return
+	}
+
+	var req dto.FilterAssetsRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	// Validate and set defaults
+	if req.Limit <= 0 || req.Limit > 100 {
+		req.Limit = 20
+	}
+	if req.Offset < 0 {
+		req.Offset = 0
+	}
+
+	ctx := c.Request.Context()
+	filter := req.Filter
+
+	// Convert filter parameters for SQL query
+	var typePtr *string
+	if filter.Type != nil {
+		typePtr = filter.Type
+	}
+
+	var filenameVal, filenameMode *string
+	if filter.Filename != nil {
+		filenameVal = &filter.Filename.Value
+		filenameMode = &filter.Filename.Mode
+	}
+
+	var dateFrom, dateTo *time.Time
+	if filter.Date != nil {
+		dateFrom = filter.Date.From
+		dateTo = filter.Date.To
+	}
+
+	albumID32 := int32(albumID)
+	assets, err := (*h.albumService).FilterAlbumAssets(ctx, repo.FilterAlbumAssetsParams{
+		AlbumID:      albumID32,
+		AssetType:    typePtr,
+		FilenameVal:  filenameVal,
+		FilenameMode: filenameMode,
+		DateFrom:     pgtype.Timestamptz{Time: safeTime(dateFrom), Valid: dateFrom != nil},
+		DateTo:       pgtype.Timestamptz{Time: safeTime(dateTo), Valid: dateTo != nil},
+		IsRaw:        filter.RAW,
+		Rating:       safeInt32(filter.Rating),
+		Liked:        filter.Liked,
+		CameraModel:  filter.CameraMake,
+		LensModel:    filter.Lens,
+		Limit:        int32(req.Limit),
+		Offset:       int32(req.Offset),
+	})
+
+	if err != nil {
+		log.Printf("Failed to filter album assets: %v", err)
+		api.GinInternalError(c, err, "Failed to filter album assets")
+		return
+	}
+
+	dtos := make([]dto.AssetDTO, len(assets))
+	for i, a := range assets {
+		dtos[i] = dto.ToAssetDTO(a)
+	}
+
+	response := dto.AssetListResponseDTO{
+		Assets: dtos,
+		Limit:  req.Limit,
+		Offset: req.Offset,
+	}
+	api.GinSuccess(c, response)
+}
+
+// Helper functions for safe type conversion
+func safeTime(t *time.Time) time.Time {
+	if t == nil {
+		return time.Time{}
+	}
+	return *t
+}
+
+func safeInt32(i *int) *int32 {
+	if i == nil {
+		return nil
+	}
+	v := int32(*i)
+	return &v
 }

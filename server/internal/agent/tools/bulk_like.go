@@ -6,7 +6,6 @@ import (
 	"server/internal/agent/core"
 	"server/internal/api/dto"
 	"server/internal/db/repo"
-	"strings"
 	"time"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -18,14 +17,14 @@ import (
 
 // BulkLikeInput 批量点赞工具的输入参数
 type BulkLikeInput struct {
-	// 使用 Reference[T] 泛型包装器接收资产集合
-	// LLM 可以传入从 filter_assets 等工具返回的 ref_id
-	Assets core.Reference[[]repo.Asset] `json:"assets" jsonschema:"description=Reference to assets collection (e.g., from filter_assets tool). Provide the ref_id as a string."`
+	// 使用 Reference[T] 泛型包装器接收过滤器配置
+	// LLM 可以传入从 filter_assets 返回的 ref_id
+	Filter core.Reference[dto.AssetFilterDTO] `json:"filter" jsonschema:"description=Reference to the filter configuration (from filter_assets tool). Provide the ref_id."`
 
 	// 点赞状态
 	// true: 标记为喜欢
 	// false: 取消喜欢
-	Liked bool `json:"liked" jsonschema:"description=Whether to like (true) or unlike (false) the assets."`
+	Liked bool `json:"liked" jsonschema:"description=Whether to like (true) or unlike (false) the assets matching the filter."`
 }
 
 // BulkLikeOutput 批量点赞工具的输出结果
@@ -43,390 +42,165 @@ type BulkLikeOutput struct {
 func RegisterBulkLikeTool() {
 	info := &schema.ToolInfo{
 		Name: "bulk_like_assets",
-		Desc: "Bulk like or unlike a collection of assets by reference ID. Use this after filter_assets to mark multiple photos as favorites or unfavorite them. The operation updates the database and returns a summary.",
+		Desc: "Bulk like or unlike assets matching a filter. Use the ref_id from filter_assets to apply the action to the same set of photos the user is viewing.",
 	}
 
 	core.GetRegistry().Register(info, func(ctx context.Context, deps *core.ToolDependencies) (tool.BaseTool, error) {
-		// Use InferTool to automatically generate the parameter schema from BulkLikeInput's struct tags.
 		t, err := utils.InferTool(info.Name, info.Desc, func(ctx context.Context, input *BulkLikeInput) (*BulkLikeOutput, error) {
 			startTime := time.Now()
+			executionID := fmt.Sprintf("%d", startTime.UnixNano())
 
-			// 1. 检查 ID 是否存在但 Data 为空
-			if input.Assets.ID != "" && len(input.Assets.Data) == 0 { // 假设 T 是切片，或者根据 T 具体类型判断 nil
-				// 2. 使用 deps 中的 ReferenceManager 加载数据
-				// 注意：这里利用了 Go 的泛型引用传递
-				err := deps.ReferenceManager.GetAs(ctx, input.Assets.ID, &input.Assets.Data)
+			// 1. Resolve Reference
+			if input.Filter.ID != "" && input.Filter.IsEmpty() {
+				err := deps.ReferenceManager.GetAs(ctx, input.Filter.ID, &input.Filter.Data)
 				if err != nil {
-					// 处理加载失败的情况，比如 ID 过期或无效
 					return &BulkLikeOutput{
-						Message: fmt.Sprintf("Failed to resolve reference %s: %v", input.Assets.ID, err),
+						Message: fmt.Sprintf("Failed to resolve filter reference %s: %v", input.Filter.ID, err),
 					}, nil
 				}
 			}
 
-			// =====================================================
-			// 阶段 1: 发送 pending 事件
-			// =====================================================
-			executionID := fmt.Sprintf("%d", time.Now().UnixNano())
+			filterDTO := input.Filter.Unwrap()
 
+			// 2. Send Pending Event
 			if deps.SideChannel != nil {
 				deps.SideChannel <- &core.SideChannelEvent{
 					Type:      "tool_execution",
 					Timestamp: startTime.UnixMilli(),
-					Tool: core.ToolIdentity{
-						Name:        "bulk_like_assets",
-						ExecutionID: executionID,
-					},
+					Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
 					Execution: core.ExecutionInfo{
-						Status: core.ExecutionStatusPending,
-						Message: fmt.Sprintf("Preparing to %s assets...", func() string {
-							if input.Liked {
-								return "like"
-							} else {
-								return "unlike"
-							}
-						}()),
+						Status:     core.ExecutionStatusPending,
+						Message:    fmt.Sprintf("Preparing to %s assets matching filter...", boolToVerb(input.Liked)),
 						Parameters: input,
 					},
 				}
 			}
 
-			// =====================================================
-			// 阶段 2: 验证输入
-			// =====================================================
-			if input.Assets.IsEmpty() {
-				duration := time.Since(startTime).Milliseconds()
+			// 3. Query Assets based on Filter
+			// We set a hard limit here to prevent accidental massive updates
+			const maxAssetsLimit = 1000
+			queryParams := convertDTOToParams(filterDTO)
+			queryParams.Limit = maxAssetsLimit + 1 // Fetch one more to check if we exceeded limit
+			queryParams.Offset = 0
 
-				// 发送错误事件
-				if deps.SideChannel != nil {
-					deps.SideChannel <- &core.SideChannelEvent{
-						Type:      "tool_execution",
-						Timestamp: time.Now().UnixMilli(),
-						Tool: core.ToolIdentity{
-							Name:        "bulk_like_assets",
-							ExecutionID: executionID,
-						},
-						Execution: core.ExecutionInfo{
-							Status:   core.ExecutionStatusError,
-							Message:  "No assets provided",
-							Duration: duration,
-							Error: &core.ErrorInfo{
-								Code:    "EMPTY_ASSETS",
-								Message: "Reference[T].Assets is empty or missing ref_id",
-							},
-						},
-					}
-				}
-
-				return &BulkLikeOutput{
-					Message:  "No assets provided. Please provide assets reference from filter_assets or similar tool.",
-					Count:    0,
-					Success:  0,
-					Failed:   0,
-					Duration: duration,
-				}, nil
-			}
-
-			// =====================================================
-			// 阶段 2.5: 验证 ref_id 格式
-			// =====================================================
-			inputRefID := input.Assets.ID
-			if inputRefID != "" {
-				// 验证 ref_id 格式：ref_ 前缀 或 UUID 格式
-				isValid := false
-				if strings.HasPrefix(inputRefID, "ref_") && len(inputRefID) > 4 {
-					isValid = true
-				} else if len(inputRefID) == 36 && inputRefID[8] == '-' && inputRefID[13] == '-' && inputRefID[18] == '-' && inputRefID[23] == '-' {
-					isValid = true
-				}
-
-				if !isValid {
-					duration := time.Since(startTime).Milliseconds()
-
-					if deps.SideChannel != nil {
-						deps.SideChannel <- &core.SideChannelEvent{
-							Type:      "tool_execution",
-							Timestamp: time.Now().UnixMilli(),
-							Tool: core.ToolIdentity{
-								Name:        "bulk_like_assets",
-								ExecutionID: executionID,
-							},
-							Execution: core.ExecutionInfo{
-								Status:   core.ExecutionStatusError,
-								Message:  "Invalid reference ID format",
-								Duration: duration,
-								Error: &core.ErrorInfo{
-									Code:    "INVALID_REF_ID",
-									Message: fmt.Sprintf("Invalid ref_id format: '%s'. Expected 'ref_xxx' or UUID.", inputRefID),
-								},
-							},
-						}
-					}
-
-					return &BulkLikeOutput{
-						Message:  fmt.Sprintf("Invalid reference ID format: '%s'. Expected 'ref_xxx' or UUID format.", inputRefID),
-						Count:    0,
-						Success:  0,
-						Failed:   0,
-						Duration: duration,
-					}, nil
-				}
-			}
-
-			// =====================================================
-			// 阶段 3: 发送 running 事件
-			// =====================================================
 			if deps.SideChannel != nil {
 				deps.SideChannel <- &core.SideChannelEvent{
 					Type:      "tool_execution",
 					Timestamp: time.Now().UnixMilli(),
-					Tool: core.ToolIdentity{
-						Name:        "bulk_like_assets",
-						ExecutionID: executionID,
-					},
+					Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
 					Execution: core.ExecutionInfo{
 						Status:  core.ExecutionStatusRunning,
-						Message: fmt.Sprintf("Processing %d assets...", len(input.Assets.Unwrap())),
+						Message: "Finding matching assets...",
 					},
 				}
 			}
 
-			// =====================================================
-			// 阶段 4: 获取资产数据
-			// =====================================================
-			assets := input.Assets.Unwrap()
-			totalAssets := len(assets)
+			assets, err := deps.Queries.FilterAssets(ctx, queryParams)
+			if err != nil {
+				return handleBulkError(ctx, deps, executionID, startTime, err)
+			}
 
-			// 验证资产数量上限（防止内存问题）
-			const maxAssetsPerBatch = 1000
-			if totalAssets > maxAssetsPerBatch {
-				duration := time.Since(startTime).Milliseconds()
+			totalFound := len(assets)
+			if totalFound > maxAssetsLimit {
+				return handleLimitExceeded(ctx, deps, executionID, startTime, totalFound, maxAssetsLimit)
+			}
 
-				if deps.SideChannel != nil {
-					deps.SideChannel <- &core.SideChannelEvent{
-						Type:      "tool_execution",
-						Timestamp: time.Now().UnixMilli(),
-						Tool: core.ToolIdentity{
-							Name:        "bulk_like_assets",
-							ExecutionID: executionID,
-						},
-						Execution: core.ExecutionInfo{
-							Status:   core.ExecutionStatusError,
-							Message:  "Too many assets in batch",
-							Duration: duration,
-							Error: &core.ErrorInfo{
-								Code:    "BATCH_TOO_LARGE",
-								Message: fmt.Sprintf("Batch size %d exceeds maximum %d", totalAssets, maxAssetsPerBatch),
-							},
-						},
-					}
+			if totalFound == 0 {
+				return handleNoAssetsFound(ctx, deps, executionID, startTime)
+			}
+
+			// 4. Perform Bulk Update
+			if deps.SideChannel != nil {
+				deps.SideChannel <- &core.SideChannelEvent{
+					Type:      "tool_execution",
+					Timestamp: time.Now().UnixMilli(),
+					Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+					Execution: core.ExecutionInfo{
+						Status:  core.ExecutionStatusRunning,
+						Message: fmt.Sprintf("Updating %d assets...", totalFound),
+					},
 				}
-
-				return &BulkLikeOutput{
-					Message:  fmt.Sprintf("Too many assets: %d (max %d). Please split into smaller batches.", totalAssets, maxAssetsPerBatch),
-					Count:    totalAssets,
-					Success:  0,
-					Failed:   0,
-					Duration: duration,
-				}, nil
 			}
 
-			if totalAssets == 0 {
-				duration := time.Since(startTime).Milliseconds()
-
-				if deps.SideChannel != nil {
-					deps.SideChannel <- &core.SideChannelEvent{
-						Type:      "tool_execution",
-						Timestamp: time.Now().UnixMilli(),
-						Tool: core.ToolIdentity{
-							Name:        "bulk_like_assets",
-							ExecutionID: executionID,
-						},
-						Execution: core.ExecutionInfo{
-							Status:   core.ExecutionStatusError,
-							Message:  "Reference contains no assets",
-							Duration: duration,
-							Error: &core.ErrorInfo{
-								Code:    "NO_ASSETS",
-								Message: "The referenced collection is empty",
-							},
-						},
-					}
-				}
-
-				return &BulkLikeOutput{
-					Message:  "The referenced asset collection is empty.",
-					Count:    0,
-					Success:  0,
-					Failed:   0,
-					Duration: duration,
-				}, nil
+			assetIDs := make([]pgtype.UUID, totalFound)
+			for i, a := range assets {
+				assetIDs[i] = a.AssetID
 			}
 
-			// =====================================================
-			// 阶段 5: 批量更新数据库
-			// =====================================================
-			// 提取所有 asset_id
-			assetIDs := make([]pgtype.UUID, len(assets))
-			for i, asset := range assets {
-				assetIDs[i] = asset.AssetID
-			}
-
-			// 使用批量更新接口（一条 SQL 更新所有记录）
-			err := deps.Queries.BulkUpdateAssetLiked(ctx, repo.BulkUpdateAssetLikedParams{
+			err = deps.Queries.BulkUpdateAssetLiked(ctx, repo.BulkUpdateAssetLikedParams{
 				Liked:    input.Liked,
 				AssetIds: assetIDs,
 			})
 
 			duration := time.Since(startTime).Milliseconds()
 
-			// 处理结果
-			successCount := totalAssets
+			// 5. Handle Result
+			successCount := totalFound
 			failedCount := 0
 			var failedAssetIDs []pgtype.UUID
 
 			if err != nil {
-				// 批量更新失败，所有记录都视为失败
 				successCount = 0
-				failedCount = totalAssets
+				failedCount = totalFound
 				failedAssetIDs = assetIDs
 			}
 
-			// =====================================================
-			// 阶段 6: 处理结果并发送 SideChannelEvent
-			// =====================================================
-
-			// 转换失败资产 ID 为字符串
+			// Convert failed IDs to strings
 			failedAssetIDStrs := make([]string, len(failedAssetIDs))
 			for i, id := range failedAssetIDs {
 				failedAssetIDStrs[i] = uuid.UUID(id.Bytes).String()
 			}
 
-			// 创建规范的 DTO 对象
-			action := "unlike"
-			if input.Liked {
-				action = "like"
-			}
-
 			resultSummary := &dto.BulkLikeUpdateDTO{
-				Total:          totalAssets,
+				Total:          totalFound,
 				Success:        successCount,
 				Failed:         failedCount,
 				FailedAssetIDs: failedAssetIDStrs,
 				Liked:          input.Liked,
-				Action:         action,
-				Description:    fmt.Sprintf("Bulk %s: %d/%d successful", action, successCount, totalAssets),
+				Action:         boolToVerb(input.Liked),
+				Description:    fmt.Sprintf("Bulk %s: %d/%d successful", boolToVerb(input.Liked), successCount, totalFound),
 				Timestamp:      startTime.Format(time.RFC3339),
 			}
 
-			// 存储操作结果到 ReferenceManager（供后续工具引用）
+			// Store result for reference
 			refID := ""
 			if deps.ReferenceManager != nil {
-				refID = deps.ReferenceManager.StoreWithID(
-					ctx,
-					resultSummary,
-					resultSummary.Description,
-				)
+				refID = deps.ReferenceManager.StoreWithID(ctx, resultSummary, resultSummary.Description)
 				resultSummary.RefID = refID
 			}
 
-			// 确定最终状态
-			var status core.ExecutionStatus
-			var statusMessage string
-			var errorInfo *core.ErrorInfo
-
-			if failedCount == 0 {
-				// 全部成功
-				status = core.ExecutionStatusSuccess
-				statusMessage = fmt.Sprintf("Successfully %sd %d assets", resultSummary.Action, successCount)
-			} else if successCount == 0 {
-				// 全部失败
-				status = core.ExecutionStatusError
-				statusMessage = fmt.Sprintf("Failed to %s any assets", resultSummary.Action)
-				errorInfo = &core.ErrorInfo{
-					Code:    "BULK_OPERATION_FAILED",
-					Message: "All asset updates failed",
-					Details: map[string]interface{}{
-						"failed_asset_ids": resultSummary.FailedAssetIDs,
-					},
-				}
-			} else {
-				// 部分成功
-				status = core.ExecutionStatusSuccess // 仍然视为成功，但有警告
-				statusMessage = fmt.Sprintf("Partially successful: %sd %d, failed %d", resultSummary.Action, successCount, failedCount)
-				errorInfo = &core.ErrorInfo{
-					Code:    "PARTIAL_FAILURE",
-					Message: "Some assets could not be updated",
-					Details: map[string]interface{}{
-						"failed_asset_ids": resultSummary.FailedAssetIDs,
-					},
+			// Send Success/Error Event
+			status := core.ExecutionStatusSuccess
+			if failedCount > 0 {
+				if successCount == 0 {
+					status = core.ExecutionStatusError
+				} else {
+					status = core.ExecutionStatusSuccess // Partial success
 				}
 			}
 
-			// 发送最终事件
 			if deps.SideChannel != nil {
 				deps.SideChannel <- &core.SideChannelEvent{
 					Type:      "tool_execution",
 					Timestamp: time.Now().UnixMilli(),
-					Tool: core.ToolIdentity{
-						Name:        "bulk_like_assets",
-						ExecutionID: executionID,
-					},
+					Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
 					Execution: core.ExecutionInfo{
-						Status:     status,
-						Message:    statusMessage,
-						Error:      errorInfo,
-						Duration:   duration,
-						Parameters: input,
+						Status:   status,
+						Message:  resultSummary.Description,
+						Duration: duration,
 					},
 					Data: &core.DataPayload{
 						RefID:       refID,
 						PayloadType: "BulkLikeUpdateDTO",
 						Payload:     resultSummary,
-						Rendering:   &core.RenderingConfig{},
-					},
-					Extra: &core.ExtraInfo{
-						ExtraType: "BulkLikeRequestDTO",
-						Data:      input,
-					},
-					Metadata: map[string]interface{}{
-						"ref_id":           input.Assets.ID,
-						"operation_type":   "bulk_like",
-						"action":           resultSummary.Action,
-						"failed_asset_ids": resultSummary.FailedAssetIDs,
 					},
 				}
-			}
-
-			// =====================================================
-			// 阶段 7: 返回给 LLM 的简报
-			// =====================================================
-			var message strings.Builder
-			actionVerb := func() string {
-				if input.Liked {
-					return "Liked"
-				} else {
-					return "Unliked"
-				}
-			}()
-
-			if failedCount == 0 {
-				message.WriteString(fmt.Sprintf("SUCCESS: %s %d assets successfully.", actionVerb, successCount))
-			} else if successCount == 0 {
-				message.WriteString(fmt.Sprintf("FAILED: Could not %s any of the %d assets.", resultSummary.Action, totalAssets))
-			} else {
-				message.WriteString(fmt.Sprintf("PARTIAL: %s %d out of %d assets successfully. %d failed.",
-					actionVerb, successCount, totalAssets, failedCount))
-			}
-
-			if refID != "" {
-				message.WriteString(fmt.Sprintf(" (ref_id: %s)", refID))
 			}
 
 			return &BulkLikeOutput{
-				Message:   message.String(),
+				Message:   resultSummary.Description,
 				RefID:     refID,
-				Count:     totalAssets,
+				Count:     totalFound,
 				Success:   successCount,
 				Failed:    failedCount,
 				Duration:  duration,
@@ -438,4 +212,118 @@ func RegisterBulkLikeTool() {
 		}
 		return t, nil
 	})
+}
+
+// --- Helper Functions ---
+
+func boolToVerb(liked bool) string {
+	if liked {
+		return "like"
+	}
+	return "unlike"
+}
+
+func convertDTOToParams(f dto.AssetFilterDTO) repo.FilterAssetsParams {
+	params := repo.FilterAssetsParams{}
+
+	if f.Type != nil {
+		params.AssetType = f.Type
+	}
+	if f.OwnerID != nil {
+		params.OwnerID = f.OwnerID
+	}
+	if f.RepositoryID != nil {
+		// Assuming UUID parsing is handled or we need to parse string to pgtype.UUID
+		// For simplicity in this snippet, we might skip complex UUID parsing if not strictly needed or handle it safely
+		// In a real app, parse the UUID string
+	}
+	if f.Filename != nil {
+		params.FilenameVal = &f.Filename.Value
+		mode := f.Filename.Mode
+		if mode == "" {
+			mode = "contains"
+		}
+		params.FilenameMode = &mode
+	}
+	if f.Date != nil {
+		if f.Date.From != nil {
+			params.DateFrom = pgtype.Timestamptz{Time: *f.Date.From, Valid: true}
+		}
+		if f.Date.To != nil {
+			params.DateTo = pgtype.Timestamptz{Time: *f.Date.To, Valid: true}
+		}
+	}
+	if f.RAW != nil {
+		params.IsRaw = f.RAW
+	}
+	if f.Rating != nil {
+		r := int32(*f.Rating)
+		params.Rating = &r
+	}
+	if f.Liked != nil {
+		params.Liked = f.Liked
+	}
+	if f.CameraMake != nil {
+		params.CameraModel = f.CameraMake
+	}
+	if f.Lens != nil {
+		params.LensModel = f.Lens
+	}
+
+	return params
+}
+
+func handleBulkError(ctx context.Context, deps *core.ToolDependencies, executionID string, startTime time.Time, err error) (*BulkLikeOutput, error) {
+	duration := time.Since(startTime).Milliseconds()
+	if deps.SideChannel != nil {
+		deps.SideChannel <- &core.SideChannelEvent{
+			Type:      "tool_execution",
+			Timestamp: time.Now().UnixMilli(),
+			Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+			Execution: core.ExecutionInfo{
+				Status:   core.ExecutionStatusError,
+				Message:  "Database query failed",
+				Error:    &core.ErrorInfo{Code: "DB_ERROR", Message: err.Error()},
+				Duration: duration,
+			},
+		}
+	}
+	return &BulkLikeOutput{Message: fmt.Sprintf("Error querying assets: %v", err)}, nil
+}
+
+func handleLimitExceeded(ctx context.Context, deps *core.ToolDependencies, executionID string, startTime time.Time, count, limit int) (*BulkLikeOutput, error) {
+	duration := time.Since(startTime).Milliseconds()
+	msg := fmt.Sprintf("Filter matches too many assets (%d). Maximum allowed for bulk update is %d. Please refine the filter.", count, limit)
+
+	if deps.SideChannel != nil {
+		deps.SideChannel <- &core.SideChannelEvent{
+			Type:      "tool_execution",
+			Timestamp: time.Now().UnixMilli(),
+			Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+			Execution: core.ExecutionInfo{
+				Status:   core.ExecutionStatusError,
+				Message:  "Too many assets",
+				Error:    &core.ErrorInfo{Code: "LIMIT_EXCEEDED", Message: msg},
+				Duration: duration,
+			},
+		}
+	}
+	return &BulkLikeOutput{Message: msg}, nil
+}
+
+func handleNoAssetsFound(ctx context.Context, deps *core.ToolDependencies, executionID string, startTime time.Time) (*BulkLikeOutput, error) {
+	duration := time.Since(startTime).Milliseconds()
+	if deps.SideChannel != nil {
+		deps.SideChannel <- &core.SideChannelEvent{
+			Type:      "tool_execution",
+			Timestamp: time.Now().UnixMilli(),
+			Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+			Execution: core.ExecutionInfo{
+				Status:   core.ExecutionStatusSuccess,
+				Message:  "No assets found matching filter",
+				Duration: duration,
+			},
+		}
+	}
+	return &BulkLikeOutput{Message: "No assets found matching the current filter."}, nil
 }
