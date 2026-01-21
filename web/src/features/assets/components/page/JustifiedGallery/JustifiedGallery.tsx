@@ -72,7 +72,8 @@ const JustifiedGallery = ({
   // 4. Layout calculation
   const layoutConfig = useMemo(() => {
     const width = containerWidth || 800;
-    const horizontalPadding = width < 640 ? 16 : width < 1024 ? 24 : 32;
+    // Use fixed 16px padding (px-4) to align with header and ensure layout fits container
+    const horizontalPadding = 16;
     return justifiedLayoutService.createResponsiveConfig(Math.max(width - horizontalPadding * 2, 300));
   }, [containerWidth]);
 
@@ -125,7 +126,7 @@ const JustifiedGallery = ({
         const layout = layouts[title];
         
         return (
-          <div key={title} className="mb-12 px-4 sm:px-6 lg:px-8 animate-in fade-in duration-500">
+          <div key={title} className="mb-12 px-4 animate-in fade-in duration-500">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold tracking-tight">{title}</h2>
               <span className="text-xs font-bold uppercase tracking-widest opacity-30">
@@ -147,10 +148,10 @@ const JustifiedGallery = ({
                         ${isSelected ? 'z-10 scale-[0.97] shadow-none' : 'hover:shadow-xl hover:-translate-y-1'}
                       `}
                       style={{ 
-                        top: `${pos.top}px`, 
-                        left: `${pos.left}px`, 
-                        width: `${pos.width}px`, 
-                        height: `${pos.height}px` 
+                        top: `${pos.top}px`,
+                        left: `${pos.left}px`,
+                        width: `${pos.width}px`,
+                        height: `${pos.height}px`
                       }}
                       onClick={(e) => selection.enabled ? selection.handleClick(asset.asset_id!, e) : openCarousel(asset.asset_id!)}
                     >
