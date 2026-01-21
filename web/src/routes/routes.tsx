@@ -7,13 +7,25 @@ import Monitor from "@/features/monitor/routes/Monitor";
 import UploadAssets from "@/features/upload/routes/UploadAssets";
 import { Portfolio } from "@/features/portfolio";
 import Collections from "@/features/collections/routes/Collections";
+import AlbumDetails from "@/features/collections/routes/AlbumDetails";
 import Updates from "@/features/updates/routes/Updates";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
+import {AssetsProvider} from "@/features/assets";
+import LoginPage from "@/features/auth/LoginPage";
+import RegisterPage from "@/features/auth/RegisterPage";
 
 export const routes = [
   {
     path: "/",
     element: <Home />,
+  },
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    path: "/register",
+    element: <RegisterPage />,
   },
   {
     path: "/updates",
@@ -26,6 +38,14 @@ export const routes = [
   {
     path: "/collections",
     element: <Collections />,
+  },
+  {
+    path: "/collections/:albumId",
+    element: <AlbumDetails />,
+  },
+  {
+    path: "/collections/:albumId/:assetId",
+    element: <AlbumDetails />,
   },
   {
     path: "/assets/photos",
@@ -73,7 +93,11 @@ export const routes = [
   },
   {
     path: "/lumilio",
-    element: <LumilioChatPage />,
+    element: (
+        <AssetsProvider>
+            <LumilioChatPage />
+        </AssetsProvider>
+    ),
   },
   {
     path: "/portfolio",

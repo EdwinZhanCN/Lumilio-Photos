@@ -10,19 +10,19 @@ import {
 } from "./utils";
 
 export interface RichInputProps {
-  /** 输入框占位符文本 */
+  /** Placeholder text for the input field. */
   placeholder?: string;
-  /** 可用的提及类型（如 album, tag, camera 等） */
+  /** Available mention types (e.g., album, tag, camera, etc.). */
   mentionTypes?: MentionTypeOption[];
-  /** 根据提及类型获取实体列表的函数 */
+  /** Function to get entity list based on mention type. */
   getEntitiesByType?: (type: MentionType) => MentionEntity[];
-  /** 可用的命令列表 */
+  /** Available command list. */
   commands?: MentionEntity[];
-  /** 提交回调 */
+  /** Callback function for submission. */
   onSubmit?: (payload: string) => void;
-  /** 是否禁用提交 */
+  /** Whether submission is disabled. */
   isSubmitting?: boolean;
-  /** 自定义样式类名 */
+  /** Custom CSS class name. */
   className?: string;
 }
 
@@ -38,6 +38,11 @@ export const RichInput: React.FC<RichInputProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const { state, dispatch } = useRichInput();
 
+  /** Updates the payload preview by parsing the editor content.
+   *
+   * Parses the current content of the editor and dispatches an action to update
+   * the payload state with the parsed result.
+   */
   const updatePayloadPreview = useCallback(() => {
     if (editorRef.current) {
       dispatch({
@@ -47,6 +52,11 @@ export const RichInput: React.FC<RichInputProps> = ({
     }
   }, [dispatch]);
 
+  /** Handles the submit button click event.
+   *
+   * Validates the payload, submits it if valid and not already submitting,
+   * clears the editor, and resets the payload state.
+   */
   const handleSubmitClick = useCallback(() => {
     if (state.payload.trim() && !isSubmitting && onSubmit) {
       onSubmit(state.payload);
@@ -55,6 +65,14 @@ export const RichInput: React.FC<RichInputProps> = ({
     }
   }, [state.payload, isSubmitting, onSubmit, dispatch]);
 
+  /** Handles keyboard events in the rich input editor.
+   *
+   * Manages keyboard navigation for the mention/menu system, including arrow key
+   * navigation, selection with Enter/Tab, escape to cancel, and Enter to submit
+   * when no menu is active.
+   *
+   * @param e - The keyboard event object.
+   */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       const { phase, options, selectedIndex } = state;
@@ -102,6 +120,12 @@ export const RichInput: React.FC<RichInputProps> = ({
     [state, dispatch, updatePayloadPreview, handleSubmitClick],
   );
 
+  /** Handles input events in the rich content editable editor.
+   *
+   * Monitors user input to detect trigger characters (@ or /) for opening the
+   * mention/command menu, calculates menu position, and resets the menu state
+   * when a space is detected.
+   */
   const handleInput = useCallback(() => {
     updatePayloadPreview();
 
@@ -131,6 +155,13 @@ export const RichInput: React.FC<RichInputProps> = ({
     }
   }, [updatePayloadPreview, state.phase, dispatch]);
 
+  /** Handles clicking on a menu option (mention type, entity, or command).
+   *
+   * Performs different actions based on the current phase: selects a mention type
+   * to filter entities, or inserts the selected entity/command as a pill element.
+   *
+   * @param option - The selected MentionEntity to process.
+   */
   const handleOptionClick = useCallback(
     (option: MentionEntity) => {
       if (state.phase === "SELECT_TYPE") {
@@ -158,6 +189,13 @@ export const RichInput: React.FC<RichInputProps> = ({
     [state.phase, dispatch, updatePayloadPreview],
   );
 
+  /** Handles mouse enter event on a menu option.
+   *
+   * Updates the selected index to the hovered option, allowing for mouse-based
+   * navigation of the mention/command menu.
+   *
+   * @param idx - The index of the option being hovered.
+   */
   const handleOptionMouseEnter = useCallback(
     (idx: number) => {
       dispatch({

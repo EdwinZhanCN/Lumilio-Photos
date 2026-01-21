@@ -12,7 +12,7 @@ import (
 type CreateAlbumRequestDTO struct {
 	AlbumName    string  `json:"album_name" binding:"required"`
 	Description  *string `json:"description"`
-	CoverAssetID string  `json:"cover_asset_id" binding:"required,uuid4"`
+	CoverAssetID *string `json:"cover_asset_id" binding:"omitempty,uuid4"`
 }
 
 // UpdateAlbumRequestDTO represents the request structure for updating an album

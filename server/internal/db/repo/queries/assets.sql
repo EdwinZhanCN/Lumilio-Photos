@@ -185,10 +185,12 @@ WHERE asset_id = $1 AND tag_id = $2;
 
 -- name: FilterAssets :many
 SELECT a.* FROM assets a
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE a.is_deleted = false
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('album_id')::integer IS NULL OR aa.album_id = sqlc.narg('album_id'))
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE sqlc.narg('filename_mode')::text
       WHEN 'contains' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
@@ -221,11 +223,13 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: SearchAssetsFilename :many
 SELECT a.* FROM assets a
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE a.is_deleted = false
   AND a.original_filename ILIKE '%' || sqlc.arg('query') || '%'
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('album_id')::integer IS NULL OR aa.album_id = sqlc.narg('album_id'))
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE sqlc.narg('filename_mode')::text
       WHEN 'contains' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
@@ -260,12 +264,14 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 SELECT a.*, (e.embedding <-> sqlc.arg('embedding')::vector) AS distance
 FROM assets a
 JOIN embeddings e ON a.asset_id = e.asset_id
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE a.is_deleted = false
   AND e.embedding_type = sqlc.arg('embedding_type')::text
   AND e.is_primary = true
   AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('album_id')::integer IS NULL OR aa.album_id = sqlc.narg('album_id'))
   AND (sqlc.narg('filename_val')::text IS NULL OR
     CASE sqlc.narg('filename_mode')::text
       WHEN 'contains' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'

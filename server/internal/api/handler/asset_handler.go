@@ -224,8 +224,12 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		}
 	}
 
-	userID := c.GetString("user_id")
-	if userID == "" {
+	// Get user ID from JWT claims
+	var userID string
+	if id, exists := c.Get("user_id"); exists {
+		userID = fmt.Sprintf("%d", id)
+	} else {
+		// Fallback to anonymous user if not authenticated
 		userID = "anonymous"
 	}
 
@@ -329,8 +333,12 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetString("user_id")
-	if userID == "" {
+	// Get user ID from JWT claims
+	var userID string
+	if id, exists := c.Get("user_id"); exists {
+		userID = fmt.Sprintf("%d", id)
+	} else {
+		// Fallback to anonymous user if not authenticated
 		userID = "anonymous"
 	}
 
@@ -1298,8 +1306,15 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 		}
 	}
 
+	// Get album ID from filter if provided
+	var albumIDPtr *int32
+	if filter.AlbumID != nil {
+		id := int32(*filter.AlbumID)
+		albumIDPtr = &id
+	}
+
 	assets, err := h.assetService.FilterAssets(ctx,
-		filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
+		filter.RepositoryID, typePtr, filter.OwnerID, albumIDPtr, filenameVal, filenameMode,
 		dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 		filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 
@@ -1376,17 +1391,24 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		dateTo = filter.Date.To
 	}
 
+	// Get album ID from filter if provided
+	var albumIDPtr *int32
+	if filter.AlbumID != nil {
+		id := int32(*filter.AlbumID)
+		albumIDPtr = &id
+	}
+
 	var assets []repo.Asset
 	var err error
 
 	if req.SearchType == "filename" {
 		assets, err = h.assetService.SearchAssetsFilename(ctx, req.Query,
-			filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
+			filter.RepositoryID, typePtr, filter.OwnerID, albumIDPtr, filenameVal, filenameMode,
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 	} else {
 		assets, err = h.assetService.SearchAssetsVector(ctx, req.Query,
-			filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
+			filter.RepositoryID, typePtr, filter.OwnerID, albumIDPtr, filenameVal, filenameMode,
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 		if err != nil && errors.Is(err, service.ErrSemanticSearchUnavailable) {

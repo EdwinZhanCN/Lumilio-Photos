@@ -5,26 +5,41 @@ import { LumilioChatProvider } from "../LumilioChatProvider";
 import { useLumilioChat } from "../hooks/useLumilioChat";
 import { LumilioInput, LumilioMessages } from "../components/LumilioChat";
 
-/**
- * The main chat UI, which consumes the context provided by LumilioChatProvider.
+/** Main chat interface component that displays conversation and handles user input.
+ *
+ * Renders the message history, input field, and confirmation dialogs for tool
+ * executions. Consumes the Lumilio chat context to manage state and dispatch
+ * actions for sending messages and resuming conversations after interrupts.
  */
 const ChatInterface: React.FC = () => {
   const { state, sendMessage, resumeConversation, dispatch } = useLumilioChat();
   const [activeTool, setActiveTool] = useState<string | null>(null);
 
-  // Find the root cause of the interrupt from the context array.
   const rootCauseInterrupt = state.interrupt?.InterruptContexts?.find(
     (ctx) => ctx.IsRootCause,
   );
 
+  /** Handles submission of user messages to the agent.
+   *
+   * Sends the query to the agent with optional tool names if a tool is selected,
+   * then resets the active tool state.
+   *
+   * @param query - The text content of the user's message.
+   */
   const handleSubmit = (query: string) => {
     const toolNames = activeTool ? [activeTool] : [];
     sendMessage(query, toolNames);
     setActiveTool(null);
   };
 
+  /** Handles user confirmation or cancellation of tool execution interrupts.
+   *
+   * Processes the user's decision (approve or cancel) and resumes the conversation
+   * with the appropriate target data.
+   *
+   * @param approved - True if the user confirmed the action, false if cancelled.
+   */
   const handleConfirmation = (approved: boolean) => {
-    // Use the pre-calculated rootCauseInterrupt.
     if (!rootCauseInterrupt) {
       console.error("No root cause found in interrupt");
       dispatch({ type: "CLEAR_INTERRUPT" });
@@ -54,7 +69,6 @@ const ChatInterface: React.FC = () => {
 
       {/* Fixed Input Area at the bottom */}
       <div className="shrink-0 bg-base-100/80 backdrop-blur-sm border-t border-base-300">
-        {/* Use the derived rootCauseInterrupt to safely access data */}
         {rootCauseInterrupt?.Info && (
           <div className="p-4 border-b border-base-300 bg-warning/10">
             <h4 className="font-bold text-warning">Confirmation Required</h4>
@@ -87,9 +101,11 @@ const ChatInterface: React.FC = () => {
   );
 };
 
-/**
- * The main route component for the Lumilio Chat page.
- * It wraps the UI with the state management provider.
+/** Main route component for the Lumilio Chat page.
+ *
+ * Wraps the chat interface with the Lumilio chat provider to enable state
+ * management and context sharing across all child components in the chat
+ * interface tree.
  */
 const LumilioChatPage: React.FC = () => {
   return (

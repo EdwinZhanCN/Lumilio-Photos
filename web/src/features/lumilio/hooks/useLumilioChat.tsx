@@ -3,8 +3,7 @@ import { useContext } from "react";
 import { LumilioChatContext } from "../LumilioChatProvider";
 import { LumilioChatContextValue } from "../lumilio.types";
 
-/**
- * Custom hook to access the Lumilio Chat context.
+/** Custom hook to access the Lumilio Chat context.
  *
  * This provides access to the chat state, dispatch function, and async actions
  * like `sendMessage` and `resumeConversation`.
