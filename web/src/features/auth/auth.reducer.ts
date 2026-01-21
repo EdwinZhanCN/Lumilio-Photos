@@ -1,9 +1,13 @@
 import { AuthAction, AuthState } from "./types";
+import { getToken, getRefreshToken } from "@/lib/http-commons/api";
+
+// Production approach: Start in loading state if we have tokens to verify
+const hasTokens = !!(getToken() || getRefreshToken());
 
 export const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
-  isLoading: false,
+  isLoading: hasTokens, 
   error: null,
 };
 
@@ -34,6 +38,8 @@ export function authReducer(state: AuthState, action: AuthAction): AuthState {
     case "LOGOUT":
       return {
         ...initialState,
+        isLoading: false,
+        isAuthenticated: false,
       };
     case "SET_USER":
       return {

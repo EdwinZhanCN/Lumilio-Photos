@@ -36,7 +36,6 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect })
     dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
     
     selection.setEnabled(true);
-    selection.setSelectionMode("single");
   }, []);
 
   // Sync selection with parent
@@ -234,7 +233,7 @@ const CreateAlbumModal: React.FC = () => {
               </div>
               
               <div className="flex-1 overflow-hidden">
-                <AssetsProvider persist={false}>
+                <AssetsProvider persist={false} defaultSelectionMode="single">
                   <PhotoPicker onSelect={handlePhotoSelect} />
                 </AssetsProvider>
               </div>

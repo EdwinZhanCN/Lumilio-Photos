@@ -8,12 +8,8 @@ const REFRESH_TOKEN_KEY = "refresh_token";
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const getRefreshToken = () => localStorage.getItem(REFRESH_TOKEN_KEY);
 export const saveToken = (token: string, refreshToken: string) => {
-  if (token) {
-    localStorage.setItem(TOKEN_KEY, token);
-  }
-  if (refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  }
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 };
 export const removeToken = () => {
   localStorage.removeItem(TOKEN_KEY);
@@ -22,18 +18,14 @@ export const removeToken = () => {
 
 // Axios config
 const config = {
-  baseURL:
-    import.meta.env.VITE_API_URL ||
-    import.meta.env.API_URL ||
-    "http://localhost:8080",
-  timeout: 10000,
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:8080",
+  timeout: 15000,
   withCredentials: true,
 };
 
-// Create axios instance
 const instance = axios.create(config);
 
-// Request interceptor for adding JWT
+// Request interceptor
 instance.interceptors.request.use(
   (config) => {
     const token = getToken();
@@ -45,42 +37,43 @@ instance.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Response interceptor for handling errors
+// Response interceptor
 instance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // If 401 error and we haven't tried to refresh the token yet
+    // Handle 401 Unauthorized
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // Don't retry if it's the refresh token request itself failing
-      if (originalRequest.url?.includes("/auth/refresh")) {
+      // Prevent infinite loops on auth endpoints
+      if (originalRequest.url?.includes("/auth/refresh") || originalRequest.url?.includes("/auth/login")) {
         return Promise.reject(error);
       }
 
       originalRequest._retry = true;
 
       try {
-        // Attempt to refresh the token
         const refreshToken = getRefreshToken();
         if (refreshToken) {
+          // Use axios directly to avoid interceptor loop
           const res = await axios.post(`${config.baseURL}/api/v1/auth/refresh`, {
             refreshToken,
           });
 
-          // Backend returns code 0 for success
           if (res.data.code === 0 && res.data.data) {
             const { token, refreshToken: newRefreshToken } = res.data.data;
             saveToken(token, newRefreshToken);
-
-            // Update the authorization header
+            
+            // Retry original request with new token
             originalRequest.headers["Authorization"] = `Bearer ${token}`;
             return instance(originalRequest);
           }
         }
       } catch (refreshError) {
-        console.error("Token refresh failed:", refreshError);
         removeToken();
+        // Force reload to trigger ProtectedRoute redirect
+        window.location.href = "/login";
+        return Promise.reject(refreshError);
       }
     }
 

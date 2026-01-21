@@ -27,6 +27,7 @@ interface AssetsProviderProps {
   children: ReactNode;
   persist?: boolean;
   basePath?: string; // Optional base path for carousel navigation
+  defaultSelectionMode?: "single" | "multiple";
 }
 
 function loadPersistedState(): Partial<AssetsState> {
@@ -78,7 +79,12 @@ function saveStateToStorage(state: AssetsState) {
   }
 }
 
-export const AssetsProvider = ({ children, persist = true, basePath }: AssetsProviderProps) => {
+export const AssetsProvider = ({ 
+  children, 
+  persist = true, 
+  basePath,
+  defaultSelectionMode = "multiple"
+}: AssetsProviderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -112,13 +118,19 @@ export const AssetsProvider = ({ children, persist = true, basePath }: AssetsPro
         isCarouselOpen,
         activeAssetId: params.assetId,
       },
+      selection: {
+        ...initialAssetsState.selection,
+        ...(persistedState.selection || {}),
+        selectionMode: defaultSelectionMode,
+      }
     };
   }, [
     location.pathname,
     searchParams,
     params.assetId,
     settingsState.ui.asset_page?.layout,
-    persist
+    persist,
+    defaultSelectionMode
   ]);
 
   const [state, dispatch] = useReducer(
