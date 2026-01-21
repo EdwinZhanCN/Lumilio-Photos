@@ -2,7 +2,7 @@
 
 # Interface: DeviceCapabilities
 
-Defined in: [utils/smartBatchSizing.ts:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e359d4441f14ec80c9eda9ee68ada26fd7bbb8e0/web/src/utils/smartBatchSizing.ts#L17)
+Defined in: [utils/smartBatchSizing.ts:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3dd9035b607ebbe85d911491cffd43a9e01c377d/web/src/utils/smartBatchSizing.ts#L17)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [utils/smartBatchSizing.ts:17](https://github.com/EdwinZhanCN/Lumili
 
 > **availableMemoryMB**: `number`
 
-Defined in: [utils/smartBatchSizing.ts:19](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e359d4441f14ec80c9eda9ee68ada26fd7bbb8e0/web/src/utils/smartBatchSizing.ts#L19)
+Defined in: [utils/smartBatchSizing.ts:19](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3dd9035b607ebbe85d911491cffd43a9e01c377d/web/src/utils/smartBatchSizing.ts#L19)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [utils/smartBatchSizing.ts:19](https://github.com/EdwinZhanCN/Lumili
 
 > **cpuCores**: `number`
 
-Defined in: [utils/smartBatchSizing.ts:18](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e359d4441f14ec80c9eda9ee68ada26fd7bbb8e0/web/src/utils/smartBatchSizing.ts#L18)
+Defined in: [utils/smartBatchSizing.ts:18](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3dd9035b607ebbe85d911491cffd43a9e01c377d/web/src/utils/smartBatchSizing.ts#L18)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [utils/smartBatchSizing.ts:18](https://github.com/EdwinZhanCN/Lumili
 
 > **isLowEndDevice**: `boolean`
 
-Defined in: [utils/smartBatchSizing.ts:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e359d4441f14ec80c9eda9ee68ada26fd7bbb8e0/web/src/utils/smartBatchSizing.ts#L20)
+Defined in: [utils/smartBatchSizing.ts:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3dd9035b607ebbe85d911491cffd43a9e01c377d/web/src/utils/smartBatchSizing.ts#L20)
 
 ***
 
@@ -34,7 +34,7 @@ Defined in: [utils/smartBatchSizing.ts:20](https://github.com/EdwinZhanCN/Lumili
 
 > **isMobile**: `boolean`
 
-Defined in: [utils/smartBatchSizing.ts:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e359d4441f14ec80c9eda9ee68ada26fd7bbb8e0/web/src/utils/smartBatchSizing.ts#L21)
+Defined in: [utils/smartBatchSizing.ts:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3dd9035b607ebbe85d911491cffd43a9e01c377d/web/src/utils/smartBatchSizing.ts#L21)
 
 ***
 
@@ -42,4 +42,4 @@ Defined in: [utils/smartBatchSizing.ts:21](https://github.com/EdwinZhanCN/Lumili
 
 > **maxConcurrency**: `number`
 
-Defined in: [utils/smartBatchSizing.ts:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e359d4441f14ec80c9eda9ee68ada26fd7bbb8e0/web/src/utils/smartBatchSizing.ts#L22)
+Defined in: [utils/smartBatchSizing.ts:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3dd9035b607ebbe85d911491cffd43a9e01c377d/web/src/utils/smartBatchSizing.ts#L22)
