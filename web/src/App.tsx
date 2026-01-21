@@ -11,6 +11,7 @@ import Notifications from "@/components/Notifications";
 import { SettingsProvider, useSettingsContext } from "./features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
 import { pollHealth } from "@/services/healthService";
+import { AuthProvider } from "./features/auth";
 
 const queryClient = new QueryClient();
 
@@ -36,36 +37,38 @@ function App(): React.ReactNode {
     <SettingsProvider>
       <GlobalProvider>
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
-            <div className="flex flex-col h-screen">
-              <div className="bg-base-100 shadow">
-                <NavBar />
+          <AuthProvider>
+            <BrowserRouter>
+              <div className="flex flex-col h-screen">
+                <div className="bg-base-100 shadow">
+                  <NavBar />
+                </div>
+                <div className="flex flex-1 overflow-hidden">
+                  <div className="w-auto bg-base-200 shadow-lg">
+                    <SideBar />
+                  </div>
+                  <div className="flex-1 p-4 overflow-y-auto overflow-x-hidden">
+                    <Routes>
+                      {routes.map((route) => (
+                        <Route
+                          key={route.path}
+                          path={route.path}
+                          element={route.element}
+                        />
+                      ))}
+                    </Routes>
+                  </div>
+                </div>
+                <footer className="bg-base-100 text-base-content text-xs">
+                  <div className="container mx-auto py-0.5">
+                    <p className="text-center">
+                      {t("footer.copyright", { year: new Date().getFullYear() })}
+                    </p>
+                  </div>
+                </footer>
               </div>
-              <div className="flex flex-1 overflow-hidden">
-                <div className="w-auto bg-base-200 shadow-lg">
-                  <SideBar />
-                </div>
-                <div className="flex-1 p-4 overflow-y-auto overflow-x-hidden">
-                  <Routes>
-                    {routes.map((route) => (
-                      <Route
-                        key={route.path}
-                        path={route.path}
-                        element={route.element}
-                      />
-                    ))}
-                  </Routes>
-                </div>
-              </div>
-              <footer className="bg-base-100 text-base-content text-xs">
-                <div className="container mx-auto py-0.5">
-                  <p className="text-center">
-                    {t("footer.copyright", { year: new Date().getFullYear() })}
-                  </p>
-                </div>
-              </footer>
-            </div>
-          </BrowserRouter>
+            </BrowserRouter>
+          </AuthProvider>
         </QueryClientProvider>
         <HealthPoller />
         <Notifications />
