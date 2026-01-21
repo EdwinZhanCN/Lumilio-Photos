@@ -4,6 +4,7 @@ import api from "@/lib/http-commons/api.ts";
 import type { AxiosRequestConfig, AxiosResponse } from "axios";
 import type { components, paths } from "@/lib/http-commons/schema.d.ts";
 import type { ApiResult } from "./uploadService";
+import { FilterAssetsRequest } from "./assetsService";
 
 // ============================================================================
 // Type Aliases from Generated Schema
@@ -66,9 +67,6 @@ export type ListAlbumsParams = NonNullable<
 export const albumService = {
   /**
    * Fetches a paginated list of albums for the authenticated user.
-   * @param {ListAlbumsParams} [params] - Query parameters for pagination (limit, offset)
-   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
-   * @returns {Promise<AxiosResponse<ApiResult<ListAlbumsResponse>>>} A promise that resolves to the albums list.
    */
   listAlbums: async (
     params?: ListAlbumsParams,
@@ -82,9 +80,6 @@ export const albumService = {
 
   /**
    * Fetches a specific album by its ID.
-   * @param {number} id - The album ID.
-   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
-   * @returns {Promise<AxiosResponse<ApiResult<Album>>>} A promise resolving to the album details.
    */
   getAlbumById: async (
     id: number,
@@ -95,9 +90,6 @@ export const albumService = {
 
   /**
    * Creates a new album for the authenticated user.
-   * @param {CreateAlbumRequest} request - The album creation data.
-   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
-   * @returns {Promise<AxiosResponse<ApiResult<Album>>>} A promise resolving to the created album.
    */
   createAlbum: async (
     request: CreateAlbumRequest,
@@ -108,10 +100,6 @@ export const albumService = {
 
   /**
    * Updates an existing album's information.
-   * @param {number} id - The album ID.
-   * @param {UpdateAlbumRequest} request - The album update data.
-   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
-   * @returns {Promise<AxiosResponse<ApiResult<Album>>>} A promise resolving to the updated album.
    */
   updateAlbum: async (
     id: number,
@@ -123,9 +111,6 @@ export const albumService = {
 
   /**
    * Deletes an album by its ID.
-   * @param {number} id - The album ID.
-   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
-   * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
    */
   deleteAlbum: async (
     id: number,
@@ -139,9 +124,6 @@ export const albumService = {
 
   /**
    * Retrieves all assets in a specific album.
-   * @param {number} id - The album ID.
-   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
-   * @returns {Promise<AxiosResponse<ApiResult<any>>>} A promise resolving to the album's assets.
    */
   getAlbumAssets: async (
     id: number,
@@ -151,12 +133,22 @@ export const albumService = {
   },
 
   /**
+   * Filter assets within a specific album.
+   */
+  filterAlbumAssets: async (
+    albumId: number,
+    request: FilterAssetsRequest,
+    config?: AxiosRequestConfig,
+  ): Promise<AxiosResponse<ApiResult<any>>> => {
+    return api.post<ApiResult<any>>(
+      `/api/v1/albums/${albumId}/filter`,
+      request,
+      config,
+    );
+  },
+
+  /**
    * Adds an asset to a specific album.
-   * @param {number} albumId - The album ID.
-   * @param {string} assetId - The asset ID (UUID format).
-   * @param {AddAssetToAlbumRequest} [request] - Optional position data.
-   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
-   * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
    */
   addAssetToAlbum: async (
     albumId: number,
@@ -173,10 +165,6 @@ export const albumService = {
 
   /**
    * Removes an asset from a specific album.
-   * @param {number} albumId - The album ID.
-   * @param {string} assetId - The asset ID (UUID format).
-   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
-   * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
    */
   removeAssetFromAlbum: async (
     albumId: number,
@@ -191,11 +179,6 @@ export const albumService = {
 
   /**
    * Updates the position of an asset within a specific album.
-   * @param {number} albumId - The album ID.
-   * @param {string} assetId - The asset ID (UUID format).
-   * @param {UpdateAssetPositionRequest} request - The new position data.
-   * @param {AxiosRequestConfig} [config] - Optional additional Axios request configuration.
-   * @returns {Promise<AxiosResponse<ApiResult<MessageResponse>>>} A promise resolving to a success message.
    */
   updateAssetPosition: async (
     albumId: number,
