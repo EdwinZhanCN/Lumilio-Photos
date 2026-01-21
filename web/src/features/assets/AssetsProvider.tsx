@@ -26,6 +26,7 @@ const STORAGE_FIELDS = ["filters", "selection"] as const;
 interface AssetsProviderProps {
   children: ReactNode;
   persist?: boolean;
+  basePath?: string; // Optional base path for carousel navigation
 }
 
 function loadPersistedState(): Partial<AssetsState> {
@@ -77,7 +78,7 @@ function saveStateToStorage(state: AssetsState) {
   }
 }
 
-export const AssetsProvider = ({ children, persist = true }: AssetsProviderProps) => {
+export const AssetsProvider = ({ children, persist = true, basePath }: AssetsProviderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -232,31 +233,39 @@ export const AssetsProvider = ({ children, persist = true }: AssetsProviderProps
   const openCarousel = useCallback(
     (assetId: string) => {
       const currentParams = new URLSearchParams(searchParams);
-      let basePath = "/assets/photos";
-      if (state.ui.currentTab === "videos") basePath = "/assets/videos";
-      else if (state.ui.currentTab === "audios") basePath = "/assets/audios";
-      const targetUrl = `${basePath}/${assetId}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
+      let path = basePath || "/assets/photos";
+      
+      if (!basePath) {
+        if (state.ui.currentTab === "videos") path = "/assets/videos";
+        else if (state.ui.currentTab === "audios") path = "/assets/audios";
+      }
+
+      const targetUrl = `${path}/${assetId}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
       navigate(targetUrl);
     },
-    [navigate, searchParams, state.ui.currentTab],
+    [navigate, searchParams, state.ui.currentTab, basePath],
   );
 
   const closeCarousel = useCallback(() => {
     const currentParams = new URLSearchParams(searchParams);
-    let basePath = "/assets/photos";
-    if (state.ui.currentTab === "videos") basePath = "/assets/videos";
-    else if (state.ui.currentTab === "audios") basePath = "/assets/audios";
-    const targetUrl = `${basePath}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
+    let path = basePath || "/assets/photos";
+    
+    if (!basePath) {
+      if (state.ui.currentTab === "videos") path = "/assets/videos";
+      else if (state.ui.currentTab === "audios") path = "/assets/audios";
+    }
+
+    const targetUrl = `${path}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
     navigate(targetUrl);
-  }, [navigate, searchParams, state.ui.currentTab]);
+  }, [navigate, searchParams, state.ui.currentTab, basePath]);
 
   const switchTab = useCallback(
     (tab: TabType) => {
       const currentParams = new URLSearchParams(searchParams);
-      let basePath = "/assets/photos";
-      if (tab === "videos") basePath = "/assets/videos";
-      else if (tab === "audios") basePath = "/assets/audios";
-      const targetUrl = `${basePath}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
+      let path = "/assets/photos";
+      if (tab === "videos") path = "/assets/videos";
+      else if (tab === "audios") path = "/assets/audios";
+      const targetUrl = `${path}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
       navigate(targetUrl);
     },
     [navigate, searchParams],

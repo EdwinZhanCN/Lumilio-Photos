@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import PhotosLoadingSkeleton from "../LoadingSkeleton";
 import { assetService } from "@/services/assetsService";
@@ -56,27 +56,46 @@ const JustifiedGallery = ({
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastWidthRef = useRef(0);
 
-  // Use a callback ref to measure width immediately on mount
-  const measureRef = useCallback((node: HTMLDivElement | null) => {
-    if (node !== null) {
-      const width = node.getBoundingClientRect().width;
-      if (width > 0) setContainerWidth(width);
-      
-      // Also find scroll parent here
-      const findScrollParent = (el: HTMLElement | null): HTMLElement => {
-        if (!el || el === document.body) return document.documentElement;
-        const style = window.getComputedStyle(el);
-        if (style.overflowY === "auto" || style.overflowY === "scroll") return el;
-        return findScrollParent(el.parentElement);
-      };
-      setScrollElement(findScrollParent(node));
+  // 1. Initialize service
+  useEffect(() => {
+    if (!serviceReady) {
+      justifiedLayoutService.initialize().then(() => setServiceReady(true));
     }
+  }, [serviceReady]);
+
+  // 2. Setup measurements once container is available
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+
+    const findScrollParent = (el: HTMLElement | null): HTMLElement => {
+      if (!el || el === document.body) return document.documentElement;
+      const style = window.getComputedStyle(el);
+      if (style.overflowY === "auto" || style.overflowY === "scroll") return el;
+      return findScrollParent(el.parentElement);
+    };
+
+    const parent = findScrollParent(node);
+    setScrollElement(prev => prev === parent ? prev : parent);
+
+    const updateWidth = () => {
+      const width = node.getBoundingClientRect().width;
+      if (width > 0 && Math.abs(width - lastWidthRef.current) > 1) {
+        lastWidthRef.current = width;
+        setContainerWidth(width);
+      }
+    };
+
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(node);
+    return () => observer.disconnect();
   }, []);
 
-  // Get all asset IDs for keyboard selection
+  // 3. Keyboard selection
   const allAssetIds = useMemo(() => {
     return Object.values(groupedPhotos).flatMap(assets => 
       assets.map(a => a.asset_id).filter((id): id is string => !!id)
@@ -85,37 +104,13 @@ const JustifiedGallery = ({
 
   const selection = useKeyboardSelection(allAssetIds);
 
-  // Initialize service
-  useEffect(() => {
-    if (!serviceReady) {
-      justifiedLayoutService.initialize().then(() => setServiceReady(true));
-    }
-  }, [serviceReady]);
-
-  // Watch for width changes (especially for modal animations)
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0].contentRect.width;
-      if (width > 0 && Math.abs(width - containerWidth) > 1) {
-        if (resizeTimeoutRef.current) clearTimeout(resizeTimeoutRef.current);
-        resizeTimeoutRef.current = setTimeout(() => setContainerWidth(width), 100);
-      }
-    });
-
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [containerWidth]);
-
+  // 4. Layout calculation
   const layoutConfig = useMemo(() => {
     const width = containerWidth || 800;
     const horizontalPadding = width < 640 ? 16 : width < 1024 ? 24 : 32;
     return justifiedLayoutService.createResponsiveConfig(Math.max(width - horizontalPadding * 2, 300));
   }, [containerWidth]);
 
-  // Calculate layouts
   useEffect(() => {
     if (Object.keys(groupedPhotos).length === 0 || containerWidth === 0) return;
 
@@ -132,6 +127,7 @@ const JustifiedGallery = ({
     calculate();
   }, [groupedPhotos, layoutConfig, containerWidth]);
 
+  // 5. Positioned assets and virtual groups
   const positionedAssetsByGroup = useMemo(() => {
     const results: Record<string, GroupLayout> = {};
     Object.entries(groupedPhotos).forEach(([key, assets]) => {
@@ -160,6 +156,7 @@ const JustifiedGallery = ({
     return groups;
   }, [groupedPhotos, positionedAssetsByGroup]);
 
+  // 6. Virtualizer
   const rowVirtualizer = useVirtualizer({
     count: virtualGroups.length,
     getScrollElement: () => scrollElement,
@@ -167,21 +164,28 @@ const JustifiedGallery = ({
     overscan: 2,
   });
 
-  // Infinite scroll
-  useEffect(() => {
+  // 7. Infinite scroll ref callback (React 19 style)
+  const loadMoreRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node || !hasMore || isLoadingMore) return;
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore && !isLoadingMore) onLoadMore?.();
+      if (entries[0].isIntersecting) onLoadMore?.();
     }, { threshold: 0.1, rootMargin: "400px" });
-
-    if (loadMoreRef.current) observer.observe(loadMoreRef.current);
+    observer.observe(node);
     return () => observer.disconnect();
   }, [hasMore, isLoadingMore, onLoadMore]);
 
-  if (isLoading && Object.keys(groupedPhotos).length === 0) return <PhotosLoadingSkeleton />;
-  if (!serviceReady) return <div className="flex justify-center py-12"><span className="loading loading-spinner"></span></div>;
+  // Render logic
+  const renderContent = () => {
+    if (isLoading && Object.keys(groupedPhotos).length === 0) return <PhotosLoadingSkeleton />;
+    if (!serviceReady) return <div className="flex justify-center py-12"><span className="loading loading-spinner"></span></div>;
+    if (Object.keys(groupedPhotos).length === 0) return (
+      <div className="text-center py-12 opacity-60">
+        <div className="text-4xl mb-4">🔍</div>
+        <p>No assets found</p>
+      </div>
+    );
 
-  return (
-    <div ref={(el) => { (containerRef as any).current = el; measureRef(el); }} className="w-full outline-none" onKeyDown={selection.handleKeyDown} tabIndex={0}>
+    return (
       <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: "100%", position: "relative" }}>
         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
           const group = virtualGroups[virtualRow.index];
@@ -224,6 +228,12 @@ const JustifiedGallery = ({
           );
         })}
       </div>
+    );
+  };
+
+  return (
+    <div ref={containerRef} className="w-full outline-none" onKeyDown={selection.handleKeyDown} tabIndex={0}>
+      {renderContent()}
       {hasMore && <div ref={loadMoreRef} className="flex justify-center py-12"><span className="loading loading-dots loading-md opacity-30"></span></div>}
     </div>
   );

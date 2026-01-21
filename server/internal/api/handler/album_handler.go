@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"strconv"
+	"time"
 
 	"server/internal/api"
 	"server/internal/api/dto"
@@ -572,4 +573,112 @@ func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 		"albums":   albums,
 		"count":    len(albums),
 	})
+}
+
+// FilterAlbumAssets filters assets within a specific album
+// @Summary Filter assets in album
+// @Description Filter assets within a specific album using comprehensive filtering options
+// @Tags albums
+// @Accept json
+// @Produce json
+// @Param id path int true "Album ID"
+// @Param request body dto.FilterAssetsRequestDTO true "Filter criteria"
+// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets filtered successfully"
+// @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /albums/{id}/filter [post]
+// @Security BearerAuth
+func (h *AlbumHandler) FilterAlbumAssets(c *gin.Context) {
+	albumIDStr := c.Param("id")
+	albumID, err := strconv.ParseInt(albumIDStr, 10, 32)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid album ID")
+		return
+	}
+
+	var req dto.FilterAssetsRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	// Validate and set defaults
+	if req.Limit <= 0 || req.Limit > 100 {
+		req.Limit = 20
+	}
+	if req.Offset < 0 {
+		req.Offset = 0
+	}
+
+	ctx := c.Request.Context()
+	filter := req.Filter
+
+	// Convert filter parameters for SQL query
+	var typePtr *string
+	if filter.Type != nil {
+		typePtr = filter.Type
+	}
+
+	var filenameVal, filenameMode *string
+	if filter.Filename != nil {
+		filenameVal = &filter.Filename.Value
+		filenameMode = &filter.Filename.Mode
+	}
+
+	var dateFrom, dateTo *time.Time
+	if filter.Date != nil {
+		dateFrom = filter.Date.From
+		dateTo = filter.Date.To
+	}
+
+	albumID32 := int32(albumID)
+	assets, err := (*h.albumService).FilterAlbumAssets(ctx, repo.FilterAlbumAssetsParams{
+		AlbumID:      albumID32,
+		AssetType:    typePtr,
+		FilenameVal:  filenameVal,
+		FilenameMode: filenameMode,
+		DateFrom:     pgtype.Timestamptz{Time: safeTime(dateFrom), Valid: dateFrom != nil},
+		DateTo:       pgtype.Timestamptz{Time: safeTime(dateTo), Valid: dateTo != nil},
+		IsRaw:        filter.RAW,
+		Rating:       safeInt32(filter.Rating),
+		Liked:        filter.Liked,
+		CameraModel:  filter.CameraMake,
+		LensModel:    filter.Lens,
+		Limit:        int32(req.Limit),
+		Offset:       int32(req.Offset),
+	})
+
+	if err != nil {
+		log.Printf("Failed to filter album assets: %v", err)
+		api.GinInternalError(c, err, "Failed to filter album assets")
+		return
+	}
+
+	dtos := make([]dto.AssetDTO, len(assets))
+	for i, a := range assets {
+		dtos[i] = dto.ToAssetDTO(a)
+	}
+
+	response := dto.AssetListResponseDTO{
+		Assets: dtos,
+		Limit:  req.Limit,
+		Offset: req.Offset,
+	}
+	api.GinSuccess(c, response)
+}
+
+// Helper functions for safe type conversion
+func safeTime(t *time.Time) time.Time {
+	if t == nil {
+		return time.Time{}
+	}
+	return *t
+}
+
+func safeInt32(i *int) *int32 {
+	if i == nil {
+		return nil
+	}
+	v := int32(*i)
+	return &v
 }

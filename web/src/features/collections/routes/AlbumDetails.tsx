@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { albumService } from "@/services/albumService";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
@@ -9,16 +9,12 @@ import { useAssetsContext, useAssetsNavigation } from "@/features/assets/hooks/u
 import { useAssetsView } from "@/features/assets/hooks/useAssetsView";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import { findAssetIndex } from "@/lib/utils/assetGrouping";
-import { useI18n } from "@/lib/i18n";
-import { Asset } from "@/lib/http-commons";
-import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
+import { WorkerProvider } from "@/contexts/WorkerProvider";
 
 const AlbumAssetsContent = () => {
   const { albumId, assetId } = useParams<{ albumId: string, assetId: string }>();
   const { state, dispatch } = useAssetsContext();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
-  const { deleteAsset } = useAssetActions();
-  const { t } = useI18n();
 
   const { groupBy, isCarouselOpen } = state.ui;
 
@@ -32,7 +28,6 @@ const AlbumAssetsContent = () => {
   const album = albumData?.data?.data;
 
   // Fetch album assets using the assets view hook
-  // We'll use the 'inheritGlobalFilter: true' to allow filtering within the album
   const {
     assets,
     groups,
@@ -42,11 +37,8 @@ const AlbumAssetsContent = () => {
     hasMore,
     error
   } = useAssetsView({
-    // We need a way to filter by album ID in the assets API
-    // Assuming the filter API supports album_id or we use a specific album assets endpoint
-    // For now, we'll use the filter object
     filter: { 
-      // @ts-ignore - assuming backend might support this or we'll need to add it
+      // @ts-ignore - backend now supports album_id in filter
       album_id: parseInt(albumId!) 
     },
     groupBy,
@@ -71,26 +63,28 @@ const AlbumAssetsContent = () => {
         onGroupByChange={(v) => dispatch({ type: "SET_GROUP_BY", payload: v })}
       />
       
-      <div className="px-8 py-4 bg-base-100/50 backdrop-blur-md border-b border-base-300">
-        <h1 className="text-3xl font-bold text-primary">{album?.album_name || "Loading Album..."}</h1>
-        {album?.description && <p className="mt-2 text-base-content/60 max-w-2xl">{album.description}</p>}
-        <div className="mt-4 flex items-center gap-4 text-sm font-medium opacity-50">
-          <span>{album?.asset_count || 0} items</span>
-          <span>•</span>
-          <span>Created {album?.created_at ? new Date(album.created_at).toLocaleDateString() : ""}</span>
+      <div className="px-8 py-6 bg-base-100/50 backdrop-blur-md border-b border-base-300">
+        <div className="flex items-baseline gap-4">
+          <h1 className="text-4xl font-black tracking-tight text-primary">{album?.album_name || "Loading..."}</h1>
+          <span className="badge badge-ghost font-mono text-xs opacity-50">ALBUM #{albumId}</span>
+        </div>
+        {album?.description && <p className="mt-3 text-base-content/70 max-w-3xl leading-relaxed">{album.description}</p>}
+        <div className="mt-6 flex items-center gap-6 text-xs font-bold uppercase tracking-widest opacity-40">
+          <div className="flex items-center gap-2">
+            <span className="text-primary">●</span>
+            <span>{album?.asset_count || 0} items</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-primary">●</span>
+            <span>Created {album?.created_at ? new Date(album.created_at).toLocaleDateString() : ""}</span>
+          </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <JustifiedGallery
           groupedPhotos={groups || {}}
-          openCarousel={(id) => {
-            // Custom navigation for album context
-            const currentParams = new URLSearchParams(window.location.search);
-            window.history.pushState({}, "", `/collections/${albumId}/${id}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`);
-            dispatch({ type: "SET_CAROUSEL_OPEN", payload: true });
-            dispatch({ type: "SET_ACTIVE_ASSET_ID", payload: id });
-          }}
+          openCarousel={openCarousel}
           onLoadMore={fetchMore}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
@@ -102,16 +96,8 @@ const AlbumAssetsContent = () => {
         <FullScreenCarousel
           photos={assets}
           initialSlide={slideIndex >= 0 ? slideIndex : 0}
-          onClose={() => {
-            const currentParams = new URLSearchParams(window.location.search);
-            window.history.pushState({}, "", `/collections/${albumId}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`);
-            dispatch({ type: "SET_CAROUSEL_OPEN", payload: false });
-          }}
-          onNavigate={(id) => {
-            const currentParams = new URLSearchParams(window.location.search);
-            window.history.pushState({}, "", `/collections/${albumId}/${id}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`);
-            dispatch({ type: "SET_ACTIVE_ASSET_ID", payload: id });
-          }}
+          onClose={closeCarousel}
+          onNavigate={openCarousel}
         />
       )}
     </div>
@@ -119,10 +105,14 @@ const AlbumAssetsContent = () => {
 };
 
 const AlbumDetails = () => {
+  const { albumId } = useParams<{ albumId: string }>();
+  
   return (
-    <AssetsProvider persist={false}>
-      <AlbumAssetsContent />
-    </AssetsProvider>
+    <WorkerProvider preload={["exif", "export"]}>
+      <AssetsProvider persist={false} basePath={`/collections/${albumId}`}>
+        <AlbumAssetsContent />
+      </AssetsProvider>
+    </WorkerProvider>
   );
 };
 
