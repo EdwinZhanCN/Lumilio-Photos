@@ -60,9 +60,21 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 
 	// Owner handling (anonymous → nil)
 	var ownerIDPtr *int32
-	if task.UserID != "anonymous" {
-		ownerID := int32(1)
-		ownerIDPtr = &ownerID
+	if task.UserID != "" && task.UserID != "anonymous" {
+		// Try to parse UserID as integer
+		var id int
+		_, err := fmt.Sscanf(task.UserID, "%d", &id)
+		if err == nil {
+			ownerID := int32(id)
+			ownerIDPtr = &ownerID
+		} else {
+			// If not an integer, try to look up by username
+			user, err := ap.queries.GetUserByUsername(ctx, task.UserID)
+			if err == nil {
+				ownerID := user.UserID
+				ownerIDPtr = &ownerID
+			}
+		}
 	}
 
 	// Create asset record with empty storage path

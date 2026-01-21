@@ -54,6 +54,114 @@ func (q *Queries) DeleteAlbum(ctx context.Context, albumID int32) error {
 	return err
 }
 
+const filterAlbumAssets = `-- name: FilterAlbumAssets :many
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status FROM assets a
+JOIN album_assets aa ON a.asset_id = aa.asset_id
+WHERE aa.album_id = $1
+  AND a.is_deleted = false
+  AND ($2::text IS NULL OR a.type = $2)
+  AND ($3::text IS NULL OR
+    CASE $4::text
+      WHEN 'contains' THEN a.original_filename ILIKE '%' || $3 || '%'
+      WHEN 'matches' THEN a.original_filename ILIKE $3
+      WHEN 'startswith' THEN a.original_filename ILIKE $3 || '%'
+      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $3
+      ELSE true
+    END
+  )
+  AND ($5::timestamptz IS NULL OR a.upload_time >= $5)
+  AND ($6::timestamptz IS NULL OR a.upload_time <= $6)
+  AND ($7::boolean IS NULL OR
+    CASE
+      WHEN $7 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      WHEN $7 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+      ELSE true
+    END
+  )
+  AND ($8::integer IS NULL OR
+    CASE
+      WHEN $8 = 0 THEN a.rating IS NULL
+      ELSE a.rating = $8
+    END
+  )
+  AND ($9::boolean IS NULL OR a.liked = $9)
+  AND ($10::text IS NULL OR a.specific_metadata->>'camera_model' = $10)
+  AND ($11::text IS NULL OR a.specific_metadata->>'lens_model' = $11)
+ORDER BY aa.position ASC, aa.added_time DESC
+LIMIT $13 OFFSET $12
+`
+
+type FilterAlbumAssetsParams struct {
+	AlbumID      int32              `db:"album_id" json:"album_id"`
+	AssetType    *string            `db:"asset_type" json:"asset_type"`
+	FilenameVal  *string            `db:"filename_val" json:"filename_val"`
+	FilenameMode *string            `db:"filename_mode" json:"filename_mode"`
+	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw        *bool              `db:"is_raw" json:"is_raw"`
+	Rating       *int32             `db:"rating" json:"rating"`
+	Liked        *bool              `db:"liked" json:"liked"`
+	CameraModel  *string            `db:"camera_model" json:"camera_model"`
+	LensModel    *string            `db:"lens_model" json:"lens_model"`
+	Offset       int32              `db:"offset" json:"offset"`
+	Limit        int32              `db:"limit" json:"limit"`
+}
+
+func (q *Queries) FilterAlbumAssets(ctx context.Context, arg FilterAlbumAssetsParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, filterAlbumAssets,
+		arg.AlbumID,
+		arg.AssetType,
+		arg.FilenameVal,
+		arg.FilenameMode,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAlbumAssetCount = `-- name: GetAlbumAssetCount :one
 SELECT COUNT(*) as count
 FROM album_assets aa

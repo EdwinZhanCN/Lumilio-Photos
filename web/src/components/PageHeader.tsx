@@ -17,7 +17,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
 }) => {
   return (
     <header
-      className={`py-2 px-4 flex justify-between items-center flex-shrink-0 ${className}`}
+      className={`py-2 px-4 flex items-center flex-shrink-0 ${className}`}
     >
       <div className="flex items-center space-x-3">
         {icon && <div>{icon}</div>}

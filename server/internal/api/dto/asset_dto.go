@@ -270,6 +270,7 @@ func (d *DateRangeDTO) UnmarshalJSON(data []byte) error {
 // AssetFilterDTO represents comprehensive filtering options
 type AssetFilterDTO struct {
 	RepositoryID *string            `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	AlbumID      *int               `json:"album_id,omitempty" example:"123"`
 	Type         *string            `json:"type,omitempty" example:"PHOTO" enums:"PHOTO,VIDEO,AUDIO"`
 	OwnerID      *int32             `json:"owner_id,omitempty" example:"123"`
 	RAW          *bool              `json:"raw,omitempty" example:"true"`

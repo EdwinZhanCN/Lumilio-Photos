@@ -55,19 +55,21 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 		return
 	}
 
-	// Parse and validate cover asset ID
-	coverAssetUUID, err := uuid.Parse(req.CoverAssetID)
-	if err != nil {
-		api.GinBadRequest(c, err, "Invalid cover asset ID")
-		return
-	}
-
 	// Create album parameters
 	params := repo.CreateAlbumParams{
-		UserID:       int32(userID.(int)),
-		AlbumName:    req.AlbumName,
-		Description:  req.Description,
-		CoverAssetID: pgtype.UUID{Bytes: coverAssetUUID, Valid: true},
+		UserID:      int32(userID.(int)),
+		AlbumName:   req.AlbumName,
+		Description: req.Description,
+	}
+
+	// Handle optional cover asset ID
+	if req.CoverAssetID != nil && *req.CoverAssetID != "" {
+		coverAssetUUID, err := uuid.Parse(*req.CoverAssetID)
+		if err != nil {
+			api.GinBadRequest(c, err, "Invalid cover asset ID")
+			return
+		}
+		params.CoverAssetID = pgtype.UUID{Bytes: coverAssetUUID, Valid: true}
 	}
 
 	album, err := (*h.albumService).CreateNewAlbum(c.Request.Context(), params)

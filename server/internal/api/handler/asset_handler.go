@@ -230,18 +230,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		userID = fmt.Sprintf("%d", id)
 	} else {
 		// Fallback to anonymous user if not authenticated
-		// In a real scenario, we might want to enforce authentication or use a specific anonymous user ID
-		// For now, we'll try to find the anonymous user in the database
-		anonUser, err := h.queries.GetUserByUsername(ctx, "anonymous")
-		if err == nil {
-			userID = fmt.Sprintf("%d", anonUser.UserID)
-		} else {
-			// If anonymous user doesn't exist, we might need to create it or handle this case
-			// For now, let's log a warning and use a placeholder, but this might fail foreign key constraints
-			log.Printf("Warning: Anonymous user not found and no authenticated user")
-			// Depending on your DB schema, you might need a valid user ID here
-			// If owner_id is nullable in assets table, we can leave it empty or handle it in the processor
-		}
+		userID = "anonymous"
 	}
 
 	payload := processors.AssetPayload{
@@ -350,12 +339,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		userID = fmt.Sprintf("%d", id)
 	} else {
 		// Fallback to anonymous user if not authenticated
-		anonUser, err := h.queries.GetUserByUsername(ctx, "anonymous")
-		if err == nil {
-			userID = fmt.Sprintf("%d", anonUser.UserID)
-		} else {
-			log.Printf("Warning: Anonymous user not found and no authenticated user")
-		}
+		userID = "anonymous"
 	}
 
 	type sessionState struct {
@@ -1322,8 +1306,15 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 		}
 	}
 
+	// Get album ID from filter if provided
+	var albumIDPtr *int32
+	if filter.AlbumID != nil {
+		id := int32(*filter.AlbumID)
+		albumIDPtr = &id
+	}
+
 	assets, err := h.assetService.FilterAssets(ctx,
-		filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
+		filter.RepositoryID, typePtr, filter.OwnerID, albumIDPtr, filenameVal, filenameMode,
 		dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 		filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 
@@ -1400,17 +1391,24 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		dateTo = filter.Date.To
 	}
 
+	// Get album ID from filter if provided
+	var albumIDPtr *int32
+	if filter.AlbumID != nil {
+		id := int32(*filter.AlbumID)
+		albumIDPtr = &id
+	}
+
 	var assets []repo.Asset
 	var err error
 
 	if req.SearchType == "filename" {
 		assets, err = h.assetService.SearchAssetsFilename(ctx, req.Query,
-			filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
+			filter.RepositoryID, typePtr, filter.OwnerID, albumIDPtr, filenameVal, filenameMode,
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 	} else {
 		assets, err = h.assetService.SearchAssetsVector(ctx, req.Query,
-			filter.RepositoryID, typePtr, filter.OwnerID, filenameVal, filenameMode,
+			filter.RepositoryID, typePtr, filter.OwnerID, albumIDPtr, filenameVal, filenameMode,
 			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
 			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
 		if err != nil && errors.Is(err, service.ErrSemanticSearchUnavailable) {

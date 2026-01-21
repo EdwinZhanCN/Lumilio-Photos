@@ -8,7 +8,9 @@ const REFRESH_TOKEN_KEY = "refresh_token";
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const getRefreshToken = () => localStorage.getItem(REFRESH_TOKEN_KEY);
 export const saveToken = (token: string, refreshToken: string) => {
-  localStorage.setItem(TOKEN_KEY, token);
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  }
   if (refreshToken) {
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
@@ -51,26 +53,33 @@ instance.interceptors.response.use(
 
     // If 401 error and we haven't tried to refresh the token yet
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Don't retry if it's the refresh token request itself failing
+      if (originalRequest.url?.includes("/auth/refresh")) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
       try {
         // Attempt to refresh the token
         const refreshToken = getRefreshToken();
         if (refreshToken) {
-          const res = await axios.post(`${config.baseURL}/auth/refresh`, {
+          const res = await axios.post(`${config.baseURL}/api/v1/auth/refresh`, {
             refreshToken,
           });
 
-          const { token } = res.data;
-          saveToken(token, refreshToken);
+          // Backend returns code 0 for success
+          if (res.data.code === 0 && res.data.data) {
+            const { token, refreshToken: newRefreshToken } = res.data.data;
+            saveToken(token, newRefreshToken);
 
-          // Update the authorization header
-          originalRequest.headers["Authorization"] = `Bearer ${token}`;
-          return instance(originalRequest);
+            // Update the authorization header
+            originalRequest.headers["Authorization"] = `Bearer ${token}`;
+            return instance(originalRequest);
+          }
         }
-      } catch (error) {
-        // If refresh fails, remove tokens and redirect to log in
-        console.log(error);
+      } catch (refreshError) {
+        console.error("Token refresh failed:", refreshError);
         removeToken();
       }
     }

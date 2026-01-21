@@ -1,4 +1,5 @@
 import ImgStackView from "../ImgStackView/ImgStackView";
+import { CheckCircle2, Circle } from "lucide-react";
 
 export interface Album {
   id: string;
@@ -16,6 +17,8 @@ interface ImgStackGridProps {
   className?: string;
   loading?: boolean;
   emptyMessage?: string;
+  selectedIds?: string[];
+  isSelectionMode?: boolean;
 }
 
 function ImgStackGrid({
@@ -24,6 +27,8 @@ function ImgStackGrid({
   className = "",
   loading = false,
   emptyMessage = "No albums found",
+  selectedIds = [],
+  isSelectionMode = false,
 }: ImgStackGridProps) {
   if (loading) {
     return (
@@ -31,15 +36,15 @@ function ImgStackGrid({
         className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 p-4 ${className}`}
       >
         {Array.from({ length: 12 }).map((_, index) => (
-          <div key={index} className="animate-pulse">
+          <div key={index} className="animate-pulse flex flex-col items-center">
             <div className="stack stack-top size-28 mb-2">
-              <div className="bg-gray-300 rounded-lg h-24 w-24"></div>
-              <div className="bg-gray-200 rounded-lg h-24 w-24"></div>
-              <div className="bg-gray-100 rounded-lg h-24 w-24"></div>
+              <div className="bg-base-300 rounded-lg h-24 w-24"></div>
+              <div className="bg-base-200 rounded-lg h-24 w-24"></div>
+              <div className="bg-base-100 rounded-lg h-24 w-24"></div>
             </div>
-            <div className="space-y-1">
-              <div className="h-4 bg-gray-300 rounded w-3/4"></div>
-              <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+            <div className="space-y-1 w-full flex flex-col items-center">
+              <div className="h-4 bg-base-300 rounded w-3/4"></div>
+              <div className="h-3 bg-base-200 rounded w-1/2"></div>
             </div>
           </div>
         ))}
@@ -52,36 +57,59 @@ function ImgStackGrid({
       <div
         className={`flex flex-col items-center justify-center p-12 text-center ${className}`}
       >
-        <div className="text-6xl mb-4 text-gray-300">📁</div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No Albums</h3>
-        <p className="text-gray-500">{emptyMessage}</p>
+        <div className="text-6xl mb-4 text-base-300">📁</div>
+        <h3 className="text-lg font-medium mb-2">No Albums</h3>
+        <p className="text-base-content/60">{emptyMessage}</p>
       </div>
     );
   }
 
   return (
     <div
-      className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 p-4 ${className}`}
+      className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 p-4 ${className}`}
     >
-      {albums.map((album) => (
-        <div
-          key={album.id}
-          className="group cursor-pointer transition-transform hover:scale-105 flex flex-col items-center text-center"
-          onClick={() => onAlbumClick?.(album)}
-        >
-          <div className="mb-2">
-            <ImgStackView coverImages={album.coverImages} albumName={album.name} />
+      {albums.map((album) => {
+        const isSelected = selectedIds.includes(album.id);
+        
+        return (
+          <div
+            key={album.id}
+            className={`group relative cursor-pointer transition-all duration-200 flex flex-col items-center text-center p-2 rounded-xl
+              ${isSelectionMode ? 'scale-95' : 'hover:scale-105'}
+            `}
+            onClick={() => onAlbumClick?.(album)}
+          >
+            {isSelectionMode && (
+              <div className="absolute top-1 right-1 z-10">
+                {isSelected ? (
+                  <CheckCircle2 className="text-primary fill-base-100" size={22} />
+                ) : (
+                  <Circle className="text-base-content/30" size={22} />
+                )}
+              </div>
+            )}
+            
+            <div className="mb-3">
+              <ImgStackView 
+                coverImages={album.coverImages} 
+                albumName={album.name} 
+                isSelected={isSelected}
+              />
+            </div>
+            
+            <div className="space-y-1 w-full px-1">
+              <h3 className={`font-semibold text-sm truncate transition-colors
+                ${isSelected ? 'text-primary' : 'group-hover:text-primary'}
+              `}>
+                {album.name}
+              </h3>
+              <p className="text-xs text-base-content/50 font-medium">
+                {album.imageCount} {album.imageCount === 1 ? "item" : "items"}
+              </p>
+            </div>
           </div>
-          <div className="space-y-1 w-full">
-            <h3 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
-              {album.name}
-            </h3>
-            <p className="text-xs text-gray-500">
-              {album.imageCount} {album.imageCount === 1 ? "image" : "images"}
-            </p>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
