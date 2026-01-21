@@ -8,9 +8,11 @@ import { AssetFilter } from "@/services/assetsService";
 import { AssetViewDefinition } from "@/features/assets/types";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
-import { findAssetIndex } from "@/lib/utils/assetGrouping";
+import { findAssetIndex, getFlatAssetsFromGrouped } from "@/lib/utils/assetGrouping";
 import PageHeader from "@/components/PageHeader.tsx";
 import {WorkerProvider} from "@/contexts/WorkerProvider.tsx";
+import { AssetsProvider } from "@/features/assets/AssetsProvider";
+import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 
 interface AssetGalleryRendererProps {
   event: SideChannelEvent;
@@ -20,7 +22,7 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
   event,
 }) => {
   const navigate = useNavigate();
-  const { dispatch } = useAssetsContext();
+  const { dispatch: globalDispatch } = useAssetsContext();
   const filterDTO = event.data?.payload as AssetFilter;
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -28,7 +30,7 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
     if (!filterDTO) return;
     
     // Reset and apply filters to global context
-    dispatch({ type: "RESET_FILTERS" });
+    globalDispatch({ type: "RESET_FILTERS" });
     
     const payload: any = { enabled: true };
     if (filterDTO.raw !== undefined) payload.raw = filterDTO.raw;
@@ -46,15 +48,15 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
     if (filterDTO.camera_make) payload.camera_make = filterDTO.camera_make;
     if (filterDTO.lens) payload.lens = filterDTO.lens;
 
-    dispatch({ type: "BATCH_UPDATE_FILTERS", payload });
+    globalDispatch({ type: "BATCH_UPDATE_FILTERS", payload });
     navigate("/assets/photos");
     setIsModalOpen(false);
-  }, [dispatch, filterDTO, navigate]);
+  }, [globalDispatch, filterDTO, navigate]);
 
   if (!filterDTO) return null;
 
   return (
-    <div className="">
+    <div>
       <button
         className="btn btn-sm btn-outline btn-primary"
         onClick={() => setIsModalOpen(true)}
@@ -77,7 +79,7 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
                   <ExternalLink className="w-4 h-4 mr-1" />
                   Open Full View
                 </button>
-                <button className="btn btn-circle btn-sm btn-soft btn-info" onClick={() => setIsModalOpen(false)}>
+                <button className="btn btn-sm btn-soft btn-info" onClick={() => setIsModalOpen(false)}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -85,7 +87,9 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
             {/* Content */}
             <div className="flex-1 overflow-y-auto relative bg-base-100" id="agent-gallery-container">
               <WorkerProvider preload={["exif","export"]}>
-                <AgentGallery filter={filterDTO} />
+                <AssetsProvider persist={false}>
+                  <AgentGallery filter={filterDTO} />
+                </AssetsProvider>
               </WorkerProvider>
             </div>
           </div>
@@ -125,11 +129,27 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
     autoFetch: true
   });
 
+  // Use flat assets from grouped to ensure order consistency with gallery
+  const flatAssets = useMemo(() => {
+    if (groups && Object.keys(groups).length > 0) {
+      return getFlatAssetsFromGrouped(groups);
+    }
+    return assets;
+  }, [groups, assets]);
+
   // Carousel logic
   const slideIndex = useMemo(() => {
     if (!carouselAssetId) return -1;
-    return findAssetIndex(assets, carouselAssetId);
-  }, [assets, carouselAssetId]);
+    return findAssetIndex(flatAssets, carouselAssetId);
+  }, [flatAssets, carouselAssetId]);
+
+  const handleLoadMore = useCallback(() => {
+    if (hasMore && !isLoadingMore) {
+      fetchMore();
+    }
+  }, [hasMore, isLoadingMore, fetchMore]);
+
+  const isInitialLoading = isLoading && assets.length === 0;
 
   return (
     <div className="min-h-full p-4">
@@ -138,39 +158,23 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
               <span>Error: {error}</span>
             </div>
           )}
-          
-          <div className="text-sm text-base-content/70 mb-4 px-1 min-h-[1.25rem]">
-            {isLoading && assets.length === 0 ? (
-               <span className="flex items-center gap-2">
-                 <span className="loading loading-spinner loading-xs"></span>
-                 Searching...
-               </span>
-            ) : (
-               <span>Found {assets.length} result{assets.length !== 1 ? 's' : ''}</span>
-            )}
-          </div>
 
-          <JustifiedGallery
-              groupedPhotos={groups || {}}
-              openCarousel={setCarouselAssetId}
-              isLoading={isLoading && assets.length === 0}
-              isLoadingMore={isLoadingMore}
-              hasMore={hasMore}
-              onLoadMore={fetchMore}
-          />
-          
-          {!isLoading && assets.length === 0 && !error && (
-             <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-               <p>No assets found matching the criteria.</p>
-               <pre className="mt-2 text-xs bg-base-200 p-2 rounded max-w-md overflow-auto">
-                 {JSON.stringify(filter, null, 2)}
-               </pre>
-             </div>
+          {isInitialLoading ? (
+            <PhotosLoadingSkeleton />
+          ) : (
+            <JustifiedGallery
+                groupedPhotos={groups || {}}
+                openCarousel={setCarouselAssetId}
+                isLoading={isLoading}
+                isLoadingMore={isLoadingMore}
+                hasMore={hasMore}
+                onLoadMore={handleLoadMore}
+            />
           )}
 
-          {carouselAssetId && (
+          {carouselAssetId && flatAssets.length > 0 && (
               <FullScreenCarousel
-                  photos={assets}
+                  photos={flatAssets}
                   initialSlide={slideIndex >= 0 ? slideIndex : 0}
                   slideIndex={slideIndex >= 0 ? slideIndex : undefined}
                   onClose={() => setCarouselAssetId(undefined)}

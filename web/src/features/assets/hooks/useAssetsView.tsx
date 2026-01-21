@@ -311,6 +311,7 @@ export const useAssetsView = (
       });
     } finally {
       fetchingRef.current = false;
+      dispatch({ type: "SET_VIEW_LOADING_MORE", payload: { viewKey, loading: false } });
     }
   }, [viewState, disabled, viewKey, isSearchOperation, hasEffectiveFilter, effectiveFilter.album_id, createSearchParams, createFilterParams, createListParams, dispatch, definition.pageSize]);
 

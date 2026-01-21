@@ -33,7 +33,7 @@ export const MarkdownToolBlock: React.FC<any> = ({ id, ...props }) => {
   switch (event.data?.rendering?.component) {
     case "justified_gallery":
       return (
-        <div>
+        <div className="flex gap-2">
           <LumilioTool event={event} />
           <AssetGalleryRenderer event={event} />
         </div>

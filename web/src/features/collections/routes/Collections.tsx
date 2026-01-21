@@ -11,18 +11,20 @@ import CreateAlbumModal from "../components/CreateAlbumModal";
 import { useState } from "react";
 import { albumService } from "@/services/albumService";
 import { useQueryClient } from "@tanstack/react-query";
+import { useMessage } from "@/hooks/util-hooks/useMessage";
 
 function CollectionsContent() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const showMessage = useMessage();
   const { 
     selectedAlbumIds, 
     isSelectionMode, 
     dispatch 
   } = useCollections();
   
-  const { data, isPending, hasNextPage, fetchNextPage, isFetchingNextPage } = useAlbums(t);
+  const { data, isPending, isFetching, hasNextPage, fetchNextPage, isFetchingNextPage } = useAlbums(t);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -62,16 +64,21 @@ function CollectionsContent() {
         selectedAlbumIds.map(id => albumService.deleteAlbum(id))
       );
       
-      queryClient.invalidateQueries({ queryKey: ["albums"] });
+      await queryClient.invalidateQueries({ queryKey: ["albums"] });
+      showMessage("success", t("collections.deleteSuccess", { defaultValue: "Albums deleted successfully" }));
       dispatch({ type: "CLEAR_SELECTION" });
       dispatch({ type: "TOGGLE_SELECTION_MODE" });
       setIsDeleteConfirmOpen(false);
     } catch (error) {
       console.error("Failed to delete albums:", error);
+      showMessage("error", t("collections.deleteError", { defaultValue: "Failed to delete albums" }));
     } finally {
       setIsDeleting(false);
     }
   };
+
+  // Show loading skeleton only on initial load when there's no data
+  const showLoading = isPending && albums.length === 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -123,10 +130,17 @@ function CollectionsContent() {
       </PageHeader>
 
       <div className="flex-1 overflow-y-auto p-4">
+        {/* Show a subtle loading indicator when refetching or invalidating */}
+        {isFetching && !isPending && !isFetchingNextPage && (
+          <div className="absolute top-20 right-8 z-20">
+            <span className="loading loading-spinner loading-sm text-primary opacity-50"></span>
+          </div>
+        )}
+
         <ImgStackGrid
           albums={albums}
           onAlbumClick={handleAlbumClick}
-          loading={isPending}
+          loading={showLoading}
           emptyMessage={t("collections.emptyMessage", {
             defaultValue: "Create your first album to get started",
           })}
