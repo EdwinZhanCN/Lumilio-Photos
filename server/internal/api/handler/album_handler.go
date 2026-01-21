@@ -64,7 +64,7 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 
 	// Create album parameters
 	params := repo.CreateAlbumParams{
-		UserID:       userID.(int32),
+		UserID:       int32(userID.(int)),
 		AlbumName:    req.AlbumName,
 		Description:  req.Description,
 		CoverAssetID: pgtype.UUID{Bytes: coverAssetUUID, Valid: true},
@@ -169,14 +169,14 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 	}
 
 	params := repo.GetAlbumsByUserParams{
-		UserID: userID.(int32),
+		UserID: int32(userID.(int)),
 		Limit:  int32(limit),
 		Offset: int32(offset),
 	}
 
 	albums, err := h.queries.GetAlbumsByUser(c.Request.Context(), params)
 	if err != nil {
-		log.Printf("Failed to retrieve albums for user %d: %v", userID.(int32), err)
+		log.Printf("Failed to retrieve albums for user %d: %v", userID.(int), err)
 		api.GinInternalError(c, err, "Failed to retrieve albums")
 		return
 	}
@@ -245,7 +245,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 
 	// Verify ownership (if user context is available)
 	userID, exists := c.Get("user_id")
-	if exists && existingAlbum.UserID != userID.(int32) {
+	if exists && existingAlbum.UserID != int32(userID.(int)) {
 		api.GinForbidden(c, errors.New("access denied"), "You don't have permission to update this album")
 		return
 	}
@@ -328,7 +328,7 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 
 	// Verify ownership (if user context is available)
 	userID, exists := c.Get("user_id")
-	if exists && existingAlbum.UserID != userID.(int32) {
+	if exists && existingAlbum.UserID != int32(userID.(int)) {
 		api.GinForbidden(c, errors.New("access denied"), "You don't have permission to delete this album")
 		return
 	}

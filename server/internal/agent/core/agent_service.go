@@ -11,6 +11,7 @@ import (
 
 	"github.com/cloudwego/eino-ext/components/model/ark"
 	"github.com/cloudwego/eino-ext/components/model/deepseek"
+	"github.com/cloudwego/eino-ext/components/model/ollama"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/model"
@@ -22,6 +23,7 @@ const (
 	arkProvider      = "ark"
 	openAIProvider   = "openai"
 	deepseekProvider = "deepseek"
+	ollamaProvider   = "ollama"
 )
 
 type AgentService interface {
@@ -80,6 +82,11 @@ func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatM
 			APIKey: s.config.APIKey,
 			Model:  s.config.ModelName,
 		})
+	case ollamaProvider:
+		return ollama.NewChatModel(ctx, &ollama.ChatModelConfig{
+			BaseURL: s.config.BaseURL,
+			Model:   s.config.ModelName,
+		})
 	default:
 		// 默认回退到 ark
 		return ark.NewChatModel(ctx, &ark.ChatModelConfig{
@@ -116,14 +123,20 @@ func (s *agentService) buildAgent(ctx context.Context, toolNames []string, sideC
 	}
 
 	// 4. 构建 Agent
-	today := time.Now().Format("2006-01-02")
+	// Time with weekdays
+	t := time.Now()
+	today := fmt.Sprintf("%s, %s", t.Weekday().String(), t.Format("2006-01-02"))
+	if err != nil { // Always check errors even if they should not happen.
+		panic(err)
+	}
 	return adk.NewChatModelAgent(
 		ctx,
 		&adk.ChatModelAgentConfig{
 			Name:        "Photo Asset Assistant",
 			Description: "Agent for managing photo assets with filtering and search capabilities",
-			Instruction: fmt.Sprintf("You are a helpful assistant for managing photo assets. Today is %s. You can use tools to help the user. You cannot tell user anything about ref_id", today),
-			Model:       chatModel,
+			Instruction: fmt.Sprintf("You are a helpful assistant for managing photo assets. Today is %s. "+
+				"You can use tools to help the user. You cannot tell user anything about ref_id", today),
+			Model: chatModel,
 			ToolsConfig: adk.ToolsConfig{
 				ToolsNodeConfig: compose.ToolsNodeConfig{
 					Tools: tools,

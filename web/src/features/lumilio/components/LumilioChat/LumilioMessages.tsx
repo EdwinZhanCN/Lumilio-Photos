@@ -1,81 +1,17 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import { Markdown } from "../LumilioMarkdown/Markdown";
-import { LumilioTool } from "../LumilioTool";
 import { LumilioAvatar } from "../LumilioAvatar/LumilioAvatar";
 import type { ChatMessage } from "@/features/lumilio/lumilio.types";
-import { GalleryThumbnails } from "lucide-react";
 
-import { SideChannelEvent } from "../../schema";
-import type { AssetDTO } from "@/lib/http-commons";
-import { assetService } from "@/services";
-
-const DynamicUIComponent: React.FC<{ event: SideChannelEvent }> = ({
-  event,
-}) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const shouldShowGalleryButton =
-    event.data?.rendering?.component === "justified_gallery";
-  const assets: AssetDTO[] = shouldShowGalleryButton
-    ? (event.data?.payload as AssetDTO[])
-    : [];
-
-  return (
-    <>
-      {/* 1. Always render the tool status UI */}
-      <LumilioTool event={event} />
-
-      {/* 2. Conditionally render the button to open the modal */}
-      {shouldShowGalleryButton && assets.length > 0 && (
-        <div className="mt-2">
-          <button
-            className="btn btn-sm btn-outline btn-primary"
-            onClick={() => setIsModalOpen(true)}
-          >
-            <GalleryThumbnails className="h-4 w-4 mr-2" />
-            View Gallery ({assets.length})
-          </button>
-        </div>
-      )}
-
-      {/* 3. The Modal dialog itself, using DaisyUI classes */}
-      <div className={`modal ${isModalOpen ? "modal-open" : ""}`}>
-        <div className="modal-box w-11/12 max-w-5xl">
-          <h3 className="font-bold text-lg">Asset Gallery</h3>
-          <p className="py-4 text-sm">{event.execution.message}</p>
-
-          <div className="bg-base-200 rounded-lg p-2 max-h-[60vh] overflow-y-auto">
-            <div className="flex flex-wrap gap-2 justify-center">
-              {assets.map((asset) => (
-                <img
-                  key={asset.asset_id}
-                  src={assetService.getThumbnailUrl(
-                    asset.asset_id ?? "",
-                    "small",
-                  )}
-                  alt={`Asset ${asset.asset_id}`}
-                  className="h-28 w-28 object-cover rounded-md shadow-md hover:scale-105 transition-transform"
-                  loading="lazy"
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="modal-action">
-            <button className="btn" onClick={() => setIsModalOpen(false)}>
-              Close
-            </button>
-          </div>
-        </div>
-        <div
-          className="modal-backdrop"
-          onClick={() => setIsModalOpen(false)}
-        ></div>
-      </div>
-    </>
-  );
-};
-
+/** Processes thinking tags in markdown content for display.
+ *
+ * Converts special thinking tags (``...``) into collapsible details elements.
+ * During streaming, the last unclosed think tag is rendered as open to show active thinking.
+ *
+ * @param content - The markdown content string containing potential thinking tags.
+ * @param isStreaming - Whether the content is currently being streamed from the agent.
+ * @returns The processed content string with thinking tags converted to HTML details elements.
+ */
 function processThinkTags(
   content: string,
   isStreaming: boolean = false,
@@ -108,6 +44,15 @@ interface LumilioMessagesProps {
   isGenerating: boolean;
 }
 
+/** Renders the chat message list with automatic scrolling.
+ *
+ * Displays all messages in the conversation, including user and assistant messages.
+ * Handles thinking tag processing for assistant messages and renders tool execution
+ * UI components as dynamic content. Automatically scrolls to the newest message.
+ *
+ * @param conversation - Array of chat messages to display.
+ * @param isGenerating - Whether the agent is currently generating a response.
+ */
 export function LumilioMessages({
   conversation,
   isGenerating,
@@ -139,9 +84,6 @@ export function LumilioMessages({
                 )}
               </div>
             </div>
-            {/*<div className="chat-header">
-              {message.role === "user" ? "You" : "Lumilio"}
-            </div>*/}
             <div
               className={` ${
                 message.role === "user"
@@ -155,12 +97,6 @@ export function LumilioMessages({
                   className={`${message.role === "user" ? "" : "mx-6 my-4"}`}
                 />
               )}
-              {message.uiEvents.map((uiEvent) => (
-                <DynamicUIComponent
-                  key={uiEvent.tool.executionId}
-                  event={uiEvent}
-                />
-              ))}
             </div>
           </div>
         );
