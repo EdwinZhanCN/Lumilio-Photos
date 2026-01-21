@@ -114,6 +114,8 @@ export const useAssetsView = (
 
       if (page && page > 1) {
         params.offset = (page - 1) * (definition.pageSize || 50);
+      } else {
+        params.offset = 0;
       }
 
       if (definition.sort) {
@@ -135,6 +137,8 @@ export const useAssetsView = (
 
       if (page && page > 1) {
         payload.offset = (page - 1) * (definition.pageSize || 50);
+      } else {
+        payload.offset = 0;
       }
 
       if (definition.types && definition.types.length > 0) {
@@ -161,6 +165,8 @@ export const useAssetsView = (
 
       if (page && page > 1) {
         params.offset = (page - 1) * (definition.pageSize || 50);
+      } else {
+        params.offset = 0;
       }
 
       const searchFilter = { ...effectiveFilter };
@@ -200,7 +206,6 @@ export const useAssetsView = (
         const albumId = effectiveFilter.album_id;
 
         if (albumId) {
-          // Use specialized album filter endpoint if album_id is present
           result = await albumService.filterAlbumAssets(albumId, createFilterParams());
         } else if (isSearchOperation) {
           result = await assetService.searchAssets(createSearchParams());

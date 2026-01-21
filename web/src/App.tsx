@@ -11,7 +11,7 @@ import Notifications from "@/components/Notifications";
 import { SettingsProvider, useSettingsContext } from "./features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
 import { pollHealth } from "@/services/healthService";
-import { AuthProvider } from "./features/auth";
+import { AuthProvider, ProtectedRoute } from "./features/auth";
 
 const queryClient = new QueryClient();
 
@@ -49,13 +49,23 @@ function App(): React.ReactNode {
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto overflow-x-hidden">
                     <Routes>
-                      {routes.map((route) => (
-                        <Route
-                          key={route.path}
-                          path={route.path}
-                          element={route.element}
-                        />
-                      ))}
+                      {routes.map((route) => {
+                        const isPublic = route.path === "/login" || route.path === "/register";
+                        
+                        return (
+                          <Route
+                            key={route.path}
+                            path={route.path}
+                            element={
+                              isPublic ? (
+                                route.element
+                              ) : (
+                                <ProtectedRoute>{route.element}</ProtectedRoute>
+                              )
+                            }
+                          />
+                        );
+                      })}
                     </Routes>
                   </div>
                 </div>
