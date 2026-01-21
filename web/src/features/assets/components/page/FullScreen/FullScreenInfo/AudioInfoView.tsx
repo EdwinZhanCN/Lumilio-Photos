@@ -1,7 +1,6 @@
 import { useOptimistic, useTransition } from "react";
 import { SquarePen, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
@@ -20,7 +19,6 @@ export default function AudioInfoView({
   onClose,
 }: AudioInfoViewProps) {
   const { t } = useI18n();
-  const showMessage = useMessage();
   const [isPending, startTransition] = useTransition();
   const { updateRating, updateDescription } = useAssetActions();
 

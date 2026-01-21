@@ -126,7 +126,7 @@ const JustifiedGallery = ({
         const layout = layouts[title];
         
         return (
-          <div key={title} className="mb-12 px-4 animate-in fade-in duration-500">
+          <div key={title} className="mb-4 px-4 animate-in fade-in duration-500">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold tracking-tight">{title}</h2>
               <span className="text-xs font-bold uppercase tracking-widest opacity-30">
