@@ -9,6 +9,7 @@ import { Portfolio } from "@/features/portfolio";
 import Collections from "@/features/collections/routes/Collections";
 import Updates from "@/features/updates/routes/Updates";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
+import {AssetsProvider} from "@/features/assets";
 
 export const routes = [
   {
@@ -73,7 +74,11 @@ export const routes = [
   },
   {
     path: "/lumilio",
-    element: <LumilioChatPage />,
+    element: (
+        <AssetsProvider>
+            <LumilioChatPage />
+        </AssetsProvider>
+    ),
   },
   {
     path: "/portfolio",

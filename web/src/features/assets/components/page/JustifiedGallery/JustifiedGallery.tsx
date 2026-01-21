@@ -77,6 +77,8 @@ const JustifiedGallery = ({
 
   // Get scroll container (main content area or window)
   useEffect(() => {
+    if (!serviceReady) return;
+
     // Find the scrollable parent
     const findScrollParent = (element: HTMLElement | null): HTMLElement => {
       if (!element || element === document.body) {
@@ -96,10 +98,12 @@ const JustifiedGallery = ({
     if (containerRef.current) {
       scrollElementRef.current = findScrollParent(containerRef.current);
     }
-  }, []);
+  }, [serviceReady]);
 
   // Measure container width using ResizeObserver with debouncing
   useEffect(() => {
+    if (!serviceReady) return;
+
     const container = containerRef.current;
     if (!container) return;
 
@@ -140,7 +144,7 @@ const JustifiedGallery = ({
         clearTimeout(resizeTimeoutRef.current);
       }
     };
-  }, []); // Remove containerWidth from dependencies to avoid loops
+  }, [serviceReady]); // Add serviceReady dependency to ensure effect runs after loading
 
   // Calculate layout config with proper margins
   const layoutConfig = useMemo(() => {

@@ -22,18 +22,15 @@ export const initialState: LumilioChatState = {
 };
 
 /** Reducer for managing the Lumilio chat state.
-
-  Handles all state transitions for the chat feature, including connection status,
-  message management, streaming content processing, UI events, interrupts,
-  and tool management.
-
-  Args:
-    state: The current Lumilio chat state.
-    action: The action to dispatch for state update.
-
-  Returns:
-    The updated Lumilio chat state based on the dispatched action.
-  */
+ *
+ * Handles all state transitions for the chat feature, including connection status,
+ * message management, streaming content processing, UI events, interrupts,
+ * and tool management.
+ *
+ * @param state - The current Lumilio chat state.
+ * @param action - The action to dispatch for state update.
+ * @returns The updated Lumilio chat state based on the dispatched action.
+ */
 export const lumilioReducer = (
   state: LumilioChatState,
   action: LumilioChatAction,
@@ -99,10 +96,22 @@ export const lumilioReducer = (
 
     case "PROCESS_STREAM_CHUNK": {
       const { reasoning, output } = action.payload;
+      
+      if (import.meta.env.DEV) {
+        console.log("[DEBUG] PROCESS_STREAM_CHUNK", { 
+          reasoning: Boolean(reasoning), 
+          output: Boolean(output), 
+          currentBlock: state.streamingBlock 
+        });
+      }
+
       const lastMsgIndex = state.conversation.length - 1;
       const lastMsg = state.conversation[lastMsgIndex];
 
       if (!lastMsg || lastMsg.role !== "assistant") {
+        if (import.meta.env.DEV) {
+          console.warn("[DEBUG] PROCESS_STREAM_CHUNK ignored: Last message is not assistant", lastMsg);
+        }
         return state;
       }
 
@@ -119,7 +128,9 @@ export const lumilioReducer = (
       }
 
       if (output) {
-        if (state.streamingBlock === "reasoning") {
+        // Check newStreamingBlock to handle case where we just switched to reasoning in the same chunk
+        // or if we were already in reasoning from previous chunks
+        if (newStreamingBlock === "reasoning") {
           newContent += "</think>" + output;
         } else {
           newContent += output;
@@ -170,14 +181,6 @@ export const lumilioReducer = (
           "[DEBUG] Reducer RECEIVE_UI_EVENT. Current conversation length:",
           state.conversation.length,
         );
-        console.log(
-          "[DEBUG] Last assistant message's uiEvents before update:",
-          JSON.parse(
-            JSON.stringify(
-              state.conversation[state.conversation.length - 1]?.uiEvents,
-            ),
-          ),
-        );
         console.log("[DEBUG] New uiEvent payload:", action.payload);
       }
 
@@ -192,12 +195,22 @@ export const lumilioReducer = (
 
         let newUiEvents;
         let newContent = lastAsstMsg.content;
+        let newStreamingBlock = state.streamingBlock;
 
         if (existingEventIndex !== -1) {
           newUiEvents = [...lastAsstMsg.uiEvents];
           newUiEvents[existingEventIndex] = newUiEvent;
         } else {
           newUiEvents = [...lastAsstMsg.uiEvents, newUiEvent];
+
+          // If we are currently in a reasoning block, close it before adding the tool
+          if (state.streamingBlock === "reasoning") {
+            newContent += "</think>";
+            newStreamingBlock = null; // Reset block state so next reasoning chunk re-opens it
+            if (import.meta.env.DEV) {
+              console.log("[DEBUG] Closed think block for tool insertion");
+            }
+          }
 
           const toolTag = `\n\n<lumilio-tool id="${newUiEvent.tool.executionId}"></lumilio-tool>\n\n`;
           newContent += toolTag;
@@ -209,7 +222,11 @@ export const lumilioReducer = (
           uiEvents: newUiEvents,
           content: newContent,
         };
-        return { ...state, conversation: newConversation };
+        return {
+          ...state,
+          conversation: newConversation,
+          streamingBlock: newStreamingBlock,
+        };
       }
       return state;
     }

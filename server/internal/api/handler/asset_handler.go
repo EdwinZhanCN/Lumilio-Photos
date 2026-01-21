@@ -224,9 +224,24 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		}
 	}
 
-	userID := c.GetString("user_id")
-	if userID == "" {
-		userID = "anonymous"
+	// Get user ID from JWT claims
+	var userID string
+	if id, exists := c.Get("user_id"); exists {
+		userID = fmt.Sprintf("%d", id)
+	} else {
+		// Fallback to anonymous user if not authenticated
+		// In a real scenario, we might want to enforce authentication or use a specific anonymous user ID
+		// For now, we'll try to find the anonymous user in the database
+		anonUser, err := h.queries.GetUserByUsername(ctx, "anonymous")
+		if err == nil {
+			userID = fmt.Sprintf("%d", anonUser.UserID)
+		} else {
+			// If anonymous user doesn't exist, we might need to create it or handle this case
+			// For now, let's log a warning and use a placeholder, but this might fail foreign key constraints
+			log.Printf("Warning: Anonymous user not found and no authenticated user")
+			// Depending on your DB schema, you might need a valid user ID here
+			// If owner_id is nullable in assets table, we can leave it empty or handle it in the processor
+		}
 	}
 
 	payload := processors.AssetPayload{
@@ -329,9 +344,18 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetString("user_id")
-	if userID == "" {
-		userID = "anonymous"
+	// Get user ID from JWT claims
+	var userID string
+	if id, exists := c.Get("user_id"); exists {
+		userID = fmt.Sprintf("%d", id)
+	} else {
+		// Fallback to anonymous user if not authenticated
+		anonUser, err := h.queries.GetUserByUsername(ctx, "anonymous")
+		if err == nil {
+			userID = fmt.Sprintf("%d", anonUser.UserID)
+		} else {
+			log.Printf("Warning: Anonymous user not found and no authenticated user")
+		}
 	}
 
 	type sessionState struct {
