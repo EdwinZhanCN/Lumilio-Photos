@@ -15,6 +15,7 @@ type UploadSession struct {
 	TotalChunks    int       `json:"total_chunks"`
 	ReceivedChunks []int     `json:"received_chunks"`
 	ContentType    string    `json:"content_type"`
+	ContentHash    string    `json:"content_hash"` // Client-provided hash
 	RepositoryID   string    `json:"repository_id"`
 	UserID         string    `json:"user_id"`
 	Status         string    `json:"status"` // "pending", "uploading", "merging", "completed", "failed"
@@ -118,6 +119,20 @@ func (sm *SessionManager) UpdateSessionStatus(sessionID string, status string) b
 
 	session.Status = status
 	session.LastActivity = time.Now()
+	return true
+}
+
+// SetSessionHash sets the client-provided hash for a session
+func (sm *SessionManager) SetSessionHash(sessionID string, hash string) bool {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	session, exists := sm.sessions[sessionID]
+	if !exists {
+		return false
+	}
+
+	session.ContentHash = hash
 	return true
 }
 

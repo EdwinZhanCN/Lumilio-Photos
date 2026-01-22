@@ -1,4 +1,4 @@
-import init, { generate_thumbnail } from "@/wasm/thumbnail_wasm";
+import init, { generate_thumbnail } from "@/wasm/thumbnail/thumbnail_wasm";
 
 interface WorkerMessageData {
   files?: File[];
@@ -134,7 +134,8 @@ async function generatePreview(
     if (file.type.startsWith("video/")) {
       url = createVideoPreview();
     } else if (isRawFile(file)) {
-      url = createRawPreview(file);
+      // Do not generate thumbnails for RAW files as requested
+      url = ""; 
     } else {
       try {
         const arrayBuffer = await file.arrayBuffer();
@@ -146,11 +147,6 @@ async function generatePreview(
         url = URL.createObjectURL(blob);
       } catch (err) {
         console.error("Error generating thumbnail:", err);
-        console.warn("File that caused error:", {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        });
         url = createDefaultPreview();
       }
     }
@@ -198,21 +194,6 @@ function isRawFile(file: File): boolean {
 function createVideoPreview(): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 <path fill="#ccc" d="M16 16c0 1.104-.896 2-2 2H4c-1.104 0-2-.896-2-2V8c0-1.104.896-2 2-2h10c1.104 0 2 .896 2 2v8zm4-10h-2v2h2v8h-2v2h4V6z"/>
-</svg>`;
-  return URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
-}
-
-function createRawPreview(file: File): string {
-  const extension = file.name.split(".").pop()?.toUpperCase() || "RAW";
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-<rect width="100%" height="100%" fill="#e2e8f0" rx="8" ry="8"/>
-<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
-      font-family="system-ui, -apple-system, sans-serif"
-      font-weight="600"
-      fill="#475569">
-  <tspan x="50%" dy="-0.6em" font-size="14">RAW</tspan>
-  <tspan x="50%" dy="1.8em" font-size="12">${extension}</tspan>
-</text>
 </svg>`;
   return URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
 }

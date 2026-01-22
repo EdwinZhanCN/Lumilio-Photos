@@ -13,6 +13,13 @@ export interface WorkerClientOptions {
   preload?: WorkerType[];
 }
 
+
+export interface SingleHashResult {
+  index: number;
+  hash: string;
+  file?: File; // 可选：把原始文件传回来方便后续处理
+}
+
 export class AppWorkerClient {
   private generateThumbnailworker: Worker | null = null;
   private hashAssetsworker: Worker | null = null;
@@ -152,37 +159,54 @@ export class AppWorkerClient {
   }
 
   // --- Hash Generation ---
-  async generateHash(data: FileList | File[]): Promise<{
-    hashResults: Array<{ index: number; hash: string }>;
-    status: string;
-  }> {
+  async generateHash(
+    data: FileList | File[],
+    // ✨ 新增：回调函数，每搞定一个就通知一次
+    onItemComplete?: (result: SingleHashResult) => void
+  ): Promise<{ status: string }> { // Promise 只负责告诉我们“全部结束了”，不负责传数据
+
     const worker = this.getOrInitializeWorker("hash");
 
     return new Promise((resolve, reject) => {
       const handler = (e: MessageEvent) => {
         switch (e.data.type) {
-          case "HASH_COMPLETE":
-            resolve({
-              hashResults: e.data.hashResult,
-              status: "complete",
-            });
-            worker.removeEventListener("message", handler);
+          // ✨ 新增：监听单个完成事件
+          case "HASH_SINGLE_COMPLETE":
+            if (onItemComplete) {
+              // 这里立刻回调，React 那边接到这个回调就可以直接触发上传逻辑
+              // 此时第 2-1000 张还在算，但第 1 张已经在往服务器传了
+              onItemComplete({
+                index: e.data.payload.index,
+                hash: e.data.payload.hash
+              });
+            }
             break;
+
+          case "HASH_COMPLETE":
+            // 全部结束，清理监听器
+            worker.removeEventListener("message", handler);
+            resolve({ status: "complete" });
+            break;
+
           case "ERROR":
             worker.removeEventListener("message", handler);
-            reject(
-              new Error(e.data.payload?.error || "WASM initialization failed"),
-            );
+            reject(new Error(e.data.payload?.error || "Hash Error"));
             break;
+
           case "PROGRESS":
+            // 这里的进度依然保留，用于 UI 进度条展示
             this.eventTarget.dispatchEvent(
               new CustomEvent("progress", { detail: e.data.payload }),
             );
             break;
         }
       };
+
       worker.addEventListener("message", handler);
+
       const filesArray = Array.isArray(data) ? data : Array.from(data);
+
+      // 发送任务
       worker.postMessage({
         type: "GENERATE_HASH",
         data: filesArray,

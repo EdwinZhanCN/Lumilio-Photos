@@ -2,7 +2,7 @@ import init, {
   add_colored_border,
   create_frosted_border,
   add_vignette_border,
-} from "@/wasm/border_wasm";
+} from "@/wasm/border/border_wasm";
 
 // --- 接口定义 (保持清晰) ---
 interface ColoredBorderParam {

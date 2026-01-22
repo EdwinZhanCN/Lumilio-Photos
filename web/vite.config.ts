@@ -15,6 +15,20 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless'
+    }
+  },
+  preview: {
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "credentialless",
+    },
+  },
+  worker: {
+    plugins: () => [wasm(), topLevelAwait()],
+    format: 'es',
   },
   plugins: [react(), tailwindcss(), wasm(), topLevelAwait()],
 
@@ -25,14 +39,20 @@ export default defineConfig({
           name: "happy-dom",
           environment: "happy-dom",
           setupFiles: ["./setup.happy-dom.ts", "@vitest/web-worker"],
+          exclude: ["src/workers/hash.test.ts"],
         },
       },
       {
         test: {
-          include: ["**/*.worker.{ts,js}", "**/*.test.{ts,js}"],
-          name: "node",
-          environment: "node",
-          setupFiles: ["./setup.node.ts", "@vitest/web-worker"],
+          name: "browser",
+          include: ["src/workers/hash.test.ts"],
+          browser: {
+            enabled: true,
+            provider: 'preview', 
+            instances: [
+              { browser: 'chrome' }
+            ],
+          },
         },
       },
     ],

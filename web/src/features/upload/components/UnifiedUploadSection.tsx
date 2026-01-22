@@ -1,7 +1,5 @@
-import React, { useRef, useEffect, ChangeEvent, useState } from "react";
+import React, { useRef, useEffect, ChangeEvent } from "react";
 import FileDropZone from "./FileDropZone";
-import ProgressIndicator from "./ProgressIndicator";
-import ImagePreviewGrid from "./ImagePreviewGrid";
 import FileUploadProgress from "./FileUploadProgress";
 
 import { useUploadContext } from "@/features/upload";
@@ -16,8 +14,6 @@ import {
   XMarkIcon,
   InformationCircleIcon,
   FolderPlusIcon,
-  EyeIcon,
-  EyeSlashIcon,
 } from "@heroicons/react/24/outline";
 
 function UnifiedUploadSection(): React.JSX.Element {
@@ -28,23 +24,16 @@ function UnifiedUploadSection(): React.JSX.Element {
     uploadFiles,
     uploadProgress,
     isProcessing,
-    isGeneratingPreviews,
-    previewProgress,
     fileProgress,
-    maxPreviewCount,
     maxTotalFiles,
-    previewCount,
   } = useUploadContext();
 
-  const { files, previews } = state;
+  const { files } = state;
   const fileCount = files.length;
 
   const showMessage = useMessage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Preview toggle state
-  const [previewEnabled, setPreviewEnabled] = useState(true);
 
   useEffect(() => {
     return () => {
@@ -57,10 +46,7 @@ function UnifiedUploadSection(): React.JSX.Element {
   /**
    * Handle file selection and validation.
    */
-  const handleFiles = async (
-    selectedFiles: FileList,
-    shouldGeneratePreviews: boolean = true,
-  ) => {
+  const handleFiles = async (selectedFiles: FileList) => {
     if (!selectedFiles || selectedFiles.length === 0) {
       return;
     }
@@ -79,8 +65,7 @@ function UnifiedUploadSection(): React.JSX.Element {
       return;
     }
 
-    // Only generate previews if preview is enabled
-    await addFiles(validFiles, shouldGeneratePreviews && previewEnabled);
+    await addFiles(validFiles);
   };
 
   const handleClear = () => {
@@ -111,7 +96,7 @@ function UnifiedUploadSection(): React.JSX.Element {
       <div className="relative">
         <FileDropZone
           fileInputRef={fileInputRef}
-          onFilesDropped={(files) => handleFiles(files, true)}
+          onFilesDropped={(files) => handleFiles(files)}
         >
           <div className="space-y-4">
             <ArrowUpTrayIcon className="mx-auto h-16 w-16 text-base-content/30" />
@@ -142,14 +127,8 @@ function UnifiedUploadSection(): React.JSX.Element {
                   <span className="font-medium">Max files:</span>{" "}
                   {maxTotalFiles}
                 </p>
-                <p>
-                  <span className="font-medium">Preview limit:</span>{" "}
-                  {maxPreviewCount} files
-                </p>
                 <p className="text-base-content/70 text-xs mt-2">
-                  The first {maxPreviewCount} files will have thumbnail previews
-                  generated when preview is enabled. Change limits in Settings →
-                  UI Settings.
+                  Change limits in Settings → UI Settings.
                 </p>
               </div>
             </div>
@@ -166,7 +145,7 @@ function UnifiedUploadSection(): React.JSX.Element {
         accept={getAcceptString()}
         onChange={(e: ChangeEvent<HTMLInputElement>) => {
           if (e.target.files) {
-            handleFiles(e.target.files, true);
+            handleFiles(e.target.files);
             e.target.value = "";
           }
         }}
@@ -174,7 +153,7 @@ function UnifiedUploadSection(): React.JSX.Element {
 
       {/* Control Bar */}
       <div className="flex items-center justify-between gap-4 mt-6">
-        {/* Left side - Add Files & Preview Toggle */}
+        {/* Left side - Add Files */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -184,25 +163,6 @@ function UnifiedUploadSection(): React.JSX.Element {
             <FolderPlusIcon className="w-4 h-4" />
             Add Files
           </button>
-
-          {/* Preview Toggle */}
-          <div className="form-control">
-            <label className="label cursor-pointer gap-2">
-              <span className="label-text text-sm">Preview</span>
-              <input
-                type="checkbox"
-                className="toggle toggle-sm toggle-primary"
-                checked={previewEnabled}
-                onChange={(e) => setPreviewEnabled(e.target.checked)}
-                disabled={isProcessing}
-              />
-              {previewEnabled ? (
-                <EyeIcon className="w-4 h-4 text-primary" />
-              ) : (
-                <EyeSlashIcon className="w-4 h-4 text-base-content/40" />
-              )}
-            </label>
-          </div>
         </div>
 
         {/* Right side - Action Buttons */}
@@ -227,30 +187,6 @@ function UnifiedUploadSection(): React.JSX.Element {
           </button>
         </div>
       </div>
-
-      {/* Preview generation progress */}
-      {isGeneratingPreviews && previewProgress && (
-        <div className="mt-6 alert alert-info">
-          <div className="flex items-center gap-4 w-full">
-            <span className="loading loading-spinner loading-sm" />
-            <ProgressIndicator
-              processed={previewProgress.numberProcessed}
-              total={previewProgress.total}
-              label="Generating thumbnails"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Preview Grid - Only show if preview is enabled and has previews */}
-      {previewEnabled && previews.length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-sm font-semibold mb-3 text-base-content/70">
-            Preview ({previewCount} of {fileCount})
-          </h3>
-          <ImagePreviewGrid previews={previews} />
-        </div>
-      )}
 
       {/* File List - Floating Card Style */}
       {fileCount > 0 && (
@@ -277,24 +213,16 @@ function UnifiedUploadSection(): React.JSX.Element {
                     className="flex items-center justify-between p-3 bg-base-100 rounded-lg hover:bg-base-300 transition-colors"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      {/* File icon/preview indicator */}
+                      {/* File icon */}
                       <div className="avatar placeholder">
                         <div className="bg-neutral text-neutral-content rounded w-10 h-10">
-                          {previews[index] ? (
-                            <img
-                              src={previews[index]!}
-                              alt=""
-                              className="w-full h-full object-cover rounded"
-                            />
-                          ) : (
-                            <span className="text-xs">
-                              {file.name
-                                .split(".")
-                                .pop()
-                                ?.toUpperCase()
-                                .slice(0, 3)}
-                            </span>
-                          )}
+                          <span className="text-xs">
+                            {file.name
+                              .split(".")
+                              .pop()
+                              ?.toUpperCase()
+                              .slice(0, 3)}
+                          </span>
                         </div>
                       </div>
 
@@ -308,14 +236,6 @@ function UnifiedUploadSection(): React.JSX.Element {
                         </p>
                       </div>
                     </div>
-
-                    {/* Status indicator */}
-                    {previews[index] && previewEnabled && (
-                      <div className="badge badge-success badge-sm gap-1">
-                        <EyeIcon className="w-3 h-3" />
-                        Preview
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>

@@ -141,6 +141,7 @@ export const uploadService = {
    * Upload a single file as chunks
    * @param file - The file to upload in chunks
    * @param sessionId - Unique session identifier
+   * @param hash - The BLAKE3 hash of the file
    * @param chunkSize - Size of each chunk in bytes
    * @param repositoryId - Optional repository UUID
    * @param onProgress - Optional progress callback
@@ -149,19 +150,17 @@ export const uploadService = {
   uploadFileInChunks: async (
     file: File,
     sessionId: string,
-    chunkSize: number = 24 * 1024 * 1024, // 24MB default to reduce chunk count
+    hash: string,
+    chunkSize: number = 24 * 1024 * 1024,
     repositoryId?: string,
     onProgress?: (progress: number) => void,
     options?: { maxConcurrent?: number; chunkSize?: number },
   ): Promise<AxiosResponse<ApiResult<BatchUploadResponse>>> => {
     const effectiveChunkSize = options?.chunkSize ?? chunkSize;
     const totalChunks = Math.ceil(file.size / effectiveChunkSize);
-    const uploadPromises: Array<
-      Promise<AxiosResponse<ApiResult<BatchUploadResponse>>>
-    > = [];
-    const maxConcurrent = options?.maxConcurrent ?? 2; // Lower concurrency for low-power mode
+    const maxConcurrent = options?.maxConcurrent ?? 2;
+    let lastResponse: AxiosResponse<ApiResult<BatchUploadResponse>> | null = null;
 
-    // Upload chunks sequentially with concurrency control
     for (
       let chunkIndex = 0;
       chunkIndex < totalChunks;
@@ -185,13 +184,17 @@ export const uploadService = {
         });
       }
 
-      // Upload this batch of chunks
-      const response = await uploadService.batchUploadFiles(
+      // Upload this batch of chunks, passing the hash in the header
+      lastResponse = await uploadService.batchUploadFiles(
         chunkBatch,
         repositoryId,
+        {
+          headers: {
+            "X-Content-Hash": hash,
+          }
+        }
       );
 
-      // Update progress
       if (onProgress) {
         const progress = Math.min(
           ((chunkIndex + chunkBatch.length) / totalChunks) * 100,
@@ -199,12 +202,13 @@ export const uploadService = {
         );
         onProgress(progress);
       }
-
-      uploadPromises.push(Promise.resolve(response));
     }
 
-    // Return the last response
-    return uploadPromises[uploadPromises.length - 1];
+    if (!lastResponse) {
+        throw new Error("No chunks were uploaded");
+    }
+
+    return lastResponse;
   },
 
   /**

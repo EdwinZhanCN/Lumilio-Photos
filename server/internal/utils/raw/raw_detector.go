@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"server/internal/utils/file"
 	"strings"
+
+	"github.com/h2non/bimg"
 )
 
 // RAWFormat represents different RAW file formats
@@ -197,28 +199,137 @@ func (d *Detector) ExtractEmbeddedPreview(reader io.ReadSeeker, result *Detectio
 		}
 	} else {
 		// Unknown size - read until we find JPEG EOI
+		// We use a stateful scanner to skip embedded thumbnails (e.g. in Exif)
 		buffer := make([]byte, 4096)
-		jpegEOI := []byte{0xFF, 0xD9}
+		previewData = make([]byte, 0, 1024*1024)
+		pos := 0
 
 		for {
 			n, err := reader.Read(buffer)
 			if err != nil && err != io.EOF {
 				return nil, fmt.Errorf("failed to read preview data: %w", err)
 			}
-			if n == 0 {
-				break
+
+			if n > 0 {
+				previewData = append(previewData, buffer[:n]...)
+
+				// Scan for EOI
+				foundEOI := false
+				for pos < len(previewData) {
+					// Check SOI at start
+					if pos == 0 {
+						if len(previewData) < 2 {
+							break // Need more data
+						}
+						if previewData[0] != 0xFF || previewData[1] != 0xD8 {
+							return nil, fmt.Errorf("invalid JPEG SOI")
+						}
+						pos = 2
+						continue
+					}
+
+					// Find next FF
+					if previewData[pos] != 0xFF {
+						idx := bytes.IndexByte(previewData[pos:], 0xFF)
+						if idx == -1 {
+							pos = len(previewData)
+							break
+						}
+						pos += idx
+					}
+
+					// Check byte after FF
+					if pos+1 >= len(previewData) {
+						break // Need more data
+					}
+
+					marker := previewData[pos+1]
+
+					if marker == 0xFF { // Padding
+						pos++
+						continue
+					}
+					if marker == 0x00 { // Stuffed
+						pos += 2
+						continue
+					}
+
+					if marker == 0xD9 { // EOI
+						previewData = previewData[:pos+2]
+						foundEOI = true
+						break
+					}
+
+					if marker == 0xDA { // SOS
+						// Skip header
+						if pos+4 > len(previewData) {
+							break
+						}
+						length := int(previewData[pos+2])<<8 | int(previewData[pos+3])
+						if pos+2+length > len(previewData) {
+							break // Need more data
+						}
+						pos += 2 + length
+
+						// Scan entropy data
+						for pos < len(previewData) {
+							if previewData[pos] != 0xFF {
+								idx := bytes.IndexByte(previewData[pos:], 0xFF)
+								if idx == -1 {
+									pos = len(previewData)
+									break
+								}
+								pos += idx
+							}
+
+							if pos+1 >= len(previewData) {
+								break // Need more data
+							}
+
+							next := previewData[pos+1]
+							if next == 0x00 || (next >= 0xD0 && next <= 0xD7) || next == 0xFF {
+								if next == 0xFF {
+									pos++
+								} else {
+									pos += 2
+								}
+								continue
+							}
+
+							// Found a marker!
+							break
+						}
+						continue
+					}
+
+					// Markers with no parameters
+					if (marker >= 0xD0 && marker <= 0xD7) || marker == 0x01 {
+						pos += 2
+						continue
+					}
+
+					// Markers with parameters
+					if pos+4 > len(previewData) {
+						break
+					}
+					length := int(previewData[pos+2])<<8 | int(previewData[pos+3])
+					if pos+2+length > len(previewData) {
+						break // Need more data
+					}
+					pos += 2 + length
+				}
+
+				if foundEOI {
+					break
+				}
 			}
 
-			previewData = append(previewData, buffer[:n]...)
-
-			// Check for JPEG end marker
-			if eoiIndex := bytes.Index(previewData, jpegEOI); eoiIndex != -1 {
-				previewData = previewData[:eoiIndex+2]
-				break
+			if err == io.EOF {
+				return nil, fmt.Errorf("EOF reached without finding JPEG EOI")
 			}
 
-			// Prevent infinite reading (max 10MB preview)
-			if len(previewData) > 10*1024*1024 {
+			// Prevent infinite reading (max 20MB preview)
+			if len(previewData) > 20*1024*1024 {
 				return nil, fmt.Errorf("preview too large, aborting")
 			}
 		}
@@ -243,11 +354,30 @@ func (d *Detector) IsPreviewAcceptable(previewData []byte, minWidth, minHeight i
 		return false, fmt.Errorf("invalid JPEG data")
 	}
 
-	// For now, accept any valid JPEG preview
-	// TODO: Add actual dimension checking using image decoder
-	if len(previewData) > 50*1024 { // At least 50KB suggests reasonable quality
-		return true, nil
+	// Check for EOI marker (FF D9) to detect truncation
+	// Use LastIndex to find the end of the image.
+	lastEOI := bytes.LastIndex(previewData, []byte{0xFF, 0xD9})
+	if lastEOI == -1 {
+		return false, nil
 	}
 
-	return false, nil
+	// If the EOI is too far from the end, it might be an embedded thumbnail's EOI
+	// while the main image is truncated.
+	// We allow some padding (e.g. 4KB), but if it's huge, it's suspicious.
+	if len(previewData)-lastEOI > 4096 {
+		return false, nil
+	}
+
+	// Check dimensions using bimg
+	img := bimg.NewImage(previewData)
+	size, err := img.Size()
+	if err != nil {
+		return false, nil
+	}
+
+	if size.Width < minWidth || size.Height < minHeight {
+		return false, nil
+	}
+
+	return true, nil
 }

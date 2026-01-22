@@ -204,7 +204,7 @@ export default function PerformanceSettings() {
                 <span className="label-text">
                   <div className="font-medium">Prioritize User Operations</div>
                   <div className="text-sm text-base-content/70">
-                    Give priority to user-visible operations like thumbnails
+                    Give priority to user-visible operations
                   </div>
                 </span>
                 <input
