@@ -20,9 +20,11 @@ export interface SingleHashResult {
   file?: File; // 可选：把原始文件传回来方便后续处理
 }
 
+const THREADS = Math.max(1, navigator.hardwareConcurrency - 1);
+
 export class AppWorkerClient {
   private generateThumbnailworker: Worker | null = null;
-  private hashAssetsworker: Worker | null = null;
+  private hashWorkers: Worker[] = [];
   private generateBorderworker: Worker | null = null;
   private exportWorker: Worker | null = null;
   private extractExifWorker: Worker | null = null;
@@ -43,7 +45,7 @@ export class AppWorkerClient {
   /**
    * Get or initialize a worker on demand
    */
-  private getOrInitializeWorker(type: WorkerType): Worker {
+  private getOrInitializeWorker(type: WorkerType, index: number = 0): Worker {
     switch (type) {
       case "thumbnail":
         if (!this.generateThumbnailworker) {
@@ -55,13 +57,13 @@ export class AppWorkerClient {
         return this.generateThumbnailworker;
 
       case "hash":
-        if (!this.hashAssetsworker) {
-          this.hashAssetsworker = new Worker(
+        if (!this.hashWorkers[index]) {
+          this.hashWorkers[index] = new Worker(
             new URL("./hash.worker.ts", import.meta.url),
             { type: "module" },
           );
         }
-        return this.hashAssetsworker;
+        return this.hashWorkers[index];
 
       case "border":
         if (!this.generateBorderworker) {
@@ -158,66 +160,75 @@ export class AppWorkerClient {
     }
   }
 
-  // --- Hash Generation ---
+  // --- Hash Generation (Worker Pool) ---
   async generateHash(
     data: FileList | File[],
-    // ✨ 新增：回调函数，每搞定一个就通知一次
     onItemComplete?: (result: SingleHashResult) => void
-  ): Promise<{ status: string }> { // Promise 只负责告诉我们“全部结束了”，不负责传数据
+  ): Promise<{ status: string }> {
+    const filesArray = Array.isArray(data) ? data : Array.from(data);
+    if (filesArray.length === 0) return { status: "complete" };
 
-    const worker = this.getOrInitializeWorker("hash");
+    const total = filesArray.length;
+    let processed = 0;
 
     return new Promise((resolve, reject) => {
-      const handler = (e: MessageEvent) => {
-        switch (e.data.type) {
-          // ✨ 新增：监听单个完成事件
-          case "HASH_SINGLE_COMPLETE":
+      let currentIndex = 0;
+      let activeWorkers = 0;
+      let hasError = false;
+
+      const runTask = (workerIndex: number) => {
+        if (currentIndex >= total || hasError) {
+          if (activeWorkers === 0 && !hasError) resolve({ status: "complete" });
+          return;
+        }
+
+        const fileIndex = currentIndex++;
+        const file = filesArray[fileIndex];
+        const worker = this.getOrInitializeWorker("hash", workerIndex);
+        activeWorkers++;
+
+        const handler = (e: MessageEvent) => {
+          if (e.data.type === "HASH_SINGLE_COMPLETE") {
             if (onItemComplete) {
-              // 这里立刻回调，React 那边接到这个回调就可以直接触发上传逻辑
-              // 此时第 2-1000 张还在算，但第 1 张已经在往服务器传了
               onItemComplete({
-                index: e.data.payload.index,
+                index: fileIndex,
                 hash: e.data.payload.hash
               });
             }
-            break;
-
-          case "HASH_COMPLETE":
-            // 全部结束，清理监听器
-            worker.removeEventListener("message", handler);
-            resolve({ status: "complete" });
-            break;
-
-          case "ERROR":
-            worker.removeEventListener("message", handler);
-            reject(new Error(e.data.payload?.error || "Hash Error"));
-            break;
-
-          case "PROGRESS":
-            // 这里的进度依然保留，用于 UI 进度条展示
+            processed++;
             this.eventTarget.dispatchEvent(
-              new CustomEvent("progress", { detail: e.data.payload }),
+              new CustomEvent("progress", { 
+                detail: { processed, total } 
+              }),
             );
-            break;
-        }
+          } else if (e.data.type === "HASH_COMPLETE") {
+            worker.removeEventListener("message", handler);
+            activeWorkers--;
+            runTask(workerIndex); // Get next task
+          } else if (e.data.type === "ERROR") {
+            worker.removeEventListener("message", handler);
+            hasError = true;
+            reject(new Error(e.data.payload?.error || "Hash Error"));
+          }
+        };
+
+        worker.addEventListener("message", handler);
+        worker.postMessage({
+          type: "GENERATE_HASH",
+          data: [file],
+        });
       };
 
-      worker.addEventListener("message", handler);
-
-      const filesArray = Array.isArray(data) ? data : Array.from(data);
-
-      // 发送任务
-      worker.postMessage({
-        type: "GENERATE_HASH",
-        data: filesArray,
-      });
+      // Start initial workers
+      const numWorkers = Math.min(THREADS, total);
+      for (let i = 0; i < numWorkers; i++) {
+        runTask(i);
+      }
     });
   }
 
   abortGenerateHash() {
-    if (this.hashAssetsworker) {
-      this.hashAssetsworker.postMessage({ type: "ABORT" });
-    }
+    this.hashWorkers.forEach(w => w.postMessage({ type: "ABORT" }));
   }
 
   // --- Border Generation ---
@@ -233,7 +244,6 @@ export class AppWorkerClient {
     };
   }> {
     const worker = this.getOrInitializeWorker("border");
-    console.log(files);
 
     return new Promise((resolve, reject) => {
       const handler = (e: MessageEvent) => {
@@ -241,7 +251,6 @@ export class AppWorkerClient {
           case "GENERATE_BORDER_COMPLETE":
             worker.removeEventListener("message", handler);
             resolve(e.data.data);
-            console.log(e.data.data);
             break;
           case "ERROR":
             worker.removeEventListener("message", handler);
@@ -371,10 +380,9 @@ export class AppWorkerClient {
       this.generateThumbnailworker.terminate();
       this.generateThumbnailworker = null;
     }
-    if (this.hashAssetsworker) {
-      this.hashAssetsworker.terminate();
-      this.hashAssetsworker = null;
-    }
+    this.hashWorkers.forEach(w => w.terminate());
+    this.hashWorkers = [];
+
     if (this.generateBorderworker) {
       this.generateBorderworker.terminate();
       this.generateBorderworker = null;

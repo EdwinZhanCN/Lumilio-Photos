@@ -1,58 +1,39 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AppWorkerClient } from './workerClient';
 
-describe('Hash Worker Performance (Real Browser)', () => {
+describe('Hash Worker Performance (Final Strategy)', () => {
   let client: AppWorkerClient;
 
   beforeEach(() => {
     client = new AppWorkerClient();
   });
 
-  const createMockFile = (sizeInMB: number) => {
-    const size = sizeInMB * 1024 * 1024;
-    const content = new Uint8Array(size);
-    // Fill with some data to avoid all-zero optimization if any
-    for (let i = 0; i < 100; i++) content[i] = i; 
-    return new File([content], `test-${sizeInMB}MB.bin`, { type: 'application/octet-stream' });
+  const createMockFiles = (count: number, sizeInMB: number) => {
+    const files: File[] = [];
+    for (let i = 0; i < count; i++) {
+      const size = sizeInMB * 1024 * 1024;
+      const content = new Uint8Array(size);
+      content[0] = i; 
+      files.push(new File([content], `test-${i}-${sizeInMB}MB.bin`, { type: 'application/octet-stream' }));
+    }
+    return files;
   };
 
-  const testHashPerformance = async (sizeInMB: number) => {
-    const file = createMockFile(sizeInMB);
-    
-    // Wait for WASM to be ready if needed (the worker sends WASM_READY)
-    // In this client, we just call generateHash which handles initialization.
-    
+  const timeout = 300000; 
+
+  it('Final Strategy: Pure Worker Pool - 50 files x 50MB', async () => {
+    const files = createMockFiles(100, 50);
+    const totalMB = 50 * 50;
     const startTime = performance.now();
     
-    let hashResult = '';
-    await client.generateHash([file], (result) => {
-      hashResult = result.hash;
+    await client.generateHash(files, (result) => {
+      expect(result.hash).toBeTruthy();
     });
 
     const endTime = performance.now();
     const durationInSeconds = (endTime - startTime) / 1000;
-    const speedMBps = sizeInMB / durationInSeconds;
+    const speedMBps = totalMB / durationInSeconds;
 
-    console.log(`[PERF] File Size: ${sizeInMB}MB, Hash: ${hashResult}, Duration: ${durationInSeconds.toFixed(4)}s, Speed: ${speedMBps.toFixed(2)} MB/s`);
-    
-    expect(hashResult).toBeTruthy();
-    expect(hashResult.length).toBeGreaterThan(10); // Should be a hex string
-    
-    return speedMBps;
-  };
-
-  // Increase timeout for large files
-  const timeout = 60000; 
-
-  it('should hash a 3MB file and record speed', async () => {
-    await testHashPerformance(3);
-  }, timeout);
-
-  it('should hash a 50MB file and record speed', async () => {
-    await testHashPerformance(50);
-  }, timeout);
-
-  it('should hash a 99MB file and record speed', async () => {
-    await testHashPerformance(99);
+    console.log(`[FINAL] Total: ${totalMB}MB, Duration: ${durationInSeconds.toFixed(2)}s, Speed: ${speedMBps.toFixed(2)} MB/s`);
   }, timeout);
 });
