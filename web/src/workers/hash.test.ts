@@ -22,7 +22,7 @@ describe('Hash Worker Performance (Final Strategy)', () => {
   const timeout = 300000; 
 
   it('Final Strategy: Pure Worker Pool - 50 files x 50MB', async () => {
-    const files = createMockFiles(100, 50);
+    const files = createMockFiles(50, 50);
     const totalMB = 50 * 50;
     const startTime = performance.now();
     
