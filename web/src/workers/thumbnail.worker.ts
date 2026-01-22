@@ -1,4 +1,4 @@
-import init, { generate_thumbnail } from "@/wasm/thumbnail/thumbnail_wasm";
+import init, { generate_thumbnail } from "../wasm/thumbnail/thumbnail_wasm";
 
 interface WorkerMessageData {
   files?: File[];
