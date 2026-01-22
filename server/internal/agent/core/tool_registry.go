@@ -3,7 +3,9 @@ package core
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
+	"time"
 
 	"server/internal/db/repo"
 
@@ -119,11 +121,42 @@ type FilterInterruptState struct {
 	StartTime   int64  `json:"start_time"`
 }
 
+// EventDispatcher defines the interface for sending side channel events
+type EventDispatcher interface {
+	Dispatch(event *SideChannelEvent)
+}
+
+// sideChannelDispatcher implements EventDispatcher with non-blocking send
+type sideChannelDispatcher struct {
+	ch chan<- *SideChannelEvent
+}
+
+func NewEventDispatcher(ch chan<- *SideChannelEvent) EventDispatcher {
+	if ch == nil {
+		return nil
+	}
+	return &sideChannelDispatcher{ch: ch}
+}
+
+func (d *sideChannelDispatcher) Dispatch(event *SideChannelEvent) {
+	if d == nil || d.ch == nil {
+		return
+	}
+
+	select {
+	case d.ch <- event:
+		// Sent successfully
+	case <-time.After(200 * time.Millisecond):
+		// Timeout, drop event to avoid blocking the agent
+		log.Printf("Warning: Side channel blocked, dropping event of type %s", event.Type)
+	}
+}
+
 // ToolDependencies Defines the dependencies like database queries that tool execution needs
 type ToolDependencies struct {
 	Queries          *repo.Queries
-	SideChannel      chan<- *SideChannelEvent // SideChannel sends DTO data to frontend, bypassing LLM
-	ReferenceManager *ReferenceManager        // ReferenceManager stores and manages tool outputs across session
+	Dispatcher       EventDispatcher   // Dispatcher sends DTO data to frontend, bypassing LLM
+	ReferenceManager *ReferenceManager // ReferenceManager stores and manages tool outputs across session
 }
 
 type ToolFactory func(ctx context.Context, deps *ToolDependencies) (tool.BaseTool, error)

@@ -141,14 +141,15 @@ func main() {
 	authService := service.NewAuthService(queries)
 	albumService := service.NewAlbumService(queries)
 
-	// Initialize Agent Service
-	agentService := core.NewAgentService(queries, llmConfig)
-	log.Println("✅ Agent Service Initialized")
-
 	// Register agent tools
 	tools.RegisterFilterAsset()
 	tools.RegisterBulkLikeTool()
 	log.Println("✅ Agent Tools Registered")
+
+	// Initialize Agent Service with default tools
+	defaultAgentTools := []string{"filter_assets", "bulk_like_assets"}
+	agentService := core.NewAgentService(queries, llmConfig, defaultAgentTools)
+	log.Println("✅ Agent Service Initialized")
 
 	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, appConfig, lumenService)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})

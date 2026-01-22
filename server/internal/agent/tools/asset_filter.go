@@ -10,16 +10,17 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/schema"
+	"github.com/go-playground/validator/v10"
 )
 
 // AssetFilterInput defines how the LLM calls this tool
 type AssetFilterInput struct {
-	DateFrom string `json:"date_from,omitempty" jsonschema:"description=Start date in YYYY-MM-DD format"`
-	DateTo   string `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format"`
-	Type     string `json:"type,omitempty" jsonschema:"description=Asset type (PHOTO | VIDEO | AUDIO)"`
+	DateFrom string `json:"date_from,omitempty" jsonschema:"description=Start date in YYYY-MM-DD format" validate:"omitempty,datetime=2006-01-02"`
+	DateTo   string `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format" validate:"omitempty,datetime=2006-01-02"`
+	Type     string `json:"type,omitempty" jsonschema:"description=Asset type (PHOTO | VIDEO | AUDIO)" validate:"omitempty,oneof=PHOTO VIDEO AUDIO"`
 	Filename string `json:"filename,omitempty" jsonschema:"description=Filename pattern to search for"`
 	Raw      *bool  `json:"raw,omitempty" jsonschema:"description=Filter for RAW photos only"`
-	Rating   *int   `json:"rating,omitempty" jsonschema:"description=Filter by rating (0-5)"`
+	Rating   *int   `json:"rating,omitempty" jsonschema:"description=Filter by rating (0-5)" validate:"omitempty,min=0,max=5"`
 	Liked    *bool  `json:"liked,omitempty" jsonschema:"description=Filter for liked/favorited assets"`
 }
 
@@ -31,9 +32,11 @@ type AssetFilterOutput struct {
 	Duration int64               `json:"duration_ms,omitempty" jsonschema:"description=The duration of the tool execution in milliseconds."`
 }
 
+var validate = validator.New()
+
 func RegisterFilterAsset() {
 	info := &schema.ToolInfo{
-		Name: "filter_assets",
+		Name: core.ToolFilterAssets,
 		Desc: "Constructs a filter configuration for assets. You should set Type per user request correctly. Use this to help the user view specific assets. " +
 			"Returns a ref_id that can be used by other tools (like bulk_like_assets) to act on these criteria.",
 	}
@@ -43,20 +46,25 @@ func RegisterFilterAsset() {
 			startTime := time.Now()
 			executionID := fmt.Sprintf("%d", startTime.UnixNano())
 
+			// 1. Validate Input
+			if err := validate.Struct(input); err != nil {
+				return handleValidationError(ctx, deps, executionID, startTime, err)
+			}
+
 			sendPendingEvent(ctx, deps, executionID, startTime, input)
 			sendRunningEvent(ctx, deps, executionID, "Configuring asset filter...")
 
-			// Build the DTO directly from input
+			// 2. Build the DTO directly from input
 			filterDTO := buildFilterDTO(input)
 
-			// Store the filter DTO in ReferenceManager
+			// 3. Store the filter DTO in ReferenceManager
 			refID := ""
 			if deps.ReferenceManager != nil {
 				// We store the DTO itself, not the assets
 				refID = deps.ReferenceManager.StoreWithID(ctx, filterDTO, "Asset Filter Configuration")
 			}
 
-			// Send the filter configuration to the frontend via side channel
+			// 4. Send the filter configuration to the frontend via side channel
 			sendFilterSuccessEvent(ctx, deps, executionID, startTime.UnixMilli(), input, filterDTO, refID)
 
 			duration := time.Since(startTime).Milliseconds()
@@ -124,38 +132,58 @@ func buildFilterDTO(input *AssetFilterInput) dto.AssetFilterDTO {
 	return filter
 }
 
+func handleValidationError(ctx context.Context, deps *core.ToolDependencies, execID string, startTime time.Time, err error) (*AssetFilterOutput, error) {
+	duration := time.Since(startTime).Milliseconds()
+	msg := fmt.Sprintf("Invalid input parameters: %v", err)
+
+	if deps.Dispatcher != nil {
+		deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+			Type:      core.EventTypeToolExecution,
+			Timestamp: time.Now().UnixMilli(),
+			Tool:      core.ToolIdentity{Name: core.ToolFilterAssets, ExecutionID: execID},
+			Execution: core.ExecutionInfo{
+				Status:   core.ExecutionStatusError,
+				Message:  "Validation failed",
+				Error:    &core.ErrorInfo{Code: "VALIDATION_ERROR", Message: msg},
+				Duration: duration,
+			},
+		})
+	}
+	return &AssetFilterOutput{Message: msg}, nil
+}
+
 func sendPendingEvent(ctx context.Context, deps *core.ToolDependencies, execID string, startTime time.Time, input *AssetFilterInput) {
-	if deps.SideChannel == nil {
+	if deps.Dispatcher == nil {
 		return
 	}
-	deps.SideChannel <- &core.SideChannelEvent{
-		Type:      "tool_execution",
+	deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+		Type:      core.EventTypeToolExecution,
 		Timestamp: startTime.UnixMilli(),
-		Tool:      core.ToolIdentity{Name: "filter_assets", ExecutionID: execID},
+		Tool:      core.ToolIdentity{Name: core.ToolFilterAssets, ExecutionID: execID},
 		Execution: core.ExecutionInfo{Status: core.ExecutionStatusPending, Message: "Preparing filter configuration...", Parameters: input},
-	}
+	})
 }
 
 func sendRunningEvent(ctx context.Context, deps *core.ToolDependencies, execID string, message string) {
-	if deps.SideChannel == nil {
+	if deps.Dispatcher == nil {
 		return
 	}
-	deps.SideChannel <- &core.SideChannelEvent{
-		Type:      "tool_execution",
+	deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+		Type:      core.EventTypeToolExecution,
 		Timestamp: time.Now().UnixMilli(),
-		Tool:      core.ToolIdentity{Name: "filter_assets", ExecutionID: execID},
+		Tool:      core.ToolIdentity{Name: core.ToolFilterAssets, ExecutionID: execID},
 		Execution: core.ExecutionInfo{Status: core.ExecutionStatusRunning, Message: message},
-	}
+	})
 }
 
 func sendFilterSuccessEvent(ctx context.Context, deps *core.ToolDependencies, execID string, startTimeMs int64, input *AssetFilterInput, filterDTO dto.AssetFilterDTO, refID string) {
-	if deps.SideChannel == nil {
+	if deps.Dispatcher == nil {
 		return
 	}
-	deps.SideChannel <- &core.SideChannelEvent{
-		Type:      "tool_execution",
+	deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+		Type:      core.EventTypeToolExecution,
 		Timestamp: time.Now().UnixMilli(),
-		Tool:      core.ToolIdentity{Name: "filter_assets", ExecutionID: execID},
+		Tool:      core.ToolIdentity{Name: core.ToolFilterAssets, ExecutionID: execID},
 		Execution: core.ExecutionInfo{
 			Status:     core.ExecutionStatusSuccess,
 			Message:    "Filter applied successfully",
@@ -171,5 +199,5 @@ func sendFilterSuccessEvent(ctx context.Context, deps *core.ToolDependencies, ex
 				Config:    &core.JustifiedGalleryConfig{GroupBy: "date"},
 			},
 		},
-	}
+	})
 }

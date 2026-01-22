@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -41,23 +42,20 @@ type AgentService interface {
 }
 
 type agentService struct {
-	queries  *repo.Queries
-	registry *ToolRegistry
-	config   config.LLMConfig
-	store    *PostgresStore
+	queries      *repo.Queries
+	registry     *ToolRegistry
+	config       config.LLMConfig
+	store        *PostgresStore
+	defaultTools []string
 }
 
-func NewAgentService(queries *repo.Queries, llmConfig config.LLMConfig) AgentService {
-	// 注册核心工具
-	// 注意：在实际启动时应该统一注册
-	// tools.RegisterFilterAsset()
-	// tools.RegisterBulkLikeTool()
-
+func NewAgentService(queries *repo.Queries, llmConfig config.LLMConfig, defaultTools []string) AgentService {
 	return &agentService{
-		queries:  queries,
-		registry: GetRegistry(),
-		config:   llmConfig,
-		store:    NewPostgresStore(queries), // 初始化 Store
+		queries:      queries,
+		registry:     GetRegistry(),
+		config:       llmConfig,
+		store:        NewPostgresStore(queries), // 初始化 Store
+		defaultTools: defaultTools,
 	}
 }
 
@@ -101,24 +99,26 @@ func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatM
 func (s *agentService) buildAgent(ctx context.Context, toolNames []string, sideChannel chan<- *SideChannelEvent) (*adk.ChatModelAgent, error) {
 	// 1. 准备工具依赖
 	deps := &ToolDependencies{
-		Queries:     s.queries,
-		SideChannel: sideChannel,
+		Queries:    s.queries,
+		Dispatcher: NewEventDispatcher(sideChannel),
 	}
 	deps.ReferenceManager = NewReferenceManager(deps)
 
 	// 2. 默认或按需加载工具
 	if len(toolNames) == 0 {
-		toolNames = []string{"filter_assets", "bulk_like_assets"}
+		toolNames = s.defaultTools
 	}
 
 	tools, err := s.registry.GetTools(ctx, toolNames, deps)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to get tools", "error", err, "toolNames", toolNames)
 		return nil, fmt.Errorf("failed to get tools: %w", err)
 	}
 
 	// 3. 创建 ChatModel
 	chatModel, err := s.newChatModel(ctx)
 	if err != nil {
+		slog.ErrorContext(ctx, "failed to create chat model", "error", err, "provider", s.config.Provider)
 		return nil, fmt.Errorf("failed to create chat model: %w", err)
 	}
 
@@ -126,9 +126,6 @@ func (s *agentService) buildAgent(ctx context.Context, toolNames []string, sideC
 	// Time with weekdays
 	t := time.Now()
 	today := fmt.Sprintf("%s, %s", t.Weekday().String(), t.Format("2006-01-02"))
-	if err != nil { // Always check errors even if they should not happen.
-		panic(err)
-	}
 	return adk.NewChatModelAgent(
 		ctx,
 		&adk.ChatModelAgentConfig{
@@ -147,6 +144,7 @@ func (s *agentService) buildAgent(ctx context.Context, toolNames []string, sideC
 }
 
 func (s *agentService) AskLLM(ctx context.Context, query string) (resp string, err error) {
+	slog.InfoContext(ctx, "AskLLM started", "query", query)
 	cm, err := s.newChatModel(ctx)
 	if err != nil {
 		return "", fmt.Errorf("create chat model error: %w", err)
@@ -159,12 +157,15 @@ func (s *agentService) AskLLM(ctx context.Context, query string) (resp string, e
 
 	response, err := cm.Generate(ctx, input)
 	if err != nil {
+		slog.ErrorContext(ctx, "AskLLM failed", "error", err)
 		return "", fmt.Errorf("ask llm error: %w", err)
 	}
+	slog.InfoContext(ctx, "AskLLM completed")
 	return response.Content, nil
 }
 
 func (s *agentService) AskAgent(ctx context.Context, threadID, query string, toolNames []string, uiChannel ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
+	slog.InfoContext(ctx, "AskAgent started", "threadID", threadID, "query", query, "toolNames", toolNames)
 	var sideChannel chan<- *SideChannelEvent
 	if len(uiChannel) > 0 && uiChannel[0] != nil {
 		sideChannel = uiChannel[0]
@@ -172,6 +173,7 @@ func (s *agentService) AskAgent(ctx context.Context, threadID, query string, too
 
 	agent, err := s.buildAgent(ctx, toolNames, sideChannel)
 	if err != nil {
+		slog.ErrorContext(ctx, "AskAgent failed to build agent", "error", err, "threadID", threadID)
 		// 在异步迭代器中返回错误
 		iter, gen := adk.NewAsyncIteratorPair[*adk.AgentEvent]()
 		gen.Send(&adk.AgentEvent{Err: err})
@@ -190,6 +192,7 @@ func (s *agentService) AskAgent(ctx context.Context, threadID, query string, too
 }
 
 func (s *agentService) ResumeAgent(ctx context.Context, threadID string, params *adk.ResumeParams, uiChannel ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error) {
+	slog.InfoContext(ctx, "ResumeAgent started", "threadID", threadID)
 	var sideChannel chan<- *SideChannelEvent
 	if len(uiChannel) > 0 && uiChannel[0] != nil {
 		sideChannel = uiChannel[0]
@@ -199,6 +202,7 @@ func (s *agentService) ResumeAgent(ctx context.Context, threadID string, params 
 	// 注意：toolNames 必须为空，以便 buildAgent 加载所有默认工具，确保与原始会话的工具集匹配
 	agent, err := s.buildAgent(ctx, []string{}, sideChannel)
 	if err != nil {
+		slog.ErrorContext(ctx, "ResumeAgent failed to build agent", "error", err, "threadID", threadID)
 		return nil, fmt.Errorf("failed to build agent for resume: %w", err)
 	}
 
@@ -213,7 +217,9 @@ func (s *agentService) ResumeAgent(ctx context.Context, threadID string, params 
 	// Eino 会自动从 Postgres 加载 data -> 反序列化 -> 填充 Session
 	iter, err := runner.ResumeWithParams(ctx, threadID, params)
 	if err != nil {
+		slog.ErrorContext(ctx, "ResumeAgent failed to resume", "error", err, "threadID", threadID)
 		return nil, fmt.Errorf("failed to resume agent: %w", err)
 	}
+	slog.InfoContext(ctx, "ResumeAgent successfully resumed", "threadID", threadID)
 	return iter, nil
 }

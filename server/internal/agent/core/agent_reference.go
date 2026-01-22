@@ -64,8 +64,8 @@ func (rm *ReferenceManager) StoreWithID(ctx context.Context, data interface{}, d
 	id := fmt.Sprintf("ref_%x", time.Now().UnixNano())
 
 	// 为了避免和其他 Session 变量冲突，加个前缀
-	sessionKey := "ref_val:" + id
-	metaKey := "ref_meta:" + id
+	sessionKey := SessionKeyRefValPrefix + id
+	metaKey := SessionKeyRefMetaPrefix + id
 
 	// 存入 Eino Session
 	// 只要开启了 CheckPointStore，这里的数据就会自动被持久化
@@ -85,7 +85,7 @@ func (rm *ReferenceManager) StoreWithID(ctx context.Context, data interface{}, d
 
 // Get 尝试从 Eino session 获取原始数据
 func (rm *ReferenceManager) Get(ctx context.Context, id string) (interface{}, error) {
-	sessionKey := "ref_val:" + id
+	sessionKey := SessionKeyRefValPrefix + id
 
 	// 从 Session 中恢复数据
 	// 无论是刚存进去的，还是 Resume 后从 Postgres 加载的，都能取到
@@ -135,7 +135,7 @@ func (rm *ReferenceManager) GetAs(ctx context.Context, id string, target interfa
 
 // GetMeta 获取引用的元数据
 func (rm *ReferenceManager) GetMeta(ctx context.Context, id string) (*ReferenceMeta, error) {
-	metaKey := "ref_meta:" + id
+	metaKey := SessionKeyRefMetaPrefix + id
 	metaVal, ok := adk.GetSessionValue(ctx, metaKey)
 	if !ok {
 		return nil, fmt.Errorf("reference metadata not found in session: %s", id)

@@ -41,7 +41,7 @@ type BulkLikeOutput struct {
 // RegisterBulkLikeTool 注册批量点赞工具
 func RegisterBulkLikeTool() {
 	info := &schema.ToolInfo{
-		Name: "bulk_like_assets",
+		Name: core.ToolBulkLikeAssets,
 		Desc: "Bulk like or unlike assets matching a filter. Use the ref_id from filter_assets to apply the action to the same set of photos the user is viewing.",
 	}
 
@@ -63,17 +63,17 @@ func RegisterBulkLikeTool() {
 			filterDTO := input.Filter.Unwrap()
 
 			// 2. Send Pending Event
-			if deps.SideChannel != nil {
-				deps.SideChannel <- &core.SideChannelEvent{
-					Type:      "tool_execution",
+			if deps.Dispatcher != nil {
+				deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+					Type:      core.EventTypeToolExecution,
 					Timestamp: startTime.UnixMilli(),
-					Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+					Tool:      core.ToolIdentity{Name: core.ToolBulkLikeAssets, ExecutionID: executionID},
 					Execution: core.ExecutionInfo{
 						Status:     core.ExecutionStatusPending,
 						Message:    fmt.Sprintf("Preparing to %s assets matching filter...", boolToVerb(input.Liked)),
 						Parameters: input,
 					},
-				}
+				})
 			}
 
 			// 3. Query Assets based on Filter
@@ -83,16 +83,16 @@ func RegisterBulkLikeTool() {
 			queryParams.Limit = maxAssetsLimit + 1 // Fetch one more to check if we exceeded limit
 			queryParams.Offset = 0
 
-			if deps.SideChannel != nil {
-				deps.SideChannel <- &core.SideChannelEvent{
-					Type:      "tool_execution",
+			if deps.Dispatcher != nil {
+				deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+					Type:      core.EventTypeToolExecution,
 					Timestamp: time.Now().UnixMilli(),
-					Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+					Tool:      core.ToolIdentity{Name: core.ToolBulkLikeAssets, ExecutionID: executionID},
 					Execution: core.ExecutionInfo{
 						Status:  core.ExecutionStatusRunning,
 						Message: "Finding matching assets...",
 					},
-				}
+				})
 			}
 
 			assets, err := deps.Queries.FilterAssets(ctx, queryParams)
@@ -110,16 +110,16 @@ func RegisterBulkLikeTool() {
 			}
 
 			// 4. Perform Bulk Update
-			if deps.SideChannel != nil {
-				deps.SideChannel <- &core.SideChannelEvent{
-					Type:      "tool_execution",
+			if deps.Dispatcher != nil {
+				deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+					Type:      core.EventTypeToolExecution,
 					Timestamp: time.Now().UnixMilli(),
-					Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+					Tool:      core.ToolIdentity{Name: core.ToolBulkLikeAssets, ExecutionID: executionID},
 					Execution: core.ExecutionInfo{
 						Status:  core.ExecutionStatusRunning,
 						Message: fmt.Sprintf("Updating %d assets...", totalFound),
 					},
-				}
+				})
 			}
 
 			assetIDs := make([]pgtype.UUID, totalFound)
@@ -179,11 +179,11 @@ func RegisterBulkLikeTool() {
 				}
 			}
 
-			if deps.SideChannel != nil {
-				deps.SideChannel <- &core.SideChannelEvent{
-					Type:      "tool_execution",
+			if deps.Dispatcher != nil {
+				deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+					Type:      core.EventTypeToolExecution,
 					Timestamp: time.Now().UnixMilli(),
-					Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+					Tool:      core.ToolIdentity{Name: core.ToolBulkLikeAssets, ExecutionID: executionID},
 					Execution: core.ExecutionInfo{
 						Status:   status,
 						Message:  resultSummary.Description,
@@ -194,7 +194,7 @@ func RegisterBulkLikeTool() {
 						PayloadType: "BulkLikeUpdateDTO",
 						Payload:     resultSummary,
 					},
-				}
+				})
 			}
 
 			return &BulkLikeOutput{
@@ -275,18 +275,18 @@ func convertDTOToParams(f dto.AssetFilterDTO) repo.FilterAssetsParams {
 
 func handleBulkError(ctx context.Context, deps *core.ToolDependencies, executionID string, startTime time.Time, err error) (*BulkLikeOutput, error) {
 	duration := time.Since(startTime).Milliseconds()
-	if deps.SideChannel != nil {
-		deps.SideChannel <- &core.SideChannelEvent{
-			Type:      "tool_execution",
+	if deps.Dispatcher != nil {
+		deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+			Type:      core.EventTypeToolExecution,
 			Timestamp: time.Now().UnixMilli(),
-			Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+			Tool:      core.ToolIdentity{Name: core.ToolBulkLikeAssets, ExecutionID: executionID},
 			Execution: core.ExecutionInfo{
 				Status:   core.ExecutionStatusError,
 				Message:  "Database query failed",
 				Error:    &core.ErrorInfo{Code: "DB_ERROR", Message: err.Error()},
 				Duration: duration,
 			},
-		}
+		})
 	}
 	return &BulkLikeOutput{Message: fmt.Sprintf("Error querying assets: %v", err)}, nil
 }
@@ -295,35 +295,35 @@ func handleLimitExceeded(ctx context.Context, deps *core.ToolDependencies, execu
 	duration := time.Since(startTime).Milliseconds()
 	msg := fmt.Sprintf("Filter matches too many assets (%d). Maximum allowed for bulk update is %d. Please refine the filter.", count, limit)
 
-	if deps.SideChannel != nil {
-		deps.SideChannel <- &core.SideChannelEvent{
-			Type:      "tool_execution",
+	if deps.Dispatcher != nil {
+		deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+			Type:      core.EventTypeToolExecution,
 			Timestamp: time.Now().UnixMilli(),
-			Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+			Tool:      core.ToolIdentity{Name: core.ToolBulkLikeAssets, ExecutionID: executionID},
 			Execution: core.ExecutionInfo{
 				Status:   core.ExecutionStatusError,
 				Message:  "Too many assets",
 				Error:    &core.ErrorInfo{Code: "LIMIT_EXCEEDED", Message: msg},
 				Duration: duration,
 			},
-		}
+		})
 	}
 	return &BulkLikeOutput{Message: msg}, nil
 }
 
 func handleNoAssetsFound(ctx context.Context, deps *core.ToolDependencies, executionID string, startTime time.Time) (*BulkLikeOutput, error) {
 	duration := time.Since(startTime).Milliseconds()
-	if deps.SideChannel != nil {
-		deps.SideChannel <- &core.SideChannelEvent{
-			Type:      "tool_execution",
+	if deps.Dispatcher != nil {
+		deps.Dispatcher.Dispatch(&core.SideChannelEvent{
+			Type:      core.EventTypeToolExecution,
 			Timestamp: time.Now().UnixMilli(),
-			Tool:      core.ToolIdentity{Name: "bulk_like_assets", ExecutionID: executionID},
+			Tool:      core.ToolIdentity{Name: core.ToolBulkLikeAssets, ExecutionID: executionID},
 			Execution: core.ExecutionInfo{
 				Status:   core.ExecutionStatusSuccess,
 				Message:  "No assets found matching filter",
 				Duration: duration,
 			},
-		}
+		})
 	}
 	return &BulkLikeOutput{Message: "No assets found matching the current filter."}, nil
 }
