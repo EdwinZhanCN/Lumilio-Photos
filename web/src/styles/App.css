@@ -5,7 +5,6 @@
 @plugin "daisyui" {
     themes: all;
 }
-
 :root:has(
     :is(
         .modal-open,

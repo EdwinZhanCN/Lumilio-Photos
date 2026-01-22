@@ -73,6 +73,15 @@ function isZeroBBox(b: LocationBBox): boolean {
   return b.north === 0 && b.south === 0 && b.east === 0 && b.west === 0;
 }
 
+function toDateInput(val: string): string {
+  if (!val) return "";
+  // If it contains 'T', assume ISO format and take the date part
+  if (val.includes("T")) {
+    return val.split("T")[0];
+  }
+  return val;
+}
+
 /* =========================
    Small hook: options loading
    ========================= */
@@ -818,10 +827,10 @@ export default function FilterTool({
     !!initialStableRef.current?.date,
   );
   const [dateFrom, setDateFrom] = useState<string>(
-    initialStableRef.current?.date?.from ?? "",
+    toDateInput(initialStableRef.current?.date?.from ?? ""),
   );
   const [dateTo, setDateTo] = useState<string>(
-    initialStableRef.current?.date?.to ?? "",
+    toDateInput(initialStableRef.current?.date?.to ?? ""),
   );
 
   // Location (BBox)

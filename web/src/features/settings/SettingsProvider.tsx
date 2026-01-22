@@ -16,7 +16,6 @@ function loadPersisted(): SettingsState {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<SettingsState>;
       return {
-        lumen: { ...initialState.lumen, ...parsed.lumen },
         server: { ...initialState.server, ...parsed.server },
         ui: {
           ...initialState.ui,

@@ -60,7 +60,11 @@
         }
     },
     "collections": {
-        "emptyMessage": "Create your first album to get started"
+        "emptyMessage": "Create your first album to get started",
+        "untitled": "Untitled Album",
+        "createSuccess": "Album created successfully",
+        "deleteSuccess": "Album deleted successfully",
+        "updateSuccess": "Album updated successfully"
     },
     "assets": {
         "photos": {
@@ -247,7 +251,8 @@
         "na": "N/A",
         "uploaded": "Uploaded",
         "pressCtrlEnterToSave": "Press Ctrl+Enter to save",
-        "clickToEdit": "Click to edit"
+        "clickToEdit": "Click to edit",
+        "loadMore": "Load More"
     },
     "monitor": {
         "title": "Server Monitor",

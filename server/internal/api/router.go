@@ -62,6 +62,7 @@ type AlbumControllerInterface interface {
 	RemoveAssetFromAlbum(c *gin.Context)
 	UpdateAssetPositionInAlbum(c *gin.Context)
 	GetAssetAlbums(c *gin.Context)
+	FilterAlbumAssets(c *gin.Context)
 }
 
 // QueueControllerInterface defines the interface for queue monitoring controllers
@@ -81,7 +82,15 @@ type StatsControllerInterface interface {
 	GetAvailableYears(c *gin.Context)          // GET /stats/available-years - Get available years
 }
 
-func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface, queueController QueueControllerInterface, statsController StatsControllerInterface) *gin.Engine {
+// AgentControllerInterface defines the interface for agent controllers
+type AgentControllerInterface interface {
+	Chat(c *gin.Context)           // POST /agent/chat - Chat with agent via SSE
+	ResumeChat(c *gin.Context)     // POST /agent/chat/resume - Resume an interrupted agent execution
+	GetTools(c *gin.Context)       // GET /agent/tools - Get available tools
+	GetToolSchemas(c *gin.Context) // GET /agent/schemas - Get tool DTO schemas
+}
+
+func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface, queueController QueueControllerInterface, statsController StatsControllerInterface, agentController AgentControllerInterface) *gin.Engine {
 	r := gin.Default()
 
 	// Add CORS middleware
@@ -155,6 +164,7 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			albums.POST("/:id/assets/:assetId", albumController.AddAssetToAlbum)
 			albums.DELETE("/:id/assets/:assetId", albumController.RemoveAssetFromAlbum)
 			albums.PUT("/:id/assets/:assetId/position", albumController.UpdateAssetPositionInAlbum)
+			albums.POST("/:id/filter", albumController.FilterAlbumAssets)
 		}
 
 		// Admin routes for queue monitoring (read-only)
@@ -179,6 +189,16 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			stats.GET("/time-distribution", statsController.GetTimeDistribution)
 			stats.GET("/daily-activity", statsController.GetDailyActivityHeatmap)
 			stats.GET("/available-years", statsController.GetAvailableYears)
+		}
+
+		// Agent routes - with optional authentication
+		agent := v1.Group("/agent")
+		agent.Use(authController.OptionalAuthMiddleware())
+		{
+			agent.POST("/chat", agentController.Chat)
+			agent.POST("/chat/resume", agentController.ResumeChat)
+			agent.GET("/tools", agentController.GetTools)
+			agent.GET("/schemas", agentController.GetToolSchemas)
 		}
 	}
 

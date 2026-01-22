@@ -59,7 +59,11 @@
         }
     },
     "collections": {
-        "emptyMessage": "创建你的第一个相册以开始使用"
+        "emptyMessage": "创建你的第一个相册以开始使用",
+        "untitled": "未命名相册",
+        "createSuccess": "相册创建成功",
+        "deleteSuccess": "相册删除成功",
+        "updateSuccess": "相册更新成功"
     },
     "assets": {
         "photos": {
@@ -245,7 +249,8 @@
         "na": "无",
         "uploaded": "上传于",
         "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
-        "clickToEdit": "点击编辑"
+        "clickToEdit": "点击编辑",
+        "loadMore": "加载更多"
     },
     "monitor": {
         "title": "服务器监控",

@@ -20,6 +20,7 @@ type AlbumService interface {
 	RemoveAssetFromAlbum(ctx context.Context, params repo.RemoveAssetFromAlbumParams) error
 	UpdateAssetPositionInAlbum(ctx context.Context, params repo.UpdateAssetPositionInAlbumParams) error
 	GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]repo.GetAssetAlbumsRow, error)
+	FilterAlbumAssets(ctx context.Context, params repo.FilterAlbumAssetsParams) ([]repo.Asset, error)
 }
 
 type albumService struct {
@@ -102,4 +103,9 @@ func (s *albumService) UpdateAssetPositionInAlbum(ctx context.Context, params re
 // GetAssetAlbums retrieves all albums that contain a specific asset
 func (s *albumService) GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]repo.GetAssetAlbumsRow, error) {
 	return s.queries.GetAssetAlbums(ctx, assetID)
+}
+
+// FilterAlbumAssets filters assets within a specific album
+func (s *albumService) FilterAlbumAssets(ctx context.Context, params repo.FilterAlbumAssetsParams) ([]repo.Asset, error) {
+	return s.queries.FilterAlbumAssets(ctx, params)
 }

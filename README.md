@@ -78,6 +78,7 @@ make server-test    # Run Go tests
 make db-logs        # View database logs
 make db-shell       # PostgreSQL shell
 make db-reset       # Reset database (⚠️ deletes all data)
+make dto            # Generate DTO schemas for both backend and frontend
 make clean          # Clean generated files
 ```
 

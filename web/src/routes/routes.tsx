@@ -2,19 +2,30 @@ import Home from "@/features/home/routes/Home";
 import Assets from "@/features/assets/routes/Assets";
 import { Studio } from "@/features/studio/routes/Studio";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { Lumen } from "@/features/lumen/routes/Lumen";
-import { LumenWikiExample } from "@/features/lumen/components/LumenWiki/LumenWikiExample";
 import Settings from "@/features/settings/routes/Settings";
 import Monitor from "@/features/monitor/routes/Monitor";
 import UploadAssets from "@/features/upload/routes/UploadAssets";
 import { Portfolio } from "@/features/portfolio";
 import Collections from "@/features/collections/routes/Collections";
+import AlbumDetails from "@/features/collections/routes/AlbumDetails";
 import Updates from "@/features/updates/routes/Updates";
+import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
+import {AssetsProvider} from "@/features/assets";
+import LoginPage from "@/features/auth/LoginPage";
+import RegisterPage from "@/features/auth/RegisterPage";
 
 export const routes = [
   {
     path: "/",
     element: <Home />,
+  },
+  {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    path: "/register",
+    element: <RegisterPage />,
   },
   {
     path: "/updates",
@@ -27,6 +38,14 @@ export const routes = [
   {
     path: "/collections",
     element: <Collections />,
+  },
+  {
+    path: "/collections/:albumId",
+    element: <AlbumDetails />,
+  },
+  {
+    path: "/collections/:albumId/:assetId",
+    element: <AlbumDetails />,
   },
   {
     path: "/assets/photos",
@@ -73,19 +92,15 @@ export const routes = [
     element: <Monitor />,
   },
   {
-    path: "/lumen",
-    element: <Lumen />,
+    path: "/lumilio",
+    element: (
+        <AssetsProvider>
+            <LumilioChatPage />
+        </AssetsProvider>
+    ),
   },
   {
     path: "/portfolio",
     element: <Portfolio />,
-  },
-  {
-    path: "/test-lumen",
-    element: (
-      <WorkerProvider preload={["llm"]}>
-        <LumenWikiExample />
-      </WorkerProvider>
-    ),
   },
 ];

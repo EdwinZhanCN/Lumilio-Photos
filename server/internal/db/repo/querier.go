@@ -57,6 +57,7 @@ type Querier interface {
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteTag(ctx context.Context, tagID int32) error
 	DeleteUser(ctx context.Context, userID int32) error
+	FilterAlbumAssets(ctx context.Context, arg FilterAlbumAssetsParams) ([]Asset, error)
 	FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]Asset, error)
 	GetAIDescriptionByAsset(ctx context.Context, assetID pgtype.UUID) (AiDescription, error)
 	GetAIDescriptionStatsByModel(ctx context.Context) ([]GetAIDescriptionStatsByModelRow, error)
@@ -93,6 +94,7 @@ type Querier interface {
 	GetAvailableYears(ctx context.Context) ([]int32, error)
 	// 获取相机+镜头组合统计
 	GetCameraLensStats(ctx context.Context, limit int32) ([]GetCameraLensStatsRow, error)
+	GetCheckpoint(ctx context.Context, id string) ([]byte, error)
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
 	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
 	// 获取每日拍摄活跃度热力图数据
@@ -209,6 +211,7 @@ type Querier interface {
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UpsertCheckpoint(ctx context.Context, arg UpsertCheckpointParams) error
 	// Unified embeddings table queries
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
 }
