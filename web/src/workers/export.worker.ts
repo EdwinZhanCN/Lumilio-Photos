@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import init, { ImageProcessor } from "@/wasm/export_wasm";
+import init, { ImageProcessor } from "@/wasm/export/export_wasm";
 import type { ExportOptions } from "@/types/Export.d.ts";
 
 const initializationPromise: Promise<void> | null = null;

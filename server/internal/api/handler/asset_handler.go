@@ -222,6 +222,8 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		} else {
 			log.Printf("Calculated hash for %s: %s", header.Filename, clientHash)
 		}
+	} else {
+		log.Printf("Trusting client-provided hash for %s: %s", header.Filename, clientHash)
 	}
 
 	// Get user ID from JWT claims
@@ -333,6 +335,8 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		return
 	}
 
+	clientHash := c.GetHeader("X-Content-Hash")
+
 	// Get user ID from JWT claims
 	var userID string
 	if id, exists := c.Get("user_id"); exists {
@@ -401,6 +405,12 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		if _, exists := h.sessionManager.GetSession(fileInfo.SessionID); !exists {
 			h.sessionManager.CreateSession(fileInfo.SessionID, filename, 0, fileInfo.TotalChunks, contentType, repository.Path, userID)
 		}
+
+		// Update session hash if provided
+		if clientHash != "" {
+			h.sessionManager.SetSessionHash(fileInfo.SessionID, clientHash)
+		}
+
 		h.sessionManager.UpdateSessionStatus(fileInfo.SessionID, "uploading")
 
 		targetName := filename
@@ -1126,6 +1136,7 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	// Set appropriate headers for audio streaming
 	c.Header("Cache-Control", "public, max-age=86400") // Cache for 1 day
 	c.Header("Content-Type", "audio/mpeg")
+	c.Header("Vary", "Accept-Encoding")
 	c.Header("Accept-Ranges", "bytes") // Enable range requests for audio seeking
 
 	// Serve the file
@@ -2152,36 +2163,36 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 		}
 	}
 
-	// Calculate hash (always use quick hash for large files)
-	log.Printf("Calculating hash for file: %s", stagingFilePath)
-	hashResult, err := hash.CalculateFileHash(stagingFilePath, hash.AlgorithmBLAKE3, true)
-	if err != nil {
-		log.Printf("Failed to calculate hash for %s: %v", stagingFilePath, err)
-		if mergedFilePath == "" {
+	// Calculate hash (prioritize client-provided hash from session)
+	var finalHash string
+	var hashMethod string
+
+	if session != nil && session.ContentHash != "" {
+		finalHash = session.ContentHash
+		hashMethod = "client-provided"
+		log.Printf("Trusting client-provided hash for %s: %s", header.Filename, finalHash)
+	} else {
+		log.Printf("Calculating hash for file: %s", stagingFilePath)
+		hashResult, err := hash.CalculateFileHash(stagingFilePath, hash.AlgorithmBLAKE3, true)
+		if err != nil {
+			log.Printf("Failed to calculate hash for %s: %v", stagingFilePath, err)
 			os.Remove(stagingFilePath)
-		} else {
-			os.Remove(stagingFilePath)
+			return nil, fmt.Errorf("failed to calculate file hash: %w", err)
 		}
-		return nil, fmt.Errorf("failed to calculate file hash: %w", err)
-	}
 
-	finalHash := hashResult.Hash
-	hashMethod := "quick"
-	if !hashResult.IsQuick {
-		hashMethod = "full"
+		finalHash = hashResult.Hash
+		hashMethod = "quick"
+		if !hashResult.IsQuick {
+			hashMethod = "full"
+		}
+		log.Printf("Calculated %s hash for %s: %s", hashMethod, header.Filename, finalHash)
 	}
-
-	log.Printf("Calculated %s hash for %s: %s", hashMethod, header.Filename, finalHash)
 
 	// Detect actual MIME type from file content for chunked uploads
 	// Read only the first 512 bytes for efficient detection
 	file, err := os.Open(stagingFilePath)
 	if err != nil {
-		if mergedFilePath == "" {
-			os.Remove(stagingFilePath)
-		} else {
-			os.Remove(stagingFilePath)
-		}
+		os.Remove(stagingFilePath)
 		return nil, fmt.Errorf("failed to open file for MIME detection: %w", err)
 	}
 	defer file.Close()
@@ -2190,11 +2201,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	headerBuf := make([]byte, 1024)
 	n, err := file.Read(headerBuf)
 	if err != nil && err != io.EOF {
-		if mergedFilePath == "" {
-			os.Remove(stagingFilePath)
-		} else {
-			os.Remove(stagingFilePath)
-		}
+		os.Remove(stagingFilePath)
 		return nil, fmt.Errorf("failed to read file header for MIME detection: %w", err)
 	}
 	headerBuf = headerBuf[:n]
@@ -2215,20 +2222,12 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	// Check for hash collision before enqueueing
 	collision, err := h.checkHashCollisionBeforeEnqueue(ctx, finalHash, header.Filename, uuid.UUID(repository.RepoID.Bytes).String())
 	if err != nil {
-		if mergedFilePath == "" {
-			os.Remove(stagingFilePath)
-		} else {
-			os.Remove(stagingFilePath)
-		}
+		os.Remove(stagingFilePath)
 		return nil, fmt.Errorf("failed to check hash collision: %w", err)
 	}
 
 	if collision {
-		if mergedFilePath == "" {
-			os.Remove(stagingFilePath)
-		} else {
-			os.Remove(stagingFilePath)
-		}
+		os.Remove(stagingFilePath)
 		return &dto.BatchUploadResultDTO{
 			Success:     false,
 			FileName:    header.Filename,
@@ -2250,21 +2249,13 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	}, &river.InsertOpts{Queue: "ingest_asset"})
 
 	if err != nil {
-		if mergedFilePath == "" {
-			os.Remove(stagingFilePath)
-		} else {
-			os.Remove(stagingFilePath)
-		}
+		os.Remove(stagingFilePath)
 		return nil, fmt.Errorf("failed to enqueue task: %w", err)
 	}
 
 	if jobResult == nil || jobResult.Job == nil {
 		log.Printf("Failed to enqueue task: empty result for file: %s", stagingFilePath)
-		if mergedFilePath == "" {
-			os.Remove(stagingFilePath)
-		} else {
-			os.Remove(stagingFilePath)
-		}
+		os.Remove(stagingFilePath)
 		return nil, errors.New("failed to enqueue task: empty result")
 	}
 

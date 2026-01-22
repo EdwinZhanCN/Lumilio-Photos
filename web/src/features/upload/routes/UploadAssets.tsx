@@ -47,7 +47,7 @@ const UploadHeader: React.FC = () => {
 
 const UploadAssets = () => {
   return (
-    <WorkerProvider preload={["hash", "thumbnail"]}>
+    <WorkerProvider preload={["hash"]}>
       <UploadProvider>
         <div className="min-h-screen bg-base-100">
           <UploadHeader />

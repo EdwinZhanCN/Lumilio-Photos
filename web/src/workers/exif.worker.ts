@@ -1,5 +1,5 @@
-import createExiv2Module, { type Exiv2Module } from "@/wasm/exiv2";
-import wasmUrl from "@/wasm/exiv2.wasm?url";
+import createExiv2Module, { type Exiv2Module } from "@/wasm/exiv2/exiv2";
+import wasmUrl from "@/wasm/exiv2/exiv2.wasm?url";
 let abortController = new AbortController();
 let exiv2ModulePromise: Promise<Exiv2Module> | null = null;
 
