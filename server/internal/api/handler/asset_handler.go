@@ -61,7 +61,8 @@ func NewAssetHandler(
 	memoryMonitor := memory.NewMemoryMonitor()
 	sessionManager := upload.NewSessionManager(30 * time.Minute) // 30 minute timeout
 	chunkMerger := upload.NewChunkMerger(storage.NewDirectoryManager())
-	uploadLimiter := make(chan struct{}, 3) // limit concurrent uploads
+	// Increased limit to 32 to support HTTP/2 multiplexing for chunked uploads
+	uploadLimiter := make(chan struct{}, 32)
 
 	handler := &AssetHandler{
 		assetService:   assetService,

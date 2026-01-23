@@ -17,12 +17,14 @@ import {
   findAssetIndex,
 } from "@/lib/utils/assetGrouping.ts";
 import { Asset } from "@/lib/http-commons";
+import { useI18n } from "@/lib/i18n";
 
 function Photos() {
   const { assetId } = useParams<{ assetId: string }>();
   const { state, dispatch } = useAssetsContext();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { deleteAsset } = useAssetActions();
+  const { t } = useI18n();
 
   // Local state to track asset updates
   const [updatedAssets, setUpdatedAssets] = useState<Map<string, Asset>>(
@@ -186,7 +188,7 @@ function Photos() {
       )}
 
       {!hasNextPage && allAssets.length > 0 && (
-        <div className="text-center p-4 text-gray-500">End of results.</div>
+        <div className="text-center p-4 text-gray-500">{t("assets.photos.end_of_results")}</div>
       )}
 
       {isCarouselOpen &&
@@ -209,14 +211,14 @@ function Photos() {
               <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center">
                 <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
                   <div className="loading loading-spinner loading-lg mb-4"></div>
-                  <p className="text-lg font-medium mb-2">Locating asset...</p>
+                  <p className="text-lg font-medium mb-2">{t("assets.photos.locating_asset")}</p>
                   {hasNextPage && !isFetching && !isFetchingNextPage ? (
                     <p className="text-sm text-gray-300">
-                      Loading more data to find the asset...
+                      {t("assets.photos.loading_more_data")}
                     </p>
                   ) : (
                     <p className="text-sm text-gray-300">
-                      Asset may not be available in the current view.
+                      {t("assets.photos.asset_not_available")}
                     </p>
                   )}
                 </div>
@@ -227,7 +229,7 @@ function Photos() {
           <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
             <div className="text-white text-center">
               <div className="loading loading-spinner loading-lg mb-4"></div>
-              <p>Loading assets...</p>
+              <p>{t("assets.photos.loading_assets")}</p>
             </div>
           </div>
         ))}

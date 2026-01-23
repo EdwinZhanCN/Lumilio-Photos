@@ -158,35 +158,25 @@ export const uploadService = {
   ): Promise<AxiosResponse<ApiResult<BatchUploadResponse>>> => {
     const effectiveChunkSize = options?.chunkSize ?? chunkSize;
     const totalChunks = Math.ceil(file.size / effectiveChunkSize);
-    const maxConcurrent = options?.maxConcurrent ?? 2;
+    // Increased default concurrency for HTTP/2 multiplexing
+    const maxConcurrent = options?.maxConcurrent ?? 6;
     let lastResponse: AxiosResponse<ApiResult<BatchUploadResponse>> | null = null;
 
-    for (
-      let chunkIndex = 0;
-      chunkIndex < totalChunks;
-      chunkIndex += maxConcurrent
-    ) {
-      const chunkBatch = [];
-
-      for (let i = 0; i < maxConcurrent && chunkIndex + i < totalChunks; i++) {
-        const currentChunkIndex = chunkIndex + i;
-        const start = currentChunkIndex * effectiveChunkSize;
-        const end = Math.min(start + effectiveChunkSize, file.size);
-        const chunk = file.slice(start, end);
-
-        chunkBatch.push({
+    // Helper to upload a single chunk
+    const uploadChunk = async (chunkIndex: number) => {
+      const start = chunkIndex * effectiveChunkSize;
+      const end = Math.min(start + effectiveChunkSize, file.size);
+      const chunk = file.slice(start, end);
+      
+      return uploadService.batchUploadFiles(
+        [{
           file: chunk,
           fileName: file.name,
           sessionId,
           isChunk: true,
-          chunkIndex: currentChunkIndex,
+          chunkIndex,
           totalChunks,
-        });
-      }
-
-      // Upload this batch of chunks, passing the hash in the header
-      lastResponse = await uploadService.batchUploadFiles(
-        chunkBatch,
+        }],
         repositoryId,
         {
           headers: {
@@ -194,21 +184,47 @@ export const uploadService = {
           }
         }
       );
+    };
 
-      if (onProgress) {
-        const progress = Math.min(
-          ((chunkIndex + chunkBatch.length) / totalChunks) * 100,
-          100,
-        );
-        onProgress(progress);
-      }
-    }
+    // Use a semaphore-like approach to limit concurrency
+    let activeUploads = 0;
+    let nextChunkIndex = 0;
+    let completedChunks = 0;
 
-    if (!lastResponse) {
-        throw new Error("No chunks were uploaded");
-    }
+    return new Promise((resolve, reject) => {
+      const processNext = () => {
+        if (nextChunkIndex >= totalChunks) {
+          if (activeUploads === 0 && lastResponse) {
+            resolve(lastResponse);
+          }
+          return;
+        }
 
-    return lastResponse;
+        while (activeUploads < maxConcurrent && nextChunkIndex < totalChunks) {
+          const currentIndex = nextChunkIndex++;
+          activeUploads++;
+          
+          uploadChunk(currentIndex)
+            .then(response => {
+              lastResponse = response;
+              completedChunks++;
+              activeUploads--;
+              
+              if (onProgress) {
+                const progress = Math.min((completedChunks / totalChunks) * 100, 100);
+                onProgress(progress);
+              }
+              
+              processNext();
+            })
+            .catch(error => {
+              reject(error);
+            });
+        }
+      };
+
+      processNext();
+    });
   },
 
   /**

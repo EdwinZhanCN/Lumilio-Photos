@@ -12,7 +12,7 @@ import {
   useSearchParams,
   useParams,
 } from "react-router-dom";
-import { AssetsContextValue, AssetsState, TabType } from "./types";
+import { AssetsContextValue, AssetsState, TabType } from "./assets.types.ts";
 import { assetsReducer, initialAssetsState } from "./assets.reducer";
 import { useSettingsContext } from "@/features/settings";
 

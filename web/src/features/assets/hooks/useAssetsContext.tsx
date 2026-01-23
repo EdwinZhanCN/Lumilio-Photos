@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import { AssetsContext } from "../AssetsProvider";
-import { AssetsContextValue } from "../types";
+import { AssetsContextValue } from "../assets.types.ts";
 
 /**
  * Main hook for accessing the assets context.

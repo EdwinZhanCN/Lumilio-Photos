@@ -60,7 +60,8 @@ services:
         environment:
             API_URL: http://server:8080
         ports:
-            - "6657:80"
+            - "6680:80"
+            - "6657:443"
 
 volumes:
     db_data:

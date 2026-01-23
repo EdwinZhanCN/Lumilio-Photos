@@ -7,6 +7,8 @@ import {
   useGenerateHashcode,
 } from "@/hooks/util-hooks/useGenerateHashcode";
 import { uploadService, BatchUploadResult } from "@/services/uploadService";
+import { globalPerformancePreferences } from "@/utils/performancePreferences";
+import { getOptimalBatchSize, ProcessingPriority } from "@/utils/smartBatchSizing";
 
 interface FailedFile {
   name: string;
@@ -88,9 +90,10 @@ export function useUploadProcess(): useUploadProcessReturn {
     const startTime = performance.now();
     let totalBytesHashed = 0;
 
-    // Concurrency control: max 3 concurrent upload requests
+    // Concurrency control: dynamic based on performance preferences
+    const maxConcurrentUploads = globalPerformancePreferences.getMaxConcurrentOperations() * 2; // Allow more for network I/O
     const semaphore = {
-      count: 3,
+      count: maxConcurrentUploads,
       queue: [] as (() => void)[],
       async acquire() {
         if (this.count > 0) {
@@ -159,6 +162,13 @@ export function useUploadProcess(): useUploadProcessReturn {
       await semaphore.acquire();
       try {
         updateFileProgress(session.file.name, { status: "uploading", sessionId: session.sessionId });
+        
+        // Use performance preferences for chunk size if not explicitly set in UI settings
+        const prefChunkSize = globalPerformancePreferences.getMemoryConstraintMultiplier() * 5 * 1024 * 1024; // Base 5MB
+        const chunkSize = settings.ui.upload?.chunk_size_mb 
+          ? settings.ui.upload.chunk_size_mb * 1024 * 1024 
+          : prefChunkSize;
+
         const resp = await uploadService.uploadFileInChunks(
           session.file, 
           session.sessionId, 
@@ -170,8 +180,9 @@ export function useUploadProcess(): useUploadProcessReturn {
             updateFileProgress(session.file.name, { progress: p });
           },
           { 
-            maxConcurrent: settings.ui.upload?.low_power_mode ? 2 : 4,
-            chunkSize: settings.ui.upload?.chunk_size_mb ? settings.ui.upload.chunk_size_mb * 1024 * 1024 : undefined
+            // Increase concurrency for HTTP/2 multiplexing, respect low power mode
+            maxConcurrent: settings.ui.upload?.low_power_mode ? 2 : maxConcurrentUploads,
+            chunkSize: chunkSize
           }
         );
         
@@ -190,6 +201,9 @@ export function useUploadProcess(): useUploadProcessReturn {
     };
 
     try {
+      // Determine optimal batch size for small files
+      const optimalBatchSize = getOptimalBatchSize("thumbnail", fileArray.length, ProcessingPriority.CRITICAL);
+
       // Start hashing and pipeline the uploads
       await generateHashCodes(files, (hashResult) => {
         const file = fileArray[hashResult.index];
@@ -206,7 +220,7 @@ export function useUploadProcess(): useUploadProcessReturn {
           uploadTasks.push(uploadChunked(session));
         } else {
           smallFileBuffer.push(session);
-          if (smallFileBuffer.length >= 10) {
+          if (smallFileBuffer.length >= optimalBatchSize) {
             uploadTasks.push(uploadBatch([...smallFileBuffer]));
             smallFileBuffer.length = 0;
           }

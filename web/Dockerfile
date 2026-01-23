@@ -1,5 +1,5 @@
 # Build React app stage
-FROM node:22.3.0-alpine as build
+FROM node:23.11.1-alpine as build
 
 WORKDIR /app
 
@@ -21,6 +21,16 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 
+# Install openssl for self-signed cert generation
+RUN apk add --no-cache openssl
+
+# Create certs directory and generate self-signed certificate
+RUN mkdir -p /etc/nginx/certs && \
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/certs/selfsigned.key \
+    -out /etc/nginx/certs/selfsigned.crt \
+    -subj "/C=US/ST=Dev/L=Local/O=Dev/CN=localhost"
+
 # Copy built files from build stage to nginx
 COPY --from=build /app/dist /usr/share/nginx/html
 
@@ -34,7 +44,7 @@ RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
     echo 'nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
 
-# Expose port
-EXPOSE 80
+# Expose ports (80 for HTTP, 443 for HTTPS)
+EXPOSE 80 443
 
 CMD ["/docker-entrypoint.sh"]

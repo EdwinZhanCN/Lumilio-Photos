@@ -14,6 +14,8 @@ import {
   DefaultVideoLayout,
   DefaultAudioLayout,
 } from "@vidstack/react/player/layouts/default";
+import { useI18n } from "@/lib/i18n";
+
 interface MediaViewerProps {
   asset: Asset;
   className?: string;
@@ -23,6 +25,7 @@ interface MediaViewerProps {
  * MediaViewer component that renders appropriate viewer based on asset type
  */
 const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
+  const { t } = useI18n();
   const videoAsset = isVideo(asset);
   const audioAsset = isAudio(asset);
 
@@ -48,7 +51,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
       >
         <div className="w-full max-w-6xl h-auto max-h-[90vh]">
           <MediaPlayer
-            title={asset.original_filename || "Video"}
+            title={asset.original_filename || t("assets.mediaViewer.video_title")}
             src={webVideoUrl}
             load="visible"
             crossOrigin
@@ -76,7 +79,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
       >
         <div className="w-full max-w-md h-auto">
           <MediaPlayer
-            title={asset.original_filename || "Audio"}
+            title={asset.original_filename || t("assets.mediaViewer.audio_title")}
             src={webAudioUrl}
             poster={posterUrl}
             load="visible"
@@ -101,7 +104,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
       >
         <img
           src={imageUrl}
-          alt={asset.original_filename || "Asset"}
+          alt={asset.original_filename || t("assets.mediaViewer.asset_alt_text")}
           className="max-h-full max-w-full object-contain select-none"
         />
       </div>
@@ -114,12 +117,12 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
       className={`w-full h-full flex items-center justify-center text-white ${className}`}
     >
       <div className="text-center">
-        <div className="text-xl mb-2">Media not available</div>
+        <div className="text-xl mb-2">{t("assets.mediaViewer.media_not_available")}</div>
         <div className="text-sm opacity-70">
-          {asset.original_filename || "Unknown file"}
+          {asset.original_filename || t("assets.mediaViewer.unknown_file")}
         </div>
         <div className="text-xs opacity-50 mt-1">
-          {asset.mime_type || asset.type || "Unknown type"}
+          {asset.mime_type || asset.type || t("assets.mediaViewer.unknown_type")}
         </div>
       </div>
     </div>

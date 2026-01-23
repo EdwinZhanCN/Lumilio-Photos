@@ -33,7 +33,7 @@ function ImgStackGrid({
   if (loading) {
     return (
       <div
-        className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 p-4 ${className}`}
+        className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 p-4 min-h-[400px] ${className}`}
       >
         {Array.from({ length: 12 }).map((_, index) => (
           <div key={index} className="animate-pulse flex flex-col items-center">
@@ -55,7 +55,7 @@ function ImgStackGrid({
   if (albums.length === 0) {
     return (
       <div
-        className={`flex flex-col items-center justify-center p-12 text-center ${className}`}
+        className={`flex flex-col items-center justify-center p-12 text-center min-h-[400px] ${className}`}
       >
         <div className="text-6xl mb-4 text-base-300">📁</div>
         <h3 className="text-lg font-medium mb-2">No Albums</h3>
@@ -66,7 +66,7 @@ function ImgStackGrid({
 
   return (
     <div
-      className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 p-4 ${className}`}
+      className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 p-4 min-h-[400px] ${className}`}
     >
       {albums.map((album) => {
         const isSelected = selectedIds.includes(album.id);

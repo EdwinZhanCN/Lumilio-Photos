@@ -7,6 +7,7 @@ import {
   getAssetAriaLabel,
 } from "@/lib/utils/mediaTypes";
 import { Asset } from "@/services";
+import { useI18n } from "@/lib/i18n";
 
 interface MediaThumbnailProps {
   asset: Asset;
@@ -28,6 +29,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   isSelected = false,
   isSelectionMode = false,
 }) => {
+  const { t } = useI18n();
   const videoAsset = isVideo(asset);
   const audioAsset = isAudio(asset);
   const duration = asset.duration;
@@ -64,7 +66,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
         {selectionOverlay}
         <img
           src={thumbnailUrl}
-          alt={asset.original_filename || "Asset"}
+          alt={asset.original_filename || t("assets.mediaThumbnail.asset_alt_text")}
           className={`w-full h-full object-cover transition-transform duration-200 ${isSelected ? '' : 'hover:scale-105'}`}
           loading="lazy"
         />
@@ -74,7 +76,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
           <div className="absolute top-2 left-2">
             <div className="bg-black/70 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
               <Video className="w-3 h-3" />
-              <span className="sr-only">Video</span>
+              <span className="sr-only">{t("assets.mediaThumbnail.video_sr_only")}</span>
             </div>
           </div>
         )}
@@ -124,14 +126,14 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
         <div className="absolute top-2 left-2">
           <div className="bg-black/30 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
             <Headphones className="w-3 h-3" />
-            <span className="sr-only">Audio</span>
+            <span className="sr-only">{t("assets.mediaThumbnail.audio_sr_only")}</span>
           </div>
         </div>
 
         <Music className="w-12 h-12 mb-2" aria-hidden="true" />
         <div className="text-center px-2">
           <div className="text-sm font-medium truncate max-w-full">
-            {asset.original_filename?.replace(/\.[^/.]+$/, "") || "Audio File"}
+            {asset.original_filename?.replace(/\.[^/.]+$/, "") || t("assets.mediaThumbnail.audio_file_fallback")}
           </div>
           {duration && (
             <div className="text-xs opacity-80 mt-1">
@@ -151,7 +153,7 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
       onClick={onClick}
       role="button"
       tabIndex={0}
-      aria-label={`Asset: ${asset.original_filename || "Unknown file"}`}
+      aria-label={`${t("assets.mediaThumbnail.asset_aria_label_prefix")}: ${asset.original_filename || t("assets.mediaThumbnail.unknown_file_fallback")}`}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
@@ -161,9 +163,9 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
     >
       {selectionOverlay}
       <div className="text-center">
-        <div className="text-xs">No Preview</div>
+        <div className="text-xs">{t("assets.mediaThumbnail.no_preview")}</div>
         <div className="text-xs opacity-60">
-          {asset.mime_type || asset.type || "Unknown MIME"}
+          {asset.mime_type || asset.type || t("assets.mediaThumbnail.unknown_mime_fallback")}
         </div>
       </div>
       {isSelected && <div className="absolute inset-0 bg-primary/10 pointer-events-none" />}

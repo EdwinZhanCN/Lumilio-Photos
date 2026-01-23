@@ -29,7 +29,7 @@ export type {
   TabType,
   GroupByType,
   ViewDefinitionOptions,
-} from "./types";
+} from "./assets.types.ts";
 
 // Export shared components
 export { default as AssetsPageHeader } from "./components/shared/AssetsPageHeader";
