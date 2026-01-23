@@ -8,6 +8,7 @@
 
 ## Interfaces
 
+- [SingleHashResult](interfaces/SingleHashResult.md)
 - [WorkerClientOptions](interfaces/WorkerClientOptions.md)
 
 ## Type Aliases

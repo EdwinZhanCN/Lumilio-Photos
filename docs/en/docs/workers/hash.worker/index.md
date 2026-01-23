@@ -4,5 +4,5 @@
 
 ## Interfaces
 
-- [WorkerHashResult](interfaces/WorkerHashResult.md)
+- [SingleHashPayload](interfaces/SingleHashPayload.md)
 - [WorkerMessage](interfaces/WorkerMessage.md)

@@ -2,7 +2,7 @@
 
 # Interface: HashcodeProgress
 
-Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:10](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3dd9035b607ebbe85d911491cffd43a9e01c377d/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L10)
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:5](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/52221c8896959c37d78aaf90412f95ba8ac912a6/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L5)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:10](https://github.com/Edw
 
 > `optional` **error**: `string`
 
-Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3dd9035b607ebbe85d911491cffd43a9e01c377d/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L13)
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:8](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/52221c8896959c37d78aaf90412f95ba8ac912a6/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L8)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:13](https://github.com/Edw
 
 > **numberProcessed**: `number`
 
-Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3dd9035b607ebbe85d911491cffd43a9e01c377d/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L11)
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:6](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/52221c8896959c37d78aaf90412f95ba8ac912a6/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L6)
 
 ***
 
@@ -26,4 +26,4 @@ Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:11](https://github.com/Edw
 
 > **total**: `number`
 
-Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3dd9035b607ebbe85d911491cffd43a9e01c377d/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L12)
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:7](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/52221c8896959c37d78aaf90412f95ba8ac912a6/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L7)
