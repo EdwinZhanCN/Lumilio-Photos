@@ -1,4 +1,4 @@
-import { startWorkers } from '../../../../wasm/blake3-wasm/pkg/snippets/wasm-bindgen-rayon-38edf6e439f6d70d/src/workerHelpers.js';
+import { startWorkers } from './snippets/wasm-bindgen-rayon-38edf6e439f6d70d/src/workerHelpers.js';
 
 let wasm;
 
