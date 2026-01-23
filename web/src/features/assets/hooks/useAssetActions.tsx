@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useAssetsContext } from "./useAssetsContext";
-import { AssetActionsResult } from "../types";
+import { AssetActionsResult } from "../assets.types.ts";
 import { assetService } from "@/services/assetsService";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";

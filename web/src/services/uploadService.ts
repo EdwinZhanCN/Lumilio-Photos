@@ -141,6 +141,7 @@ export const uploadService = {
    * Upload a single file as chunks
    * @param file - The file to upload in chunks
    * @param sessionId - Unique session identifier
+   * @param hash - The BLAKE3 hash of the file
    * @param chunkSize - Size of each chunk in bytes
    * @param repositoryId - Optional repository UUID
    * @param onProgress - Optional progress callback
@@ -149,62 +150,81 @@ export const uploadService = {
   uploadFileInChunks: async (
     file: File,
     sessionId: string,
-    chunkSize: number = 24 * 1024 * 1024, // 24MB default to reduce chunk count
+    hash: string,
+    chunkSize: number = 24 * 1024 * 1024,
     repositoryId?: string,
     onProgress?: (progress: number) => void,
     options?: { maxConcurrent?: number; chunkSize?: number },
   ): Promise<AxiosResponse<ApiResult<BatchUploadResponse>>> => {
     const effectiveChunkSize = options?.chunkSize ?? chunkSize;
     const totalChunks = Math.ceil(file.size / effectiveChunkSize);
-    const uploadPromises: Array<
-      Promise<AxiosResponse<ApiResult<BatchUploadResponse>>>
-    > = [];
-    const maxConcurrent = options?.maxConcurrent ?? 2; // Lower concurrency for low-power mode
+    // Increased default concurrency for HTTP/2 multiplexing
+    const maxConcurrent = options?.maxConcurrent ?? 6;
+    let lastResponse: AxiosResponse<ApiResult<BatchUploadResponse>> | null = null;
 
-    // Upload chunks sequentially with concurrency control
-    for (
-      let chunkIndex = 0;
-      chunkIndex < totalChunks;
-      chunkIndex += maxConcurrent
-    ) {
-      const chunkBatch = [];
-
-      for (let i = 0; i < maxConcurrent && chunkIndex + i < totalChunks; i++) {
-        const currentChunkIndex = chunkIndex + i;
-        const start = currentChunkIndex * effectiveChunkSize;
-        const end = Math.min(start + effectiveChunkSize, file.size);
-        const chunk = file.slice(start, end);
-
-        chunkBatch.push({
+    // Helper to upload a single chunk
+    const uploadChunk = async (chunkIndex: number) => {
+      const start = chunkIndex * effectiveChunkSize;
+      const end = Math.min(start + effectiveChunkSize, file.size);
+      const chunk = file.slice(start, end);
+      
+      return uploadService.batchUploadFiles(
+        [{
           file: chunk,
           fileName: file.name,
           sessionId,
           isChunk: true,
-          chunkIndex: currentChunkIndex,
+          chunkIndex,
           totalChunks,
-        });
-      }
-
-      // Upload this batch of chunks
-      const response = await uploadService.batchUploadFiles(
-        chunkBatch,
+        }],
         repositoryId,
+        {
+          headers: {
+            "X-Content-Hash": hash,
+          }
+        }
       );
+    };
 
-      // Update progress
-      if (onProgress) {
-        const progress = Math.min(
-          ((chunkIndex + chunkBatch.length) / totalChunks) * 100,
-          100,
-        );
-        onProgress(progress);
-      }
+    // Use a semaphore-like approach to limit concurrency
+    let activeUploads = 0;
+    let nextChunkIndex = 0;
+    let completedChunks = 0;
 
-      uploadPromises.push(Promise.resolve(response));
-    }
+    return new Promise((resolve, reject) => {
+      const processNext = () => {
+        if (nextChunkIndex >= totalChunks) {
+          if (activeUploads === 0 && lastResponse) {
+            resolve(lastResponse);
+          }
+          return;
+        }
 
-    // Return the last response
-    return uploadPromises[uploadPromises.length - 1];
+        while (activeUploads < maxConcurrent && nextChunkIndex < totalChunks) {
+          const currentIndex = nextChunkIndex++;
+          activeUploads++;
+          
+          uploadChunk(currentIndex)
+            .then(response => {
+              lastResponse = response;
+              completedChunks++;
+              activeUploads--;
+              
+              if (onProgress) {
+                const progress = Math.min((completedChunks / totalChunks) * 100, 100);
+                onProgress(progress);
+              }
+              
+              processNext();
+            })
+            .catch(error => {
+              reject(error);
+            });
+        }
+      };
+
+      processNext();
+    });
   },
 
   /**

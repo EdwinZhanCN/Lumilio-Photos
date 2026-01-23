@@ -1,4 +1,4 @@
-import { SettingsAction, UISettings } from "../types";
+import { SettingsAction, UISettings } from "../settings.types.ts";
 
 export const uiReducer = (
   state: UISettings,
@@ -11,11 +11,6 @@ export const uiReducer = (
       return { ...state, language: action.payload };
     case "SET_REGION":
       return { ...state, region: action.payload };
-    case "SET_UPLOAD_MAX_PREVIEW_COUNT":
-      return {
-        ...state,
-        upload: { ...state.upload!, max_preview_count: action.payload },
-      };
     case "SET_UPLOAD_MAX_TOTAL_FILES":
       return {
         ...state,

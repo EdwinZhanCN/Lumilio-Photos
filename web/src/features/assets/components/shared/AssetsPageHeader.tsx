@@ -11,12 +11,13 @@ import FilterTool, {
 } from "@/features/assets/components/page/FilterTool/FilterTool";
 import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
 import { useSelection, useBulkAssetOperations } from "@/features/assets/hooks/useSelection";
-import { GroupByType } from "@/features/assets/types";
+import { GroupByType } from "@/features/assets/assets.types.ts";
 import { selectTabTitle } from "@/features/assets/reducers/ui.reducer";
 import { useCallback, useMemo, useRef, useEffect, useState, ReactNode } from "react";
 import { albumService, Album } from "@/services/albumService";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { assetService } from "@/services/assetsService";
+import { useI18n } from "@/lib/i18n";
 
 interface AssetsPageHeaderProps {
   groupBy: GroupByType;
@@ -65,6 +66,7 @@ const AssetsPageHeader = ({
   title,
   icon,
 }: AssetsPageHeaderProps) => {
+  const { t } = useI18n();
   const { state, dispatch } = useAssetsContext();
   const selection = useSelection();
   const bulkOps = useBulkAssetOperations();
@@ -206,9 +208,9 @@ const AssetsPageHeader = ({
   const confirmDelete = async () => {
     try {
       await bulkOps.bulkDelete();
-      showMessage("success", `Successfully deleted ${selection.selectedCount} assets`);
+      showMessage("success", t("assets.assetsPageHeader.messages.deleteSuccess", { count: selection.selectedCount }));
     } catch (error) {
-      showMessage("error", "Failed to delete assets");
+      showMessage("error", t("assets.assetsPageHeader.messages.deleteError"));
     } finally {
       setIsDeleteConfirmOpen(false);
     }
@@ -217,9 +219,9 @@ const AssetsPageHeader = ({
   const handleDownloadAll = async () => {
     try {
       await bulkOps.bulkDownload();
-      showMessage("success", "Download started");
+      showMessage("success", t("assets.assetsPageHeader.messages.downloadStart"));
     } catch (error) {
-      showMessage("error", "Failed to start download");
+      showMessage("error", t("assets.assetsPageHeader.messages.downloadError"));
     }
   };
 
@@ -232,7 +234,7 @@ const AssetsPageHeader = ({
         setAlbums(response.data.data.albums || []);
       }
     } catch (error) {
-      showMessage("error", "Failed to load albums");
+      showMessage("error", t("assets.assetsPageHeader.messages.loadAlbumsError"));
     } finally {
       setIsLoadingAlbums(false);
     }
@@ -242,11 +244,11 @@ const AssetsPageHeader = ({
     setIsAddingToAlbum(true);
     try {
       await bulkOps.bulkAddToAlbum(albumId);
-      showMessage("success", `Added ${selection.selectedCount} items to album`);
+      showMessage("success", t("assets.assetsPageHeader.messages.addToAlbumSuccess", { count: selection.selectedCount }));
       setIsAlbumModalOpen(false);
       selection.clear();
     } catch (error) {
-      showMessage("error", "Failed to add items to album");
+      showMessage("error", t("assets.assetsPageHeader.messages.addToAlbumError"));
     } finally {
       setIsAddingToAlbum(false);
     }
@@ -266,7 +268,7 @@ const AssetsPageHeader = ({
             className="btn btn-sm btn-soft btn-info"
           >
             <FunnelIcon className="size-4" />
-            Group by {groupBy}
+            {t("assets.assetsPageHeader.groupBy", { groupBy })}
           </div>
           <ul
             tabIndex={0}
@@ -277,7 +279,7 @@ const AssetsPageHeader = ({
                 onClick={() => onGroupByChange("date")}
                 className={groupBy === "date" ? "active" : ""}
               >
-                Date
+                {t("assets.assetsPageHeader.groupByOptions.date")}
               </a>
             </li>
             <li>
@@ -285,7 +287,7 @@ const AssetsPageHeader = ({
                 onClick={() => onGroupByChange("type")}
                 className={groupBy === "type" ? "active" : ""}
               >
-                Type
+                {t("assets.assetsPageHeader.groupByOptions.type")}
               </a>
             </li>
             <li>
@@ -293,7 +295,7 @@ const AssetsPageHeader = ({
                 onClick={() => onGroupByChange("album")}
                 className={groupBy === "album" ? "active" : ""}
               >
-                Album
+                {t("assets.assetsPageHeader.groupByOptions.album")}
               </a>
             </li>
             <li>
@@ -301,7 +303,7 @@ const AssetsPageHeader = ({
                 onClick={() => onGroupByChange("flat")}
                 className={groupBy === "flat" ? "active" : ""}
               >
-                Flat
+                {t("assets.assetsPageHeader.groupByOptions.flat")}
               </a>
             </li>
           </ul>
@@ -321,7 +323,7 @@ const AssetsPageHeader = ({
           } relative`}
           onClick={handleToggleSelection}
           title={
-            selection.enabled ? "Exit Selection Mode" : "Enter Selection Mode"
+            selection.enabled ? t("assets.assetsPageHeader.selectionMode.exit") : t("assets.assetsPageHeader.selectionMode.enter")
           }
         >
           <SquareMousePointer className="w-4 h-4" />
@@ -338,35 +340,35 @@ const AssetsPageHeader = ({
               tabIndex={0}
               role="button"
               className={`btn btn-sm btn-accent ${selection.selectedCount === 0 ? 'btn-disabled opacity-50' : ''}`}
-              title="Quick Actions"
+              title={t("assets.assetsPageHeader.actions.title")}
             >
               <Rocket className="size-4" />
-              Actions
+              {t("assets.assetsPageHeader.actions.title")}
             </div>
             <ul
               tabIndex={0}
               className="dropdown-content menu bg-base-200 rounded-box z-[100] w-52 p-2 shadow-lg mt-2"
             >
               <li className="menu-title px-4 py-2 text-xs opacity-50 uppercase tracking-wider">
-                Apply to {selection.selectedCount} items
+                {t("assets.assetsPageHeader.actions.applyToItems", { count: selection.selectedCount })}
               </li>
               <li>
                 <button onClick={() => bulkOps.bulkToggleLike()}>
                   <Heart size={16} className="text-error" />
-                  Toggle Like
+                  {t("assets.assetsPageHeader.actions.toggleLike")}
                 </button>
               </li>
               <li>
                 <div className="flex flex-col items-stretch p-0">
                   <div className="px-4 py-2 flex items-center gap-2 text-sm">
                     <Star size={16} className="text-warning" />
-                    Set Rating
+                    {t("assets.assetsPageHeader.actions.setRating")}
                   </div>
                   <div className="flex justify-around p-2 pt-0">
                     <button
                       className="btn btn-xs btn-ghost btn-square text-base-content/50"
                       onClick={() => bulkOps.bulkUpdateRating(0)}
-                      title="Clear Rating"
+                      title={t("assets.assetsPageHeader.actions.clearRating")}
                     >
                       <X size={12} />
                     </button>
@@ -386,19 +388,19 @@ const AssetsPageHeader = ({
               <li>
                 <button className="text-info" onClick={handleAddToAlbumClick}>
                   <FolderPlus size={16} />
-                  Add to Album
+                  {t("assets.assetsPageHeader.actions.addToAlbum")}
                 </button>
               </li>
               <li>
                 <button onClick={handleDownloadAll}>
                   <Download size={16} />
-                  Download All
+                  {t("assets.assetsPageHeader.actions.downloadAll")}
                 </button>
               </li>
               <li>
                 <button className="text-error" onClick={handleDeleteClick}>
                   <Trash2 size={16} />
-                  Delete Selected
+                  {t("assets.assetsPageHeader.actions.deleteSelected")}
                 </button>
               </li>
             </ul>
@@ -415,19 +417,18 @@ const AssetsPageHeader = ({
           <div className="modal-box border-t-4 border-error">
             <div className="flex items-center gap-3 text-error mb-4">
               <AlertTriangle size={24} />
-              <h3 className="font-bold text-lg">Confirm Deletion</h3>
+              <h3 className="font-bold text-lg">{t("assets.assetsPageHeader.deleteConfirmModal.title")}</h3>
             </div>
             <p className="py-4">
-              Are you sure you want to delete <strong>{selection.selectedCount}</strong> selected assets? 
-              This action will mark them as deleted and they will no longer appear in your library.
+              {t("assets.assetsPageHeader.deleteConfirmModal.message", { count: selection.selectedCount })}
             </p>
             <div className="modal-action">
               <button className="btn btn-ghost" onClick={() => setIsDeleteConfirmOpen(false)}>
-                Cancel
+                {t("assets.assetsPageHeader.deleteConfirmModal.cancelButton")}
               </button>
               <button className="btn btn-error gap-2" onClick={confirmDelete}>
                 <Trash2 size={18} />
-                Delete Assets
+                {t("assets.assetsPageHeader.deleteConfirmModal.deleteButton")}
               </button>
             </div>
           </div>
@@ -442,7 +443,7 @@ const AssetsPageHeader = ({
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-lg flex items-center gap-2">
                 <FolderPlus className="text-primary" />
-                Add to Album
+                {t("assets.assetsPageHeader.addToAlbumModal.title")}
               </h3>
               <button className="btn btn-sm btn-circle btn-ghost" onClick={() => setIsAlbumModalOpen(false)}>
                 <X size={20} />
@@ -450,13 +451,14 @@ const AssetsPageHeader = ({
             </div>
             
             <p className="text-sm opacity-70 mb-4">
-              Select an album to add {selection.selectedCount} items to.
+              {t("assets.assetsPageHeader.addToAlbumModal.message", { count: selection.selectedCount })}
             </p>
 
             <div className="max-h-64 overflow-y-auto space-y-2 custom-scrollbar pr-1">
               {isLoadingAlbums ? (
                 <div className="flex justify-center py-8">
                   <span className="loading loading-spinner loading-md text-primary"></span>
+                  <span className="sr-only">{t("assets.assetsPageHeader.addToAlbumModal.loadingAlbums")}</span>
                 </div>
               ) : albums.length > 0 ? (
                 albums.map(album => (
@@ -480,14 +482,14 @@ const AssetsPageHeader = ({
                     <div className="text-left">
                       <div className="font-bold text-sm">{album.album_name}</div>
                       <div className="text-[10px] opacity-50 uppercase tracking-wider">
-                        {album.asset_count || 0} items
+                        {t("assets.assetsPageHeader.addToAlbumModal.itemCount", { count: album.asset_count || 0 })}
                       </div>
                     </div>
                   </button>
                 ))
               ) : (
                 <div className="text-center py-8 opacity-50">
-                  <p>No albums found</p>
+                  <p>{t("assets.assetsPageHeader.addToAlbumModal.noAlbumsFound")}</p>
                 </div>
               )}
             </div>
@@ -495,7 +497,7 @@ const AssetsPageHeader = ({
             <div className="modal-action border-t border-base-200 pt-4">
               <button className="btn btn-primary btn-sm gap-2">
                 <Plus size={16} />
-                Create New Album
+                {t("assets.assetsPageHeader.addToAlbumModal.createNewAlbum")}
               </button>
             </div>
           </div>

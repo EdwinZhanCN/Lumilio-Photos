@@ -1,13 +1,16 @@
 # Build React app stage
-FROM node:22.3.0-alpine as build
+FROM node:23.11.1-alpine as build
+
+# Install pnpm
+RUN npm install -g pnpm
 
 WORKDIR /app
 
-# Copy package.json files
-COPY web/package*.json ./
+# Copy package.json and pnpm-lock.yaml files
+COPY web/package.json web/pnpm-lock.yaml ./
 
 # Install dependencies
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 # Copy frontend source code
 COPY web/ ./
@@ -16,10 +19,20 @@ COPY web/ ./
 RUN echo "VITE_API_URL=RUNTIME_API_URL" > .env
 
 # Build the application
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM nginx:alpine
+
+# Install openssl for self-signed cert generation
+RUN apk add --no-cache openssl
+
+# Create certs directory and generate self-signed certificate
+RUN mkdir -p /etc/nginx/certs && \
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/certs/selfsigned.key \
+    -out /etc/nginx/certs/selfsigned.crt \
+    -subj "/C=US/ST=Dev/L=Local/O=Dev/CN=localhost"
 
 # Copy built files from build stage to nginx
 COPY --from=build /app/dist /usr/share/nginx/html
@@ -34,7 +47,7 @@ RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
     echo 'nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
 
-# Expose port
-EXPOSE 80
+# Expose ports (80 for HTTP, 443 for HTTPS)
+EXPOSE 80 443
 
 CMD ["/docker-entrypoint.sh"]

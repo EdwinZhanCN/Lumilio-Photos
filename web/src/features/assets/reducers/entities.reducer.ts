@@ -1,4 +1,4 @@
-import { AssetsAction, EntitiesState, EntityMeta } from "../types";
+import { AssetsAction, EntitiesState, EntityMeta } from "../assets.types.ts";
 import { Asset } from "@/services";
 
 export const initialEntitiesState: EntitiesState = {

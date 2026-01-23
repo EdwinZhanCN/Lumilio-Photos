@@ -1,3 +1,5 @@
+import { useI18n } from "@/lib/i18n";
+
 type ProgressIndicatorProps = {
   processed?: number;
   total?: number;
@@ -9,6 +11,7 @@ const ProgressIndicator = ({
   total,
   label,
 }: ProgressIndicatorProps) => {
+  const { t } = useI18n();
   return (
     <div className="mb-4">
       <div className="flex items-center gap-2">
@@ -18,7 +21,7 @@ const ProgressIndicator = ({
           max={total}
         ></progress>
         <span className="text-sm text-gray-500">
-          {processed}/{total} {label && ` - ${label}`}
+          {t('upload.ProgressIndicator.progress_display', { processed, total, label })}
         </span>
       </div>
     </div>

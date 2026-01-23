@@ -35,7 +35,7 @@ export interface UploadContextValue {
   handleDrop: (e: DragEvent, handleFiles?: (files: FileList) => void) => void;
 
   // File operations
-  addFiles: (files: File[], generatePreviews: boolean) => Promise<void>;
+  addFiles: (files: File[]) => Promise<void>;
   clearFiles: () => void;
   uploadFiles: () => Promise<void>;
 

@@ -1,4 +1,4 @@
-import { AssetsAction, SelectionState } from "../types";
+import { AssetsAction, SelectionState } from "../assets.types.ts";
 
 export const initialSelectionState: SelectionState = {
   enabled: false,

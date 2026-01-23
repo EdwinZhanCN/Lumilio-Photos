@@ -5,7 +5,7 @@ import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
 import { useAssetsView } from "@/features/assets/hooks/useAssetsView";
 import { SideChannelEvent } from "@/features/lumilio/schema";
 import { AssetFilter } from "@/services/assetsService";
-import { AssetViewDefinition } from "@/features/assets/types";
+import { AssetViewDefinition } from "@/features/assets/assets.types.ts";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import { findAssetIndex, getFlatAssetsFromGrouped } from "@/lib/utils/assetGrouping";
