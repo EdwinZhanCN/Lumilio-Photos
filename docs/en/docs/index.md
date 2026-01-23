@@ -1,37 +1,87 @@
-# Web Frontend of Lumilio-Photos
+# Lumilio Photos - Web Frontend
+
+The modern, high-performance web interface for Lumilio Photos, built with React, TypeScript, and WebAssembly.
 
 ## Tech Stack
 
-- **React**
-- **TypeScript**
-- **Vite**
-- **Tailwind CSS (DaisyUI)**
-- **Web Assembly**
+- **Framework:** [React 19](https://react.dev/)
+- **Build Tool:** [Vite](https://vitejs.dev/)
+- **Language:** [TypeScript](https://www.typescriptlang.org/)
+- **Styling:** [Tailwind CSS](https://tailwindcss.com/) & [DaisyUI](https://daisyui.com/)
+- **State Management:** [Redux Toolkit](https://redux-toolkit.js.org/) & [TanStack Query](https://tanstack.com/query/latest)
+- **Performance:** [WebAssembly (WASM)](https://webassembly.org/) & [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API)
+- **Routing:** [React Router 7](https://reactrouter.com/)
+- **Testing:** [Vitest](https://vitest.dev/)
 
-## Project Overview
+## Getting Started
 
-This project is the web frontend for Lumilio Photos, a photo management and machine learning service. It provides a user interface for interacting with the machine learning services
+### Prerequisites
 
-### Custom Hooks
+- [Node.js](https://nodejs.org/) (version specified in `.nvmrc`)
+- [pnpm](https://pnpm.io/) (recommended)
 
-custom hooks are under `src/hooks` directory, which are used to encapsulate logic that can be reused across components.
+### Installation
 
-### Custom Components
+```bash
+pnpm install
+```
 
-custom components are under `src/components` directory, which are reusable UI components that can be used across different pages.
+### Development
 
-### Contexts
+```bash
+pnpm dev
+```
 
-contexts are under `src/contexts` directory, which are used to manage global state and provide it to the components.
+### Build
 
-### Web Assembly
+```bash
+pnpm build
+```
 
-Web Assembly files are under `src/wasm` directory, which is used to encapsulate the logic of the web assembly module.
+### Other Scripts
 
-### Services
+- `pnpm lint`: Run oxlint for fast linting.
+- `pnpm type-check`: Run TypeScript type checking.
+- `pnpm test`: Run unit tests with Vitest.
+- `pnpm docs`: Generate documentation using TypeDoc.
 
-services are under `src/services` directory, which are used to interact with the backend services.
+## Project Structure
 
-### Web Workers
+The project follows a feature-based and modular architecture:
 
-Web Workers are under `src/workers` directory, which are used to run background tasks without blocking the main thread.
+- **`src/features/`**: Domain-specific logic and components (e.g., `auth`, `home`).
+- **`src/wasm/`**: WebAssembly modules for heavy computations (Exif extraction, image processing, hashing).
+- **`src/workers/`**: Web Workers to run WASM and other intensive tasks off the main thread.
+- **`src/hooks/`**: 
+    - `api-hooks/`: Data fetching and mutation hooks.
+    - `util-hooks/`: Reusable UI and logic hooks.
+- **`src/lib/`**: Core utilities, HTTP client (Axios), i18n configuration, and shared helper functions.
+- **`src/contexts/`**: Global React Contexts for state like `WorkerProvider` and `GlobalContext`.
+- **`src/components/`**: Reusable UI components.
+- **`src/styles/`**: Global CSS and Tailwind configurations.
+
+## Key Features
+
+- **Client-side Processing:** Uses WASM (Blake3, Exiv2) to process images and metadata directly in the browser.
+- **Multithreaded:** Offloads heavy tasks to Web Workers to ensure a smooth 60fps UI.
+- **Justified Layout:** Efficient photo grid rendering using `@immich/justified-layout-wasm`.
+- **Internationalization:** Full i18n support using `react-i18next`.
+- **Modern UI:** Responsive design with Tailwind CSS
+
+## Testing
+
+We use Vitest for unit and integration testing.
+
+```bash
+pnpm test          # Run tests
+pnpm test:ui       # Run tests with UI
+pnpm test:coverage # Generate coverage report
+```
+
+## Documentation
+
+API and internal documentation can be generated via TypeDoc:
+
+```bash
+pnpm docs
+```
