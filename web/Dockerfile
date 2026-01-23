@@ -1,13 +1,16 @@
 # Build React app stage
 FROM node:23.11.1-alpine as build
 
+# Install pnpm
+RUN npm install -g pnpm
+
 WORKDIR /app
 
-# Copy package.json files
-COPY web/package*.json ./
+# Copy package.json and pnpm-lock.yaml files
+COPY web/package.json web/pnpm-lock.yaml ./
 
 # Install dependencies
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 # Copy frontend source code
 COPY web/ ./
@@ -16,7 +19,7 @@ COPY web/ ./
 RUN echo "VITE_API_URL=RUNTIME_API_URL" > .env
 
 # Build the application
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM nginx:alpine

@@ -10,6 +10,7 @@ import {
   MusicalNoteIcon,
   CameraIcon,
 } from "@heroicons/react/24/outline";
+import { useI18n } from "@/lib/i18n"; // Import useI18n
 
 interface SupportedFormatsModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { t } = useI18n(); // Initialize useI18n
   const formatGroups = getFormatGroups();
   const summary = getSupportedFormatsSummary();
 
@@ -68,11 +70,11 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
         <div className="modal-box max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-2xl">Supported File Formats</h3>
+            <h3 className="font-bold text-2xl">{t('upload.SupportedFormatsModal.title')}</h3>
             <button
               onClick={onClose}
               className="btn btn-sm btn-circle btn-ghost"
-              aria-label="Close"
+              aria-label={t('upload.SupportedFormatsModal.close_button_aria_label')}
             >
               ✕
             </button>
@@ -93,7 +95,7 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <span className="text-sm">{summary}</span>
+            <span className="text-sm">{t('upload.SupportedFormatsModal.summary_message', { summary })}</span>
           </div>
 
           {/* Format groups */}
@@ -108,12 +110,12 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
                         {getCategoryIcon(group.category)}
                       </div>
                       <h4 className="font-semibold text-lg">
-                        {group.category}
+                        {t(`upload.SupportedFormatsModal.category_${group.category.toLowerCase().replace(/ /g, '_')}`)}
                       </h4>
                       <div
                         className={`badge ${getCategoryColor(group.category)} badge-sm`}
                       >
-                        {group.formats.length} formats
+                        {t('upload.SupportedFormatsModal.formats_count', { count: group.formats.length })}
                       </div>
                     </div>
 
@@ -142,7 +144,7 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
           {/* Footer */}
           <div className="modal-action mt-4">
             <button onClick={onClose} className="btn btn-primary">
-              Got it!
+              {t('upload.SupportedFormatsModal.got_it_button')}
             </button>
           </div>
         </div>

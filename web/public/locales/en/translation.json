@@ -319,6 +319,36 @@
             "supported_formats_button": "Supported Formats",
             "error_boundary_title": "Upload Section Error!",
             "error_boundary_message": "The upload section failed to load or encountered an error during operation."
+        },
+        "SupportedFormatsModal": {
+            "title": "Supported File Formats",
+            "close_button_aria_label": "Close",
+            "summary_message": "{{summary}}",
+            "category_photos": "Photos",
+            "category_raw_formats": "RAW Formats",
+            "category_videos": "Videos",
+            "category_audio": "Audio",
+            "formats_count": "{{count}} formats",
+            "got_it_button": "Got it!"
+        },
+        "UnifiedUploadSection": {
+            "no_valid_files_selected": "No valid files selected",
+            "cannot_clear_while_processing": "Cannot clear files while processing",
+            "no_files_selected_for_upload": "No files selected for upload",
+            "drag_drop_or_click": "Drag & Drop or Click to Upload",
+            "supported_file_types_description": "Supports images, RAW formats, videos, and audio files",
+            "upload_information_title": "Upload Information",
+            "max_files_label": "Max files:",
+            "change_limits_settings_hint": "Change limits in Settings → UI Settings.",
+            "add_files_button": "Add Files",
+            "clear_button": "Clear",
+            "uploading_status": "Uploading...",
+            "upload_button": "Upload {{count > 0 ? '(' + count + ')' : ''}}",
+            "selected_files_title": "Selected Files",
+            "overall_progress_label": "Overall Progress"
+        },
+        "ProgressIndicator": {
+            "progress_display": "{{processed}}/{{total}}{{label ? ' - ' + label : ''}}"
         }
     },
     "updates": {

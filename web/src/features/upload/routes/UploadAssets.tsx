@@ -8,23 +8,25 @@ import { useUploadContext } from "@/features/upload";
 import React, { useState } from "react";
 import { ArrowUpTrayIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import SupportedFormatsModal from "../components/SupportedFormatsModal";
+import { useI18n } from "@/lib/i18n"; // Import useI18n
 
 const UploadHeader: React.FC = () => {
+  const { t } = useI18n(); // Initialize useI18n
   const { state, isProcessing } = useUploadContext();
   const [showFormatsModal, setShowFormatsModal] = useState(false);
 
   const total = state.files.length;
   const subtitle =
     isProcessing && total > 0
-      ? `Processing ${total} file${total !== 1 ? "s" : ""}...`
+      ? t('upload.UploadAssets.processing_files', { count: total })
       : total > 0
-        ? `${total} file${total !== 1 ? "s" : ""} ready to upload`
-        : "No files selected";
+        ? t('upload.UploadAssets.files_ready_to_upload', { count: total })
+        : t('upload.UploadAssets.no_files_selected');
 
   return (
     <>
       <PageHeader
-        title="Upload Assets"
+        title={t('upload.UploadAssets.page_title')}
         icon={<ArrowUpTrayIcon className="w-6 h-6 text-primary" />}
       >
         <button
@@ -32,7 +34,7 @@ const UploadHeader: React.FC = () => {
           onClick={() => setShowFormatsModal(true)}
         >
           <DocumentTextIcon className="w-4 h-4" />
-          Supported Formats
+          {t('upload.UploadAssets.supported_formats_button')}
         </button>
         <small>{subtitle}</small>
       </PageHeader>
@@ -46,6 +48,7 @@ const UploadHeader: React.FC = () => {
 };
 
 const UploadAssets = () => {
+  const { t } = useI18n(); // Initialize useI18n
   return (
     <WorkerProvider preload={["hash"]}>
       <UploadProvider>
@@ -55,10 +58,8 @@ const UploadAssets = () => {
             FallbackComponent={(props) => (
               <ErrorFallBack
                 code={"500"}
-                title={"Upload Section Error!"}
-                message={
-                  "The upload section failed to load or encountered an error during operation."
-                }
+                title={t('upload.UploadAssets.error_boundary_title')}
+                message={t('upload.UploadAssets.error_boundary_message')}
                 {...props}
               />
             )}

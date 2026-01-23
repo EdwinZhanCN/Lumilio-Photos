@@ -4,8 +4,10 @@ import { uploadReducer, initialState } from "./reducers";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { UploadContext } from "./upload.types.ts";
 import { useSettingsContext } from "@/features/settings";
+import { useI18n } from "@/lib/i18n"; // Import useI18n
 
 export function UploadProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n(); // Initialize useI18n
   const [state, dispatch] = useReducer(uploadReducer, initialState);
   const showMessage = useMessage();
   const uploadProcess = useUploadProcess();
@@ -47,7 +49,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       // Check total files limit
       const availableSlots = maxTotalFiles - state.files.length;
       if (availableSlots <= 0) {
-        showMessage("error", `Maximum ${maxTotalFiles} files allowed`);
+        showMessage("error", t('upload.UploadProvider.max_files_allowed', { count: maxTotalFiles }));
         return;
       }
 
@@ -55,7 +57,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       if (files.length > availableSlots) {
         showMessage(
           "hint",
-          `${files.length - availableSlots} files exceeded the limit and were removed`,
+          t('upload.UploadProvider.files_exceeded_limit', { count: files.length - availableSlots }),
         );
       }
 
@@ -68,7 +70,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
         },
       });
     },
-    [state.files.length, maxTotalFiles, showMessage],
+    [state.files.length, maxTotalFiles, showMessage, t],
   );
 
   const clearFiles = useCallback(() => {
@@ -77,20 +79,20 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   const uploadFiles = useCallback(async () => {
     if (!state.files.length) {
-      showMessage("info", "No files selected for upload.");
+      showMessage("info", t('upload.UploadProvider.no_files_selected_for_upload_message'));
       return;
     }
 
     try {
       await uploadProcess.processFiles(state.files);
       dispatch({ type: "CLEAR_FILES" });
-      showMessage("success", "Upload completed successfully!");
+      showMessage("success", t('upload.UploadProvider.upload_completed_success'));
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Upload failed";
+        error instanceof Error ? error.message : t('upload.UploadProvider.upload_failed_generic');
       showMessage("error", errorMessage);
     }
-  }, [state.files, uploadProcess, showMessage]);
+  }, [state.files, uploadProcess, showMessage, t]);
 
   const contextValue = useMemo(
     () => ({
