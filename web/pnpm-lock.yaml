@@ -111,9 +111,6 @@ importers:
         specifier: ^4.0.8
         version: 4.1.18
     devDependencies:
-      '@catppuccin/tailwindcss':
-        specifier: ^1.0.0
-        version: 1.0.0
       '@eslint/js':
         specifier: ^9.19.0
         version: 9.39.2
@@ -314,10 +311,6 @@ packages:
   '@babel/types@7.28.6':
     resolution: {integrity: sha512-0ZrskXVEHSWIqZM/sQZ4EV3jZJXRkio/WCxaqKZP1g//CEWEPSfeZFcms4XeKBCHU0ZKnIkdJeU/kF+eRp5lBg==}
     engines: {node: '>=6.9.0'}
-
-  '@catppuccin/tailwindcss@1.0.0':
-    resolution: {integrity: sha512-l8pOlcYe2ncGd8a1gUmL5AHmKlxR2+CHuG5kt4Me6IZwzntW1DoLmj89BH+DcsPHBsdDGLrTSv35emlYyU3FeQ==}
-    engines: {node: '>=22.0.0'}
 
   '@csstools/color-helpers@5.1.0':
     resolution: {integrity: sha512-S11EXWJyy0Mz5SYvRmY8nJYTFFd1LCNV+7cXyAgQtOOuzb4EsgfqDufL+9esx72/eLhsRdGZwaldu/h+E4t4BA==}
@@ -3783,8 +3776,6 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
-
-  '@catppuccin/tailwindcss@1.0.0': {}
 
   '@csstools/color-helpers@5.1.0':
     optional: true

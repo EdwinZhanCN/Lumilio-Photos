@@ -66,7 +66,7 @@ The project follows a feature-based and modular architecture:
 - **Multithreaded:** Offloads heavy tasks to Web Workers to ensure a smooth 60fps UI.
 - **Justified Layout:** Efficient photo grid rendering using `@immich/justified-layout-wasm`.
 - **Internationalization:** Full i18n support using `react-i18next`.
-- **Modern UI:** Responsive design with Tailwind CSS and Catppuccin color schemes.
+- **Modern UI:** Responsive design with Tailwind CSS
 
 ## Testing
 
