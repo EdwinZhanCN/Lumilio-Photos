@@ -7,20 +7,20 @@
  * @since 1.1.0
  */
 
+import { globalPerformancePreferences } from "@/utils/performancePreferences";
+
 export type WorkerType = "thumbnail" | "hash" | "border" | "export" | "exif";
 
 export interface WorkerClientOptions {
   preload?: WorkerType[];
 }
 
-
 export interface SingleHashResult {
   index: number;
   hash: string;
   file?: File; // 可选：把原始文件传回来方便后续处理
+  error?: string;
 }
-
-const THREADS = Math.max(1, navigator.hardwareConcurrency - 1);
 
 export class AppWorkerClient {
   private generateThumbnailworker: Worker | null = null;
@@ -170,6 +170,7 @@ export class AppWorkerClient {
 
     const total = filesArray.length;
     let processed = 0;
+    const maxThreads = globalPerformancePreferences.getMaxConcurrentOperations();
 
     return new Promise((resolve, reject) => {
       let currentIndex = 0;
@@ -190,10 +191,15 @@ export class AppWorkerClient {
         const handler = (e: MessageEvent) => {
           if (e.data.type === "HASH_SINGLE_COMPLETE") {
             if (onItemComplete) {
-              onItemComplete({
-                index: fileIndex,
-                hash: e.data.payload.hash
-              });
+              try {
+                onItemComplete({
+                  index: fileIndex,
+                  hash: e.data.payload.hash,
+                  error: e.data.payload.error
+                });
+              } catch (err) {
+                console.error("Error in onItemComplete callback:", err);
+              }
             }
             processed++;
             this.eventTarget.dispatchEvent(
@@ -216,11 +222,15 @@ export class AppWorkerClient {
         worker.postMessage({
           type: "GENERATE_HASH",
           data: [file],
+          config: {
+            // Pass memory constraint multiplier to adjust chunk sizes in worker
+            memoryMultiplier: globalPerformancePreferences.getMemoryConstraintMultiplier()
+          }
         });
       };
 
       // Start initial workers
-      const numWorkers = Math.min(THREADS, total);
+      const numWorkers = Math.min(maxThreads, total);
       for (let i = 0; i < numWorkers; i++) {
         runTask(i);
       }
@@ -380,7 +390,9 @@ export class AppWorkerClient {
       this.generateThumbnailworker.terminate();
       this.generateThumbnailworker = null;
     }
-    this.hashWorkers.forEach(w => w.terminate());
+    this.hashWorkers.forEach(w => {
+      if (w) w.terminate();
+    });
     this.hashWorkers = [];
 
     if (this.generateBorderworker) {

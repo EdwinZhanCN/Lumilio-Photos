@@ -1,4 +1,4 @@
-import { CollectionsAction, CollectionsState } from "./types";
+import { CollectionsAction, CollectionsState } from "./collections.types.ts";
 
 export const initialState: CollectionsState = {
   selectedAlbumIds: [],

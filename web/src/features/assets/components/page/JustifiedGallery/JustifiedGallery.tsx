@@ -8,6 +8,7 @@ import {
 import MediaThumbnail from "../../shared/MediaThumbnail";
 import { Asset } from "@/services";
 import { useKeyboardSelection } from "@/features/assets/hooks/useSelection";
+import { useI18n } from "@/lib/i18n";
 
 interface JustifiedGalleryProps {
   groupedPhotos: Record<string, Asset[]>;
@@ -26,6 +27,7 @@ const JustifiedGallery = ({
   hasMore = false,
   isLoadingMore = false,
 }: JustifiedGalleryProps) => {
+  const { t } = useI18n();
   const [serviceReady, setServiceReady] = useState(justifiedLayoutService.isReady());
   const [layouts, setLayouts] = useState<Record<string, LayoutResult>>({});
   const [containerWidth, setContainerWidth] = useState(0);
@@ -115,7 +117,7 @@ const JustifiedGallery = ({
     return (
       <div className="text-center py-24 opacity-40">
         <div className="text-6xl mb-4">📸</div>
-        <p className="text-xl font-medium">No assets found</p>
+        <p className="text-xl font-medium">{t("assets.justifiedGallery.no_assets_found")}</p>
       </div>
     );
   }
@@ -130,7 +132,7 @@ const JustifiedGallery = ({
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xl font-bold tracking-tight">{title}</h2>
               <span className="text-xs font-bold uppercase tracking-widest opacity-30">
-                {assets.length} item{assets.length !== 1 ? "s" : ""}
+                {t("assets.justifiedGallery.item_count", { count: assets.length })}
               </span>
             </div>
 
@@ -179,7 +181,7 @@ const JustifiedGallery = ({
         {hasMore && (
           <div className="flex flex-col items-center gap-2 opacity-30">
             <span className="loading loading-ring loading-md"></span>
-            <span className="text-xs font-bold uppercase tracking-widest">Loading more</span>
+            <span className="text-xs font-bold uppercase tracking-widest">{t("assets.justifiedGallery.loading_more")}</span>
           </div>
         )}
       </div>

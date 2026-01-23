@@ -2,7 +2,7 @@ import React, { ReactNode, useReducer, useCallback, useMemo } from "react";
 import { useUploadProcess } from "@/hooks/api-hooks/useUploadProcess";
 import { uploadReducer, initialState } from "./reducers";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { UploadContext } from "./types";
+import { UploadContext } from "./upload.types.ts";
 import { useSettingsContext } from "@/features/settings";
 
 export function UploadProvider({ children }: { children: ReactNode }) {

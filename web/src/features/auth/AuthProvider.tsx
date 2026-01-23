@@ -1,6 +1,6 @@
 import React, { createContext, useReducer, useEffect, ReactNode, useRef } from "react";
 import { authReducer, initialState } from "./auth.reducer";
-import { AuthAction, AuthState } from "./types";
+import { AuthAction, AuthState } from "./auth.types.ts";
 import { authService } from "@/services/authService";
 import { getToken, getRefreshToken, removeToken, saveToken } from "@/lib/http-commons/api";
 

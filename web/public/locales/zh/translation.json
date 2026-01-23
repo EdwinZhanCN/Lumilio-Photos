@@ -66,8 +66,16 @@
         "updateSuccess": "相册更新成功"
     },
     "assets": {
+        "errorFallback": {
+            "something_went_wrong": "出了些问题"
+        },
         "photos": {
             "title": "照片",
+            "end_of_results": "已无更多结果。",
+            "locating_asset": "正在定位资产...",
+            "loading_more_data": "正在加载更多数据以查找资产...",
+            "asset_not_available": "资产可能在当前视图中不可用。",
+            "loading_assets": "正在加载资产...",
             "fullscreen": {
                 "info": {
                     "title": "元数据",
@@ -101,10 +109,20 @@
             }
         },
         "videos": {
-            "title": "视频"
+            "title": "视频",
+            "end_of_results": "已无更多结果。",
+            "locating_asset": "正在定位资产...",
+            "loading_more_data": "正在加载更多数据以查找资产...",
+            "asset_not_available": "资产可能在当前视图中不可用。",
+            "loading_assets": "正在加载资产..."
         },
         "audios": {
-            "title": "音频"
+            "title": "音频",
+            "end_of_results": "已无更多结果。",
+            "locating_asset": "正在定位资产...",
+            "loading_more_data": "正在加载更多数据以查找资产...",
+            "asset_not_available": "资产可能在当前视图中不可用。",
+            "loading_assets": "正在加载资产..."
         },
         "empty": "暂无资产",
         "basicInfo": {
@@ -130,6 +148,107 @@
                 "forbidden": "无权访问原始文件",
                 "extractFailed": "提取 EXIF 失败：{{message}}"
             }
+        },
+        "filterTool": {
+            "sectionShell": {
+                "enable": "启用"
+            },
+            "rawSection": {
+                "title": "RAW",
+                "include": "包含",
+                "exclude": "排除"
+            },
+            "ratingSection": {
+                "title": "评分",
+                "rating_n": "{{n}} 星",
+                "unrated_title": "未评分",
+                "unrated_short": "U"
+            },
+            "likeSection": {
+                "title": "喜欢",
+                "liked": "已喜欢",
+                "unliked": "未喜欢"
+            },
+            "filenameSection": {
+                "title": "文件名",
+                "contains": "包含",
+                "matches": "匹配",
+                "starts_with": "开头是",
+                "ends_with": "结尾是",
+                "placeholder": "输入文本..."
+            },
+            "dateSection": {
+                "title": "日期",
+                "from": "从",
+                "to": "到"
+            },
+            "locationSection": {
+                "title": "位置",
+                "north_placeholder": "北",
+                "south_placeholder": "南",
+                "east_placeholder": "东",
+                "west_placeholder": "西",
+                "pick_on_map": "在地图上选择",
+                "use_current_location": "使用当前位置",
+                "modal_title": "选择位置",
+                "modal_description": "提供中心点 + 半径以生成边界框，或手动编辑值。",
+                "center_lat": "中心纬度",
+                "center_lon": "中心经度",
+                "radius_km": "半径 (公里)",
+                "generate_bbox": "生成边界框",
+                "preview_map": "预览地图",
+                "bbox_coords": "边界框 北:{{north}} 南:{{south}} 东:{{east}} 西:{{west}}",
+                "cancel": "取消",
+                "done": "完成",
+                "close_modal": "关闭"
+            },
+            "cameraMakeSection": {
+                "title": "相机品牌",
+                "select_placeholder": "选择相机品牌",
+                "loading_options": "正在加载选项…"
+            },
+            "lensSection": {
+                "title": "镜头",
+                "select_placeholder": "选择镜头",
+                "loading_options": "正在加载选项…"
+            },
+            "main": {
+                "filters_button_title": "筛选器",
+                "filters_header": "筛选器",
+                "active_filters_count": "{{count}} 个活跃",
+                "enable_toggle": "启用",
+                "reset_button": "重置",
+                "apply_button": "应用"
+            }
+        },
+        "audioInfoView": {
+            "channels_mono": "单声道",
+            "channels_stereo": "立体声",
+            "channels_count": "{{count}} 声道",
+            "audio_badge": "音频",
+            "codec_label": "编码: {{codec}}"
+        },
+        "photoInfoView": {
+            "raw_badge": "RAW",
+            "iso_prefix": "ISO ",
+            "exposure_suffix": "秒",
+            "ev_suffix": "EV"
+        },
+        "videoInfoView": {
+            "video_badge": "视频",
+            "codec_label": "编码: {{codec}}",
+            "recording_location": "录制地点"
+        },
+        "fullScreenBasicInfo": {
+            "unknown_asset_type": "未知",
+            "unknown_file": "未知文件",
+            "unknown_type": "未知类型"
+        },
+        "justifiedGallery": {
+            "no_assets_found": "未找到任何资产",
+            "item_count": "{{count}} 项",
+            "item_count_plural": "{{count}} 项",
+            "loading_more": "正在加载更多"
         }
     },
     "upload": {

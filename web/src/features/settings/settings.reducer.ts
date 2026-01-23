@@ -1,4 +1,4 @@
-import { SettingsAction, SettingsState } from "./types";
+import { SettingsAction, SettingsState } from "./settings.types.ts";
 import { uiReducer } from "./reducers/ui.reducer";
 import { serverReducer } from "./reducers/server.reducer";
 import { getCurrentLanguage } from "@/lib/i18n.tsx";

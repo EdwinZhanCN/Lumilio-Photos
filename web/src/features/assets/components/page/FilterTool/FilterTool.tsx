@@ -1,6 +1,7 @@
 import { ListFilterIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { assetService } from "@/services/assetsService";
+import { useI18n } from "@/lib/i18n";
 
 /* =========================
    Types
@@ -180,12 +181,13 @@ const SectionShell = memo(function SectionShell({
   disabled?: boolean;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <div className="form-control mb-3">
       <div className="flex items-center justify-between">
         <span className="label-text font-medium">{title}</span>
         <label className="label cursor-pointer p-0 gap-2">
-          <span className="label-text">Enable</span>
+          <span className="label-text">{t("assets.filterTool.sectionShell.enable")}</span>
           <input
             type="checkbox"
             className="toggle toggle-primary"
@@ -217,9 +219,10 @@ const RawSection = memo(function RawSection({
   mode: "include" | "exclude";
   onModeChange: (m: "include" | "exclude") => void;
 }) {
+  const { t } = useI18n();
   return (
     <SectionShell
-      title="RAW"
+      title={t("assets.filterTool.rawSection.title")}
       enabled={enabled}
       onToggle={onEnabledChange}
       disabled={filterDisabled}
@@ -231,7 +234,7 @@ const RawSection = memo(function RawSection({
           disabled={filterDisabled || !enabled}
           onClick={() => onModeChange("include")}
         >
-          Include
+          {t("assets.filterTool.rawSection.include")}
         </button>
         <button
           type="button"
@@ -239,7 +242,7 @@ const RawSection = memo(function RawSection({
           disabled={filterDisabled || !enabled}
           onClick={() => onModeChange("exclude")}
         >
-          Exclude
+          {t("assets.filterTool.rawSection.exclude")}
         </button>
       </div>
     </SectionShell>
@@ -259,9 +262,10 @@ const RatingSection = memo(function RatingSection({
   value: number;
   onValueChange: (n: number) => void;
 }) {
+  const { t } = useI18n();
   return (
     <SectionShell
-      title="Rating"
+      title={t("assets.filterTool.ratingSection.title")}
       enabled={enabled}
       onToggle={onEnabledChange}
       disabled={filterDisabled}
@@ -274,7 +278,7 @@ const RatingSection = memo(function RatingSection({
             className={`btn btn-xs join-item ${value === n ? "btn-primary" : "btn-outline"}`}
             disabled={filterDisabled || !enabled}
             onClick={() => onValueChange(n)}
-            title={`Rating ${n}`}
+            title={t("assets.filterTool.ratingSection.rating_n", { n })}
           >
             {n}
           </button>
@@ -284,9 +288,9 @@ const RatingSection = memo(function RatingSection({
           className={`btn btn-xs join-item ${value === 0 ? "btn-primary" : "btn-outline"}`}
           disabled={filterDisabled || !enabled}
           onClick={() => onValueChange(0)}
-          title="Unrated"
+          title={t("assets.filterTool.ratingSection.unrated_title")}
         >
-          U
+          {t("assets.filterTool.ratingSection.unrated_short")}
         </button>
       </div>
     </SectionShell>
@@ -306,9 +310,10 @@ const LikeSection = memo(function LikeSection({
   value: boolean;
   onValueChange: (v: boolean) => void;
 }) {
+  const { t } = useI18n();
   return (
     <SectionShell
-      title="Like"
+      title={t("assets.filterTool.likeSection.title")}
       enabled={enabled}
       onToggle={onEnabledChange}
       disabled={filterDisabled}
@@ -320,7 +325,7 @@ const LikeSection = memo(function LikeSection({
           disabled={filterDisabled || !enabled}
           onClick={() => onValueChange(true)}
         >
-          Liked
+          {t("assets.filterTool.likeSection.liked")}
         </button>
         <button
           type="button"
@@ -328,7 +333,7 @@ const LikeSection = memo(function LikeSection({
           disabled={filterDisabled || !enabled}
           onClick={() => onValueChange(false)}
         >
-          Unliked
+          {t("assets.filterTool.likeSection.unliked")}
         </button>
       </div>
     </SectionShell>
@@ -352,9 +357,10 @@ const FilenameSection = memo(function FilenameSection({
   value: string;
   onValueChange: (v: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <SectionShell
-      title="Filename"
+      title={t("assets.filterTool.filenameSection.title")}
       enabled={enabled}
       onToggle={onEnabledChange}
       disabled={filterDisabled}
@@ -366,15 +372,15 @@ const FilenameSection = memo(function FilenameSection({
           value={operator}
           onChange={(e) => onOperatorChange(e.target.value as FilenameOperator)}
         >
-          <option value="contains">Contains</option>
-          <option value="matches">Matches</option>
-          <option value="starts_with">Starts with</option>
-          <option value="ends_with">Ends with</option>
+          <option value="contains">{t("assets.filterTool.filenameSection.contains")}</option>
+          <option value="matches">{t("assets.filterTool.filenameSection.matches")}</option>
+          <option value="starts_with">{t("assets.filterTool.filenameSection.starts_with")}</option>
+          <option value="ends_with">{t("assets.filterTool.filenameSection.ends_with")}</option>
         </select>
         <input
           type="text"
           className="input input-bordered input-xs w-2/3"
-          placeholder="Enter text..."
+          placeholder={t("assets.filterTool.filenameSection.placeholder")}
           disabled={filterDisabled || !enabled}
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
@@ -401,16 +407,17 @@ const DateSection = memo(function DateSection({
   to: string;
   onToChange: (v: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <SectionShell
-      title="Date"
+      title={t("assets.filterTool.dateSection.title")}
       enabled={enabled}
       onToggle={onEnabledChange}
       disabled={filterDisabled}
     >
       <div className="flex gap-2">
         <label className="input input-bordered input-xs flex-1 flex items-center gap-2">
-          <span className="text-xs opacity-70">From</span>
+          <span className="text-xs opacity-70">{t("assets.filterTool.dateSection.from")}</span>
           <input
             type="date"
             className="grow text-xs"
@@ -420,7 +427,7 @@ const DateSection = memo(function DateSection({
           />
         </label>
         <label className="input input-bordered input-xs flex-1 flex items-center gap-2">
-          <span className="text-xs opacity-70">To</span>
+          <span className="text-xs opacity-70">{t("assets.filterTool.dateSection.to")}</span>
           <input
             type="date"
             className="grow text-xs"
@@ -451,6 +458,7 @@ const LocationSection = memo(function LocationSection({
   const [locationRadiusKm, setLocationRadiusKm] = useState<number>(5);
   const [locationCenterLat, setLocationCenterLat] = useState<number>(0);
   const [locationCenterLon, setLocationCenterLon] = useState<number>(0);
+  const { t } = useI18n();
 
   const setCurrentLocationAsCenter = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -473,7 +481,7 @@ const LocationSection = memo(function LocationSection({
   return (
     <>
       <SectionShell
-        title="Location"
+        title={t("assets.filterTool.locationSection.title")}
         enabled={enabled}
         onToggle={onEnabledChange}
         disabled={filterDisabled}
@@ -483,7 +491,7 @@ const LocationSection = memo(function LocationSection({
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder="North"
+              placeholder={t("assets.filterTool.locationSection.north_placeholder")}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.north}
@@ -494,7 +502,7 @@ const LocationSection = memo(function LocationSection({
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder="South"
+              placeholder={t("assets.filterTool.locationSection.south_placeholder")}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.south}
@@ -507,7 +515,7 @@ const LocationSection = memo(function LocationSection({
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder="East"
+              placeholder={t("assets.filterTool.locationSection.east_placeholder")}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.east}
@@ -518,7 +526,7 @@ const LocationSection = memo(function LocationSection({
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder="West"
+              placeholder={t("assets.filterTool.locationSection.west_placeholder")}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.west}
@@ -535,7 +543,7 @@ const LocationSection = memo(function LocationSection({
               disabled={filterDisabled || !enabled}
               onClick={() => setMapModalOpen(true)}
             >
-              Pick on map
+              {t("assets.filterTool.locationSection.pick_on_map")}
             </button>
             <button
               type="button"
@@ -543,7 +551,7 @@ const LocationSection = memo(function LocationSection({
               disabled={filterDisabled || !enabled}
               onClick={setCurrentLocationAsCenter}
             >
-              Use current location
+              {t("assets.filterTool.locationSection.use_current_location")}
             </button>
           </div>
         </div>
@@ -552,15 +560,14 @@ const LocationSection = memo(function LocationSection({
       {mapModalOpen && (
         <dialog className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg">Pick location</h3>
+            <h3 className="font-bold text-lg">{t("assets.filterTool.locationSection.modal_title")}</h3>
             <p className="py-2 text-sm opacity-80">
-              Provide a center + radius to generate a bounding box, or manually
-              edit the values.
+              {t("assets.filterTool.locationSection.modal_description")}
             </p>
 
             <div className="grid grid-cols-2 gap-2 mt-2">
               <label className="form-control">
-                <span className="label-text">Center lat</span>
+                <span className="label-text">{t("assets.filterTool.locationSection.center_lat")}</span>
                 <input
                   type="number"
                   className="input input-bordered input-sm"
@@ -571,7 +578,7 @@ const LocationSection = memo(function LocationSection({
               </label>
 
               <label className="form-control">
-                <span className="label-text">Center lon</span>
+                <span className="label-text">{t("assets.filterTool.locationSection.center_lon")}</span>
                 <input
                   type="number"
                   className="input input-bordered input-sm"
@@ -582,7 +589,7 @@ const LocationSection = memo(function LocationSection({
               </label>
 
               <label className="form-control col-span-2">
-                <span className="label-text">Radius (km)</span>
+                <span className="label-text">{t("assets.filterTool.locationSection.radius_km")}</span>
                 <input
                   type="number"
                   className="input input-bordered input-sm"
@@ -600,19 +607,19 @@ const LocationSection = memo(function LocationSection({
                 className="btn btn-sm btn-outline"
                 onClick={setCurrentLocationAsCenter}
               >
-                Use current location
+                {t("assets.filterTool.locationSection.use_current_location")}
               </button>
               <button
                 type="button"
                 className="btn btn-sm"
                 onClick={computeBBoxFromCenter}
               >
-                Generate BBox
+                {t("assets.filterTool.locationSection.generate_bbox")}
               </button>
             </div>
 
             <div className="mt-4">
-              <div className="text-sm opacity-70 mb-2">Preview map</div>
+              <div className="text-sm opacity-70 mb-2">{t("assets.filterTool.locationSection.preview_map")}</div>
               <div className="w-full h-48 rounded-box overflow-hidden border border-base-300">
                 <iframe
                   title="map"
@@ -629,9 +636,12 @@ const LocationSection = memo(function LocationSection({
                 />
               </div>
               <div className="text-xs opacity-70 mt-2">
-                BBox N:{bbox.north.toFixed(6)} S:{bbox.south.toFixed(6)} E:
-                {bbox.east.toFixed(6)} W:
-                {bbox.west.toFixed(6)}
+                {t("assets.filterTool.locationSection.bbox_coords", {
+                  north: bbox.north.toFixed(6),
+                  south: bbox.south.toFixed(6),
+                  east: bbox.east.toFixed(6),
+                  west: bbox.west.toFixed(6),
+                })}
               </div>
             </div>
 
@@ -641,7 +651,7 @@ const LocationSection = memo(function LocationSection({
                 className="btn btn-ghost"
                 onClick={() => setMapModalOpen(false)}
               >
-                Cancel
+                {t("assets.filterTool.locationSection.cancel")}
               </button>
               <button
                 type="button"
@@ -650,7 +660,7 @@ const LocationSection = memo(function LocationSection({
                   setMapModalOpen(false);
                 }}
               >
-                Done
+                {t("assets.filterTool.locationSection.done")}
               </button>
             </div>
           </div>
@@ -659,7 +669,7 @@ const LocationSection = memo(function LocationSection({
             className="modal-backdrop"
             onClick={() => setMapModalOpen(false)}
           >
-            <button>close</button>
+            <button>{t("assets.filterTool.locationSection.close_modal")}</button>
           </form>
         </dialog>
       )}
@@ -684,9 +694,10 @@ const CameraMakeSection = memo(function CameraMakeSection({
   items: string[];
   loading: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <SectionShell
-      title="Camera Make"
+      title={t("assets.filterTool.cameraMakeSection.title")}
       enabled={enabled}
       onToggle={onEnabledChange}
       disabled={filterDisabled}
@@ -697,7 +708,7 @@ const CameraMakeSection = memo(function CameraMakeSection({
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
       >
-        <option value="">Select camera make</option>
+        <option value="">{t("assets.filterTool.cameraMakeSection.select_placeholder")}</option>
         {items.map((item) => (
           <option key={item} value={item}>
             {item}
@@ -705,7 +716,7 @@ const CameraMakeSection = memo(function CameraMakeSection({
         ))}
       </select>
       {loading && (
-        <span className="text-xs opacity-70 mt-1 block">Loading options…</span>
+        <span className="text-xs opacity-70 mt-1 block">{t("assets.filterTool.cameraMakeSection.loading_options")}</span>
       )}
     </SectionShell>
   );
@@ -728,9 +739,10 @@ const LensSection = memo(function LensSection({
   items: string[];
   loading: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <SectionShell
-      title="Lens"
+      title={t("assets.filterTool.lensSection.title")}
       enabled={enabled}
       onToggle={onEnabledChange}
       disabled={filterDisabled}
@@ -741,7 +753,7 @@ const LensSection = memo(function LensSection({
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
       >
-        <option value="">Select lens</option>
+        <option value="">{t("assets.filterTool.lensSection.select_placeholder")}</option>
         {items.map((item) => (
           <option key={item} value={item}>
             {item}
@@ -749,7 +761,7 @@ const LensSection = memo(function LensSection({
         ))}
       </select>
       {loading && (
-        <span className="text-xs opacity-70 mt-1 block">Loading options…</span>
+        <span className="text-xs opacity-70 mt-1 block">{t("assets.filterTool.lensSection.loading_options")}</span>
       )}
     </SectionShell>
   );
@@ -768,6 +780,7 @@ export default function FilterTool({
   fetchCameraMakes,
   fetchLenses,
 }: FilterToolProps) {
+  const { t } = useI18n();
   // Dropdown open state (independent of filter enabled)
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -1046,7 +1059,7 @@ export default function FilterTool({
         className={`btn btn-sm btn-circle btn-soft btn-info ${filterEnabled ? "btn-active" : ""} relative`}
         aria-pressed={filterEnabled}
         onClick={() => setOpen((v) => !v)}
-        title="Filters"
+        title={t("assets.filterTool.main.filters_button_title")}
       >
         <ListFilterIcon className="w-4 h-4" />
         {enabledCount > 0 && (
@@ -1060,12 +1073,12 @@ export default function FilterTool({
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span className="font-medium">Filters</span>
-            <span className="badge badge-ghost">{enabledCount} active</span>
+            <span className="font-medium">{t("assets.filterTool.main.filters_header")}</span>
+            <span className="badge badge-ghost">{t("assets.filterTool.main.active_filters_count", { count: enabledCount })}</span>
           </div>
           <div className="flex items-center gap-2">
             <label className="label cursor-pointer p-0 gap-2">
-              <span className="label-text">Enable</span>
+              <span className="label-text">{t("assets.filterTool.main.enable_toggle")}</span>
               <input
                 type="checkbox"
                 className="toggle toggle-primary"
@@ -1160,7 +1173,7 @@ export default function FilterTool({
             className="btn btn-xs btn-outline"
             onClick={resetAll}
           >
-            Reset
+            {t("assets.filterTool.main.reset_button")}
           </button>
           {!autoApply && (
             <button
@@ -1168,7 +1181,7 @@ export default function FilterTool({
               className="btn btn-xs btn-primary"
               onClick={applyNow}
             >
-              Apply
+              {t("assets.filterTool.main.apply_button")}
             </button>
           )}
         </div>

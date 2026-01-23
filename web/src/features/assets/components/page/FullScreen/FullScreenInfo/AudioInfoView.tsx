@@ -67,10 +67,10 @@ export default function AudioInfoView({
     : "-";
   const channels = metadata.channels
     ? metadata.channels === 1
-      ? "Mono"
+      ? t("assets.audioInfoView.channels_mono")
       : metadata.channels === 2
-        ? "Stereo"
-        : `${metadata.channels} channels`
+        ? t("assets.audioInfoView.channels_stereo")
+        : t("assets.audioInfoView.channels_count", { count: metadata.channels })
     : "-";
 
   // Music metadata
@@ -139,7 +139,7 @@ export default function AudioInfoView({
               <h1 className="font-sans font-bold">
                 {t("assets.basicInfo.title")}
               </h1>
-              <div className="badge badge-soft badge-warning">AUDIO</div>
+              <div className="badge badge-soft badge-warning">{t("assets.audioInfoView.audio_badge")}</div>
             </div>
             <div className="flex gap-1">
               <button className="btn btn-circle btn-xs" disabled>
@@ -191,7 +191,7 @@ export default function AudioInfoView({
             {/* Audio Technical Info */}
             <div className="rounded bg-base-300 overflow-hidden">
               <div className="px-3 py-2 space-y-1">
-                <p className="text-xs opacity-70">Codec: {codec}</p>
+                <p className="text-xs opacity-70">{t("assets.audioInfoView.codec_label", { codec })}</p>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-60">
                   <span>{duration}</span>
                   <span>{sizeM}</span>

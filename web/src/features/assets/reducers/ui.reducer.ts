@@ -1,4 +1,4 @@
-import { AssetsAction, UIState, TabType } from "../types";
+import { AssetsAction, UIState, TabType } from "../assets.types.ts";
 
 export const initialUIState: UIState = {
   currentTab: "photos",
