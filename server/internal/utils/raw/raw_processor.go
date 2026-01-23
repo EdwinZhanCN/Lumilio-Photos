@@ -1,6 +1,7 @@
 package raw
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -113,17 +114,22 @@ func (p *Processor) ProcessRAW(ctx context.Context, reader io.ReadSeeker, filena
 
 	// Try fast embedded preview via LibRaw first (more modern, better camera support)
 	if preview, err := p.librawProcessor.ExtractEmbeddedWithLibRaw(ctx, rawData, filename); err == nil && len(preview) > 0 {
-		result.Strategy = StrategyEmbeddedPreview
-		result.UsedEmbedded = true
-		result.PreviewData = preview
-		result.ProcessingTime = time.Since(start)
-		if img := bimg.NewImage(preview); img != nil {
-			if size, err := img.Size(); err == nil {
-				result.Width = size.Width
-				result.Height = size.Height
+		// Validate preview quality and completeness
+		valid, err := p.detector.IsPreviewAcceptable(preview, p.options.MinPreviewWidth, p.options.MinPreviewHeight)
+		if err == nil && valid {
+			result.Strategy = StrategyEmbeddedPreview
+			result.UsedEmbedded = true
+			result.PreviewData = preview
+			result.ProcessingTime = time.Since(start)
+			if img := bimg.NewImage(preview); img != nil {
+				if size, err := img.Size(); err == nil {
+					result.Width = size.Width
+					result.Height = size.Height
+				}
 			}
+			return result, nil
 		}
-		return result, nil
+		log.Printf("LibRaw embedded preview invalid or truncated, falling back to other strategies")
 	}
 
 	// Fallback to full LibRaw rendering
@@ -199,7 +205,7 @@ func (p *Processor) chooseStrategy(detection *DetectionResult) ProcessingStrateg
 func (p *Processor) processEmbeddedPreview(rawData []byte, detection *DetectionResult) ([]byte, error) {
 	// This is a fallback - we already tried LibRaw embedded preview in ProcessRAW
 	// If we get here, it means the fast path failed, so try with full context
-	previewData, err := p.detector.ExtractEmbeddedPreview(nil, detection)
+	previewData, err := p.detector.ExtractEmbeddedPreview(bytes.NewReader(rawData), detection)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract embedded preview: %w", err)
 	}

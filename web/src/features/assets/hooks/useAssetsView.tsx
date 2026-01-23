@@ -5,7 +5,7 @@ import {
   AssetsViewResult,
   ViewDefinitionOptions,
   TabType,
-} from "../types";
+} from "../assets.types.ts";
 import {
   generateViewKey,
   selectView,

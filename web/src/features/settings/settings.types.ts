@@ -5,7 +5,6 @@ export interface UISettings {
     layout: "compact" | "wide" | "full";
   };
   upload?: {
-    max_preview_count: number; // 生成预览图的最大数量
     max_total_files: number; // 总文件上传数量限制
     low_power_mode?: boolean; // 低功耗模式开关
     chunk_size_mb?: number; // 客户端分片大小（MB）
@@ -29,7 +28,6 @@ export type SettingsAction =
   | { type: "SET_LANGUAGE"; payload: "en" | "zh" }
   | { type: "SET_REGION"; payload: "china" | "other" }
   // Upload Actions
-  | { type: "SET_UPLOAD_MAX_PREVIEW_COUNT"; payload: number }
   | { type: "SET_UPLOAD_MAX_TOTAL_FILES"; payload: number }
   | { type: "SET_UPLOAD_LOW_POWER_MODE"; payload: boolean }
   | { type: "SET_UPLOAD_CHUNK_SIZE_MB"; payload: number }

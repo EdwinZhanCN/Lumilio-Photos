@@ -3,7 +3,7 @@ import {
   ViewsState,
   ViewState,
   AssetViewDefinition,
-} from "../types";
+} from "../assets.types.ts";
 // Browser-compatible hash function (no crypto import needed)
 
 export const initialViewsState: ViewsState = {

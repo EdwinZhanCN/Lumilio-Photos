@@ -1,10 +1,6 @@
-import { GlobalRegistrator } from '@happy-dom/global-registrator';
 import { afterEach, beforeEach, describe, expect, it, test, vi } from 'vitest';
 
-// Register Happy DOM as the global environment for tests
-GlobalRegistrator.register();
-
-// Setup global mocks and test environment
+// Setup global mocks and test environment for Node
 beforeEach(() => {
   // Add any global mocks or setup here
 });
@@ -23,14 +19,6 @@ global.it = it;
 global.test = test;
 global.beforeEach = beforeEach;
 global.afterEach = afterEach;
-
-// Polyfill any missing browser APIs if needed
-// For example:
-// global.ResizeObserver = vi.fn().mockImplementation(() => ({
-//   observe: vi.fn(),
-//   unobserve: vi.fn(),
-//   disconnect: vi.fn(),
-// }));
 
 // Export vitest functions to be available in test files
 export { afterEach, beforeEach, describe, expect, it, test, vi };

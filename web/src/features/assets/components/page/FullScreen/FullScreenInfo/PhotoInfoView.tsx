@@ -90,7 +90,7 @@ export default function PhotoInfoView({
   );
 
   // Additional metadata
-  const isRaw = metadata.is_raw ? "RAW" : "";
+  const isRaw = metadata.is_raw ? t("assets.photoInfoView.raw_badge") : "";
   const currentRating = optimisticRating;
 
   const handleRatingChange = (newRating: number) => {
@@ -203,7 +203,7 @@ export default function PhotoInfoView({
               <div className="flex flex-wrap gap-2 items-center">
                 <p className="text-sm">{takenDisplay}</p>
                 <div className="text-xs text-info">{mimeDisplay}</div>
-                {isRaw && <div className="badge badge-xs badge-warning">RAW</div>}
+                {isRaw && <div className="badge badge-xs badge-warning">{isRaw}</div>}
               </div>
               <div className="flex gap-2 items-center mt-2">
                 <RatingComponent
@@ -232,13 +232,13 @@ export default function PhotoInfoView({
               </div>
               <div className="flex flex-wrap gap-2 p-3 pt-0">
                 <div className="px-2 py-0.5 rounded-full bg-base-100 text-[10px] font-bold">
-                  {"ISO " + iso}
+                  {t("assets.photoInfoView.iso_prefix") + iso}
                 </div>
                 <div className="px-2 py-0.5 rounded-full bg-base-100 text-[10px] font-bold">
-                  {exposure + "s"}
+                  {exposure + t("assets.photoInfoView.exposure_suffix")}
                 </div>
                 <div className="px-2 py-0.5 rounded-full bg-base-100 text-[10px] font-bold">
-                  {ev + "ev"}
+                  {ev + t("assets.photoInfoView.ev_suffix")}
                 </div>
                 <div className="px-2 py-0.5 rounded-full bg-base-100 text-[10px] font-bold">
                   {focal}

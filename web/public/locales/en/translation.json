@@ -67,8 +67,16 @@
         "updateSuccess": "Album updated successfully"
     },
     "assets": {
+        "errorFallback": {
+            "something_went_wrong": "Something went wrong"
+        },
         "photos": {
             "title": "Photos",
+            "end_of_results": "End of results.",
+            "locating_asset": "Locating asset...",
+            "loading_more_data": "Loading more data to find the asset...",
+            "asset_not_available": "Asset may not be available in the current view.",
+            "loading_assets": "Loading assets...",
             "fullscreen": {
                 "info": {
                     "title": "Metadata",
@@ -103,10 +111,20 @@
             "filter": {}
         },
         "videos": {
-            "title": "Videos"
+            "title": "Videos",
+            "end_of_results": "End of results.",
+            "locating_asset": "Locating asset...",
+            "loading_more_data": "Loading more data to find the asset...",
+            "asset_not_available": "Asset may not be available in the current view.",
+            "loading_assets": "Loading assets..."
         },
         "audios": {
-            "title": "Audios"
+            "title": "Audios",
+            "end_of_results": "End of results.",
+            "locating_asset": "Locating asset...",
+            "loading_more_data": "Loading more data to find the asset...",
+            "asset_not_available": "Asset may not be available in the current view.",
+            "loading_assets": "Loading assets..."
         },
         "empty": "No assets yet",
         "basicInfo": {
@@ -132,12 +150,206 @@
                 "forbidden": "Access denied to original file",
                 "extractFailed": "Failed to extract EXIF: {{message}}"
             }
+        },
+        "filterTool": {
+            "sectionShell": {
+                "enable": "Enable"
+            },
+            "rawSection": {
+                "title": "RAW",
+                "include": "Include",
+                "exclude": "Exclude"
+            },
+            "ratingSection": {
+                "title": "Rating",
+                "rating_n": "Rating {{n}}",
+                "unrated_title": "Unrated",
+                "unrated_short": "U"
+            },
+            "likeSection": {
+                "title": "Like",
+                "liked": "Liked",
+                "unliked": "Unliked"
+            },
+            "filenameSection": {
+                "title": "Filename",
+                "contains": "Contains",
+                "matches": "Matches",
+                "starts_with": "Starts with",
+                "ends_with": "Ends with",
+                "placeholder": "Enter text..."
+            },
+            "dateSection": {
+                "title": "Date",
+                "from": "From",
+                "to": "To"
+            },
+            "locationSection": {
+                "title": "Location",
+                "north_placeholder": "North",
+                "south_placeholder": "South",
+                "east_placeholder": "East",
+                "west_placeholder": "West",
+                "pick_on_map": "Pick on map",
+                "use_current_location": "Use current location",
+                "modal_title": "Pick location",
+                "modal_description": "Provide a center + radius to generate a bounding box, or manually edit the values.",
+                "center_lat": "Center lat",
+                "center_lon": "Center lon",
+                "radius_km": "Radius (km)",
+                "generate_bbox": "Generate BBox",
+                "preview_map": "Preview map",
+                "bbox_coords": "BBox N:{{north}} S:{{south}} E:{{east}} W:{{west}}",
+                "cancel": "Cancel",
+                "done": "Done",
+                "close_modal": "close"
+            },
+            "cameraMakeSection": {
+                "title": "Camera Make",
+                "select_placeholder": "Select camera make",
+                "loading_options": "Loading options…"
+            },
+            "lensSection": {
+                "title": "Lens",
+                "select_placeholder": "Select lens",
+                "loading_options": "Loading options…"
+            },
+            "main": {
+                "filters_button_title": "Filters",
+                "filters_header": "Filters",
+                "active_filters_count": "{{count}} active",
+                "enable_toggle": "Enable",
+                "reset_button": "Reset",
+                "apply_button": "Apply"
+            }
+        },
+        "audioInfoView": {
+            "channels_mono": "Mono",
+            "channels_stereo": "Stereo",
+            "channels_count": "{{count}} channels",
+            "audio_badge": "AUDIO",
+            "codec_label": "Codec: {{codec}}"
+        },
+        "photoInfoView": {
+            "raw_badge": "RAW",
+            "iso_prefix": "ISO ",
+            "exposure_suffix": "s",
+            "ev_suffix": "ev"
+        },
+        "videoInfoView": {
+            "video_badge": "VIDEO",
+            "codec_label": "Codec: {{codec}}",
+            "recording_location": "Recording Location"
+        },
+        "fullScreenBasicInfo": {
+            "unknown_asset_type": "UNKNOWN",
+            "unknown_file": "Unknown file",
+            "unknown_type": "Unknown type"
+        },
+        "justifiedGallery": {
+            "no_assets_found": "No assets found",
+            "item_count": "{{count}} item",
+            "item_count_plural": "{{count}} items",
+            "loading_more": "Loading more"
+        },
+        "mediaViewer": {
+            "video_title": "Video",
+            "audio_title": "Audio",
+            "asset_alt_text": "Asset",
+            "media_not_available": "Media not available",
+            "unknown_file": "Unknown file",
+            "unknown_type": "Unknown type"
+        },
+        "assetsPageHeader": {
+            "messages": {
+                "deleteSuccess": "Successfully deleted {{count}} assets",
+                "deleteError": "Failed to delete assets",
+                "downloadStart": "Download started",
+                "downloadError": "Failed to start download",
+                "loadAlbumsError": "Failed to load albums",
+                "addToAlbumSuccess": "Added {{count}} items to album",
+                "addToAlbumError": "Failed to add items to album"
+            },
+            "groupBy": "Group by {{groupBy}}",
+            "groupByOptions": {
+                "date": "Date",
+                "type": "Type",
+                "album": "Album",
+                "flat": "Flat"
+            },
+            "selectionMode": {
+                "exit": "Exit Selection Mode",
+                "enter": "Enter Selection Mode"
+            },
+            "actions": {
+                "title": "Actions",
+                "applyToItems": "Apply to {{count}} items",
+                "toggleLike": "Toggle Like",
+                "setRating": "Set Rating",
+                "clearRating": "Clear Rating",
+                "addToAlbum": "Add to Album",
+                "downloadAll": "Download All",
+                "deleteSelected": "Delete Selected"
+            },
+            "deleteConfirmModal": {
+                "title": "Confirm Deletion",
+                "message": "Are you sure you want to delete {{count}} selected assets? This action will mark them as deleted and they will no longer appear in your library.",
+                "cancelButton": "Cancel",
+                "deleteButton": "Delete Assets"
+            },
+            "addToAlbumModal": {
+                "title": "Add to Album",
+                "message": "Select an album to add {{count}} items to.",
+                "loadingAlbums": "Loading albums...",
+                "itemCount": "{{count}} items",
+                "noAlbumsFound": "No albums found",
+                "createNewAlbum": "Create New Album"
+            }
         }
     },
     "upload": {
         "title": "Upload Photos",
         "button": "Upload",
-        "dragDrop": "Drag and drop files here"
+        "dragDrop": "Drag and drop files here",
+        "UploadAssets": {
+            "processing_files": "Processing {{count}} file{{count === 1 ? '' : 's'}}...",
+            "files_ready_to_upload": "{{count}} file{{count === 1 ? '' : 's'}} ready to upload",
+            "no_files_selected": "No files selected",
+            "page_title": "Upload Assets",
+            "supported_formats_button": "Supported Formats",
+            "error_boundary_title": "Upload Section Error!",
+            "error_boundary_message": "The upload section failed to load or encountered an error during operation."
+        },
+        "SupportedFormatsModal": {
+            "title": "Supported File Formats",
+            "close_button_aria_label": "Close",
+            "summary_message": "{{summary}}",
+            "category_photos": "Photos",
+            "category_raw_formats": "RAW Formats",
+            "category_videos": "Videos",
+            "category_audio": "Audio",
+            "formats_count": "{{count}} formats",
+            "got_it_button": "Got it!"
+        },
+        "UnifiedUploadSection": {
+            "no_valid_files_selected": "No valid files selected",
+            "cannot_clear_while_processing": "Cannot clear files while processing",
+            "no_files_selected_for_upload": "No files selected for upload",
+            "drag_drop_or_click": "Drag & Drop or Click to Upload",
+            "supported_file_types_description": "Supports images, RAW formats, videos, and audio files",
+            "upload_information_title": "Upload Information",
+            "max_files_label": "Max files:",
+            "change_limits_settings_hint": "Change limits in Settings → UI Settings.",
+            "add_files_button": "Add Files",
+            "clear_button": "Clear",
+            "uploading_status": "Uploading...",
+            "upload_button": "Upload {{count > 0 ? '(' + count + ')' : ''}}",
+            "selected_files_title": "Selected Files",
+            "overall_progress_label": "Overall Progress"
+        },
+        "ProgressIndicator": {
+            "progress_display": "{{processed}}/{{total}}{{label ? ' - ' + label : ''}}"
+        }
     },
     "updates": {
         "title": "Updates",

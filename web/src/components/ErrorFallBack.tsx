@@ -14,8 +14,8 @@ type ErrorFallBackProps = {
   code: string | number;
   title: string;
   message?: string;
-  error?: Error;
-  resetErrorBoundary?: () => void;
+  error?: any;
+  resetErrorBoundary?: (...args: any[]) => void;
 };
 
 export default function ErrorFallBack({
@@ -39,7 +39,7 @@ export default function ErrorFallBack({
       "",
       `Code: ${code ?? "(n/a)"}`,
       `Title: ${title ?? "(n/a)"}`,
-      `Message: ${message || error?.message || "(none)"}`,
+      `Message: ${message || error?.message || String(error) || "(none)"}`,
       `URL: ${href}`,
       `UserAgent: ${ua}`,
       `Time: ${time}`,

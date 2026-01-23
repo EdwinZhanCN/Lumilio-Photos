@@ -1,4 +1,4 @@
-import { AssetsAction, FiltersState } from "../types";
+import { AssetsAction, FiltersState } from "../assets.types.ts";
 
 export const initialFiltersState: FiltersState = {
   enabled: false,

@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useAssetsContext } from "./useAssetsContext";
-import { SelectionResult } from "../types";
+import { SelectionResult } from "../assets.types.ts";
 import {
   selectSelectionEnabled,
   selectSelectedIds,

@@ -50,7 +50,7 @@
 
 为了确保类型安全，首先定义从后端接收到的数据结构。
 
-`src/features/agent/types.ts`:
+`src/features/agent/assets.auth.collections.settings.upload.types.ts`:
 ```typescript
 // --- 基本事件结构 ---
 

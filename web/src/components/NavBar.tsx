@@ -1,91 +1,26 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
 import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/LumilioAvatar";
 
-// Extend Window interface for our observer
-declare global {
-  interface Window {
-    shadcnThemeObserver?: MutationObserver;
-  }
-}
-
 function NavBar() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const { t } = useI18n();
-  const observerRef = useRef<MutationObserver | null>(null);
 
   // Initialize theme on component mount
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
-    const isDark = savedTheme === "macchiato" || savedTheme === "dark";
+    const isDark = savedTheme === "dark";
 
-    // If no theme is saved, default to light theme
-    if (!savedTheme) {
-      localStorage.setItem("theme", "latte");
-      document.documentElement.setAttribute("data-theme", "latte");
-      setIsDarkMode(false);
-      updateShadcnScopeTheme(false);
-    } else {
-      // Apply the saved theme
+    if (savedTheme) {
       document.documentElement.setAttribute("data-theme", savedTheme);
       setIsDarkMode(isDark);
-      updateShadcnScopeTheme(isDark);
+    } else {
+      // Default to light theme if no theme is saved
+      document.documentElement.setAttribute("data-theme", "light");
+      setIsDarkMode(false);
     }
   }, []);
-
-  // Cleanup effect
-  useEffect(() => {
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-        observerRef.current = null;
-      }
-    };
-  }, []);
-
-  // Function to update shadcn-scope elements with dark class
-  const updateShadcnScopeTheme = (isDark: boolean) => {
-    // Function to apply theme to a single element
-    const applyThemeToElement = (element: Element) => {
-      if (isDark) {
-        element.classList.add("dark");
-      } else {
-        element.classList.remove("dark");
-      }
-    };
-
-    // Update existing elements
-    const shadcnScopes = document.querySelectorAll(".shadcn-scope");
-    shadcnScopes.forEach(applyThemeToElement);
-
-    // Set up MutationObserver to handle dynamically added elements
-    if (!observerRef.current) {
-      observerRef.current = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === "childList") {
-            mutation.addedNodes.forEach((node) => {
-              if (node instanceof Element) {
-                // Check the node itself
-                if (node.classList.contains("shadcn-scope")) {
-                  applyThemeToElement(node);
-                }
-                // Check descendants
-                const scopes = node.querySelectorAll(".shadcn-scope");
-                scopes.forEach(applyThemeToElement);
-              }
-            });
-          }
-        });
-      });
-
-      // Start observing the entire document
-      observerRef.current.observe(document.body, {
-        childList: true,
-        subtree: true,
-      });
-    }
-  };
 
   return (
     <div className="navbar bg-base-100 px-4 py-2 justify-between">
@@ -134,7 +69,6 @@ function NavBar() {
             localStorage.setItem("theme", newTheme);
             document.documentElement.setAttribute("data-theme", newTheme);
             setIsDarkMode(e.target.checked);
-            updateShadcnScopeTheme(e.target.checked);
           }}
         />
 
@@ -144,7 +78,7 @@ function NavBar() {
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
         >
-          <path d="M5.64,17l-.71.71a1,1,0,0,0,0,1.41,1,1,0,0,0,1.41,0l.71-.71A1,1,0,0,0,5.64,17ZM5,12a1,1,0,0,0-1-1H3a1,1,0,0,0,0,2H4A1,1,0,0,0,5,12Zm7-7a1,1,0,0,0,1-1V3a1,1,0,0,0-2,0V4A1,1,0,0,0,12,5ZM5.64,7.05a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29,1,1,0,0,0,0-1.41l-.71-.71A1,1,0,0,0,4.93,6.34Zm12,.29a1,1,0,0,0,.7-.29l.71-.71a1,1,0,1,0-1.41-1.41L17,5.64a1,1,0,0,0,0,1.41A1,1,0,0,0,17.66,7.34ZM21,11H20a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2Zm-9,8a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V20A1,1,0,0,0,12,19ZM18.36,17A1,1,0,0,0,17,18.36l.71.71a1,1,0,0,0,1.41,0,1,1,0,0,0,0-1.41ZM12,6.5A5.5,5.5,0,1,0,17.5,12,5.51,5.51,0,0,0,12,6.5Zm0,9A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" />
+          <path d="M5.64,17l-.71.71a1,1,0,0,0,0,1.41,1,1,0,0,0,1.41,0l.71-.71A1,1,0,0,0,5.64,17ZM5,12a1,1,0,0,0-1-1H3a1,1,0,0,0,0,2H4A1,1,0,0,0,5,12Zm7-7a1,1,0,0,0,1-1V3a1,1,0,0,0-2,0V4A1,1,0,0,0,12,5ZM5.64,7.05a1,1,0,0,0,.7.29,1,1,0,0,0,0-1.41l-.71-.71A1,1,0,0,0,4.93,6.34Zm12,.29a1,1,0,0,0,.7-.29l.71-.71a1,1,0,1,0-1.41-1.41L17,5.64a1,1,0,0,0,0,1.41A1,1,0,0,0,17.66,7.34ZM21,11H20a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2Zm-9,8a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V20A1,1,0,0,0,12,19ZM18.36,17A1,1,0,0,0,17,18.36l.71.71a1,1,0,0,0,1.41,0,1,1,0,0,0,0-1.41ZM12,6.5A5.5,5.5,0,1,0,17.5,12,5.51,5.51,0,0,0,12,6.5Zm0,9A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" />
         </svg>
 
         {/* moon icon */}

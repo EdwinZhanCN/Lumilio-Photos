@@ -1,12 +1,12 @@
 /// <reference types="vitest" />
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import wasm from "vite-plugin-wasm";
 import path from "path";
 import topLevelAwait from "vite-plugin-top-level-await";
+import {preview} from "@vitest/browser-preview";
 
-// https://vite.dev/config/
 export default defineConfig({
   resolve: {
     alias: {
@@ -15,28 +15,45 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless'
+    }
   },
   plugins: [react(), tailwindcss(), wasm(), topLevelAwait()],
+
+  worker: {
+    format: 'es',
+    plugins: () => [wasm(), topLevelAwait()]
+  },
 
   test: {
     projects: [
       {
+        extends: true,
         test: {
           name: "happy-dom",
           environment: "happy-dom",
-          setupFiles: ["./setup.happy-dom.ts", "@vitest/web-worker"],
-        },
+          setupFiles: ["./setup.happy-dom.ts"],
+          exclude: ["src/workers/*"],
+        }
       },
       {
+        extends: true,
         test: {
-          include: ["**/*.worker.{ts,js}", "**/*.test.{ts,js}"],
-          name: "node",
-          environment: "node",
-          setupFiles: ["./setup.node.ts", "@vitest/web-worker"],
-        },
+          name: "browser",
+          include: ["src/workers/*"],
+          browser: {
+            provider: preview(),
+            instances: [
+              { browser: 'chrome' },
+            ],
+            enabled: true,
+          },
+        }
       },
-    ],
-  },
+    ],  },
+
   optimizeDeps: {
     exclude: ["@immich/justified-layout-wasm"],
   },

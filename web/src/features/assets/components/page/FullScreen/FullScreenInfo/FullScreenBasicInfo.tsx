@@ -158,17 +158,17 @@ export default function FullScreenBasicInfo({
             <h1 className="font-sans font-bold">
               {t("assets.basicInfo.title")}
             </h1>
-            <div className="badge badge-soft badge-neutral">UNKNOWN</div>
+            <div className="badge badge-soft badge-neutral">{t("assets.fullScreenBasicInfo.unknown_asset_type")}</div>
             <button className="btn btn-circle btn-xs" onClick={closeInfo}>
               <X className="w-4 h-4" />
             </button>
           </div>
           <div className="px-2">
             <p className="text-sm text-base-content/70">
-              {asset.original_filename || "Unknown file"}
+              {asset.original_filename || t("assets.fullScreenBasicInfo.unknown_file")}
             </p>
             <p className="text-xs text-base-content/50 mt-2">
-              {asset.mime_type || "Unknown type"}
+              {asset.mime_type || t("assets.fullScreenBasicInfo.unknown_type")}
             </p>
             {asset.file_size && (
               <p className="text-xs text-base-content/50">

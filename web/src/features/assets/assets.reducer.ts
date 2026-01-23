@@ -1,4 +1,4 @@
-import { AssetsAction, AssetsState } from "./types";
+import { AssetsAction, AssetsState } from "./assets.types.ts";
 import {
   entitiesReducer,
   initialEntitiesState,

@@ -9,6 +9,7 @@ import AssetTabs from "@/features/assets/components/AssetTabs";
 import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import ErrorFallBack from "@/components/ErrorFallBack";
+import { useI18n } from "@/lib/i18n";
 
 const AssetsContent = ({ activeTab }: { activeTab: string }) => {
   const { state } = useAssetsContext();
@@ -27,6 +28,7 @@ const AssetsContent = ({ activeTab }: { activeTab: string }) => {
 const Assets = () => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("photos");
+  const { t } = useI18n();
 
   // Determine active tab based on URL path
   useEffect(() => {
@@ -44,7 +46,7 @@ const Assets = () => {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack code={500} title="Something went wrong" {...props} />
+        <ErrorFallBack code={500} title={t("assets.errorFallback.something_went_wrong")} {...props} />
       )}
     >
       <AssetsProvider>

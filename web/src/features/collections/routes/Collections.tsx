@@ -86,7 +86,7 @@ function CollectionsContent() {
         title={t("routes.collections")}
         icon={<Album className="w-6 h-6 text-primary" strokeWidth={1.5} />}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-h-[32px]">
           {isSelectionMode ? (
             <>
               <span className="text-sm font-medium mr-2">
@@ -129,7 +129,7 @@ function CollectionsContent() {
         </div>
       </PageHeader>
 
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 min-h-0">
         {/* Show a subtle loading indicator when refetching or invalidating */}
         {isFetching && !isPending && !isFetchingNextPage && (
           <div className="absolute top-20 right-8 z-20">
@@ -149,7 +149,7 @@ function CollectionsContent() {
         />
 
         {hasNextPage && (
-          <div className="flex justify-center p-8">
+          <div className="flex justify-center p-8 min-h-[100px]">
             <button
               onClick={() => fetchNextPage()}
               disabled={isFetchingNextPage}

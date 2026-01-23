@@ -1,4 +1,4 @@
-// Lumilio-Photos/web/src/features/lumilio/rich-input/types.ts
+// Lumilio-Photos/web/src/features/lumilio/rich-input/assets.auth.collections.settings.upload.types.ts
 
 // ==================== 基础类型 ====================
 

@@ -6,6 +6,7 @@ import {
   ArrowPathIcon,
   ClockIcon,
 } from "@heroicons/react/24/outline";
+import { useI18n } from "@/lib/i18n"; // Import useI18n
 
 interface FileUploadProgressProps {
   fileProgress: FileUploadProgress[];
@@ -14,6 +15,8 @@ interface FileUploadProgressProps {
 const FileUploadProgress: React.FC<FileUploadProgressProps> = ({
   fileProgress,
 }) => {
+  const { t } = useI18n(); // Initialize useI18n
+
   if (fileProgress.length === 0) {
     return null;
   }
@@ -63,14 +66,14 @@ const FileUploadProgress: React.FC<FileUploadProgressProps> = ({
   const getStatusText = (status: FileUploadProgress["status"]) => {
     switch (status) {
       case "completed":
-        return "Completed";
+        return t('upload.FileUploadProgress.status_completed');
       case "uploading":
-        return "Uploading";
+        return t('upload.FileUploadProgress.status_uploading');
       case "failed":
-        return "Failed";
+        return t('upload.FileUploadProgress.status_failed');
       case "pending":
       default:
-        return "Pending";
+        return t('upload.FileUploadProgress.status_pending');
     }
   };
 
@@ -78,7 +81,7 @@ const FileUploadProgress: React.FC<FileUploadProgressProps> = ({
     <div className="card bg-base-200 shadow-lg">
       <div className="card-body p-4">
         <h3 className="card-title text-base mb-2">
-          Upload Progress
+          {t('upload.FileUploadProgress.title')}
           <div className="badge badge-primary badge-sm">
             {fileProgress.length}
           </div>
@@ -111,7 +114,7 @@ const FileUploadProgress: React.FC<FileUploadProgressProps> = ({
                     </span>
                     {file.isChunked && (
                       <span className="badge badge-xs badge-outline">
-                        Chunked
+                        {t('upload.FileUploadProgress.chunked_badge')}
                       </span>
                     )}
                   </div>

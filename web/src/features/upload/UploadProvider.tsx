@@ -2,26 +2,19 @@ import React, { ReactNode, useReducer, useCallback, useMemo } from "react";
 import { useUploadProcess } from "@/hooks/api-hooks/useUploadProcess";
 import { uploadReducer, initialState } from "./reducers";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { UploadContext } from "./types";
+import { UploadContext } from "./upload.types.ts";
 import { useSettingsContext } from "@/features/settings";
-import { useGenerateThumbnail } from "@/hooks/util-hooks/useGenerateThumbnail";
+import { useI18n } from "@/lib/i18n"; // Import useI18n
 
 export function UploadProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n(); // Initialize useI18n
   const [state, dispatch] = useReducer(uploadReducer, initialState);
   const showMessage = useMessage();
   const uploadProcess = useUploadProcess();
   const { state: settings } = useSettingsContext();
-  const { isGenerating, progress, generatePreviews } = useGenerateThumbnail();
 
   // Get settings with defaults
-  const maxPreviewCount = settings.ui.upload?.max_preview_count ?? 30;
   const maxTotalFiles = settings.ui.upload?.max_total_files ?? 100;
-
-  // Calculate how many files currently have previews
-  const previewCount = useMemo(
-    () => state.previews.filter((p) => p !== "").length,
-    [state.previews],
-  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -48,16 +41,15 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   /**
    * Add files to the upload queue
    * @param files - Files to add
-   * @param generatePreviewsFlag - Whether to generate preview thumbnails for these files
    */
   const addFiles = useCallback(
-    async (files: File[], generatePreviewsFlag: boolean) => {
+    async (files: File[]) => {
       if (files.length === 0) return;
 
       // Check total files limit
       const availableSlots = maxTotalFiles - state.files.length;
       if (availableSlots <= 0) {
-        showMessage("error", `Maximum ${maxTotalFiles} files allowed`);
+        showMessage("error", t('upload.UploadProvider.max_files_allowed', { count: maxTotalFiles }));
         return;
       }
 
@@ -65,28 +57,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       if (files.length > availableSlots) {
         showMessage(
           "hint",
-          `${files.length - availableSlots} files exceeded the limit and were removed`,
+          t('upload.UploadProvider.files_exceeded_limit', { count: files.length - availableSlots }),
         );
       }
-
-      // Determine how many previews to generate
-      let previewsToGenerate = 0;
-      if (generatePreviewsFlag) {
-        const currentPreviewCount = state.previews.filter(
-          (p) => p !== "",
-        ).length;
-        const availablePreviewSlots = maxPreviewCount - currentPreviewCount;
-        previewsToGenerate = Math.min(filesToAdd.length, availablePreviewSlots);
-
-        if (previewsToGenerate < filesToAdd.length) {
-          showMessage(
-            "info",
-            `Generating previews for first ${previewsToGenerate} files (limit: ${maxPreviewCount})`,
-          );
-        }
-      }
-
-      const startIndex = state.files.length;
 
       // Add files with empty preview strings initially
       dispatch({
@@ -96,49 +69,8 @@ export function UploadProvider({ children }: { children: ReactNode }) {
           previews: filesToAdd.map(() => ""),
         },
       });
-
-      // Generate previews for the first N files if requested
-      if (previewsToGenerate > 0) {
-        try {
-          const filesToPreview = filesToAdd.slice(0, previewsToGenerate);
-          const result = await generatePreviews(filesToPreview);
-
-          if (result instanceof Error) {
-            throw result;
-          }
-
-          if (!result) {
-            throw new Error("Preview generation returned undefined");
-          }
-
-          const previewUrls = result.map((p) => p?.url || "");
-
-          dispatch({
-            type: "UPDATE_PREVIEW_URLS",
-            payload: {
-              startIndex,
-              urls: previewUrls,
-            },
-          });
-        } catch (error) {
-          console.error("Preview generation failed:", error);
-          showMessage(
-            "error",
-            error instanceof Error
-              ? error.message
-              : "Failed to generate previews",
-          );
-        }
-      }
     },
-    [
-      state.files.length,
-      state.previews,
-      maxTotalFiles,
-      maxPreviewCount,
-      showMessage,
-      generatePreviews,
-    ],
+    [state.files.length, maxTotalFiles, showMessage, t],
   );
 
   const clearFiles = useCallback(() => {
@@ -147,20 +79,20 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   const uploadFiles = useCallback(async () => {
     if (!state.files.length) {
-      showMessage("info", "No files selected for upload.");
+      showMessage("info", t('upload.UploadProvider.no_files_selected_for_upload_message'));
       return;
     }
 
     try {
       await uploadProcess.processFiles(state.files);
       dispatch({ type: "CLEAR_FILES" });
-      showMessage("success", "Upload completed successfully!");
+      showMessage("success", t('upload.UploadProvider.upload_completed_success'));
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Upload failed";
+        error instanceof Error ? error.message : t('upload.UploadProvider.upload_failed_generic');
       showMessage("error", errorMessage);
     }
-  }, [state.files, uploadProcess, showMessage]);
+  }, [state.files, uploadProcess, showMessage, t]);
 
   const contextValue = useMemo(
     () => ({
@@ -177,12 +109,12 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       uploadProgress: uploadProcess.uploadProgress,
       hashcodeProgress: uploadProcess.hashcodeProgress,
       isGeneratingHashCodes: uploadProcess.isGeneratingHashCodes,
-      isGeneratingPreviews: isGenerating,
-      previewProgress: progress,
+      isGeneratingPreviews: false,
+      previewProgress: null,
       fileProgress: uploadProcess.fileProgress,
-      maxPreviewCount,
+      maxPreviewCount: 0,
       maxTotalFiles,
-      previewCount,
+      previewCount: 0,
     }),
     [
       state,
@@ -197,11 +129,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       uploadProcess.uploadProgress,
       uploadProcess.hashcodeProgress,
       uploadProcess.fileProgress,
-      isGenerating,
-      progress,
-      maxPreviewCount,
       maxTotalFiles,
-      previewCount,
     ],
   );
 

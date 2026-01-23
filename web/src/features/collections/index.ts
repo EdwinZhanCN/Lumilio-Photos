@@ -1,2 +1,2 @@
 export * from "./CollectionsProvider";
-export * from "./types";
+export * from "./collections.types.ts";

@@ -7,15 +7,24 @@
  * @since 1.1.0
  */
 
+import { globalPerformancePreferences } from "@/utils/performancePreferences";
+
 export type WorkerType = "thumbnail" | "hash" | "border" | "export" | "exif";
 
 export interface WorkerClientOptions {
   preload?: WorkerType[];
 }
 
+export interface SingleHashResult {
+  index: number;
+  hash: string;
+  file?: File; // 可选：把原始文件传回来方便后续处理
+  error?: string;
+}
+
 export class AppWorkerClient {
   private generateThumbnailworker: Worker | null = null;
-  private hashAssetsworker: Worker | null = null;
+  private hashWorkers: Worker[] = [];
   private generateBorderworker: Worker | null = null;
   private exportWorker: Worker | null = null;
   private extractExifWorker: Worker | null = null;
@@ -36,7 +45,7 @@ export class AppWorkerClient {
   /**
    * Get or initialize a worker on demand
    */
-  private getOrInitializeWorker(type: WorkerType): Worker {
+  private getOrInitializeWorker(type: WorkerType, index: number = 0): Worker {
     switch (type) {
       case "thumbnail":
         if (!this.generateThumbnailworker) {
@@ -48,13 +57,13 @@ export class AppWorkerClient {
         return this.generateThumbnailworker;
 
       case "hash":
-        if (!this.hashAssetsworker) {
-          this.hashAssetsworker = new Worker(
+        if (!this.hashWorkers[index]) {
+          this.hashWorkers[index] = new Worker(
             new URL("./hash.worker.ts", import.meta.url),
             { type: "module" },
           );
         }
-        return this.hashAssetsworker;
+        return this.hashWorkers[index];
 
       case "border":
         if (!this.generateBorderworker) {
@@ -151,49 +160,85 @@ export class AppWorkerClient {
     }
   }
 
-  // --- Hash Generation ---
-  async generateHash(data: FileList | File[]): Promise<{
-    hashResults: Array<{ index: number; hash: string }>;
-    status: string;
-  }> {
-    const worker = this.getOrInitializeWorker("hash");
+  // --- Hash Generation (Worker Pool) ---
+  async generateHash(
+    data: FileList | File[],
+    onItemComplete?: (result: SingleHashResult) => void
+  ): Promise<{ status: string }> {
+    const filesArray = Array.isArray(data) ? data : Array.from(data);
+    if (filesArray.length === 0) return { status: "complete" };
+
+    const total = filesArray.length;
+    let processed = 0;
+    const maxThreads = globalPerformancePreferences.getMaxConcurrentOperations();
 
     return new Promise((resolve, reject) => {
-      const handler = (e: MessageEvent) => {
-        switch (e.data.type) {
-          case "HASH_COMPLETE":
-            resolve({
-              hashResults: e.data.hashResult,
-              status: "complete",
-            });
-            worker.removeEventListener("message", handler);
-            break;
-          case "ERROR":
-            worker.removeEventListener("message", handler);
-            reject(
-              new Error(e.data.payload?.error || "WASM initialization failed"),
-            );
-            break;
-          case "PROGRESS":
-            this.eventTarget.dispatchEvent(
-              new CustomEvent("progress", { detail: e.data.payload }),
-            );
-            break;
+      let currentIndex = 0;
+      let activeWorkers = 0;
+      let hasError = false;
+
+      const runTask = (workerIndex: number) => {
+        if (currentIndex >= total || hasError) {
+          if (activeWorkers === 0 && !hasError) resolve({ status: "complete" });
+          return;
         }
+
+        const fileIndex = currentIndex++;
+        const file = filesArray[fileIndex];
+        const worker = this.getOrInitializeWorker("hash", workerIndex);
+        activeWorkers++;
+
+        const handler = (e: MessageEvent) => {
+          if (e.data.type === "HASH_SINGLE_COMPLETE") {
+            if (onItemComplete) {
+              try {
+                onItemComplete({
+                  index: fileIndex,
+                  hash: e.data.payload.hash,
+                  error: e.data.payload.error
+                });
+              } catch (err) {
+                console.error("Error in onItemComplete callback:", err);
+              }
+            }
+            processed++;
+            this.eventTarget.dispatchEvent(
+              new CustomEvent("progress", { 
+                detail: { processed, total } 
+              }),
+            );
+          } else if (e.data.type === "HASH_COMPLETE") {
+            worker.removeEventListener("message", handler);
+            activeWorkers--;
+            runTask(workerIndex); // Get next task
+          } else if (e.data.type === "ERROR") {
+            worker.removeEventListener("message", handler);
+            hasError = true;
+            reject(new Error(e.data.payload?.error || "Hash Error"));
+          }
+        };
+
+        worker.addEventListener("message", handler);
+        worker.postMessage({
+          type: "GENERATE_HASH",
+          data: [file],
+          config: {
+            // Pass memory constraint multiplier to adjust chunk sizes in worker
+            memoryMultiplier: globalPerformancePreferences.getMemoryConstraintMultiplier()
+          }
+        });
       };
-      worker.addEventListener("message", handler);
-      const filesArray = Array.isArray(data) ? data : Array.from(data);
-      worker.postMessage({
-        type: "GENERATE_HASH",
-        data: filesArray,
-      });
+
+      // Start initial workers
+      const numWorkers = Math.min(maxThreads, total);
+      for (let i = 0; i < numWorkers; i++) {
+        runTask(i);
+      }
     });
   }
 
   abortGenerateHash() {
-    if (this.hashAssetsworker) {
-      this.hashAssetsworker.postMessage({ type: "ABORT" });
-    }
+    this.hashWorkers.forEach(w => w.postMessage({ type: "ABORT" }));
   }
 
   // --- Border Generation ---
@@ -209,7 +254,6 @@ export class AppWorkerClient {
     };
   }> {
     const worker = this.getOrInitializeWorker("border");
-    console.log(files);
 
     return new Promise((resolve, reject) => {
       const handler = (e: MessageEvent) => {
@@ -217,7 +261,6 @@ export class AppWorkerClient {
           case "GENERATE_BORDER_COMPLETE":
             worker.removeEventListener("message", handler);
             resolve(e.data.data);
-            console.log(e.data.data);
             break;
           case "ERROR":
             worker.removeEventListener("message", handler);
@@ -347,10 +390,11 @@ export class AppWorkerClient {
       this.generateThumbnailworker.terminate();
       this.generateThumbnailworker = null;
     }
-    if (this.hashAssetsworker) {
-      this.hashAssetsworker.terminate();
-      this.hashAssetsworker = null;
-    }
+    this.hashWorkers.forEach(w => {
+      if (w) w.terminate();
+    });
+    this.hashWorkers = [];
+
     if (this.generateBorderworker) {
       this.generateBorderworker.terminate();
       this.generateBorderworker = null;

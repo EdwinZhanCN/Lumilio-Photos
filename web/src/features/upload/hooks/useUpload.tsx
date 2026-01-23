@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { UploadContext, UploadContextValue } from "../types";
+import { UploadContext, UploadContextValue } from "../upload.types.ts";
 
 /**
  * Custom hook for consuming the upload context.

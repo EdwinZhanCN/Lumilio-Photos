@@ -1,14 +1,22 @@
 /// <reference lib="webworker" />
 
-import init, { hash_asset, HashResult } from "@/wasm/blake3_wasm";
+import init, {StreamingHasher} from "../wasm/blake3/blake3_wasm";
+
+// --- Constants (Matching Backend) ---
+const QUICK_HASH_THRESHOLD = 100 * 1024 * 1024; // 100 MB
+const DEFAULT_QUICK_HASH_CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB
+const DEFAULT_CHUNK_SIZE = 4 * 1024 * 1024; // 4MB chunks for efficient streaming
 
 // --- Type Definitions ---
 export interface WorkerMessage {
   type: "ABORT" | "GENERATE_HASH";
   data?: File[];
+  config?: {
+    memoryMultiplier?: number;
+  };
 }
 
-export interface WorkerHashResult {
+export interface SingleHashPayload {
   index: number;
   hash: string;
   error?: string;
@@ -17,139 +25,109 @@ export interface WorkerHashResult {
 // --- Initialization Control ---
 let initializationPromise: Promise<void> | null = null;
 
-function initialize(): Promise<void> {
-  if (initializationPromise) {
-    return initializationPromise;
-  }
+async function initialize(): Promise<void> {
+  if (initializationPromise) return initializationPromise;
 
-  initializationPromise = new Promise((resolve, reject) => {
-    init()
-      .then(() => {
-        self.postMessage({ type: "WASM_READY" });
-        resolve();
-      })
-      .catch((error: unknown) => {
-        const errMsg = (error as Error).message ?? "Unknown worker error";
-        console.error("Error initializing genHash WebAssembly module:", error);
-        self.postMessage({ type: "ERROR", payload: { error: errMsg } });
-        reject(new Error(errMsg));
-      });
-  });
+  initializationPromise = (async () => {
+    try {
+      // Pass the URL to the WASM file explicitly to ensure it's loaded correctly in workers
+      await init(new URL("../wasm/blake3/blake3_wasm_bg.wasm", import.meta.url));
+      self.postMessage({ type: "WASM_READY" });
+    } catch (error: unknown) {
+      const errMsg = (error as Error).message ?? "Unknown worker error";
+      self.postMessage({ type: "ERROR", payload: { error: errMsg } });
+      throw new Error(errMsg);
+    }
+  })();
 
   return initializationPromise;
 }
 
-// --- Concurrency Tuning ---
-const HW_CONCURRENCY = Math.max(1, self.navigator?.hardwareConcurrency ?? 4);
-const DEFAULT_CONCURRENCY = Math.min(HW_CONCURRENCY, 4); // cap to avoid oversubscription
-const LARGE_FILE_BYTES = 20_000_000; // 20MB
-const MAX_LARGE_FILE_CONCURRENCY = 2;
+async function calculateQuickHash(file: File, signal: AbortSignal, chunkSize: number): Promise<string> {
+  const hasher = new StreamingHasher();
+  const sizeBuf = new ArrayBuffer(8);
+  const sizeView = new BigUint64Array(sizeBuf);
+  sizeView[0] = BigInt(file.size);
+  hasher.update(new Uint8Array(sizeBuf));
 
-// --- Abort Control ---
+  const firstChunk = await file.slice(0, chunkSize).arrayBuffer();
+  if (signal.aborted) throw new Error("Aborted");
+  hasher.update(new Uint8Array(firstChunk));
+
+  if (file.size > chunkSize) {
+    let lastChunkStart = file.size - chunkSize;
+    if (lastChunkStart < chunkSize) lastChunkStart = chunkSize;
+    const lastChunk = await file.slice(lastChunkStart, file.size).arrayBuffer();
+    if (signal.aborted) throw new Error("Aborted");
+    hasher.update(new Uint8Array(lastChunk));
+  }
+  return hasher.finalize();
+}
+
+async function calculateFullHash(file: File, signal: AbortSignal, chunkSize: number): Promise<string> {
+  const hasher = new StreamingHasher();
+  let offset = 0;
+  while (offset < file.size) {
+    if (signal.aborted) throw new Error("Aborted");
+    const end = Math.min(offset + chunkSize, file.size);
+    const chunk = await file.slice(offset, end).arrayBuffer();
+    hasher.update(new Uint8Array(chunk));
+    offset = end;
+  }
+  return hasher.finalize();
+}
+
 let abortController = new AbortController();
 
-// --- Main Logic ---
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
-  const { type, data } = e.data;
+  const { type, data, config } = e.data;
 
   switch (type) {
     case "ABORT":
       abortController.abort();
-      abortController = new AbortController(); // Reset for the next task
+      abortController = new AbortController();
       break;
 
     case "GENERATE_HASH": {
-      abortController = new AbortController(); // Create a new controller for this job
       const signal = abortController.signal;
-      let numberOfFilesProcessed = 0;
+      const memoryMultiplier = config?.memoryMultiplier || 1.0;
+      
+      // Adjust chunk sizes based on memory multiplier
+      const chunkSize = Math.floor(DEFAULT_CHUNK_SIZE * memoryMultiplier);
+      const quickHashChunkSize = Math.floor(DEFAULT_QUICK_HASH_CHUNK_SIZE * memoryMultiplier);
 
       try {
         await initialize();
-
-        if (!data) {
-          throw new Error("No files provided for hashing");
+        if (!data || data.length === 0) {
+          self.postMessage({ type: "HASH_COMPLETE" });
+          return;
         }
 
-        const assets = data;
-        const firstSize = assets[0]?.size ?? 0;
-        const CONCURRENCY =
-          firstSize > LARGE_FILE_BYTES
-            ? Math.max(
-                1,
-                Math.min(DEFAULT_CONCURRENCY, MAX_LARGE_FILE_CONCURRENCY),
-              )
-            : DEFAULT_CONCURRENCY;
-
-        const allResults: WorkerHashResult[] = [];
-
-        for (let i = 0; i < assets.length; i += CONCURRENCY) {
+        for (let i = 0; i < data.length; i++) {
           if (signal.aborted) break;
+          const asset = data[i];
+          try {
+            const hash = asset.size > QUICK_HASH_THRESHOLD 
+              ? await calculateQuickHash(asset, signal, quickHashChunkSize) 
+              : await calculateFullHash(asset, signal, chunkSize);
 
-          const batch = assets.slice(i, i + CONCURRENCY);
-          const promises = batch.map(async (asset, batchIndex) => {
-            const globalIndex = i + batchIndex;
-            if (signal.aborted) {
-              return {
-                index: globalIndex,
-                hash: "0".repeat(64),
-                error: "Operation aborted",
-              };
-            }
-
-            try {
-              const arrayBuffer = await asset.arrayBuffer();
-              if (signal.aborted) {
-                return {
-                  index: globalIndex,
-                  hash: "0".repeat(64),
-                  error: "Operation aborted",
-                };
-              }
-              const rawHash: HashResult = hash_asset(
-                new Uint8Array(arrayBuffer),
-              );
-              return { index: globalIndex, hash: rawHash.hash };
-            } catch (err: unknown) {
-              const errorMessage = `Error generating hash for ${asset.name}`;
-              console.error(errorMessage, err);
-              return {
-                index: globalIndex,
-                hash: "0".repeat(64),
-                error: (err as Error).message,
-              };
-            } finally {
-              self.postMessage({
-                type: "PROGRESS",
-                payload: {
-                  processed: ++numberOfFilesProcessed,
-                  total: assets.length,
-                },
-              });
-            }
-          });
-
-          const batchResults = await Promise.all(promises);
-          allResults.push(...batchResults);
+            self.postMessage({
+              type: "HASH_SINGLE_COMPLETE",
+              payload: { index: i, hash }
+            });
+          } catch (err: any) {
+            if (err.message === "Aborted") break;
+            self.postMessage({
+              type: "HASH_SINGLE_COMPLETE",
+              payload: { index: i, hash: "", error: err.message }
+            });
+          }
         }
-
-        self.postMessage({
-          type: "HASH_COMPLETE",
-          hashResult: allResults.sort((a, b) => a.index - b.index),
-        });
-      } catch (err: unknown) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Unknown worker error";
-        console.error("Error in GENERATE_HASH task:", err);
-        self.postMessage({ type: "ERROR", payload: { error: errorMessage } });
+        if (!signal.aborted) self.postMessage({ type: "HASH_COMPLETE" });
+      } catch (err: any) {
+        self.postMessage({ type: "ERROR", payload: { error: err.message } });
       }
       break;
     }
-
-    default:
-      self.postMessage({
-        type: "ERROR",
-        payload: { error: `Unknown message type: ${type}` },
-      });
-      break;
   }
 };

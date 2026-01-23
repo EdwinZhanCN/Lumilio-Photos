@@ -135,7 +135,7 @@ export default function VideoInfoView({
               <h1 className="font-sans font-bold">
                 {t("assets.basicInfo.title")}
               </h1>
-              <div className="badge badge-soft badge-info">VIDEO</div>
+              <div className="badge badge-soft badge-info">{t("assets.videoInfoView.video_badge")}</div>
             </div>
             <div className="flex gap-1">
               <button className="btn btn-circle btn-xs" disabled>
@@ -173,7 +173,7 @@ export default function VideoInfoView({
             <div className="rounded bg-base-300 overflow-hidden">
               <div className="px-3 py-2 space-y-1">
                 {cameraModel !== "-" && <p className="text-sm font-medium">{cameraModel}</p>}
-                <p className="text-xs opacity-70">Codec: {codec}</p>
+                <p className="text-xs opacity-70">{t("assets.videoInfoView.codec_label", { codec })}</p>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs opacity-60">
                   <span>{resolution}</span>
                   <span>{duration}</span>
@@ -213,7 +213,7 @@ export default function VideoInfoView({
             {hasGPS && (
               <div className="rounded bg-base-200 p-3">
                 <div className="text-[10px] uppercase tracking-wider font-bold text-base-content/50 mb-2">
-                  Recording Location
+                  {t("assets.videoInfoView.recording_location")}
                 </div>
                 <div className="text-[10px] font-mono text-base-content/50">
                   {gpsDisplay}

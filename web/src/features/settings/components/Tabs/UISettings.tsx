@@ -98,27 +98,6 @@ export default function UISettings() {
 
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <label className="font-semibold min-w-40">Max Preview Count</label>
-            <input
-              type="number"
-              className="input input-bordered w-32"
-              min="0"
-              max="100"
-              value={state.ui.upload?.max_preview_count ?? 30}
-              onChange={(e) => {
-                const value = parseInt(e.target.value) || 0;
-                dispatch({
-                  type: "SET_UPLOAD_MAX_PREVIEW_COUNT",
-                  payload: value,
-                });
-              }}
-            />
-            <span className="text-sm text-base-content/70">
-              Number of files to generate thumbnails for
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
             <label className="font-semibold min-w-40">Max Total Files</label>
             <input
               type="number"
