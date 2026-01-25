@@ -1,13 +1,12 @@
 // src/services/healthService.ts
 
-import api from "@/lib/http-commons/api.ts";
-import type { AxiosResponse } from "axios";
+import client from "@/lib/http-commons/client";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-export const HEALTH_ENDPOINT = "/api/v1/health";
+export const HEALTH_ENDPOINT = "/health" as const;
 export const MIN_HEALTH_INTERVAL_SEC = 1;
 export const MAX_HEALTH_INTERVAL_SEC = 50;
 export const DEFAULT_HEALTH_INTERVAL_SEC = 5;
@@ -16,10 +15,10 @@ export const DEFAULT_HEALTH_INTERVAL_SEC = 5;
 // Health Check Types
 // ============================================================================
 
-export interface HealthCheckResult<T = any> {
+export interface HealthCheckResult {
   online: boolean;
   statusCode: number;
-  data?: T;
+  data?: { status?: string };
   error?: string;
 }
 
@@ -28,33 +27,34 @@ export interface HealthCheckResult<T = any> {
 // ============================================================================
 
 /**
- * Fetch raw health response using shared axios instance.
- * Consumers rarely need this directly. Prefer checkHealth or isServerOnline.
+ * Fetch raw health response using openapi-fetch client.
+ * Returns the typed response from the /health endpoint.
  */
-export async function fetchHealth<T = any>(): Promise<AxiosResponse<T>> {
-  // Accept non-2xx for explicit online=false classification without throwing
-  return api.get<T>(HEALTH_ENDPOINT, { validateStatus: () => true });
+export async function fetchHealth() {
+  return client.GET("/health", {});
 }
 
 /**
- * Calls /api/v1/health and returns normalized result.
+ * Calls /health and returns normalized result.
  * online is true for 2xx responses, false otherwise (including network errors).
  */
-export async function checkHealth<T = any>(): Promise<HealthCheckResult<T>> {
+export async function checkHealth(): Promise<HealthCheckResult> {
   try {
-    const res = await fetchHealth<T>();
-    const online = res.status >= 200 && res.status < 300;
+    const { data, error, response } = await fetchHealth();
+    const online = response.status >= 200 && response.status < 300;
+
     return {
       online,
-      statusCode: res.status,
-      data: res.data,
+      statusCode: response.status,
+      data: data?.data as { status?: string } | undefined,
+      error: error ? String(error) : undefined,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       online: false,
       statusCode: 0,
       error:
-        typeof err?.message === "string"
+        err instanceof Error
           ? err.message
           : "Network or CORS error",
     };
@@ -78,9 +78,9 @@ export async function isServerOnline(): Promise<boolean> {
  * const stop = pollHealth(5, ({ online }) => setOnline(online));
  * // later: stop()
  */
-export function pollHealth<T = any>(
+export function pollHealth(
   intervalSeconds: number,
-  onUpdate: (result: HealthCheckResult<T>) => void,
+  onUpdate: (result: HealthCheckResult) => void,
 ): () => void {
   const ms = Math.max(
     1000,
@@ -95,7 +95,7 @@ export function pollHealth<T = any>(
 
   const run = async () => {
     if (cancelled) return;
-    const result = await checkHealth<T>();
+    const result = await checkHealth();
     if (!cancelled) onUpdate(result);
   };
 

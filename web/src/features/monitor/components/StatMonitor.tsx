@@ -14,7 +14,7 @@ export function StatMonitor() {
       try {
         const data = await getJobStats();
         if (mounted) {
-          setStats(data);
+          setStats(data ?? null);
           setError(null);
         }
       } catch (err) {
@@ -67,12 +67,12 @@ export function StatMonitor() {
     );
   }
 
-  const activeJobs = stats.available + stats.scheduled + stats.running;
-  const issueJobs = stats.retryable + stats.cancelled + stats.discarded;
-  const totalProcessed = stats.completed + stats.cancelled + stats.discarded;
+  const activeJobs = (stats.available ?? 0) + (stats.scheduled ?? 0) + (stats.running ?? 0);
+  const issueJobs = (stats.retryable ?? 0) + (stats.cancelled ?? 0) + (stats.discarded ?? 0);
+  const totalProcessed = (stats.completed ?? 0) + (stats.cancelled ?? 0) + (stats.discarded ?? 0);
   const successRate =
     totalProcessed > 0
-      ? ((stats.completed / totalProcessed) * 100).toFixed(1)
+      ? (((stats.completed ?? 0) / totalProcessed) * 100).toFixed(1)
       : "0.0";
 
   return (
@@ -85,18 +85,18 @@ export function StatMonitor() {
         <div className="stat-title">Active Jobs</div>
         <div className="stat-value text-primary">{activeJobs}</div>
         <div className="stat-desc">
-          {stats.running > 0 && (
+          {(stats.running ?? 0) > 0 && (
             <span className="inline-flex items-center gap-1 text-info">
               <Loader2 className="w-3 h-3 animate-spin" />
               {stats.running} running
             </span>
           )}
-          {stats.running === 0 && stats.available > 0 && (
+          {(stats.running ?? 0) === 0 && (stats.available ?? 0) > 0 && (
             <span className="text-neutral">{stats.available} available</span>
           )}
-          {stats.running === 0 &&
-            stats.available === 0 &&
-            stats.scheduled > 0 && (
+          {(stats.running ?? 0) === 0 &&
+            (stats.available ?? 0) === 0 &&
+            (stats.scheduled ?? 0) > 0 && (
               <span className="text-neutral">{stats.scheduled} scheduled</span>
             )}
         </div>
@@ -108,7 +108,7 @@ export function StatMonitor() {
           <CheckCircle2 className="w-8 h-8" />
         </div>
         <div className="stat-title">Completed</div>
-        <div className="stat-value text-success">{stats.completed}</div>
+        <div className="stat-value text-success">{stats.completed ?? 0}</div>
         <div className="stat-desc">
           {totalProcessed > 0 ? (
             <span>{successRate}% success rate</span>
@@ -126,20 +126,20 @@ export function StatMonitor() {
         <div className="stat-title">Issues</div>
         <div className="stat-value text-warning">{issueJobs}</div>
         <div className="stat-desc">
-          {stats.retryable > 0 && (
+          {(stats.retryable ?? 0) > 0 && (
             <span className="text-warning">{stats.retryable} retryable</span>
           )}
-          {stats.retryable > 0 &&
-            (stats.cancelled > 0 || stats.discarded > 0) && (
+          {(stats.retryable ?? 0) > 0 &&
+            ((stats.cancelled ?? 0) > 0 || (stats.discarded ?? 0) > 0) && (
               <span className="mx-1">·</span>
             )}
-          {stats.cancelled > 0 && (
+          {(stats.cancelled ?? 0) > 0 && (
             <span className="text-error">{stats.cancelled} cancelled</span>
           )}
-          {stats.cancelled > 0 && stats.discarded > 0 && (
+          {(stats.cancelled ?? 0) > 0 && (stats.discarded ?? 0) > 0 && (
             <span className="mx-1">·</span>
           )}
-          {stats.discarded > 0 && (
+          {(stats.discarded ?? 0) > 0 && (
             <span className="text-error">{stats.discarded} discarded</span>
           )}
           {issueJobs === 0 && <span className="text-success">All healthy</span>}

@@ -9,15 +9,20 @@ import SearchBar from "@/components/SearchBar";
 import FilterTool, {
   FilterDTO,
 } from "@/features/assets/components/page/FilterTool/FilterTool";
-import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
 import { useSelection, useBulkAssetOperations } from "@/features/assets/hooks/useSelection";
-import { GroupByType } from "@/features/assets/assets.types.ts";
-import { selectTabTitle } from "@/features/assets/reducers/ui.reducer";
+import { GroupByType } from "@/features/assets/types/assets.type";
+import { selectTabTitle } from "@/features/assets/slices/ui.slice";
 import { useCallback, useMemo, useRef, useEffect, useState, ReactNode } from "react";
 import { albumService, Album } from "@/services/albumService";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { assetService } from "@/services/assetsService";
 import { useI18n } from "@/lib/i18n";
+import {
+  useFilterState,
+  useFilterActions,
+  useCurrentTab,
+  useSearchQuery,
+} from "@/features/assets/selectors";
 
 interface AssetsPageHeaderProps {
   groupBy: GroupByType;
@@ -67,11 +72,19 @@ const AssetsPageHeader = ({
   icon,
 }: AssetsPageHeaderProps) => {
   const { t } = useI18n();
-  const { state, dispatch } = useAssetsContext();
   const selection = useSelection();
   const bulkOps = useBulkAssetOperations();
   const showMessage = useMessage();
-  
+
+  // Selectors & Actions
+  const filters = useFilterState();
+  const { batchUpdateFilters } = useFilterActions();
+  const currentTab = useCurrentTab();
+  const searchQuery = useSearchQuery();
+  // We use the prop callback for onGroupByChange, but we might want to dispatch too?
+  // The prop onGroupByChange passed from parent (Photos.tsx) already calls setGroupBy action.
+  // So we just use the prop. But for search effect we need to call it.
+
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -80,7 +93,7 @@ const AssetsPageHeader = ({
 
   // Hydrate FilterTool from global filters (single source of truth)
   const inboundDTO = useMemo(() => {
-    const f = state.filters;
+    const f = filters;
     if (!f?.enabled) return {};
     const dto: FilterDTO = {};
     if (typeof f.raw === "boolean") dto.raw = f.raw;
@@ -98,13 +111,13 @@ const AssetsPageHeader = ({
     if (f.camera_make?.trim()) dto.camera_make = f.camera_make.trim();
     if (f.lens?.trim()) dto.lens = f.lens.trim();
     return dto;
-  }, [state.filters]);
+  }, [filters]);
+
   const inboundHash = useMemo(
     () => JSON.stringify(inboundDTO || {}),
     [inboundDTO],
   );
 
-  const currentTab = state.ui.currentTab;
   // Get tab-specific configuration
   const tabTitle = selectTabTitle(currentTab);
 
@@ -122,10 +135,10 @@ const AssetsPageHeader = ({
 
   // Handle search activation (switch to flat view when searching)
   useEffect(() => {
-    if (state.ui.searchQuery.trim() && groupBy !== "flat") {
+    if (searchQuery.trim() && groupBy !== "flat") {
       onGroupByChange("flat");
     }
-  }, [state.ui.searchQuery, groupBy, onGroupByChange]);
+  }, [searchQuery, groupBy, onGroupByChange]);
 
   // Use ref to store the latest onFiltersChange callback to avoid dependency issues
   const onFiltersChangeRef = useRef(onFiltersChange);
@@ -138,17 +151,17 @@ const AssetsPageHeader = ({
 
   // Handle filter changes
   const handleFiltersChange = useCallback(
-    (filters: FilterDTO) => {
+    (newFilters: FilterDTO) => {
       // Prevent re-emit loop when FilterTool mounts with initial values
-      const nextHash = JSON.stringify(filters || {});
+      const nextHash = JSON.stringify(newFilters || {});
       if (nextHash === inboundHash) {
-        onFiltersChangeRef.current?.(filters);
+        onFiltersChangeRef.current?.(newFilters);
         return;
       }
 
       // Build a full payload resetting all fields first (single source of truth)
       const payload: any = {
-        enabled: Object.keys(filters).length > 0,
+        enabled: Object.keys(newFilters).length > 0,
         raw: undefined,
         rating: undefined,
         liked: undefined,
@@ -158,42 +171,42 @@ const AssetsPageHeader = ({
         lens: undefined,
       };
 
-      if (filters.raw !== undefined) payload.raw = filters.raw;
-      if (filters.rating !== undefined) payload.rating = filters.rating;
-      if (filters.liked !== undefined) payload.liked = filters.liked;
+      if (newFilters.raw !== undefined) payload.raw = newFilters.raw;
+      if (newFilters.rating !== undefined) payload.rating = newFilters.rating;
+      if (newFilters.liked !== undefined) payload.liked = newFilters.liked;
 
-      if (filters.filename && filters.filename.value.trim()) {
+      if (newFilters.filename && newFilters.filename.value.trim()) {
         payload.filename = {
-          mode: mapFilenameOperatorToMode(filters.filename.operator),
-          value: filters.filename.value.trim(),
+          mode: mapFilenameOperatorToMode(newFilters.filename.operator),
+          value: newFilters.filename.value.trim(),
         };
       }
 
-      if (filters.date && (filters.date.from || filters.date.to)) {
+      if (newFilters.date && (newFilters.date.from || newFilters.date.to)) {
         payload.date = {
-          from: filters.date.from,
-          to: filters.date.to,
+          from: newFilters.date.from,
+          to: newFilters.date.to,
         };
       }
 
-      if (filters.camera_make && filters.camera_make.trim()) {
-        payload.camera_make = filters.camera_make.trim();
+      if (newFilters.camera_make && newFilters.camera_make.trim()) {
+        payload.camera_make = newFilters.camera_make.trim();
       }
 
-      if (filters.lens && filters.lens.trim()) {
-        payload.lens = filters.lens.trim();
+      if (newFilters.lens && newFilters.lens.trim()) {
+        payload.lens = newFilters.lens.trim();
       }
 
-      dispatch({ type: "BATCH_UPDATE_FILTERS", payload });
+      batchUpdateFilters(payload);
 
       // Switch to flat view when filtering for better result visibility
       if (payload.enabled && groupBy !== "flat") {
         onGroupByChangeRef.current("flat");
       }
 
-      onFiltersChangeRef.current?.(filters);
+      onFiltersChangeRef.current?.(newFilters);
     },
-    [dispatch, groupBy, inboundHash],
+    [batchUpdateFilters, groupBy, inboundHash],
   );
 
   // Toggle selection mode
@@ -230,7 +243,7 @@ const AssetsPageHeader = ({
     setIsLoadingAlbums(true);
     try {
       const response = await albumService.listAlbums({ limit: 50 });
-      if (response.status === 200 && response.data.data) {
+      if (response.data?.data) {
         setAlbums(response.data.data.albums || []);
       }
     } catch (error) {
@@ -318,9 +331,8 @@ const AssetsPageHeader = ({
 
         {/* Selection Toggle Button */}
         <button
-          className={`btn btn-sm btn-circle btn-soft btn-info ${
-            selection.enabled ? "btn-active" : ""
-          } relative`}
+          className={`btn btn-sm btn-circle btn-soft btn-info ${selection.enabled ? "btn-active" : ""
+            } relative`}
           onClick={handleToggleSelection}
           title={
             selection.enabled ? t("assets.assetsPageHeader.selectionMode.exit") : t("assets.assetsPageHeader.selectionMode.enter")
@@ -449,7 +461,7 @@ const AssetsPageHeader = ({
                 <X size={20} />
               </button>
             </div>
-            
+
             <p className="text-sm opacity-70 mb-4">
               {t("assets.assetsPageHeader.addToAlbumModal.message", { count: selection.selectedCount })}
             </p>
@@ -470,8 +482,8 @@ const AssetsPageHeader = ({
                   >
                     <div className="w-10 h-10 rounded bg-base-300 flex items-center justify-center overflow-hidden">
                       {album.cover_asset_id ? (
-                        <img 
-                          src={assetService.getThumbnailUrl(album.cover_asset_id, "small")} 
+                        <img
+                          src={assetService.getThumbnailUrl(album.cover_asset_id, "small")}
                           className="w-full h-full object-cover"
                           alt=""
                         />

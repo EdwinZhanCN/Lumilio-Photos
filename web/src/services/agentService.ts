@@ -1,6 +1,7 @@
 // src/services/agentService.ts
 
-import api from "@/lib/http-commons/api";
+import client from "@/lib/http-commons/client";
+import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema";
 
 // ============================================================================
@@ -9,29 +10,10 @@ import type { components } from "@/lib/http-commons/schema";
 
 type Schemas = components["schemas"];
 
-/**
- * Agent chat request
- */
 export type AgentChatRequest = Schemas["handler.AgentChatRequest"];
-
-/**
- * Agent resume request
- */
 export type AgentResumeRequest = Schemas["handler.AgentResumeRequest"];
-
-/**
- * Tool info response
- */
 export type ToolInfoResponse = Schemas["handler.ToolInfoResponse"];
-
-/**
- * API result wrapper
- */
-export type ApiResult<T> = {
-  code: number;
-  message: string;
-  data: T;
-};
+export type ToolSchemaResponse = Schemas["handler.ToolSchemaResponse"];
 
 /**
  * Agent event from SSE stream
@@ -65,30 +47,27 @@ export type AgentEventType =
  */
 export interface AgentStreamEvent {
   type: AgentEventType;
-  data: any; // Data can be of any type based on the event
+  data: unknown;
 }
+
+// Base URL for SSE streaming
+const baseURL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 // ============================================================================
 // Agent Service
 // ============================================================================
 
-/**
- * Agent Service for handling AI agent interactions
- */
 export const agentService = {
   /**
    * Get the base URL for API requests
    */
   getBaseUrl(): string {
-    return (
-      import.meta.env.VITE_API_URL ||
-      import.meta.env.API_URL ||
-      "http://localhost:8080"
-    );
+    return baseURL;
   },
 
   /**
    * Private method to handle SSE streaming for both chat and resume
+   * Note: SSE streaming uses raw fetch, not openapi-fetch
    */
   async *_streamer(
     url: string,
@@ -154,7 +133,7 @@ export const agentService = {
     request: AgentChatRequest,
     signal?: AbortSignal,
   ): AsyncGenerator<AgentStreamEvent> {
-    const url = `${this.getBaseUrl()}/api/v1/agent/chat`;
+    const url = `${this.getBaseUrl()}/agent/chat`;
     yield* this._streamer(url, request, signal);
   },
 
@@ -165,7 +144,7 @@ export const agentService = {
     request: AgentResumeRequest,
     signal?: AbortSignal,
   ): AsyncGenerator<AgentStreamEvent> {
-    const url = `${this.getBaseUrl()}/api/v1/agent/chat/resume`;
+    const url = `${this.getBaseUrl()}/agent/chat/resume`;
     yield* this._streamer(url, request, signal);
   },
 
@@ -201,17 +180,21 @@ export const agentService = {
   /**
    * Gets the list of available tools
    */
-  async getAvailableTools(): Promise<ToolInfoResponse[]> {
-    const response = await api.get<ApiResult<ToolInfoResponse[]>>(
-      "/api/v1/agent/tools",
-    );
-    return response.data.data || [];
+  async getAvailableTools() {
+    const { data } = await client.GET("/agent/tools", {});
+    return data?.data as ToolInfoResponse[] | undefined;
+  },
+
+  /**
+   * Gets tool schemas
+   */
+  async getToolSchemas() {
+    const { data } = await client.GET("/agent/schemas", {});
+    return data?.data as ToolSchemaResponse | undefined;
   },
 
   /**
    * Gets tools formatted for slash commands
-   *
-   * @returns Promise resolving to array of command objects
    */
   async getSlashCommands(): Promise<
     Array<{
@@ -233,8 +216,8 @@ export const agentService = {
       return tools
         .filter((tool) => tool.name)
         .map((tool) => ({
-          id: tool.name!, // Use tool name as ID
-          label: tool.name!, // Label is just the name, without slash
+          id: tool.name!,
+          label: tool.name!,
           type: "command" as const,
           meta: tool.desc || "No description available",
           description: tool.desc,
@@ -245,5 +228,21 @@ export const agentService = {
     }
   },
 };
+
+// ============================================================================
+// React Query Hooks
+// ============================================================================
+
+/**
+ * Hook for available tools
+ */
+export const useAgentTools = () =>
+  $api.useQuery("get", "/agent/tools", {});
+
+/**
+ * Hook for tool schemas
+ */
+export const useToolSchemas = () =>
+  $api.useQuery("get", "/agent/schemas", {});
 
 export default agentService;

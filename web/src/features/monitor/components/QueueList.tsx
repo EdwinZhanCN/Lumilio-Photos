@@ -14,7 +14,7 @@ export function QueueList() {
       try {
         const data = await listQueues();
         if (mounted) {
-          setQueues(data.queues);
+          setQueues(data?.queues ?? []);
           setError(null);
         }
       } catch (err) {
@@ -76,7 +76,7 @@ export function QueueList() {
       <div className="flex-1 overflow-y-auto">
         <ul className="list">
           {queues.map((queue) => {
-            const lastUpdate = new Date(queue.updated_at);
+            const lastUpdate = queue.updated_at ? new Date(queue.updated_at) : new Date();
             const now = new Date();
             const secondsAgo = Math.floor(
               (now.getTime() - lastUpdate.getTime()) / 1000,
@@ -98,15 +98,13 @@ export function QueueList() {
             return (
               <li
                 key={queue.name}
-                className={`list-row hover:bg-base-200/50 transition-all duration-200 ${
-                  isStale ? "opacity-60" : ""
-                }`}
+                className={`list-row hover:bg-base-200/50 transition-all duration-200 ${isStale ? "opacity-60" : ""
+                  }`}
               >
                 {/* Queue Icon */}
                 <div
-                  className={`flex-shrink-0 ${
-                    isVeryActive ? "text-success" : "text-primary"
-                  }`}
+                  className={`flex-shrink-0 ${isVeryActive ? "text-success" : "text-primary"
+                    }`}
                 >
                   <Zap className="w-5 h-5" />
                 </div>

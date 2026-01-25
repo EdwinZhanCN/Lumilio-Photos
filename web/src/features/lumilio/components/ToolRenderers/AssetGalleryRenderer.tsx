@@ -1,16 +1,16 @@
 import React, { useCallback, useState, useMemo } from "react";
-import {GalleryThumbnails, X, ExternalLink, Hammer} from "lucide-react";
+import { GalleryThumbnails, X, ExternalLink, Hammer } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
+import { useAssetsStore } from "@/features/assets/assets.store";
 import { useAssetsView } from "@/features/assets/hooks/useAssetsView";
 import { SideChannelEvent } from "@/features/lumilio/schema";
 import { AssetFilter } from "@/services/assetsService";
-import { AssetViewDefinition } from "@/features/assets/assets.types.ts";
+import { AssetViewDefinition } from "@/features/assets/types/assets.type";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import { findAssetIndex, getFlatAssetsFromGrouped } from "@/lib/utils/assetGrouping";
 import PageHeader from "@/components/PageHeader.tsx";
-import {WorkerProvider} from "@/contexts/WorkerProvider.tsx";
+import { WorkerProvider } from "@/contexts/WorkerProvider.tsx";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 
@@ -22,23 +22,24 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
   event,
 }) => {
   const navigate = useNavigate();
-  const { dispatch: globalDispatch } = useAssetsContext();
+  const resetFilters = useAssetsStore((s) => s.resetFilters);
+  const batchUpdateFilters = useAssetsStore((s) => s.batchUpdateFilters);
   const filterDTO = event.data?.payload as AssetFilter;
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleOpenMainView = useCallback(() => {
     if (!filterDTO) return;
-    
+
     // Reset and apply filters to global context
-    globalDispatch({ type: "RESET_FILTERS" });
-    
+    resetFilters();
+
     const payload: any = { enabled: true };
     if (filterDTO.raw !== undefined) payload.raw = filterDTO.raw;
     if (filterDTO.rating !== undefined) payload.rating = filterDTO.rating;
     if (filterDTO.liked !== undefined) payload.liked = filterDTO.liked;
     if (filterDTO.filename) {
       payload.filename = {
-        mode: filterDTO.filename.mode, 
+        mode: filterDTO.filename.mode,
         value: filterDTO.filename.value
       };
     }
@@ -48,10 +49,10 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
     if (filterDTO.camera_make) payload.camera_make = filterDTO.camera_make;
     if (filterDTO.lens) payload.lens = filterDTO.lens;
 
-    globalDispatch({ type: "BATCH_UPDATE_FILTERS", payload });
+    batchUpdateFilters(payload);
     navigate("/assets/photos");
     setIsModalOpen(false);
-  }, [globalDispatch, filterDTO, navigate]);
+  }, [resetFilters, batchUpdateFilters, filterDTO, navigate]);
 
   if (!filterDTO) return null;
 
@@ -64,7 +65,7 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
         <GalleryThumbnails className="h-4 w-4 mr-2" />
         View Results
       </button>
-      
+
       {isModalOpen && (
         <dialog className="modal modal-open">
           <div className="modal-box w-11/12 max-w-7xl h-[90vh] p-5 overflow-hidden flex flex-col bg-base-100 shadow-2xl">
@@ -86,7 +87,7 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
             </PageHeader>
             {/* Content */}
             <div className="flex-1 overflow-y-auto relative bg-base-100" id="agent-gallery-container">
-              <WorkerProvider preload={["exif","export"]}>
+              <WorkerProvider preload={["exif", "export"]}>
                 <AssetsProvider persist={false}>
                   <AgentGallery filter={filterDTO} />
                 </AssetsProvider>
@@ -103,9 +104,10 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
 };
 
 const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
-  const { dispatch } = useAssetsContext();
+  const updateEntity = useAssetsStore((s) => s.updateEntity);
+  const deleteEntity = useAssetsStore((s) => s.deleteEntity);
   const [carouselAssetId, setCarouselAssetId] = useState<string | undefined>();
-  
+
   const viewDefinition = useMemo<AssetViewDefinition>(() => ({
     filter: filter,
     // Default to all types to prevent "missing query parameters" error from backend
@@ -116,12 +118,12 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
     inheritGlobalFilter: false,
   }), [filter]);
 
-  const { 
-    assets, 
-    groups, 
-    isLoading, 
-    isLoadingMore, 
-    hasMore, 
+  const {
+    assets,
+    groups,
+    isLoading,
+    isLoadingMore,
+    hasMore,
     fetchMore,
     error
   } = useAssetsView(viewDefinition, {
@@ -153,42 +155,39 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
 
   return (
     <div className="min-h-full p-4">
-          {error && (
-            <div className="alert alert-error mb-4">
-              <span>Error: {error}</span>
-            </div>
-          )}
+      {error && (
+        <div className="alert alert-error mb-4">
+          <span>Error: {error}</span>
+        </div>
+      )}
 
-          {isInitialLoading ? (
-            <PhotosLoadingSkeleton />
-          ) : (
-            <JustifiedGallery
-                groupedPhotos={groups || {}}
-                openCarousel={setCarouselAssetId}
-                isLoading={isLoading}
-                isLoadingMore={isLoadingMore}
-                hasMore={hasMore}
-                onLoadMore={handleLoadMore}
-            />
-          )}
+      {isInitialLoading ? (
+        <PhotosLoadingSkeleton />
+      ) : (
+        <JustifiedGallery
+          groupedPhotos={groups || {}}
+          openCarousel={setCarouselAssetId}
+          isLoading={isLoading}
+          isLoadingMore={isLoadingMore}
+          hasMore={hasMore}
+          onLoadMore={handleLoadMore}
+        />
+      )}
 
-          {carouselAssetId && flatAssets.length > 0 && (
-              <FullScreenCarousel
-                  photos={flatAssets}
-                  initialSlide={slideIndex >= 0 ? slideIndex : 0}
-                  slideIndex={slideIndex >= 0 ? slideIndex : undefined}
-                  onClose={() => setCarouselAssetId(undefined)}
-                  onNavigate={setCarouselAssetId}
-                  onAssetUpdate={(updatedAsset) => dispatch({
-                    type: "UPDATE_ENTITY",
-                    payload: { assetId: updatedAsset.asset_id ?? "", updates: updatedAsset }
-                  })}
-                  onAssetDelete={(assetId) => dispatch({
-                    type: "DELETE_ENTITY",
-                    payload: { assetId }
-                  })}
-              />
+      {carouselAssetId && flatAssets.length > 0 && (
+        <FullScreenCarousel
+          photos={flatAssets}
+          initialSlide={slideIndex >= 0 ? slideIndex : 0}
+          slideIndex={slideIndex >= 0 ? slideIndex : undefined}
+          onClose={() => setCarouselAssetId(undefined)}
+          onNavigate={setCarouselAssetId}
+          onAssetUpdate={(updatedAsset) => updateEntity(
+            updatedAsset.asset_id ?? "",
+            updatedAsset
           )}
+          onAssetDelete={(assetId) => deleteEntity(assetId)}
+        />
+      )}
     </div>
   );
 };

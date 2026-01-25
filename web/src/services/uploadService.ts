@@ -1,6 +1,8 @@
-import api from "@/lib/http-commons/api.ts";
-import type { AxiosRequestConfig, AxiosResponse } from "axios";
+// src/services/uploadService.ts
+
+import { getToken } from "@/lib/http-commons/api";
 import type { components } from "@/lib/http-commons/schema.d.ts";
+import client from "@/lib/http-commons/client";
 
 // ============================================================================
 // Type Aliases from Generated Schema
@@ -45,8 +47,19 @@ export type UploadProgressResponse = Schemas["dto.UploadProgressResponseDTO"];
  */
 export type SessionProgress = Schemas["dto.SessionProgressDTO"];
 
+// Base URL for uploads
+const baseURL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
+/**
+ * Options for upload progress tracking
+ */
+export interface UploadOptions {
+  onUploadProgress?: (progress: { loaded: number; total: number; percent: number }) => void;
+  signal?: AbortSignal;
+}
+
 // ============================================================================
-// Upload Service
+// Upload Service (using native fetch for multipart/form-data)
 // ============================================================================
 
 export const uploadService = {
@@ -54,25 +67,75 @@ export const uploadService = {
    * Upload a single file to the server
    * @param file - The file to upload
    * @param hash - Unique file identifier (BLAKE3 hash)
-   * @param config - Optional Axios config (e.g., onUploadProgress)
-   * @returns A promise resolving to an Axios response with UploadResponse
+   * @param options - Optional config (progress callback, abort signal)
+   * @returns A promise resolving to upload response
    */
   uploadFile: async (
     file: File,
     hash: string,
-    config?: AxiosRequestConfig,
-  ): Promise<AxiosResponse<ApiResult<UploadResponse>>> => {
+    options?: UploadOptions,
+  ): Promise<ApiResult<UploadResponse>> => {
     const formData = new FormData();
     formData.append("file", file);
 
-    return api.post<ApiResult<UploadResponse>>("/api/v1/assets", formData, {
-      ...config,
-      headers: {
-        "Content-Type": "multipart/form-data",
-        "X-Content-Hash": hash,
-        ...config?.headers,
-      },
+    const headers: HeadersInit = {
+      "X-Content-Hash": hash,
+    };
+
+    const token = getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    // Use XMLHttpRequest for progress tracking if callback provided
+    if (options?.onUploadProgress) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${baseURL}/assets`);
+
+        // Set headers
+        Object.entries(headers).forEach(([key, value]) => {
+          xhr.setRequestHeader(key, value);
+        });
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && options.onUploadProgress) {
+            options.onUploadProgress({
+              loaded: event.loaded,
+              total: event.total,
+              percent: Math.round((event.loaded / event.total) * 100),
+            });
+          }
+        };
+
+        xhr.onload = () => {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response);
+          } catch {
+            reject(new Error("Failed to parse response"));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Upload failed"));
+
+        if (options.signal) {
+          options.signal.addEventListener("abort", () => xhr.abort());
+        }
+
+        xhr.send(formData);
+      });
+    }
+
+    // Use fetch for simple uploads without progress
+    const response = await fetch(`${baseURL}/assets`, {
+      method: "POST",
+      headers,
+      body: formData,
+      signal: options?.signal,
     });
+
+    return response.json();
   },
 
   /**
@@ -81,7 +144,7 @@ export const uploadService = {
    * or chunk_{session_id}_{index}_{total} for chunks
    * @param files - Array of file objects with session IDs and optional chunk info
    * @param repositoryId - Optional repository UUID
-   * @param config - Optional Axios config
+   * @param options - Optional config (progress callback, abort signal)
    * @returns A promise resolving to batch upload results
    */
   batchUploadFiles: async (
@@ -94,8 +157,8 @@ export const uploadService = {
       totalChunks?: number;
     }>,
     repositoryId?: string,
-    config?: AxiosRequestConfig,
-  ): Promise<AxiosResponse<ApiResult<BatchUploadResponse>>> => {
+    options?: UploadOptions & { contentHash?: string },
+  ): Promise<ApiResult<BatchUploadResponse>> => {
     const formData = new FormData();
 
     // Add repository ID if provided
@@ -124,17 +187,66 @@ export const uploadService = {
       formData.append(fieldName, fileObj.file, filename);
     });
 
-    return api.post<ApiResult<BatchUploadResponse>>(
-      "/api/v1/assets/batch",
-      formData,
-      {
-        ...config,
-        headers: {
-          "Content-Type": "multipart/form-data",
-          ...config?.headers,
-        },
-      },
-    );
+    const headers: HeadersInit = {};
+
+    if (options?.contentHash) {
+      headers["X-Content-Hash"] = options.contentHash;
+    }
+
+    const token = getToken();
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    // Use XMLHttpRequest for progress tracking if callback provided
+    if (options?.onUploadProgress) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${baseURL}/assets/batch`);
+
+        // Set headers
+        Object.entries(headers).forEach(([key, value]) => {
+          xhr.setRequestHeader(key, value);
+        });
+
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && options.onUploadProgress) {
+            options.onUploadProgress({
+              loaded: event.loaded,
+              total: event.total,
+              percent: Math.round((event.loaded / event.total) * 100),
+            });
+          }
+        };
+
+        xhr.onload = () => {
+          try {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response);
+          } catch {
+            reject(new Error("Failed to parse response"));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Batch upload failed"));
+
+        if (options.signal) {
+          options.signal.addEventListener("abort", () => xhr.abort());
+        }
+
+        xhr.send(formData);
+      });
+    }
+
+    // Use fetch for simple uploads without progress
+    const response = await fetch(`${baseURL}/assets/batch`, {
+      method: "POST",
+      headers,
+      body: formData,
+      signal: options?.signal,
+    });
+
+    return response.json();
   },
 
   /**
@@ -155,19 +267,19 @@ export const uploadService = {
     repositoryId?: string,
     onProgress?: (progress: number) => void,
     options?: { maxConcurrent?: number; chunkSize?: number },
-  ): Promise<AxiosResponse<ApiResult<BatchUploadResponse>>> => {
+  ): Promise<ApiResult<BatchUploadResponse>> => {
     const effectiveChunkSize = options?.chunkSize ?? chunkSize;
     const totalChunks = Math.ceil(file.size / effectiveChunkSize);
     // Increased default concurrency for HTTP/2 multiplexing
     const maxConcurrent = options?.maxConcurrent ?? 6;
-    let lastResponse: AxiosResponse<ApiResult<BatchUploadResponse>> | null = null;
+    let lastResponse: ApiResult<BatchUploadResponse> | null = null;
 
     // Helper to upload a single chunk
     const uploadChunk = async (chunkIndex: number) => {
       const start = chunkIndex * effectiveChunkSize;
       const end = Math.min(start + effectiveChunkSize, file.size);
       const chunk = file.slice(start, end);
-      
+
       return uploadService.batchUploadFiles(
         [{
           file: chunk,
@@ -179,9 +291,7 @@ export const uploadService = {
         }],
         repositoryId,
         {
-          headers: {
-            "X-Content-Hash": hash,
-          }
+          contentHash: hash,
         }
       );
     };
@@ -203,18 +313,18 @@ export const uploadService = {
         while (activeUploads < maxConcurrent && nextChunkIndex < totalChunks) {
           const currentIndex = nextChunkIndex++;
           activeUploads++;
-          
+
           uploadChunk(currentIndex)
             .then(response => {
               lastResponse = response;
               completedChunks++;
               activeUploads--;
-              
+
               if (onProgress) {
                 const progress = Math.min((completedChunks / totalChunks) * 100, 100);
                 onProgress(progress);
               }
-              
+
               processNext();
             })
             .catch(error => {
@@ -231,12 +341,9 @@ export const uploadService = {
    * Get upload configuration including chunk size and concurrency limits
    * @returns A promise resolving to upload configuration
    */
-  getUploadConfig: async (): Promise<
-    AxiosResponse<ApiResult<UploadConfigResponse>>
-  > => {
-    return api.get<ApiResult<UploadConfigResponse>>(
-      "/api/v1/assets/batch/config",
-    );
+  getUploadConfig: async (): Promise<UploadConfigResponse | undefined> => {
+    const { data } = await client.GET("/assets/batch/config", {});
+    return data?.data as UploadConfigResponse | undefined;
   },
 
   /**
@@ -246,12 +353,11 @@ export const uploadService = {
    */
   getUploadProgress: async (
     sessionIds?: string,
-  ): Promise<AxiosResponse<ApiResult<UploadProgressResponse>>> => {
-    const params = sessionIds ? { session_ids: sessionIds } : undefined;
-    return api.get<ApiResult<UploadProgressResponse>>(
-      "/api/v1/assets/batch/progress",
-      { params },
-    );
+  ): Promise<UploadProgressResponse | undefined> => {
+    const { data } = await client.GET("/assets/batch/progress", {
+      params: { query: sessionIds ? { session_ids: sessionIds } : undefined },
+    });
+    return data?.data as UploadProgressResponse | undefined;
   },
 
   /**

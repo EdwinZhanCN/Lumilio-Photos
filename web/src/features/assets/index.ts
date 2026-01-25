@@ -1,5 +1,4 @@
 export { AssetsProvider } from "./AssetsProvider";
-export { useAssetsContext } from "./hooks/useAssetsContext";
 export { useAssetsView, useCurrentTabAssets } from "./hooks/useAssetsView";
 export {
   useAsset,
@@ -17,11 +16,17 @@ export {
   useSelectionState,
   useBulkAssetOperations,
 } from "./hooks/useSelection";
+export { useAssetsNavigation } from "./hooks/useAssetsNavigation";
+
+// Export selectors for fine-grained access
+export * from "./selectors";
+
+// Export Zustand store
+export { useAssetsStore } from "./assets.store";
 
 // Export types
 export type {
   AssetsState,
-  AssetsContextValue,
   AssetViewDefinition,
   AssetsViewResult,
   AssetActionsResult,
@@ -29,21 +34,25 @@ export type {
   TabType,
   GroupByType,
   ViewDefinitionOptions,
-} from "./assets.types.ts";
+} from "./types/assets.type";
+
+// Re-export AssetsContextValue from types (for backwards compat)
+export type { AssetsContextValue } from "./types/assets.type";
 
 // Export shared components
 export { default as AssetsPageHeader } from "./components/shared/AssetsPageHeader";
 export { default as JustifiedGallery } from "./components/page/JustifiedGallery/JustifiedGallery";
 
-// Export utilities and selectors
-export { generateViewKey } from "./reducers/views.reducer";
+// Export utilities and selectors from slices
+export { generateViewKey } from "./slices/views.slice";
 export {
   selectActiveFilterCount,
   selectHasActiveFilters,
   selectFilterAsAssetFilter,
-} from "./reducers/filters.reducer";
+} from "./slices/filters.slice";
 export {
   selectTabTitle,
   selectTabSupportsSemanticSearch,
   selectTabAssetTypes,
-} from "./reducers/ui.reducer";
+} from "./slices/ui.slice";
+

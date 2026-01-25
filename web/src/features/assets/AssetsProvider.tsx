@@ -1,10 +1,10 @@
 import {
   createContext,
-  useReducer,
   ReactNode,
   useEffect,
   useMemo,
   useCallback,
+  useRef,
 } from "react";
 import {
   useLocation,
@@ -12,13 +12,21 @@ import {
   useSearchParams,
   useParams,
 } from "react-router-dom";
-import { AssetsContextValue, AssetsState, TabType } from "./assets.types.ts";
-import { assetsReducer, initialAssetsState } from "./assets.reducer";
+import { TabType } from "./types/assets.type";
 import { useSettingsContext } from "@/features/settings";
+import { useAssetsStore } from "./assets.store";
+import { useShallow } from "zustand/react/shallow";
 
-export const AssetsContext = createContext<AssetsContextValue | undefined>(
-  undefined,
-);
+// Context for navigation helpers which depend on router
+interface AssetsNavigationContextValue {
+  openCarousel: (assetId: string) => void;
+  closeCarousel: () => void;
+  switchTab: (tab: TabType) => void;
+}
+
+export const AssetsNavigationContext = createContext<
+  AssetsNavigationContextValue | undefined
+>(undefined);
 
 const STORAGE_KEY = "assets_state_v1";
 const STORAGE_FIELDS = ["filters", "selection"] as const;
@@ -30,12 +38,12 @@ interface AssetsProviderProps {
   defaultSelectionMode?: "single" | "multiple";
 }
 
-function loadPersistedState(): Partial<AssetsState> {
+function loadPersistedState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      const restored: Partial<AssetsState> = {};
+      const restored: any = {};
 
       STORAGE_FIELDS.forEach((field) => {
         if (parsed[field]) {
@@ -43,7 +51,7 @@ function loadPersistedState(): Partial<AssetsState> {
             restored[field] = {
               ...parsed[field],
               selectedIds: new Set(parsed[field].selectedIds || []),
-            } as any;
+            };
           } else {
             restored[field] = parsed[field];
           }
@@ -58,18 +66,20 @@ function loadPersistedState(): Partial<AssetsState> {
   return {};
 }
 
-function saveStateToStorage(state: AssetsState) {
+function saveStateToStorage(state: any) {
   try {
-    const toSave: Partial<AssetsState> = {};
+    const toSave: any = {};
 
     STORAGE_FIELDS.forEach((field) => {
-      if (field === "selection") {
-        toSave[field] = {
-          ...state[field],
-          selectedIds: Array.from(state[field].selectedIds),
-        } as any;
-      } else {
-        toSave[field] = state[field];
+      if (state[field]) {
+        if (field === "selection") {
+          toSave[field] = {
+            ...state[field],
+            selectedIds: Array.from(state[field].selectedIds),
+          };
+        } else {
+          toSave[field] = state[field];
+        }
       }
     });
 
@@ -79,11 +89,11 @@ function saveStateToStorage(state: AssetsState) {
   }
 }
 
-export const AssetsProvider = ({ 
-  children, 
-  persist = true, 
+export const AssetsProvider = ({
+  children,
+  persist = true,
   basePath,
-  defaultSelectionMode = "multiple"
+  defaultSelectionMode = "multiple",
 }: AssetsProviderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -91,60 +101,88 @@ export const AssetsProvider = ({
   const params = useParams<{ assetId?: string }>();
   const { state: settingsState } = useSettingsContext();
 
-  const initializeState = useCallback((): AssetsState => {
-    const persistedState = persist ? loadPersistedState() : {};
-
-    const currentTab: TabType = location.pathname.includes("/videos")
-      ? "videos"
-      : location.pathname.includes("/audios")
-        ? "audios"
-        : "photos";
-
-    const preferredGroupBy =
-      settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
-
-    const urlGroupBy = (searchParams.get("groupBy") as any) || preferredGroupBy;
-    const urlQuery = searchParams.get("q") || "";
-    const isCarouselOpen = !!params.assetId;
-
-    return {
-      ...initialAssetsState,
-      ...persistedState,
-      ui: {
-        currentTab,
-        groupBy: urlGroupBy,
-        searchQuery: urlQuery,
-        searchMode: initialAssetsState.ui.searchMode,
-        isCarouselOpen,
-        activeAssetId: params.assetId,
-      },
-      selection: {
-        ...initialAssetsState.selection,
-        ...(persistedState.selection || {}),
-        selectionMode: defaultSelectionMode,
-      }
-    };
-  }, [
-    location.pathname,
-    searchParams,
-    params.assetId,
-    settingsState.ui.asset_page?.layout,
-    persist,
-    defaultSelectionMode
-  ]);
-
-  const [state, dispatch] = useReducer(
-    assetsReducer,
-    undefined,
-    initializeState,
+  // Store actions
+  const {
+    setCurrentTab,
+    setCarouselOpen,
+    setActiveAssetId,
+    hydrateUIFromURL,
+    removeView,
+    setSelectionMode,
+    batchUpdateFilters,
+    setSelectionEnabled,
+    selectAll,
+  } = useAssetsStore(
+    useShallow((state) => ({
+      setCurrentTab: state.setCurrentTab,
+      setCarouselOpen: state.setCarouselOpen,
+      setActiveAssetId: state.setActiveAssetId,
+      hydrateUIFromURL: state.hydrateUIFromURL,
+      removeView: state.removeView,
+      setSelectionMode: state.setSelectionMode,
+      batchUpdateFilters: state.batchUpdateFilters,
+      setSelectionEnabled: state.setSelectionEnabled,
+      selectAll: state.selectAll,
+    })),
   );
 
+  // Store state for effects
+  const uiState = useAssetsStore(useShallow((state) => state.ui));
+  const viewsState = useAssetsStore(useShallow((state) => state.views));
+  const filtersState = useAssetsStore(useShallow((state) => state.filters));
+  const selectionState = useAssetsStore(useShallow((state) => state.selection));
+
+  // Initialize state from storage and URL
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+
+    // Load persisted state
+    if (persist) {
+      const persistedState = loadPersistedState();
+      if (persistedState.filters) {
+        batchUpdateFilters(persistedState.filters);
+      }
+      if (persistedState.selection) {
+        // We need to manually reconstruct the selection state
+        // because the slice actions expect specific calls
+        if (persistedState.selection.enabled) {
+          setSelectionEnabled(true);
+        }
+        if (persistedState.selection.selectionMode) {
+          setSelectionMode(persistedState.selection.selectionMode);
+        }
+        if (persistedState.selection.selectedIds?.size > 0) {
+          selectAll(Array.from(persistedState.selection.selectedIds));
+        }
+      }
+    }
+
+    // Set default selection mode
+    if (!persist || !loadPersistedState().selection) {
+      setSelectionMode(defaultSelectionMode);
+    }
+  }, [
+    persist,
+    defaultSelectionMode,
+    batchUpdateFilters,
+    setSelectionEnabled,
+    setSelectionMode,
+    selectAll,
+  ]);
+
+  // Persist state changes
   useEffect(() => {
     if (persist) {
-      saveStateToStorage(state);
+      saveStateToStorage({
+        filters: filtersState,
+        selection: selectionState,
+      });
     }
-  }, [state.filters, state.selection, persist]);
+  }, [filtersState, selectionState, persist]);
 
+  // Sync Tab with URL
   useEffect(() => {
     const currentTab: TabType = location.pathname.includes("/videos")
       ? "videos"
@@ -152,47 +190,52 @@ export const AssetsProvider = ({
         ? "audios"
         : "photos";
 
-    if (currentTab !== state.ui.currentTab) {
-      dispatch({ type: "SET_CURRENT_TAB", payload: currentTab });
+    if (currentTab !== uiState.currentTab) {
+      setCurrentTab(currentTab);
     }
-  }, [location.pathname, state.ui.currentTab]);
+  }, [location.pathname, uiState.currentTab, setCurrentTab]);
 
+  // Sync Carousel with URL
   useEffect(() => {
     const isCarouselOpen = !!params.assetId;
     const activeAssetId = params.assetId;
 
-    dispatch({ type: "SET_CAROUSEL_OPEN", payload: isCarouselOpen });
-    dispatch({ type: "SET_ACTIVE_ASSET_ID", payload: activeAssetId });
-  }, [params.assetId]);
+    setCarouselOpen(isCarouselOpen);
+    setActiveAssetId(activeAssetId);
+  }, [params.assetId, setCarouselOpen, setActiveAssetId]);
 
+  // Sync UI state from URL params
   useEffect(() => {
     const urlGroupBy = searchParams.get("groupBy");
     const urlQuery = searchParams.get("q");
-    const defaultGroupBy = settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
+    const defaultGroupBy =
+      settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
     const expectedGroupBy = urlGroupBy || defaultGroupBy;
 
-    if (expectedGroupBy !== state.ui.groupBy) {
-      dispatch({
-        type: "HYDRATE_UI_FROM_URL",
-        payload: { groupBy: expectedGroupBy as any },
-      });
+    if (expectedGroupBy !== uiState.groupBy) {
+      hydrateUIFromURL({ groupBy: expectedGroupBy as any });
     }
 
-    if (urlQuery !== null && urlQuery !== state.ui.searchQuery) {
-      dispatch({
-        type: "HYDRATE_UI_FROM_URL",
-        payload: { searchQuery: urlQuery },
-      });
+    if (urlQuery !== null && urlQuery !== uiState.searchQuery) {
+      hydrateUIFromURL({ searchQuery: urlQuery });
     }
-  }, [searchParams, settingsState.ui.asset_page?.layout]);
+  }, [
+    searchParams,
+    settingsState.ui.asset_page?.layout,
+    uiState.groupBy,
+    uiState.searchQuery,
+    hydrateUIFromURL,
+  ]);
 
+  // Sync URL with UI state
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     let hasChanges = false;
-    const defaultGroupBy = settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
+    const defaultGroupBy =
+      settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
 
-    if (state.ui.groupBy !== defaultGroupBy) {
-      params.set("groupBy", state.ui.groupBy);
+    if (uiState.groupBy !== defaultGroupBy) {
+      params.set("groupBy", uiState.groupBy);
       hasChanges = true;
     } else {
       if (params.has("groupBy")) {
@@ -201,8 +244,8 @@ export const AssetsProvider = ({
       }
     }
 
-    if (state.ui.searchQuery.trim()) {
-      params.set("q", state.ui.searchQuery);
+    if (uiState.searchQuery.trim()) {
+      params.set("q", uiState.searchQuery);
       hasChanges = true;
     } else {
       if (params.has("q")) {
@@ -215,23 +258,25 @@ export const AssetsProvider = ({
       setSearchParams(params, { replace: true });
     }
   }, [
-    state.ui.groupBy,
-    state.ui.searchQuery,
+    uiState.groupBy,
+    uiState.searchQuery,
     settingsState.ui.asset_page?.layout,
     setSearchParams,
+    searchParams,
   ]);
 
+  // Cleanup stale views
   useEffect(() => {
     const interval = setInterval(
       () => {
-        if (Object.keys(state.views.views).length > 10) {
+        if (Object.keys(viewsState).length > 10) {
           const now = Date.now();
           const maxAge = 30 * 60 * 1000;
-          const activeViewKeys = new Set(state.views.activeViewKeys);
+          const activeViewKeys = new Set(useAssetsStore.getState().activeViewKeys);
 
-          Object.entries(state.views.views).forEach(([key, view]) => {
+          Object.entries(useAssetsStore.getState().views).forEach(([key, view]) => {
             if (!activeViewKeys.has(key) && now - view.lastFetchAt > maxAge) {
-              dispatch({ type: "REMOVE_VIEW", payload: { viewKey: key } });
+              removeView(key);
             }
           });
         }
@@ -240,36 +285,36 @@ export const AssetsProvider = ({
     );
 
     return () => clearInterval(interval);
-  }, [state.views.views, state.views.activeViewKeys]);
+  }, [removeView]);
 
   const openCarousel = useCallback(
     (assetId: string) => {
       const currentParams = new URLSearchParams(searchParams);
       let path = basePath || "/assets/photos";
-      
+
       if (!basePath) {
-        if (state.ui.currentTab === "videos") path = "/assets/videos";
-        else if (state.ui.currentTab === "audios") path = "/assets/audios";
+        if (uiState.currentTab === "videos") path = "/assets/videos";
+        else if (uiState.currentTab === "audios") path = "/assets/audios";
       }
 
       const targetUrl = `${path}/${assetId}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
       navigate(targetUrl);
     },
-    [navigate, searchParams, state.ui.currentTab, basePath],
+    [navigate, searchParams, uiState.currentTab, basePath],
   );
 
   const closeCarousel = useCallback(() => {
     const currentParams = new URLSearchParams(searchParams);
     let path = basePath || "/assets/photos";
-    
+
     if (!basePath) {
-      if (state.ui.currentTab === "videos") path = "/assets/videos";
-      else if (state.ui.currentTab === "audios") path = "/assets/audios";
+      if (uiState.currentTab === "videos") path = "/assets/videos";
+      else if (uiState.currentTab === "audios") path = "/assets/audios";
     }
 
     const targetUrl = `${path}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
     navigate(targetUrl);
-  }, [navigate, searchParams, state.ui.currentTab, basePath]);
+  }, [navigate, searchParams, uiState.currentTab, basePath]);
 
   const switchTab = useCallback(
     (tab: TabType) => {
@@ -283,20 +328,18 @@ export const AssetsProvider = ({
     [navigate, searchParams],
   );
 
-  const contextValue = useMemo<AssetsContextValue>(
+  const contextValue = useMemo<AssetsNavigationContextValue>(
     () => ({
-      state,
-      dispatch,
       openCarousel,
       closeCarousel,
       switchTab,
     }),
-    [state, dispatch, openCarousel, closeCarousel, switchTab],
+    [openCarousel, closeCarousel, switchTab],
   );
 
   return (
-    <AssetsContext.Provider value={contextValue}>
+    <AssetsNavigationContext.Provider value={contextValue}>
       {children}
-    </AssetsContext.Provider>
+    </AssetsNavigationContext.Provider>
   );
 };

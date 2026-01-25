@@ -7,6 +7,7 @@ import path from "path";
 import topLevelAwait from "vite-plugin-top-level-await";
 import {preview} from "@vitest/browser-preview";
 
+
 export default defineConfig({
   resolve: {
     alias: {

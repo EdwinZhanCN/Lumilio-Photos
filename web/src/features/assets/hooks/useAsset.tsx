@@ -1,6 +1,6 @@
 import { useMemo } from "react";
-import { useAssetsContext } from "./useAssetsContext";
-import { selectAsset, selectAssetMeta } from "../reducers/entities.reducer";
+import { useAssetsStore } from "../assets.store";
+import { selectAsset, selectAssetMeta } from "../slices/entities.slice";
 import { Asset } from "@/services";
 
 /**
@@ -9,44 +9,19 @@ import { Asset } from "@/services";
  *
  * @param assetId The ID of the asset to retrieve
  * @returns Asset object and metadata, or undefined if not found
- *
- * @example
- * ```tsx
- * function AssetCard({ assetId }: { assetId: string }) {
- *   const { asset, meta, isOptimistic } = useAsset(assetId);
- *
- *   if (!asset) {
- *     return <div>Asset not found</div>;
- *   }
- *
- *   return (
- *     <div className={isOptimistic ? 'opacity-50' : ''}>
- *       <img src={asset.thumbnail_url} alt={asset.original_filename} />
- *       <p>Rating: {asset.specific_metadata?.rating || 'Unrated'}</p>
- *       {isOptimistic && <span>Updating...</span>}
- *     </div>
- *   );
- * }
- * ```
  */
 export const useAsset = (assetId: string) => {
-  const { state } = useAssetsContext();
+  const asset = useAssetsStore((s) => selectAsset(s.entities, assetId));
+  const meta = useAssetsStore((s) => selectAssetMeta(s.entities, assetId));
 
-  const result = useMemo(() => {
-    const asset = selectAsset(state.entities, assetId);
-    const meta = selectAssetMeta(state.entities, assetId);
-
-    return {
-      asset,
-      meta,
-      exists: !!asset,
-      isOptimistic: meta?.isOptimistic ?? false,
-      lastUpdated: meta?.lastUpdated,
-      fetchOrigin: meta?.fetchOrigin,
-    };
-  }, [state.entities, assetId]);
-
-  return result;
+  return useMemo(() => ({
+    asset,
+    meta,
+    exists: !!asset,
+    isOptimistic: meta?.isOptimistic ?? false,
+    lastUpdated: meta?.lastUpdated,
+    fetchOrigin: meta?.fetchOrigin,
+  }), [asset, meta]);
 };
 
 /**
@@ -55,33 +30,9 @@ export const useAsset = (assetId: string) => {
  *
  * @param assetIds Array of asset IDs to retrieve
  * @returns Object mapping asset IDs to asset data
- *
- * @example
- * ```tsx
- * function AssetGrid({ assetIds }: { assetIds: string[] }) {
- *   const assetsMap = useAssets(assetIds);
- *
- *   return (
- *     <div className="grid">
- *       {assetIds.map(id => {
- *         const { asset, isOptimistic } = assetsMap[id] || {};
- *         if (!asset) return null;
- *
- *         return (
- *           <AssetThumbnail
- *             key={id}
- *             asset={asset}
- *             isOptimistic={isOptimistic}
- *           />
- *         );
- *       })}
- *     </div>
- *   );
- * }
- * ```
  */
 export const useAssets = (assetIds: string[]) => {
-  const { state } = useAssetsContext();
+  const entities = useAssetsStore((s) => s.entities);
 
   const assetsMap = useMemo(() => {
     const result: Record<
@@ -97,8 +48,8 @@ export const useAssets = (assetIds: string[]) => {
     > = {};
 
     assetIds.forEach((assetId) => {
-      const asset = selectAsset(state.entities, assetId);
-      const meta = selectAssetMeta(state.entities, assetId);
+      const asset = selectAsset(entities, assetId);
+      const meta = selectAssetMeta(entities, assetId);
 
       result[assetId] = {
         asset,
@@ -111,7 +62,7 @@ export const useAssets = (assetIds: string[]) => {
     });
 
     return result;
-  }, [state.entities, assetIds]);
+  }, [entities, assetIds]);
 
   return assetsMap;
 };
@@ -124,11 +75,7 @@ export const useAssets = (assetIds: string[]) => {
  * @returns Boolean indicating if asset exists
  */
 export const useAssetExists = (assetId: string): boolean => {
-  const { state } = useAssetsContext();
-
-  return useMemo(() => {
-    return !!selectAsset(state.entities, assetId);
-  }, [state.entities, assetId]);
+  return useAssetsStore((s) => !!selectAsset(s.entities, assetId));
 };
 
 /**
@@ -139,9 +86,5 @@ export const useAssetExists = (assetId: string): boolean => {
  * @returns Asset metadata
  */
 export const useAssetMeta = (assetId: string) => {
-  const { state } = useAssetsContext();
-
-  return useMemo(() => {
-    return selectAssetMeta(state.entities, assetId);
-  }, [state.entities, assetId]);
+  return useAssetsStore((s) => selectAssetMeta(s.entities, assetId));
 };

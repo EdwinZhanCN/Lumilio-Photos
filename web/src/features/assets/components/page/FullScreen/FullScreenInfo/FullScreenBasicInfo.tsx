@@ -3,7 +3,6 @@ import { X } from "lucide-react";
 import { useExtractExifdata } from "@/hooks/util-hooks/useExtractExifdata";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { assetService } from "@/services/assetsService";
-import { AxiosError } from "axios";
 import { useI18n } from "@/lib/i18n.tsx";
 import { ExifDataDisplay } from "@/features/studio/components/panels/ExifDataDisplay";
 import type { Asset } from "@/lib/http-commons";
@@ -45,9 +44,10 @@ export default function FullScreenBasicInfo({
       setIsLoadingFile(true);
       setDetailedExif(null);
 
-      // Fetch the original file using the service method
-      const response = await assetService.getOriginalFile(asset.asset_id);
-      const blob = response.data;
+      // Fetch the original file using the URL helper
+      const url = assetService.getOriginalFileUrl(asset.asset_id);
+      const response = await fetch(url);
+      const blob = await response.blob();
       const file = new File([blob], asset.original_filename || "image", {
         type: asset.mime_type || "image/jpeg",
       });
@@ -64,21 +64,14 @@ export default function FullScreenBasicInfo({
     } catch (error) {
       setIsLoadingFile(false);
 
-      // Handle specific error cases
-      if ((error as AxiosError)?.response?.status === 404) {
-        showMessage("error", t("assets.basicInfo.errors.notFound"));
-      } else if ((error as AxiosError)?.response?.status === 401) {
-        showMessage("error", t("assets.basicInfo.errors.unauthorized"));
-      } else if ((error as AxiosError)?.response?.status === 403) {
-        showMessage("error", t("assets.basicInfo.errors.forbidden"));
-      } else {
-        showMessage(
-          "error",
-          t("assets.basicInfo.errors.extractFailed", {
-            message: (error as Error).message,
-          }),
-        );
-      }
+      // Handle error - fetch doesn't throw on HTTP errors, so we just show the message
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      showMessage(
+        "error",
+        t("assets.basicInfo.errors.extractFailed", {
+          message: errorMessage,
+        }),
+      );
     }
   };
 

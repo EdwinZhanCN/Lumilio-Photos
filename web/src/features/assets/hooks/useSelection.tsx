@@ -1,16 +1,15 @@
 import { useCallback, useMemo } from "react";
-import { useAssetsContext } from "./useAssetsContext";
-import { SelectionResult } from "../assets.types.ts";
+import { useAssetsStore } from "../assets.store";
+import { SelectionResult } from "../types/assets.type";
 import {
-  selectSelectionEnabled,
-  selectSelectedIds,
-  selectSelectedCount,
-  selectIsAssetSelected,
+  useSelectionEnabled,
+  useSelectedIds,
+  useSelectionMode,
+  useSelectionActions,
+} from "../selectors";
+import {
   selectLastSelectedId,
-  selectSelectionMode,
-  selectHasSelection,
-  selectSelectedAsArray,
-} from "../reducers/selection.reducer";
+} from "../slices/selection.slice";
 import { useAssetActions } from "./useAssetActions";
 import { albumService } from "@/services/albumService";
 import { assetService } from "@/services/assetsService";
@@ -23,81 +22,63 @@ import { assetService } from "@/services/assetsService";
  * @returns SelectionResult with selection state and operations
  */
 export const useSelection = (): SelectionResult => {
-  const { state, dispatch } = useAssetsContext();
+  // Fine-grained subscriptions
+  const enabled = useSelectionEnabled();
+  const selectedIds = useSelectedIds();
+  const selectionMode = useSelectionMode();
 
-  // Memoized selectors
-  const enabled = useMemo(
-    () => selectSelectionEnabled(state.selection),
-    [state.selection],
-  );
+  // Actions
+  const {
+    toggle: toggleAssetSelection,
+    select: selectAsset,
+    deselect: deselectAsset,
+    selectAll: selectAllAssets,
+    clear: clearSelection,
+    setEnabled,
+    setMode: setSelectionMode,
+  } = useSelectionActions();
 
-  const selectedIds = useMemo(
-    () => selectSelectedIds(state.selection),
-    [state.selection],
-  );
-
-  const selectedCount = useMemo(
-    () => selectSelectedCount(state.selection),
-    [state.selection],
-  );
-
-  const selectionMode = useMemo(
-    () => selectSelectionMode(state.selection),
-    [state.selection],
-  );
-
-  const hasSelection = useMemo(
-    () => selectHasSelection(state.selection),
-    [state.selection],
-  );
+  // Derived values
+  const selectedCount = selectedIds.size;
+  const hasSelection = selectedCount > 0;
 
   const selectedAsArray = useMemo(
-    () => selectSelectedAsArray(state.selection),
-    [state.selection],
+    () => Array.from(selectedIds),
+    [selectedIds],
   );
 
   // Selection operations
   const isSelected = useCallback(
     (assetId: string): boolean => {
-      return selectIsAssetSelected(state.selection, assetId);
+      // Direct access from the subscribed state in this component
+      return selectedIds.has(assetId);
     },
-    [state.selection],
+    [selectedIds],
   );
 
+  // Wrappers for store actions
   const toggle = useCallback(
     (assetId: string): void => {
       if (!enabled) return;
-
-      dispatch({
-        type: "TOGGLE_ASSET_SELECTION",
-        payload: { assetId },
-      });
+      toggleAssetSelection(assetId);
     },
-    [enabled, dispatch],
+    [enabled, toggleAssetSelection],
   );
 
   const select = useCallback(
     (assetId: string): void => {
       if (!enabled) return;
-
-      dispatch({
-        type: "SELECT_ASSET",
-        payload: { assetId },
-      });
+      selectAsset(assetId);
     },
-    [enabled, dispatch],
+    [enabled, selectAsset],
   );
 
   const deselect = useCallback(
     (assetId: string): void => {
       if (!enabled) return;
-
-      dispatch({
-        type: "DESELECT_ASSET",
-        payload: { assetId },
-      });
+      deselectAsset(assetId);
     },
-    [enabled, dispatch],
+    [enabled, deselectAsset],
   );
 
   const selectAll = useCallback(
@@ -110,42 +91,17 @@ export const useSelection = (): SelectionResult => {
         return;
       }
 
-      dispatch({
-        type: "SELECT_ALL",
-        payload: { assetIds },
-      });
+      selectAllAssets(assetIds);
     },
-    [enabled, dispatch],
+    [enabled, selectAllAssets],
   );
 
-  const clear = useCallback((): void => {
-    dispatch({ type: "CLEAR_SELECTION" });
-  }, [dispatch]);
-
-  const setEnabled = useCallback(
-    (newEnabled: boolean): void => {
-      dispatch({
-        type: "SET_SELECTION_ENABLED",
-        payload: newEnabled,
-      });
-    },
-    [dispatch],
-  );
-
-  const setSelectionMode = useCallback(
-    (mode: "single" | "multiple"): void => {
-      dispatch({
-        type: "SET_SELECTION_MODE",
-        payload: mode,
-      });
-    },
-    [dispatch],
-  );
-
-  // Bulk operations helpers
+  // Bulk operations helpers - using getState to avoid stale closures and re-renders
   const selectRange = useCallback(
     (fromAssetId: string, toAssetId: string, assetIds: string[]): void => {
-      if (!enabled || selectionMode !== "multiple") return;
+      // Check current state from store
+      const state = useAssetsStore.getState();
+      if (!state.selection.enabled || state.selection.selectionMode !== "multiple") return;
 
       const fromIndex = assetIds.indexOf(fromAssetId);
       const toIndex = assetIds.indexOf(toAssetId);
@@ -157,17 +113,18 @@ export const useSelection = (): SelectionResult => {
       const rangeIds = assetIds.slice(startIndex, endIndex + 1);
 
       rangeIds.forEach((assetId) => {
-        if (!isSelected(assetId)) {
-          select(assetId);
+        if (!state.selection.selectedIds.has(assetId)) {
+          selectAsset(assetId);
         }
       });
     },
-    [enabled, selectionMode, isSelected, select],
+    [selectAsset],
   );
 
   const toggleRange = useCallback(
     (fromAssetId: string, toAssetId: string, assetIds: string[]): void => {
-      if (!enabled || selectionMode !== "multiple") return;
+      const state = useAssetsStore.getState();
+      if (!state.selection.enabled || state.selection.selectionMode !== "multiple") return;
 
       const fromIndex = assetIds.indexOf(fromAssetId);
       const toIndex = assetIds.indexOf(toAssetId);
@@ -178,47 +135,50 @@ export const useSelection = (): SelectionResult => {
       const endIndex = Math.max(fromIndex, toIndex);
       const rangeIds = assetIds.slice(startIndex, endIndex + 1);
 
-      // Check if all items in range are selected
-      const allSelected = rangeIds.every((id) => isSelected(id));
+      // Check if all items in range are selected based on current state
+      const allSelected = rangeIds.every((id) => state.selection.selectedIds.has(id));
 
       rangeIds.forEach((assetId) => {
         if (allSelected) {
-          deselect(assetId);
+          deselectAsset(assetId);
         } else {
-          select(assetId);
+          selectAsset(assetId);
         }
       });
     },
-    [enabled, selectionMode, isSelected, select, deselect],
+    [selectAsset, deselectAsset],
   );
 
   const selectFiltered = useCallback(
     (assetIds: string[], predicate: (assetId: string) => boolean): void => {
-      if (!enabled) return;
+      const state = useAssetsStore.getState();
+      if (!state.selection.enabled) return;
 
       const filteredIds = assetIds.filter(predicate);
-      filteredIds.forEach(select);
+      filteredIds.forEach(selectAsset);
     },
-    [enabled, select],
+    [selectAsset],
   );
 
   const deselectFiltered = useCallback(
     (assetIds: string[], predicate: (assetId: string) => boolean): void => {
-      if (!enabled) return;
+      const state = useAssetsStore.getState();
+      if (!state.selection.enabled) return;
 
       const filteredIds = assetIds.filter(predicate);
-      filteredIds.forEach(deselect);
+      filteredIds.forEach(deselectAsset);
     },
-    [enabled, deselect],
+    [deselectAsset],
   );
 
   const invertSelection = useCallback(
     (assetIds: string[]): void => {
-      if (!enabled) return;
+      const state = useAssetsStore.getState();
+      if (!state.selection.enabled) return;
 
-      assetIds.forEach(toggle);
+      assetIds.forEach(toggleAssetSelection);
     },
-    [enabled, toggle],
+    [toggleAssetSelection],
   );
 
   return {
@@ -234,7 +194,7 @@ export const useSelection = (): SelectionResult => {
     select,
     deselect,
     selectAll,
-    clear,
+    clear: clearSelection,
     setEnabled,
     setSelectionMode,
 
@@ -256,7 +216,7 @@ export const useSelection = (): SelectionResult => {
  */
 export const useKeyboardSelection = (assetIds: string[]) => {
   const selection = useSelection();
-  const { state } = useAssetsContext();
+  // We need to access the store state directly for event handlers
 
   const handleClick = useCallback(
     (assetId: string, event: MouseEvent | React.MouseEvent): void => {
@@ -269,7 +229,10 @@ export const useKeyboardSelection = (assetIds: string[]) => {
         selection.toggle(assetId);
       } else if (event.shiftKey && selection.selectedCount > 0) {
         // Shift + Click: Select range
+        const state = useAssetsStore.getState();
         const lastSelected = selectLastSelectedId(state.selection);
+        // Or simpler:
+        // const lastSelected = state.selection.lastSelectedId;
         if (lastSelected) {
           selection.selectRange(lastSelected, assetId, assetIds);
         } else {
@@ -283,7 +246,7 @@ export const useKeyboardSelection = (assetIds: string[]) => {
         selection.select(assetId);
       }
     },
-    [selection, assetIds, state.selection],
+    [selection, assetIds],
   );
 
   const handleKeyDown = useCallback(
@@ -322,19 +285,22 @@ export const useKeyboardSelection = (assetIds: string[]) => {
  * Hook for selection state without operations.
  */
 export const useSelectionState = () => {
-  const { state } = useAssetsContext();
+  // Replaced context usage with direct store access
+  const enabled = useSelectionEnabled();
+  const selectedIds = useSelectedIds();
+  const selectedCount = selectedIds.size;
+  const selectionMode = useSelectionMode();
 
   return useMemo(
     () => ({
-      enabled: selectSelectionEnabled(state.selection),
-      selectedIds: selectSelectedIds(state.selection),
-      selectedCount: selectSelectedCount(state.selection),
-      selectionMode: selectSelectionMode(state.selection),
-      hasSelection: selectHasSelection(state.selection),
-      isSelected: (assetId: string) =>
-        selectIsAssetSelected(state.selection, assetId),
+      enabled,
+      selectedIds,
+      selectedCount,
+      selectionMode,
+      hasSelection: selectedCount > 0,
+      isSelected: (assetId: string) => selectedIds.has(assetId),
     }),
-    [state.selection],
+    [enabled, selectedIds, selectedCount, selectionMode],
   );
 };
 
@@ -378,25 +344,26 @@ export const useBulkAssetOperations = () => {
 
     for (const id of ids) {
       try {
-        const response = await assetService.getOriginalFile(id);
-        const blob = response.data;
-        const url = window.URL.createObjectURL(blob);
+        const url = assetService.getOriginalFileUrl(id as string);
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = url;
-        
+        link.href = blobUrl;
+
         // Try to get filename from content-disposition or use a fallback
-        const contentDisposition = response.headers['content-disposition'];
+        const contentDisposition = response.headers.get('content-disposition');
         let filename = `asset-${id}`;
         if (contentDisposition) {
           const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
           if (filenameMatch) filename = filenameMatch[1];
         }
-        
+
         link.setAttribute('download', filename);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        window.URL.revokeObjectURL(blobUrl);
       } catch (error) {
         console.error(`Failed to download asset ${id}:`, error);
       }
@@ -408,7 +375,7 @@ export const useBulkAssetOperations = () => {
   const bulkAddToAlbum = useCallback(async (albumId: number): Promise<void> => {
     const ids = Array.from(selection.selectedIds);
     await Promise.all(
-      ids.map(assetId => albumService.addAssetToAlbum(albumId, assetId, {}))
+      ids.map(assetId => albumService.addAssetToAlbum(albumId, assetId as string, {}))
     );
   }, [selection.selectedIds]);
 
@@ -422,3 +389,5 @@ export const useBulkAssetOperations = () => {
     hasSelection: selection.selectedCount > 0,
   };
 };
+
+// ... (End of file, removed duplicate useBulkAssetOperations)

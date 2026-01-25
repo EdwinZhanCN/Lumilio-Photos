@@ -85,7 +85,7 @@ export function useUploadProcess(): useUploadProcessReturn {
     const results: BatchUploadResult[] = [];
     const uploadTasks: Promise<void>[] = [];
     const smallFileBuffer: FileUploadSession[] = [];
-    
+
     // Metrics
     const startTime = performance.now();
     let totalBytesHashed = 0;
@@ -125,7 +125,7 @@ export function useUploadProcess(): useUploadProcessReturn {
       await semaphore.acquire();
       try {
         sessions.forEach(s => updateFileProgress(s.file.name, { status: "uploading", sessionId: s.sessionId }));
-        
+
         const response = await uploadService.batchUploadFiles(
           sessions.map(s => ({ file: s.file, sessionId: s.sessionId })),
           undefined,
@@ -138,9 +138,9 @@ export function useUploadProcess(): useUploadProcessReturn {
           }
         );
 
-        const batchResults = response.data?.data?.results || [];
+        const batchResults = response.data?.results || [];
         results.push(...batchResults);
-        
+
         batchResults.forEach(r => {
           updateFileProgress(r.file_name || "", {
             status: r.success ? "completed" : "failed",
@@ -162,35 +162,35 @@ export function useUploadProcess(): useUploadProcessReturn {
       await semaphore.acquire();
       try {
         updateFileProgress(session.file.name, { status: "uploading", sessionId: session.sessionId });
-        
+
         // Use performance preferences for chunk size if not explicitly set in UI settings
         const prefChunkSize = globalPerformancePreferences.getMemoryConstraintMultiplier() * 5 * 1024 * 1024; // Base 5MB
-        const chunkSize = settings.ui.upload?.chunk_size_mb 
-          ? settings.ui.upload.chunk_size_mb * 1024 * 1024 
+        const chunkSize = settings.ui.upload?.chunk_size_mb
+          ? settings.ui.upload.chunk_size_mb * 1024 * 1024
           : prefChunkSize;
 
         const resp = await uploadService.uploadFileInChunks(
-          session.file, 
-          session.sessionId, 
-          session.hash, 
-          undefined, 
+          session.file,
+          session.sessionId,
+          session.hash,
+          undefined,
           undefined,
           (p) => {
             setUploadProgress(p);
             updateFileProgress(session.file.name, { progress: p });
           },
-          { 
+          {
             // Increase concurrency for HTTP/2 multiplexing, respect low power mode
             maxConcurrent: settings.ui.upload?.low_power_mode ? 2 : maxConcurrentUploads,
             chunkSize: chunkSize
           }
         );
-        
-        const result = resp.data?.data?.results?.[0] || { success: false, file_name: session.file.name, error: "No result" };
+
+        const result = resp.data?.results?.[0] || { success: false, file_name: session.file.name, error: "No result" };
         results.push(result);
-        updateFileProgress(session.file.name, { 
-          status: result.success ? "completed" : "failed", 
-          progress: result.success ? 100 : 0 
+        updateFileProgress(session.file.name, {
+          status: result.success ? "completed" : "failed",
+          progress: result.success ? 100 : 0
         });
       } catch (err: any) {
         results.push({ success: false, file_name: session.file.name, error: err.message });
@@ -208,7 +208,7 @@ export function useUploadProcess(): useUploadProcessReturn {
       await generateHashCodes(files, (hashResult) => {
         const file = fileArray[hashResult.index];
         totalBytesHashed += file.size;
-        
+
         const session: FileUploadSession = {
           file,
           hash: hashResult.hash,

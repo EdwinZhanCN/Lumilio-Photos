@@ -1,6 +1,10 @@
-import { AssetFilter } from "@/services/assetsService";
 import { Asset } from "@/services";
+
+import React from "react";
+import type { components } from "@/lib/http-commons";
+
 // ===== Core Types =====
+export type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
 export type TabType = "photos" | "videos" | "audios";
 export type GroupByType = "date" | "type" | "album" | "flat";
 
@@ -101,103 +105,13 @@ export interface SelectionState {
 }
 
 // ===== Main State =====
-export interface AssetsState {
+export interface AssetsState extends SelectionState {
   entities: EntitiesState;
   views: ViewsState;
   ui: UIState;
   filters: FiltersState;
   selection: SelectionState;
 }
-
-// ===== Actions =====
-export type AssetsAction =
-  // Entity Actions
-  | {
-      type: "SET_ENTITY";
-      payload: { assetId: string; asset: Asset; meta?: Partial<EntityMeta> };
-    }
-  | {
-      type: "UPDATE_ENTITY";
-      payload: {
-        assetId: string;
-        updates: Partial<Asset>;
-        meta?: Partial<EntityMeta>;
-      };
-    }
-  | { type: "DELETE_ENTITY"; payload: { assetId: string } }
-  | {
-      type: "BATCH_SET_ENTITIES";
-      payload: { assets: Asset[]; meta?: Record<string, Partial<EntityMeta>> };
-    }
-
-  // View Actions
-  | {
-      type: "CREATE_VIEW";
-      payload: { viewKey: string; definition: AssetViewDefinition };
-    }
-  | { type: "SET_VIEW_LOADING"; payload: { viewKey: string; loading: boolean } }
-  | {
-      type: "SET_VIEW_ASSETS";
-      payload: {
-        viewKey: string;
-        assetIds: string[];
-        hasMore: boolean;
-        pageInfo: ViewState["pageInfo"];
-        replace?: boolean;
-      };
-    }
-  | {
-      type: "APPEND_VIEW_ASSETS";
-      payload: {
-        viewKey: string;
-        assetIds: string[];
-        hasMore: boolean;
-        pageInfo: ViewState["pageInfo"];
-      };
-    }
-  | {
-      type: "SET_VIEW_ERROR";
-      payload: { viewKey: string; error: string | null };
-    }
-  | {
-      type: "SET_VIEW_LOADING_MORE";
-      payload: { viewKey: string; loading: boolean };
-    }
-  | { type: "REMOVE_VIEW"; payload: { viewKey: string } }
-  | { type: "REMOVE_ASSET_FROM_VIEWS"; payload: { assetId: string } }
-
-  // UI Actions
-  | { type: "SET_CURRENT_TAB"; payload: TabType }
-  | { type: "SET_GROUP_BY"; payload: GroupByType }
-  | { type: "SET_SEARCH_QUERY"; payload: string }
-  | { type: "SET_SEARCH_MODE"; payload: "filename" | "semantic" }
-  | { type: "SET_CAROUSEL_OPEN"; payload: boolean }
-  | { type: "SET_ACTIVE_ASSET_ID"; payload: string | undefined }
-  | {
-      type: "HYDRATE_UI_FROM_URL";
-      payload: Partial<Pick<UIState, "groupBy" | "searchQuery">>;
-    }
-
-  // Filter Actions
-  | { type: "SET_FILTERS_ENABLED"; payload: boolean }
-  | { type: "SET_FILTER_RAW"; payload: boolean | undefined }
-  | { type: "SET_FILTER_RATING"; payload: number | undefined }
-  | { type: "SET_FILTER_LIKED"; payload: boolean | undefined }
-  | { type: "SET_FILTER_FILENAME"; payload: FiltersState["filename"] }
-  | { type: "SET_FILTER_DATE"; payload: FiltersState["date"] }
-  | { type: "SET_FILTER_CAMERA_MAKE"; payload: string | undefined }
-  | { type: "SET_FILTER_LENS"; payload: string | undefined }
-  | { type: "RESET_FILTERS" }
-  | { type: "BATCH_UPDATE_FILTERS"; payload: Partial<FiltersState> }
-
-  // Selection Actions
-  | { type: "SET_SELECTION_ENABLED"; payload: boolean }
-  | { type: "TOGGLE_ASSET_SELECTION"; payload: { assetId: string } }
-  | { type: "SELECT_ASSET"; payload: { assetId: string } }
-  | { type: "DESELECT_ASSET"; payload: { assetId: string } }
-  | { type: "SELECT_ALL"; payload: { assetIds: string[] } }
-  | { type: "CLEAR_SELECTION" }
-  | { type: "SET_SELECTION_MODE"; payload: "single" | "multiple" };
 
 // ===== Hook Return Types =====
 export interface AssetsViewResult {
@@ -270,7 +184,7 @@ export interface SelectionResult {
 // ===== Context Value =====
 export interface AssetsContextValue {
   state: AssetsState;
-  dispatch: React.Dispatch<AssetsAction>;
+  dispatch: React.Dispatch<any>;
   // Navigation helpers
   openCarousel: (assetId: string) => void;
   closeCarousel: () => void;
