@@ -1102,6 +1102,15 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "handler.HealthResponse": {
+                "properties": {
+                    "status": {
+                        "example": "ok",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "handler.HeatmapResponse": {
                 "properties": {
                     "data": {
@@ -5887,6 +5896,63 @@ const docTemplate = `{
                 "summary": "Register a new user",
                 "tags": [
                     "auth"
+                ]
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Check if the server is healthy",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Server is healthy"
+                    }
+                },
+                "summary": "Health check",
+                "tags": [
+                    "Health"
                 ]
             }
         }

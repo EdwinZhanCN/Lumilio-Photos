@@ -132,7 +132,7 @@ function useFilterOptions({
           } else {
             // Use the new filter options API
             const response = await assetService.getFilterOptions();
-            if (response.data.code === 0 && response.data.data) {
+            if (response.data?.code === 0 && response.data?.data) {
               if (cm.length === 0) {
                 cm = response.data.data.camera_makes || [];
               }
@@ -795,7 +795,7 @@ export default function FilterTool({
   // Global filter enable/disable
   const [filterEnabled, setFilterEnabled] = useState<boolean>(
     !!initialStableRef.current &&
-      Object.keys(initialStableRef.current).length > 0,
+    Object.keys(initialStableRef.current).length > 0,
   );
 
   // RAW

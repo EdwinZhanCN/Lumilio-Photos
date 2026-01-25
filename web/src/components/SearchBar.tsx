@@ -1,7 +1,7 @@
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline/index.js";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
-import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
+import { useSearchMode, useUIActions } from "@/features/assets/selectors";
 
 interface SearchBarProps {
   enableSemanticSearch?: boolean;
@@ -11,14 +11,15 @@ export default function SearchBar({
   enableSemanticSearch = false,
 }: SearchBarProps) {
   const { t } = useI18n();
-  const { state, dispatch } = useAssetsContext();
+  const searchMode = useSearchMode();
+  const { setSearchQuery, setSearchMode: setSearchModeAction, setGroupBy } = useUIActions();
 
   const [searchText, setSearchText] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [active, setActive] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const isSemanticMode = state.ui.searchMode === "semantic";
+  const isSemanticMode = searchMode === "semantic";
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
@@ -28,28 +29,28 @@ export default function SearchBar({
   const performSearch = useCallback(
     async (query: string, isSemanticSearch: boolean) => {
       if (!query.trim()) {
-        dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
+        setSearchQuery("");
         return;
       }
 
       setIsSearching(true);
       try {
         // Update search mode based on semantic toggle
-        const searchMode = isSemanticSearch ? "semantic" : "filename";
-        dispatch({ type: "SET_SEARCH_MODE", payload: searchMode });
+        const newSearchMode = isSemanticSearch ? "semantic" : "filename";
+        setSearchModeAction(newSearchMode);
 
         // Set search query
-        dispatch({ type: "SET_SEARCH_QUERY", payload: query.trim() });
+        setSearchQuery(query.trim());
 
         // Auto-switch to flat view for better search results display
-        dispatch({ type: "SET_GROUP_BY", payload: "flat" });
+        setGroupBy("flat");
       } catch (error) {
         console.error("Search error:", error);
       } finally {
         setIsSearching(false);
       }
     },
-    [dispatch],
+    [setSearchQuery, setSearchModeAction, setGroupBy],
   );
 
   // Debounce search execution
@@ -78,8 +79,8 @@ export default function SearchBar({
 
   const toggleSemanticSearch = useCallback(() => {
     const newMode = isSemanticMode ? "filename" : "semantic";
-    dispatch({ type: "SET_SEARCH_MODE", payload: newMode });
-  }, [isSemanticMode, dispatch]);
+    setSearchModeAction(newMode);
+  }, [isSemanticMode, setSearchModeAction]);
 
   return (
     <div className="flex-1">
@@ -94,7 +95,7 @@ export default function SearchBar({
                 // Deactivating search: clear local and context search state
                 if (!next) {
                   setSearchText("");
-                  dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
+                  setSearchQuery("");
                 }
                 return next;
               })
@@ -117,11 +118,11 @@ export default function SearchBar({
                   placeholder={
                     isSemanticMode && enableSemanticSearch
                       ? t("search.placeholderai", {
-                          defaultValue: "Describe what you're looking for...",
-                        })
+                        defaultValue: "Describe what you're looking for...",
+                      })
                       : t("search.placeholder", {
-                          defaultValue: "Search by filename...",
-                        })
+                        defaultValue: "Search by filename...",
+                      })
                   }
                   value={searchText}
                   className="input input-sm input-bordered search-input pr-8"

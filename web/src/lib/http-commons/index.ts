@@ -94,5 +94,6 @@ export function getTypedMetadata(
   }
 }
 
-// Re-export API client
-export { default as api } from "./api";
+// Re-export token management functions and client
+export { getToken, getRefreshToken, saveToken, removeToken } from "./api";
+export { default as client } from "./client";

@@ -38,30 +38,30 @@ function getRelevantTimestamp(job: JobDTO): { label: string; time: string } {
     case "running":
       return {
         label: "Started",
-        time: job.attempted_at || job.created_at,
+        time: job.attempted_at || job.created_at || new Date().toISOString(),
       };
     case "completed":
     case "cancelled":
     case "discarded":
       return {
         label: "Finished",
-        time: job.finalized_at || job.created_at,
+        time: job.finalized_at || job.created_at || new Date().toISOString(),
       };
     case "retryable":
       return {
         label: "Failed",
-        time: job.attempted_at || job.created_at,
+        time: job.attempted_at || job.created_at || new Date().toISOString(),
       };
     case "scheduled":
       return {
         label: "Scheduled",
-        time: job.scheduled_at,
+        time: job.scheduled_at || new Date().toISOString(),
       };
     case "available":
     default:
       return {
         label: "Created",
-        time: job.created_at,
+        time: job.created_at || new Date().toISOString(),
       };
   }
 }
@@ -114,8 +114,8 @@ export function TaskMonitor() {
         }
 
         const data = await listJobs(params);
-        if (mounted) {
-          setJobs(data.jobs);
+        if (mounted && data) {
+          setJobs(data.jobs ?? []);
           setNextCursor(data.cursor);
           setError(null);
 
@@ -441,7 +441,7 @@ export function TaskMonitor() {
               const job = jobs[virtualRow.index];
               const duration = getJobDuration(job);
               const hasErrors = job.errors && job.errors.length > 0;
-              const badgeClass = getStateBadgeClass(job.state);
+              const badgeClass = getStateBadgeClass((job.state || 'available') as JobState);
               const timestamp = getRelevantTimestamp(job);
               const relativeTime = formatRelativeTime(timestamp.time);
 
@@ -458,7 +458,7 @@ export function TaskMonitor() {
                   <div
                     className={`badge ${badgeClass} badge-sm flex-shrink-0 font-mono flex items-center`}
                   >
-                    {getStateIcon(job.state)}
+                    {getStateIcon((job.state || 'available') as JobState)}
                     <span className="hidden sm:inline sm:ml-1">
                       {job.state}
                     </span>
@@ -501,11 +501,11 @@ export function TaskMonitor() {
                         </>
                       )}
 
-                      {job.attempt > 0 && (
+                      {(job.attempt ?? 0) > 0 && (
                         <>
                           <span>•</span>
                           <span>
-                            {job.attempt}/{job.max_attempts} attempts
+                            {job.attempt ?? 0}/{job.max_attempts ?? 0} attempts
                           </span>
                         </>
                       )}

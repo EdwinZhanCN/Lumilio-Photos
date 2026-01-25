@@ -65,24 +65,25 @@ export function usePhotoStats(
           statsService.getAvailableYears(),
         ]);
 
-      // Check focal length response
-      if (focalResponse.data.code === 0 && focalResponse.data.data) {
-        setFocalLengthData(focalResponse.data.data);
+      // Check focal length response (openapi-fetch format)
+      if (focalResponse.data?.code === 0 && focalResponse.data?.data) {
+        setFocalLengthData(focalResponse.data.data as FocalLengthDistributionResponse);
       }
 
       // Check camera lens response
-      if (cameraLensResponse.data.code === 0 && cameraLensResponse.data.data) {
-        setCameraLensData(cameraLensResponse.data.data);
+      if (cameraLensResponse.data?.code === 0 && cameraLensResponse.data?.data) {
+        setCameraLensData(cameraLensResponse.data.data as CameraLensStatsResponse);
       }
 
       // Check time distribution response
-      if (timeResponse.data.code === 0 && timeResponse.data.data) {
-        setTimeDistributionData(timeResponse.data.data);
+      if (timeResponse.data?.code === 0 && timeResponse.data?.data) {
+        setTimeDistributionData(timeResponse.data.data as TimeDistributionResponse);
       }
 
       // Check years response
-      if (yearsResponse.data.code === 0 && yearsResponse.data.data) {
-        const years = yearsResponse.data.data.years;
+      if (yearsResponse.data?.code === 0 && yearsResponse.data?.data) {
+        const yearsData = yearsResponse.data.data as { years?: number[] };
+        const years = yearsData.years ?? [];
         setAvailableYears(years);
 
         // Fetch heatmap for the most recent year
@@ -99,8 +100,8 @@ export function usePhotoStats(
             const heatmapResponse = await statsService.getDailyActivityHeatmap(
               daysDiff + 365,
             );
-            if (heatmapResponse.data.code === 0 && heatmapResponse.data.data) {
-              setHeatmapData(heatmapResponse.data.data);
+            if (heatmapResponse.data?.code === 0 && heatmapResponse.data?.data) {
+              setHeatmapData(heatmapResponse.data.data as HeatmapResponse);
             }
           }
         } finally {
@@ -132,8 +133,8 @@ export function usePhotoStats(
         daysDiff + 365,
       );
 
-      if (heatmapResponse.data.code === 0 && heatmapResponse.data.data) {
-        setHeatmapData(heatmapResponse.data.data);
+      if (heatmapResponse.data?.code === 0 && heatmapResponse.data?.data) {
+        setHeatmapData(heatmapResponse.data.data as HeatmapResponse);
       }
     } catch (err) {
       const errorMessage =

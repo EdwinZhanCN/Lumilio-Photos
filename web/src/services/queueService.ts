@@ -1,28 +1,20 @@
 // src/services/queueService.ts
 
-import api from "@/lib/http-commons/api.ts";
-import type { AxiosResponse } from "axios";
+import client from "@/lib/http-commons/client";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { components } from "@/lib/http-commons/schema.d.ts";
 
 // ============================================================================
-// Type Definitions
+// Type Definitions from Schema
 // ============================================================================
 
-export interface JobDTO {
-  id: number;
-  queue: string;
-  kind: string;
-  state: JobState;
-  attempt: number;
-  max_attempts: number;
-  priority: number;
-  scheduled_at: string;
-  created_at: string;
-  attempted_at?: string;
-  finalized_at?: string;
-  errors?: string[];
-  args?: any;
-  metadata?: any;
-}
+type Schemas = components["schemas"];
+
+export type JobDTO = Schemas["handler.JobDTO"];
+export type JobListResponse = Schemas["handler.JobListResponse"];
+export type QueueStatsDTO = Schemas["handler.QueueStatsDTO"];
+export type QueueStatsResponse = Schemas["handler.QueueStatsResponse"];
+export type JobStatsResponse = Schemas["handler.JobStatsResponse"];
 
 export type JobState =
   | "available"
@@ -32,32 +24,6 @@ export type JobState =
   | "completed"
   | "cancelled"
   | "discarded";
-
-export interface JobListResponse {
-  jobs: JobDTO[];
-  cursor?: string;
-  total_count?: number;
-}
-
-export interface QueueStatsDTO {
-  name: string;
-  updated_at: string;
-  metadata?: any;
-}
-
-export interface QueueStatsResponse {
-  queues: QueueStatsDTO[];
-}
-
-export interface JobStatsResponse {
-  available: number;
-  scheduled: number;
-  running: number;
-  retryable: number;
-  completed: number;
-  cancelled: number;
-  discarded: number;
-}
 
 export interface JobListParams {
   state?: JobState;
@@ -69,72 +35,92 @@ export interface JobListParams {
   include_count?: boolean;
 }
 
-// ============================================================================
-// API Result Wrapper
-// ============================================================================
-
-export interface ApiResult<T = any> {
+// Legacy API Result wrapper type for backwards compatibility
+export interface ApiResult<T = unknown> {
   code: number;
   message: string;
   data?: T;
 }
 
 // ============================================================================
-// Queue Service Functions
+// Queue Service (Direct API calls)
 // ============================================================================
 
 /**
  * List jobs with optional filters
  */
-export async function listJobs(
-  params?: JobListParams,
-): Promise<JobListResponse> {
-  const queryParams = new URLSearchParams();
-
-  if (params?.state) queryParams.append("state", params.state);
-  if (params?.queue) queryParams.append("queue", params.queue);
-  if (params?.kind) queryParams.append("kind", params.kind);
-  if (params?.limit) queryParams.append("limit", params.limit.toString());
-  if (params?.cursor) queryParams.append("cursor", params.cursor);
-  if (params?.time_range) queryParams.append("time_range", params.time_range);
-  if (params?.include_count) queryParams.append("include_count", "true");
-
-  const url = `/api/v1/admin/river/jobs${queryParams.toString() ? `?${queryParams.toString()}` : ""}`;
-
-  const response: AxiosResponse<ApiResult<JobListResponse>> =
-    await api.get(url);
-  return response.data.data!;
+export async function listJobs(params?: JobListParams) {
+  const { data } = await client.GET("/admin/river/jobs", {
+    params: { query: params },
+  });
+  return data?.data as JobListResponse | undefined;
 }
 
 /**
  * Get a single job by ID
  */
-export async function getJob(jobId: number): Promise<JobDTO> {
-  const response: AxiosResponse<ApiResult<JobDTO>> = await api.get(
-    `/api/v1/admin/river/jobs/${jobId}`,
-  );
-  return response.data.data!;
+export async function getJob(jobId: number) {
+  const { data } = await client.GET("/admin/river/jobs/{id}", {
+    params: { path: { id: jobId } },
+  });
+  return data?.data as JobDTO | undefined;
 }
 
 /**
  * List all active queues
  */
-export async function listQueues(limit?: number): Promise<QueueStatsResponse> {
-  const url = `/api/v1/admin/river/queues${limit ? `?limit=${limit}` : ""}`;
-  const response: AxiosResponse<ApiResult<QueueStatsResponse>> =
-    await api.get(url);
-  return response.data.data!;
+export async function listQueues(limit?: number) {
+  const { data } = await client.GET("/admin/river/queues", {
+    params: { query: { limit } },
+  });
+  return data?.data as QueueStatsResponse | undefined;
 }
 
 /**
  * Get aggregated job statistics by state
  */
-export async function getJobStats(): Promise<JobStatsResponse> {
-  const response: AxiosResponse<ApiResult<JobStatsResponse>> = await api.get(
-    `/api/v1/admin/river/stats`,
-  );
-  return response.data.data!;
+export async function getJobStats() {
+  const { data } = await client.GET("/admin/river/stats", {});
+  return data?.data as JobStatsResponse | undefined;
 }
+
+// ============================================================================
+// React Query Hooks
+// ============================================================================
+
+/**
+ * Hook for listing jobs
+ */
+export const useJobs = (params?: JobListParams) =>
+  $api.useQuery("get", "/admin/river/jobs", {
+    params: { query: params },
+  });
+
+/**
+ * Hook for getting a single job
+ */
+export const useJob = (jobId: number) =>
+  $api.useQuery("get", "/admin/river/jobs/{id}", {
+    params: { path: { id: jobId } },
+  });
+
+/**
+ * Hook for listing queues
+ */
+export const useQueues = (limit?: number) =>
+  $api.useQuery("get", "/admin/river/queues", {
+    params: { query: { limit } },
+  });
+
+/**
+ * Hook for job stats
+ */
+export const useJobStats = () =>
+  $api.useQuery("get", "/admin/river/stats", {});
+
+// ============================================================================
+// Polling Functions
+// ============================================================================
 
 /**
  * Start polling job stats at specified interval (in seconds)
@@ -149,19 +135,14 @@ export function pollJobStats(
   const poll = async () => {
     try {
       const stats = await getJobStats();
-      onUpdate(stats);
+      if (stats) onUpdate(stats);
     } catch (error) {
       console.error("Failed to fetch job stats:", error);
     }
   };
 
-  // Initial fetch
   poll();
-
-  // Start interval
   const intervalId = setInterval(poll, intervalMs);
-
-  // Return cleanup function
   return () => clearInterval(intervalId);
 }
 
@@ -179,21 +160,20 @@ export function pollJobList(
   const poll = async () => {
     try {
       const response = await listJobs(params);
-      onUpdate(response.jobs);
+      if (response?.jobs) onUpdate(response.jobs);
     } catch (error) {
       console.error("Failed to fetch job list:", error);
     }
   };
 
-  // Initial fetch
   poll();
-
-  // Start interval
   const intervalId = setInterval(poll, intervalMs);
-
-  // Return cleanup function
   return () => clearInterval(intervalId);
 }
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
 /**
  * Get human-readable duration from timestamps

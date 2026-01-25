@@ -1,27 +1,27 @@
 import { useEffect, useCallback, useMemo, useRef } from "react";
-import { useAssetsContext } from "./useAssetsContext";
+import { useAssetsStore } from "../assets.store";
+import { useShallow } from "zustand/react/shallow";
 import {
   AssetViewDefinition,
   AssetsViewResult,
   ViewDefinitionOptions,
   TabType,
-} from "../assets.types.ts";
+} from "../types/assets.type";
 import {
   generateViewKey,
   selectView,
   selectViewAssetIds,
-} from "../reducers/views.reducer";
-import { selectAssets } from "../reducers/entities.reducer";
+} from "../slices/views.slice";
+import { selectAssets } from "../slices/entities.slice";
 import {
   selectFilterAsAssetFilter,
   selectFiltersEnabled,
-} from "../reducers/filters.reducer";
-import {
-  assetService,
-  ListAssetsParams,
-  SearchAssetsParams,
-} from "@/services/assetsService";
-import { albumService } from "@/services/albumService";
+} from "../slices/filters.slice";
+import client from "@/lib/http-commons/client";
+import type { components, paths } from "@/lib/http-commons/schema.d.ts";
+
+type ListAssetsParams = NonNullable<paths["/assets"]["get"]["parameters"]["query"]>;
+type SearchAssetsParams = components["schemas"]["dto.SearchAssetsRequestDTO"];
 import { groupAssets } from "@/lib/utils/assetGrouping";
 import { Asset } from "@/services";
 
@@ -33,7 +33,6 @@ export const useAssetsView = (
   definition: AssetViewDefinition,
   options: ViewDefinitionOptions = {},
 ): AssetsViewResult => {
-  const { state, dispatch } = useAssetsContext();
   const { autoFetch = true, disabled = false, withGroups = false } = options;
 
   // Generate stable view key
@@ -41,19 +40,50 @@ export const useAssetsView = (
     return generateViewKey(definition);
   }, [definition]);
 
-  // Get view state
-  const viewState = selectView(state.views, viewKey);
-  const assetIds = selectViewAssetIds(state.views, viewKey);
+  // Actions
+  const {
+    createView,
+    setViewLoading,
+    setViewAssets,
+    appendViewAssets,
+    setViewError,
+    setViewLoadingMore,
+    batchSetEntities,
+  } = useAssetsStore(
+    useShallow((state) => ({
+      createView: state.createView,
+      setViewLoading: state.setViewLoading,
+      setViewAssets: state.setViewAssets,
+      appendViewAssets: state.appendViewAssets,
+      setViewError: state.setViewError,
+      setViewLoadingMore: state.setViewLoadingMore,
+      batchSetEntities: state.batchSetEntities,
+    })),
+  );
 
-  // Get actual asset objects from entity store
-  const assets = useMemo(() => {
-    return selectAssets(state.entities, assetIds);
-  }, [state.entities, assetIds]);
+  // Get view state
+  const viewState = useAssetsStore((state) => selectView(state, viewKey));
+  const assetIds = useAssetsStore((state) => selectViewAssetIds(state, viewKey));
+
+  // Get actual asset objects from entity store - subscribe only to the assets in this view
+  const assets = useAssetsStore(
+    useShallow((state) => selectAssets(state.entities, assetIds))
+  );
+
+  // Get filters state for calculating effective filter
+  // We need to subscribe to filter changes to re-calculate effective filter
+  const filtersState = useAssetsStore(
+    useShallow((state) => ({
+      // We subscribe to the whole filter object to ensure we catch any updates
+      // This is acceptable as filter changes usually mean we need to refetch anyway
+      ...state.filters
+    }))
+  );
 
   // Merge filters if inheritGlobalFilter is enabled
   const effectiveFilter = useMemo(() => {
-    const globalFilter = selectFiltersEnabled(state.filters)
-      ? selectFilterAsAssetFilter(state.filters)
+    const globalFilter = selectFiltersEnabled({ filters: filtersState } as any)
+      ? selectFilterAsAssetFilter({ filters: filtersState } as any)
       : {};
 
     const baseFilter =
@@ -63,7 +93,7 @@ export const useAssetsView = (
       ...baseFilter,
       ...definition.filter,
     };
-  }, [definition.filter, definition.inheritGlobalFilter, state.filters]);
+  }, [definition.filter, definition.inheritGlobalFilter, filtersState]);
 
   const hasEffectiveFilter = useMemo(() => {
     return Object.keys(effectiveFilter || {}).length > 0;
@@ -197,66 +227,63 @@ export const useAssetsView = (
       try {
         fetchingRef.current = true;
 
-        dispatch({
-          type: "SET_VIEW_LOADING",
-          payload: { viewKey, loading: true },
-        });
+        setViewLoading(viewKey, true);
 
         let result;
         const albumId = effectiveFilter.album_id;
 
         if (albumId) {
-          result = await albumService.filterAlbumAssets(albumId, createFilterParams());
+          result = await client.POST("/albums/{id}/filter", {
+            params: { path: { id: albumId } },
+            body: createFilterParams(),
+          });
         } else if (isSearchOperation) {
-          result = await assetService.searchAssets(createSearchParams());
+          result = await client.POST("/assets/search", {
+            body: createSearchParams(),
+          });
         } else if (hasEffectiveFilter) {
-          result = await assetService.filterAssets(createFilterParams());
+          result = await client.POST("/assets/filter", {
+            body: createFilterParams(),
+          });
         } else {
-          result = await assetService.listAssets(createListParams());
+          result = await client.GET("/assets", {
+            params: { query: createListParams() },
+          });
         }
 
         const responseData = result.data?.data;
         const assets = responseData?.assets || [];
 
         if (assets && assets.length > 0) {
-          dispatch({
-            type: "BATCH_SET_ENTITIES",
-            payload: { assets },
-          });
+          batchSetEntities(assets);
         }
 
         const newAssetIds = assets
           .map((asset: Asset) => asset.asset_id)
           .filter((id: any): id is string => Boolean(id));
 
-        dispatch({
-          type: "SET_VIEW_ASSETS",
-          payload: {
-            viewKey,
-            assetIds: newAssetIds,
-            hasMore: (responseData?.assets?.length || 0) >= (definition.pageSize || 50),
-            pageInfo: {
-              cursor: undefined,
-              page: responseData?.offset ? Math.floor(responseData.offset / (definition.pageSize || 50)) + 1 : 1,
-              total: undefined,
-            },
-            replace,
+        setViewAssets(
+          viewKey,
+          newAssetIds,
+          (assets.length || 0) >= (definition.pageSize || 50),
+          {
+            cursor: undefined,
+            page: responseData?.offset ? Math.floor(responseData.offset / (definition.pageSize || 50)) + 1 : 1,
+            total: undefined,
           },
-        });
+          replace
+        );
       } catch (error) {
         console.error("Failed to fetch assets:", error);
-        dispatch({
-          type: "SET_VIEW_ERROR",
-          payload: {
-            viewKey,
-            error: error instanceof Error ? error.message : "Failed to fetch assets",
-          },
-        });
+        setViewError(
+          viewKey,
+          error instanceof Error ? error.message : "Failed to fetch assets"
+        );
       } finally {
         fetchingRef.current = false;
       }
     },
-    [disabled, viewKey, isSearchOperation, hasEffectiveFilter, effectiveFilter.album_id, createSearchParams, createFilterParams, createListParams, dispatch, definition.pageSize],
+    [disabled, viewKey, isSearchOperation, hasEffectiveFilter, effectiveFilter.album_id, createSearchParams, createFilterParams, createListParams, definition.pageSize, setViewLoading, setViewAssets, batchSetEntities, setViewError],
   );
 
   const fetchMore = useCallback(async () => {
@@ -266,54 +293,57 @@ export const useAssetsView = (
 
     try {
       fetchingRef.current = true;
-      dispatch({ type: "SET_VIEW_LOADING_MORE", payload: { viewKey, loading: true } });
+      setViewLoadingMore(viewKey, true);
 
       const nextPage = viewState.pageInfo.page ? viewState.pageInfo.page + 1 : 2;
       let result;
       const albumId = effectiveFilter.album_id;
 
       if (albumId) {
-        result = await albumService.filterAlbumAssets(albumId, createFilterParams(nextPage));
+        result = await client.POST("/albums/{id}/filter", {
+          params: { path: { id: albumId } },
+          body: createFilterParams(nextPage),
+        });
       } else if (isSearchOperation) {
-        result = await assetService.searchAssets(createSearchParams(nextPage));
+        result = await client.POST("/assets/search", {
+          body: createSearchParams(nextPage),
+        });
       } else if (hasEffectiveFilter) {
-        result = await assetService.filterAssets(createFilterParams(nextPage));
+        result = await client.POST("/assets/filter", {
+          body: createFilterParams(nextPage),
+        });
       } else {
-        result = await assetService.listAssets(createListParams(nextPage));
+        result = await client.GET("/assets", {
+          params: { query: createListParams(nextPage) },
+        });
       }
 
       const responseData = result.data?.data;
       const assets = responseData?.assets || [];
 
       if (assets && assets.length > 0) {
-        dispatch({ type: "BATCH_SET_ENTITIES", payload: { assets } });
+        batchSetEntities(assets);
       }
 
       const newAssetIds = assets.map((asset: Asset) => asset.asset_id).filter((id: any): id is string => Boolean(id));
 
-      dispatch({
-        type: "APPEND_VIEW_ASSETS",
-        payload: {
-          viewKey,
-          assetIds: newAssetIds,
-          hasMore: (responseData?.assets?.length || 0) >= (definition.pageSize || 50),
-          pageInfo: { cursor: undefined, page: nextPage, total: undefined },
-        },
-      });
+      appendViewAssets(
+        viewKey,
+        newAssetIds,
+        (assets.length || 0) >= (definition.pageSize || 50),
+        { cursor: undefined, page: nextPage, total: undefined }
+      );
     } catch (error) {
       console.error("Failed to fetch more assets:", error);
-      dispatch({
-        type: "SET_VIEW_ERROR",
-        payload: {
-          viewKey,
-          error: error instanceof Error ? error.message : "Failed to fetch more assets",
-        },
-      });
+      setViewError(
+        viewKey,
+        error instanceof Error ? error.message : "Failed to fetch more assets"
+      );
     } finally {
       fetchingRef.current = false;
-      dispatch({ type: "SET_VIEW_LOADING_MORE", payload: { viewKey, loading: false } });
+      setViewLoadingMore(viewKey, false);
     }
-  }, [viewState, disabled, viewKey, isSearchOperation, hasEffectiveFilter, effectiveFilter.album_id, createSearchParams, createFilterParams, createListParams, dispatch, definition.pageSize]);
+  }, [viewState, disabled, viewKey, isSearchOperation, hasEffectiveFilter, effectiveFilter.album_id, createSearchParams, createFilterParams, createListParams, definition.pageSize, setViewLoadingMore, batchSetEntities, appendViewAssets, setViewError]);
 
   const refetch = useCallback(async () => {
     await fetchAssets(true);
@@ -322,9 +352,9 @@ export const useAssetsView = (
   // 1. Ensure view exists
   useEffect(() => {
     if (!disabled) {
-      dispatch({ type: "CREATE_VIEW", payload: { viewKey, definition } });
+      createView(viewKey, definition);
     }
-  }, [viewKey, disabled, dispatch]);
+  }, [viewKey, disabled, createView, definition]);
 
   // 2. Auto-fetch on mount or view creation
   useEffect(() => {
@@ -373,23 +403,27 @@ export const useCurrentTabAssets = (
     pageSize?: number;
   } = {},
 ): AssetsViewResult => {
-  const { state } = useAssetsContext();
+  const currentTab = useAssetsStore((state) => state.ui.currentTab);
+  const uiGroupBy = useAssetsStore((state) => state.ui.groupBy);
+  const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
+  const searchMode = useAssetsStore((state) => state.ui.searchMode);
+
   const { groupBy, pageSize, ...viewOptions } = options;
 
   const definition: AssetViewDefinition = useMemo(
     () => ({
-      types: [state.ui.currentTab],
-      groupBy: (groupBy as any) || state.ui.groupBy,
+      types: [currentTab],
+      groupBy: (groupBy as any) || uiGroupBy,
       pageSize: pageSize || 50,
       sort: { field: "taken_time", direction: "desc" },
-      search: state.ui.searchQuery.trim()
+      search: searchQuery.trim()
         ? {
-            query: state.ui.searchQuery.trim(),
-            mode: state.ui.currentTab === "photos" ? state.ui.searchMode : "filename",
-          }
+          query: searchQuery.trim(),
+          mode: currentTab === "photos" ? searchMode : "filename",
+        }
         : undefined,
     }),
-    [state.ui.currentTab, state.ui.groupBy, state.ui.searchQuery, state.ui.searchMode, groupBy, pageSize],
+    [currentTab, uiGroupBy, searchQuery, searchMode, groupBy, pageSize],
   );
 
   return useAssetsView(definition, {
@@ -397,3 +431,4 @@ export const useCurrentTabAssets = (
     withGroups: true,
   });
 };
+

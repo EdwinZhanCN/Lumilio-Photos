@@ -5,12 +5,16 @@ import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import {
-  useAssetsContext,
   useAssetsNavigation,
-} from "@/features/assets/hooks/useAssetsContext";
+} from "@/features/assets/hooks/useAssetsNavigation";
 import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
-import { selectView } from "@/features/assets/reducers/views.reducer";
+import {
+  useGroupBy,
+  useIsCarouselOpen,
+  useView,
+  useUIActions
+} from "@/features/assets/selectors";
 import {
   groupAssets,
   getFlatAssetsFromGrouped,
@@ -21,17 +25,19 @@ import { useI18n } from "@/lib/i18n";
 
 function Audios() {
   const { assetId } = useParams<{ assetId: string }>();
-  const { state, dispatch } = useAssetsContext();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { deleteAsset } = useAssetActions();
   const { t } = useI18n();
+
+  // Selectors
+  const groupBy = useGroupBy();
+  const isCarouselOpen = useIsCarouselOpen();
+  const { setGroupBy } = useUIActions();
 
   // Local state to track asset updates
   const [updatedAssets, setUpdatedAssets] = useState<Map<string, Asset>>(
     new Map(),
   );
-
-  const { groupBy, isCarouselOpen } = state.ui;
 
   // Get assets for current view using the new hook
   const {
@@ -48,14 +54,14 @@ function Audios() {
     groupBy,
   });
 
-  const viewState = selectView(state.views, viewKey);
-  const hasFetchedOnce = (viewState?.lastFetchAt ?? 0) > 0;
-
   const handleLoadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  const viewState = useView(viewKey);
+  const hasFetchedOnce = (viewState?.lastFetchAt ?? 0) > 0;
 
   // Use grouped assets if available, otherwise group manually
   const finalGroupedAudios = useMemo(() => {
@@ -158,7 +164,7 @@ function Audios() {
       });
 
       // Delete via the actions hook which handles the store updates
-      deleteAsset(deletedAssetId).catch((error) => {
+      deleteAsset(deletedAssetId).catch((error: any) => {
         console.error("Failed to delete asset:", error);
       });
     },
@@ -169,8 +175,8 @@ function Audios() {
     <div>
       <AssetsPageHeader
         groupBy={groupBy}
-        onGroupByChange={(v) => dispatch({ type: "SET_GROUP_BY", payload: v })}
-        onFiltersChange={() => {}}
+        onGroupByChange={(v) => setGroupBy(v)}
+        onFiltersChange={() => { }}
       />
 
       {isFetching && allAssets.length === 0 ? (

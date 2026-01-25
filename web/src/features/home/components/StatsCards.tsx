@@ -41,21 +41,23 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "" }) => {
 
   // Transform focal length data to percentage format
   const focalStats = useMemo(() => {
-    if (!focalLengthData || focalLengthData.total === 0) return [];
+    const total = focalLengthData?.total ?? 0;
+    if (!focalLengthData || total === 0) return [];
 
-    return focalLengthData.data.slice(0, 5).map((item) => ({
-      label: `${item.focal_length}mm`,
-      value: Math.round((item.count / focalLengthData.total) * 100),
+    return (focalLengthData.data ?? []).slice(0, 5).map((item) => ({
+      label: `${item.focal_length ?? 0}mm`,
+      value: Math.round(((item.count ?? 0) / total) * 100),
     }));
   }, [focalLengthData]);
 
   // Transform camera lens data to percentage format
   const combos = useMemo(() => {
-    if (!cameraLensData || cameraLensData.total === 0) return [];
+    const total = cameraLensData?.total ?? 0;
+    if (!cameraLensData || total === 0) return [];
 
-    return cameraLensData.data.map((item) => ({
-      combo: `${item.camera_model} + ${item.lens_model}`,
-      rate: Math.round((item.count / cameraLensData.total) * 100),
+    return (cameraLensData.data ?? []).map((item) => ({
+      combo: `${item.camera_model ?? 'Unknown'} + ${item.lens_model ?? 'Unknown'}`,
+      rate: Math.round(((item.count ?? 0) / total) * 100),
     }));
   }, [cameraLensData]);
 
@@ -71,8 +73,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "" }) => {
         };
       }
 
-      const totalCount = timeDistributionData.data.reduce(
-        (sum, item) => sum + item.count,
+      const dataArray = timeDistributionData.data ?? [];
+      const totalCount = dataArray.reduce(
+        (sum, item) => sum + (item.count ?? 0),
         0,
       );
       if (totalCount === 0) {
@@ -85,9 +88,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "" }) => {
       }
 
       const sumHours = (hours: number[]) =>
-        timeDistributionData.data
-          .filter((item) => hours.includes(item.value))
-          .reduce((sum, item) => sum + item.count, 0);
+        dataArray
+          .filter((item) => hours.includes(item.value ?? 0))
+          .reduce((sum, item) => sum + (item.count ?? 0), 0);
 
       const goldenPercent = Math.round(
         (sumHours([5, 6, 7, 8, 17, 18, 19, 20]) / totalCount) * 100,
@@ -108,10 +111,12 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "" }) => {
   // Transform heatmap data for GitHubStyleHeatmap
   const heatmapValues = useMemo(() => {
     if (!heatmapData || !heatmapData.data) return [];
-    return heatmapData.data.map((item) => ({
-      date: item.date,
-      count: item.count,
-    }));
+    return heatmapData.data
+      .filter((item) => item.date !== undefined)
+      .map((item) => ({
+        date: item.date as string,
+        count: item.count ?? 0,
+      }));
   }, [heatmapData]);
 
   // Show loading state
@@ -305,9 +310,8 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "" }) => {
                       key={year}
                       onClick={() => handleYearChange(year)}
                       disabled={heatmapLoading}
-                      className={`btn btn-xs ${
-                        selectedYear === year ? "btn-primary" : "btn-ghost"
-                      } ${heatmapLoading ? "btn-disabled" : ""}`}
+                      className={`btn btn-xs ${selectedYear === year ? "btn-primary" : "btn-ghost"
+                        } ${heatmapLoading ? "btn-disabled" : ""}`}
                     >
                       {heatmapLoading && selectedYear === year ? (
                         <span className="loading loading-spinner loading-xs" />

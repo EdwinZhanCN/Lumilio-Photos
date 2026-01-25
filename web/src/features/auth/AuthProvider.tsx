@@ -1,7 +1,7 @@
 import React, { createContext, useReducer, useEffect, ReactNode, useRef } from "react";
 import { authReducer, initialState } from "./auth.reducer";
 import { AuthAction, AuthState } from "./auth.types.ts";
-import { authService } from "@/services/authService";
+import { authService, User } from "@/services/authService";
 import { getToken, getRefreshToken, removeToken, saveToken } from "@/lib/http-commons/api";
 
 interface AuthContextType extends AuthState {
@@ -19,7 +19,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     if (isInitialized.current) return;
-    
+
     const initAuth = async () => {
       const token = getToken();
       const refreshToken = getRefreshToken();
@@ -34,8 +34,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // 1. Try to get current user with existing access token
         if (token) {
           const response = await authService.getCurrentUser();
-          if (response.data.code === 0 && response.data.data) {
-            dispatch({ type: "AUTH_SUCCESS", payload: response.data.data });
+          if (response.data?.code === 0 && response.data?.data) {
+            dispatch({ type: "AUTH_SUCCESS", payload: response.data.data as User });
             isInitialized.current = true;
             return;
           }
@@ -44,7 +44,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // 2. If access token failed or missing, try refresh token
         if (refreshToken) {
           const refreshRes = await authService.refreshToken({ refreshToken });
-          if (refreshRes.data.code === 0 && refreshRes.data.data) {
+          if (refreshRes.data?.code === 0 && refreshRes.data?.data) {
             const { token: newToken, refreshToken: newRefreshToken, user } = refreshRes.data.data;
             saveToken(newToken!, newRefreshToken || refreshToken);
             dispatch({ type: "AUTH_SUCCESS", payload: user! });
@@ -52,7 +52,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
           }
         }
-        
+
         // 3. Everything failed
         removeToken();
         dispatch({ type: "AUTH_FAILURE", payload: "Session expired" });
@@ -72,14 +72,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     dispatch({ type: "AUTH_START" });
     try {
       const response = await authService.login({ username, password });
-      if (response.data.code === 0 && response.data.data) {
+      if (response.data?.code === 0 && response.data?.data) {
         const { token, refreshToken, user } = response.data.data;
         if (token && user) {
           saveToken(token, refreshToken || "");
           dispatch({ type: "AUTH_SUCCESS", payload: user });
         }
       } else {
-        dispatch({ type: "AUTH_FAILURE", payload: response.data.message || "Login failed" });
+        dispatch({ type: "AUTH_FAILURE", payload: response.data?.message || "Login failed" });
       }
     } catch (error: any) {
       dispatch({
@@ -94,14 +94,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     dispatch({ type: "AUTH_START" });
     try {
       const response = await authService.register({ username, email, password });
-      if (response.data.code === 0 && response.data.data) {
+      if (response.data?.code === 0 && response.data?.data) {
         const { token, refreshToken, user } = response.data.data;
         if (token && user) {
           saveToken(token, refreshToken || "");
           dispatch({ type: "AUTH_SUCCESS", payload: user });
         }
       } else {
-        dispatch({ type: "AUTH_FAILURE", payload: response.data.message || "Registration failed" });
+        dispatch({ type: "AUTH_FAILURE", payload: response.data?.message || "Registration failed" });
       }
     } catch (error: any) {
       dispatch({

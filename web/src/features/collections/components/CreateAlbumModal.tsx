@@ -3,17 +3,19 @@ import { useCollections } from "../CollectionsProvider";
 import { albumService } from "@/services/albumService";
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n.tsx";
-import {X, FolderPlus, Image as ImageIcon, MoveLeft} from "lucide-react";
+import { X, FolderPlus, Image as ImageIcon, MoveLeft } from "lucide-react";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
-import { useAssetsContext } from "@/features/assets/hooks/useAssetsContext";
+import { useGroupBy, useUIActions, useFilterActions, useSelectionActions } from "@/features/assets/selectors";
 import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import { useSelection } from "@/features/assets/hooks/useSelection";
 
 const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect }) => {
-  const { state, dispatch } = useAssetsContext();
-  const { groupBy } = state.ui;
+  const groupBy = useGroupBy();
+  const { setGroupBy, setSearchQuery } = useUIActions();
+  const { resetFilters } = useFilterActions();
+  const { clear: clearSelection, setEnabled: setSelectionEnabled } = useSelectionActions();
   const selection = useSelection();
 
   const {
@@ -31,11 +33,11 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect })
   // Initialize picker state
   useEffect(() => {
     // Force clear everything on mount
-    dispatch({ type: "CLEAR_SELECTION" });
-    dispatch({ type: "RESET_FILTERS" });
-    dispatch({ type: "SET_SEARCH_QUERY", payload: "" });
-    
-    selection.setEnabled(true);
+    clearSelection();
+    resetFilters();
+    setSearchQuery("");
+
+    setSelectionEnabled(true);
   }, []);
 
   // Sync selection with parent
@@ -43,7 +45,7 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect })
     if (selection.enabled && selection.selectedCount > 0) {
       const id = Array.from(selection.selectedIds)[0];
       if (id) {
-        onSelect(id);
+        onSelect(id as string);
       }
     }
   }, [selection.selectedIds, selection.enabled, onSelect]);
@@ -52,14 +54,14 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect })
     <div className="flex flex-col h-full bg-base-100 overflow-hidden">
       <AssetsPageHeader
         groupBy={groupBy}
-        onGroupByChange={(v) => dispatch({ type: "SET_GROUP_BY", payload: v })}
+        onGroupByChange={setGroupBy}
         title="Select Cover Photo"
         icon={<ImageIcon className="w-6 h-6 text-primary" />}
       />
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <JustifiedGallery
           groupedPhotos={groupedAssets || {}}
-          openCarousel={() => {}} 
+          openCarousel={() => { }}
           onLoadMore={fetchMore}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
@@ -99,7 +101,7 @@ const CreateAlbumModal: React.FC = () => {
         cover_asset_id: selectedCoverId,
       });
 
-      if (response.data.code === 0) {
+      if (response.data?.code === 0) {
         queryClient.invalidateQueries({ queryKey: ["albums"] });
         dispatch({ type: "CLOSE_CREATE_MODAL" });
         resetForm();
@@ -174,8 +176,8 @@ const CreateAlbumModal: React.FC = () => {
                 <label className="label">
                   <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">Album Cover</span>
                 </label>
-                
-                <div 
+
+                <div
                   className={`flex-1 min-h-[250px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 transition-all cursor-pointer overflow-hidden relative group
                     ${selectedCoverId ? 'border-primary bg-base-100 shadow-inner' : 'border-base-300 bg-base-100 hover:border-primary/50 hover:bg-base-200/50'}
                   `}
@@ -183,8 +185,8 @@ const CreateAlbumModal: React.FC = () => {
                 >
                   {selectedCoverId ? (
                     <>
-                      <img 
-                        src={`http://localhost:8080/api/v1/assets/${selectedCoverId}/thumbnail?size=medium`} 
+                      <img
+                        src={`http://localhost:8080/api/v1/assets/${selectedCoverId}/thumbnail?size=medium`}
                         className="w-full h-full object-cover"
                         alt="Selected cover"
                       />
@@ -211,8 +213,8 @@ const CreateAlbumModal: React.FC = () => {
               <button type="button" className="btn btn-ghost px-8" onClick={handleClose}>
                 Cancel
               </button>
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className={`btn btn-primary px-12 shadow-lg shadow-primary/20 ${isSubmitting ? 'loading' : ''}`}
                 disabled={isSubmitting || !name.trim() || !selectedCoverId}
               >
@@ -225,7 +227,7 @@ const CreateAlbumModal: React.FC = () => {
           {isChoosingCover && (
             <div className="absolute inset-0 bg-base-100 z-40 flex flex-col animate-in slide-in-from-bottom duration-300">
               <div className="flex items-center justify-between p-4 bg-base-100 sticky top-0 z-50 shadow-sm">
-                <button 
+                <button
                   type="button"
                   className="btn btn-sm btn-soft btn-accent w-full"
                   onClick={() => setIsChoosingCover(false)}
@@ -233,7 +235,7 @@ const CreateAlbumModal: React.FC = () => {
                   <MoveLeft size={20} />
                 </button>
               </div>
-              
+
               <div className="flex-1 overflow-hidden">
                 <AssetsProvider persist={false} defaultSelectionMode="single">
                   <PhotoPicker onSelect={handlePhotoSelect} />

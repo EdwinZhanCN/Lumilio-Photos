@@ -5,24 +5,25 @@ import { albumService } from "@/services/albumService";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
-import { useAssetsContext, useAssetsNavigation } from "@/features/assets/hooks/useAssetsContext";
+import { useGroupBy, useIsCarouselOpen, useUIActions } from "@/features/assets/selectors";
+import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
 import { useAssetsView } from "@/features/assets/hooks/useAssetsView";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import { findAssetIndex, getFlatAssetsFromGrouped } from "@/lib/utils/assetGrouping";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
-import {AssetViewDefinition} from "@/features/assets";
+import { AssetViewDefinition } from "@/features/assets";
 import { FolderIcon } from "lucide-react";
 
 const AlbumAssetsContent = () => {
   const { albumId, assetId } = useParams<{ albumId: string, assetId: string }>();
-  const { state, dispatch } = useAssetsContext();
+  const groupBy = useGroupBy();
+  const isCarouselOpen = useIsCarouselOpen();
+  const { setGroupBy } = useUIActions();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { deleteAsset } = useAssetActions();
   const [isScrolled, setIsScrolled] = useState(false);
-
-  const { groupBy, isCarouselOpen } = state.ui;
 
   // Fetch album metadata
   const { data: albumData, isLoading: isAlbumLoading } = useQuery({
@@ -98,7 +99,7 @@ const AlbumAssetsContent = () => {
 
   const handleAssetDelete = useCallback(
     (deletedAssetId: string) => {
-      deleteAsset(deletedAssetId).catch((error) => {
+      deleteAsset(deletedAssetId).catch((error: any) => {
         console.error("Failed to delete asset:", error);
       });
     },
@@ -115,11 +116,11 @@ const AlbumAssetsContent = () => {
       <div className="sticky top-0 z-30 bg-base-100/80 backdrop-blur-md border-b border-base-200/30">
         <AssetsPageHeader
           groupBy={groupBy}
-          onGroupByChange={(v) => dispatch({ type: "SET_GROUP_BY", payload: v })}
+          onGroupByChange={setGroupBy}
           title={album?.album_name || "Album"}
           icon={<FolderIcon className="w-6 h-6 text-primary" />}
         />
-        
+
         <div className={`px-4 transition-all duration-500 ease-in-out overflow-hidden ${isScrolled ? "py-1.5" : "py-4"}`}>
           {/* Title and Badge - Collapses when scrolled */}
           <div className={`flex items-baseline gap-4 transition-all duration-500 ease-in-out ${isScrolled ? "max-h-0 opacity-0 -translate-y-2" : "max-h-20 opacity-100 translate-y-0"}`}>
@@ -132,7 +133,7 @@ const AlbumAssetsContent = () => {
               </>
             )}
           </div>
-          
+
           {/* Description - Collapses or becomes a single line preview */}
           <div className={`transition-all duration-500 ease-in-out ${isScrolled ? "max-h-0 opacity-0" : "max-h-40 opacity-100 mt-3"}`}>
             {isAlbumLoading && !album ? (
@@ -160,10 +161,10 @@ const AlbumAssetsContent = () => {
                 <span>Created {album?.created_at ? new Date(album.created_at).toLocaleDateString() : ""}</span>
               )}
             </div>
-            
+
             {/* Inline description preview when scrolled */}
             <div className={`flex items-center gap-2 ml-auto max-w-[50%] transition-all duration-500 ${isScrolled ? "opacity-70 translate-x-0" : "opacity-0 translate-x-4 pointer-events-none"}`}>
-               <span className="truncate italic font-normal normal-case">{album?.description}</span>
+              <span className="truncate italic font-normal normal-case">{album?.description}</span>
             </div>
           </div>
         </div>
@@ -212,7 +213,7 @@ const AlbumAssetsContent = () => {
 
 const AlbumDetails = () => {
   const { albumId } = useParams<{ albumId: string }>();
-  
+
   return (
     <WorkerProvider preload={["exif", "export"]}>
       <AssetsProvider persist={false} basePath={`/collections/${albumId}`}>
