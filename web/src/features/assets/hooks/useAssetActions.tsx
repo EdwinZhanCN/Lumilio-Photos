@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useAssetsStore } from "../assets.store";
 import { useShallow } from "zustand/react/shallow";
-import { AssetActionsResult } from "../types/assets.type";
+import { AssetActionsResult } from "@/features/assets";
 import client from "@/lib/http-commons/client";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";
