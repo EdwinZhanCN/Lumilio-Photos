@@ -1,4 +1,4 @@
-import { UploadAction, UploadState } from "../upload.types.ts";
+import { UploadAction, UploadState } from "../upload.type.ts";
 
 export const initialState: UploadState = {
   files: [],

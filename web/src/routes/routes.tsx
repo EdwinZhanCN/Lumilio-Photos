@@ -11,8 +11,8 @@ import AlbumDetails from "@/features/collections/routes/AlbumDetails";
 import Updates from "@/features/updates/routes/Updates";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
 import {AssetsProvider} from "@/features/assets";
-import LoginPage from "@/features/auth/LoginPage";
-import RegisterPage from "@/features/auth/RegisterPage";
+import LoginPage from "@/features/auth/routes/LoginPage.tsx";
+import RegisterPage from "@/features/auth/routes/RegisterPage.tsx";
 
 export const routes = [
   {

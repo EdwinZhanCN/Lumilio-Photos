@@ -1,5 +1,3 @@
-// src/features/lumilio/lumilio.assets.auth.collections.settings.upload.types.ts
-
 import type {
   SideChannelEvent,
   InterruptInfo,

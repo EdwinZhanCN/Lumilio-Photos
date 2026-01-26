@@ -1,8 +1,8 @@
 import React, { ReactNode, useReducer, useCallback, useMemo } from "react";
-import { useUploadProcess } from "@/hooks/api-hooks/useUploadProcess";
+import { useUploadProcess } from "./hooks/useUploadProcess";
 import { uploadReducer, initialState } from "./reducers";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { UploadContext } from "./upload.types.ts";
+import { UploadContext } from "./upload.type.ts";
 import { useSettingsContext } from "@/features/settings";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 

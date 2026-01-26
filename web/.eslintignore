@@ -16,6 +16,3 @@ node_modules/
 # Test setup files that might be empty
 setup.node.ts
 setup.happy-dom.ts
-
-# Empty type files
-src/features/lumen/assets.auth.collections.settings.upload.types.ts

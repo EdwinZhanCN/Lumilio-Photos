@@ -1,4 +1,4 @@
-import { ServerSettings, SettingsAction } from "../settings.types.ts";
+import { ServerSettings, SettingsAction } from "../settings.type.ts";
 
 export const serverReducer = (
   state: ServerSettings,

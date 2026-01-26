@@ -1,4 +1,4 @@
-import { SettingsAction, UISettings } from "../settings.types.ts";
+import { SettingsAction, UISettings } from "../settings.type.ts";
 
 export const uiReducer = (
   state: UISettings,

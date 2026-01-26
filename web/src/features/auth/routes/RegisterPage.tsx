@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useAuth } from "./hooks/useAuth";
+import { useAuth } from "../hooks/useAuth.ts";
 import { useNavigate, Link } from "react-router-dom";
 
 const RegisterPage: React.FC = () => {

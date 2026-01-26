@@ -4,7 +4,7 @@ This directory contains the core business logic and UI modules of the applicatio
 
 ## State Management Structure
 
-We follow a **feature-based state management** approach. While global state exists, we encourage using Redux on a per-feature basis to keep the logic modular and maintainable.
+We follow a **feature-based state management** approach. While global state exists, we encourage using React Context on a per-feature basis to keep the logic modular and maintainable.
 
 ### Feature Store Pattern
 
@@ -17,14 +17,14 @@ src/
 └── features/
     └── settings/
         ├── index.ts              // Entry point: export { SettingsProvider, useSettings } from '...'
-        ├── SettingsProvider.tsx  // Provider component (wraps Redux store or Context)
+        ├── SettingsProvider.tsx  // Provider component (wraps Context)
         ├── hooks/
         │   └── useSettings.ts    // Custom Hook for accessing feature state
         ├── reducers/
         │   ├── lumen.reducer.ts  // Sub-reducer
         │   └── ui.reducer.ts     // Sub-reducer
         ├── settings.reducer.ts   // Root Reducer for this feature
-        └── settings.assets.auth.collections.settings.upload.types.ts              // Feature-specific type definitions
+        └── settings.type.ts              // Feature-specific type definitions
 ```
 
 ## Design Protocol

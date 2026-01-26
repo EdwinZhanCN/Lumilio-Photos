@@ -1,7 +1,7 @@
 // src/features/lumilio/hooks/useLumilioChat.tsx
 import { useContext } from "react";
 import { LumilioChatContext } from "../LumilioChatProvider";
-import { LumilioChatContextValue } from "../lumilio.types";
+import { LumilioChatContextValue } from "../lumilio.type.ts";
 
 /** Custom hook to access the Lumilio Chat context.
  *
