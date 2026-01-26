@@ -2,7 +2,7 @@
 
 # Class: SmartBatchSizer
 
-Defined in: [utils/smartBatchSizing.ts:145](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/utils/smartBatchSizing.ts#L145)
+Defined in: [utils/smartBatchSizing.ts:145](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L145)
 
 Smart Batch Sizing Manager
 Maintains performance history and adapts batch sizes dynamically
@@ -13,7 +13,7 @@ Maintains performance history and adapts batch sizes dynamically
 
 > **new SmartBatchSizer**(): `SmartBatchSizer`
 
-Defined in: [utils/smartBatchSizing.ts:151](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/utils/smartBatchSizing.ts#L151)
+Defined in: [utils/smartBatchSizing.ts:151](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L151)
 
 #### Returns
 
@@ -25,7 +25,7 @@ Defined in: [utils/smartBatchSizing.ts:151](https://github.com/EdwinZhanCN/Lumil
 
 > **getDeviceCapabilities**(): [`DeviceCapabilities`](../interfaces/DeviceCapabilities.md)
 
-Defined in: [utils/smartBatchSizing.ts:363](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/utils/smartBatchSizing.ts#L363)
+Defined in: [utils/smartBatchSizing.ts:363](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L363)
 
 Gets device capabilities
 
@@ -39,7 +39,7 @@ Gets device capabilities
 
 > **getOptimalBatchSize**(`operationType`, `totalItems`, `priority`): `number`
 
-Defined in: [utils/smartBatchSizing.ts:158](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/utils/smartBatchSizing.ts#L158)
+Defined in: [utils/smartBatchSizing.ts:158](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L158)
 
 Gets the optimal batch size for a given operation type and priority
 
@@ -67,7 +67,7 @@ Gets the optimal batch size for a given operation type and priority
 
 > **isMemoryPressureDetected**(): `boolean`
 
-Defined in: [utils/smartBatchSizing.ts:224](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/utils/smartBatchSizing.ts#L224)
+Defined in: [utils/smartBatchSizing.ts:224](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L224)
 
 Checks if memory pressure is detected
 
@@ -81,7 +81,7 @@ Checks if memory pressure is detected
 
 > **recordMetrics**(`metrics`): `void`
 
-Defined in: [utils/smartBatchSizing.ts:202](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/utils/smartBatchSizing.ts#L202)
+Defined in: [utils/smartBatchSizing.ts:202](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L202)
 
 Records processing metrics for future batch size optimization
 
@@ -101,7 +101,7 @@ Records processing metrics for future batch size optimization
 
 > **resetMetrics**(): `void`
 
-Defined in: [utils/smartBatchSizing.ts:370](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/utils/smartBatchSizing.ts#L370)
+Defined in: [utils/smartBatchSizing.ts:370](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L370)
 
 Resets metrics history (useful for testing or configuration changes)
 
