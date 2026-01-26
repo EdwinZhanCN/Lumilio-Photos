@@ -4,7 +4,7 @@ import {
   LumilioChatState,
   LumilioChatAction,
   ChatMessage,
-} from "./lumilio.types";
+} from "./lumilio.type.ts";
 
 export const initialState: LumilioChatState = {
   connection: {

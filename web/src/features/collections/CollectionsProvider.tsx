@@ -1,6 +1,6 @@
 import React, { createContext, useReducer, ReactNode, useContext } from "react";
 import { collectionsReducer, initialState } from "./collections.reducer";
-import { CollectionsAction, CollectionsState } from "./collections.types.ts";
+import { CollectionsAction, CollectionsState } from "./collections.type.ts";
 
 interface CollectionsContextType extends CollectionsState {
   dispatch: React.Dispatch<CollectionsAction>;

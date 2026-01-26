@@ -1,7 +1,6 @@
 // src/services/albumService.ts
 
 import client from "@/lib/http-commons/client";
-import { $api } from "@/lib/http-commons/queryClient";
 import type { components, paths } from "@/lib/http-commons/schema.d.ts";
 
 // ============================================================================
@@ -124,30 +123,3 @@ export const albumService = {
   },
 };
 
-// ============================================================================
-// React Query Hooks
-// ============================================================================
-
-/**
- * Hook for listing albums
- */
-export const useAlbums = (params?: ListAlbumsParams) =>
-  $api.useQuery("get", "/albums", {
-    params: { query: params },
-  });
-
-/**
- * Hook for getting a single album
- */
-export const useAlbum = (id: number) =>
-  $api.useQuery("get", "/albums/{id}", {
-    params: { path: { id } },
-  });
-
-/**
- * Hook for getting album assets
- */
-export const useAlbumAssets = (id: number) =>
-  $api.useQuery("get", "/albums/{id}/assets", {
-    params: { path: { id } },
-  });

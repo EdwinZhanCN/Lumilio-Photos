@@ -1,4 +1,4 @@
-import { AuthAction, AuthState } from "./auth.types.ts";
+import { AuthAction, AuthState } from "./auth.type.ts";
 import { getToken, getRefreshToken } from "@/lib/http-commons/api";
 
 // Production approach: Start in loading state if we have tokens to verify

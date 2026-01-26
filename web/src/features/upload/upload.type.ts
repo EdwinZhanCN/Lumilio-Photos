@@ -1,5 +1,5 @@
 import { DragEvent, Dispatch, createContext } from "react";
-import type { FileUploadProgress } from "@/hooks/api-hooks/useUploadProcess";
+import type { FileUploadProgress } from "./hooks/useUploadProcess";
 
 /**
  * Single unified upload state
@@ -17,9 +17,9 @@ export type UploadAction =
   | { type: "SET_DRAGGING"; payload: boolean }
   | { type: "ADD_FILES"; payload: { files: File[]; previews: string[] } }
   | {
-      type: "UPDATE_PREVIEW_URLS";
-      payload: { startIndex: number; urls: string[] };
-    }
+    type: "UPDATE_PREVIEW_URLS";
+    payload: { startIndex: number; urls: string[] };
+  }
   | { type: "CLEAR_FILES" };
 
 /**

@@ -1,7 +1,7 @@
 import { useRef, useEffect } from "react";
 import { Markdown } from "../LumilioMarkdown/Markdown";
 import { LumilioAvatar } from "../LumilioAvatar/LumilioAvatar";
-import type { ChatMessage } from "@/features/lumilio/lumilio.types";
+import type { ChatMessage } from "@/features/lumilio/lumilio.type.ts";
 
 /** Processes thinking tags in markdown content for display.
  *

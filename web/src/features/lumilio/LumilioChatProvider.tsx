@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { LumilioChatContextValue } from "./lumilio.types";
+import { LumilioChatContextValue } from "./lumilio.type.ts";
 import { lumilioReducer, initialState } from "./lumilio.reducer";
 import { agentService } from "@/services/agentService";
 import type {

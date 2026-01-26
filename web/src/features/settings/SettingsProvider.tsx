@@ -1,6 +1,6 @@
 // src/features/settings/SettingsProvider.tsx
 import { createContext, useReducer, ReactNode, useEffect } from "react";
-import { SettingsContextValue, SettingsState } from "./settings.types.ts";
+import { SettingsContextValue, SettingsState } from "./settings.type.ts";
 import { SettingsReducer, initialState } from "./settings.reducer";
 import { getCurrentLanguage, changeLanguage } from "@/lib/i18n.tsx";
 

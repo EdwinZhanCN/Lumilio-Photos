@@ -1,5 +1,5 @@
 import React from "react";
-import type { FileUploadProgress } from "@/hooks/api-hooks/useUploadProcess";
+import type { FileUploadProgress } from "../hooks/useUploadProcess";
 import {
   CheckCircleIcon,
   XCircleIcon,
