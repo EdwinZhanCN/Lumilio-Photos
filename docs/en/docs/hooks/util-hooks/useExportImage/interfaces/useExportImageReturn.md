@@ -2,7 +2,7 @@
 
 # Interface: useExportImageReturn
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/hooks/util-hooks/useExportImage.tsx#L26)
+Defined in: [hooks/util-hooks/useExportImage.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/hooks/util-hooks/useExportImage.tsx#L26)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:26](https://github.com/EdwinZha
 
 > **cancelExport**: () => `void`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:36](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/hooks/util-hooks/useExportImage.tsx#L36)
+Defined in: [hooks/util-hooks/useExportImage.tsx:36](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/hooks/util-hooks/useExportImage.tsx#L36)
 
 #### Returns
 
@@ -22,7 +22,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:36](https://github.com/EdwinZha
 
 > **downloadOriginal**: (`asset`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/hooks/util-hooks/useExportImage.tsx#L29)
+Defined in: [hooks/util-hooks/useExportImage.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/hooks/util-hooks/useExportImage.tsx#L29)
 
 #### Parameters
 
@@ -118,7 +118,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:29](https://github.com/EdwinZha
 
 > **exportImage**: (`asset`, `options`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/hooks/util-hooks/useExportImage.tsx#L30)
+Defined in: [hooks/util-hooks/useExportImage.tsx:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/hooks/util-hooks/useExportImage.tsx#L30)
 
 #### Parameters
 
@@ -218,7 +218,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:30](https://github.com/EdwinZha
 
 > **exportMultiple**: (`assets`, `options`, `priority?`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/hooks/util-hooks/useExportImage.tsx#L31)
+Defined in: [hooks/util-hooks/useExportImage.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/hooks/util-hooks/useExportImage.tsx#L31)
 
 #### Parameters
 
@@ -244,7 +244,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:31](https://github.com/EdwinZha
 
 > **exportProgress**: [`ExportProgress`](ExportProgress.md) \| `null`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/hooks/util-hooks/useExportImage.tsx#L28)
+Defined in: [hooks/util-hooks/useExportImage.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/hooks/util-hooks/useExportImage.tsx#L28)
 
 ***
 
@@ -252,4 +252,4 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:28](https://github.com/EdwinZha
 
 > **isExporting**: `boolean`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/688e6b882d759a1db5e0f0c3da3d0cd075f00e23/web/src/hooks/util-hooks/useExportImage.tsx#L27)
+Defined in: [hooks/util-hooks/useExportImage.tsx:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/hooks/util-hooks/useExportImage.tsx#L27)
