@@ -1,7 +1,6 @@
 // src/services/assetsService.ts
 
 import client from "@/lib/http-commons/client";
-import { $api } from "@/lib/http-commons/queryClient";
 import type { components, paths } from "@/lib/http-commons/schema.d.ts";
 
 // ============================================================================
@@ -225,59 +224,3 @@ export const assetService = {
     });
   },
 };
-
-// ============================================================================
-// React Query Hooks
-// ============================================================================
-
-/**
- * Hook for listing assets
- */
-export const useAssets = (params: ListAssetsParams) =>
-  $api.useQuery("get", "/assets", {
-    params: { query: params },
-  });
-
-/**
- * Hook for getting a single asset
- */
-export const useAsset = (id: string, params?: GetAssetByIdParams) =>
-  $api.useQuery("get", "/assets/{id}", {
-    params: { path: { id }, query: params },
-  });
-
-/**
- * Hook for asset types
- */
-export const useAssetTypes = () =>
-  $api.useQuery("get", "/assets/types", {});
-
-/**
- * Hook for filter options
- */
-export const useFilterOptions = () =>
-  $api.useQuery("get", "/assets/filter-options", {});
-
-/**
- * Hook for liked assets
- */
-export const useLikedAssets = (limit: number = 20, offset: number = 0) =>
-  $api.useQuery("get", "/assets/liked", {
-    params: { query: { limit, offset } },
-  });
-
-/**
- * Hook for assets by rating
- */
-export const useAssetsByRating = (rating: number, limit: number = 20, offset: number = 0) =>
-  $api.useQuery("get", "/assets/rating/{rating}", {
-    params: { path: { rating }, query: { limit, offset } },
-  });
-
-/**
- * Hook for asset albums
- */
-export const useAssetAlbums = (id: string) =>
-  $api.useQuery("get", "/assets/{id}/albums", {
-    params: { path: { id } },
-  });

@@ -6,7 +6,7 @@ import {
   AssetsViewResult,
   ViewDefinitionOptions,
   TabType,
-} from "../types/assets.type";
+} from "@/features/assets";
 import {
   generateViewKey,
   selectView,

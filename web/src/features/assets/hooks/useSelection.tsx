@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useAssetsStore } from "../assets.store";
-import { SelectionResult } from "../types/assets.type";
+import { SelectionResult } from "@/features/assets";
 import {
   useSelectionEnabled,
   useSelectedIds,
