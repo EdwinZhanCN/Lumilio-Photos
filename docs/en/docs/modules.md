@@ -4,7 +4,6 @@
 
 - [contexts/GlobalContext](contexts/GlobalContext/index.md)
 - [contexts/WorkerProvider](contexts/WorkerProvider/index.md)
-- [hooks/api-hooks/useUploadProcess](hooks/api-hooks/useUploadProcess/index.md)
 - [hooks/util-hooks/useExportImage](hooks/util-hooks/useExportImage/index.md)
 - [hooks/util-hooks/useExtractExifdata](hooks/util-hooks/useExtractExifdata/index.md)
 - [hooks/util-hooks/useGenerateBorder](hooks/util-hooks/useGenerateBorder/index.md)

@@ -2,7 +2,7 @@
 
 # Enumeration: ProcessingPriority
 
-Defined in: [utils/smartBatchSizing.ts:48](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L48)
+Defined in: [utils/smartBatchSizing.ts:48](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/utils/smartBatchSizing.ts#L48)
 
 ## Enumeration Members
 
@@ -10,7 +10,7 @@ Defined in: [utils/smartBatchSizing.ts:48](https://github.com/EdwinZhanCN/Lumili
 
 > **CRITICAL**: `4`
 
-Defined in: [utils/smartBatchSizing.ts:52](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L52)
+Defined in: [utils/smartBatchSizing.ts:52](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/utils/smartBatchSizing.ts#L52)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [utils/smartBatchSizing.ts:52](https://github.com/EdwinZhanCN/Lumili
 
 > **HIGH**: `3`
 
-Defined in: [utils/smartBatchSizing.ts:51](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L51)
+Defined in: [utils/smartBatchSizing.ts:51](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/utils/smartBatchSizing.ts#L51)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [utils/smartBatchSizing.ts:51](https://github.com/EdwinZhanCN/Lumili
 
 > **LOW**: `1`
 
-Defined in: [utils/smartBatchSizing.ts:49](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L49)
+Defined in: [utils/smartBatchSizing.ts:49](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/utils/smartBatchSizing.ts#L49)
 
 ***
 
@@ -34,4 +34,4 @@ Defined in: [utils/smartBatchSizing.ts:49](https://github.com/EdwinZhanCN/Lumili
 
 > **NORMAL**: `2`
 
-Defined in: [utils/smartBatchSizing.ts:50](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c1ade2cae0cd52d3d07c8db26e98e243f7e665c1/web/src/utils/smartBatchSizing.ts#L50)
+Defined in: [utils/smartBatchSizing.ts:50](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/utils/smartBatchSizing.ts#L50)
