@@ -4,9 +4,9 @@
  * This client provides type-safe API requests using the generated OpenAPI schema.
  * It handles JWT token management and automatic token refresh.
  */
-import createClient, { type Middleware } from "openapi-fetch";
+import createClient, { type Middleware } from "@/lib/http-commons/openapi-fetch";
 import type { paths } from "./schema";
-import { getToken, getRefreshToken, saveToken, removeToken } from "./api";
+import { getToken, getRefreshToken, saveToken, removeToken } from "./auth.ts";
 
 export const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
 

@@ -126,24 +126,25 @@ albumService.removeAssetFromAlbum(albumId: number, assetId: string, config?: Axi
 albumService.updateAssetPosition(albumId: number, assetId: string, request: UpdateAssetPositionRequest, config?: AxiosRequestConfig)
 ```
 
-### 4. Auth Service (`authService.ts`)
+### 4. Auth API (React Query)
 
-Handles authentication and user management.
+Authentication endpoints are called directly with `$api` from
+`lib/http-commons/queryClient.ts`. Token handling lives in
+`lib/http-commons/api` and is orchestrated by `features/auth/AuthProvider.tsx`.
 
-**Types:**
+**Types (from `schema.d.ts`):**
 - `User` - User data object
 - `AuthResponse` - Authentication response with tokens
 - `LoginRequest` - Login credentials
 - `RegisterRequest` - Registration data
 - `RefreshTokenRequest` - Token refresh request
 
-**Methods:**
+**Endpoints (via `$api`):**
 ```typescript
-authService.login(request: LoginRequest, config?: AxiosRequestConfig)
-authService.register(request: RegisterRequest, config?: AxiosRequestConfig)
-authService.refreshToken(request: RefreshTokenRequest, config?: AxiosRequestConfig)
-authService.logout(request: RefreshTokenRequest, config?: AxiosRequestConfig)
-authService.getCurrentUser(config?: AxiosRequestConfig)
+$api.useMutation("post", "/api/v1/auth/login")
+$api.useMutation("post", "/api/v1/auth/register")
+$api.useMutation("post", "/api/v1/auth/refresh")
+$api.useMutation("get", "/api/v1/auth/me")
 ```
 
 ### 5. Health Service (`healthService.ts`)
@@ -308,33 +309,16 @@ async function createVacationAlbum(assetIds: string[]) {
 ### Example 5: User Authentication Flow
 
 ```typescript
-import { authService, type LoginRequest, type AuthResponse } from "@/services";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
-async function loginUser(username: string, password: string) {
-  const request: LoginRequest = {
-    username,
-    password
+function LoginForm() {
+  const { login, isLoading, error } = useAuth();
+
+  const handleLogin = async (username: string, password: string) => {
+    await login(username, password);
   };
 
-  try {
-    const response = await authService.login(request);
-    const authData: AuthResponse | undefined = response.data.data;
-
-    if (authData?.token) {
-      // Store tokens
-      localStorage.setItem("accessToken", authData.token);
-      localStorage.setItem("refreshToken", authData.refreshToken || "");
-
-      // Get user info
-      const user = authData.user;
-      console.log(`Logged in as ${user?.username}`);
-
-      return authData;
-    }
-  } catch (error) {
-    console.error("Login failed:", error);
-    throw error;
-  }
+  return { handleLogin, isLoading, error };
 }
 ```
 

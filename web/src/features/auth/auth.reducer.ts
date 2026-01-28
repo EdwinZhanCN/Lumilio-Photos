@@ -1,5 +1,5 @@
 import { AuthAction, AuthState } from "./auth.type.ts";
-import { getToken, getRefreshToken } from "@/lib/http-commons/api";
+import { getToken, getRefreshToken } from "@/lib/http-commons/auth.ts";
 
 // Production approach: Start in loading state if we have tokens to verify
 const hasTokens = !!(getToken() || getRefreshToken());
