@@ -7,7 +7,7 @@
  * @since 1.1.0
  */
 
-import { globalPerformancePreferences } from "@/utils/performancePreferences";
+import { globalPerformancePreferences } from "@/lib/utils/performancePreferences.ts";
 
 export type WorkerType = "thumbnail" | "hash" | "border" | "export" | "exif";
 

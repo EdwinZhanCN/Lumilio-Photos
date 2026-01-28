@@ -5,7 +5,7 @@ import {
   getOptimalBatchSize, 
   recordProcessingMetrics, 
   ProcessingPriority 
-} from "@/utils/smartBatchSizing";
+} from "@/lib/utils/smartBatchSizing.ts";
 
 export type BorderOptions = "COLORED" | "FROSTED" | "VIGNETTE";
 
