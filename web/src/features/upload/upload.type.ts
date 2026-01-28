@@ -2,16 +2,25 @@ import { DragEvent, Dispatch, createContext } from "react";
 import type { FileUploadProgress } from "./hooks/useUploadProcess";
 
 /**
- * Single unified upload state
+ * Single unified upload state interface.
+ * 
+ * Contains all the state information needed for file upload operations,
+ * including file lists, previews, and drag-and-drop status.
  */
 export interface UploadState {
+  /** Array of selected files for upload */
   files: File[];
-  previews: string[]; // Empty string means no preview generated
+  /** Array of preview URLs - empty string indicates no preview generated */
+  previews: string[];
+  /** Whether files are currently being dragged over the drop zone */
   isDragging: boolean;
 }
 
 /**
  * Actions supported by the upload reducer.
+ * 
+ * These actions define all possible state mutations for the upload system,
+ * following the Redux pattern for predictable state updates.
  */
 export type UploadAction =
   | { type: "SET_DRAGGING"; payload: boolean }
@@ -24,6 +33,9 @@ export type UploadAction =
 
 /**
  * The value provided by the UploadContext.
+ * 
+ * This interface defines the complete API available through the upload context,
+ * including state, actions, drag-and-drop handlers, file operations, and status information.
  */
 export interface UploadContextValue {
   state: UploadState;

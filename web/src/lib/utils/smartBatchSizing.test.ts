@@ -5,7 +5,7 @@ import {
   detectDeviceCapabilities,
   getOptimalBatchSize,
   recordProcessingMetrics
-} from './smartBatchSizing';
+} from './smartBatchSizing.ts';
 
 // Mock performance.memory API
 Object.defineProperty(performance, 'memory', {

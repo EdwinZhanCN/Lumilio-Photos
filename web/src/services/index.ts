@@ -1,7 +1,6 @@
 // src/services/index.ts
 // Central export point for all service modules
 
-export * from "./uploadService";
 export {
   albumService,
   type Album,

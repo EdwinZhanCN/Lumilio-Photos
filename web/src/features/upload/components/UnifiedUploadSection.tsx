@@ -1,8 +1,12 @@
-import React, { useRef, useEffect, ChangeEvent } from "react";
+import React, { useRef, useEffect, ChangeEvent, useMemo } from "react";
 import FileDropZone from "./FileDropZone";
 import FileUploadProgress from "./FileUploadProgress";
 
 import { useUploadContext } from "@/features/upload";
+import {
+  useUploadConfig,
+  useUploadProgress,
+} from "@/features/upload/hooks/useUploadQueries";
 import {
   validateFile,
   getValidationErrorMessage,
@@ -37,6 +41,31 @@ function UnifiedUploadSection(): React.JSX.Element {
   const showMessage = useMessage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const activeSessionIds = useMemo(() => {
+    const ids = fileProgress
+      .filter((file) => file.status === "uploading" && file.sessionId)
+      .map((file) => file.sessionId);
+    return Array.from(new Set(ids));
+  }, [fileProgress]);
+
+  const sessionIds = activeSessionIds.length > 0 ? activeSessionIds.join(",") : undefined;
+  const uploadConfigQuery = useUploadConfig();
+  const uploadProgressQuery = useUploadProgress(sessionIds, {
+    enabled: activeSessionIds.length > 0,
+    refetchInterval: activeSessionIds.length > 0 ? 2000 : false,
+  });
+
+  const uploadConfig = uploadConfigQuery.data?.data;
+  const serverProgress = uploadProgressQuery.data?.data;
+  const serverSummary = serverProgress?.summary;
+  const serverSessions = serverProgress?.sessions ?? [];
+
+  const formatBytes = (value?: number) => {
+    if (!value && value !== 0) return "-";
+    const mb = value / (1024 * 1024);
+    return `${mb.toFixed(1)} MB`;
+  };
 
   useEffect(() => {
     return () => {
@@ -130,6 +159,34 @@ function UnifiedUploadSection(): React.JSX.Element {
                   <span className="font-medium">{t('upload.UnifiedUploadSection.max_files_label')}</span>{" "}
                   {maxTotalFiles}
                 </p>
+                {uploadConfig && (
+                  <div className="mt-2 space-y-1 text-xs text-base-content/70">
+                    <p>
+                      <span className="font-medium">
+                        {t("upload.UnifiedUploadSection.server_chunk_size", {
+                          defaultValue: "Server chunk size",
+                        })}
+                      </span>{" "}
+                      {formatBytes(uploadConfig.chunk_size)}
+                    </p>
+                    <p>
+                      <span className="font-medium">
+                        {t("upload.UnifiedUploadSection.server_concurrency", {
+                          defaultValue: "Server concurrency",
+                        })}
+                      </span>{" "}
+                      {uploadConfig.max_concurrent ?? "-"}
+                    </p>
+                    <p>
+                      <span className="font-medium">
+                        {t("upload.UnifiedUploadSection.server_in_flight", {
+                          defaultValue: "In-flight requests",
+                        })}
+                      </span>{" "}
+                      {uploadConfig.max_in_flight_requests ?? "-"}
+                    </p>
+                  </div>
+                )}
                 <p className="text-base-content/70 text-xs mt-2">
                   {t('upload.UnifiedUploadSection.change_limits_settings_hint')}
                 </p>
@@ -269,6 +326,83 @@ function UnifiedUploadSection(): React.JSX.Element {
               value={uploadProgress}
               max="100"
             />
+          </div>
+        </div>
+      )}
+
+      {(serverSummary || serverSessions.length > 0) && (
+        <div className="mt-6 card bg-base-200 shadow-lg">
+          <div className="card-body p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">
+                {t("upload.UnifiedUploadSection.server_progress_label", {
+                  defaultValue: "Server processing",
+                })}
+              </span>
+              {typeof serverSummary?.overall_progress === "number" && (
+                <span className="text-sm font-bold text-primary">
+                  {serverSummary.overall_progress.toFixed(1)}%
+                </span>
+              )}
+            </div>
+
+            {typeof serverSummary?.overall_progress === "number" && (
+              <progress
+                className="progress progress-primary w-full"
+                value={serverSummary.overall_progress}
+                max="100"
+              />
+            )}
+
+            {serverSummary && (
+              <div className="mt-2 flex flex-wrap gap-4 text-xs text-base-content/70">
+                <span>
+                  {t("upload.UnifiedUploadSection.server_active_sessions", {
+                    defaultValue: "Active sessions",
+                  })}
+                  : {serverSummary.active_sessions ?? 0}
+                </span>
+                <span>
+                  {t("upload.UnifiedUploadSection.server_completed_files", {
+                    defaultValue: "Completed files",
+                  })}
+                  : {serverSummary.completed_files ?? 0}
+                </span>
+                <span>
+                  {t("upload.UnifiedUploadSection.server_failed_sessions", {
+                    defaultValue: "Failed sessions",
+                  })}
+                  : {serverSummary.failed_sessions ?? 0}
+                </span>
+              </div>
+            )}
+
+            {serverSessions.length > 0 && (
+              <div className="mt-3 space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                {serverSessions.map((session, index) => (
+                  <div
+                    key={session.session_id || index}
+                    className="rounded bg-base-100 px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="truncate max-w-[70%]">
+                        {session.filename || session.session_id}
+                      </span>
+                      <span className="font-medium">
+                        {typeof session.progress === "number"
+                          ? `${session.progress.toFixed(1)}%`
+                          : "-"}
+                      </span>
+                    </div>
+                    <progress
+                      className="progress progress-primary w-full mt-1"
+                      value={session.progress ?? 0}
+                      max="100"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

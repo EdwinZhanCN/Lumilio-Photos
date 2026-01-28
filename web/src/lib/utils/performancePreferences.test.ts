@@ -4,7 +4,7 @@ import {
   PerformanceProfile,
   globalPerformancePreferences,
   usePerformancePreferences
-} from './performancePreferences';
+} from './performancePreferences.ts';
 
 // Mock localStorage
 const localStorageMock = {

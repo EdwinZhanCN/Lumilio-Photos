@@ -1,22 +1,21 @@
-# Services Documentation
+# API Modules Documentation
 
-This directory contains all API service modules for the Lumilio Photos application. All services have been refactored to use TypeScript types generated from the OpenAPI schema.
+This directory contains API service modules and references to related helpers for the Lumilio Photos application. All API access uses TypeScript types generated from the OpenAPI schema.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Architecture](#architecture)
-- [Available Services](#available-services)
+- [Available API Modules](#available-api-modules)
 - [Type Safety](#type-safety)
 - [Usage Examples](#usage-examples)
-- [Migration Guide](#migration-guide)
 
 ## Overview
 
-All service modules follow a consistent pattern:
+Most API modules follow a consistent pattern:
 
 1. **Type Aliases**: Import and alias types from the generated OpenAPI schema (`schema.d.ts`)
-2. **Service Object**: Export a service object with typed methods
+2. **API Wrapper**: Expose either a service object or React Query hooks
 3. **Full Type Safety**: All requests and responses are fully typed
 
 ### Key Features
@@ -57,22 +56,32 @@ This provides:
 - `data?: T` - Typed response data
 - `error?: string` - Debug error message (when applicable)
 
-## Available Services
+## Available API Modules
 
-### 1. Upload Service (`uploadService.ts`)
+### 1. Upload Helpers & Hooks
 
-Handles file uploads (single and batch).
+Handles file uploads (single, batch, and chunked).
 
-**Types:**
+**Types (from `@/lib/upload/types`):**
 - `UploadResponse` - Single upload result
 - `BatchUploadResponse` - Batch upload results
 - `BatchUploadResult` - Individual file result in batch
 
-**Methods:**
+**Transport Helpers (from `@/lib/upload/uploadTransport`):**
 ```typescript
-uploadService.uploadFile(file: File, hash: string, config?: AxiosRequestConfig)
-uploadService.batchUploadFiles(files: { file: File; hash: string }[], config?: AxiosRequestConfig)
+uploadFile(file: File, hash: string, options?: UploadOptions)
+batchUploadFiles(files: BatchUploadFile[], repositoryId?: string, options?: BatchUploadOptions)
+uploadFileInChunks(file: File, sessionId: string, hash: string, chunkSize?: number, repositoryId?: string, onProgress?: (progress: number) => void, options?: ChunkedUploadOptions)
+generateSessionId(): string
+shouldUseChunks(file: File, threshold?: number): boolean
 ```
+
+**React Query Hooks (from `@/features/upload/hooks`):**
+- `useUploadFileMutation`
+- `useBatchUploadMutation`
+- `useChunkedUploadMutation`
+- `useUploadConfig`
+- `useUploadProgress`
 
 ### 2. Assets Types & URLs
 
@@ -206,33 +215,39 @@ const thumbnail = assetUrls.getThumbnailUrl("asset-id", "medium");
 ### Example 2: Upload Files with Progress
 
 ```typescript
-import { uploadService, type BatchUploadResult } from "@/services";
+import { useBatchUploadMutation } from "@/features/upload/hooks/useUploadMutations";
+import { generateSessionId } from "@/lib/upload/uploadTransport";
+import type { BatchUploadFile, BatchUploadResult } from "@/lib/upload/types";
 
-async function uploadPhotos(files: File[]) {
-  // Compute BLAKE3 hashes for files (implementation not shown)
-  const filesWithHashes = await Promise.all(
-    files.map(async (file) => ({
+function useUploadPhotos() {
+  const batchUpload = useBatchUploadMutation();
+
+  return async (files: File[]) => {
+    const uploadFiles: BatchUploadFile[] = files.map((file) => ({
       file,
-      hash: await computeBlake3Hash(file)
-    }))
-  );
+      sessionId: generateSessionId(),
+    }));
 
-  try {
-    const response = await uploadService.batchUploadFiles(filesWithHashes, {
-      onUploadProgress: (progressEvent) => {
-        const percent = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
-        console.log(`Upload progress: ${percent}%`);
-      }
+    const response = await batchUpload.mutateAsync({
+      files: uploadFiles,
+      options: {
+        onUploadProgress: (progressEvent) => {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / (progressEvent.total || 1),
+          );
+          console.log(`Upload progress: ${percent}%`);
+        },
+      },
     });
 
-    const results: BatchUploadResult[] = response.data.data?.results || [];
-    const successful = results.filter(r => r.success);
-    console.log(`${successful.length}/${results.length} files uploaded successfully`);
+    const results: BatchUploadResult[] = response.data?.results || [];
+    const successful = results.filter((r) => r.success);
+    console.log(
+      `${successful.length}/${results.length} files uploaded successfully`,
+    );
 
     return results;
-  } catch (error) {
-    console.error("Batch upload failed:", error);
-  }
+  };
 }
 ```
 
@@ -352,51 +367,6 @@ const filterQuery = $api.useQuery("post", "/api/v1/assets/filter", {
 
 const assets = filterQuery.data?.data?.assets || [];
 ```
-
-## Migration Guide
-
-### Before (Old Code)
-
-```typescript
-// Custom interfaces
-interface Asset {
-  id: string;
-  type: string;
-  // ... manual type definitions
-}
-
-// Untyped API calls
-const response = await api.get("/api/v1/assets");
-const assets = response.data.data.assets; // No type safety
-```
-
-### After (Refactored Code)
-
-```typescript
-// Generated types
-import { $api } from "@/lib/http-commons/queryClient";
-import type { ListAssetsParams, Asset } from "@/lib/assets/types";
-
-// Fully typed API calls
-const params: ListAssetsParams = { type: "PHOTO", limit: 20 };
-const listQuery = $api.useQuery("get", "/api/v1/assets", {
-  params: { query: params },
-});
-const assets: Asset[] = listQuery.data?.data?.assets || [];
-```
-
-### Key Changes
-
-1. **Import from query client**: Use `$api` for typed React Query calls
-2. **Use generated types**: Replace custom interfaces with schema types
-3. **Type parameters**: All query/path parameters are now typed
-4. **Response typing**: Response shapes are fully typed with `ApiResult<T>`
-
-### Breaking Changes
-
-- `uploadService.ApiResult` is now properly typed from schema
-- Asset calls now flow through `$api` for React Query integration
-- Some method signatures have changed to accept request objects instead of individual parameters
 
 ## Best Practices
 

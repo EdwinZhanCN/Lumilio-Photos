@@ -3,8 +3,8 @@ import {
   usePerformancePreferences,
   PerformanceProfile,
   PerformancePreferences,
-} from "@/utils/performancePreferences";
-import { detectDeviceCapabilities } from "@/utils/smartBatchSizing";
+} from "@/lib/utils/performancePreferences.ts";
+import { detectDeviceCapabilities } from "@/lib/utils/smartBatchSizing.ts";
 
 export default function PerformanceSettings() {
   const { preferences, updatePreferences, resetToDefaults } =
