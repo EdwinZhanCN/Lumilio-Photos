@@ -23,6 +23,8 @@ import {
 import { Asset } from "@/lib/http-commons";
 import { useI18n } from "@/lib/i18n";
 
+const NO_OP = () => { };
+
 function Photos() {
   const { assetId } = useParams<{ assetId: string }>();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
@@ -175,8 +177,8 @@ function Photos() {
     <div>
       <AssetsPageHeader
         groupBy={groupBy}
-        onGroupByChange={(v) => setGroupBy(v)}
-        onFiltersChange={() => { }}
+        onGroupByChange={setGroupBy}
+        onFiltersChange={NO_OP}
       />
 
       {isFetching && allAssets.length === 0 ? (

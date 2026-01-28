@@ -4,9 +4,9 @@ import L, { LatLngExpression, LatLngTuple, DivIcon } from "leaflet";
 import { useSettingsContext } from "@/features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useEffect, useState } from "react";
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
 import { convertCoordinatesForMap } from "@/lib/utils/mapUtils";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 
 // Fix Leaflet default icon issue
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -228,7 +228,7 @@ function MapComponent({
 
         {convertedPhotoLocations.map((location) => {
           const thumbnailUrl = location.asset?.asset_id
-            ? assetService.getThumbnailUrl(location.asset.asset_id, "small")
+            ? assetUrls.getThumbnailUrl(location.asset.asset_id, "small")
             : undefined;
           const markerSize = showSinglePhoto ? 50 : 40;
 

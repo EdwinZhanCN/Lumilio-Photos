@@ -40,7 +40,7 @@ func NewAlbumHandler(albumService *service.AlbumService, queries *repo.Queries) 
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Failed to create album"
-// @Router /albums [post]
+// @Router /api/v1/albums [post]
 // @Security BearerAuth
 func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 	// Get user ID from JWT claims (set by auth middleware)
@@ -101,7 +101,7 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 // @Success 200 {object} api.Result{data=dto.GetAlbumResponseDTO} "Album retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid album ID"
 // @Failure 404 {object} api.Result "Album not found"
-// @Router /albums/{id} [get]
+// @Router /api/v1/albums/{id} [get]
 // @Security BearerAuth
 func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
@@ -144,7 +144,7 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 // @Failure 400 {object} api.Result "Invalid parameters"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Failed to retrieve albums"
-// @Router /albums [get]
+// @Router /api/v1/albums [get]
 // @Security BearerAuth
 func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 	// Get user ID from JWT claims
@@ -223,7 +223,7 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 // @Failure 403 {object} api.Result "Forbidden"
 // @Failure 404 {object} api.Result "Album not found"
 // @Failure 500 {object} api.Result "Failed to update album"
-// @Router /albums/{id} [put]
+// @Router /api/v1/albums/{id} [put]
 // @Security BearerAuth
 func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
@@ -312,7 +312,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 // @Failure 403 {object} api.Result "Forbidden"
 // @Failure 404 {object} api.Result "Album not found"
 // @Failure 500 {object} api.Result "Failed to delete album"
-// @Router /albums/{id} [delete]
+// @Router /api/v1/albums/{id} [delete]
 // @Security BearerAuth
 func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
@@ -357,7 +357,7 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 // @Failure 400 {object} api.Result "Invalid album ID"
 // @Failure 404 {object} api.Result "Album not found"
 // @Failure 500 {object} api.Result "Failed to retrieve album assets"
-// @Router /albums/{id}/assets [get]
+// @Router /api/v1/albums/{id}/assets [get]
 // @Security BearerAuth
 func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 	albumIDStr := c.Param("id")
@@ -401,7 +401,7 @@ func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 // @Failure 400 {object} api.Result "Invalid album ID or asset ID"
 // @Failure 404 {object} api.Result "Album not found"
 // @Failure 500 {object} api.Result "Failed to add asset to album"
-// @Router /albums/{id}/assets/{assetId} [post]
+// @Router /api/v1/albums/{id}/assets/{assetId} [post]
 // @Security BearerAuth
 func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
@@ -458,7 +458,7 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 // @Success 200 {object} api.Result "Asset removed from album successfully"
 // @Failure 400 {object} api.Result "Invalid album ID or asset ID"
 // @Failure 500 {object} api.Result "Failed to remove asset from album"
-// @Router /albums/{id}/assets/{assetId} [delete]
+// @Router /api/v1/albums/{id}/assets/{assetId} [delete]
 // @Security BearerAuth
 func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
@@ -502,7 +502,7 @@ func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 // @Success 200 {object} api.Result "Asset position updated successfully"
 // @Failure 400 {object} api.Result "Invalid album ID or asset ID"
 // @Failure 500 {object} api.Result "Failed to update asset position"
-// @Router /albums/{id}/assets/{assetId}/position [put]
+// @Router /api/v1/albums/{id}/assets/{assetId}/position [put]
 // @Security BearerAuth
 func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 	albumIDStr := c.Param("id")
@@ -551,7 +551,7 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 // @Success 200 {object} api.Result "Albums retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 500 {object} api.Result "Failed to retrieve asset albums"
-// @Router /assets/{id}/albums [get]
+// @Router /api/v1/assets/{id}/albums [get]
 // @Security BearerAuth
 func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 	assetIDStr := c.Param("id")
@@ -586,7 +586,7 @@ func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 // @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets filtered successfully"
 // @Failure 400 {object} api.Result "Invalid request parameters"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /albums/{id}/filter [post]
+// @Router /api/v1/albums/{id}/filter [post]
 // @Security BearerAuth
 func (h *AlbumHandler) FilterAlbumAssets(c *gin.Context) {
 	albumIDStr := c.Param("id")

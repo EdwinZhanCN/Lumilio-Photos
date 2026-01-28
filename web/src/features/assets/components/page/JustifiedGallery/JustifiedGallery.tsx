@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import PhotosLoadingSkeleton from "../LoadingSkeleton";
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
 import {
   justifiedLayoutService,
   type LayoutResult,
 } from "@/services/justifiedLayoutService";
 import MediaThumbnail from "../../shared/MediaThumbnail";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 import { useKeyboardSelection } from "@/features/assets/hooks/useSelection";
 import { useI18n } from "@/lib/i18n";
 
@@ -159,7 +159,7 @@ const JustifiedGallery = ({
                     >
                       <MediaThumbnail
                         asset={asset}
-                        thumbnailUrl={assetService.getThumbnailUrl(asset.asset_id, "medium")}
+                        thumbnailUrl={assetUrls.getThumbnailUrl(asset.asset_id, "medium")}
                         isSelected={isSelected}
                         isSelectionMode={selection.enabled}
                       />

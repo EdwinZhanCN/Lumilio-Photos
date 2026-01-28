@@ -20,7 +20,7 @@ export type MessageResponse = Schemas["dto.MessageResponseDTO"];
 export type FilterAssetsRequest = Schemas["dto.FilterAssetsRequestDTO"];
 
 export type ListAlbumsParams = NonNullable<
-  Paths["/albums"]["get"]["parameters"]["query"]
+  Paths["/api/v1/albums"]["get"]["parameters"]["query"]
 >;
 
 // ============================================================================
@@ -32,7 +32,7 @@ export const albumService = {
    * Fetches a paginated list of albums for the authenticated user.
    */
   async listAlbums(params?: ListAlbumsParams) {
-    return client.GET("/albums", {
+    return client.GET("/api/v1/albums", {
       params: { query: params },
     });
   },
@@ -41,7 +41,7 @@ export const albumService = {
    * Fetches a specific album by its ID.
    */
   async getAlbumById(id: number) {
-    return client.GET("/albums/{id}", {
+    return client.GET("/api/v1/albums/{id}", {
       params: { path: { id } },
     });
   },
@@ -50,7 +50,7 @@ export const albumService = {
    * Creates a new album for the authenticated user.
    */
   async createAlbum(request: CreateAlbumRequest) {
-    return client.POST("/albums", {
+    return client.POST("/api/v1/albums", {
       body: request,
     });
   },
@@ -59,7 +59,7 @@ export const albumService = {
    * Updates an existing album's information.
    */
   async updateAlbum(id: number, request: UpdateAlbumRequest) {
-    return client.PUT("/albums/{id}", {
+    return client.PUT("/api/v1/albums/{id}", {
       params: { path: { id } },
       body: request,
     });
@@ -69,7 +69,7 @@ export const albumService = {
    * Deletes an album by its ID.
    */
   async deleteAlbum(id: number) {
-    return client.DELETE("/albums/{id}", {
+    return client.DELETE("/api/v1/albums/{id}", {
       params: { path: { id } },
     });
   },
@@ -78,7 +78,7 @@ export const albumService = {
    * Retrieves all assets in a specific album.
    */
   async getAlbumAssets(id: number) {
-    return client.GET("/albums/{id}/assets", {
+    return client.GET("/api/v1/albums/{id}/assets", {
       params: { path: { id } },
     });
   },
@@ -87,7 +87,7 @@ export const albumService = {
    * Filter assets within a specific album.
    */
   async filterAlbumAssets(albumId: number, request: FilterAssetsRequest) {
-    return client.POST("/albums/{id}/filter", {
+    return client.POST("/api/v1/albums/{id}/filter", {
       params: { path: { id: albumId } },
       body: request,
     });
@@ -97,7 +97,7 @@ export const albumService = {
    * Adds an asset to a specific album.
    */
   async addAssetToAlbum(albumId: number, assetId: string, request?: AddAssetToAlbumRequest) {
-    return client.POST("/albums/{id}/assets/{assetId}", {
+    return client.POST("/api/v1/albums/{id}/assets/{assetId}", {
       params: { path: { id: albumId, assetId } },
       body: request,
     });
@@ -107,7 +107,7 @@ export const albumService = {
    * Removes an asset from a specific album.
    */
   async removeAssetFromAlbum(albumId: number, assetId: string) {
-    return client.DELETE("/albums/{id}/assets/{assetId}", {
+    return client.DELETE("/api/v1/albums/{id}/assets/{assetId}", {
       params: { path: { id: albumId, assetId } },
     });
   },
@@ -116,7 +116,7 @@ export const albumService = {
    * Updates the position of an asset within a specific album.
    */
   async updateAssetPosition(albumId: number, assetId: string, request: UpdateAssetPositionRequest) {
-    return client.PUT("/albums/{id}/assets/{assetId}/position", {
+    return client.PUT("/api/v1/albums/{id}/assets/{assetId}/position", {
       params: { path: { id: albumId, assetId } },
       body: request,
     });

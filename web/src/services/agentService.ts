@@ -133,7 +133,7 @@ export const agentService = {
     request: AgentChatRequest,
     signal?: AbortSignal,
   ): AsyncGenerator<AgentStreamEvent> {
-    const url = `${this.getBaseUrl()}/agent/chat`;
+    const url = `${this.getBaseUrl()}/api/v1/agent/chat`;
     yield* this._streamer(url, request, signal);
   },
 
@@ -144,7 +144,7 @@ export const agentService = {
     request: AgentResumeRequest,
     signal?: AbortSignal,
   ): AsyncGenerator<AgentStreamEvent> {
-    const url = `${this.getBaseUrl()}/agent/chat/resume`;
+    const url = `${this.getBaseUrl()}/api/v1/agent/chat/resume`;
     yield* this._streamer(url, request, signal);
   },
 
@@ -181,7 +181,7 @@ export const agentService = {
    * Gets the list of available tools
    */
   async getAvailableTools() {
-    const { data } = await client.GET("/agent/tools", {});
+    const { data } = await client.GET("/api/v1/agent/tools", {});
     return data?.data as ToolInfoResponse[] | undefined;
   },
 
@@ -189,7 +189,7 @@ export const agentService = {
    * Gets tool schemas
    */
   async getToolSchemas() {
-    const { data } = await client.GET("/agent/schemas", {});
+    const { data } = await client.GET("/api/v1/agent/schemas", {});
     return data?.data as ToolSchemaResponse | undefined;
   },
 
@@ -237,12 +237,12 @@ export const agentService = {
  * Hook for available tools
  */
 export const useAgentTools = () =>
-  $api.useQuery("get", "/agent/tools", {});
+  $api.useQuery("get", "/api/v1/agent/tools", {});
 
 /**
  * Hook for tool schemas
  */
 export const useToolSchemas = () =>
-  $api.useQuery("get", "/agent/schemas", {});
+  $api.useQuery("get", "/api/v1/agent/schemas", {});
 
 export default agentService;

@@ -6,7 +6,7 @@ import client from "@/lib/http-commons/client";
 // Constants
 // ============================================================================
 
-export const HEALTH_ENDPOINT = "/health" as const;
+export const HEALTH_ENDPOINT = "/api/v1/health" as const;
 export const MIN_HEALTH_INTERVAL_SEC = 1;
 export const MAX_HEALTH_INTERVAL_SEC = 50;
 export const DEFAULT_HEALTH_INTERVAL_SEC = 5;
@@ -31,7 +31,7 @@ export interface HealthCheckResult {
  * Returns the typed response from the /health endpoint.
  */
 export async function fetchHealth() {
-  return client.GET("/health", {});
+  return client.GET("/api/v1/health", {});
 }
 
 /**

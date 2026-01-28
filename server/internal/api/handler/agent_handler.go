@@ -53,7 +53,7 @@ type AgentResumeRequest struct {
 // @Success 200 {string} string "SSE stream"
 // @Failure 400 {object} api.Result "Invalid request"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /agent/chat [post]
+// @Router /api/v1/agent/chat [post]
 func (h *AgentHandler) Chat(c *gin.Context) {
 	var req AgentChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -97,7 +97,7 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 // @Success 200 {string} string "SSE stream"
 // @Failure 400 {object} api.Result "Invalid request"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /agent/chat/resume [post]
+// @Router /api/v1/agent/chat/resume [post]
 func (h *AgentHandler) ResumeChat(c *gin.Context) {
 	var req AgentResumeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -356,7 +356,7 @@ type ToolInfoResponse struct {
 // @Tags agent
 // @Produce json
 // @Success 200 {object} api.Result{data=[]ToolInfoResponse}
-// @Router /agent/tools [get]
+// @Router /api/v1/agent/tools [get]
 func (h *AgentHandler) GetTools(c *gin.Context) {
 	registry := core.GetRegistry()
 	tools := registry.GetAllToolInfos()
@@ -386,7 +386,7 @@ type ToolSchemaResponse struct {
 // @Tags agent
 // @Produce json
 // @Success 200 {object} api.Result{data=ToolSchemaResponse}
-// @Router /agent/schemas [get]
+// @Router /api/v1/agent/schemas [get]
 func (h *AgentHandler) GetToolSchemas(c *gin.Context) {
 	schema := ToolSchemaResponse{
 		BulkLikeUpdate: dto.BulkLikeUpdateDTO{
