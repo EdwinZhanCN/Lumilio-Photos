@@ -11,14 +11,6 @@ export {
   type UpdateAssetPositionRequest,
   type ListAlbumsParams,
 } from "./albumService";
-export {
-  authService,
-  type User,
-  type AuthResponse,
-  type LoginRequest,
-  type RegisterRequest,
-  type RefreshTokenRequest,
-} from "./authService";
 export * from "./healthService";
 export * from "./geoService";
 export * from "./justifiedLayoutService";

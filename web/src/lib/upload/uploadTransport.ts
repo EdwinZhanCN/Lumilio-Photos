@@ -1,4 +1,4 @@
-import { getToken } from "@/lib/http-commons/api";
+import { getToken } from "@/lib/http-commons/auth.ts";
 import type {
   ApiResult,
   UploadResponse,

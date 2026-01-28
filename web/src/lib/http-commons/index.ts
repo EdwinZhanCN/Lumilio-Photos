@@ -95,5 +95,5 @@ export function getTypedMetadata(
 }
 
 // Re-export token management functions and client
-export { getToken, getRefreshToken, saveToken, removeToken } from "./api";
+export { getToken, getRefreshToken, saveToken, removeToken } from "./auth.ts";
 export { default as client } from "./client";
