@@ -74,11 +74,11 @@ uploadService.uploadFile(file: File, hash: string, config?: AxiosRequestConfig)
 uploadService.batchUploadFiles(files: { file: File; hash: string }[], config?: AxiosRequestConfig)
 ```
 
-### 2. Assets Service (`assetsService.ts`)
+### 2. Assets Types & URLs
 
-Manages asset operations (photos, videos, audio, documents).
+Asset operations now use React Query via `$api` from `queryClient.ts`. Asset types live in `lib/assets/types.ts`, and URL helpers live in `lib/assets/assetUrls.ts`.
 
-**Types:**
+**Types (from `@/lib/assets/types`):**
 - `Asset` - Asset data transfer object
 - `AssetListResponse` - Paginated asset list
 - `AssetFilter` - Filter criteria
@@ -86,26 +86,12 @@ Manages asset operations (photos, videos, audio, documents).
 - `FilterAssetsRequest` - Filter parameters
 - And many more...
 
-**Key Methods:**
+**URL Helpers (from `@/lib/assets/assetUrls`):**
 ```typescript
-assetService.listAssets(params: ListAssetsParams, config?: AxiosRequestConfig)
-assetService.getAssetById(id: string, params?: GetAssetByIdParams, config?: AxiosRequestConfig)
-assetService.deleteAsset(id: string, config?: AxiosRequestConfig)
-assetService.updateAssetMetadata(id: string, request: UpdateAssetRequest, config?: AxiosRequestConfig)
-assetService.filterAssets(request: FilterAssetsRequest, config?: AxiosRequestConfig)
-assetService.searchAssets(request: SearchAssetsRequest, config?: AxiosRequestConfig)
-assetService.getFilterOptions(config?: AxiosRequestConfig)
-assetService.updateAssetRating(id: string, rating: number, config?: AxiosRequestConfig)
-assetService.updateAssetLike(id: string, liked: boolean, config?: AxiosRequestConfig)
-assetService.updateAssetDescription(id: string, description: string, config?: AxiosRequestConfig)
-```
-
-**URL Helpers:**
-```typescript
-assetService.getOriginalFileUrl(id: string): string
-assetService.getThumbnailUrl(id: string, size?: "small" | "medium" | "large"): string
-assetService.getWebVideoUrl(id: string): string
-assetService.getWebAudioUrl(id: string): string
+assetUrls.getOriginalFileUrl(id: string): string
+assetUrls.getThumbnailUrl(id: string, size?: "small" | "medium" | "large"): string
+assetUrls.getWebVideoUrl(id: string): string
+assetUrls.getWebAudioUrl(id: string): string
 ```
 
 ### 3. Album Service (`albumService.ts`)
@@ -188,63 +174,33 @@ type Schemas = components["schemas"];
 type Paths = paths;
 
 // Access schema types
-type Asset = Schemas["handler.AssetDTO"];
+type Asset = Schemas["dto.AssetDTO"];
 
 // Access path parameter types
-type ListAssetsParams = NonNullable<Paths["/assets"]["get"]["parameters"]["query"]>;
+type ListAssetsParams =
+  NonNullable<Paths["/api/v1/assets"]["get"]["parameters"]["query"]>;
 ```
 
 ### Request/Response Types
 
-Every service method is fully typed:
+Every `$api` call is fully typed:
 
 ```typescript
-// Typed request
-const request: SearchAssetsRequest = {
-  query: "sunset",
-  search_type: "semantic",
-  limit: 20,
-  filter: {
-    type: "PHOTO",
-    rating: 5
-  }
-};
-
 // Typed response
-const response: AxiosResponse<ApiResult<AssetListResponse>> =
-  await assetService.searchAssets(request);
+const optionsQuery = $api.useQuery("get", "/api/v1/assets/filter-options", {});
 
 // Access typed data
-const assets: Asset[] = response.data.data?.assets || [];
+const options = optionsQuery.data?.data;
 ```
 
 ## Usage Examples
 
-### Example 1: List Assets with Filters
+### Example 1: Asset URL Helpers
 
 ```typescript
-import { assetService, type ListAssetsParams } from "@/services";
+import { assetUrls } from "@/lib/assets/assetUrls";
 
-async function loadPhotos() {
-  const params: ListAssetsParams = {
-    type: "PHOTO",
-    limit: 50,
-    offset: 0,
-    sort_order: "desc"
-  };
-
-  try {
-    const response = await assetService.listAssets(params);
-
-    if (response.data.code === 0) {
-      const assets = response.data.data?.assets || [];
-      console.log(`Loaded ${assets.length} photos`);
-      return assets;
-    }
-  } catch (error) {
-    console.error("Failed to load photos:", error);
-  }
-}
+const thumbnail = assetUrls.getThumbnailUrl("asset-id", "medium");
 ```
 
 ### Example 2: Upload Files with Progress
@@ -283,33 +239,27 @@ async function uploadPhotos(files: File[]) {
 ### Example 3: Search Assets Semantically
 
 ```typescript
-import { assetService, type SearchAssetsRequest } from "@/services";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { SearchAssetsRequest } from "@/lib/assets/types";
 
-async function searchImages(query: string) {
-  const request: SearchAssetsRequest = {
-    query,
-    search_type: "semantic",
-    limit: 20,
-    filter: {
-      type: "PHOTO",
-      liked: true  // Only search liked photos
-    }
-  };
+const request: SearchAssetsRequest = {
+  query: "sunset",
+  search_type: "semantic",
+  limit: 20,
+  filter: { type: "PHOTO", liked: true }
+};
 
-  try {
-    const response = await assetService.searchAssets(request);
-    return response.data.data?.assets || [];
-  } catch (error) {
-    console.error("Search failed:", error);
-    return [];
-  }
-}
+const searchQuery = $api.useQuery("post", "/api/v1/assets/search", {
+  body: request,
+});
+
+const assets = searchQuery.data?.data?.assets || [];
 ```
 
 ### Example 4: Create Album and Add Photos
 
 ```typescript
-import { albumService, assetService, type CreateAlbumRequest } from "@/services";
+import { albumService, type CreateAlbumRequest } from "@/services";
 
 async function createVacationAlbum(assetIds: string[]) {
   // Create album
@@ -376,34 +326,31 @@ async function loginUser(username: string, password: string) {
 ### Example 6: Filter Assets with Advanced Criteria
 
 ```typescript
-import { assetService, type FilterAssetsRequest, type AssetFilter } from "@/services";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { FilterAssetsRequest, AssetFilter } from "@/lib/assets/types";
 
-async function findRawPhotos() {
-  const filter: AssetFilter = {
-    type: "PHOTO",
-    raw: true,
-    rating: 4,
-    camera_make: "Canon",
-    date: {
-      from: "2024-01-01T00:00:00Z",
-      to: "2024-12-31T23:59:59Z"
-    }
-  };
-
-  const request: FilterAssetsRequest = {
-    filter,
-    limit: 100,
-    offset: 0
-  };
-
-  try {
-    const response = await assetService.filterAssets(request);
-    return response.data.data?.assets || [];
-  } catch (error) {
-    console.error("Filter failed:", error);
-    return [];
+const filter: AssetFilter = {
+  type: "PHOTO",
+  raw: true,
+  rating: 4,
+  camera_make: "Canon",
+  date: {
+    from: "2024-01-01T00:00:00Z",
+    to: "2024-12-31T23:59:59Z"
   }
-}
+};
+
+const request: FilterAssetsRequest = {
+  filter,
+  limit: 100,
+  offset: 0
+};
+
+const filterQuery = $api.useQuery("post", "/api/v1/assets/filter", {
+  body: request,
+});
+
+const assets = filterQuery.data?.data?.assets || [];
 ```
 
 ## Migration Guide
@@ -427,17 +374,20 @@ const assets = response.data.data.assets; // No type safety
 
 ```typescript
 // Generated types
-import { assetService, type Asset, type ListAssetsParams } from "@/services";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { ListAssetsParams, Asset } from "@/lib/assets/types";
 
 // Fully typed API calls
 const params: ListAssetsParams = { type: "PHOTO", limit: 20 };
-const response = await assetService.listAssets(params);
-const assets: Asset[] = response.data.data?.assets || [];
+const listQuery = $api.useQuery("get", "/api/v1/assets", {
+  params: { query: params },
+});
+const assets: Asset[] = listQuery.data?.data?.assets || [];
 ```
 
 ### Key Changes
 
-1. **Import from services**: Instead of calling `api` directly, use service methods
+1. **Import from query client**: Use `$api` for typed React Query calls
 2. **Use generated types**: Replace custom interfaces with schema types
 3. **Type parameters**: All query/path parameters are now typed
 4. **Response typing**: Response shapes are fully typed with `ApiResult<T>`
@@ -445,14 +395,14 @@ const assets: Asset[] = response.data.data?.assets || [];
 ### Breaking Changes
 
 - `uploadService.ApiResult` is now properly typed from schema
-- `assetService` methods now require typed request objects
+- Asset calls now flow through `$api` for React Query integration
 - Some method signatures have changed to accept request objects instead of individual parameters
 
 ## Best Practices
 
 1. **Always import types**: Use `type` imports for better tree-shaking
    ```typescript
-   import { assetService, type Asset } from "@/services";
+   import type { Asset } from "@/lib/assets/types";
    ```
 
 2. **Handle errors properly**: Check `response.data.code` for business logic errors

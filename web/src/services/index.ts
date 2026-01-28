@@ -3,27 +3,6 @@
 
 export * from "./uploadService";
 export {
-  assetService,
-  type Asset,
-  type AssetListResponse,
-  type AssetTypesResponse,
-  type AssetFilter,
-  type FilenameFilter,
-  type DateRange,
-  type FilterAssetsRequest,
-  type SearchAssetsRequest,
-  type FilterOptionsResponse,
-  type UpdateAssetRequest,
-  type UpdateRatingRequest,
-  type UpdateLikeRequest,
-  type UpdateRatingAndLikeRequest,
-  type UpdateDescriptionRequest,
-  type ListAssetsParams,
-  type GetAssetByIdParams,
-  type SearchAssetsParams,
-  type FilterAssetsParams,
-} from "./assetsService";
-export {
   albumService,
   type Album,
   type ListAlbumsResponse,

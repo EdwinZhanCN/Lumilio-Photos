@@ -71,8 +71,10 @@ export const useAllAssets = () =>
 export const useView = (viewKey: string) =>
     useAssetsStore((s) => s.views[viewKey]);
 
+const EMPTY_ARRAY: string[] = [];
+
 export const useViewAssetIds = (viewKey: string) =>
-    useAssetsStore((s) => s.views[viewKey]?.assetIds || []);
+    useAssetsStore((s) => s.views[viewKey]?.assetIds || EMPTY_ARRAY);
 
 // ===== Actions (stable references) =====
 export const useSelectionActions = () =>
@@ -84,8 +86,10 @@ export const useSelectionActions = () =>
         clear: s.clearSelection,
         setEnabled: s.setSelectionEnabled,
         setMode: s.setSelectionMode,
-        selectRange: () => console.warn('selectRange not implemented in store yet'), // Placeholder
+        selectRange: PLACEHOLDER_SELECT_RANGE,
     })));
+
+const PLACEHOLDER_SELECT_RANGE = () => console.warn('selectRange not implemented in store yet');
 
 export const useUIActions = () =>
     useAssetsStore(useShallow((s) => ({

@@ -1,5 +1,5 @@
 import { StateCreator } from "zustand";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 import { EntitiesState, EntityMeta } from "../types/assets.type";
 
 export interface EntitiesSlice {
@@ -94,10 +94,14 @@ export const selectAsset = (
   return state.assets[assetId];
 };
 
+// Stable empty array to avoid creating new instances on each selector call
+const EMPTY_ASSETS: Asset[] = [];
+
 export const selectAssets = (
   input: EntitiesInput,
   assetIds: string[],
 ): Asset[] => {
+  if (assetIds.length === 0) return EMPTY_ASSETS;
   const state = getEntitiesState(input);
   return assetIds
     .map((id) => state.assets[id])
@@ -116,4 +120,3 @@ export const selectAllAssets = (input: EntitiesInput): Asset[] => {
   const state = getEntitiesState(input);
   return Object.values(state.assets);
 };
-

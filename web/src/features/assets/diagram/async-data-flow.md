@@ -9,7 +9,7 @@ sequenceDiagram
     participant UI as FilterPanel (Consumer)
     participant Store as AssetsStore
     participant Hook as useAssetView Hook
-    participant API as assetService
+    participant API as $api
     
     Note over UI, API: User toggles filter (e.g., rating ≥ 4)
     
@@ -52,7 +52,7 @@ sequenceDiagram
     participant UI as SearchInput (Consumer)
     participant Store as AssetsStore
     participant Hook as useAssetView Hook
-    participant API as assetService
+    participant API as $api
     
     Note over UI, API: User types "sunset" in search
     
@@ -93,7 +93,7 @@ sequenceDiagram
     participant UI as AssetGrid (Consumer)
     participant Store as AssetsStore
     participant Hook as useAssetView Hook
-    participant API as assetService
+    participant API as $api
     
     Note over UI, API: User scrolls near bottom
     
@@ -131,7 +131,7 @@ sequenceDiagram
 sequenceDiagram
     participant UI as AssetCard (Consumer)
     participant Store as AssetsStore
-    participant API as assetService
+    participant API as $api
     
     Note over UI, API: User clicks star to rate 5
     
@@ -165,7 +165,7 @@ sequenceDiagram
 sequenceDiagram
     participant UI as SelectionToolbar
     participant Store as AssetsStore
-    participant API as assetService
+    participant API as $api
     
     Note over UI, API: User selects multiple assets
     

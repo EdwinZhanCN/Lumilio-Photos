@@ -35,7 +35,7 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 409 {object} api.Result "User already exists"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /auth/register [post]
+// @Router /api/v1/auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req dto.RegisterRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -71,7 +71,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Invalid credentials"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /auth/login [post]
+// @Router /api/v1/auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req dto.LoginRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -106,7 +106,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Invalid or expired refresh token"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /auth/refresh [post]
+// @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	var req dto.RefreshTokenRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -140,7 +140,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 401 {object} api.Result "Invalid refresh token"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /auth/logout [post]
+// @Router /api/v1/auth/logout [post]
 func (h *AuthHandler) Logout(c *gin.Context) {
 	var req dto.RefreshTokenRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -171,7 +171,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // @Success 200 {object} api.Result{data=dto.UserDTO} "User information retrieved successfully"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /auth/me [get]
+// @Router /api/v1/auth/me [get]
 func (h *AuthHandler) Me(c *gin.Context) {
 	// Get user ID from JWT claims (set by auth middleware)
 	userID, exists := c.Get("user_id")

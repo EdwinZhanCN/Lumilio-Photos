@@ -12,7 +12,7 @@ import {
 } from "../slices/selection.slice";
 import { useAssetActions } from "./useAssetActions";
 import { albumService } from "@/services/albumService";
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
 
 /**
  * Hook for managing asset selection state and operations.
@@ -344,7 +344,7 @@ export const useBulkAssetOperations = () => {
 
     for (const id of ids) {
       try {
-        const url = assetService.getOriginalFileUrl(id as string);
+        const url = assetUrls.getOriginalFileUrl(id as string);
         const response = await fetch(url);
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);

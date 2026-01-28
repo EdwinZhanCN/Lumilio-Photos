@@ -15,7 +15,7 @@ import { selectTabTitle } from "@/features/assets/slices/ui.slice";
 import { useCallback, useMemo, useRef, useEffect, useState, ReactNode } from "react";
 import { albumService, Album } from "@/services/albumService";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
 import {
   useFilterState,
@@ -64,6 +64,7 @@ function mapFilenameOperatorToMode(
   }
 }
 
+
 const AssetsPageHeader = ({
   groupBy,
   onGroupByChange,
@@ -71,6 +72,7 @@ const AssetsPageHeader = ({
   title,
   icon,
 }: AssetsPageHeaderProps) => {
+
   const { t } = useI18n();
   const selection = useSelection();
   const bulkOps = useBulkAssetOperations();
@@ -136,9 +138,9 @@ const AssetsPageHeader = ({
   // Handle search activation (switch to flat view when searching)
   useEffect(() => {
     if (searchQuery.trim() && groupBy !== "flat") {
-      onGroupByChange("flat");
+      onGroupByChangeRef.current("flat");
     }
-  }, [searchQuery, groupBy, onGroupByChange]);
+  }, [searchQuery, groupBy]);
 
   // Use ref to store the latest onFiltersChange callback to avoid dependency issues
   const onFiltersChangeRef = useRef(onFiltersChange);
@@ -483,7 +485,7 @@ const AssetsPageHeader = ({
                     <div className="w-10 h-10 rounded bg-base-300 flex items-center justify-center overflow-hidden">
                       {album.cover_asset_id ? (
                         <img
-                          src={assetService.getThumbnailUrl(album.cover_asset_id, "small")}
+                          src={assetUrls.getThumbnailUrl(album.cover_asset_id, "small")}
                           className="w-full h-full object-cover"
                           alt=""
                         />

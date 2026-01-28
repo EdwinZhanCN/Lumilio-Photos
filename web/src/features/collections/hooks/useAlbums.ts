@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { albumService, Album as AlbumDTO } from "@/services/albumService";
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Album as ImgStackAlbum } from "../components/ImgStackGrid/ImgStackGrid";
 
 const PAGE_SIZE = 60;
@@ -20,7 +20,7 @@ export const mapAlbumToUI = (
     description: album.description ?? "",
     imageCount: album.asset_count ?? 0,
     coverImages: album.cover_asset_id
-      ? [assetService.getThumbnailUrl(album.cover_asset_id, "medium")]
+      ? [assetUrls.getThumbnailUrl(album.cover_asset_id, "medium")]
       : undefined,
     createdAt: album.created_at ? new Date(album.created_at) : new Date(),
     updatedAt: album.updated_at ? new Date(album.updated_at) : new Date(),

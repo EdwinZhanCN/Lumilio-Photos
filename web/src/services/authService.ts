@@ -32,7 +32,7 @@ export const authService = {
    * Authenticates a user with username and password.
    */
   async login(request: LoginRequest) {
-    const result = await client.POST("/auth/login", {
+    const result = await client.POST("/api/v1/auth/login", {
       body: request,
     });
 
@@ -54,7 +54,7 @@ export const authService = {
    * Registers a new user account.
    */
   async register(request: RegisterRequest) {
-    const result = await client.POST("/auth/register", {
+    const result = await client.POST("/api/v1/auth/register", {
       body: request,
     });
 
@@ -75,7 +75,7 @@ export const authService = {
    * Refreshes the access token using a valid refresh token.
    */
   async refreshToken(request: RefreshTokenRequest) {
-    return client.POST("/auth/refresh", {
+    return client.POST("/api/v1/auth/refresh", {
       body: request,
     });
   },
@@ -84,7 +84,7 @@ export const authService = {
    * Logs out the user by revoking the refresh token.
    */
   async logout(request: RefreshTokenRequest) {
-    const result = await client.POST("/auth/logout", {
+    const result = await client.POST("/api/v1/auth/logout", {
       body: request,
     });
 
@@ -98,6 +98,6 @@ export const authService = {
    * Gets information about the currently authenticated user.
    */
   async getCurrentUser() {
-    return client.GET("/auth/me", {});
+    return client.GET("/api/v1/auth/me", {});
   },
 };

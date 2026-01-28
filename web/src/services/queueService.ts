@@ -50,7 +50,7 @@ export interface ApiResult<T = unknown> {
  * List jobs with optional filters
  */
 export async function listJobs(params?: JobListParams) {
-  const { data } = await client.GET("/admin/river/jobs", {
+  const { data } = await client.GET("/api/v1/admin/river/jobs", {
     params: { query: params },
   });
   return data?.data as JobListResponse | undefined;
@@ -60,7 +60,7 @@ export async function listJobs(params?: JobListParams) {
  * Get a single job by ID
  */
 export async function getJob(jobId: number) {
-  const { data } = await client.GET("/admin/river/jobs/{id}", {
+  const { data } = await client.GET("/api/v1/admin/river/jobs/{id}", {
     params: { path: { id: jobId } },
   });
   return data?.data as JobDTO | undefined;
@@ -70,7 +70,7 @@ export async function getJob(jobId: number) {
  * List all active queues
  */
 export async function listQueues(limit?: number) {
-  const { data } = await client.GET("/admin/river/queues", {
+  const { data } = await client.GET("/api/v1/admin/river/queues", {
     params: { query: { limit } },
   });
   return data?.data as QueueStatsResponse | undefined;
@@ -80,7 +80,7 @@ export async function listQueues(limit?: number) {
  * Get aggregated job statistics by state
  */
 export async function getJobStats() {
-  const { data } = await client.GET("/admin/river/stats", {});
+  const { data } = await client.GET("/api/v1/admin/river/stats", {});
   return data?.data as JobStatsResponse | undefined;
 }
 
@@ -92,7 +92,7 @@ export async function getJobStats() {
  * Hook for listing jobs
  */
 export const useJobs = (params?: JobListParams) =>
-  $api.useQuery("get", "/admin/river/jobs", {
+  $api.useQuery("get", "/api/v1/admin/river/jobs", {
     params: { query: params },
   });
 
@@ -100,7 +100,7 @@ export const useJobs = (params?: JobListParams) =>
  * Hook for getting a single job
  */
 export const useJob = (jobId: number) =>
-  $api.useQuery("get", "/admin/river/jobs/{id}", {
+  $api.useQuery("get", "/api/v1/admin/river/jobs/{id}", {
     params: { path: { id: jobId } },
   });
 
@@ -108,7 +108,7 @@ export const useJob = (jobId: number) =>
  * Hook for listing queues
  */
 export const useQueues = (limit?: number) =>
-  $api.useQuery("get", "/admin/river/queues", {
+  $api.useQuery("get", "/api/v1/admin/river/queues", {
     params: { query: { limit } },
   });
 
@@ -116,7 +116,7 @@ export const useQueues = (limit?: number) =>
  * Hook for job stats
  */
 export const useJobStats = () =>
-  $api.useQuery("get", "/admin/river/stats", {});
+  $api.useQuery("get", "/api/v1/admin/river/stats", {});
 
 // ============================================================================
 // Polling Functions

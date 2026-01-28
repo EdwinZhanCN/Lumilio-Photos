@@ -6,7 +6,7 @@ import {
   formatGPSCoordinates,
 } from "@/lib/utils/mapUtils";
 import { useI18n } from "@/lib/i18n.tsx";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 
 interface PhotoMapViewProps {
   assets: Asset[];

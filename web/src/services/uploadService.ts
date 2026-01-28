@@ -342,7 +342,7 @@ export const uploadService = {
    * @returns A promise resolving to upload configuration
    */
   getUploadConfig: async (): Promise<UploadConfigResponse | undefined> => {
-    const { data } = await client.GET("/assets/batch/config", {});
+    const { data } = await client.GET("/api/v1/assets/batch/config", {});
     return data?.data as UploadConfigResponse | undefined;
   },
 
@@ -354,7 +354,7 @@ export const uploadService = {
   getUploadProgress: async (
     sessionIds?: string,
   ): Promise<UploadProgressResponse | undefined> => {
-    const { data } = await client.GET("/assets/batch/progress", {
+    const { data } = await client.GET("/api/v1/assets/batch/progress", {
       params: { query: sessionIds ? { session_ids: sessionIds } : undefined },
     });
     return data?.data as UploadProgressResponse | undefined;

@@ -207,13 +207,16 @@ export const selectView = (
   return state.views[viewKey];
 };
 
+// Stable empty array to avoid creating new instances on each selector call
+const EMPTY_ASSET_IDS: string[] = [];
+
 export const selectViewAssetIds = (
   input: ViewsInput,
   viewKey: string,
 ): string[] => {
   const state = getViewsState(input);
   const view = state.views[viewKey];
-  return view?.assetIds || [];
+  return view?.assetIds || EMPTY_ASSET_IDS;
 };
 
 export const selectActiveViews = (

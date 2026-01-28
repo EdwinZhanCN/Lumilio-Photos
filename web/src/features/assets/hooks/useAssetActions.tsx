@@ -5,7 +5,7 @@ import { AssetActionsResult } from "@/features/assets";
 import client from "@/lib/http-commons/client";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 
 /**
  * Hook for performing business operations on assets.
@@ -70,7 +70,7 @@ export const useAssetActions = (): AssetActionsResult => {
 
       try {
         // Perform actual API call
-        await client.PUT("/assets/{id}/rating", {
+        await client.PUT("/api/v1/assets/{id}/rating", {
           params: { path: { id: assetId } },
           body: { rating },
         });
@@ -117,7 +117,7 @@ export const useAssetActions = (): AssetActionsResult => {
 
       try {
         // Perform actual API call
-        await client.PUT("/assets/{id}/like", {
+        await client.PUT("/api/v1/assets/{id}/like", {
           params: { path: { id: assetId } },
           body: { liked: newLiked },
         });
@@ -164,7 +164,7 @@ export const useAssetActions = (): AssetActionsResult => {
 
       try {
         // Perform actual API call
-        await client.PUT("/assets/{id}/description", {
+        await client.PUT("/api/v1/assets/{id}/description", {
           params: { path: { id: assetId } },
           body: { description },
         });
@@ -201,7 +201,7 @@ export const useAssetActions = (): AssetActionsResult => {
 
       try {
         // Perform API call first for delete (no optimistic update for safety)
-        await client.DELETE("/assets/{id}", {
+        await client.DELETE("/api/v1/assets/{id}", {
           params: { path: { id: assetId } },
         });
 
@@ -242,19 +242,19 @@ export const useAssetActions = (): AssetActionsResult => {
           updates.map(async ({ assetId, updates: assetUpdates }) => {
             // Implement specific API calls based on update type
             if (assetUpdates.rating !== undefined) {
-              await client.PUT("/assets/{id}/rating", {
+              await client.PUT("/api/v1/assets/{id}/rating", {
                 params: { path: { id: assetId } },
                 body: { rating: assetUpdates.rating },
               });
             }
             if (assetUpdates.liked !== undefined) {
-              await client.PUT("/assets/{id}/like", {
+              await client.PUT("/api/v1/assets/{id}/like", {
                 params: { path: { id: assetId } },
                 body: { liked: assetUpdates.liked },
               });
             }
             if (assetUpdates.specific_metadata?.description !== undefined) {
-              await client.PUT("/assets/{id}/description", {
+              await client.PUT("/api/v1/assets/{id}/description", {
                 params: { path: { id: assetId } },
                 body: { description: assetUpdates.specific_metadata.description },
               });
@@ -294,7 +294,7 @@ export const useAssetActions = (): AssetActionsResult => {
   const refreshAsset = useCallback(
     async (assetId: string): Promise<void> => {
       try {
-        const response = await client.GET("/assets/{id}", {
+        const response = await client.GET("/api/v1/assets/{id}", {
           params: { path: { id: assetId } },
         });
         const updatedAsset = response.data?.data as Asset | undefined;
@@ -333,7 +333,7 @@ export const useAssetActionsSimple = () => {
   const updateRating = useCallback(
     async (assetId: string, rating: number) => {
       try {
-        await client.PUT("/assets/{id}/rating", {
+        await client.PUT("/api/v1/assets/{id}/rating", {
           params: { path: { id: assetId } },
           body: { rating },
         });
@@ -352,4 +352,3 @@ export const useAssetActionsSimple = () => {
 
   return { updateRating };
 };
-
