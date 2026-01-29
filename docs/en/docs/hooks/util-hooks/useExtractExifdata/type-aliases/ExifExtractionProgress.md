@@ -4,4 +4,4 @@
 
 > **ExifExtractionProgress** = \{ `error?`: `string`; `failedAt?`: `number` \| `null`; `processed`: `number`; `total`: `number`; \} \| `null`
 
-Defined in: [hooks/util-hooks/useExtractExifdata.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ab494a6fe19f862ebe412e16cfbeb19bbe77964d/web/src/hooks/util-hooks/useExtractExifdata.tsx#L11)
+Defined in: [hooks/util-hooks/useExtractExifdata.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/4d9f4d0b2b509a48ecc9629806f3968f81c63ae9/web/src/hooks/util-hooks/useExtractExifdata.tsx#L11)
