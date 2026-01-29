@@ -2,7 +2,7 @@
 
 # Interface: UseGenerateThumbnailReturn
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:25](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L25)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:25](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ab494a6fe19f862ebe412e16cfbeb19bbe77964d/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L25)
 
 Represents the state and actions returned by the useGenerateThumbnail hook.
 
@@ -12,7 +12,7 @@ Represents the state and actions returned by the useGenerateThumbnail hook.
 
 > **cancelGeneration**: () => `void`
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L29)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ab494a6fe19f862ebe412e16cfbeb19bbe77964d/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L29)
 
 #### Returns
 
@@ -24,7 +24,7 @@ Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:29](https://github.com/Ed
 
 > **generatePreviews**: (`files`, `priority?`) => `Promise`\<`ThumbnailResult`[] \| `undefined`\>
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L28)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ab494a6fe19f862ebe412e16cfbeb19bbe77964d/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L28)
 
 #### Parameters
 
@@ -34,7 +34,7 @@ Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:28](https://github.com/Ed
 
 ##### priority?
 
-[`ProcessingPriority`](../../../../utils/smartBatchSizing/enumerations/ProcessingPriority.md)
+`ProcessingPriority`
 
 #### Returns
 
@@ -46,7 +46,7 @@ Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:28](https://github.com/Ed
 
 > **isGenerating**: `boolean`
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L26)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ab494a6fe19f862ebe412e16cfbeb19bbe77964d/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L26)
 
 ***
 
@@ -54,4 +54,4 @@ Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:26](https://github.com/Ed
 
 > **progress**: [`ThumbnailProgress`](ThumbnailProgress.md) \| `null`
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L27)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ab494a6fe19f862ebe412e16cfbeb19bbe77964d/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L27)
