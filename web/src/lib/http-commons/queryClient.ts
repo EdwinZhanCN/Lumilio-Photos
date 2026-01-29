@@ -18,5 +18,6 @@ import client from "./client";
 
 // @ts-ignore
 export const $api = createClient<paths>(client);
+export { client };
 
 export default $api;

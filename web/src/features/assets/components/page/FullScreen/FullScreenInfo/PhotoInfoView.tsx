@@ -3,13 +3,50 @@ import { SquarePen, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useSettingsContext } from "@/features/settings";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
-import { geoService } from "@/services/geoService";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
 import MapComponent from "@/components/MapComponent";
 import { assetToPhotoLocation } from "@/lib/utils/mapUtils";
 import type { Asset, PhotoSpecificMetadata } from "@/lib/http-commons";
 import { isPhotoMetadata } from "@/lib/http-commons";
+
+interface GeoResponse {
+  display_name: string;
+}
+
+const reverseGeocode = async (
+  latitude: number,
+  longitude: number,
+  region: string = "other",
+  language: string = "en",
+): Promise<string> => {
+  const isChina = region === "china";
+  const baseUrl = isChina
+    ? "https://api.mirror-earth.com/nominatim/reverse"
+    : "https://nominatim.openstreetmap.org/reverse";
+  const acceptLanguage = language === "zh" ? "zh-CN" : "en-US,en";
+
+  const params = new URLSearchParams({
+    lat: latitude.toString(),
+    lon: longitude.toString(),
+    format: "jsonv2",
+    addressdetails: "1",
+    "accept-language": acceptLanguage,
+  });
+
+  if (!isChina) {
+    params.set("namedetails", "1");
+  }
+
+  const response = await fetch(`${baseUrl}?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const result: GeoResponse = await response.json();
+  return result.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+};
 
 interface PhotoInfoViewProps {
   asset: Asset;
@@ -147,13 +184,12 @@ export default function PhotoInfoView({
       const region = settings.ui.region || "other";
       const language = settings.ui.language || "en";
 
-      geoService
-        .reverseGeocode(
-          metadata.gps_latitude,
-          metadata.gps_longitude,
-          region,
-          language,
-        )
+      reverseGeocode(
+        metadata.gps_latitude,
+        metadata.gps_longitude,
+        region,
+        language,
+      )
         .then((name) => {
           setLocationName(name);
         })

@@ -19,6 +19,7 @@
     "dependencies": {
         "@heroicons/react": "^2.2.0",
         "@immich/justified-layout-wasm": "^0.4.3",
+        "@microsoft/fetch-event-source": "^2.0.1",
         "@reduxjs/toolkit": "^2.6.1",
         "@tanstack/react-query": "^5.74.4",
         "@tanstack/react-virtual": "^3.13.12",

@@ -13,7 +13,6 @@ import { useSelection, useBulkAssetOperations } from "@/features/assets/hooks/us
 import { GroupByType } from "@/features/assets/types/assets.type";
 import { selectTabTitle } from "@/features/assets/slices/ui.slice";
 import { useCallback, useMemo, useRef, useEffect, useState, ReactNode } from "react";
-import { albumService, Album } from "@/services/albumService";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
@@ -23,6 +22,8 @@ import {
   useCurrentTab,
   useSearchQuery,
 } from "@/features/assets/selectors";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { Album, ApiResult, ListAlbumsResponse } from "@/lib/albums/types";
 
 interface AssetsPageHeaderProps {
   groupBy: GroupByType;
@@ -92,6 +93,7 @@ const AssetsPageHeader = ({
   const [albums, setAlbums] = useState<Album[]>([]);
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
+  const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
 
   // Hydrate FilterTool from global filters (single source of truth)
   const inboundDTO = useMemo(() => {
@@ -244,9 +246,12 @@ const AssetsPageHeader = ({
     setIsAlbumModalOpen(true);
     setIsLoadingAlbums(true);
     try {
-      const response = await albumService.listAlbums({ limit: 50 });
-      if (response.data?.data) {
-        setAlbums(response.data.data.albums || []);
+      const response = await listAlbumsMutation.mutateAsync({
+        params: { query: { limit: 50 } },
+      });
+      const responseData = response as ApiResult<ListAlbumsResponse> | undefined;
+      if (responseData?.data) {
+        setAlbums(responseData.data.albums || []);
       }
     } catch (error) {
       showMessage("error", t("assets.assetsPageHeader.messages.loadAlbumsError"));

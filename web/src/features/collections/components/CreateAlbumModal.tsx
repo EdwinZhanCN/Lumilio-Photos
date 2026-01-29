@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useCollections } from "../CollectionsProvider";
-import { albumService } from "@/services/albumService";
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n.tsx";
 import { X, FolderPlus, Image as ImageIcon, MoveLeft } from "lucide-react";
@@ -10,6 +9,9 @@ import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import { useSelection } from "@/features/assets/hooks/useSelection";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { ApiResult } from "@/lib/albums/types";
+import { WorkerProvider } from "@/contexts/WorkerProvider";
 
 const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect }) => {
   const groupBy = useGroupBy();
@@ -81,6 +83,7 @@ const CreateAlbumModal: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isChoosingCover, setIsChoosingCover] = useState(false);
   const queryClient = useQueryClient();
+  const createAlbumMutation = $api.useMutation("post", "/api/v1/albums");
 
   const handlePhotoSelect = useCallback((id: string) => {
     setSelectedCoverId(id);
@@ -95,13 +98,16 @@ const CreateAlbumModal: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      const response = await albumService.createAlbum({
-        album_name: name,
-        description: description,
-        cover_asset_id: selectedCoverId,
+      const response = await createAlbumMutation.mutateAsync({
+        body: {
+          album_name: name,
+          description: description,
+          cover_asset_id: selectedCoverId,
+        },
       });
 
-      if (response.data?.code === 0) {
+      const responseData = response as ApiResult;
+      if (responseData?.code === 0) {
         queryClient.invalidateQueries({ queryKey: ["albums"] });
         dispatch({ type: "CLOSE_CREATE_MODAL" });
         resetForm();
@@ -237,9 +243,11 @@ const CreateAlbumModal: React.FC = () => {
               </div>
 
               <div className="flex-1 overflow-hidden">
-                <AssetsProvider persist={false} defaultSelectionMode="single">
-                  <PhotoPicker onSelect={handlePhotoSelect} />
-                </AssetsProvider>
+                <WorkerProvider preload={["justified"]}>
+                  <AssetsProvider persist={false} defaultSelectionMode="single">
+                    <PhotoPicker onSelect={handlePhotoSelect} />
+                  </AssetsProvider>
+                </WorkerProvider>
               </div>
             </div>
           )}
