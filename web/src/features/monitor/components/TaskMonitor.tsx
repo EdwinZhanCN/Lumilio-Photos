@@ -12,12 +12,14 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  listJobs,
-  getJobDuration,
-  type JobDTO,
-  type JobState,
-} from "@/services/queueService";
+import { $api } from "@/lib/http-commons/queryClient";
+import type {
+  ApiResult,
+  JobDTO,
+  JobListParams,
+  JobListResponse,
+  JobState,
+} from "../monitor.type";
 
 // Format timestamp to relative time
 function formatRelativeTime(timestamp: string): string {
@@ -66,6 +68,20 @@ function getRelevantTimestamp(job: JobDTO): { label: string; time: string } {
   }
 }
 
+function getJobDuration(job: JobDTO): string | null {
+  if (!job.attempted_at) return null;
+
+  const start = new Date(job.attempted_at);
+  const end = job.finalized_at ? new Date(job.finalized_at) : new Date();
+
+  const durationMs = end.getTime() - start.getTime();
+
+  if (durationMs < 1000) return `${durationMs}ms`;
+  if (durationMs < 60000) return `${(durationMs / 1000).toFixed(1)}s`;
+  if (durationMs < 3600000) return `${(durationMs / 60000).toFixed(1)}m`;
+  return `${(durationMs / 3600000).toFixed(1)}h`;
+}
+
 export function TaskMonitor() {
   const [jobs, setJobs] = useState<JobDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,13 +102,14 @@ export function TaskMonitor() {
   const [totalPages, setTotalPages] = useState<number | null>(null);
 
   const parentRef = useRef<HTMLDivElement>(null);
+  const jobsMutation = $api.useMutation("get", "/api/v1/admin/river/jobs");
 
   useEffect(() => {
     let mounted = true;
 
     const fetchJobs = async () => {
       try {
-        const params: any = {
+        const params: JobListParams = {
           limit: 50,
           include_count: currentPage === 1, // Only fetch count on first page
         };
@@ -113,7 +130,11 @@ export function TaskMonitor() {
           params.cursor = currentCursor;
         }
 
-        const data = await listJobs(params);
+        const response = await jobsMutation.mutateAsync({
+          params: { query: params },
+        });
+        const responseData = response as ApiResult<JobListResponse> | undefined;
+        const data = responseData?.data;
         if (mounted && data) {
           setJobs(data.jobs ?? []);
           setNextCursor(data.cursor);

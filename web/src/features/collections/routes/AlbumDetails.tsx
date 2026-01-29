@@ -1,7 +1,5 @@
 import { useParams } from "react-router-dom";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { albumService } from "@/services/albumService";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
@@ -15,6 +13,8 @@ import { WorkerProvider } from "@/contexts/WorkerProvider";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import { AssetViewDefinition } from "@/features/assets";
 import { FolderIcon } from "lucide-react";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { Album, ApiResult } from "@/lib/albums/types";
 
 const AlbumAssetsContent = () => {
   const { albumId, assetId } = useParams<{ albumId: string, assetId: string }>();
@@ -24,15 +24,22 @@ const AlbumAssetsContent = () => {
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { deleteAsset } = useAssetActions();
   const [isScrolled, setIsScrolled] = useState(false);
+  const albumIdNumber = albumId ? Number(albumId) : 0;
 
   // Fetch album metadata
-  const { data: albumData, isLoading: isAlbumLoading } = useQuery({
-    queryKey: ["album", albumId],
-    queryFn: () => albumService.getAlbumById(parseInt(albumId!)),
-    enabled: !!albumId
-  });
-
-  const album = albumData?.data?.data;
+  const albumQuery = $api.useQuery(
+    "get",
+    "/api/v1/albums/{id}",
+    {
+      params: { path: { id: albumIdNumber } },
+    },
+    {
+      enabled: !!albumId,
+    },
+  );
+  const albumResponse = albumQuery.data as ApiResult<Album> | undefined;
+  const album = albumResponse?.data;
+  const isAlbumLoading = albumQuery.isLoading;
 
   // Memoize view definition to prevent unnecessary re-renders/fetches
   const viewDefinition: AssetViewDefinition = useMemo(() => ({

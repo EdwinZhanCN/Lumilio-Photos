@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import SideBar from "@/components/SideBar";
 import NavBar from "@/components/NavBar";
@@ -10,7 +10,7 @@ import "katex/dist/katex.min.css";
 import Notifications from "@/components/Notifications";
 import { SettingsProvider, useSettingsContext } from "./features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
-import { pollHealth } from "@/services/healthService";
+import { $api } from "@/lib/http-commons/queryClient";
 import { AuthProvider, ProtectedRoute } from "./features/auth";
 
 const queryClient = new QueryClient();
@@ -19,13 +19,16 @@ function HealthPoller(): React.ReactNode {
   const { state } = useSettingsContext();
   const { setOnline } = useGlobal();
 
-  useEffect(() => {
-    const intervalSec = state.server?.update_timespan ?? 5;
-    const stop = pollHealth(intervalSec, ({ online }) => setOnline(online));
-    return () => {
-      stop();
-    };
-  }, [state.server?.update_timespan, setOnline]);
+  const intervalSec = state.server?.update_timespan ?? 5;
+  const intervalMs = Math.max(1000, Math.min(50, Math.max(1, intervalSec)) * 1000);
+
+  $api.useQuery("get", "/api/v1/health", {}, {
+    refetchInterval: intervalMs,
+    refetchIntervalInBackground: true,
+    retry: false,
+    onSuccess: () => setOnline(true),
+    onError: () => setOnline(false),
+  });
 
   return null;
 }
@@ -79,8 +82,8 @@ function App(): React.ReactNode {
               </div>
             </BrowserRouter>
           </AuthProvider>
+          <HealthPoller />
         </QueryClientProvider>
-        <HealthPoller />
         <Notifications />
       </GlobalProvider>
     </SettingsProvider>

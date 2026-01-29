@@ -1,4 +1,4 @@
-import { Album } from "@/services/albumService";
+import type { Album } from "@/lib/albums/types";
 
 export interface CollectionsState {
   selectedAlbumIds: number[];
