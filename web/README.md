@@ -8,7 +8,7 @@ The modern, high-performance web interface for Lumilio Photos, built with React,
 - **Build Tool:** [Vite](https://vitejs.dev/)
 - **Language:** [TypeScript](https://www.typescriptlang.org/)
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/) & [DaisyUI](https://daisyui.com/)
-- **State Management:** [Redux Toolkit](https://redux-toolkit.js.org/) & [TanStack Query](https://tanstack.com/query/latest)
+- **State Management:** [Zustand](https://zustand-demo.pmnd.rs/) & [TanStack Query](https://tanstack.com/query/latest)
 - **Performance:** [WebAssembly (WASM)](https://webassembly.org/) & [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API)
 - **Routing:** [React Router 7](https://reactrouter.com/)
 - **Testing:** [Vitest](https://vitest.dev/)
@@ -52,10 +52,8 @@ The project follows a feature-based and modular architecture:
 - **`src/features/`**: Domain-specific logic and components (e.g., `auth`, `home`).
 - **`src/wasm/`**: WebAssembly modules for heavy computations (Exif extraction, image processing, hashing).
 - **`src/workers/`**: Web Workers to run WASM and other intensive tasks off the main thread.
-- **`src/hooks/`**: 
-    - `api-hooks/`: Data fetching and mutation hooks.
-    - `util-hooks/`: Reusable UI and logic hooks.
-- **`src/lib/`**: Core utilities, HTTP client (Axios), i18n configuration, and shared helper functions.
+- **`src/hooks/`**: `util-hooks/` for reusable UI and logic hooks.
+- **`src/lib/`**: Core utilities, OpenAPI-based HTTP client and React Query setup, i18n configuration, and shared helpers.
 - **`src/contexts/`**: Global React Contexts for state like `WorkerProvider` and `GlobalContext`.
 - **`src/components/`**: Reusable UI components.
 - **`src/styles/`**: Global CSS and Tailwind configurations.
