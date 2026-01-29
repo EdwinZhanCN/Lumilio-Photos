@@ -1,9 +1,9 @@
 import React from "react";
 import { MediaPlayer, MediaProvider } from "@vidstack/react";
 
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
 import { isVideo, isAudio } from "@/lib/utils/mediaTypes";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 import "@vidstack/react/player/styles/base.css";
 import "@vidstack/react/player/styles/default/theme.css";
 import "@vidstack/react/player/styles/default/layouts/video.css";
@@ -31,16 +31,16 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
 
   // Get media source URL
   const webVideoUrl = asset.asset_id
-    ? assetService.getWebVideoUrl(asset.asset_id)
+    ? assetUrls.getWebVideoUrl(asset.asset_id)
     : undefined;
   const webAudioUrl = asset.asset_id
-    ? assetService.getWebAudioUrl(asset.asset_id)
+    ? assetUrls.getWebAudioUrl(asset.asset_id)
     : undefined;
 
   // For photos, get large thumbnail as fallback to original
   const imageUrl =
     !videoAsset && !audioAsset && asset.asset_id
-      ? assetService.getThumbnailUrl(asset.asset_id, "large")
+      ? assetUrls.getThumbnailUrl(asset.asset_id, "large")
       : undefined;
 
   // Video player
@@ -70,7 +70,7 @@ const MediaViewer: React.FC<MediaViewerProps> = ({ asset, className = "" }) => {
   if (audioAsset && webAudioUrl) {
     // Try to get a poster image for audio (album art or thumbnail)
     const posterUrl = asset.asset_id
-      ? assetService.getThumbnailUrl(asset.asset_id, "medium")
+      ? assetUrls.getThumbnailUrl(asset.asset_id, "medium")
       : undefined;
 
     return (

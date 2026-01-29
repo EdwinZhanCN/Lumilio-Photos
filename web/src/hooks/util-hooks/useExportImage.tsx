@@ -5,8 +5,8 @@ import {
   getOptimalBatchSize,
   recordProcessingMetrics,
   ProcessingPriority,
-} from "@/utils/smartBatchSizing";
-import { Asset } from "@/services";
+} from "@/lib/utils/smartBatchSizing.ts";
+import { Asset } from "@/lib/assets/types";
 
 export interface ExportOptions {
   format: "jpeg" | "png" | "webp" | "original";

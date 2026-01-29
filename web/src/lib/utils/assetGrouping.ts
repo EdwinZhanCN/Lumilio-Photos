@@ -1,5 +1,5 @@
 import { GroupByType } from "@/features/assets";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 
 /**
  * Groups assets by the specified criteria

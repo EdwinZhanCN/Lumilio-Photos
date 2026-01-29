@@ -1,6 +1,6 @@
 import { ListFilterIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { assetService } from "@/services/assetsService";
+import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
 
 /* =========================
@@ -104,54 +104,54 @@ function useFilterOptions({
     cameraMakeOptions ?? [],
   );
   const [lensItems, setLensItems] = useState<string[]>(lensOptions ?? []);
-  const [loadingOptions, setLoadingOptions] = useState<boolean>(false);
-  const optionsLoadedRef = useRef<boolean>(false);
+  const [isCustomLoading, setIsCustomLoading] = useState<boolean>(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  const needsCameraMakes = !cameraMakeOptions || cameraMakeOptions.length === 0;
+  const needsLenses = !lensOptions || lensOptions.length === 0;
+  const needsOptions = needsCameraMakes || needsLenses;
+  const canUseCustomFetchers = !!fetchCameraMakes && !!fetchLenses;
+  const shouldFetchDefault =
+    open && !hasLoaded && needsOptions && !canUseCustomFetchers;
+
+  const filterOptionsQuery = $api.useQuery(
+    "get",
+    "/api/v1/assets/filter-options",
+    {},
+    {
+      enabled: shouldFetchDefault,
+    },
+  );
+  const loadingOptions = isCustomLoading || filterOptionsQuery.isFetching;
 
   useEffect(() => {
     const shouldFetch =
       open &&
-      !optionsLoadedRef.current &&
-      (!cameraMakeOptions ||
-        cameraMakeOptions.length === 0 ||
-        !lensOptions ||
-        lensOptions.length === 0);
+      !hasLoaded &&
+      needsOptions &&
+      canUseCustomFetchers;
     if (!shouldFetch) return;
 
     let running = true;
     const load = async () => {
       try {
-        setLoadingOptions(true);
+        setIsCustomLoading(true);
 
         let cm: string[] = cameraMakeOptions ?? [];
         let ln: string[] = lensOptions ?? [];
 
-        if (cm.length === 0 || ln.length === 0) {
-          if (fetchCameraMakes && fetchLenses) {
-            cm = await fetchCameraMakes();
-            ln = await fetchLenses();
-          } else {
-            // Use the new filter options API
-            const response = await assetService.getFilterOptions();
-            if (response.data?.code === 0 && response.data?.data) {
-              if (cm.length === 0) {
-                cm = response.data.data.camera_makes || [];
-              }
-              if (ln.length === 0) {
-                ln = response.data.data.lenses || [];
-              }
-            }
-          }
-        }
+        cm = await fetchCameraMakes!();
+        ln = await fetchLenses!();
 
         if (running) {
           setCameraMakeItems(cm);
           setLensItems(ln);
-          optionsLoadedRef.current = true;
+          setHasLoaded(true);
         }
       } catch {
         // ignore
       } finally {
-        if (running) setLoadingOptions(false);
+        if (running) setIsCustomLoading(false);
       }
     };
     void load();
@@ -159,7 +159,36 @@ function useFilterOptions({
     return () => {
       running = false;
     };
-  }, [open, cameraMakeOptions, lensOptions, fetchCameraMakes, fetchLenses]);
+  }, [
+    open,
+    cameraMakeOptions,
+    lensOptions,
+    fetchCameraMakes,
+    fetchLenses,
+    needsOptions,
+    canUseCustomFetchers,
+    hasLoaded,
+  ]);
+
+  useEffect(() => {
+    if (!shouldFetchDefault) return;
+    const response = filterOptionsQuery.data;
+    if (!response?.data) return;
+
+    if (needsCameraMakes) {
+      setCameraMakeItems(response.data.camera_makes || []);
+    }
+    if (needsLenses) {
+      setLensItems(response.data.lenses || []);
+    }
+
+    setHasLoaded(true);
+  }, [
+    shouldFetchDefault,
+    filterOptionsQuery.data,
+    needsCameraMakes,
+    needsLenses,
+  ]);
 
   return { cameraMakeItems, lensItems, loadingOptions };
 }
@@ -780,6 +809,7 @@ export default function FilterTool({
   fetchCameraMakes,
   fetchLenses,
 }: FilterToolProps) {
+
   const { t } = useI18n();
   // Dropdown open state (independent of filter enabled)
   const [open, setOpen] = useState(false);

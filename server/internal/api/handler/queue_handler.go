@@ -93,7 +93,7 @@ type JobStatsResponse struct {
 // @Param time_range query string false "Time range filter (1h, 24h, 30d) - filters by created_at"
 // @Param include_count query bool false "Include total count of matching jobs (may be slower)"
 // @Success 200 {object} api.Result{data=JobListResponse}
-// @Router /admin/river/jobs [get]
+// @Router /api/v1/admin/river/jobs [get]
 func (h *QueueHandler) ListJobs(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()
@@ -253,7 +253,7 @@ func (h *QueueHandler) ListJobs(c *gin.Context) {
 // @Param id path int true "Job ID"
 // @Success 200 {object} api.Result{data=JobDTO}
 // @Failure 404 {object} api.Result "Job not found"
-// @Router /admin/river/jobs/{id} [get]
+// @Router /api/v1/admin/river/jobs/{id} [get]
 func (h *QueueHandler) GetJob(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
@@ -287,7 +287,7 @@ func (h *QueueHandler) GetJob(c *gin.Context) {
 // @Produce json
 // @Param limit query int false "Number of queues to return (default: 100)"
 // @Success 200 {object} api.Result{data=QueueStatsResponse}
-// @Router /admin/river/queues [get]
+// @Router /api/v1/admin/river/queues [get]
 func (h *QueueHandler) ListQueues(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
@@ -328,7 +328,7 @@ func (h *QueueHandler) ListQueues(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Success 200 {object} api.Result{data=JobStatsResponse}
-// @Router /admin/river/stats [get]
+// @Router /api/v1/admin/river/stats [get]
 func (h *QueueHandler) GetJobStats(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 	defer cancel()

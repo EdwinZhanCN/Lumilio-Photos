@@ -13,9 +13,10 @@ import {
   useExportImage,
   type ExportOptions,
 } from "@/hooks/util-hooks/useExportImage.tsx";
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
+import { $api } from "@/lib/http-commons/queryClient";
 import { PaintBrushIcon } from "@heroicons/react/24/outline";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 import { RETRY_TASKS_BY_CATEGORY } from "@/config/retryTasks";
 
 type ExportFormat = "png" | "jpeg" | "webp";
@@ -53,11 +54,15 @@ export default function ExportModal({
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [forceFullRetry, setForceFullRetry] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const reprocessMutation = $api.useMutation(
+    "post",
+    "/api/v1/assets/{id}/reprocess",
+  );
 
   const originalUrl = useMemo(() => {
     if (!asset?.asset_id) return "";
     try {
-      return assetService.getOriginalFileUrl(asset.asset_id) || "";
+      return assetUrls.getOriginalFileUrl(asset.asset_id) || "";
     } catch {
       return "";
     }
@@ -126,9 +131,12 @@ export default function ExportModal({
 
     setIsRetrying(true);
     try {
-      await assetService.reprocessAsset(asset.asset_id, {
-        tasks: selectedTasks,
-        force_full_retry: forceFullRetry,
+      await reprocessMutation.mutateAsync({
+        params: { path: { id: asset.asset_id } },
+        body: {
+          tasks: selectedTasks,
+          force_full_retry: forceFullRetry,
+        },
       });
 
       // Close retry modal on success

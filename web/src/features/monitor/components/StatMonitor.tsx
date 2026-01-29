@@ -1,45 +1,23 @@
-import { useEffect, useState } from "react";
 import { Activity, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
-import { getJobStats, type JobStatsResponse } from "@/services/queueService";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { ApiResult, JobStatsResponse } from "../monitor.type";
 
 export function StatMonitor() {
-  const [stats, setStats] = useState<JobStatsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const statsQuery = $api.useQuery(
+    "get",
+    "/api/v1/admin/river/stats",
+    {},
+    {
+      refetchInterval: 5000,
+      refetchIntervalInBackground: true,
+      retry: false,
+    },
+  );
 
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchStats = async () => {
-      try {
-        const data = await getJobStats();
-        if (mounted) {
-          setStats(data ?? null);
-          setError(null);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError("Failed to fetch queue stats");
-          console.error("Queue stats error:", err);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    // Initial fetch
-    fetchStats();
-
-    // Poll every 5 seconds
-    const interval = setInterval(fetchStats, 5000);
-
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
+  const response = statsQuery.data as ApiResult<JobStatsResponse> | undefined;
+  const stats = response?.data ?? null;
+  const loading = statsQuery.isLoading;
+  const error = statsQuery.isError ? "Failed to fetch queue stats" : null;
 
   if (loading) {
     return (

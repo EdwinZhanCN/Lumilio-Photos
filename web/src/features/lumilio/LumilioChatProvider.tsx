@@ -1,17 +1,93 @@
-import React, {
+import {
   createContext,
   useReducer,
   ReactNode,
   useEffect,
   useCallback,
+  useRef,
 } from "react";
+import {
+  fetchEventSource,
+  type EventSourceMessage,
+} from "@microsoft/fetch-event-source";
 import { LumilioChatContextValue } from "./lumilio.type.ts";
 import { lumilioReducer, initialState } from "./lumilio.reducer";
-import { agentService } from "@/services/agentService";
+import { $api } from "@/lib/http-commons/queryClient";
 import type {
+  AgentEventType,
+  AgentStreamEvent,
+  ApiResult,
   AgentChatRequest,
   AgentResumeRequest,
-} from "@/services/agentService";
+  ToolInfoResponse,
+} from "./agent.type";
+import type {
+  AgentMessageEvent,
+  InterruptInfo,
+  SessionInfoEvent,
+  SideChannelEvent,
+} from "./schema";
+import type { MentionEntity } from "./components/RichInput";
+
+const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
+const parseAgentStreamEvent = (
+  message: EventSourceMessage,
+): AgentStreamEvent | null => {
+  const eventType = (message.event || "message") as AgentEventType;
+  if (eventType === "heartbeat" || !message.data) {
+    return null;
+  }
+
+  let data: unknown = message.data;
+  try {
+    data = JSON.parse(message.data);
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn("Failed to parse SSE payload:", error);
+    }
+  }
+
+  return { type: eventType, data };
+};
+
+const buildSlashCommands = (
+  tools: ToolInfoResponse[] | undefined,
+): MentionEntity[] => {
+  if (!tools || !Array.isArray(tools)) {
+    return [];
+  }
+
+  return tools
+    .filter((tool) => tool.name)
+    .map((tool) => ({
+      id: tool.name!,
+      label: tool.name!,
+      type: "command",
+      meta: tool.desc || "No description available",
+      desc: tool.desc,
+    }));
+};
+
+const getErrorMessage = (data: unknown): string => {
+  if (!data) return "Unknown error";
+  if (typeof data === "string") return data;
+  if (typeof data === "object" && data && "error" in data) {
+    const message = (data as { error?: string }).error;
+    if (message) return message;
+  }
+  return "Unknown error";
+};
+
+const isInterruptInfo = (value: unknown): value is InterruptInfo => {
+  if (!value || typeof value !== "object") return false;
+  const interrupt = value as InterruptInfo;
+  return (
+    "data" in interrupt &&
+    "InterruptContexts" in interrupt &&
+    Array.isArray(interrupt.InterruptContexts)
+  );
+};
 
 export const LumilioChatContext = createContext<
   LumilioChatContextValue | undefined
@@ -20,88 +96,130 @@ export const LumilioChatContext = createContext<
 export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(lumilioReducer, initialState);
 
+  const toolsQuery = $api.useQuery("get", "/api/v1/agent/tools", {}, {
+    retry: false,
+  });
+  const toolsLoadingRef = useRef(false);
+
   useEffect(() => {
-    const fetchTools = async () => {
-      try {
-        dispatch({ type: "FETCH_TOOLS_START" });
-        const commands = await agentService.getSlashCommands();
-        dispatch({ type: "FETCH_TOOLS_SUCCESS", payload: commands });
-      } catch (error) {
-        console.error("Failed to fetch agent tools:", error);
+    if (toolsQuery.isLoading && !toolsLoadingRef.current) {
+      toolsLoadingRef.current = true;
+      dispatch({ type: "FETCH_TOOLS_START" });
+    }
+    if (!toolsQuery.isLoading) {
+      toolsLoadingRef.current = false;
+    }
+  }, [toolsQuery.isLoading, dispatch]);
+
+  useEffect(() => {
+    if (toolsQuery.isError) {
+      console.error("Failed to fetch agent tools:", toolsQuery.error);
+      dispatch({ type: "FETCH_TOOLS_SUCCESS", payload: [] });
+      return;
+    }
+
+    if (!toolsQuery.data) return;
+
+    const response =
+      toolsQuery.data as ApiResult<ToolInfoResponse[]> | undefined;
+    const commands = buildSlashCommands(response?.data);
+    dispatch({ type: "FETCH_TOOLS_SUCCESS", payload: commands });
+  }, [toolsQuery.data, toolsQuery.isError, toolsQuery.error, dispatch]);
+
+  const handleAgentMessageEvent = useCallback(
+    (eventData: AgentMessageEvent | undefined) => {
+      if (!eventData) return;
+
+      if (eventData.output || eventData.reasoning) {
+        dispatch({
+          type: "PROCESS_STREAM_CHUNK",
+          payload: {
+            output: eventData.output,
+            reasoning: eventData.reasoning,
+          },
+        });
       }
-    };
-    fetchTools();
-  }, []);
 
-  /** Processes the SSE stream and dispatches appropriate actions.
-   *
-   * Iterates through the stream of events from the agent and dispatches corresponding
-   * actions to update the chat state. Handles session info, messages, UI events,
-   * actions, completion, and errors.
-   *
-   * @param stream - Async generator yielding SSE events from the agent.
-   * @param dispatch - React dispatch function to update the chat state.
-   */
-  const processStream = useCallback(
-    async (stream: AsyncGenerator<any>, dispatch: React.Dispatch<any>) => {
-      for await (const event of stream) {
-        if (!event) continue;
-
-        switch (event.type) {
-          case "session_info":
-            dispatch({
-              type: "CHAT_CONNECT_SUCCESS",
-              payload: { threadId: event.data.thread_id },
-            });
-            break;
-          case "message": {
-            // A message can contain text chunks and/or an action.
-            if (event.data.output || event.data.reasoning) {
-              dispatch({ type: "PROCESS_STREAM_CHUNK", payload: event.data });
-            }
-            // Handle potential case mismatch for the interrupt property from the backend.
-            const interrupt =
-              event.data.action?.interrupted || event.data.action?.Interrupted;
-            if (interrupt) {
-              dispatch({
-                type: "RECEIVE_INTERRUPT",
-                payload: interrupt,
-              });
-            }
-            break;
-          }
-          case "ui_event":
-            dispatch({ type: "RECEIVE_UI_EVENT", payload: event.data });
-            break;
-          case "action": {
-            // An action can also contain text chunks.
-            if (event.data.output || event.data.reasoning) {
-              dispatch({ type: "PROCESS_STREAM_CHUNK", payload: event.data });
-            }
-            // Handle potential case mismatch for the interrupt property from the backend.
-            const actionInterrupt =
-              event.data.action?.interrupted || event.data.action?.Interrupted;
-            if (actionInterrupt) {
-              dispatch({
-                type: "RECEIVE_INTERRUPT",
-                payload: actionInterrupt,
-              });
-            }
-            break;
-          }
-          case "done":
-            dispatch({ type: "FINISH_STREAM" });
-            break;
-          case "error":
-            dispatch({
-              type: "CHAT_CONNECT_ERROR",
-              payload: { error: event.data.error },
-            });
-            break;
-        }
+      const interrupt =
+        eventData.action?.interrupted ??
+        (eventData.action as { Interrupted?: unknown } | undefined)?.Interrupted;
+      if (isInterruptInfo(interrupt)) {
+        dispatch({ type: "RECEIVE_INTERRUPT", payload: interrupt });
       }
     },
-    [],
+    [dispatch],
+  );
+
+  const handleAgentStreamEvent = useCallback(
+    (event: AgentStreamEvent) => {
+      if (!event) return;
+
+      switch (event.type) {
+        case "session_info": {
+          const data = event.data as SessionInfoEvent | undefined;
+          if (data?.thread_id) {
+            dispatch({
+              type: "CHAT_CONNECT_SUCCESS",
+              payload: { threadId: data.thread_id },
+            });
+          }
+          break;
+        }
+        case "message":
+        case "action": {
+          handleAgentMessageEvent(event.data as AgentMessageEvent);
+          break;
+        }
+        case "ui_event":
+          dispatch({
+            type: "RECEIVE_UI_EVENT",
+            payload: event.data as SideChannelEvent,
+          });
+          break;
+        case "done":
+          dispatch({ type: "FINISH_STREAM" });
+          break;
+        case "error":
+          dispatch({
+            type: "CHAT_CONNECT_ERROR",
+            payload: { error: getErrorMessage(event.data) },
+          });
+          break;
+        default:
+          break;
+      }
+    },
+    [dispatch, handleAgentMessageEvent],
+  );
+
+  const streamAgent = useCallback(
+    async (
+      path: string,
+      body: AgentChatRequest | AgentResumeRequest,
+      signal?: AbortSignal,
+    ) => {
+      await fetchEventSource(`${baseUrl}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+        async onopen(response) {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+        },
+        onmessage(message) {
+          const event = parseAgentStreamEvent(message);
+          if (event) {
+            handleAgentStreamEvent(event);
+          }
+        },
+        onerror(error) {
+          throw error;
+        },
+      });
+    },
+    [handleAgentStreamEvent],
   );
 
   /** Sends a message to the agent and initiates a conversation.
@@ -124,8 +242,7 @@ export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
       };
 
       try {
-        const stream = agentService.streamAgentChat(request);
-        await processStream(stream, dispatch);
+        await streamAgent("/api/v1/agent/chat", request);
       } catch (error) {
         dispatch({
           type: "CHAT_CONNECT_ERROR",
@@ -133,7 +250,7 @@ export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
         });
       }
     },
-    [state.threadId, processStream],
+    [state.threadId, streamAgent],
   );
 
   /** Resumes a conversation that was interrupted.
@@ -157,8 +274,7 @@ export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
       };
 
       try {
-        const stream = agentService.streamAgentResume(request);
-        await processStream(stream, dispatch);
+        await streamAgent("/api/v1/agent/chat/resume", request);
       } catch (error) {
         dispatch({
           type: "CHAT_CONNECT_ERROR",
@@ -166,7 +282,7 @@ export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
         });
       }
     },
-    [state.threadId, processStream],
+    [state.threadId, streamAgent],
   );
 
   const value: LumilioChatContextValue = {

@@ -8,7 +8,7 @@ import "@/styles/custom-swiper.css";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
-import { assetService } from "@/services/assetsService";
+import { $api } from "@/lib/http-commons/queryClient";
 import FullScreenBasicInfo from "../FullScreenInfo/FullScreenBasicInfo";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -44,6 +44,8 @@ const FullScreenCarousel = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const showMessage = useMessage();
   const { t } = useI18n();
+  const updateLikeMutation = $api.useMutation("put", "/api/v1/assets/{id}/like");
+  const deleteAssetMutation = $api.useMutation("delete", "/api/v1/assets/{id}");
 
   const slides = useMemo(() => {
     return photos.map((photo) => ({
@@ -120,7 +122,10 @@ const FullScreenCarousel = ({
 
     try {
       // Call API to persist the change
-      await assetService.updateAssetLike(currentAsset.asset_id, newLiked);
+      await updateLikeMutation.mutateAsync({
+        params: { path: { id: currentAsset.asset_id } },
+        body: { liked: newLiked },
+      });
 
       // Update the actual asset state after successful API call
       const updatedAsset = {
@@ -144,7 +149,9 @@ const FullScreenCarousel = ({
 
     setIsDeleting(true);
     try {
-      await assetService.deleteAsset(currentAsset.asset_id);
+      await deleteAssetMutation.mutateAsync({
+        params: { path: { id: currentAsset.asset_id } },
+      });
 
       showMessage("success", t("delete.success"));
 

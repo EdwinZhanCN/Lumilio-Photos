@@ -6,9 +6,17 @@ import {
   HashcodeProgress,
   useGenerateHashcode,
 } from "@/hooks/util-hooks/useGenerateHashcode";
-import { uploadService, BatchUploadResult } from "@/services/uploadService";
-import { globalPerformancePreferences } from "@/utils/performancePreferences";
-import { getOptimalBatchSize, ProcessingPriority } from "@/utils/smartBatchSizing";
+import type { BatchUploadResult } from "@/lib/upload/types";
+import {
+  generateSessionId,
+  shouldUseChunks,
+} from "@/lib/upload/uploadTransport";
+import {
+  useBatchUploadMutation,
+  useChunkedUploadMutation,
+} from "@/features/upload/hooks/useUploadMutations";
+import { globalPerformancePreferences } from "@/lib/utils/performancePreferences.ts";
+import { getOptimalBatchSize, ProcessingPriority } from "@/lib/utils/smartBatchSizing.ts";
 
 interface FailedFile {
   name: string;
@@ -59,6 +67,8 @@ export function useUploadProcess(): useUploadProcessReturn {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [fileProgress, setFileProgress] = useState<FileUploadProgress[]>([]);
+  const batchUploadMutation = useBatchUploadMutation();
+  const chunkedUploadMutation = useChunkedUploadMutation();
 
   const {
     generateHashCodes,
@@ -118,7 +128,7 @@ export function useUploadProcess(): useUploadProcessReturn {
       progress: 0,
       status: "pending",
       sessionId: "",
-      isChunked: uploadService.shouldUseChunks(file),
+      isChunked: shouldUseChunks(file),
     })));
 
     const uploadBatch = async (sessions: FileUploadSession[]) => {
@@ -126,17 +136,16 @@ export function useUploadProcess(): useUploadProcessReturn {
       try {
         sessions.forEach(s => updateFileProgress(s.file.name, { status: "uploading", sessionId: s.sessionId }));
 
-        const response = await uploadService.batchUploadFiles(
-          sessions.map(s => ({ file: s.file, sessionId: s.sessionId })),
-          undefined,
-          {
+        const response = await batchUploadMutation.mutateAsync({
+          files: sessions.map(s => ({ file: s.file, sessionId: s.sessionId })),
+          options: {
             onUploadProgress: (e) => {
               const p = e.total ? Math.round((e.loaded * 100) / e.total) : 0;
               setUploadProgress(p);
               sessions.forEach(s => updateFileProgress(s.file.name, { progress: p }));
             }
-          }
-        );
+          },
+        });
 
         const batchResults = response.data?.results || [];
         results.push(...batchResults);
@@ -169,22 +178,20 @@ export function useUploadProcess(): useUploadProcessReturn {
           ? settings.ui.upload.chunk_size_mb * 1024 * 1024
           : prefChunkSize;
 
-        const resp = await uploadService.uploadFileInChunks(
-          session.file,
-          session.sessionId,
-          session.hash,
-          undefined,
-          undefined,
-          (p) => {
+        const resp = await chunkedUploadMutation.mutateAsync({
+          file: session.file,
+          sessionId: session.sessionId,
+          hash: session.hash,
+          onProgress: (p) => {
             setUploadProgress(p);
             updateFileProgress(session.file.name, { progress: p });
           },
-          {
+          options: {
             // Increase concurrency for HTTP/2 multiplexing, respect low power mode
             maxConcurrent: settings.ui.upload?.low_power_mode ? 2 : maxConcurrentUploads,
             chunkSize: chunkSize
-          }
-        );
+          },
+        });
 
         const result = resp.data?.results?.[0] || { success: false, file_name: session.file.name, error: "No result" };
         results.push(result);
@@ -212,8 +219,8 @@ export function useUploadProcess(): useUploadProcessReturn {
         const session: FileUploadSession = {
           file,
           hash: hashResult.hash,
-          sessionId: uploadService.generateSessionId(),
-          shouldUseChunks: uploadService.shouldUseChunks(file)
+          sessionId: generateSessionId(),
+          shouldUseChunks: shouldUseChunks(file)
         };
 
         if (session.shouldUseChunks) {
@@ -238,7 +245,7 @@ export function useUploadProcess(): useUploadProcessReturn {
       }
 
       await Promise.all(uploadTasks);
-      queryClient.invalidateQueries({ queryKey: ["userAssets"] });
+      await queryClient.invalidateQueries({queryKey: ["userAssets"]});
 
       const uploaded = results.filter(r => r.success).map(r => r.file_name || "");
       const failed = results.filter(r => !r.success).map(r => ({

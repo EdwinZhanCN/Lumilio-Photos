@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAssetsStore } from "@/features/assets/assets.store";
 import { useAssetsView } from "@/features/assets/hooks/useAssetsView";
 import { SideChannelEvent } from "@/features/lumilio/schema";
-import { AssetFilter } from "@/services/assetsService";
+import { AssetFilter } from "@/lib/assets/types";
 import { AssetViewDefinition } from "@/features/assets/types/assets.type";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";

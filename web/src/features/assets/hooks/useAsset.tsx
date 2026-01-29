@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useAssetsStore } from "../assets.store";
 import { selectAsset, selectAssetMeta } from "../slices/entities.slice";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 
 /**
  * Hook for accessing a single asset from the entity store.

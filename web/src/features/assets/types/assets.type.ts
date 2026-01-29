@@ -1,4 +1,4 @@
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 
 import React from "react";
 import type { components } from "@/lib/http-commons";

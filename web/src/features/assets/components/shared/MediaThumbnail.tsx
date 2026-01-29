@@ -6,7 +6,7 @@ import {
   formatDuration,
   getAssetAriaLabel,
 } from "@/lib/utils/mediaTypes";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 
 interface MediaThumbnailProps {
