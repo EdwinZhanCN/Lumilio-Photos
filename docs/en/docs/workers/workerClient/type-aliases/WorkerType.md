@@ -2,6 +2,6 @@
 
 # Type Alias: WorkerType
 
-> **WorkerType** = `"thumbnail"` \| `"hash"` \| `"border"` \| `"export"` \| `"exif"`
+> **WorkerType** = `"thumbnail"` \| `"hash"` \| `"border"` \| `"export"` \| `"exif"` \| `"justified"`
 
-Defined in: [workers/workerClient.ts:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/e210b1b53e0ecfd439db8dd1bdbbd52b846c159f/web/src/workers/workerClient.ts#L12)
+Defined in: [workers/workerClient.ts:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ab494a6fe19f862ebe412e16cfbeb19bbe77964d/web/src/workers/workerClient.ts#L17)
