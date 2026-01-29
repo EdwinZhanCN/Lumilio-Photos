@@ -1,45 +1,23 @@
-import { useEffect, useState } from "react";
 import { Clock, Zap, Loader2, AlertCircle } from "lucide-react";
-import { listQueues, type QueueStatsDTO } from "@/services/queueService";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { ApiResult, QueueStatsDTO, QueueStatsResponse } from "../monitor.type";
 
 export function QueueList() {
-  const [queues, setQueues] = useState<QueueStatsDTO[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queuesQuery = $api.useQuery(
+    "get",
+    "/api/v1/admin/river/queues",
+    {},
+    {
+      refetchInterval: 10000,
+      refetchIntervalInBackground: true,
+      retry: false,
+    },
+  );
 
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchQueues = async () => {
-      try {
-        const data = await listQueues();
-        if (mounted) {
-          setQueues(data?.queues ?? []);
-          setError(null);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError("Failed to fetch queues");
-          console.error("Queue list error:", err);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    // Initial fetch
-    fetchQueues();
-
-    // Poll every 10 seconds
-    const interval = setInterval(fetchQueues, 10000);
-
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
+  const response = queuesQuery.data as ApiResult<QueueStatsResponse> | undefined;
+  const queues: QueueStatsDTO[] = response?.data?.queues ?? [];
+  const loading = queuesQuery.isLoading;
+  const error = queuesQuery.isError ? "Failed to fetch queues" : null;
 
   if (loading) {
     return (

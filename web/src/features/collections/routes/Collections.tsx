@@ -9,9 +9,9 @@ import { useNavigate } from "react-router-dom";
 import { CollectionsProvider, useCollections } from "../CollectionsProvider";
 import CreateAlbumModal from "../components/CreateAlbumModal";
 import { useState } from "react";
-import { albumService } from "@/services/albumService";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
+import { $api } from "@/lib/http-commons/queryClient";
 
 function CollectionsContent() {
   const { t } = useI18n();
@@ -23,6 +23,7 @@ function CollectionsContent() {
     isSelectionMode, 
     dispatch 
   } = useCollections();
+  const deleteAlbumMutation = $api.useMutation("delete", "/api/v1/albums/{id}");
   
   const { data, isPending, isFetching, hasNextPage, fetchNextPage, isFetchingNextPage } = useAlbums(t);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -61,7 +62,9 @@ function CollectionsContent() {
     try {
       // Bulk delete albums
       await Promise.all(
-        selectedAlbumIds.map(id => albumService.deleteAlbum(id))
+        selectedAlbumIds.map((id) =>
+          deleteAlbumMutation.mutateAsync({ params: { path: { id } } }),
+        ),
       );
       
       await queryClient.invalidateQueries({ queryKey: ["albums"] });

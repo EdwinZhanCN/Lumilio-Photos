@@ -1,14 +1,16 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import PhotosLoadingSkeleton from "../LoadingSkeleton";
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
 import {
-  justifiedLayoutService,
+  assetsToLayoutBoxes,
+  createResponsiveConfig,
   type LayoutResult,
-} from "@/services/justifiedLayoutService";
+} from "@/lib/layout/justifiedLayout";
 import MediaThumbnail from "../../shared/MediaThumbnail";
-import { Asset } from "@/services";
+import { Asset } from "@/lib/assets/types";
 import { useKeyboardSelection } from "@/features/assets/hooks/useSelection";
 import { useI18n } from "@/lib/i18n";
+import { useJustifiedLayoutService } from "@/hooks/util-hooks/useJustifiedLayoutService.ts";
 
 interface JustifiedGalleryProps {
   groupedPhotos: Record<string, Asset[]>;
@@ -28,20 +30,17 @@ const JustifiedGallery = ({
   isLoadingMore = false,
 }: JustifiedGalleryProps) => {
   const { t } = useI18n();
-  const [serviceReady, setServiceReady] = useState(justifiedLayoutService.isReady());
+  const {
+    isReady: isLayoutReady,
+    error: layoutError,
+    calculateMultipleLayouts,
+  } = useJustifiedLayoutService();
   const [layouts, setLayouts] = useState<Record<string, LayoutResult>>({});
   const [containerWidth, setContainerWidth] = useState(0);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const lastWidthRef = useRef(0);
-
-  // 1. Initialize service
-  useEffect(() => {
-    if (!serviceReady) {
-      justifiedLayoutService.initialize().then(() => setServiceReady(true));
-    }
-  }, [serviceReady]);
 
   // 2. Measure container width
   useEffect(() => {
@@ -76,24 +75,41 @@ const JustifiedGallery = ({
     const width = containerWidth || 800;
     // Use fixed 16px padding (px-4) to align with header and ensure layout fits container
     const horizontalPadding = 16;
-    return justifiedLayoutService.createResponsiveConfig(Math.max(width - horizontalPadding * 2, 300));
+    return createResponsiveConfig(Math.max(width - horizontalPadding * 2, 300));
   }, [containerWidth]);
 
   useEffect(() => {
-    if (Object.keys(groupedPhotos).length === 0 || containerWidth === 0) return;
+    if (!isLayoutReady || Object.keys(groupedPhotos).length === 0 || containerWidth === 0) {
+      return;
+    }
+
+    let cancelled = false;
 
     const calculate = async () => {
       const groups: Record<string, any> = {};
       Object.entries(groupedPhotos).forEach(([key, assets]) => {
-        if (assets.length > 0) groups[key] = justifiedLayoutService.assetsToLayoutBoxes(assets);
+        if (assets.length > 0) {
+          groups[key] = assetsToLayoutBoxes(assets);
+        }
       });
 
-      const results = await justifiedLayoutService.calculateMultipleLayouts(groups, layoutConfig);
-      setLayouts(results);
+      try {
+        const results = await calculateMultipleLayouts(groups, layoutConfig);
+        if (!cancelled) {
+          setLayouts(results);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to calculate justified layouts:", error);
+        }
+      }
     };
 
     calculate();
-  }, [groupedPhotos, layoutConfig, containerWidth]);
+    return () => {
+      cancelled = true;
+    };
+  }, [groupedPhotos, layoutConfig, containerWidth, isLayoutReady, calculateMultipleLayouts]);
 
   // 5. Infinite scroll observer
   useEffect(() => {
@@ -111,7 +127,20 @@ const JustifiedGallery = ({
   }, [hasMore, isLoadingMore, onLoadMore]);
 
   if (isLoading && Object.keys(groupedPhotos).length === 0) return <PhotosLoadingSkeleton />;
-  if (!serviceReady) return <div className="flex justify-center py-12"><span className="loading loading-spinner"></span></div>;
+  if (!isLayoutReady && !layoutError) {
+    return (
+      <div className="flex justify-center py-12">
+        <span className="loading loading-spinner"></span>
+      </div>
+    );
+  }
+  if (layoutError) {
+    return (
+      <div className="flex justify-center py-12 text-error">
+        {t("assets.justifiedGallery.layout_error", { defaultValue: "Failed to load layout engine" })}
+      </div>
+    );
+  }
 
   if (Object.keys(groupedPhotos).length === 0) {
     return (
@@ -159,7 +188,7 @@ const JustifiedGallery = ({
                     >
                       <MediaThumbnail
                         asset={asset}
-                        thumbnailUrl={assetService.getThumbnailUrl(asset.asset_id, "medium")}
+                        thumbnailUrl={assetUrls.getThumbnailUrl(asset.asset_id, "medium")}
                         isSelected={isSelected}
                         isSelectionMode={selection.enabled}
                       />

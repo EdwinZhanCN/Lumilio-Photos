@@ -6,6 +6,41 @@ import { UploadContext } from "./upload.type.ts";
 import { useSettingsContext } from "@/features/settings";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 
+/**
+ * Provider component that manages upload state and operations.
+ * 
+ * This component wraps the application with upload functionality, providing:
+ * - File upload state management using useReducer
+ * - Drag and drop event handling
+ * - File processing and upload orchestration
+ * - Progress tracking and error handling
+ * - Integration with settings and internationalization
+ * 
+ * @param props - Component props
+ * @param props.children - Child components that will have access to upload context
+ * 
+ * @example
+ * ```typescript
+ * function App() {
+ *   return (
+ *     <UploadProvider>
+ *       <YourAppComponents />
+ *     </UploadProvider>
+ *   );
+ * }
+ * 
+ * function UploadComponent() {
+ *   const { addFiles, uploadFiles, isProcessing } = useUploadContext();
+ *   
+ *   const handleUpload = async (files: File[]) => {
+ *     await addFiles(files);
+ *     await uploadFiles();
+ *   };
+ *   
+ *   return <YourUploadUI onUpload={handleUpload} />;
+ * }
+ * ```
+ */
 export function UploadProvider({ children }: { children: ReactNode }) {
   const { t } = useI18n(); // Initialize useI18n
   const [state, dispatch] = useReducer(uploadReducer, initialState);

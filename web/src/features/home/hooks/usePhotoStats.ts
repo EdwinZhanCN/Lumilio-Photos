@@ -1,16 +1,26 @@
 import { useState, useEffect, useCallback } from "react";
-import { statsService } from "@/services";
-import type {
-  FocalLengthDistributionResponse,
-  CameraLensStatsResponse,
-  TimeDistributionResponse,
-  HeatmapResponse,
-} from "@/services";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { components } from "@/lib/http-commons/schema.d.ts";
+
+type Schemas = components["schemas"];
+
+type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
+  data?: T;
+};
+
+type FocalLengthDistributionResponse =
+  Schemas["handler.FocalLengthDistributionResponse"];
+type CameraLensStatsResponse = Schemas["handler.CameraLensStatsResponse"];
+type TimeDistributionResponse = Schemas["handler.TimeDistributionResponse"];
+type HeatmapResponse = Schemas["handler.HeatmapResponse"];
+type AvailableYearsResponse = Schemas["handler.AvailableYearsResponse"];
+
+type TimeDistributionType = "hourly" | "monthly";
 
 interface UsePhotoStatsOptions {
   autoFetch?: boolean;
   cameraLensLimit?: number;
-  timeDistributionType?: "hourly" | "monthly";
+  timeDistributionType?: TimeDistributionType;
 }
 
 interface UsePhotoStatsReturn {
@@ -52,6 +62,27 @@ export function usePhotoStats(
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { mutateAsync: fetchFocalLength } = $api.useMutation(
+    "get",
+    "/api/v1/stats/focal-length",
+  );
+  const { mutateAsync: fetchCameraLensStats } = $api.useMutation(
+    "get",
+    "/api/v1/stats/camera-lens",
+  );
+  const { mutateAsync: fetchTimeDistribution } = $api.useMutation(
+    "get",
+    "/api/v1/stats/time-distribution",
+  );
+  const { mutateAsync: fetchAvailableYears } = $api.useMutation(
+    "get",
+    "/api/v1/stats/available-years",
+  );
+  const { mutateAsync: fetchDailyActivity } = $api.useMutation(
+    "get",
+    "/api/v1/stats/daily-activity",
+  );
+
   const fetchAllStats = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -59,31 +90,41 @@ export function usePhotoStats(
     try {
       const [focalResponse, cameraLensResponse, timeResponse, yearsResponse] =
         await Promise.all([
-          statsService.getFocalLengthDistribution(),
-          statsService.getCameraLensStats(cameraLensLimit),
-          statsService.getTimeDistribution(timeDistributionType),
-          statsService.getAvailableYears(),
+          fetchFocalLength({}),
+          fetchCameraLensStats({
+            params: { query: { limit: cameraLensLimit } },
+          }),
+          fetchTimeDistribution({
+            params: { query: { type: timeDistributionType } },
+          }),
+          fetchAvailableYears({}),
         ]);
 
       // Check focal length response (openapi-fetch format)
-      if (focalResponse.data?.code === 0 && focalResponse.data?.data) {
-        setFocalLengthData(focalResponse.data.data as FocalLengthDistributionResponse);
+      const focalData = focalResponse as ApiResult<FocalLengthDistributionResponse> | undefined;
+      if (focalData?.code === 0 && focalData.data) {
+        setFocalLengthData(focalData.data);
       }
 
       // Check camera lens response
-      if (cameraLensResponse.data?.code === 0 && cameraLensResponse.data?.data) {
-        setCameraLensData(cameraLensResponse.data.data as CameraLensStatsResponse);
+      const cameraLensData =
+        cameraLensResponse as ApiResult<CameraLensStatsResponse> | undefined;
+      if (cameraLensData?.code === 0 && cameraLensData.data) {
+        setCameraLensData(cameraLensData.data);
       }
 
       // Check time distribution response
-      if (timeResponse.data?.code === 0 && timeResponse.data?.data) {
-        setTimeDistributionData(timeResponse.data.data as TimeDistributionResponse);
+      const timeDistributionData =
+        timeResponse as ApiResult<TimeDistributionResponse> | undefined;
+      if (timeDistributionData?.code === 0 && timeDistributionData.data) {
+        setTimeDistributionData(timeDistributionData.data);
       }
 
       // Check years response
-      if (yearsResponse.data?.code === 0 && yearsResponse.data?.data) {
-        const yearsData = yearsResponse.data.data as { years?: number[] };
-        const years = yearsData.years ?? [];
+      const yearsData =
+        yearsResponse as ApiResult<AvailableYearsResponse> | undefined;
+      if (yearsData?.code === 0 && yearsData.data) {
+        const years = yearsData.data.years ?? [];
         setAvailableYears(years);
 
         // Fetch heatmap for the most recent year
@@ -97,11 +138,13 @@ export function usePhotoStats(
               (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
             );
 
-            const heatmapResponse = await statsService.getDailyActivityHeatmap(
-              daysDiff + 365,
-            );
-            if (heatmapResponse.data?.code === 0 && heatmapResponse.data?.data) {
-              setHeatmapData(heatmapResponse.data.data as HeatmapResponse);
+            const heatmapResponse = await fetchDailyActivity({
+              params: { query: { days: daysDiff + 365 } },
+            });
+            const heatmapData =
+              heatmapResponse as ApiResult<HeatmapResponse> | undefined;
+            if (heatmapData?.code === 0 && heatmapData.data) {
+              setHeatmapData(heatmapData.data);
             }
           }
         } finally {
@@ -116,7 +159,15 @@ export function usePhotoStats(
     } finally {
       setIsLoading(false);
     }
-  }, [cameraLensLimit, timeDistributionType]);
+  }, [
+    cameraLensLimit,
+    timeDistributionType,
+    fetchAvailableYears,
+    fetchCameraLensStats,
+    fetchDailyActivity,
+    fetchFocalLength,
+    fetchTimeDistribution,
+  ]);
 
   const refetchHeatmap = useCallback(async (year: number) => {
     setHeatmapLoading(true);
@@ -129,12 +180,14 @@ export function usePhotoStats(
         (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
       );
 
-      const heatmapResponse = await statsService.getDailyActivityHeatmap(
-        daysDiff + 365,
-      );
+      const heatmapResponse = await fetchDailyActivity({
+        params: { query: { days: daysDiff + 365 } },
+      });
+      const heatmapData =
+        heatmapResponse as ApiResult<HeatmapResponse> | undefined;
 
-      if (heatmapResponse.data?.code === 0 && heatmapResponse.data?.data) {
-        setHeatmapData(heatmapResponse.data.data as HeatmapResponse);
+      if (heatmapData?.code === 0 && heatmapData.data) {
+        setHeatmapData(heatmapData.data);
       }
     } catch (err) {
       const errorMessage =
@@ -144,7 +197,7 @@ export function usePhotoStats(
     } finally {
       setHeatmapLoading(false);
     }
-  }, []);
+  }, [fetchDailyActivity]);
 
   useEffect(() => {
     if (autoFetch) {

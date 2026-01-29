@@ -13,9 +13,8 @@ import { useSelection, useBulkAssetOperations } from "@/features/assets/hooks/us
 import { GroupByType } from "@/features/assets/types/assets.type";
 import { selectTabTitle } from "@/features/assets/slices/ui.slice";
 import { useCallback, useMemo, useRef, useEffect, useState, ReactNode } from "react";
-import { albumService, Album } from "@/services/albumService";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
 import {
   useFilterState,
@@ -23,6 +22,8 @@ import {
   useCurrentTab,
   useSearchQuery,
 } from "@/features/assets/selectors";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { Album, ApiResult, ListAlbumsResponse } from "@/lib/albums/types";
 
 interface AssetsPageHeaderProps {
   groupBy: GroupByType;
@@ -64,6 +65,7 @@ function mapFilenameOperatorToMode(
   }
 }
 
+
 const AssetsPageHeader = ({
   groupBy,
   onGroupByChange,
@@ -71,6 +73,7 @@ const AssetsPageHeader = ({
   title,
   icon,
 }: AssetsPageHeaderProps) => {
+
   const { t } = useI18n();
   const selection = useSelection();
   const bulkOps = useBulkAssetOperations();
@@ -90,6 +93,7 @@ const AssetsPageHeader = ({
   const [albums, setAlbums] = useState<Album[]>([]);
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
+  const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
 
   // Hydrate FilterTool from global filters (single source of truth)
   const inboundDTO = useMemo(() => {
@@ -136,9 +140,9 @@ const AssetsPageHeader = ({
   // Handle search activation (switch to flat view when searching)
   useEffect(() => {
     if (searchQuery.trim() && groupBy !== "flat") {
-      onGroupByChange("flat");
+      onGroupByChangeRef.current("flat");
     }
-  }, [searchQuery, groupBy, onGroupByChange]);
+  }, [searchQuery, groupBy]);
 
   // Use ref to store the latest onFiltersChange callback to avoid dependency issues
   const onFiltersChangeRef = useRef(onFiltersChange);
@@ -242,9 +246,12 @@ const AssetsPageHeader = ({
     setIsAlbumModalOpen(true);
     setIsLoadingAlbums(true);
     try {
-      const response = await albumService.listAlbums({ limit: 50 });
-      if (response.data?.data) {
-        setAlbums(response.data.data.albums || []);
+      const response = await listAlbumsMutation.mutateAsync({
+        params: { query: { limit: 50 } },
+      });
+      const responseData = response as ApiResult<ListAlbumsResponse> | undefined;
+      if (responseData?.data) {
+        setAlbums(responseData.data.albums || []);
       }
     } catch (error) {
       showMessage("error", t("assets.assetsPageHeader.messages.loadAlbumsError"));
@@ -483,7 +490,7 @@ const AssetsPageHeader = ({
                     <div className="w-10 h-10 rounded bg-base-300 flex items-center justify-center overflow-hidden">
                       {album.cover_asset_id ? (
                         <img
-                          src={assetService.getThumbnailUrl(album.cover_asset_id, "small")}
+                          src={assetUrls.getThumbnailUrl(album.cover_asset_id, "small")}
                           className="w-full h-full object-cover"
                           alt=""
                         />

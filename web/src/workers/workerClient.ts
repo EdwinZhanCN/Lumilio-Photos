@@ -7,9 +7,20 @@
  * @since 1.1.0
  */
 
-import { globalPerformancePreferences } from "@/utils/performancePreferences";
+import { globalPerformancePreferences } from "@/lib/utils/performancePreferences.ts";
+import type {
+  LayoutBox,
+  LayoutConfig,
+  LayoutResult,
+} from "@/lib/layout/justifiedLayout";
 
-export type WorkerType = "thumbnail" | "hash" | "border" | "export" | "exif";
+export type WorkerType =
+  | "thumbnail"
+  | "hash"
+  | "border"
+  | "export"
+  | "exif"
+  | "justified";
 
 export interface WorkerClientOptions {
   preload?: WorkerType[];
@@ -28,6 +39,9 @@ export class AppWorkerClient {
   private generateBorderworker: Worker | null = null;
   private exportWorker: Worker | null = null;
   private extractExifWorker: Worker | null = null;
+  private justifiedLayoutWorker: Worker | null = null;
+  private justifiedInitPromise: Promise<void> | null = null;
+  private justifiedRequestId = 0;
 
   private eventTarget: EventTarget;
 
@@ -92,6 +106,15 @@ export class AppWorkerClient {
         }
         return this.extractExifWorker;
 
+      case "justified":
+        if (!this.justifiedLayoutWorker) {
+          this.justifiedLayoutWorker = new Worker(
+            new URL("./justified.worker.ts", import.meta.url),
+            { type: "module" },
+          );
+        }
+        return this.justifiedLayoutWorker;
+
       default:
         throw new Error(`Unknown worker type: ${type}`);
     }
@@ -110,6 +133,98 @@ export class AppWorkerClient {
         "progress",
         handler as EventListener,
       );
+  }
+
+  private nextJustifiedRequestId(): number {
+    this.justifiedRequestId += 1;
+    return this.justifiedRequestId;
+  }
+
+  async initializeJustifiedLayout(): Promise<void> {
+    if (this.justifiedInitPromise) return this.justifiedInitPromise;
+    const worker = this.getOrInitializeWorker("justified");
+
+    this.justifiedInitPromise = new Promise((resolve, reject) => {
+      const handler = (e: MessageEvent) => {
+        if (e.data?.type === "JUSTIFIED_READY") {
+          worker.removeEventListener("message", handler);
+          resolve();
+        } else if (e.data?.type === "ERROR" && !e.data?.payload?.requestId) {
+          worker.removeEventListener("message", handler);
+          this.justifiedInitPromise = null;
+          reject(
+            new Error(
+              e.data?.payload?.error || "Justified layout init failed",
+            ),
+          );
+        }
+      };
+
+      worker.addEventListener("message", handler);
+      worker.postMessage({ type: "INIT" });
+    });
+
+    return this.justifiedInitPromise;
+  }
+
+  async calculateJustifiedLayout(
+    boxes: LayoutBox[],
+    config: LayoutConfig,
+  ): Promise<LayoutResult> {
+    await this.initializeJustifiedLayout();
+    const worker = this.getOrInitializeWorker("justified");
+    const requestId = this.nextJustifiedRequestId();
+
+    return new Promise((resolve, reject) => {
+      const handler = (e: MessageEvent) => {
+        const { type, payload } = e.data || {};
+        if (!payload || payload.requestId !== requestId) return;
+
+        if (type === "JUSTIFIED_LAYOUT_COMPLETE") {
+          worker.removeEventListener("message", handler);
+          resolve(payload.result as LayoutResult);
+        } else if (type === "ERROR") {
+          worker.removeEventListener("message", handler);
+          reject(new Error(payload.error || "Justified layout failed"));
+        }
+      };
+
+      worker.addEventListener("message", handler);
+      worker.postMessage({
+        type: "CALCULATE_LAYOUT",
+        payload: { requestId, boxes, config },
+      });
+    });
+  }
+
+  async calculateJustifiedLayouts(
+    groups: Record<string, LayoutBox[]>,
+    config: LayoutConfig,
+  ): Promise<Record<string, LayoutResult>> {
+    await this.initializeJustifiedLayout();
+    const worker = this.getOrInitializeWorker("justified");
+    const requestId = this.nextJustifiedRequestId();
+
+    return new Promise((resolve, reject) => {
+      const handler = (e: MessageEvent) => {
+        const { type, payload } = e.data || {};
+        if (!payload || payload.requestId !== requestId) return;
+
+        if (type === "JUSTIFIED_LAYOUTS_COMPLETE") {
+          worker.removeEventListener("message", handler);
+          resolve(payload.results as Record<string, LayoutResult>);
+        } else if (type === "ERROR") {
+          worker.removeEventListener("message", handler);
+          reject(new Error(payload.error || "Justified layout failed"));
+        }
+      };
+
+      worker.addEventListener("message", handler);
+      worker.postMessage({
+        type: "CALCULATE_MULTIPLE_LAYOUTS",
+        payload: { requestId, groups, config },
+      });
+    });
   }
 
   // --- Thumbnail Generation ---
@@ -407,6 +522,11 @@ export class AppWorkerClient {
       this.extractExifWorker.terminate();
       this.extractExifWorker = null;
     }
+    if (this.justifiedLayoutWorker) {
+      this.justifiedLayoutWorker.terminate();
+      this.justifiedLayoutWorker = null;
+    }
+    this.justifiedInitPromise = null;
     console.log("All workers terminated.");
   }
 }

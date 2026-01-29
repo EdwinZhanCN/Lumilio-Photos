@@ -133,9 +133,13 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			assets.POST("/batch", assetController.BatchUploadAssets)
 			assets.GET("/:id", assetController.GetAsset)
 			assets.GET("/:id/original", assetController.GetOriginalFile)
+			assets.HEAD("/:id/original", assetController.GetOriginalFile)
 			assets.GET("/:id/video/web", assetController.GetWebVideo)
+			assets.HEAD("/:id/video/web", assetController.GetWebVideo)
 			assets.GET("/:id/audio/web", assetController.GetWebAudio)
+			assets.HEAD("/:id/audio/web", assetController.GetWebAudio)
 			assets.GET("/:id/thumbnail", assetController.GetAssetThumbnail)
+			assets.HEAD("/:id/thumbnail", assetController.GetAssetThumbnail)
 			assets.PUT("/:id", assetController.UpdateAsset)
 			assets.DELETE("/:id", assetController.DeleteAsset)
 			assets.POST("/:id/albums/:albumId", assetController.AddAssetToAlbum)
@@ -209,7 +213,7 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:6657")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-content-hash")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 

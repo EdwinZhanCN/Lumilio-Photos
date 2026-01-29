@@ -5,7 +5,7 @@ import {
   getOptimalBatchSize,
   recordProcessingMetrics,
   ProcessingPriority
-} from "@/utils/smartBatchSizing";
+} from "@/lib/utils/smartBatchSizing.ts";
 
 // Define the shape of the progress state for better type safety
 export type ExifExtractionProgress = {

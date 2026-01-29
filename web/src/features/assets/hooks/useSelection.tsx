@@ -11,8 +11,8 @@ import {
   selectLastSelectedId,
 } from "../slices/selection.slice";
 import { useAssetActions } from "./useAssetActions";
-import { albumService } from "@/services/albumService";
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
+import { $api } from "@/lib/http-commons/queryClient";
 
 /**
  * Hook for managing asset selection state and operations.
@@ -310,6 +310,10 @@ export const useSelectionState = () => {
 export const useBulkAssetOperations = () => {
   const selection = useSelection();
   const { toggleLike, deleteAsset, batchUpdateAssets } = useAssetActions();
+  const { mutateAsync: addAssetToAlbum } = $api.useMutation(
+    "post",
+    "/api/v1/albums/{id}/assets/{assetId}",
+  );
 
   const bulkUpdateRating = useCallback(
     async (rating: number): Promise<void> => {
@@ -344,7 +348,7 @@ export const useBulkAssetOperations = () => {
 
     for (const id of ids) {
       try {
-        const url = assetService.getOriginalFileUrl(id as string);
+        const url = assetUrls.getOriginalFileUrl(id as string);
         const response = await fetch(url);
         const blob = await response.blob();
         const blobUrl = window.URL.createObjectURL(blob);
@@ -375,9 +379,14 @@ export const useBulkAssetOperations = () => {
   const bulkAddToAlbum = useCallback(async (albumId: number): Promise<void> => {
     const ids = Array.from(selection.selectedIds);
     await Promise.all(
-      ids.map(assetId => albumService.addAssetToAlbum(albumId, assetId as string, {}))
+      ids.map((assetId) =>
+        addAssetToAlbum({
+          params: { path: { id: albumId, assetId: assetId as string } },
+          body: {},
+        }),
+      ),
     );
-  }, [selection.selectedIds]);
+  }, [selection.selectedIds, addAssetToAlbum]);
 
   return {
     bulkUpdateRating,

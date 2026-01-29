@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { useExtractExifdata } from "@/hooks/util-hooks/useExtractExifdata";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { assetService } from "@/services/assetsService";
+import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n.tsx";
 import { ExifDataDisplay } from "@/features/studio/components/panels/ExifDataDisplay";
 import type { Asset } from "@/lib/http-commons";
@@ -45,7 +45,7 @@ export default function FullScreenBasicInfo({
       setDetailedExif(null);
 
       // Fetch the original file using the URL helper
-      const url = assetService.getOriginalFileUrl(asset.asset_id);
+      const url = assetUrls.getOriginalFileUrl(asset.asset_id);
       const response = await fetch(url);
       const blob = await response.blob();
       const file = new File([blob], asset.original_filename || "image", {

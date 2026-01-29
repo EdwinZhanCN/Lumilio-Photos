@@ -11,7 +11,7 @@
 import {
   globalPerformancePreferences,
   PerformanceProfile,
-} from "./performancePreferences";
+} from "./performancePreferences.ts";
 
 // Device capability metrics
 export interface DeviceCapabilities {

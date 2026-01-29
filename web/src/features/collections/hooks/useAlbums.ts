@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { albumService, Album as AlbumDTO } from "@/services/albumService";
-import { assetService } from "@/services/assetsService";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { ApiResult, Album as AlbumDTO, ListAlbumsResponse } from "@/lib/albums/types";
+import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Album as ImgStackAlbum } from "../components/ImgStackGrid/ImgStackGrid";
 
 const PAGE_SIZE = 60;
@@ -20,7 +21,7 @@ export const mapAlbumToUI = (
     description: album.description ?? "",
     imageCount: album.asset_count ?? 0,
     coverImages: album.cover_asset_id
-      ? [assetService.getThumbnailUrl(album.cover_asset_id, "medium")]
+      ? [assetUrls.getThumbnailUrl(album.cover_asset_id, "medium")]
       : undefined,
     createdAt: album.created_at ? new Date(album.created_at) : new Date(),
     updatedAt: album.updated_at ? new Date(album.updated_at) : new Date(),
@@ -31,16 +32,17 @@ export const mapAlbumToUI = (
  * Hook for fetching albums with infinite scrolling/pagination
  */
 export function useAlbums(t: (key: string, options?: any) => string) {
+  const { mutateAsync: fetchAlbums } = $api.useMutation("get", "/api/v1/albums");
+
   return useInfiniteQuery({
     queryKey: ["albums"],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
-      const response = await albumService.listAlbums({
-        limit: PAGE_SIZE,
-        offset: pageParam,
+      const response = await fetchAlbums({
+        params: { query: { limit: PAGE_SIZE, offset: pageParam } },
       });
-
-      const payload = response.data?.data;
+      const responseData = response as ApiResult<ListAlbumsResponse> | undefined;
+      const payload = responseData?.data;
       const total = payload?.total ?? 0;
 
       return {
