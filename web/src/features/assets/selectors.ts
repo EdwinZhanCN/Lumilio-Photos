@@ -1,5 +1,9 @@
 import { useAssetsStore } from "./assets.store";
 import { useShallow } from "zustand/react/shallow";
+import { selectActiveFilterCount } from "./slices/filters.slice";
+import { useSearchParams } from "react-router-dom";
+import { useSettingsContext } from "@/features/settings";
+import { useCallback } from "react";
 
 // ===== Selection Selectors =====
 export const useSelectionEnabled = () =>
@@ -41,40 +45,10 @@ export const useFiltersEnabled = () =>
     useAssetsStore((s) => s.filters.enabled);
 
 export const useActiveFilterCount = () =>
-    useAssetsStore((s) => {
-        if (!s.filters.enabled) return 0;
-        let count = 0;
-        if (s.filters.raw !== undefined) count++;
-        if (s.filters.rating !== undefined) count++;
-        if (s.filters.liked !== undefined) count++;
-        if (s.filters.filename && s.filters.filename.value.trim()) count++;
-        if (s.filters.date && (s.filters.date.from || s.filters.date.to)) count++;
-        if (s.filters.camera_make && s.filters.camera_make.trim()) count++;
-        if (s.filters.lens && s.filters.lens.trim()) count++;
-        return count;
-    });
+    useAssetsStore((s) => selectActiveFilterCount(s.filters));
 
 export const useFilterState = () =>
     useAssetsStore(useShallow((s) => s.filters));
-
-// ===== Entity Selectors =====
-export const useAsset = (assetId: string) =>
-    useAssetsStore((s) => s.entities.assets[assetId]);
-
-export const useAssetMeta = (assetId: string) =>
-    useAssetsStore((s) => s.entities.meta[assetId]);
-
-export const useAllAssets = () =>
-    useAssetsStore((s) => s.entities.assets);
-
-// ===== View Selectors =====
-export const useView = (viewKey: string) =>
-    useAssetsStore((s) => s.views[viewKey]);
-
-const EMPTY_ARRAY: string[] = [];
-
-export const useViewAssetIds = (viewKey: string) =>
-    useAssetsStore((s) => s.views[viewKey]?.assetIds || EMPTY_ARRAY);
 
 // ===== Actions (stable references) =====
 export const useSelectionActions = () =>
@@ -86,18 +60,56 @@ export const useSelectionActions = () =>
         clear: s.clearSelection,
         setEnabled: s.setSelectionEnabled,
         setMode: s.setSelectionMode,
-        selectRange: PLACEHOLDER_SELECT_RANGE,
     })));
 
-const PLACEHOLDER_SELECT_RANGE = () => console.warn('selectRange not implemented in store yet');
-
-export const useUIActions = () =>
-    useAssetsStore(useShallow((s) => ({
+export const useUIActions = () => {
+    const store = useAssetsStore(useShallow((s) => ({
         setTab: s.setCurrentTab,
         setGroupBy: s.setGroupBy,
         setSearchQuery: s.setSearchQuery,
         setSearchMode: s.setSearchMode,
     })));
+
+    const [searchParams, setSearchParams] = useSearchParams();
+    const { state: settingsState } = useSettingsContext();
+
+    const setGroupBy = useCallback((groupBy: any) => {
+        store.setGroupBy(groupBy);
+
+        // Sync to URL
+        const params = new URLSearchParams(searchParams);
+        const defaultGroupBy = settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
+
+        if (groupBy !== defaultGroupBy) {
+            params.set("groupBy", groupBy);
+        } else {
+            params.delete("groupBy");
+        }
+
+        setSearchParams(params, { replace: true });
+    }, [store.setGroupBy, searchParams, setSearchParams, settingsState.ui.asset_page?.layout]);
+
+    const setSearchQuery = useCallback((query: string) => {
+        store.setSearchQuery(query);
+
+        // Sync to URL
+        const params = new URLSearchParams(searchParams);
+
+        if (query.trim()) {
+            params.set("q", query);
+        } else {
+            params.delete("q");
+        }
+
+        setSearchParams(params, { replace: true });
+    }, [store.setSearchQuery, searchParams, setSearchParams]);
+
+    return {
+        ...store,
+        setGroupBy,
+        setSearchQuery,
+    };
+};
 
 export const useFilterActions = () =>
     useAssetsStore(useShallow((s) => ({

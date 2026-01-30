@@ -9,6 +9,10 @@ import SearchBar from "@/components/SearchBar";
 import FilterTool, {
   FilterDTO,
 } from "@/features/assets/components/page/FilterTool/FilterTool";
+import {
+  mapFilenameModeToDTO,
+  mapFilenameOperatorToMode,
+} from "@/features/assets/utils/filterUtils";
 import { useSelection, useBulkAssetOperations } from "@/features/assets/hooks/useSelection";
 import { GroupByType } from "@/features/assets/types/assets.type";
 import { selectTabTitle } from "@/features/assets/slices/ui.slice";
@@ -22,6 +26,7 @@ import {
   useCurrentTab,
   useSearchQuery,
 } from "@/features/assets/selectors";
+import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult, ListAlbumsResponse } from "@/lib/albums/types";
 
@@ -31,38 +36,6 @@ interface AssetsPageHeaderProps {
   onFiltersChange?: (filters: FilterDTO) => void;
   title?: string;
   icon?: ReactNode;
-}
-
-function mapFilenameModeToDTO(
-  mode?: "contains" | "matches" | "startswith" | "endswith",
-): "contains" | "matches" | "starts_with" | "ends_with" | undefined {
-  switch (mode) {
-    case "startswith":
-      return "starts_with";
-    case "endswith":
-      return "ends_with";
-    case "contains":
-    case "matches":
-      return mode;
-    default:
-      return undefined;
-  }
-}
-
-function mapFilenameOperatorToMode(
-  op?: "contains" | "matches" | "starts_with" | "ends_with",
-): "contains" | "matches" | "startswith" | "endswith" | undefined {
-  switch (op) {
-    case "starts_with":
-      return "startswith";
-    case "ends_with":
-      return "endswith";
-    case "contains":
-    case "matches":
-      return op;
-    default:
-      return undefined;
-  }
 }
 
 
@@ -233,9 +206,18 @@ const AssetsPageHeader = ({
     }
   };
 
+  const { assets } = useCurrentTabAssets();
+
+  // Compute selected assets for operations that need the object (e.g. download filename)
+  // We use useMemo to avoid re-calculation on every render
+  const selectedAssets = useMemo(() => {
+    if (!selection.enabled || selection.selectedCount === 0) return [];
+    return assets.filter(a => selection.selectedIds.has(a.asset_id!));
+  }, [assets, selection.enabled, selection.selectedCount, selection.selectedIds]);
+
   const handleDownloadAll = async () => {
     try {
-      await bulkOps.bulkDownload();
+      await bulkOps.bulkDownload(selectedAssets);
       showMessage("success", t("assets.assetsPageHeader.messages.downloadStart"));
     } catch (error) {
       showMessage("error", t("assets.assetsPageHeader.messages.downloadError"));
@@ -372,10 +354,23 @@ const AssetsPageHeader = ({
                 {t("assets.assetsPageHeader.actions.applyToItems", { count: selection.selectedCount })}
               </li>
               <li>
-                <button onClick={() => bulkOps.bulkToggleLike()}>
-                  <Heart size={16} className="text-error" />
-                  {t("assets.assetsPageHeader.actions.toggleLike")}
-                </button>
+                <div className="flex gap-1 px-4 py-2">
+                  <button
+                    className="btn btn-xs btn-ghost flex-1 justify-start gap-2"
+                    onClick={() => bulkOps.bulkSetLike(true)}
+                  >
+                    <Heart size={16} className="fill-error text-error" />
+                    {t("assets.assetsPageHeader.actions.like")}
+                  </button>
+                  <div className="divider divider-horizontal m-0"></div>
+                  <button
+                    className="btn btn-xs btn-ghost flex-1 justify-start gap-2"
+                    onClick={() => bulkOps.bulkSetLike(false)}
+                  >
+                    <Heart size={16} className="text-base-content" />
+                    {t("assets.assetsPageHeader.actions.unlike")}
+                  </button>
+                </div>
               </li>
               <li>
                 <div className="flex flex-col items-stretch p-0">

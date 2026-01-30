@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useCollections } from "../CollectionsProvider";
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -12,6 +12,7 @@ import { useSelection } from "@/features/assets/hooks/useSelection";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { ApiResult } from "@/lib/albums/types";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
+import { getFlatAssetsFromGrouped } from "@/lib/utils/assetGrouping";
 
 const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect }) => {
   const groupBy = useGroupBy();
@@ -27,10 +28,25 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect })
     isLoadingMore,
     fetchMore,
     hasMore,
+    viewKey,
   } = useCurrentTabAssets({
     withGroups: true,
     groupBy,
   });
+
+  const flatAssets = useMemo(() => {
+    if (groupedAssets && Object.keys(groupedAssets).length > 0) {
+      return getFlatAssetsFromGrouped(groupedAssets);
+    }
+    return allAssets;
+  }, [groupedAssets, allAssets]);
+
+  const layoutKey = useMemo(() => {
+    const assetIds = flatAssets
+      .map((asset) => asset.asset_id)
+      .filter((id): id is string => Boolean(id));
+    return `${viewKey}:${assetIds.join(",")}`;
+  }, [viewKey, flatAssets]);
 
   // Initialize picker state
   useEffect(() => {
@@ -63,6 +79,7 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect })
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <JustifiedGallery
           groupedPhotos={groupedAssets || {}}
+          key={layoutKey}
           openCarousel={() => { }}
           onLoadMore={fetchMore}
           hasMore={hasMore}

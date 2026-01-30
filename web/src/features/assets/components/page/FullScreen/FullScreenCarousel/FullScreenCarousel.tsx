@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useState } from "react";
+import { useMemo, useRef, useEffect, useState, useOptimistic, useTransition } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Virtual, Navigation, Pagination } from "swiper/modules";
 import { XMarkIcon } from "@heroicons/react/24/outline";
@@ -8,10 +8,9 @@ import "@/styles/custom-swiper.css";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
-import { $api } from "@/lib/http-commons/queryClient";
 import FullScreenBasicInfo from "../FullScreenInfo/FullScreenBasicInfo";
-import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";
+import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import MediaViewer from "../../../shared/MediaViewer";
 import type { Asset } from "@/lib/http-commons";
 
@@ -42,10 +41,8 @@ const FullScreenCarousel = ({
     return photos[index] || photos[0] || null;
   });
   const [isDeleting, setIsDeleting] = useState(false);
-  const showMessage = useMessage();
   const { t } = useI18n();
-  const updateLikeMutation = $api.useMutation("put", "/api/v1/assets/{id}/like");
-  const deleteAssetMutation = $api.useMutation("delete", "/api/v1/assets/{id}");
+  const { toggleLike, deleteAsset } = useAssetActions();
 
   const slides = useMemo(() => {
     return photos.map((photo) => ({
@@ -114,34 +111,25 @@ const FullScreenCarousel = ({
     }
   };
 
-  const handleLikeToggle = async () => {
+  const [, startTransition] = useTransition();
+  const [optimisticLiked, setOptimisticLiked] = useOptimistic(
+    currentAsset?.liked ?? false,
+    (_state, newLiked: boolean) => newLiked
+  );
+
+  const handleLikeToggle = () => {
     if (!currentAsset?.asset_id) return;
+    const newLiked = !optimisticLiked;
+    const assetId = currentAsset.asset_id;
 
-    const currentLiked = currentAsset.liked || false;
-    const newLiked = !currentLiked;
-
-    try {
-      // Call API to persist the change
-      await updateLikeMutation.mutateAsync({
-        params: { path: { id: currentAsset.asset_id } },
-        body: { liked: newLiked },
-      });
-
-      // Update the actual asset state after successful API call
-      const updatedAsset = {
-        ...currentAsset,
-        liked: newLiked,
-        specific_metadata: {
-          ...currentAsset.specific_metadata,
-        },
-      };
-
-      handleAssetUpdate(updatedAsset);
-      showMessage("success", t("rating.updateSuccess"));
-    } catch (error) {
-      console.error("Failed to update like status:", error);
-      showMessage("error", t("rating.updateError"));
-    }
+    startTransition(async () => {
+      setOptimisticLiked(newLiked);
+      try {
+        await toggleLike(assetId, newLiked);
+      } catch (error) {
+        console.error("Failed to update like status:", error);
+      }
+    });
   };
 
   const handleDeleteAsset = async () => {
@@ -149,22 +137,19 @@ const FullScreenCarousel = ({
 
     setIsDeleting(true);
     try {
-      await deleteAssetMutation.mutateAsync({
-        params: { path: { id: currentAsset.asset_id } },
-      });
+      if (currentAsset.asset_id) {
+        await deleteAsset(currentAsset.asset_id);
 
-      showMessage("success", t("delete.success"));
+        // Notify parent about deletion
+        if (onAssetDelete) {
+          onAssetDelete(currentAsset.asset_id);
+        }
 
-      // Notify parent about deletion
-      if (onAssetDelete) {
-        onAssetDelete(currentAsset.asset_id);
+        // Close the carousel
+        handleClose();
       }
-
-      // Close the carousel
-      handleClose();
     } catch (error) {
       console.error("Failed to delete asset:", error);
-      showMessage("error", t("delete.error"));
     } finally {
       setIsDeleting(false);
       // Close the modal
@@ -267,12 +252,11 @@ const FullScreenCarousel = ({
 
         {/* Like / Favorite */}
         <button
-          className={`btn btn-circle btn-lg ${
-            currentAsset?.liked ? "text-red-500" : ""
-          }`}
+          className={`btn btn-circle btn-lg ${optimisticLiked ? "text-red-500" : ""
+            }`}
           onClick={handleLikeToggle}
         >
-          <Heart className={`${currentAsset?.liked ? "fill-red-500" : ""}`} />
+          <Heart className={`${optimisticLiked ? "fill-red-500" : ""}`} />
         </button>
 
         {/* Share / Export */}

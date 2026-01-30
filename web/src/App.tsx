@@ -50,7 +50,10 @@ function App(): React.ReactNode {
                   <div className="w-auto bg-base-200 shadow-lg">
                     <SideBar />
                   </div>
-                  <div className="flex-1 p-4 overflow-y-auto overflow-x-hidden">
+                  <div
+                    id="app-scroll-container"
+                    className="flex-1 p-4 overflow-y-auto overflow-x-hidden"
+                  >
                     <Routes>
                       {routes.map((route) => {
                         const isPublic = route.path === "/login" || route.path === "/register";

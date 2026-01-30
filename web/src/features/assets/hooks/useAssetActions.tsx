@@ -1,6 +1,5 @@
 import { useCallback } from "react";
-import { useAssetsStore } from "../assets.store";
-import { useShallow } from "zustand/react/shallow";
+import { useQueryClient } from "@tanstack/react-query";
 import { AssetActionsResult } from "@/features/assets";
 import client from "@/lib/http-commons/client";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
@@ -9,208 +8,175 @@ import { Asset } from "@/lib/assets/types";
 
 /**
  * Hook for performing business operations on assets.
- * Handles optimistic updates and error recovery automatically.
+ * Now simplified for React 19 architecture:
+ * - No manual cache updates (optimistic UI handles immediate feedback)
+ * - No snapshot/restore logic
+ * - Just API call + invalidateQueries
  *
  * @returns Object containing asset action functions
- *
- * @example
- * ```tsx
- * function AssetRating({ assetId }: { assetId: string }) {
- *   const { updateRating } = useAssetActions();
- *   const { asset } = useAsset(assetId);
- *
- *   const handleRatingChange = async (newRating: number) => {
- *     await updateRating(assetId, newRating);
- *   };
- *
- *   return (
- *     <StarRating
- *       rating={asset?.specific_metadata?.rating || 0}
- *       onChange={handleRatingChange}
- *     />
- *   );
- * }
- * ```
  */
 export const useAssetActions = (): AssetActionsResult => {
-  const {
-    updateEntity,
-    deleteEntity,
-    removeAssetFromViews,
-    setEntity,
-  } = useAssetsStore(
-    useShallow((state) => ({
-      updateEntity: state.updateEntity,
-      deleteEntity: state.deleteEntity,
-      removeAssetFromViews: state.removeAssetFromViews,
-      setEntity: state.setEntity,
-    }))
-  );
-
+  const queryClient = useQueryClient();
   const showMessage = useMessage();
   const { t } = useI18n();
 
+  // List of API paths that return asset lists (infinite queries)
+  // We strictly match these to avoid accidentally updating unrelated queries
+  const ASSET_LIST_QUERY_PATHS = new Set([
+    "/api/v1/assets",
+    "/api/v1/assets/search",
+    "/api/v1/assets/filter",
+    // Albums also return asset lists via filter endpoint
+    // Note: This is an exact path match on the template, NOT the expanded URL
+    "/api/v1/albums/{id}/filter",
+  ]);
+
   /**
-   * Update asset rating with optimistic updates
+   * Helper to invalidate asset queries
+   */
+  const invalidateAssetQueries = useCallback(() => {
+    return queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey;
+        // openapi-react-query keys are typically [method, path, params]
+        if (Array.isArray(key)) {
+          const path = key[1];
+          if (typeof path === 'string') {
+            return ASSET_LIST_QUERY_PATHS.has(path);
+          }
+        }
+        return false;
+      },
+    });
+  }, [queryClient]);
+
+  /**
+   * Helper to manually update asset in cache without invalidation
+   */
+  const updateAssetInCache = useCallback((assetId: string, updateFn: (asset: Asset) => Asset) => {
+    queryClient.setQueriesData(
+      {
+        predicate: (query) => {
+          const key = query.queryKey;
+          if (Array.isArray(key)) {
+            const path = key[1];
+            if (typeof path === 'string') {
+              return ASSET_LIST_QUERY_PATHS.has(path);
+            }
+          }
+          return false;
+        },
+      },
+      (oldData: any) => {
+        if (!oldData) return oldData;
+
+        // Handle Infinite Query data structure
+        if (oldData.pages && Array.isArray(oldData.pages)) {
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page: any) => {
+              if (page.data && Array.isArray(page.data.assets)) {
+                return {
+                  ...page,
+                  data: {
+                    ...page.data,
+                    assets: page.data.assets.map((asset: Asset) => {
+                      if (asset.asset_id === assetId) {
+                        return updateFn(asset);
+                      }
+                      return asset;
+                    }),
+                  },
+                };
+              }
+              return page;
+            }),
+          };
+        }
+        return oldData;
+      }
+    );
+  }, [queryClient]);
+
+  /**
+   * Update asset rating
    */
   const updateRating = useCallback(
     async (assetId: string, rating: number): Promise<void> => {
-      // Access current state via getState() to avoid subscription rerenders
-      const currentAsset = useAssetsStore.getState().entities.assets[assetId];
-      if (!currentAsset) {
-        throw new Error("Asset not found");
-      }
-
-      // Optimistic update
-      const optimisticUpdate = {
-        rating,
-      };
-
-      updateEntity(assetId, optimisticUpdate, { isOptimistic: true });
-
       try {
-        // Perform actual API call
         await client.PUT("/api/v1/assets/{id}/rating", {
           params: { path: { id: assetId } },
           body: { rating },
         });
 
-        // Confirm the update (remove optimistic flag)
-        updateEntity(assetId, optimisticUpdate, { isOptimistic: false });
-
-        showMessage("success", t("rating.updateSuccess"));
+        // Hybrid Strategy: Manual update for low-risk, high-frequency action
+        updateAssetInCache(assetId, (asset) => ({ ...asset, rating }));
       } catch (error) {
-        // Revert optimistic update on error
-        updateEntity(
-          assetId,
-          { rating: currentAsset.rating },
-          { isOptimistic: false }
-        );
-
         console.error("Failed to update rating:", error);
         showMessage("error", t("rating.updateError"));
         throw error;
       }
     },
-    [updateEntity, showMessage, t],
+    [updateAssetInCache, showMessage, t],
   );
 
   /**
-   * Toggle asset like status with optimistic updates
+   * Toggle asset like status
    */
   const toggleLike = useCallback(
-    async (assetId: string): Promise<void> => {
-      const currentAsset = useAssetsStore.getState().entities.assets[assetId];
-      if (!currentAsset) {
-        throw new Error("Asset not found");
-      }
-
-      const currentLiked = currentAsset.liked || false;
-      const newLiked = !currentLiked;
-
-      // Optimistic update
-      const optimisticUpdate = {
-        liked: newLiked,
-      };
-
-      updateEntity(assetId, optimisticUpdate, { isOptimistic: true });
-
+    async (assetId: string, isLiked: boolean): Promise<void> => {
       try {
-        // Perform actual API call
         await client.PUT("/api/v1/assets/{id}/like", {
           params: { path: { id: assetId } },
-          body: { liked: newLiked },
+          body: { liked: isLiked },
         });
 
-        // Confirm the update
-        updateEntity(assetId, optimisticUpdate, { isOptimistic: false });
-
-        showMessage("success", t("rating.updateSuccess"));
+        // Hybrid Strategy: Manual update for low-risk, high-frequency action
+        updateAssetInCache(assetId, (asset) => ({ ...asset, liked: isLiked }));
       } catch (error) {
-        // Revert optimistic update on error
-        updateEntity(
-          assetId,
-          { liked: currentAsset.liked },
-          { isOptimistic: false }
-        );
-
         console.error("Failed to toggle like:", error);
         showMessage("error", t("rating.updateError"));
         throw error;
       }
     },
-    [updateEntity, showMessage, t],
+    [updateAssetInCache, showMessage, t],
   );
 
   /**
-   * Update asset description with optimistic updates
+   * Update asset description
    */
   const updateDescription = useCallback(
     async (assetId: string, description: string): Promise<void> => {
-      const currentAsset = useAssetsStore.getState().entities.assets[assetId];
-      if (!currentAsset) {
-        throw new Error("Asset not found");
-      }
-
-      // Optimistic update
-      const optimisticUpdate = {
-        specific_metadata: {
-          ...currentAsset.specific_metadata,
-          description,
-        },
-      };
-
-      updateEntity(assetId, optimisticUpdate, { isOptimistic: true });
-
       try {
-        // Perform actual API call
         await client.PUT("/api/v1/assets/{id}/description", {
           params: { path: { id: assetId } },
           body: { description },
         });
 
-        // Confirm the update
-        updateEntity(assetId, optimisticUpdate, { isOptimistic: false });
-
+        // Hybrid Strategy: Invalidate for higher-risk/lower-frequency action
+        // Ensuring description matches everywhere (e.g. search results) is complex to patch manually
+        await invalidateAssetQueries();
         showMessage("success", t("assets.basicInfo.descriptionUpdated"));
       } catch (error) {
-        // Revert optimistic update on error
-        updateEntity(
-          assetId,
-          { specific_metadata: currentAsset.specific_metadata },
-          { isOptimistic: false }
-        );
-
         console.error("Failed to update description:", error);
         showMessage("error", t("assets.basicInfo.descriptionUpdateError"));
         throw error;
       }
     },
-    [updateEntity, showMessage, t],
+    [invalidateAssetQueries, showMessage, t],
   );
 
   /**
-   * Delete asset (soft delete, marks as deleted and removes from views)
+   * Delete asset
    */
   const deleteAsset = useCallback(
     async (assetId: string): Promise<void> => {
-      const currentAsset = useAssetsStore.getState().entities.assets[assetId];
-      if (!currentAsset) {
-        throw new Error("Asset not found");
-      }
-
       try {
-        // Perform API call first for delete (no optimistic update for safety)
         await client.DELETE("/api/v1/assets/{id}", {
           params: { path: { id: assetId } },
         });
 
-        // Remove from all views
-        removeAssetFromViews(assetId);
-
-        // Mark as deleted in entity store (or remove entirely)
-        deleteEntity(assetId);
-
+        await invalidateAssetQueries();
         showMessage("success", t("delete.success"));
       } catch (error) {
         console.error("Failed to delete asset:", error);
@@ -218,11 +184,11 @@ export const useAssetActions = (): AssetActionsResult => {
         throw error;
       }
     },
-    [deleteEntity, removeAssetFromViews, showMessage, t],
+    [invalidateAssetQueries, showMessage, t],
   );
 
   /**
-   * Batch update multiple assets (useful for bulk operations)
+   * Batch update multiple assets
    */
   const batchUpdateAssets = useCallback(
     async (
@@ -231,16 +197,10 @@ export const useAssetActions = (): AssetActionsResult => {
         updates: Partial<Asset>;
       }>,
     ): Promise<void> => {
-      // Apply optimistic updates
-      updates.forEach(({ assetId, updates: assetUpdates }) => {
-        updateEntity(assetId, assetUpdates, { isOptimistic: true });
-      });
-
       try {
-        // Batch API call (if supported, otherwise sequential calls)
+        // Batch API call (looping for now as per original logic)
         await Promise.all(
           updates.map(async ({ assetId, updates: assetUpdates }) => {
-            // Implement specific API calls based on update type
             if (assetUpdates.rating !== undefined) {
               await client.PUT("/api/v1/assets/{id}/rating", {
                 params: { path: { id: assetId } },
@@ -262,53 +222,29 @@ export const useAssetActions = (): AssetActionsResult => {
           }),
         );
 
-        // Confirm all updates
-        updates.forEach(({ assetId, updates: assetUpdates }) => {
-          updateEntity(assetId, assetUpdates, { isOptimistic: false });
-        });
-
+        await invalidateAssetQueries();
         showMessage(
           "success",
           t("bulk.updateSuccess", { count: updates.length }),
         );
       } catch (error) {
-        // Revert all optimistic updates
-        updates.forEach(({ assetId }) => {
-          const originalAsset = useAssetsStore.getState().entities.assets[assetId];
-          if (originalAsset) {
-            setEntity(assetId, originalAsset, { isOptimistic: false });
-          }
-        });
-
         console.error("Failed to batch update assets:", error);
         showMessage("error", t("bulk.updateError"));
         throw error;
       }
     },
-    [updateEntity, setEntity, showMessage, t],
+    [invalidateAssetQueries, showMessage, t],
   );
 
   /**
-   * Refresh asset data from server (useful after external changes)
+   * Refresh asset data
    */
   const refreshAsset = useCallback(
-    async (assetId: string): Promise<void> => {
-      try {
-        const response = await client.GET("/api/v1/assets/{id}", {
-          params: { path: { id: assetId } },
-        });
-        const updatedAsset = response.data?.data as Asset | undefined;
-
-        if (updatedAsset) {
-          setEntity(assetId, updatedAsset, { fetchOrigin: "refresh" });
-        }
-      } catch (error) {
-        console.error("Failed to refresh asset:", error);
-        showMessage("error", t("refresh.error"));
-        throw error;
-      }
+    async (): Promise<void> => {
+      // With the new strategy, refresh usually just means invalidating
+      await invalidateAssetQueries();
     },
-    [setEntity, showMessage, t],
+    [invalidateAssetQueries],
   );
 
   return {
@@ -323,32 +259,7 @@ export const useAssetActions = (): AssetActionsResult => {
 
 /**
  * Hook for asset actions that don't require optimistic updates.
- * Useful for operations where immediate feedback isn't critical.
+ * (This is essentially the same as above now, potentially can be merged or deprecated)
  */
-export const useAssetActionsSimple = () => {
-  const showMessage = useMessage();
-  const { t } = useI18n();
-  const updateEntity = useAssetsStore((state) => state.updateEntity);
+export const useAssetActionsSimple = useAssetActions;
 
-  const updateRating = useCallback(
-    async (assetId: string, rating: number) => {
-      try {
-        await client.PUT("/api/v1/assets/{id}/rating", {
-          params: { path: { id: assetId } },
-          body: { rating },
-        });
-
-        // Simple update without optimistic handling
-        updateEntity(assetId, { rating });
-
-        showMessage("success", t("rating.updateSuccess"));
-      } catch (error) {
-        showMessage("error", t("rating.updateError"));
-        throw error;
-      }
-    },
-    [updateEntity, showMessage, t],
-  );
-
-  return { updateRating };
-};

@@ -20,25 +20,12 @@ sequenceDiagram
     deactivate Store
     
     Note over Hook: Hook detects filter change
-    Hook->>Store: setViewLoading(viewKey, true)
-    Store-->>UI: (re-render: Loading=true)
-    
     Hook->>API: filterAssets({ rating: 4, ... })
     activate API
     API-->>Hook: { assets: [...], total, hasMore }
     deactivate API
     
-    Hook->>Store: batchSetEntities(assets)
-    activate Store
-    Store->>Store: entities.assets[id] = asset (for each)
-    deactivate Store
-    
-    Hook->>Store: setViewAssets(viewKey, assetIds, hasMore, pageInfo)
-    activate Store
-    Store->>Store: views[viewKey].assetIds = [...]
-    Store->>Store: views[viewKey].isLoading = false
-    Store-->>UI: (re-render: Grid shows filtered results)
-    deactivate Store
+    Hook-->>UI: (re-render: Grid shows filtered results)
 ```
 
 ---
@@ -64,9 +51,6 @@ sequenceDiagram
     
     Note over Hook: Debounce (300ms) then trigger search
     
-    Hook->>Store: setViewLoading(viewKey, true)
-    Store-->>UI: (Loading spinner)
-    
     alt Semantic Search Mode
         Hook->>API: searchAssets({ query: "sunset", mode: "semantic" })
     else Filename Search Mode
@@ -77,9 +61,7 @@ sequenceDiagram
     API-->>Hook: { assets: [...], total }
     deactivate API
     
-    Hook->>Store: batchSetEntities(assets)
-    Hook->>Store: setViewAssets(viewKey, assetIds, hasMore, pageInfo)
-    Store-->>UI: (Grid shows search results)
+    Hook-->>UI: (Grid shows search results)
 ```
 
 ---
@@ -91,33 +73,23 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant UI as AssetGrid (Consumer)
-    participant Store as AssetsStore
     participant Hook as useAssetView Hook
     participant API as $api
     
     Note over UI, API: User scrolls near bottom
     
     UI->>Hook: onLoadMore()
-    Hook->>Store: Check views[viewKey].hasMore
+    Hook->>Hook: Check hasMore
     
     alt hasMore = false
         Note over Hook: No action needed
     else hasMore = true
-        Hook->>Store: setViewLoadingMore(viewKey, true)
-        Store-->>UI: (Show loading indicator at bottom)
-        
         Hook->>API: listAssets({ cursor: nextCursor, ... })
         activate API
         API-->>Hook: { assets: [...], nextCursor, hasMore }
         deactivate API
         
-        Hook->>Store: batchSetEntities(assets)
-        Hook->>Store: appendViewAssets(viewKey, newIds, hasMore, pageInfo)
-        activate Store
-        Store->>Store: views[viewKey].assetIds.push(...newIds)
-        Store->>Store: views[viewKey].isLoadingMore = false
-        Store-->>UI: (Grid appends new items)
-        deactivate Store
+        Hook-->>UI: (Grid appends new items)
     end
 ```
 
@@ -130,16 +102,15 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant UI as AssetCard (Consumer)
-    participant Store as AssetsStore
+    participant QueryCache as ReactQuery
     participant API as $api
     
     Note over UI, API: User clicks star to rate 5
     
-    UI->>Store: updateEntity(assetId, { rating: 5 })
-    activate Store
-    Store->>Store: entities.assets[id].rating = 5 (optimistic)
-    Store-->>UI: (Star fills immediately)
-    deactivate Store
+    UI->>QueryCache: updateAssetInQueries(assetId, { rating: 5 })
+    activate QueryCache
+    QueryCache-->>UI: (Star fills immediately)
+    deactivate QueryCache
     
     UI->>API: updateAssetRating(id, 5)
     activate API
@@ -149,8 +120,8 @@ sequenceDiagram
         Note over UI: No action needed (already updated)
     else Error
         API-->>UI: { error: "..." }
-        UI->>Store: updateEntity(assetId, { rating: oldRating })
-        Store-->>UI: (Rollback: star reverts)
+        UI->>QueryCache: updateAssetInQueries(assetId, { rating: oldRating })
+        QueryCache-->>UI: (Rollback: star reverts)
     end
     deactivate API
 ```
@@ -166,6 +137,7 @@ sequenceDiagram
     participant UI as SelectionToolbar
     participant Store as AssetsStore
     participant API as $api
+    participant QueryCache as ReactQuery
     
     Note over UI, API: User selects multiple assets
     
@@ -183,10 +155,9 @@ sequenceDiagram
     UI->>Store: Get selectedIds from store
     
     loop For each selectedId
+        UI->>QueryCache: markAssetDeletedInQueries(id)
         UI->>API: deleteAsset(id)
         API-->>UI: { success: true }
-        UI->>Store: deleteEntity(id)
-        UI->>Store: removeAssetFromViews(id)
     end
     
     UI->>Store: clearSelection()

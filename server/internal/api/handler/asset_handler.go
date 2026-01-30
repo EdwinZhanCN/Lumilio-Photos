@@ -723,7 +723,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Param type query string false "Single asset type filter" Enums(PHOTO,VIDEO,AUDIO,DOCUMENT) example("PHOTO")
+// @Param type query string false "Single asset type filter" Enums(PHOTO,VIDEO,AUDIO) example("PHOTO")
 // @Param types query string false "Multiple asset types filter (comma-separated)" example("PHOTO,VIDEO")
 // @Param owner_id query int false "Filter by owner ID" example(123)
 // @Param limit query int false "Maximum number of results (max 100)" default(20) example(20)
