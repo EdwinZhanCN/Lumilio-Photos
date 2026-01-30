@@ -1,5 +1,6 @@
 import { StateCreator } from "zustand";
 import { FiltersState } from "../types/assets.type";
+import { mapFilenameModeToDTO } from "../utils/filterUtils";
 
 export interface FiltersSlice {
   filters: FiltersState;
@@ -112,16 +113,17 @@ export const selectActiveFilterCount = (input: FiltersInput): number => {
   const state = getFiltersState(input);
   if (!state.enabled) return 0;
 
-  let count = 0;
-  if (state.raw !== undefined) count++;
-  if (state.rating !== undefined) count++;
-  if (state.liked !== undefined) count++;
-  if (state.filename && state.filename.value.trim()) count++;
-  if (state.date && (state.date.from || state.date.to)) count++;
-  if (state.camera_make && state.camera_make.trim()) count++;
-  if (state.lens && state.lens.trim()) count++;
+  const activeCriteria = [
+    state.raw !== undefined,
+    state.rating !== undefined,
+    state.liked !== undefined,
+    state.filename?.value?.trim(),
+    state.date && (state.date.from || state.date.to),
+    state.camera_make?.trim(),
+    state.lens?.trim(),
+  ];
 
-  return count;
+  return activeCriteria.filter(Boolean).length;
 };
 
 export const selectHasActiveFilters = (input: FiltersInput): boolean => {
@@ -145,7 +147,7 @@ export const selectFilterAsAssetFilter = (input: FiltersInput) => {
   }
   if (state.filename && state.filename.value.trim()) {
     filter.filename = {
-      mode: state.filename.mode,
+      operator: mapFilenameModeToDTO(state.filename.mode),
       value: state.filename.value.trim(),
     };
   }

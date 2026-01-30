@@ -1,17 +1,15 @@
 import { useParams } from "react-router-dom";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
-import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import { useGroupBy, useIsCarouselOpen, useUIActions } from "@/features/assets/selectors";
 import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
 import { useAssetsView } from "@/features/assets/hooks/useAssetsView";
-import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
-import { findAssetIndex, getFlatAssetsFromGrouped } from "@/lib/utils/assetGrouping";
+import {findAssetIndex, getFlatAssetsFromGrouped, groupAssets} from "@/lib/utils/assetGrouping";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
-import { AssetViewDefinition } from "@/features/assets";
+import {AssetViewDefinition, JustifiedGallery} from "@/features/assets";
 import { FolderIcon } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult } from "@/lib/albums/types";
@@ -22,8 +20,8 @@ const AlbumAssetsContent = () => {
   const isCarouselOpen = useIsCarouselOpen();
   const { setGroupBy } = useUIActions();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
-  const { deleteAsset } = useAssetActions();
   const [isScrolled, setIsScrolled] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const albumIdNumber = albumId ? Number(albumId) : 0;
 
   // Fetch album metadata
@@ -58,16 +56,24 @@ const AlbumAssetsContent = () => {
     isLoadingMore,
     fetchMore,
     hasMore,
-    error
+    error,
   } = useAssetsView(viewDefinition, { withGroups: true });
+
+  // Handle flat grouping - ensure we have a proper groups object
+  const groupedPhotos = useMemo(() => {
+    if (groups && Object.keys(groups).length > 0) {
+      return groups;
+    }
+    return groupAssets(assets, groupBy);
+  }, [groups, assets, groupBy]);
 
   // Use flat assets from grouped to ensure order consistency with gallery
   const flatAssets = useMemo(() => {
-    if (groups && Object.keys(groups).length > 0) {
-      return getFlatAssetsFromGrouped(groups);
+    if (groupedPhotos && Object.keys(groupedPhotos).length > 0) {
+      return getFlatAssetsFromGrouped(groupedPhotos);
     }
     return assets;
-  }, [groups, assets]);
+  }, [groupedPhotos, assets]);
 
   // Calculate slide index from URL assetId
   const slideIndex = useMemo(() => {
@@ -103,15 +109,6 @@ const AlbumAssetsContent = () => {
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setIsScrolled(e.currentTarget.scrollTop > 60);
   }, []);
-
-  const handleAssetDelete = useCallback(
-    (deletedAssetId: string) => {
-      deleteAsset(deletedAssetId).catch((error: any) => {
-        console.error("Failed to delete asset:", error);
-      });
-    },
-    [deleteAsset],
-  );
 
   if (error) return <div className="p-8 text-error">Error loading album: {error}</div>;
 
@@ -177,13 +174,17 @@ const AlbumAssetsContent = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto" onScroll={handleScroll}>
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto"
+        onScroll={handleScroll}
+      >
         <div>
           {isInitialLoading ? (
             <PhotosLoadingSkeleton />
           ) : (
             <JustifiedGallery
-              groupedPhotos={groups || {}}
+              groupedPhotos={groupedPhotos}
               openCarousel={openCarousel}
               onLoadMore={handleLoadMore}
               hasMore={hasMore}
@@ -201,7 +202,6 @@ const AlbumAssetsContent = () => {
             slideIndex={slideIndex >= 0 ? slideIndex : undefined}
             onClose={closeCarousel}
             onNavigate={openCarousel}
-            onAssetDelete={handleAssetDelete}
           />
           {isLocatingAsset && (
             <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center">

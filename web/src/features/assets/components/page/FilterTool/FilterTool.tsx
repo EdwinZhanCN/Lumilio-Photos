@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
 
+
 /* =========================
    Types
    ========================= */
@@ -38,6 +39,8 @@ export interface FilterDTO {
   // Extended field to represent spatial filtering
   location?: LocationBBox;
 }
+
+
 
 type FilterToolProps = {
   initial?: FilterDTO;

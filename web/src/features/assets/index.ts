@@ -1,11 +1,6 @@
 export { AssetsProvider } from "./AssetsProvider";
 export { useAssetsView, useCurrentTabAssets } from "./hooks/useAssetsView";
-export {
-  useAsset,
-  useAssets,
-  useAssetExists,
-  useAssetMeta,
-} from "./hooks/useAsset";
+// Export removed: useAsset and related hooks are deleted
 export {
   useAssetActions,
   useAssetActionsSimple,
@@ -44,7 +39,7 @@ export { default as AssetsPageHeader } from "./components/shared/AssetsPageHeade
 export { default as JustifiedGallery } from "./components/page/JustifiedGallery/JustifiedGallery";
 
 // Export utilities and selectors from slices
-export { generateViewKey } from "./slices/views.slice";
+export { generateViewKey } from "./utils/viewKey";
 export {
   selectActiveFilterCount,
   selectHasActiveFilters,
@@ -55,4 +50,3 @@ export {
   selectTabSupportsSemanticSearch,
   selectTabAssetTypes,
 } from "./slices/ui.slice";
-

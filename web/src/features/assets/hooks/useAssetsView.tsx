@@ -1,18 +1,12 @@
-import { useEffect, useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useAssetsStore } from "../assets.store";
-import { useShallow } from "zustand/react/shallow";
 import {
   AssetViewDefinition,
   AssetsViewResult,
   ViewDefinitionOptions,
   TabType,
 } from "@/features/assets";
-import {
-  generateViewKey,
-  selectView,
-  selectViewAssetIds,
-} from "../slices/views.slice";
-import { selectAssets } from "../slices/entities.slice";
+import { generateViewKey } from "../utils/viewKey";
 import {
   selectFilterAsAssetFilter,
   selectFiltersEnabled,
@@ -24,19 +18,6 @@ import { Asset } from "@/lib/assets/types";
 
 type ListAssetsParams = NonNullable<paths["/api/v1/assets"]["get"]["parameters"]["query"]>;
 type SearchAssetsParams = components["schemas"]["dto.SearchAssetsRequestDTO"];
-
-type StoreSyncResult = {
-  assets: Asset[];
-  viewState:
-    | {
-        isLoading: boolean;
-        isLoadingMore: boolean;
-        hasMore: boolean;
-        error: string | null;
-        pageInfo: { cursor?: string; page?: number; total?: number };
-      }
-    | undefined;
-};
 
 type AssetsViewQueryResult = {
   assets: Asset[];
@@ -50,6 +31,8 @@ type AssetsViewQueryResult = {
   viewKey: string;
   pageInfo: { cursor?: string; page: number; total?: number };
 };
+
+
 
 /**
  * Converts tab types to their corresponding API MIME type strings.
@@ -323,20 +306,23 @@ export const useAssetsViewQuery = (
     },
   );
 
-  const pages = query.data?.pages ?? [];
-  const pageParams = query.data?.pageParams ?? [];
-  const assetsPages = pages.map((page, index) => {
-    const offset = Number(pageParams[index] ?? 0) || 0;
-    const responseData = (page as any)?.data;
-    const assets = responseData?.assets || [];
-    const total = responseData?.total;
-    const hasMore =
-      typeof total === "number"
-        ? offset + assets.length < total
-        : assets.length >= pageSize;
+  const assetsPages = useMemo(() => {
+    const pages = query.data?.pages ?? [];
+    const pageParams = query.data?.pageParams ?? [];
 
-    return { assets, offset, total, hasMore };
-  });
+    return pages.map((page, index) => {
+      const offset = Number(pageParams[index] ?? 0) || 0;
+      const responseData = (page as any)?.data;
+      const assets = responseData?.assets || [];
+      const total = responseData?.total;
+      const hasMore =
+        typeof total === "number"
+          ? offset + assets.length < total
+          : assets.length >= pageSize;
+
+      return { assets, offset, total, hasMore };
+    });
+  }, [query.dataUpdatedAt, pageSize]);
 
   const assets = useMemo(
     () => assetsPages.flatMap((page) => page.assets),
@@ -361,6 +347,8 @@ export const useAssetsViewQuery = (
         ? String(query.error)
         : null;
 
+
+
   return {
     assets,
     isLoading: query.isLoading,
@@ -376,127 +364,6 @@ export const useAssetsViewQuery = (
     error,
     viewKey,
     pageInfo,
-  };
-};
-
-/**
- * Synchronizes React Query results with the Zustand assets store for legacy compatibility.
- * 
- * This hook maintains backward compatibility by keeping the zustand view state
- * synchronized with the React Query lifecycle. It handles:
- * - View creation and initialization
- * - Loading state synchronization
- * - Error state propagation
- * - Asset entity updates in the store
- * - Pagination state management
- * 
- * @param definition - The asset view definition
- * @param options - View options including disabled flag
- * @param queryResult - The query result from useAssetsViewQuery
- * 
- * @returns StoreSyncResult containing synchronized assets and view state
- * 
- * @example
- * ```ts
- * const queryResult = useAssetsViewQuery(definition, options);
- * const { assets, viewState } = useAssetsViewStoreSync(definition, options, queryResult);
- * ```
- */
-const useAssetsViewStoreSync = (
-  definition: AssetViewDefinition,
-  options: ViewDefinitionOptions,
-  queryResult: AssetsViewQueryResult,
-): StoreSyncResult => {
-  const { disabled = false } = options;
-  const {
-    assets: queryAssets,
-    isLoading,
-    isLoadingMore,
-    hasMore,
-    isFetched,
-    error,
-    viewKey,
-    pageInfo,
-  } = queryResult;
-
-  const {
-    createView,
-    setViewLoading,
-    setViewAssets,
-    setViewError,
-    setViewLoadingMore,
-    batchSetEntities,
-  } = useAssetsStore(
-    useShallow((state) => ({
-      createView: state.createView,
-      setViewLoading: state.setViewLoading,
-      setViewAssets: state.setViewAssets,
-      setViewError: state.setViewError,
-      setViewLoadingMore: state.setViewLoadingMore,
-      batchSetEntities: state.batchSetEntities,
-    })),
-  );
-
-  const viewState = useAssetsStore((state) => selectView(state, viewKey));
-  const assetIds = useAssetsStore((state) => selectViewAssetIds(state, viewKey));
-  const assets = useAssetsStore(
-    useShallow((state) => selectAssets(state.entities, assetIds)),
-  );
-
-  useEffect(() => {
-    if (!disabled) {
-      createView(viewKey, definition);
-    }
-  }, [viewKey, disabled, createView, definition]);
-
-  useEffect(() => {
-    if (disabled) return;
-    setViewLoading(viewKey, isLoading);
-  }, [disabled, viewKey, isLoading, setViewLoading]);
-
-  useEffect(() => {
-    if (disabled) return;
-    setViewLoadingMore(viewKey, isLoadingMore);
-  }, [disabled, viewKey, isLoadingMore, setViewLoadingMore]);
-
-  useEffect(() => {
-    if (disabled) return;
-    setViewError(viewKey, error);
-  }, [disabled, viewKey, error, setViewError]);
-
-  useEffect(() => {
-    if (disabled) return;
-    if (!isFetched) return;
-
-    batchSetEntities(queryAssets);
-
-    const newAssetIds = queryAssets
-      .map((asset) => asset.asset_id)
-      .filter((id): id is string => Boolean(id));
-
-    setViewAssets(viewKey, newAssetIds, hasMore, pageInfo, true);
-  }, [
-    disabled,
-    queryAssets,
-    viewKey,
-    hasMore,
-    pageInfo,
-    isFetched,
-    batchSetEntities,
-    setViewAssets,
-  ]);
-
-  return {
-    assets,
-    viewState: viewState
-      ? {
-          isLoading: viewState.isLoading,
-          isLoadingMore: viewState.isLoadingMore,
-          hasMore: viewState.hasMore,
-          error: viewState.error,
-          pageInfo: viewState.pageInfo,
-        }
-      : undefined,
   };
 };
 
@@ -544,7 +411,6 @@ const useAssetsViewGrouping = (
  * - View-aware filtering and sorting
  * - Optional asset grouping
  * - Error handling and loading states
- * - Store synchronization for legacy compatibility
  * 
  * @param definition - The asset view definition specifying what data to fetch
  * @param options - Additional configuration options
@@ -577,25 +443,28 @@ export const useAssetsView = (
 ): AssetsViewResult => {
   const { withGroups = false } = options;
   const queryResult = useAssetsViewQuery(definition, options);
-  const { assets, viewState } = useAssetsViewStoreSync(
-    definition,
-    options,
-    queryResult,
+
+  const filteredAssets = useMemo(
+    () =>
+      queryResult.assets.filter(
+        (asset) => !asset.is_deleted && !asset.deleted_at,
+      ),
+    [queryResult.assets],
   );
-  const groups = useAssetsViewGrouping(assets, definition, withGroups);
+  const groups = useAssetsViewGrouping(filteredAssets, definition, withGroups);
 
   return {
-    assets,
+    assets: filteredAssets,
     groups,
-    isLoading: viewState?.isLoading ?? false,
-    isLoadingMore: viewState?.isLoadingMore ?? false,
-    error: viewState?.error ?? null,
+    isLoading: queryResult.isLoading,
+    isLoadingMore: queryResult.isLoadingMore,
+    error: queryResult.error,
     fetchMore: queryResult.fetchMore,
     refetch: queryResult.refetch,
-    hasMore: viewState?.hasMore ?? true,
+    hasMore: queryResult.hasMore,
+    isFetched: queryResult.isFetched,
     viewKey: queryResult.viewKey,
-    pageInfo:
-      viewState?.pageInfo ?? { cursor: undefined, page: 1, total: undefined },
+    pageInfo: queryResult.pageInfo,
   };
 };
 

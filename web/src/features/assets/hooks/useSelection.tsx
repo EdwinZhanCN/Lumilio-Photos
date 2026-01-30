@@ -13,6 +13,7 @@ import {
 import { useAssetActions } from "./useAssetActions";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { $api } from "@/lib/http-commons/queryClient";
+import { Asset } from "@/lib/assets/types";
 
 /**
  * Hook for managing asset selection state and operations.
@@ -309,7 +310,7 @@ export const useSelectionState = () => {
  */
 export const useBulkAssetOperations = () => {
   const selection = useSelection();
-  const { toggleLike, deleteAsset, batchUpdateAssets } = useAssetActions();
+  const { deleteAsset, batchUpdateAssets } = useAssetActions();
   const { mutateAsync: addAssetToAlbum } = $api.useMutation(
     "post",
     "/api/v1/albums/{id}/assets/{assetId}",
@@ -325,15 +326,18 @@ export const useBulkAssetOperations = () => {
       }));
 
       await batchUpdateAssets(updates);
-    },
-    [selection.selectedIds, batchUpdateAssets],
-  );
+    }, [selection.selectedIds, batchUpdateAssets]);
 
-  const bulkToggleLike = useCallback(async (): Promise<void> => {
-    await Promise.all(
-      Array.from(selection.selectedIds).map((assetId) => toggleLike(assetId)),
-    );
-  }, [selection.selectedIds, toggleLike]);
+  const bulkSetLike = useCallback(async (liked: boolean): Promise<void> => {
+    const updates = Array.from(selection.selectedIds).map((assetId) => ({
+      assetId,
+      updates: {
+        liked,
+      },
+    }));
+
+    await batchUpdateAssets(updates);
+  }, [selection.selectedIds, batchUpdateAssets]);
 
   const bulkDelete = useCallback(async (): Promise<void> => {
     await Promise.all(
@@ -342,7 +346,7 @@ export const useBulkAssetOperations = () => {
     selection.clear();
   }, [selection.selectedIds, selection.clear, deleteAsset]);
 
-  const bulkDownload = useCallback(async (): Promise<void> => {
+  const bulkDownload = useCallback(async (assets?: Asset[]): Promise<void> => {
     const ids = Array.from(selection.selectedIds);
     if (ids.length === 0) return;
 
@@ -355,12 +359,24 @@ export const useBulkAssetOperations = () => {
         const link = document.createElement('a');
         link.href = blobUrl;
 
-        // Try to get filename from content-disposition or use a fallback
-        const contentDisposition = response.headers.get('content-disposition');
+        // Try to get filename from asset object first, then content-disposition, then fallback
         let filename = `asset-${id}`;
-        if (contentDisposition) {
-          const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-          if (filenameMatch) filename = filenameMatch[1];
+
+        // 1. Try asset object
+        if (assets) {
+          const asset = assets.find(a => a.asset_id === id);
+          if (asset?.original_filename) {
+            filename = asset.original_filename;
+          }
+        }
+
+        // 2. Try content-disposition if we didn't find it
+        if (filename === `asset-${id}`) {
+          const contentDisposition = response.headers.get('content-disposition');
+          if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+            if (filenameMatch) filename = filenameMatch[1];
+          }
         }
 
         link.setAttribute('download', filename);
@@ -390,13 +406,11 @@ export const useBulkAssetOperations = () => {
 
   return {
     bulkUpdateRating,
-    bulkToggleLike,
+    bulkSetLike,
     bulkDelete,
-    bulkDownload,
+    bulkDownload: (assets?: Asset[]) => bulkDownload(assets),
     bulkAddToAlbum,
     selectedCount: selection.selectedCount,
     hasSelection: selection.selectedCount > 0,
   };
 };
-
-// ... (End of file, removed duplicate useBulkAssetOperations)

@@ -1,6 +1,6 @@
 # AssetsStore Anatomy
 
-> Store composition with 5 slices: Entities, Views, UI, Filters, and Selection
+> Store composition with 4 slices: UI, Filters, Selection, and Entities (Deprecated)
 
 ```mermaid
 classDiagram
@@ -11,7 +11,7 @@ classDiagram
         <<Zustand Store>>
     }
     
-    %% ========== ENTITIES SLICE ==========
+    %% ========== ENTITIES SLICE (DEPRECATED) ==========
     class EntitiesSlice {
         <<Slice>>
         %% State
@@ -23,25 +23,6 @@ classDiagram
         +updateEntity(id, updates, meta)
         +deleteEntity(id)
         +batchSetEntities(assets, meta)
-    }
-    
-    %% ========== VIEWS SLICE ==========
-    class ViewsSlice {
-        <<Slice>>
-        %% State
-        +Record~key, ViewState~ views
-        +string[] activeViewKeys
-        
-        %% Actions
-        +createView(key, definition)
-        +setViewLoading(key, loading)
-        +setViewAssets(key, ids, hasMore, pageInfo)
-        +appendViewAssets(key, ids, hasMore, pageInfo)
-        +setViewError(key, error)
-        +setViewLoadingMore(key, loading)
-        +removeView(key)
-        +removeAssetFromViews(assetId)
-        +cleanupStaleViews(maxAge)
     }
     
     %% ========== UI SLICE ==========
@@ -133,14 +114,10 @@ classDiagram
         +useActiveFilterCount()
         +useFilterState()
         
-        %% Entities
+        %% Entities (Deprecated)
         +useAsset(id)
         +useAssetMeta(id)
         +useAllAssets()
-        
-        %% Views
-        +useView(key)
-        +useViewAssetIds(key)
         
         %% Action Hooks
         +useSelectionActions()
@@ -163,13 +140,11 @@ classDiagram
     
     %% Relationships
     AssetsStore *-- EntitiesSlice : composes
-    AssetsStore *-- ViewsSlice : composes
     AssetsStore *-- UISlice : composes
     AssetsStore *-- FiltersSlice : composes
     AssetsStore *-- SelectionSlice : composes
     
     Selectors ..> AssetsStore : subscribes
-    ViewsSlice ..> AssetService : fetches via
     EntitiesSlice ..> AssetService : mutations via
 ```
 
@@ -177,8 +152,7 @@ classDiagram
 
 | Slice | Purpose |
 |-------|---------|
-| **EntitiesSlice** | Normalized asset data cache (single source of truth for asset objects) |
-| **ViewsSlice** | Manages paginated lists of asset IDs for different views/queries |
+| **EntitiesSlice** | (Deprecated) Normalized asset data cache. Now assets are managed by React Query. |
 | **UISlice** | UI state like current tab, search query, carousel visibility |
 | **FiltersSlice** | Advanced filter state (rating, date range, camera, lens, etc.) |
 | **SelectionSlice** | Multi-select functionality for bulk operations |

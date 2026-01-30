@@ -100,6 +100,7 @@ export const AssetsProvider = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams<{ assetId?: string }>();
   const { state: settingsState } = useSettingsContext();
+  const lastUrlSyncRef = useRef<string>("");
 
   // Store actions
   const {
@@ -107,7 +108,6 @@ export const AssetsProvider = ({
     setCarouselOpen,
     setActiveAssetId,
     hydrateUIFromURL,
-    removeView,
     setSelectionMode,
     batchUpdateFilters,
     setSelectionEnabled,
@@ -118,7 +118,6 @@ export const AssetsProvider = ({
       setCarouselOpen: state.setCarouselOpen,
       setActiveAssetId: state.setActiveAssetId,
       hydrateUIFromURL: state.hydrateUIFromURL,
-      removeView: state.removeView,
       setSelectionMode: state.setSelectionMode,
       batchUpdateFilters: state.batchUpdateFilters,
       setSelectionEnabled: state.setSelectionEnabled,
@@ -128,7 +127,6 @@ export const AssetsProvider = ({
 
   // Store state for effects
   const uiState = useAssetsStore(useShallow((state) => state.ui));
-  const viewsState = useAssetsStore(useShallow((state) => state.views));
   const filtersState = useAssetsStore(useShallow((state) => state.filters));
   const selectionState = useAssetsStore(useShallow((state) => state.selection));
 
@@ -210,6 +208,13 @@ export const AssetsProvider = ({
     const urlQuery = searchParams.get("q");
     const defaultGroupBy =
       settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
+    const urlSyncKey = `${urlGroupBy ?? ""}|${urlQuery ?? ""}|${defaultGroupBy}`;
+
+    if (lastUrlSyncRef.current === urlSyncKey) {
+      return;
+    }
+    lastUrlSyncRef.current = urlSyncKey;
+
     const expectedGroupBy = urlGroupBy || defaultGroupBy;
 
     if (expectedGroupBy !== uiState.groupBy) {
@@ -228,6 +233,7 @@ export const AssetsProvider = ({
   ]);
 
   // Sync URL with UI state
+  // Restored to ensure URL reflects Store state (e.g. for deep linking consistency)
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
     let hasChanges = false;
@@ -235,8 +241,10 @@ export const AssetsProvider = ({
       settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
 
     if (uiState.groupBy !== defaultGroupBy) {
-      params.set("groupBy", uiState.groupBy);
-      hasChanges = true;
+      if (params.get("groupBy") !== uiState.groupBy) {
+        params.set("groupBy", uiState.groupBy);
+        hasChanges = true;
+      }
     } else {
       if (params.has("groupBy")) {
         params.delete("groupBy");
@@ -245,8 +253,10 @@ export const AssetsProvider = ({
     }
 
     if (uiState.searchQuery.trim()) {
-      params.set("q", uiState.searchQuery);
-      hasChanges = true;
+      if (params.get("q") !== uiState.searchQuery) {
+        params.set("q", uiState.searchQuery);
+        hasChanges = true;
+      }
     } else {
       if (params.has("q")) {
         params.delete("q");
@@ -265,27 +275,6 @@ export const AssetsProvider = ({
     searchParams,
   ]);
 
-  // Cleanup stale views
-  useEffect(() => {
-    const interval = setInterval(
-      () => {
-        if (Object.keys(viewsState).length > 10) {
-          const now = Date.now();
-          const maxAge = 30 * 60 * 1000;
-          const activeViewKeys = new Set(useAssetsStore.getState().activeViewKeys);
-
-          Object.entries(useAssetsStore.getState().views).forEach(([key, view]) => {
-            if (!activeViewKeys.has(key) && now - view.lastFetchAt > maxAge) {
-              removeView(key);
-            }
-          });
-        }
-      },
-      5 * 60 * 1000,
-    );
-
-    return () => clearInterval(interval);
-  }, [removeView]);
 
   const openCarousel = useCallback(
     (assetId: string) => {

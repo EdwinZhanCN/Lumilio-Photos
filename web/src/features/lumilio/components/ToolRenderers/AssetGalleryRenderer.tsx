@@ -104,8 +104,6 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
 };
 
 const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
-  const updateEntity = useAssetsStore((s) => s.updateEntity);
-  const deleteEntity = useAssetsStore((s) => s.deleteEntity);
   const [carouselAssetId, setCarouselAssetId] = useState<string | undefined>();
 
   const viewDefinition = useMemo<AssetViewDefinition>(() => ({
@@ -125,7 +123,7 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
     isLoadingMore,
     hasMore,
     fetchMore,
-    error
+    error,
   } = useAssetsView(viewDefinition, {
     withGroups: true,
     autoFetch: true
@@ -181,11 +179,6 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
           slideIndex={slideIndex >= 0 ? slideIndex : undefined}
           onClose={() => setCarouselAssetId(undefined)}
           onNavigate={setCarouselAssetId}
-          onAssetUpdate={(updatedAsset) => updateEntity(
-            updatedAsset.asset_id ?? "",
-            updatedAsset
-          )}
-          onAssetDelete={(assetId) => deleteEntity(assetId)}
         />
       )}
     </div>

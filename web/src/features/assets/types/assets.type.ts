@@ -35,11 +35,13 @@ export interface AssetViewDefinition {
   key?: string;
 }
 
-// ===== Entities State =====
+// ===== Entities State (DEPRECATED) =====
+// Kept for compatibility, but effectively unused
 export interface EntityMeta {
   lastUpdated: number;
   isOptimistic?: boolean;
   fetchOrigin?: string;
+  signature?: string;
 }
 
 export interface EntitiesState {
@@ -47,25 +49,10 @@ export interface EntitiesState {
   meta: Record<string, EntityMeta>;
 }
 
-// ===== Views State =====
-export interface ViewState {
-  assetIds: string[];
-  isLoading: boolean;
-  isLoadingMore: boolean;
-  hasMore: boolean;
-  error: string | null;
-  pageInfo: {
-    cursor?: string;
-    page?: number;
-    total?: number;
-  };
-  definitionHash: string;
-  lastFetchAt: number;
-}
-
-export interface ViewsState {
-  views: Record<string, ViewState>;
-  activeViewKeys: string[];
+export interface AssetsPageInfo {
+  cursor?: string;
+  page?: number;
+  total?: number;
 }
 
 // ===== UI State =====
@@ -107,7 +94,6 @@ export interface SelectionState {
 // ===== Main State =====
 export interface AssetsState extends SelectionState {
   entities: EntitiesState;
-  views: ViewsState;
   ui: UIState;
   filters: FiltersState;
   selection: SelectionState;
@@ -119,17 +105,18 @@ export interface AssetsViewResult {
   groups?: Record<string, Asset[]>;
   isLoading: boolean;
   isLoadingMore: boolean;
+  isFetched: boolean;
   error: string | null;
   fetchMore: () => Promise<void>;
   refetch: () => Promise<void>;
   hasMore: boolean;
   viewKey: string;
-  pageInfo: ViewState["pageInfo"];
+  pageInfo: AssetsPageInfo;
 }
 
 export interface AssetActionsResult {
   updateRating: (assetId: string, rating: number) => Promise<void>;
-  toggleLike: (assetId: string) => Promise<void>;
+  toggleLike: (assetId: string, isLiked: boolean) => Promise<void>;
   updateDescription: (assetId: string, description: string) => Promise<void>;
   deleteAsset: (assetId: string) => Promise<void>;
   batchUpdateAssets: (
