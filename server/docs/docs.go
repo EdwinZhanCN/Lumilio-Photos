@@ -2843,8 +2843,7 @@ const docTemplate = `{
                             "enum": [
                                 "PHOTO",
                                 "VIDEO",
-                                "AUDIO",
-                                "DOCUMENT"
+                                "AUDIO"
                             ],
                             "type": "string"
                         }
