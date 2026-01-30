@@ -4,7 +4,7 @@
 
 > **useExportImage**(): [`useExportImageReturn`](../interfaces/useExportImageReturn.md)
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:48](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/de987cdd15acb3657c4a975799d47e0436cb4a73/web/src/hooks/util-hooks/useExportImage.tsx#L48)
+Defined in: [hooks/util-hooks/useExportImage.tsx:48](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/05ce3fa0e1f7bce40d97a39a342261134b7de42b/web/src/hooks/util-hooks/useExportImage.tsx#L48)
 
 Custom hook for downloading and exporting images.
 It uses the shared worker client for format conversion and processing.
