@@ -1862,7 +1862,6 @@ paths:
           - PHOTO
           - VIDEO
           - AUDIO
-          - DOCUMENT
           type: string
       - description: Multiple asset types filter (comma-separated)
         example: '"PHOTO,VIDEO"'
