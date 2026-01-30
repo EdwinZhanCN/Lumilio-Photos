@@ -16,6 +16,7 @@ import { TabType } from "./types/assets.type";
 import { useSettingsContext } from "@/features/settings";
 import { useAssetsStore } from "./assets.store";
 import { useShallow } from "zustand/react/shallow";
+import { isGroupByType, resolveGroupByFromUrl } from "./utils/groupBy";
 
 // Context for navigation helpers which depend on router
 interface AssetsNavigationContextValue {
@@ -100,7 +101,6 @@ export const AssetsProvider = ({
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams<{ assetId?: string }>();
   const { state: settingsState } = useSettingsContext();
-  const lastUrlSyncRef = useRef<string>("");
 
   // Store actions
   const {
@@ -206,23 +206,24 @@ export const AssetsProvider = ({
   useEffect(() => {
     const urlGroupBy = searchParams.get("groupBy");
     const urlQuery = searchParams.get("q");
-    const defaultGroupBy =
-      settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
-    const urlSyncKey = `${urlGroupBy ?? ""}|${urlQuery ?? ""}|${defaultGroupBy}`;
+    const resolvedGroupBy = resolveGroupByFromUrl(
+      urlGroupBy,
+      settingsState.ui.asset_page?.layout,
+    );
+    const resolvedQuery = urlQuery ?? "";
 
-    if (lastUrlSyncRef.current === urlSyncKey) {
-      return;
-    }
-    lastUrlSyncRef.current = urlSyncKey;
-
-    const expectedGroupBy = urlGroupBy || defaultGroupBy;
-
-    if (expectedGroupBy !== uiState.groupBy) {
-      hydrateUIFromURL({ groupBy: expectedGroupBy as any });
+    if (resolvedGroupBy !== uiState.groupBy) {
+      hydrateUIFromURL({ groupBy: resolvedGroupBy as any });
     }
 
-    if (urlQuery !== null && urlQuery !== uiState.searchQuery) {
-      hydrateUIFromURL({ searchQuery: urlQuery });
+    if (resolvedQuery !== uiState.searchQuery) {
+      hydrateUIFromURL({ searchQuery: resolvedQuery });
+    }
+
+    if (!isGroupByType(urlGroupBy)) {
+      const params = new URLSearchParams(searchParams);
+      params.set("groupBy", resolvedGroupBy);
+      setSearchParams(params, { replace: true });
     }
   }, [
     searchParams,
@@ -230,49 +231,7 @@ export const AssetsProvider = ({
     uiState.groupBy,
     uiState.searchQuery,
     hydrateUIFromURL,
-  ]);
-
-  // Sync URL with UI state
-  // Restored to ensure URL reflects Store state (e.g. for deep linking consistency)
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams);
-    let hasChanges = false;
-    const defaultGroupBy =
-      settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
-
-    if (uiState.groupBy !== defaultGroupBy) {
-      if (params.get("groupBy") !== uiState.groupBy) {
-        params.set("groupBy", uiState.groupBy);
-        hasChanges = true;
-      }
-    } else {
-      if (params.has("groupBy")) {
-        params.delete("groupBy");
-        hasChanges = true;
-      }
-    }
-
-    if (uiState.searchQuery.trim()) {
-      if (params.get("q") !== uiState.searchQuery) {
-        params.set("q", uiState.searchQuery);
-        hasChanges = true;
-      }
-    } else {
-      if (params.has("q")) {
-        params.delete("q");
-        hasChanges = true;
-      }
-    }
-
-    if (hasChanges) {
-      setSearchParams(params, { replace: true });
-    }
-  }, [
-    uiState.groupBy,
-    uiState.searchQuery,
-    settingsState.ui.asset_page?.layout,
     setSearchParams,
-    searchParams,
   ]);
 
 

@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useAssetsStore } from "../assets.store";
+import { useGroupBy } from "../selectors";
 import {
   AssetViewDefinition,
   AssetsViewResult,
@@ -511,7 +512,7 @@ export const useCurrentTabAssets = (
   } = {},
 ): AssetsViewResult => {
   const currentTab = useAssetsStore((state) => state.ui.currentTab);
-  const uiGroupBy = useAssetsStore((state) => state.ui.groupBy);
+  const uiGroupBy = useGroupBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
   const searchMode = useAssetsStore((state) => state.ui.searchMode);
 

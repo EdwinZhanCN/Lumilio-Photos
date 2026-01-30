@@ -4,6 +4,8 @@ import { selectActiveFilterCount } from "./slices/filters.slice";
 import { useSearchParams } from "react-router-dom";
 import { useSettingsContext } from "@/features/settings";
 import { useCallback } from "react";
+import { GroupByType } from "./types/assets.type";
+import { resolveGroupByFromUrl } from "./utils/groupBy";
 
 // ===== Selection Selectors =====
 export const useSelectionEnabled = () =>
@@ -25,8 +27,14 @@ export const useSelectionMode = () =>
 export const useCurrentTab = () =>
     useAssetsStore((s) => s.ui.currentTab);
 
-export const useGroupBy = () =>
-    useAssetsStore((s) => s.ui.groupBy);
+export const useGroupBy = (): GroupByType => {
+    const [searchParams] = useSearchParams();
+    const { state: settingsState } = useSettingsContext();
+    return resolveGroupByFromUrl(
+        searchParams.get("groupBy"),
+        settingsState.ui.asset_page?.layout,
+    );
+};
 
 export const useSearchQuery = () =>
     useAssetsStore((s) => s.ui.searchQuery);
@@ -65,29 +73,17 @@ export const useSelectionActions = () =>
 export const useUIActions = () => {
     const store = useAssetsStore(useShallow((s) => ({
         setTab: s.setCurrentTab,
-        setGroupBy: s.setGroupBy,
         setSearchQuery: s.setSearchQuery,
         setSearchMode: s.setSearchMode,
     })));
 
     const [searchParams, setSearchParams] = useSearchParams();
-    const { state: settingsState } = useSettingsContext();
 
-    const setGroupBy = useCallback((groupBy: any) => {
-        store.setGroupBy(groupBy);
-
-        // Sync to URL
+    const setGroupBy = useCallback((groupBy: GroupByType) => {
         const params = new URLSearchParams(searchParams);
-        const defaultGroupBy = settingsState.ui.asset_page?.layout === "wide" ? "type" : "date";
-
-        if (groupBy !== defaultGroupBy) {
-            params.set("groupBy", groupBy);
-        } else {
-            params.delete("groupBy");
-        }
-
+        params.set("groupBy", groupBy);
         setSearchParams(params, { replace: true });
-    }, [store.setGroupBy, searchParams, setSearchParams, settingsState.ui.asset_page?.layout]);
+    }, [searchParams, setSearchParams]);
 
     const setSearchQuery = useCallback((query: string) => {
         store.setSearchQuery(query);
