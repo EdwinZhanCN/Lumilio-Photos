@@ -2,7 +2,7 @@
 
 # Interface: ExportOptions
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/4ddc34a6e707189b2116a0678fed27466b70ea5a/web/src/hooks/util-hooks/useExportImage.tsx#L11)
+Defined in: [hooks/util-hooks/useExportImage.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/de987cdd15acb3657c4a975799d47e0436cb4a73/web/src/hooks/util-hooks/useExportImage.tsx#L11)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:11](https://github.com/EdwinZha
 
 > `optional` **filename**: `string`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:16](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/4ddc34a6e707189b2116a0678fed27466b70ea5a/web/src/hooks/util-hooks/useExportImage.tsx#L16)
+Defined in: [hooks/util-hooks/useExportImage.tsx:16](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/de987cdd15acb3657c4a975799d47e0436cb4a73/web/src/hooks/util-hooks/useExportImage.tsx#L16)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:16](https://github.com/EdwinZha
 
 > **format**: `"jpeg"` \| `"png"` \| `"webp"` \| `"original"`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/4ddc34a6e707189b2116a0678fed27466b70ea5a/web/src/hooks/util-hooks/useExportImage.tsx#L12)
+Defined in: [hooks/util-hooks/useExportImage.tsx:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/de987cdd15acb3657c4a975799d47e0436cb4a73/web/src/hooks/util-hooks/useExportImage.tsx#L12)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:12](https://github.com/EdwinZha
 
 > `optional` **maxHeight**: `number`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:15](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/4ddc34a6e707189b2116a0678fed27466b70ea5a/web/src/hooks/util-hooks/useExportImage.tsx#L15)
+Defined in: [hooks/util-hooks/useExportImage.tsx:15](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/de987cdd15acb3657c4a975799d47e0436cb4a73/web/src/hooks/util-hooks/useExportImage.tsx#L15)
 
 ***
 
@@ -34,7 +34,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:15](https://github.com/EdwinZha
 
 > `optional` **maxWidth**: `number`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/4ddc34a6e707189b2116a0678fed27466b70ea5a/web/src/hooks/util-hooks/useExportImage.tsx#L14)
+Defined in: [hooks/util-hooks/useExportImage.tsx:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/de987cdd15acb3657c4a975799d47e0436cb4a73/web/src/hooks/util-hooks/useExportImage.tsx#L14)
 
 ***
 
@@ -42,4 +42,4 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:14](https://github.com/EdwinZha
 
 > **quality**: `number`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/4ddc34a6e707189b2116a0678fed27466b70ea5a/web/src/hooks/util-hooks/useExportImage.tsx#L13)
+Defined in: [hooks/util-hooks/useExportImage.tsx:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/de987cdd15acb3657c4a975799d47e0436cb4a73/web/src/hooks/util-hooks/useExportImage.tsx#L13)
