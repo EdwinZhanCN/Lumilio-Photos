@@ -245,7 +245,7 @@ const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`w-full px-4 pb-8 ${className}`}
+      className={`w-full px-4 pb-8 transition-all ${className}`}
       aria-busy={isLoading || isLoadingMore}
       tabIndex={selection.enabled ? 0 : -1}
       onKeyDown={selection.enabled ? selection.handleKeyDown : undefined}
