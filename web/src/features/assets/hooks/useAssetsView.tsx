@@ -123,7 +123,7 @@ export const useAssetsViewQuery = (
    * Handles all query types: listing, filtering, and searching.
    */
   const createUnifiedRequest = useCallback(
-    (offset = 0): AssetQueryRequest => {
+    (): AssetQueryRequest => {
       const filter: AssetFilter = { ...effectiveFilter };
 
       // Add asset type filters
@@ -136,12 +136,11 @@ export const useAssetsViewQuery = (
         }
       }
 
-      const request: AssetQueryRequest & { group_by?: string } = {
+      const request: AssetQueryRequest = {
         filter,
-        group_by: definition.groupBy, // Send groupBy strategy to server for server-side sorting
         pagination: {
           limit: pageSize,
-          offset,
+          offset: 0,
         },
       };
 
@@ -162,7 +161,7 @@ export const useAssetsViewQuery = (
     method: "post",
     path: "/api/v1/assets/list",
     init: {
-      body: createUnifiedRequest(0),
+      body: createUnifiedRequest(),
     },
     pageParamName: "offset",
   } as const), [createUnifiedRequest]);
@@ -208,16 +207,10 @@ export const useAssetsViewQuery = (
     });
   }, [query.dataUpdatedAt, pageSize]);
 
-  const assets = useMemo(() => {
-    const seen = new Set<string>();
-    return assetsPages.flatMap((page) => page.assets).filter((asset) => {
-      if (!asset.asset_id || seen.has(asset.asset_id)) {
-        return false;
-      }
-      seen.add(asset.asset_id);
-      return true;
-    });
-  }, [assetsPages]);
+  const assets = useMemo(
+    () => assetsPages.flatMap((page) => page.assets),
+    [assetsPages],
+  );
 
   const lastPage =
     assetsPages.length > 0 ? assetsPages[assetsPages.length - 1] : undefined;
