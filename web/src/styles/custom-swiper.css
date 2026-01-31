@@ -1,53 +1,67 @@
-/* Custom Swiper Navigation Styles */
+/* 1. 核心变量控制：这是修改 SVG 大小的最快路径 */
+.fullscreen-swiper {
+    --swiper-navigation-size: 20px;      /* 箭头 SVG 本身的大小 */
+    --swiper-navigation-color: #ffffff; /* 箭头颜色 */
+}
 
+/* 2. 导航按钮外圈 */
 .fullscreen-swiper .swiper-button-next,
 .fullscreen-swiper .swiper-button-prev {
     background-color: rgba(30, 41, 59, 0.4);
-    border-radius: 9999px; /* circle */
-    width: 3rem; /* 48px */
-    height: 3rem; /* 48px */
-    display: flex;
+    width: 3.5rem;   /* 圆圈的宽度 */
+    height: 3.5rem;  /* 圆圈的高度 */
+    border-radius: 50%;
+    backdrop-filter: blur(4px);
+    transition: all 0.3s ease;
+
+    /* 强行居中内部的 SVG */
+    display: flex !important;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-    transition:
-        background-color 0.2s,
-        box-shadow 0.2s;
-    outline: none;
-    border: none;
-    cursor: pointer;
 }
 
-.fullscreen-swiper .swiper-button-next:hover,
-.fullscreen-swiper .swiper-button-prev:hover,
-.fullscreen-swiper .swiper-button-next:focus,
-.fullscreen-swiper .swiper-button-prev:focus {
-    background-color: rgba(30, 41, 59, 0.7);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+
+.fullscreen-swiper .swiper-button-next svg,
+.fullscreen-swiper .swiper-button-prev svg {
+    width: var(--swiper-navigation-size) !important;
+    height: var(--swiper-navigation-size) !important;
+    object-fit: contain;
+    overflow: visible;
 }
 
-.fullscreen-swiper .swiper-button-next:active,
-.fullscreen-swiper .swiper-button-prev:active {
-    background-color: rgba(30, 41, 59, 0.9);
-}
-
-/* Hide Swiper pagination bullets for FullScreenCarousel */
-.fullscreen-swiper .swiper-pagination {
-    display: none !important;
+/* 选中 SVG 内部的路径 */
+.fullscreen-swiper .swiper-button-next svg path,
+.fullscreen-swiper .swiper-button-prev svg path {
+    stroke: currentColor;
+    stroke-width: 1px;
+    stroke-linejoin: round;
+    stroke-linecap: round;
 }
 
 .fullscreen-swiper .swiper-button-next::after,
 .fullscreen-swiper .swiper-button-prev::after {
-    color: white;
-    font-size: 1.5rem; /* 24px */
-    font-weight: 700;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    display: none !important;
+    content: "" !important;
+}
+
+.fullscreen-swiper .swiper-button-next:hover,
+.fullscreen-swiper .swiper-button-prev:hover {
+    background-color: rgba(30, 41, 59, 0.7);
+    transform: scale(1.05);
+}
+
+.fullscreen-swiper .swiper-button-next:active,
+.fullscreen-swiper .swiper-button-prev:active {
+    transform: scale(0.95);
 }
 
 .fullscreen-swiper .swiper-button-prev {
-    left: 1.5rem; /* 24px */
+    left: 1.5rem;
+}
+.fullscreen-swiper .swiper-button-next {
+    right: 1.5rem;
 }
 
-.fullscreen-swiper .swiper-button-next {
-    right: 1.5rem; /* 24px */
+.fullscreen-swiper .swiper-pagination {
+    display: none !important;
 }

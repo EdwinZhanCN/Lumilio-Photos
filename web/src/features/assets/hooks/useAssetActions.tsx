@@ -23,12 +23,7 @@ export const useAssetActions = (): AssetActionsResult => {
   // List of API paths that return asset lists (infinite queries)
   // We strictly match these to avoid accidentally updating unrelated queries
   const ASSET_LIST_QUERY_PATHS = new Set([
-    "/api/v1/assets",
-    "/api/v1/assets/search",
-    "/api/v1/assets/filter",
-    // Albums also return asset lists via filter endpoint
-    // Note: This is an exact path match on the template, NOT the expanded URL
-    "/api/v1/albums/{id}/filter",
+    "/api/v1/assets/list",
   ]);
 
   /**
