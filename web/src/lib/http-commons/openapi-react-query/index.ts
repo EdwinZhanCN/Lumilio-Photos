@@ -229,9 +229,22 @@ export default function createClient<Paths extends {}, Media extends MediaType =
           queryFn: async ({ queryKey: [method, path, init], pageParam = 0, signal }) => {
             const mth = method.toUpperCase() as Uppercase<typeof method>;
             const fn = client[mth] as ClientMethod<Paths, typeof method, Media>;
+
+            // Update body.pagination.offset for POST requests with pagination in body
+            const bodyWithPagination = init?.body && typeof init.body === "object" && "pagination" in init.body
+              ? {
+                  ...init.body,
+                  pagination: {
+                    ...(init.body as any).pagination,
+                    offset: pageParam,
+                  },
+                }
+              : init?.body;
+
             const mergedInit = {
               ...init,
               signal,
+              body: bodyWithPagination,
               params: {
                 ...init?.params,
                 query: {

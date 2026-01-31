@@ -14,7 +14,6 @@ type AssetControllerInterface interface {
 	GetOriginalFile(c *gin.Context)
 	GetWebVideo(c *gin.Context)
 	GetWebAudio(c *gin.Context)
-	ListAssets(c *gin.Context)
 	UpdateAsset(c *gin.Context)
 	DeleteAsset(c *gin.Context)
 	BatchUploadAssets(c *gin.Context)
@@ -23,8 +22,7 @@ type AssetControllerInterface interface {
 	GetAssetThumbnail(c *gin.Context)
 
 	// New filtering and search operations
-	FilterAssets(c *gin.Context)     // POST /assets/filter - Complex asset filtering
-	SearchAssets(c *gin.Context)     // POST /assets/search - Filename and semantic search
+	QueryAssets(c *gin.Context)      // POST /assets/list - Unified asset listing, filtering, and search
 	GetFilterOptions(c *gin.Context) // GET /assets/filter-options - Get available filter options
 
 	// Rating management operations
@@ -62,7 +60,6 @@ type AlbumControllerInterface interface {
 	RemoveAssetFromAlbum(c *gin.Context)
 	UpdateAssetPositionInAlbum(c *gin.Context)
 	GetAssetAlbums(c *gin.Context)
-	FilterAlbumAssets(c *gin.Context)
 }
 
 // QueueControllerInterface defines the interface for queue monitoring controllers
@@ -125,11 +122,9 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 		assets.Use(authController.OptionalAuthMiddleware())
 		{
 			assets.POST("", assetController.UploadAsset)
-			assets.GET("", assetController.ListAssets)
 			assets.GET("/types", assetController.GetAssetTypes)
 			assets.GET("/filter-options", assetController.GetFilterOptions)
-			assets.POST("/filter", assetController.FilterAssets)
-			assets.POST("/search", assetController.SearchAssets)
+			assets.POST("/list", assetController.QueryAssets)
 			assets.POST("/batch", assetController.BatchUploadAssets)
 			assets.GET("/:id", assetController.GetAsset)
 			assets.GET("/:id/original", assetController.GetOriginalFile)
@@ -168,7 +163,6 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			albums.POST("/:id/assets/:assetId", albumController.AddAssetToAlbum)
 			albums.DELETE("/:id/assets/:assetId", albumController.RemoveAssetFromAlbum)
 			albums.PUT("/:id/assets/:assetId/position", albumController.UpdateAssetPositionInAlbum)
-			albums.POST("/:id/filter", albumController.FilterAlbumAssets)
 		}
 
 		// Admin routes for queue monitoring (read-only)

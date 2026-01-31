@@ -1199,89 +1199,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/albums/{id}/filter": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Filter assets in album
-         * @description Filter assets within a specific album using comprehensive filtering options
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Album ID */
-                    id: number;
-                };
-                cookie?: never;
-            };
-            /** @description Filter criteria */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.FilterAssetsRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Assets filtered successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/assets": {
         parameters: {
             query?: never;
@@ -1289,101 +1206,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List assets
-         * @description Retrieve a paginated list of assets. Filter by type(s) or owner. Assets are sorted by taken_time (photo capture time or video record time). At least one filter parameter is required.
-         */
-        get: {
-            parameters: {
-                query?: {
-                    /**
-                     * @description Single asset type filter
-                     * @example "PHOTO"
-                     */
-                    type?: "PHOTO" | "VIDEO" | "AUDIO" | "DOCUMENT";
-                    /**
-                     * @description Multiple asset types filter (comma-separated)
-                     * @example "PHOTO,VIDEO"
-                     */
-                    types?: string;
-                    /**
-                     * @description Filter by owner ID
-                     * @example 123
-                     */
-                    owner_id?: number;
-                    /**
-                     * @description Maximum number of results (max 100)
-                     * @example 20
-                     */
-                    limit?: number;
-                    /**
-                     * @description Number of results to skip for pagination
-                     * @example 0
-                     */
-                    offset?: number;
-                    /**
-                     * @description Sort order by taken_time
-                     * @example "desc"
-                     */
-                    sort_order?: "asc" | "desc";
-                };
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Assets retrieved successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
+        get?: never;
         put?: never;
         /**
          * Upload a single asset
@@ -2798,86 +2621,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/assets/filter": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Filter assets
-         * @description Filter assets using comprehensive filtering options including repository selection, RAW, rating, liked status, filename patterns, date ranges, camera make, and lens
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Filter criteria */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.FilterAssetsRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Assets filtered successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/assets/filter-options": {
         parameters: {
             query?: never;
@@ -3023,6 +2766,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Query assets (unified endpoint)
+         * @description Unified endpoint for listing, filtering, and searching assets. Replaces separate /filter and /search endpoints.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Query parameters */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.AssetQueryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Assets queried successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Semantic search unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/rating/{rating}": {
         parameters: {
             query?: never;
@@ -3104,95 +2936,6 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/assets/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Search assets
-         * @description Search assets using either filename matching or semantic vector search. Can be combined with comprehensive filters including repository selection.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Search criteria */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.SearchAssetsRequestDTO"];
-                };
-            };
-            responses: {
-                /** @description Assets found successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request parameters */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Semantic search unavailable */
-                503: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
         delete?: never;
         options?: never;
         head?: never;
@@ -4214,6 +3957,7 @@ export interface components {
             upload_time?: string;
             width?: number;
         };
+        /** @description Unified filter options */
         "dto.AssetFilterDTO": {
             /** @example 123 */
             album_id?: number;
@@ -4238,6 +3982,14 @@ export interface components {
              * @enum {string}
              */
             type?: "PHOTO" | "VIDEO" | "AUDIO";
+            /**
+             * @description Multiple asset types
+             * @example [
+             *       "PHOTO",
+             *       "VIDEO"
+             *     ]
+             */
+            types?: string[];
         };
         "dto.AssetListResponseDTO": {
             assets?: components["schemas"]["dto.AssetDTO"][];
@@ -4245,6 +3997,23 @@ export interface components {
             limit?: number;
             /** @example 0 */
             offset?: number;
+            /** @example 150 */
+            total?: number;
+        };
+        "dto.AssetQueryRequestDTO": {
+            filter?: components["schemas"]["dto.AssetFilterDTO"];
+            pagination?: components["schemas"]["dto.PaginationDTO"];
+            /**
+             * @description Search keyword (optional)
+             * @example sunset photo
+             */
+            query?: string;
+            /**
+             * @description "filename" (default) | "semantic"
+             * @example filename
+             * @enum {string}
+             */
+            search_type?: "filename" | "semantic";
         };
         "dto.AssetTypesResponseDTO": {
             types?: components["schemas"]["dbtypes.AssetType"][];
@@ -4337,13 +4106,6 @@ export interface components {
             /** @example IMG_ */
             value?: string;
         };
-        "dto.FilterAssetsRequestDTO": {
-            filter?: components["schemas"]["dto.AssetFilterDTO"];
-            /** @example 20 */
-            limit?: number;
-            /** @example 0 */
-            offset?: number;
-        };
         "dto.GetAlbumResponseDTO": {
             album_id?: number;
             album_name?: string;
@@ -4371,6 +4133,13 @@ export interface components {
         "dto.OptionsResponseDTO": {
             camera_makes?: string[];
             lenses?: string[];
+        };
+        /** @description limit, offset */
+        "dto.PaginationDTO": {
+            /** @example 20 */
+            limit?: number;
+            /** @example 0 */
+            offset?: number;
         };
         "dto.ProgressSummaryDTO": {
             active_sessions?: number;
@@ -4420,20 +4189,6 @@ export interface components {
             retry_tasks?: string[];
             /** @example queued */
             status?: string;
-        };
-        "dto.SearchAssetsRequestDTO": {
-            filter?: components["schemas"]["dto.AssetFilterDTO"];
-            /** @example 20 */
-            limit?: number;
-            /** @example 0 */
-            offset?: number;
-            /** @example red bird on branch */
-            query: string;
-            /**
-             * @example filename
-             * @enum {string}
-             */
-            search_type: "filename" | "semantic";
         };
         "dto.SessionProgressDTO": {
             bytes_done?: number;

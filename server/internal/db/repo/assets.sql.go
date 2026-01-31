@@ -201,6 +201,151 @@ func (q *Queries) CountAssetsByStatusAndRepository(ctx context.Context, arg Coun
 	return count, err
 }
 
+const countAssetsUnified = `-- name: CountAssetsUnified :one
+SELECT COUNT(DISTINCT a.asset_id) as count
+FROM assets a
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
+WHERE a.is_deleted = false
+  AND ($1::text IS NULL OR a.original_filename ILIKE '%' || $1 || '%')
+  AND ($2::text IS NULL OR a.type = $2)
+  AND ($3::text[] IS NULL OR a.type = ANY($3::text[]))
+  AND ($4::integer IS NULL OR a.owner_id = $4)
+  AND ($5::uuid IS NULL OR a.repository_id = $5)
+  AND ($6::integer IS NULL OR aa.album_id = $6)
+  AND ($7::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $7)
+  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $8)
+  AND ($9::boolean IS NULL OR
+    CASE
+      WHEN $9 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+    END
+  )
+  AND ($10::integer IS NULL OR
+    CASE
+      WHEN $10 = 0 THEN a.rating IS NULL
+      ELSE a.rating = $10
+    END
+  )
+  AND ($11::boolean IS NULL OR a.liked = $11)
+  AND ($12::text IS NULL OR a.specific_metadata->>'camera_model' = $12)
+  AND ($13::text IS NULL OR a.specific_metadata->>'lens_model' = $13)
+`
+
+type CountAssetsUnifiedParams struct {
+	Query        *string            `db:"query" json:"query"`
+	AssetType    *string            `db:"asset_type" json:"asset_type"`
+	AssetTypes   []string           `db:"asset_types" json:"asset_types"`
+	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	AlbumID      *int32             `db:"album_id" json:"album_id"`
+	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw        *bool              `db:"is_raw" json:"is_raw"`
+	Rating       *int32             `db:"rating" json:"rating"`
+	Liked        *bool              `db:"liked" json:"liked"`
+	CameraModel  *string            `db:"camera_model" json:"camera_model"`
+	LensModel    *string            `db:"lens_model" json:"lens_model"`
+}
+
+// Count query matching GetAssetsUnified WHERE clause
+// Returns total count of assets matching the filters (for pagination)
+func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countAssetsUnified,
+		arg.Query,
+		arg.AssetType,
+		arg.AssetTypes,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.AlbumID,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countAssetsVectorUnified = `-- name: CountAssetsVectorUnified :one
+SELECT COUNT(DISTINCT a.asset_id) as count
+FROM assets a
+JOIN embeddings e ON a.asset_id = e.asset_id
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
+WHERE a.is_deleted = false
+  AND e.embedding_type = $1::text
+  AND e.is_primary = true
+  AND ($2::text IS NULL OR a.type = $2)
+  AND ($3::text[] IS NULL OR a.type = ANY($3::text[]))
+  AND ($4::integer IS NULL OR a.owner_id = $4)
+  AND ($5::uuid IS NULL OR a.repository_id = $5)
+  AND ($6::integer IS NULL OR aa.album_id = $6)
+  AND ($7::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $7)
+  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $8)
+  AND ($9::boolean IS NULL OR
+    CASE
+      WHEN $9 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+    END
+  )
+  AND ($10::integer IS NULL OR
+    CASE
+      WHEN $10 = 0 THEN a.rating IS NULL
+      ELSE a.rating = $10
+    END
+  )
+  AND ($11::boolean IS NULL OR a.liked = $11)
+  AND ($12::text IS NULL OR a.specific_metadata->>'camera_model' = $12)
+  AND ($13::text IS NULL OR a.specific_metadata->>'lens_model' = $13)
+  AND (e.embedding <-> $14::vector) <= $15::float8
+`
+
+type CountAssetsVectorUnifiedParams struct {
+	EmbeddingType string             `db:"embedding_type" json:"embedding_type"`
+	AssetType     *string            `db:"asset_type" json:"asset_type"`
+	AssetTypes    []string           `db:"asset_types" json:"asset_types"`
+	OwnerID       *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID  pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	AlbumID       *int32             `db:"album_id" json:"album_id"`
+	DateFrom      pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo        pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw         *bool              `db:"is_raw" json:"is_raw"`
+	Rating        *int32             `db:"rating" json:"rating"`
+	Liked         *bool              `db:"liked" json:"liked"`
+	CameraModel   *string            `db:"camera_model" json:"camera_model"`
+	LensModel     *string            `db:"lens_model" json:"lens_model"`
+	Embedding     *pgvector.Vector   `db:"embedding" json:"embedding"`
+	MaxDistance   *float64           `db:"max_distance" json:"max_distance"`
+}
+
+// Count query matching SearchAssetsVectorUnified WHERE clause
+// Returns total count of assets matching semantic search (for pagination)
+func (q *Queries) CountAssetsVectorUnified(ctx context.Context, arg CountAssetsVectorUnifiedParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countAssetsVectorUnified,
+		arg.EmbeddingType,
+		arg.AssetType,
+		arg.AssetTypes,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.AlbumID,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.Embedding,
+		arg.MaxDistance,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countLikedAssets = `-- name: CountLikedAssets :one
 SELECT COUNT(*) as count
 FROM assets
@@ -1326,6 +1471,125 @@ func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTyp
 	return items, nil
 }
 
+const getAssetsUnified = `-- name: GetAssetsUnified :many
+
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status FROM assets a
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
+WHERE a.is_deleted = false
+  AND ($1::text IS NULL OR a.original_filename ILIKE '%' || $1 || '%')
+  AND ($2::text IS NULL OR a.type = $2)
+  AND ($3::text[] IS NULL OR a.type = ANY($3::text[]))
+  AND ($4::integer IS NULL OR a.owner_id = $4)
+  AND ($5::uuid IS NULL OR a.repository_id = $5)
+  AND ($6::integer IS NULL OR aa.album_id = $6)
+  AND ($7::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $7)
+  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $8)
+  AND ($9::boolean IS NULL OR
+    CASE
+      WHEN $9 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+    END
+  )
+  AND ($10::integer IS NULL OR
+    CASE
+      WHEN $10 = 0 THEN a.rating IS NULL
+      ELSE a.rating = $10
+    END
+  )
+  AND ($11::boolean IS NULL OR a.liked = $11)
+  AND ($12::text IS NULL OR a.specific_metadata->>'camera_model' = $12)
+  AND ($13::text IS NULL OR a.specific_metadata->>'lens_model' = $13)
+ORDER BY
+  -- When sorting by type, use mime_type for actual file format grouping
+  -- This ensures image/jpeg, image/png, image/heic etc. are grouped together
+  CASE WHEN $14::text = 'type' THEN a.mime_type END ASC,
+  COALESCE(a.taken_time, a.upload_time) DESC
+LIMIT $16 OFFSET $15
+`
+
+type GetAssetsUnifiedParams struct {
+	Query        *string            `db:"query" json:"query"`
+	AssetType    *string            `db:"asset_type" json:"asset_type"`
+	AssetTypes   []string           `db:"asset_types" json:"asset_types"`
+	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	AlbumID      *int32             `db:"album_id" json:"album_id"`
+	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw        *bool              `db:"is_raw" json:"is_raw"`
+	Rating       *int32             `db:"rating" json:"rating"`
+	Liked        *bool              `db:"liked" json:"liked"`
+	CameraModel  *string            `db:"camera_model" json:"camera_model"`
+	LensModel    *string            `db:"lens_model" json:"lens_model"`
+	SortBy       *string            `db:"sort_by" json:"sort_by"`
+	Offset       int32              `db:"offset" json:"offset"`
+	Limit        int32              `db:"limit" json:"limit"`
+}
+
+// ============================================================================
+// UNIFIED QUERY API
+// These queries consolidate List, Filter, and Search operations with shared WHERE logic
+// ============================================================================
+// Handles: listing, filename search, and all filtering
+// Use this for most queries unless semantic search is needed
+func (q *Queries) GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsUnified,
+		arg.Query,
+		arg.AssetType,
+		arg.AssetTypes,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.AlbumID,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.SortBy,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAssetsWithErrors = `-- name: GetAssetsWithErrors :many
 SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status FROM assets
 WHERE status->>'state' = 'failed' AND is_deleted = false
@@ -2226,6 +2490,147 @@ func (q *Queries) SearchAssetsVector(ctx context.Context, arg SearchAssetsVector
 	var items []SearchAssetsVectorRow
 	for rows.Next() {
 		var i SearchAssetsVectorRow
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+			&i.Distance,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchAssetsVectorUnified = `-- name: SearchAssetsVectorUnified :many
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, (e.embedding <-> $1::vector) AS distance
+FROM assets a
+JOIN embeddings e ON a.asset_id = e.asset_id
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
+WHERE a.is_deleted = false
+  AND e.embedding_type = $2::text
+  AND e.is_primary = true
+  AND ($3::text IS NULL OR a.type = $3)
+  AND ($4::text[] IS NULL OR a.type = ANY($4::text[]))
+  AND ($5::integer IS NULL OR a.owner_id = $5)
+  AND ($6::uuid IS NULL OR a.repository_id = $6)
+  AND ($7::integer IS NULL OR aa.album_id = $7)
+  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $8)
+  AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $9)
+  AND ($10::boolean IS NULL OR
+    CASE
+      WHEN $10 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+    END
+  )
+  AND ($11::integer IS NULL OR
+    CASE
+      WHEN $11 = 0 THEN a.rating IS NULL
+      ELSE a.rating = $11
+    END
+  )
+  AND ($12::boolean IS NULL OR a.liked = $12)
+  AND ($13::text IS NULL OR a.specific_metadata->>'camera_model' = $13)
+  AND ($14::text IS NULL OR a.specific_metadata->>'lens_model' = $14)
+  AND (e.embedding <-> $1::vector) <= $15::float8
+ORDER BY (e.embedding <-> $1::vector)
+LIMIT $17 OFFSET $16
+`
+
+type SearchAssetsVectorUnifiedParams struct {
+	Embedding     *pgvector.Vector   `db:"embedding" json:"embedding"`
+	EmbeddingType string             `db:"embedding_type" json:"embedding_type"`
+	AssetType     *string            `db:"asset_type" json:"asset_type"`
+	AssetTypes    []string           `db:"asset_types" json:"asset_types"`
+	OwnerID       *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID  pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	AlbumID       *int32             `db:"album_id" json:"album_id"`
+	DateFrom      pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo        pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw         *bool              `db:"is_raw" json:"is_raw"`
+	Rating        *int32             `db:"rating" json:"rating"`
+	Liked         *bool              `db:"liked" json:"liked"`
+	CameraModel   *string            `db:"camera_model" json:"camera_model"`
+	LensModel     *string            `db:"lens_model" json:"lens_model"`
+	MaxDistance   *float64           `db:"max_distance" json:"max_distance"`
+	Offset        int32              `db:"offset" json:"offset"`
+	Limit         int32              `db:"limit" json:"limit"`
+}
+
+type SearchAssetsVectorUnifiedRow struct {
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
+	Type             string                   `db:"type" json:"type"`
+	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
+	StoragePath      *string                  `db:"storage_path" json:"storage_path"`
+	MimeType         string                   `db:"mime_type" json:"mime_type"`
+	FileSize         int64                    `db:"file_size" json:"file_size"`
+	Hash             *string                  `db:"hash" json:"hash"`
+	Width            *int32                   `db:"width" json:"width"`
+	Height           *int32                   `db:"height" json:"height"`
+	Duration         *float64                 `db:"duration" json:"duration"`
+	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
+	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating           *int32                   `db:"rating" json:"rating"`
+	Liked            *bool                    `db:"liked" json:"liked"`
+	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
+	Status           []byte                   `db:"status" json:"status"`
+	Distance         interface{}              `db:"distance" json:"distance"`
+}
+
+// Handles: semantic vector search with all filtering
+// Same WHERE clause as GetAssetsUnified for consistency
+func (q *Queries) SearchAssetsVectorUnified(ctx context.Context, arg SearchAssetsVectorUnifiedParams) ([]SearchAssetsVectorUnifiedRow, error) {
+	rows, err := q.db.Query(ctx, searchAssetsVectorUnified,
+		arg.Embedding,
+		arg.EmbeddingType,
+		arg.AssetType,
+		arg.AssetTypes,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.AlbumID,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.MaxDistance,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchAssetsVectorUnifiedRow
+	for rows.Next() {
+		var i SearchAssetsVectorUnifiedRow
 		if err := rows.Scan(
 			&i.AssetID,
 			&i.OwnerID,
