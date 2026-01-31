@@ -717,110 +717,6 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 	api.GinSuccess(c, asset)
 }
 
-// ListAssets retrieves assets with optional filtering
-// @Summary List assets
-// @Description Retrieve a paginated list of assets. Filter by type(s) or owner. Assets are sorted by taken_time (photo capture time or video record time). At least one filter parameter is required.
-// @Tags assets
-// @Accept json
-// @Produce json
-// @Param type query string false "Single asset type filter" Enums(PHOTO,VIDEO,AUDIO) example("PHOTO")
-// @Param types query string false "Multiple asset types filter (comma-separated)" example("PHOTO,VIDEO")
-// @Param owner_id query int false "Filter by owner ID" example(123)
-// @Param limit query int false "Maximum number of results (max 100)" default(20) example(20)
-// @Param offset query int false "Number of results to skip for pagination" default(0) example(0)
-// @Param sort_order query string false "Sort order by taken_time" Enums(asc,desc) default("desc") example("desc")
-// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets retrieved successfully"
-// @Failure 400 {object} api.Result "Invalid parameters"
-// @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets [get]
-func (h *AssetHandler) ListAssets(c *gin.Context) {
-	limitStr := c.DefaultQuery("limit", "20")
-	offsetStr := c.DefaultQuery("offset", "0")
-	typeStr := c.Query("type")
-	typesStr := c.Query("types")
-	ownerIDStr := c.Query("owner_id")
-	sortOrder := c.DefaultQuery("sort_order", "desc")
-
-	limit, _ := strconv.Atoi(limitStr)
-	offset, _ := strconv.Atoi(offsetStr)
-
-	if limit > 100 {
-		limit = 100
-	}
-
-	// Validate sort parameter
-	if sortOrder != "asc" && sortOrder != "desc" {
-		api.GinBadRequest(c, errors.New("invalid sort_order"), "sort_order must be 'asc' or 'desc'")
-		return
-	}
-
-	ctx := c.Request.Context()
-	var assets []repo.Asset
-	var err error
-
-	// Determine asset types to filter by
-	var assetTypes []string
-	if typesStr != "" {
-		// Handle comma-separated types parameter
-		typeList := strings.Split(typesStr, ",")
-		for _, t := range typeList {
-			t = strings.TrimSpace(t)
-			assetType := dbtypes.AssetType(t)
-			if !assetType.Valid() {
-				api.GinBadRequest(c, errors.New("invalid asset type in types"), fmt.Sprintf("Invalid asset type: %s", t))
-				return
-			}
-			assetTypes = append(assetTypes, *assetType.String())
-		}
-	} else if typeStr != "" {
-		// Handle single type parameter for backward compatibility
-		assetType := dbtypes.AssetType(typeStr)
-		if !assetType.Valid() {
-			api.GinBadRequest(c, errors.New("invalid asset type"), "Invalid asset type")
-			return
-		}
-		assetTypes = append(assetTypes, *assetType.String())
-	}
-
-	switch {
-	case ownerIDStr != "":
-		ownerID, parseErr := strconv.Atoi(ownerIDStr)
-		if parseErr != nil {
-			api.GinBadRequest(c, parseErr, "Invalid owner_id")
-			return
-		}
-		if len(assetTypes) > 0 {
-			assets, err = h.assetService.GetAssetsByOwnerAndTypes(ctx, ownerID, assetTypes, sortOrder, limit, offset)
-		} else {
-			assets, err = h.assetService.GetAssetsByOwnerSorted(ctx, ownerID, sortOrder, limit, offset)
-		}
-
-	case len(assetTypes) > 0:
-		assets, err = h.assetService.GetAssetsByTypesSorted(ctx, assetTypes, sortOrder, limit, offset)
-
-	default:
-		api.GinBadRequest(c, errors.New("missing query parameters"), "Please specify type, types, or owner_id")
-		return
-	}
-
-	if err != nil {
-		log.Printf("Failed to retrieve assets: %v", err)
-		api.GinInternalError(c, err, "Failed to retrieve assets")
-		return
-	}
-
-	dtos := make([]dto.AssetDTO, len(assets))
-	for i, a := range assets {
-		dtos[i] = dto.ToAssetDTO(a)
-	}
-	response := dto.AssetListResponseDTO{
-		Assets: dtos,
-		Limit:  limit,
-		Offset: offset,
-	}
-	api.GinSuccess(c, response)
-}
-
 // GetAssetThumbnail retrieves a thumbnail for a specific asset by asset ID and size
 // @Summary Get asset thumbnail
 // @Description Retrieve a specific thumbnail image for an asset by asset ID and size parameter. Returns the image file directly.
@@ -1276,47 +1172,48 @@ func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 	api.GinSuccess(c, dto.AssetTypesResponseDTO{Types: types})
 }
 
-// FilterAssets handles asset filtering with complex filters
-// @Summary Filter assets
-// @Description Filter assets using comprehensive filtering options including repository selection, RAW, rating, liked status, filename patterns, date ranges, camera make, and lens
+// QueryAssets handles unified asset listing, filtering, and searching
+// @Summary Query assets (unified endpoint)
+// @Description Unified endpoint for listing, filtering, and searching assets. Replaces separate /filter and /search endpoints.
 // @Tags assets
 // @Accept json
 // @Produce json
-// @Param request body dto.FilterAssetsRequestDTO true "Filter criteria"
-// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets filtered successfully"
+// @Param request body dto.AssetQueryRequestDTO true "Query parameters"
+// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets queried successfully"
 // @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 503 {object} api.Result "Semantic search unavailable"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets/filter [post]
-func (h *AssetHandler) FilterAssets(c *gin.Context) {
-	var req dto.FilterAssetsRequestDTO
+// @Router /api/v1/assets/list [post]
+func (h *AssetHandler) QueryAssets(c *gin.Context) {
+	var req dto.AssetQueryRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
 	}
 
-	// Validate and set defaults
-	if req.Limit <= 0 || req.Limit > 100 {
-		req.Limit = 20
+	// Validate and set defaults for pagination
+	if req.Pagination.Limit <= 0 || req.Pagination.Limit > 100 {
+		req.Pagination.Limit = 20
 	}
-	if req.Offset < 0 {
-		req.Offset = 0
+	if req.Pagination.Offset < 0 {
+		req.Pagination.Offset = 0
+	}
+
+	// Validate search type if provided
+	if req.SearchType != "" && req.SearchType != "filename" && req.SearchType != "semantic" {
+		api.GinBadRequest(c, errors.New("invalid search type"), "Search type must be 'filename' or 'semantic'")
+		return
+	}
+
+	// Default to filename search if not specified
+	if req.SearchType == "" {
+		req.SearchType = "filename"
 	}
 
 	ctx := c.Request.Context()
 	filter := req.Filter
 
-	// Convert filter parameters for SQL query
-	var typePtr *string
-	if filter.Type != nil {
-		typePtr = filter.Type
-	}
-
-	var filenameVal, filenameMode *string
-	if filter.Filename != nil {
-		filenameVal = &filter.Filename.Value
-		filenameMode = &filter.Filename.Mode
-	}
-
+	// Convert filter parameters
 	var dateFrom, dateTo *time.Time
 	if filter.Date != nil {
 		dateFrom = filter.Date.From
@@ -1339,113 +1236,36 @@ func (h *AssetHandler) FilterAssets(c *gin.Context) {
 		albumIDPtr = &id
 	}
 
-	assets, err := h.assetService.FilterAssets(ctx,
-		filter.RepositoryID, typePtr, filter.OwnerID, albumIDPtr, filenameVal, filenameMode,
-		dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
-		filter.CameraMake, filter.Lens, req.Limit, req.Offset)
+	// Build unified query params
+	params := service.QueryAssetsParams{
+		Query:        req.Query,
+		SearchType:   req.SearchType,
+		RepositoryID: filter.RepositoryID,
+		AssetType:    filter.Type,
+		AssetTypes:   filter.Types,
+		OwnerID:      filter.OwnerID,
+		AlbumID:      albumIDPtr,
+		DateFrom:     dateFrom,
+		DateTo:       dateTo,
+		IsRaw:        filter.RAW,
+		Rating:       filter.Rating,
+		Liked:        filter.Liked,
+		CameraModel:  filter.CameraMake,
+		LensModel:    filter.Lens,
+		GroupBy:      req.GroupBy,
+		Limit:        req.Pagination.Limit,
+		Offset:       req.Pagination.Offset,
+	}
 
+	assets, total, err := h.assetService.QueryAssets(ctx, params)
 	if err != nil {
-		log.Printf("Failed to filter assets: %v", err)
-		api.GinInternalError(c, err, "Failed to filter assets")
-		return
-	}
-
-	dtos := make([]dto.AssetDTO, len(assets))
-	for i, a := range assets {
-		dtos[i] = dto.ToAssetDTO(a)
-	}
-
-	response := dto.AssetListResponseDTO{
-		Assets: dtos,
-		Limit:  req.Limit,
-		Offset: req.Offset,
-	}
-	api.GinSuccess(c, response)
-}
-
-// SearchAssets handles both filename and semantic search with optional filtering
-// @Summary Search assets
-// @Description Search assets using either filename matching or semantic vector search. Can be combined with comprehensive filters including repository selection.
-// @Tags assets
-// @Accept json
-// @Produce json
-// @Param request body dto.SearchAssetsRequestDTO true "Search criteria"
-// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets found successfully"
-// @Failure 400 {object} api.Result "Invalid request parameters"
-// @Failure 503 {object} api.Result "Semantic search unavailable"
-// @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/assets/search [post]
-func (h *AssetHandler) SearchAssets(c *gin.Context) {
-	var req dto.SearchAssetsRequestDTO
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
-		return
-	}
-
-	// Validate search type
-	if req.SearchType != "filename" && req.SearchType != "semantic" {
-		api.GinBadRequest(c, errors.New("invalid search type"), "Search type must be 'filename' or 'semantic'")
-		return
-	}
-
-	// Validate and set defaults
-	if req.Limit <= 0 || req.Limit > 100 {
-		req.Limit = 20
-	}
-	if req.Offset < 0 {
-		req.Offset = 0
-	}
-
-	ctx := c.Request.Context()
-	filter := req.Filter
-
-	// Convert filter parameters for SQL query
-	var typePtr *string
-	if filter.Type != nil {
-		typePtr = filter.Type
-	}
-
-	var filenameVal, filenameMode *string
-	if filter.Filename != nil {
-		filenameVal = &filter.Filename.Value
-		filenameMode = &filter.Filename.Mode
-	}
-
-	var dateFrom, dateTo *time.Time
-	if filter.Date != nil {
-		dateFrom = filter.Date.From
-		dateTo = filter.Date.To
-	}
-
-	// Get album ID from filter if provided
-	var albumIDPtr *int32
-	if filter.AlbumID != nil {
-		id := int32(*filter.AlbumID)
-		albumIDPtr = &id
-	}
-
-	var assets []repo.Asset
-	var err error
-
-	if req.SearchType == "filename" {
-		assets, err = h.assetService.SearchAssetsFilename(ctx, req.Query,
-			filter.RepositoryID, typePtr, filter.OwnerID, albumIDPtr, filenameVal, filenameMode,
-			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
-			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
-	} else {
-		assets, err = h.assetService.SearchAssetsVector(ctx, req.Query,
-			filter.RepositoryID, typePtr, filter.OwnerID, albumIDPtr, filenameVal, filenameMode,
-			dateFrom, dateTo, filter.RAW, filter.Rating, filter.Liked,
-			filter.CameraMake, filter.Lens, req.Limit, req.Offset)
-		if err != nil && errors.Is(err, service.ErrSemanticSearchUnavailable) {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Semantic search unavailable"})
+		// Check for semantic search unavailable error
+		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
+			api.GinError(c, 503, err, 503, "Semantic search is currently unavailable")
 			return
 		}
-	}
-
-	if err != nil {
-		log.Printf("Failed to search assets: %v", err)
-		api.GinInternalError(c, err, "Failed to search assets")
+		log.Printf("Failed to query assets: %v", err)
+		api.GinInternalError(c, err, "Failed to query assets")
 		return
 	}
 
@@ -1454,10 +1274,12 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		dtos[i] = dto.ToAssetDTO(a)
 	}
 
+	totalInt := int(total)
 	response := dto.AssetListResponseDTO{
 		Assets: dtos,
-		Limit:  req.Limit,
-		Offset: req.Offset,
+		Total:  &totalInt,
+		Limit:  req.Pagination.Limit,
+		Offset: req.Pagination.Offset,
 	}
 	api.GinSuccess(c, response)
 }

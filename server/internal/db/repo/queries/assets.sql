@@ -515,3 +515,146 @@ FROM assets
 WHERE is_deleted = false
   AND repository_id = sqlc.arg('repository_id')::uuid
   AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'));
+
+-- ============================================================================
+-- UNIFIED QUERY API
+-- These queries consolidate List, Filter, and Search operations with shared WHERE logic
+-- ============================================================================
+
+-- name: GetAssetsUnified :many
+-- Handles: listing, filename search, and all filtering
+-- Use this for most queries unless semantic search is needed
+SELECT a.* FROM assets a
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
+WHERE a.is_deleted = false
+  AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
+  AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
+  AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('album_id')::integer IS NULL OR aa.album_id = sqlc.narg('album_id'))
+  AND (sqlc.narg('date_from')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= sqlc.narg('date_from'))
+  AND (sqlc.narg('date_to')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= sqlc.narg('date_to'))
+  AND (sqlc.narg('is_raw')::boolean IS NULL OR
+    CASE
+      WHEN sqlc.narg('is_raw') = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+    END
+  )
+  AND (sqlc.narg('rating')::integer IS NULL OR
+    CASE
+      WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL
+      ELSE a.rating = sqlc.narg('rating')
+    END
+  )
+  AND (sqlc.narg('liked')::boolean IS NULL OR a.liked = sqlc.narg('liked'))
+  AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
+  AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
+ORDER BY
+  -- When sorting by type, use mime_type for actual file format grouping
+  -- This ensures image/jpeg, image/png, image/heic etc. are grouped together
+  CASE WHEN sqlc.narg('sort_by')::text = 'type' THEN a.mime_type END ASC,
+  COALESCE(a.taken_time, a.upload_time) DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: SearchAssetsVectorUnified :many
+-- Handles: semantic vector search with all filtering
+-- Same WHERE clause as GetAssetsUnified for consistency
+SELECT a.*, (e.embedding <-> sqlc.arg('embedding')::vector) AS distance
+FROM assets a
+JOIN embeddings e ON a.asset_id = e.asset_id
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
+WHERE a.is_deleted = false
+  AND e.embedding_type = sqlc.arg('embedding_type')::text
+  AND e.is_primary = true
+  AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
+  AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('album_id')::integer IS NULL OR aa.album_id = sqlc.narg('album_id'))
+  AND (sqlc.narg('date_from')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= sqlc.narg('date_from'))
+  AND (sqlc.narg('date_to')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= sqlc.narg('date_to'))
+  AND (sqlc.narg('is_raw')::boolean IS NULL OR
+    CASE
+      WHEN sqlc.narg('is_raw') = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+    END
+  )
+  AND (sqlc.narg('rating')::integer IS NULL OR
+    CASE
+      WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL
+      ELSE a.rating = sqlc.narg('rating')
+    END
+  )
+  AND (sqlc.narg('liked')::boolean IS NULL OR a.liked = sqlc.narg('liked'))
+  AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
+  AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
+  AND (e.embedding <-> sqlc.arg('embedding')::vector) <= sqlc.narg('max_distance')::float8
+ORDER BY (e.embedding <-> sqlc.arg('embedding')::vector)
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: CountAssetsUnified :one
+-- Count query matching GetAssetsUnified WHERE clause
+-- Returns total count of assets matching the filters (for pagination)
+SELECT COUNT(DISTINCT a.asset_id) as count
+FROM assets a
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
+WHERE a.is_deleted = false
+  AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
+  AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
+  AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('album_id')::integer IS NULL OR aa.album_id = sqlc.narg('album_id'))
+  AND (sqlc.narg('date_from')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= sqlc.narg('date_from'))
+  AND (sqlc.narg('date_to')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= sqlc.narg('date_to'))
+  AND (sqlc.narg('is_raw')::boolean IS NULL OR
+    CASE
+      WHEN sqlc.narg('is_raw') = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+    END
+  )
+  AND (sqlc.narg('rating')::integer IS NULL OR
+    CASE
+      WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL
+      ELSE a.rating = sqlc.narg('rating')
+    END
+  )
+  AND (sqlc.narg('liked')::boolean IS NULL OR a.liked = sqlc.narg('liked'))
+  AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
+  AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'));
+
+-- name: CountAssetsVectorUnified :one
+-- Count query matching SearchAssetsVectorUnified WHERE clause
+-- Returns total count of assets matching semantic search (for pagination)
+SELECT COUNT(DISTINCT a.asset_id) as count
+FROM assets a
+JOIN embeddings e ON a.asset_id = e.asset_id
+LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
+WHERE a.is_deleted = false
+  AND e.embedding_type = sqlc.arg('embedding_type')::text
+  AND e.is_primary = true
+  AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
+  AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('album_id')::integer IS NULL OR aa.album_id = sqlc.narg('album_id'))
+  AND (sqlc.narg('date_from')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= sqlc.narg('date_from'))
+  AND (sqlc.narg('date_to')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= sqlc.narg('date_to'))
+  AND (sqlc.narg('is_raw')::boolean IS NULL OR
+    CASE
+      WHEN sqlc.narg('is_raw') = true THEN (a.specific_metadata->>'is_raw')::boolean = true
+      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+    END
+  )
+  AND (sqlc.narg('rating')::integer IS NULL OR
+    CASE
+      WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL
+      ELSE a.rating = sqlc.narg('rating')
+    END
+  )
+  AND (sqlc.narg('liked')::boolean IS NULL OR a.liked = sqlc.narg('liked'))
+  AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
+  AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
+  AND (e.embedding <-> sqlc.arg('embedding')::vector) <= sqlc.narg('max_distance')::float8;
+

@@ -75,11 +75,6 @@ type AssetService interface {
 
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, hash string) (string, error)
 	SaveNewThumbnail(ctx context.Context, repoPath string, buffers io.Reader, asset *repo.Asset, size string) error
-
-	// New filtering and search methods
-	FilterAssets(ctx context.Context, repositoryID *string, assetType *string, ownerID *int32, albumID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
-	SearchAssetsFilename(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, albumID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
-	SearchAssetsVector(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, albumID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]string, error)
 	GetDistinctLenses(ctx context.Context) ([]string, error)
 
@@ -88,6 +83,30 @@ type AssetService interface {
 	SaveAudioVersion(ctx context.Context, repoPath string, audioReader io.Reader, asset *repo.Asset, version string) error
 	UpdateAssetDuration(ctx context.Context, id uuid.UUID, duration float64) error
 	UpdateAssetDimensions(ctx context.Context, id uuid.UUID, width, height int32) error
+
+	// Unified query API
+	QueryAssets(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
+}
+
+// QueryAssetsParams contains all parameters for the unified asset query
+type QueryAssetsParams struct {
+	Query        string // Filename search query (empty for list-only)
+	SearchType   string // "filename" (default) | "semantic"
+	RepositoryID *string
+	AssetType    *string  // Single type filter
+	AssetTypes   []string // Multiple types filter
+	OwnerID      *int32
+	AlbumID      *int32
+	DateFrom     *time.Time
+	DateTo       *time.Time
+	IsRaw        *bool
+	Rating       *int
+	Liked        *bool
+	CameraModel  *string
+	LensModel    *string
+	GroupBy      string // Grouping strategy for server-side sorting (e.g., "type")
+	Limit        int
+	Offset       int
 }
 
 type assetService struct {
@@ -643,8 +662,6 @@ func (s *assetService) SaveNewThumbnail(ctx context.Context, repoPath string, bu
 	return nil
 }
 
-// TODO: SaveNewDescription (VLM)
-
 // ================================
 // Helper functions
 // ================================
@@ -705,237 +722,6 @@ func intPtrFromInt32Ptr(i32 *int32) *int {
 	}
 	i := int(*i32)
 	return &i
-}
-
-// ================================
-// New filtering and search methods
-// ================================
-
-func (s *assetService) FilterAssets(ctx context.Context, repositoryID *string, assetType *string, ownerID *int32, albumID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
-	// Convert repository ID string to pgtype.UUID if provided
-	var repoUUID pgtype.UUID
-	if repositoryID != nil && *repositoryID != "" {
-		parsedUUID, err := uuid.Parse(*repositoryID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid repository ID: %w", err)
-		}
-		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
-	}
-
-	// Convert rating pointer for SQL
-	var ratingPtr *int32
-	if rating != nil {
-		r := int32(*rating)
-		ratingPtr = &r
-	}
-
-	// Convert dates to pgtype.Timestamptz
-	var fromTime, toTime pgtype.Timestamptz
-	if dateFrom != nil {
-		fromTime = pgtype.Timestamptz{Time: *dateFrom, Valid: true}
-	}
-	if dateTo != nil {
-		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
-	}
-
-	// If albumID is provided, use the specialized FilterAlbumAssets query
-	if albumID != nil {
-		return s.queries.FilterAlbumAssets(ctx, repo.FilterAlbumAssetsParams{
-			AlbumID:      *albumID,
-			AssetType:    assetType,
-			FilenameVal:  filenameVal,
-			FilenameMode: filenameMode,
-			DateFrom:     fromTime,
-			DateTo:       toTime,
-			IsRaw:        isRaw,
-			Rating:       ratingPtr,
-			Liked:        liked,
-			CameraModel:  cameraMake,
-			LensModel:    lens,
-			Limit:        int32(limit),
-			Offset:       int32(offset),
-		})
-	}
-
-	return s.queries.FilterAssets(ctx, repo.FilterAssetsParams{
-		AssetType:    assetType,
-		OwnerID:      ownerID,
-		RepositoryID: repoUUID,
-		FilenameVal:  filenameVal,
-		FilenameMode: filenameMode,
-		DateFrom:     fromTime,
-		DateTo:       toTime,
-		IsRaw:        isRaw,
-		Rating:       ratingPtr,
-		Liked:        liked,
-		CameraModel:  cameraMake,
-		LensModel:    lens,
-		Limit:        int32(limit),
-		Offset:       int32(offset),
-	})
-}
-
-func (s *assetService) SearchAssetsFilename(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, albumID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
-	// Convert repository ID string to pgtype.UUID if provided
-	var repoUUID pgtype.UUID
-	if repositoryID != nil && *repositoryID != "" {
-		parsedUUID, err := uuid.Parse(*repositoryID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid repository ID: %w", err)
-		}
-		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
-	}
-
-	// Convert rating pointer for SQL
-	var ratingPtr *int32
-	if rating != nil {
-		r := int32(*rating)
-		ratingPtr = &r
-	}
-
-	// Convert dates to pgtype.Timestamptz
-	var fromTime, toTime pgtype.Timestamptz
-	if dateFrom != nil {
-		fromTime = pgtype.Timestamptz{Time: *dateFrom, Valid: true}
-	}
-	if dateTo != nil {
-		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
-	}
-
-	return s.queries.SearchAssetsFilename(ctx, repo.SearchAssetsFilenameParams{
-		Query:        &query,
-		AssetType:    assetType,
-		OwnerID:      ownerID,
-		RepositoryID: repoUUID,
-		AlbumID:      albumID,
-		FilenameVal:  filenameVal,
-		FilenameMode: filenameMode,
-		DateFrom:     fromTime,
-		DateTo:       toTime,
-		IsRaw:        isRaw,
-		Rating:       ratingPtr,
-		Liked:        liked,
-		CameraModel:  cameraMake,
-		LensModel:    lens,
-		Limit:        int32(limit),
-		Offset:       int32(offset),
-	})
-}
-
-func (s *assetService) SearchAssetsVector(ctx context.Context, query string, repositoryID *string, assetType *string, ownerID *int32, albumID *int32, filenameVal *string, filenameMode *string, dateFrom *time.Time, dateTo *time.Time, isRaw *bool, rating *int, liked *bool, cameraMake *string, lens *string, limit int, offset int) ([]repo.Asset, error) {
-	if s.lumen == nil {
-		return nil, fmt.Errorf("%w: lumen service not available for semantic search", ErrSemanticSearchUnavailable)
-	}
-	if !s.lumen.IsTaskAvailable("clip_text_embed") {
-		return nil, fmt.Errorf("%w: clip_text_embed task not available", ErrSemanticSearchUnavailable)
-	}
-
-	// 1. Get text embedding using LumenService
-	embeddingResult, err := s.lumen.ClipTextEmbed(ctx, []byte(query))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get query embedding: %w", err)
-	}
-
-	// Convert lumen embedding vector to float32
-	queryVector := make([]float32, len(embeddingResult.Vector))
-	for i, v := range embeddingResult.Vector {
-		queryVector[i] = float32(v)
-	}
-
-	// 2. Prepare query parameters for database-level filtering and search
-	pgVector := pgvector.NewVector(queryVector)
-	pgVectorPtr := &pgVector
-
-	// Convert repository ID string to pgtype.UUID if provided
-	var repoUUID pgtype.UUID
-	if repositoryID != nil && *repositoryID != "" {
-		parsedUUID, err := uuid.Parse(*repositoryID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid repository ID: %w", err)
-		}
-		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
-	}
-
-	// Default distance threshold (env override: SEMANTIC_MAX_DISTANCE)
-	maxDistance := 0.5
-	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			maxDistance = f
-		}
-	}
-
-	// Convert rating pointer for SQL
-	var ratingPtr *int32
-	if rating != nil {
-		r := int32(*rating)
-		ratingPtr = &r
-	}
-
-	// Convert dates to pgtype.Timestamptz
-	var fromTime, toTime pgtype.Timestamptz
-	if dateFrom != nil {
-		fromTime = pgtype.Timestamptz{Time: *dateFrom, Valid: true}
-	}
-	if dateTo != nil {
-		toTime = pgtype.Timestamptz{Time: *dateTo, Valid: true}
-	}
-
-	// 3. Execute optimized single SQL query with vector search and all filters
-	params := repo.SearchAssetsVectorParams{
-		Embedding:     pgVectorPtr,
-		EmbeddingType: string(EmbeddingTypeCLIP), // Use CLIP embeddings by default
-		AssetType:     assetType,
-		OwnerID:       ownerID,
-		RepositoryID:  repoUUID,
-		AlbumID:       albumID,
-		FilenameVal:   filenameVal,
-		FilenameMode:  filenameMode,
-		DateFrom:      fromTime,
-		DateTo:        toTime,
-		IsRaw:         isRaw,
-		Rating:        ratingPtr,
-		Liked:         liked,
-		CameraModel:   cameraMake,
-		LensModel:     lens,
-		MaxDistance:   &maxDistance,
-		Offset:        int32(offset),
-		Limit:         int32(limit),
-	}
-
-	// 4. Execute optimized database query
-	results, err := s.queries.SearchAssetsVector(ctx, params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to search assets with vector: %w", err)
-	}
-
-	// 5. Convert results to Asset slice (distance field is in the result but we don't return it to client)
-	assets := make([]repo.Asset, len(results))
-	for i, result := range results {
-		assets[i] = repo.Asset{
-			AssetID:          result.AssetID,
-			OwnerID:          result.OwnerID,
-			Type:             result.Type,
-			OriginalFilename: result.OriginalFilename,
-			StoragePath:      result.StoragePath,
-			MimeType:         result.MimeType,
-			FileSize:         result.FileSize,
-			Hash:             result.Hash,
-			Width:            result.Width,
-			Height:           result.Height,
-			Duration:         result.Duration,
-			TakenTime:        result.TakenTime,
-			UploadTime:       result.UploadTime,
-			IsDeleted:        result.IsDeleted,
-			DeletedAt:        result.DeletedAt,
-			SpecificMetadata: result.SpecificMetadata,
-			Rating:           result.Rating,
-			Liked:            result.Liked,
-			RepositoryID:     result.RepositoryID,
-			Status:           result.Status,
-		}
-	}
-
-	return assets, nil
 }
 
 // Helper function for filename matching
@@ -1214,4 +1000,214 @@ func (s *assetService) UpdateAssetDimensions(ctx context.Context, id uuid.UUID, 
 	}
 
 	return s.queries.UpdateAssetDimensions(ctx, params)
+}
+
+// ================================
+// Unified Query API
+// ================================
+
+// QueryAssets is the unified method for listing, filtering, and searching assets.
+func (s *assetService) QueryAssets(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
+	if params.SearchType == "semantic" && params.Query != "" {
+		return s.queryAssetsVector(ctx, params)
+	}
+	return s.queryAssetsUnified(ctx, params)
+}
+
+func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
+	var repoUUID pgtype.UUID
+	if params.RepositoryID != nil && *params.RepositoryID != "" {
+		parsedUUID, err := uuid.Parse(*params.RepositoryID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("invalid repository ID: %w", err)
+		}
+		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
+	}
+
+	var ratingPtr *int32
+	if params.Rating != nil {
+		r := int32(*params.Rating)
+		ratingPtr = &r
+	}
+
+	var fromTime, toTime pgtype.Timestamptz
+	if params.DateFrom != nil {
+		fromTime = pgtype.Timestamptz{Time: *params.DateFrom, Valid: true}
+	}
+	if params.DateTo != nil {
+		toTime = pgtype.Timestamptz{Time: *params.DateTo, Valid: true}
+	}
+
+	var queryPtr *string
+	if params.Query != "" {
+		queryPtr = &params.Query
+	}
+
+	// Determine SortBy based on GroupBy for server-side sorting
+	// This ensures that when grouping by type, all assets of the same type
+	// are returned together, maintaining group continuity across pagination
+	var sortByPtr *string
+	if params.GroupBy == "type" {
+		s := "type"
+		sortByPtr = &s
+	}
+	// For other GroupBy values (e.g., "date", "album", or empty),
+	// sortByPtr remains nil, which defaults to time-based sorting in SQL
+
+	// Get total count
+	countResult, err := s.queries.CountAssetsUnified(ctx, repo.CountAssetsUnifiedParams{
+		AssetType:    params.AssetType,
+		AssetTypes:   params.AssetTypes,
+		RepositoryID: repoUUID,
+		OwnerID:      params.OwnerID,
+		AlbumID:      params.AlbumID,
+		Query:        queryPtr,
+		IsRaw:        params.IsRaw,
+		Rating:       ratingPtr,
+		Liked:        params.Liked,
+		CameraModel:  params.CameraModel,
+		LensModel:    params.LensModel,
+		DateFrom:     fromTime,
+		DateTo:       toTime,
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count assets: %w", err)
+	}
+
+	// Get assets
+	assets, err := s.queries.GetAssetsUnified(ctx, repo.GetAssetsUnifiedParams{
+		AssetType:    params.AssetType,
+		AssetTypes:   params.AssetTypes,
+		RepositoryID: repoUUID,
+		OwnerID:      params.OwnerID,
+		AlbumID:      params.AlbumID,
+		Query:        queryPtr,
+		IsRaw:        params.IsRaw,
+		Rating:       ratingPtr,
+		Liked:        params.Liked,
+		CameraModel:  params.CameraModel,
+		LensModel:    params.LensModel,
+		SortBy:       sortByPtr,
+		DateFrom:     fromTime,
+		DateTo:       toTime,
+		Limit:        int32(params.Limit),
+		Offset:       int32(params.Offset),
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return assets, countResult, nil
+}
+
+func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
+	if s.lumen == nil {
+		return nil, 0, fmt.Errorf("%w: lumen service not available", ErrSemanticSearchUnavailable)
+	}
+	if !s.lumen.IsTaskAvailable("clip_text_embed") {
+		return nil, 0, fmt.Errorf("%w: clip_text_embed task not available", ErrSemanticSearchUnavailable)
+	}
+
+	embeddingResult, err := s.lumen.ClipTextEmbed(ctx, []byte(params.Query))
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get query embedding: %w", err)
+	}
+
+	queryVector := make([]float32, len(embeddingResult.Vector))
+	for i, v := range embeddingResult.Vector {
+		queryVector[i] = float32(v)
+	}
+
+	pgVector := pgvector.NewVector(queryVector)
+
+	var repoUUID pgtype.UUID
+	if params.RepositoryID != nil && *params.RepositoryID != "" {
+		parsedUUID, err := uuid.Parse(*params.RepositoryID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("invalid repository ID: %w", err)
+		}
+		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
+	}
+
+	maxDistance := 0.5
+	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			maxDistance = f
+		}
+	}
+
+	var ratingPtr *int32
+	if params.Rating != nil {
+		r := int32(*params.Rating)
+		ratingPtr = &r
+	}
+
+	var fromTime, toTime pgtype.Timestamptz
+	if params.DateFrom != nil {
+		fromTime = pgtype.Timestamptz{Time: *params.DateFrom, Valid: true}
+	}
+	if params.DateTo != nil {
+		toTime = pgtype.Timestamptz{Time: *params.DateTo, Valid: true}
+	}
+
+	// Get total count
+	countResult, err := s.queries.CountAssetsVectorUnified(ctx, repo.CountAssetsVectorUnifiedParams{
+		Embedding:     &pgVector,
+		EmbeddingType: string(EmbeddingTypeCLIP),
+		MaxDistance:   &maxDistance,
+		AssetType:     params.AssetType,
+		AssetTypes:    params.AssetTypes,
+		RepositoryID:  repoUUID,
+		OwnerID:       params.OwnerID,
+		AlbumID:       params.AlbumID,
+		IsRaw:         params.IsRaw,
+		Rating:        ratingPtr,
+		Liked:         params.Liked,
+		CameraModel:   params.CameraModel,
+		LensModel:     params.LensModel,
+		DateFrom:      fromTime,
+		DateTo:        toTime,
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count assets: %w", err)
+	}
+
+	// Get assets
+	results, err := s.queries.SearchAssetsVectorUnified(ctx, repo.SearchAssetsVectorUnifiedParams{
+		Embedding:     &pgVector,
+		EmbeddingType: string(EmbeddingTypeCLIP),
+		MaxDistance:   &maxDistance,
+		AssetType:     params.AssetType,
+		AssetTypes:    params.AssetTypes,
+		RepositoryID:  repoUUID,
+		OwnerID:       params.OwnerID,
+		AlbumID:       params.AlbumID,
+		IsRaw:         params.IsRaw,
+		Rating:        ratingPtr,
+		Liked:         params.Liked,
+		CameraModel:   params.CameraModel,
+		LensModel:     params.LensModel,
+		DateFrom:      fromTime,
+		DateTo:        toTime,
+		Limit:         int32(params.Limit),
+		Offset:        int32(params.Offset),
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to search assets: %w", err)
+	}
+
+	assets := make([]repo.Asset, len(results))
+	for i, r := range results {
+		assets[i] = repo.Asset{
+			AssetID: r.AssetID, OwnerID: r.OwnerID, Type: r.Type,
+			OriginalFilename: r.OriginalFilename, StoragePath: r.StoragePath,
+			MimeType: r.MimeType, FileSize: r.FileSize, Hash: r.Hash,
+			Width: r.Width, Height: r.Height, Duration: r.Duration,
+			TakenTime: r.TakenTime, UploadTime: r.UploadTime,
+			IsDeleted: r.IsDeleted, DeletedAt: r.DeletedAt,
+			SpecificMetadata: r.SpecificMetadata, Rating: r.Rating,
+			Liked: r.Liked, RepositoryID: r.RepositoryID, Status: r.Status,
+		}
+	}
+	return assets, countResult, nil
 }

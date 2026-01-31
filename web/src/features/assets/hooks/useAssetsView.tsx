@@ -13,12 +13,12 @@ import {
   selectFiltersEnabled,
 } from "../slices/filters.slice";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { components, paths } from "@/lib/http-commons/schema.d.ts";
+import type { components } from "@/lib/http-commons/schema.d.ts";
 import { groupAssets } from "@/lib/utils/assetGrouping";
 import { Asset } from "@/lib/assets/types";
 
-type ListAssetsParams = NonNullable<paths["/api/v1/assets"]["get"]["parameters"]["query"]>;
-type SearchAssetsParams = components["schemas"]["dto.SearchAssetsRequestDTO"];
+type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
+type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
 
 type AssetsViewQueryResult = {
   assets: Asset[];
@@ -116,173 +116,56 @@ export const useAssetsViewQuery = (
     };
   }, [definition.filter, definition.inheritGlobalFilter, filtersState]);
 
-  const hasEffectiveFilter = useMemo(() => {
-    return Object.keys(effectiveFilter || {}).length > 0;
-  }, [effectiveFilter]);
-
-  const isSearchOperation = useMemo(() => {
-    return !!definition.search?.query;
-  }, [definition.search]);
-
   const pageSize = definition.pageSize || 50;
 
   /**
-   * Creates API parameters for listing assets with filtering, sorting, and pagination.
-   * 
-   * @param offset - The number of assets to skip for pagination (default: 0)
-   * @returns ListAssetsParams object containing query parameters for the API
-   * 
-   * @example
-   * ```ts
-   * const params = createListParams(50);
-   * // Returns: { limit: 50, offset: 50, type: "PHOTO", sort_order: "desc" }
-   * ```
+   * Creates a unified request body for the /api/v1/assets/list endpoint.
+   * Handles all query types: listing, filtering, and searching.
    */
-  const createListParams = useCallback(
-    (offset: number = 0): ListAssetsParams => {
-      const params: ListAssetsParams = {
-        limit: pageSize,
-        offset,
-      };
+  const createUnifiedRequest = useCallback(
+    (offset = 0): AssetQueryRequest => {
+      const filter: AssetFilter = { ...effectiveFilter };
 
+      // Add asset type filters
       if (definition.types && definition.types.length > 0) {
         const mimeTypes = getApiMimeTypes(definition.types);
         if (mimeTypes.length === 1) {
-          params.type = mimeTypes[0];
+          filter.type = mimeTypes[0];
         } else if (mimeTypes.length > 1) {
-          params.types = mimeTypes.join(",");
+          filter.types = mimeTypes;
         }
       }
 
-      if (definition.sort) {
-        params.sort_order = definition.sort.direction;
-      }
-
-      return params;
-    },
-    [definition, pageSize],
-  );
-
-  /**
-   * Creates request body parameters for filtered asset queries.
-   * Combines effective filters with asset type restrictions and pagination.
-   * 
-   * @returns Request payload object for filter-based API endpoints
-   * 
-   * @example
-   * ```ts
-   * const payload = createFilterParams();
-   * // Returns: { filter: { type: "PHOTO", album_id: "123" }, limit: 50 }
-   * ```
-   */
-  const createFilterParams = useCallback(
-    () => {
-      const payload: any = {
-        filter: { ...effectiveFilter },
-        limit: pageSize,
+      const request: AssetQueryRequest & { group_by?: string } = {
+        filter,
+        group_by: definition.groupBy, // Send groupBy strategy to server for server-side sorting
+        pagination: {
+          limit: pageSize,
+          offset,
+        },
       };
 
-      if (definition.types && definition.types.length > 0) {
-        const mimeTypes = getApiMimeTypes(definition.types);
-        if (mimeTypes.length === 1) {
-          payload.filter.type = mimeTypes[0];
-        }
+      // Add search parameters if present
+      if (definition.search?.query) {
+        request.query = definition.search.query;
+        request.search_type =
+          definition.search.mode === "semantic" ? "semantic" : "filename";
       }
 
-      return payload;
+      return request;
     },
     [definition, effectiveFilter, pageSize],
   );
-
-  /**
-   * Creates request body parameters for asset search queries.
-   * Supports both semantic and filename-based search with filtering.
-   * 
-   * @returns SearchAssetsParams object for the search API endpoint
-   * 
-   * @example
-   * ```ts
-   * const params = createSearchParams();
-   * // Returns: { query: "beach", search_type: "semantic", filter: { type: "PHOTO" }, limit: 50 }
-   * ```
-   */
-  const createSearchParams = useCallback(
-    (): SearchAssetsParams => {
-      const params: SearchAssetsParams = {
-        query: definition.search!.query,
-        search_type:
-          definition.search!.mode === "semantic" ? "semantic" : "filename",
-        limit: pageSize,
-      };
-
-      const searchFilter = { ...effectiveFilter };
-
-      if (definition.types && definition.types.length > 0) {
-        const mimeTypes = getApiMimeTypes(definition.types);
-        if (mimeTypes.length === 1) {
-          searchFilter.type = mimeTypes[0];
-        }
-      }
-
-      params.filter = searchFilter;
-      return params;
+  // All queries use the unified /api/v1/assets/list endpoint
+  // Album filtering is handled via filter.album_id
+  const requestConfig = useMemo(() => ({
+    method: "post",
+    path: "/api/v1/assets/list",
+    init: {
+      body: createUnifiedRequest(0),
     },
-    [definition, effectiveFilter, pageSize],
-  );
-
-  const requestConfig = useMemo(() => {
-    const albumId = effectiveFilter.album_id;
-
-    if (albumId) {
-      return {
-        method: "post",
-        path: "/api/v1/albums/{id}/filter",
-        init: {
-          params: { path: { id: albumId } },
-          body: createFilterParams(),
-        },
-        pageParamName: "offset",
-      } as const;
-    }
-
-    if (isSearchOperation) {
-      return {
-        method: "post",
-        path: "/api/v1/assets/search",
-        init: {
-          body: createSearchParams(),
-        },
-        pageParamName: "offset",
-      } as const;
-    }
-
-    if (hasEffectiveFilter) {
-      return {
-        method: "post",
-        path: "/api/v1/assets/filter",
-        init: {
-          body: createFilterParams(),
-        },
-        pageParamName: "offset",
-      } as const;
-    }
-
-    return {
-      method: "get",
-      path: "/api/v1/assets",
-      init: {
-        params: { query: createListParams(0) },
-      },
-      pageParamName: "offset",
-    } as const;
-  }, [
-    effectiveFilter.album_id,
-    isSearchOperation,
-    hasEffectiveFilter,
-    createFilterParams,
-    createSearchParams,
-    createListParams,
-  ]);
+    pageParamName: "offset",
+  } as const), [createUnifiedRequest]);
 
   const query = $api.useInfiniteQuery(
     requestConfig.method as any,
@@ -325,10 +208,16 @@ export const useAssetsViewQuery = (
     });
   }, [query.dataUpdatedAt, pageSize]);
 
-  const assets = useMemo(
-    () => assetsPages.flatMap((page) => page.assets),
-    [assetsPages],
-  );
+  const assets = useMemo(() => {
+    const seen = new Set<string>();
+    return assetsPages.flatMap((page) => page.assets).filter((asset) => {
+      if (!asset.asset_id || seen.has(asset.asset_id)) {
+        return false;
+      }
+      seen.add(asset.asset_id);
+      return true;
+    });
+  }, [assetsPages]);
 
   const lastPage =
     assetsPages.length > 0 ? assetsPages[assetsPages.length - 1] : undefined;

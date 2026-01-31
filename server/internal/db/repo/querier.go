@@ -22,6 +22,12 @@ type Querier interface {
 	CountAssetsByStatus(ctx context.Context, status []byte) (int64, error)
 	CountAssetsByStatusAndOwner(ctx context.Context, arg CountAssetsByStatusAndOwnerParams) (int64, error)
 	CountAssetsByStatusAndRepository(ctx context.Context, arg CountAssetsByStatusAndRepositoryParams) (int64, error)
+	// Count query matching GetAssetsUnified WHERE clause
+	// Returns total count of assets matching the filters (for pagination)
+	CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error)
+	// Count query matching SearchAssetsVectorUnified WHERE clause
+	// Returns total count of assets matching semantic search (for pagination)
+	CountAssetsVectorUnified(ctx context.Context, arg CountAssetsVectorUnifiedParams) (int64, error)
 	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
@@ -88,6 +94,13 @@ type Querier interface {
 	GetAssetsByStatusAndRepository(ctx context.Context, arg GetAssetsByStatusAndRepositoryParams) ([]Asset, error)
 	GetAssetsByType(ctx context.Context, arg GetAssetsByTypeParams) ([]Asset, error)
 	GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTypesSortedParams) ([]Asset, error)
+	// ============================================================================
+	// UNIFIED QUERY API
+	// These queries consolidate List, Filter, and Search operations with shared WHERE logic
+	// ============================================================================
+	// Handles: listing, filename search, and all filtering
+	// Use this for most queries unless semantic search is needed
+	GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedParams) ([]Asset, error)
 	GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErrorsParams) ([]Asset, error)
 	GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWarningsParams) ([]Asset, error)
 	// 获取所有有照片的年份列表
@@ -182,6 +195,9 @@ type Querier interface {
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
 	SearchAssetsFilename(ctx context.Context, arg SearchAssetsFilenameParams) ([]Asset, error)
 	SearchAssetsVector(ctx context.Context, arg SearchAssetsVectorParams) ([]SearchAssetsVectorRow, error)
+	// Handles: semantic vector search with all filtering
+	// Same WHERE clause as GetAssetsUnified for consistency
+	SearchAssetsVectorUnified(ctx context.Context, arg SearchAssetsVectorUnifiedParams) ([]SearchAssetsVectorUnifiedRow, error)
 	SearchEmbeddingsByModel(ctx context.Context, arg SearchEmbeddingsByModelParams) ([]SearchEmbeddingsByModelRow, error)
 	SearchEmbeddingsByType(ctx context.Context, arg SearchEmbeddingsByTypeParams) ([]SearchEmbeddingsByTypeRow, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error

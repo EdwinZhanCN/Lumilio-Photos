@@ -183,6 +183,7 @@ components:
           type: integer
       type: object
     dto.AssetFilterDTO:
+      description: Unified filter options
       properties:
         album_id:
           example: 123
@@ -221,6 +222,15 @@ components:
           - AUDIO
           example: PHOTO
           type: string
+        types:
+          description: Multiple asset types
+          example:
+          - PHOTO
+          - VIDEO
+          items:
+            type: string
+          type: array
+          uniqueItems: false
       type: object
     dto.AssetListResponseDTO:
       properties:
@@ -235,6 +245,27 @@ components:
         offset:
           example: 0
           type: integer
+        total:
+          example: 150
+          type: integer
+      type: object
+    dto.AssetQueryRequestDTO:
+      properties:
+        filter:
+          $ref: '#/components/schemas/dto.AssetFilterDTO'
+        pagination:
+          $ref: '#/components/schemas/dto.PaginationDTO'
+        query:
+          description: Search keyword (optional)
+          example: sunset photo
+          type: string
+        search_type:
+          description: '"filename" (default) | "semantic"'
+          enum:
+          - filename
+          - semantic
+          example: filename
+          type: string
       type: object
     dto.AssetTypesResponseDTO:
       properties:
@@ -366,20 +397,6 @@ components:
           example: IMG_
           type: string
       type: object
-    dto.FilterAssetsRequestDTO:
-      properties:
-        filter:
-          $ref: '#/components/schemas/dto.AssetFilterDTO'
-        limit:
-          example: 20
-          maximum: 100
-          minimum: 1
-          type: integer
-        offset:
-          example: 0
-          minimum: 0
-          type: integer
-      type: object
     dto.GetAlbumResponseDTO:
       properties:
         album_id:
@@ -441,6 +458,19 @@ components:
             type: string
           type: array
           uniqueItems: false
+      type: object
+    dto.PaginationDTO:
+      description: limit, offset
+      properties:
+        limit:
+          example: 20
+          maximum: 100
+          minimum: 1
+          type: integer
+        offset:
+          example: 0
+          minimum: 0
+          type: integer
       type: object
     dto.ProgressSummaryDTO:
       properties:
@@ -520,32 +550,6 @@ components:
         status:
           example: queued
           type: string
-      type: object
-    dto.SearchAssetsRequestDTO:
-      properties:
-        filter:
-          $ref: '#/components/schemas/dto.AssetFilterDTO'
-        limit:
-          example: 20
-          maximum: 100
-          minimum: 1
-          type: integer
-        offset:
-          example: 0
-          minimum: 0
-          type: integer
-        query:
-          example: red bird on branch
-          type: string
-        search_type:
-          enum:
-          - filename
-          - semantic
-          example: filename
-          type: string
-      required:
-      - query
-      - search_type
       type: object
     dto.SessionProgressDTO:
       properties:
@@ -1781,171 +1785,7 @@ paths:
       summary: Update asset position in album
       tags:
       - albums
-  /api/v1/albums/{id}/filter:
-    post:
-      description: Filter assets within a specific album using comprehensive filtering
-        options
-      parameters:
-      - description: Album ID
-        in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-      requestBody:
-        content:
-          application/json:
-            schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.FilterAssetsRequestDTO'
-                description: Filter criteria
-                summary: request
-        description: Filter criteria
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
-          description: Assets filtered successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Invalid request parameters
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Internal server error
-      security:
-      - BearerAuth: []
-      summary: Filter assets in album
-      tags:
-      - albums
   /api/v1/assets:
-    get:
-      description: Retrieve a paginated list of assets. Filter by type(s) or owner.
-        Assets are sorted by taken_time (photo capture time or video record time).
-        At least one filter parameter is required.
-      parameters:
-      - description: Single asset type filter
-        example: '"PHOTO"'
-        in: query
-        name: type
-        schema:
-          enum:
-          - PHOTO
-          - VIDEO
-          - AUDIO
-          type: string
-      - description: Multiple asset types filter (comma-separated)
-        example: '"PHOTO,VIDEO"'
-        in: query
-        name: types
-        schema:
-          type: string
-      - description: Filter by owner ID
-        example: 123
-        in: query
-        name: owner_id
-        schema:
-          type: integer
-      - description: Maximum number of results (max 100)
-        example: 20
-        in: query
-        name: limit
-        schema:
-          default: 20
-          type: integer
-      - description: Number of results to skip for pagination
-        example: 0
-        in: query
-        name: offset
-        schema:
-          default: 0
-          type: integer
-      - description: Sort order by taken_time
-        example: '"desc"'
-        in: query
-        name: sort_order
-        schema:
-          default: '"desc"'
-          enum:
-          - asc
-          - desc
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
-          description: Assets retrieved successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Invalid parameters
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Internal server error
-      summary: List assets
-      tags:
-      - assets
     post:
       description: Upload a single photo, video, audio file, or document to the system.
         The file is staged in a repository and queued for processing.
@@ -2991,64 +2831,6 @@ paths:
       summary: Get upload progress
       tags:
       - assets
-  /api/v1/assets/filter:
-    post:
-      description: Filter assets using comprehensive filtering options including repository
-        selection, RAW, rating, liked status, filename patterns, date ranges, camera
-        make, and lens
-      requestBody:
-        content:
-          application/json:
-            schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.FilterAssetsRequestDTO'
-                description: Filter criteria
-                summary: request
-        description: Filter criteria
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
-          description: Assets filtered successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Invalid request parameters
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Internal server error
-      summary: Filter assets
-      tags:
-      - assets
   /api/v1/assets/filter-options:
     get:
       description: Get available camera makes and lenses for filter dropdowns
@@ -3150,6 +2932,69 @@ paths:
       summary: Get liked assets
       tags:
       - assets
+  /api/v1/assets/list:
+    post:
+      description: Unified endpoint for listing, filtering, and searching assets.
+        Replaces separate /filter and /search endpoints.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.AssetQueryRequestDTO'
+                description: Query parameters
+                summary: request
+        description: Query parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: Assets queried successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Invalid request parameters
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Internal server error
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Semantic search unavailable
+      summary: Query assets (unified endpoint)
+      tags:
+      - assets
   /api/v1/assets/rating/{rating}:
     get:
       description: Get assets with a specific rating (0-5)
@@ -3217,69 +3062,6 @@ paths:
                 $ref: '#/components/schemas/api.Result'
           description: Internal server error
       summary: Get assets by rating
-      tags:
-      - assets
-  /api/v1/assets/search:
-    post:
-      description: Search assets using either filename matching or semantic vector
-        search. Can be combined with comprehensive filters including repository selection.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              oneOf:
-              - type: object
-              - $ref: '#/components/schemas/dto.SearchAssetsRequestDTO'
-                description: Search criteria
-                summary: request
-        description: Search criteria
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/data'
-                description: Standard API response wrapper
-                properties:
-                  code:
-                    description: Business status code (0 for success, non-zero for
-                      errors)
-                    example: 0
-                    type: integer
-                  data:
-                    description: Business data, ignore empty values
-                    type: object
-                  error:
-                    description: Debug error message, ignore empty values
-                    example: error details
-                    type: string
-                  message:
-                    description: User readable message
-                    example: success
-                    type: string
-                type: object
-          description: Assets found successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Invalid request parameters
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Internal server error
-        "503":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/api.Result'
-          description: Semantic search unavailable
-      summary: Search assets
       tags:
       - assets
   /api/v1/assets/types:
