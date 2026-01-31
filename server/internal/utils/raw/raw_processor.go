@@ -263,18 +263,21 @@ func (p *Processor) GenerateThumbnails(previewData []byte, sizes map[string][2]i
 	}
 
 	thumbnails := make(map[string][]byte)
-	img := bimg.NewImage(previewData)
 
 	for sizeName, dimensions := range sizes {
 		width, height := dimensions[0], dimensions[1]
 
+		// Create a new bimg instance for each size to avoid libvips state issues
+		img := bimg.NewImage(previewData)
+
 		thumbnail, err := img.Process(bimg.Options{
-			Width:   width,
-			Height:  height,
-			Crop:    true,
-			Gravity: bimg.GravitySmart,
-			Quality: p.options.Quality,
-			Type:    p.options.OutputFormat,
+			Width:         width,
+			Height:        height,
+			Crop:          true,
+			Gravity:       bimg.GravitySmart,
+			Quality:       p.options.Quality,
+			Type:          p.options.OutputFormat,
+			StripMetadata: true, // Prevent color space issues from cached metadata
 		})
 		if err != nil {
 			log.Printf("Failed to generate %s thumbnail: %v", sizeName, err)
