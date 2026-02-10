@@ -1922,7 +1922,7 @@ paths:
     get:
       description: Retrieve detailed information about a specific asset. Optionally
         include thumbnails, tags, albums, species predictions, OCR results, face recognition,
-        and AI descriptions.
+        and captions.
       parameters:
       - description: Asset ID (UUID format)
         example: '"550e8400-e29b-41d4-a716-446655440000"'
@@ -1967,9 +1967,9 @@ paths:
         schema:
           default: false
           type: boolean
-      - description: Include AI descriptions
+      - description: Include captions
         in: query
-        name: include_ai_descriptions
+        name: include_captions
         schema:
           default: false
           type: boolean

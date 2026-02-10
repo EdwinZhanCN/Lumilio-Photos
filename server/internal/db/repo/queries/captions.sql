@@ -1,17 +1,17 @@
--- name: CreateAIDescription :one
-INSERT INTO ai_descriptions (asset_id, model_id, description, summary, confidence, tokens_generated, processing_time_ms, prompt_used, finish_reason)
+-- name: CreateCaption :one
+INSERT INTO captions (asset_id, model_id, description, summary, confidence, tokens_generated, processing_time_ms, prompt_used, finish_reason)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
--- name: GetAIDescriptionByAsset :one
-SELECT * FROM ai_descriptions
+-- name: GetCaptionByAsset :one
+SELECT * FROM captions
 WHERE asset_id = $1;
 
--- name: DeleteAIDescriptionByAsset :exec
-DELETE FROM ai_descriptions WHERE asset_id = $1;
+-- name: DeleteCaptionByAsset :exec
+DELETE FROM captions WHERE asset_id = $1;
 
--- name: UpdateAIDescription :one
-UPDATE ai_descriptions
+-- name: UpdateCaption :one
+UPDATE captions
 SET
     model_id = $2,
     description = $3,
@@ -25,30 +25,30 @@ SET
 WHERE asset_id = $1
 RETURNING *;
 
--- name: SearchAssetsByAIDescription :many
+-- name: SearchAssetsByCaption :many
 SELECT DISTINCT a.* FROM assets a
-JOIN ai_descriptions d ON a.asset_id = d.asset_id
+JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.description) @@ plainto_tsquery('english', $1)
 ORDER BY a.upload_time DESC
 LIMIT $3 OFFSET $2;
 
--- name: SearchAssetsByAIDescriptionWithConfidence :many
+-- name: SearchAssetsByCaptionWithConfidence :many
 SELECT DISTINCT a.* FROM assets a
-JOIN ai_descriptions d ON a.asset_id = d.asset_id
+JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.description) @@ plainto_tsquery('english', $1)
 AND d.confidence >= $4
 ORDER BY a.upload_time DESC
 LIMIT $3 OFFSET $2;
 
--- name: SearchAssetsByAISummary :many
+-- name: SearchAssetsByCaptionSummary :many
 SELECT DISTINCT a.* FROM assets a
-JOIN ai_descriptions d ON a.asset_id = d.asset_id
+JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.summary) @@ plainto_tsquery('english', $1)
 AND d.summary IS NOT NULL
 ORDER BY a.upload_time DESC
 LIMIT $3 OFFSET $2;
 
--- name: GetAIDescriptionStatsByModel :many
+-- name: GetCaptionStatsByModel :many
 SELECT
     model_id,
     COUNT(*) as total_descriptions,
@@ -59,29 +59,29 @@ SELECT
     MIN(processing_time_ms) as min_processing_time,
     MAX(processing_time_ms) as max_processing_time,
     AVG(confidence) as avg_confidence
-FROM ai_descriptions
+FROM captions
 GROUP BY model_id
 ORDER BY total_descriptions DESC;
 
--- name: GetTopAIDescriptionsByTokens :many
-SELECT * FROM ai_descriptions
+-- name: GetTopCaptionsByTokens :many
+SELECT * FROM captions
 ORDER BY tokens_generated DESC
 LIMIT $1;
 
--- name: GetAIDescriptionsByModel :many
-SELECT * FROM ai_descriptions
+-- name: GetCaptionsByModel :many
+SELECT * FROM captions
 WHERE model_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3;
 
--- name: GetLongAIDescriptions :many
-SELECT * FROM ai_descriptions
-WHERE LENGTH(description) > $1
+-- name: GetLongCaptions :many
+SELECT * FROM captions
+WHERE LENGTH(description) > sqlc.arg(min_length)::int
 ORDER BY LENGTH(description) DESC
-LIMIT $2;
+LIMIT sqlc.arg(row_limit);
 
--- name: UpdateAIDescriptionStats :exec
-UPDATE ai_descriptions
+-- name: UpdateCaptionStats :exec
+UPDATE captions
 SET
     tokens_generated = (
         SELECT LENGTH(description) / 4.0 -- Approximate token count (rough estimate: 1 token ≈ 4 characters)
