@@ -2,13 +2,13 @@
 
 # Function: useMessage()
 
-> **useMessage**(`timeout`): (`type`, `message`) => `void`
+> **useMessage**(`timeout?`): (`type`, `message`) => `void`
 
-Defined in: [hooks/util-hooks/useMessage.tsx:4](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2e1dabc4b81eb0ab6047f103f52245f09e6ea56f/web/src/hooks/util-hooks/useMessage.tsx#L4)
+Defined in: [hooks/util-hooks/useMessage.tsx:4](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/f13175206e08d524f3e55e943038759f4e537ede/web/src/hooks/util-hooks/useMessage.tsx#L4)
 
 ## Parameters
 
-### timeout
+### timeout?
 
 `number` = `5000`
 
