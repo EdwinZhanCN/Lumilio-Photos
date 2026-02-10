@@ -658,3 +658,34 @@ WHERE a.is_deleted = false
   AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
   AND (e.embedding <-> sqlc.arg('embedding')::vector) <= sqlc.narg('max_distance')::float8;
 
+-- name: GetPhotoMapPoints :many
+-- Lightweight photo locations for map clustering/rendering.
+SELECT
+  a.asset_id,
+  a.original_filename,
+  a.upload_time,
+  a.taken_time,
+  (a.specific_metadata->>'gps_latitude')::double precision AS gps_latitude,
+  (a.specific_metadata->>'gps_longitude')::double precision AS gps_longitude
+FROM assets a
+WHERE a.is_deleted = false
+  AND a.type = 'PHOTO'
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
+  AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
+  AND (a.specific_metadata->>'gps_latitude')::double precision BETWEEN -90 AND 90
+  AND (a.specific_metadata->>'gps_longitude')::double precision BETWEEN -180 AND 180
+ORDER BY COALESCE(a.taken_time, a.upload_time) DESC
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: CountPhotoMapPoints :one
+-- Count query matching GetPhotoMapPoints.
+SELECT COUNT(*) as count
+FROM assets a
+WHERE a.is_deleted = false
+  AND a.type = 'PHOTO'
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
+  AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
+  AND (a.specific_metadata->>'gps_latitude')::double precision BETWEEN -90 AND 90
+  AND (a.specific_metadata->>'gps_longitude')::double precision BETWEEN -180 AND 180;

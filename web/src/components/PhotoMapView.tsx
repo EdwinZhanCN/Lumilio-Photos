@@ -1,16 +1,17 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { MapIcon, ListIcon } from "lucide-react";
 import MapComponent, { PhotoLocation } from "./MapComponent";
-import {
-  assetsToPhotoLocations,
-  formatGPSCoordinates,
-} from "@/lib/utils/mapUtils";
+import { formatGPSCoordinates } from "@/lib/utils/mapUtils";
 import { useI18n } from "@/lib/i18n.tsx";
-import { Asset } from "@/lib/assets/types";
+import type { components } from "@/lib/http-commons/schema.d.ts";
+import { assetUrls } from "@/lib/assets/assetUrls";
+
+type Schemas = components["schemas"];
+type MapPhotoPoint = Schemas["dto.AssetMapPointDTO"];
 
 interface PhotoMapViewProps {
-  assets: Asset[];
-  onAssetClick?: (asset: Asset) => void;
+  points: MapPhotoPoint[];
+  onPointClick?: (assetId: string) => void;
   className?: string;
   showViewToggle?: boolean;
   defaultView?: "map" | "list";
@@ -20,8 +21,8 @@ interface PhotoMapViewProps {
 type ViewMode = "map" | "list";
 
 export default function PhotoMapView({
-  assets,
-  onAssetClick,
+  points,
+  onPointClick,
   className = "",
   showViewToggle = true,
   defaultView = "map",
@@ -29,22 +30,33 @@ export default function PhotoMapView({
 }: PhotoMapViewProps) {
   const { t } = useI18n();
   const [viewMode, setViewMode] = useState<ViewMode>(defaultView);
-  const [photoLocations, setPhotoLocations] = useState<PhotoLocation[]>([]);
-  const [, setSelectedLocation] = useState<PhotoLocation | null>(null);
+  const photoLocations = useMemo(
+    () =>
+      points
+        .map((point, index): PhotoLocation | null => {
+          if (
+            !point.asset_id ||
+            typeof point.gps_latitude !== "number" ||
+            typeof point.gps_longitude !== "number"
+          ) {
+            return null;
+          }
 
-  // Convert assets to photo locations
-  useEffect(() => {
-    const locations = assetsToPhotoLocations(assets);
-    setPhotoLocations(locations);
-  }, [assets]);
-
-  // Handle photo location click
-  const handleLocationClick = (location: PhotoLocation) => {
-    setSelectedLocation(location);
-    if (location.asset && onAssetClick) {
-      onAssetClick(location.asset);
-    }
-  };
+          const title = point.original_filename || `Photo ${index + 1}`;
+          const subtitle = point.taken_time ?? point.upload_time;
+          return {
+            id: point.asset_id,
+            position: [point.gps_latitude, point.gps_longitude],
+            title,
+            description: subtitle
+              ? new Date(subtitle).toLocaleString()
+              : undefined,
+            thumbnailUrl: assetUrls.getThumbnailUrl(point.asset_id, "small"),
+          };
+        })
+        .filter((location): location is PhotoLocation => location !== null),
+    [points],
+  );
 
   // Group photos by location (approximately)
   const groupPhotosByLocation = (locations: PhotoLocation[]) => {
@@ -134,11 +146,11 @@ export default function PhotoMapView({
                       <div
                         key={location.id}
                         className="aspect-square bg-base-300 rounded cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
-                        onClick={() => handleLocationClick(location)}
+                        onClick={() => onPointClick?.(location.id)}
                       >
-                        {location.asset?.asset_id ? (
+                        {location.thumbnailUrl ? (
                           <img
-                            src={`/api/assets/${location.asset.asset_id}/thumbnail?size=small`}
+                            src={location.thumbnailUrl}
                             alt={location.title}
                             className="w-full h-full object-cover"
                             onError={(e) => {

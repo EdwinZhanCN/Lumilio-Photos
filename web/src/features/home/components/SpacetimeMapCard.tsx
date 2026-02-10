@@ -1,7 +1,10 @@
 import React from "react";
 import { MapIcon } from "@heroicons/react/24/outline";
 import PhotoMapView from "@/components/PhotoMapView";
-import type { Asset } from "@/lib/http-commons";
+import type { components } from "@/lib/http-commons/schema.d.ts";
+
+type Schemas = components["schemas"];
+type MapPhotoPoint = Schemas["dto.AssetMapPointDTO"];
 
 export interface SpacetimeMapCardProps {
   /**
@@ -22,10 +25,9 @@ export interface SpacetimeMapCardProps {
    */
   headerRight?: React.ReactNode;
   /**
-   * Assets with GPS coordinates to display on the map.
-   * Only assets with valid GPS data will be shown.
+   * Lightweight photo map points with GPS coordinates.
    */
-  assets?: Asset[];
+  points?: MapPhotoPoint[];
   /**
    * Outer card className.
    */
@@ -51,7 +53,7 @@ const SpacetimeMapCard: React.FC<SpacetimeMapCardProps> = ({
   subtitle,
   icon,
   headerRight,
-  assets = [],
+  points = [],
   className = "",
   aspect = "aspect-[16/9]",
   style,
@@ -80,7 +82,7 @@ const SpacetimeMapCard: React.FC<SpacetimeMapCardProps> = ({
         </div>
 
         <div className={aspect}>
-          <PhotoMapView assets={assets} showViewToggle={false} height="100%" />
+          <PhotoMapView points={points} showViewToggle={false} height="100%" />
         </div>
       </div>
     </section>

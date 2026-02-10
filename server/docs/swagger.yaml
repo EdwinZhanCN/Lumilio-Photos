@@ -249,6 +249,44 @@ components:
           example: 150
           type: integer
       type: object
+    dto.AssetMapPointDTO:
+      properties:
+        asset_id:
+          example: 550e8400-e29b-41d4-a716-446655440000
+          type: string
+        gps_latitude:
+          example: 37.7749
+          type: number
+        gps_longitude:
+          example: -122.4194
+          type: number
+        original_filename:
+          example: IMG_1234.HEIC
+          type: string
+        taken_time:
+          example: "2026-02-09T08:30:00Z"
+          type: string
+        upload_time:
+          example: "2026-02-10T12:00:00Z"
+          type: string
+      type: object
+    dto.AssetMapPointListResponseDTO:
+      properties:
+        limit:
+          example: 1000
+          type: integer
+        offset:
+          example: 0
+          type: integer
+        points:
+          items:
+            $ref: '#/components/schemas/dto.AssetMapPointDTO'
+          type: array
+          uniqueItems: false
+        total:
+          example: 1500
+          type: integer
+      type: object
     dto.AssetQueryRequestDTO:
       properties:
         filter:
@@ -3104,6 +3142,75 @@ paths:
                 $ref: '#/components/schemas/api.Result'
           description: Semantic search unavailable
       summary: Query assets (unified endpoint)
+      tags:
+      - assets
+  /api/v1/assets/map-points:
+    get:
+      description: Return lightweight paginated photo records containing only map-related
+        fields (asset ID, filename, times, GPS lat/lon).
+      parameters:
+      - description: Page size (1-5000)
+        in: query
+        name: limit
+        schema:
+          default: 1000
+          type: integer
+      - description: Page offset
+        in: query
+        name: offset
+        schema:
+          default: 0
+          type: integer
+      - description: Optional repository UUID filter
+        in: query
+        name: repository_id
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: Map points retrieved successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Invalid request parameters
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Internal server error
+      summary: Get photo map points
       tags:
       - assets
   /api/v1/assets/rating/{rating}:

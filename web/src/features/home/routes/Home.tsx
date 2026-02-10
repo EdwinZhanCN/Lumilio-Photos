@@ -15,6 +15,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { isPhotoMetadata } from "@/lib/http-commons";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
+import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
 
 const EMPTY_EXIF = {
   camera: "-",
@@ -42,8 +43,22 @@ function Home() {
     candidateLimit: 240,
     days: 3650,
   });
+  const {
+    points: mapPoints,
+    loadedPhotos: mapLoadedPhotos,
+    totalPhotos: mapTotalPhotos,
+    isLoading: isMapLoading,
+    isFetchingNextPage: isMapFetchingNextPage,
+    hasNextPage: mapHasNextPage,
+  } = useMapPhotoAssets();
 
   const galleryItems = featuredAssets.length > 0 ? featuredAssets.length : 8;
+  const mapSubtitle =
+    isMapLoading && mapLoadedPhotos === 0
+      ? "正在加载地图数据..."
+      : mapPoints.length > 0
+        ? `定位照片 ${mapPoints.length} 张 / 已加载 ${mapLoadedPhotos}${mapTotalPhotos ? ` / 总计 ${mapTotalPhotos}` : ""}${isMapFetchingNextPage || mapHasNextPage ? "（继续加载中）" : ""}`
+        : "暂无带地理位置的照片";
 
   return (
     <div className="flex flex-col gap-8 p-6 relative">
@@ -153,12 +168,8 @@ function Home() {
       )}
 
       <SpacetimeMapCard
-        assets={featuredAssets}
-        subtitle={
-          featuredAssets.length > 0
-            ? `本次精选 ${featuredAssets.length} 张（seed: ${seed}）`
-            : "暂无精选照片可展示"
-        }
+        points={mapPoints}
+        subtitle={mapSubtitle}
       />
     </div>
   );

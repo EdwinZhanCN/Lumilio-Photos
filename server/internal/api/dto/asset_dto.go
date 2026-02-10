@@ -191,6 +191,24 @@ type FeaturedAssetsResponseDTO struct {
 	GeneratedAtTime time.Time  `json:"generated_at_time" example:"2026-02-10T12:00:00Z"`
 }
 
+// AssetMapPointDTO represents a lightweight map point for photo location rendering.
+type AssetMapPointDTO struct {
+	AssetID          string     `json:"asset_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	OriginalFilename string     `json:"original_filename" example:"IMG_1234.HEIC"`
+	UploadTime       time.Time  `json:"upload_time" example:"2026-02-10T12:00:00Z"`
+	TakenTime        *time.Time `json:"taken_time,omitempty" example:"2026-02-09T08:30:00Z"`
+	GPSLatitude      float64    `json:"gps_latitude" example:"37.7749"`
+	GPSLongitude     float64    `json:"gps_longitude" example:"-122.4194"`
+}
+
+// AssetMapPointListResponseDTO represents paginated lightweight photo map points.
+type AssetMapPointListResponseDTO struct {
+	Points []AssetMapPointDTO `json:"points"`
+	Total  *int               `json:"total,omitempty" example:"1500"`
+	Limit  int                `json:"limit" example:"1000"`
+	Offset int                `json:"offset" example:"0"`
+}
+
 // UpdateAssetRequestDTO represents the request structure for updating asset metadata
 type UpdateAssetRequestDTO struct {
 	Metadata dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object" oneOf:"dbtypes.PhotoSpecificMetadata,dbtypes.VideoSpecificMetadata,dbtypes.AudioSpecificMetadata"`

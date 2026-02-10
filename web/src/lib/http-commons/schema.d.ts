@@ -2945,6 +2945,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/map-points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get photo map points
+         * @description Return lightweight paginated photo records containing only map-related fields (asset ID, filename, times, GPS lat/lon).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Page size (1-5000) */
+                    limit?: number;
+                    /** @description Page offset */
+                    offset?: number;
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Map points retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/rating/{rating}": {
         parameters: {
             query?: never;
@@ -4088,6 +4174,29 @@ export interface components {
             /** @example 0 */
             offset?: number;
             /** @example 150 */
+            total?: number;
+        };
+        "dto.AssetMapPointDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            asset_id?: string;
+            /** @example 37.7749 */
+            gps_latitude?: number;
+            /** @example -122.4194 */
+            gps_longitude?: number;
+            /** @example IMG_1234.HEIC */
+            original_filename?: string;
+            /** @example 2026-02-09T08:30:00Z */
+            taken_time?: string;
+            /** @example 2026-02-10T12:00:00Z */
+            upload_time?: string;
+        };
+        "dto.AssetMapPointListResponseDTO": {
+            /** @example 1000 */
+            limit?: number;
+            /** @example 0 */
+            offset?: number;
+            points?: components["schemas"]["dto.AssetMapPointDTO"][];
+            /** @example 1500 */
             total?: number;
         };
         "dto.AssetQueryRequestDTO": {
