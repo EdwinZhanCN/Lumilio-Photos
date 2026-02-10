@@ -156,45 +156,6 @@ created_at: "2024-01-15T10:30:00Z"
 # - "flat": All files in a single directory
 storage_strategy: "date"
 
-# Synchronization settings for file system monitoring
-sync_settings:
-  # How often to perform quick metadata scans (file size, modification time)
-  quick_scan_interval: "5m"
-
-  # How often to perform full content verification scans
-  full_scan_interval: "30m"
-
-  # File patterns to ignore during scanning
-  ignore_patterns:
-    - ".DS_Store"
-    - "Thumbs.db"
-    - "ehthumbs.db"
-    - "Icon?"
-    - "Icon\r"
-    - "*.tmp"
-    - "*.temp"
-    - "*.part"
-    - "*.partial"
-    - "*.wbk"
-    - "*.bak"
-    - "*.orig"
-    - "*~"
-    - "~$*"
-    - "*.swp"
-    - "*.swo"
-    - ".*.swp"
-    - ".lumilio"
-    - ".Trash"
-    - ".Trashes"
-    - ".fseventsd"
-    - ".Spotlight-V100"
-    - ".TemporaryItems"
-    - "lost+found"
-    - "desktop.ini"
-    - "*._*"
-    - "npm-debug.log"
-    - "yarn-error.log"
-
 # Repository-specific local settings
 local_settings:
   # Whether to preserve original filenames when storing files

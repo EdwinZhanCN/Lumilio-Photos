@@ -81,7 +81,7 @@ func main() {
 	queries := database.Queries
 
 	// Initialize new repository-based storage system
-	repoManager, err := storage.NewRepositoryManager(queries, pgxPool)
+	repoManager, err := storage.NewRepositoryManager(queries)
 	if err != nil {
 		log.Fatalf("Failed to initialize repository manager: %v", err)
 	}
