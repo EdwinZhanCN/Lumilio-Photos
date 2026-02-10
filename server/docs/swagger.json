@@ -557,6 +557,38 @@
                 },
                 "type": "object"
             },
+            "dto.FeaturedAssetsResponseDTO": {
+                "properties": {
+                    "assets": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "candidate_count": {
+                        "example": 240,
+                        "type": "integer"
+                    },
+                    "count": {
+                        "example": 8,
+                        "type": "integer"
+                    },
+                    "generated_at_time": {
+                        "example": "2026-02-10T12:00:00Z",
+                        "type": "string"
+                    },
+                    "seed": {
+                        "example": "2026-02-10",
+                        "type": "string"
+                    },
+                    "strategy": {
+                        "example": "weighted_aes_v1",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.FilenameFilterDTO": {
                 "properties": {
                     "mode": {
@@ -3053,6 +3085,128 @@
                     }
                 },
                 "summary": "Get upload progress",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/featured": {
+            "get": {
+                "description": "Select a small set of featured photos using deterministic weighted sampling (A-ES) with diversity constraints.",
+                "parameters": [
+                    {
+                        "description": "Number of featured photos to return",
+                        "in": "query",
+                        "name": "count",
+                        "schema": {
+                            "default": 8,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Max candidate photos considered before selection",
+                        "in": "query",
+                        "name": "candidate_limit",
+                        "schema": {
+                            "default": 240,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Only consider photos from the last N days (0 disables date cutoff)",
+                        "in": "query",
+                        "name": "days",
+                        "schema": {
+                            "default": 3650,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Deterministic seed (default: current UTC date YYYY-MM-DD)",
+                        "in": "query",
+                        "name": "seed",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Featured photos selected successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get featured photos",
                 "tags": [
                     "assets"
                 ]
