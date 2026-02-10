@@ -78,6 +78,27 @@ type IngestAssetArgs struct {
 
 func (IngestAssetArgs) Kind() string { return "ingest_asset" }
 
+// DiscoverAssetArgs handles repository file-tree discovery ingestion.
+type DiscoverAssetArgs struct {
+	RepositoryID string    `json:"repositoryId" river:"unique"`
+	RelativePath string    `json:"relativePath" river:"unique"` // repository-relative user workspace path, e.g. albums/2026/02/a.jpg
+	FileName     string    `json:"fileName"`
+	ContentType  string    `json:"contentType,omitempty"`
+	FileSize     int64     `json:"fileSize,omitempty"`
+	DetectedAt   time.Time `json:"detectedAt"`
+}
+
+func (DiscoverAssetArgs) Kind() string { return "discover_asset" }
+
+// InsertOpts reduces burst duplicates from file change storms.
+func (DiscoverAssetArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		UniqueOpts: river.UniqueOpts{
+			ByPeriod: 1 * time.Minute,
+		},
+	}
+}
+
 // MetadataArgs triggers EXIF/ffprobe metadata extraction per asset.
 type MetadataArgs struct {
 	AssetID          pgtype.UUID       `json:"assetId"`

@@ -13,6 +13,7 @@ import (
 func New(dbpool *pgxpool.Pool, workers *river.Workers, mlConfig config.MLConfig) (*river.Client[pgx.Tx], error) {
 	queues := map[string]river.QueueConfig{
 		"ingest_asset":    {MaxWorkers: 50},
+		"discover_asset":  {MaxWorkers: 20},
 		"metadata_asset":  {MaxWorkers: 20},
 		"thumbnail_asset": {MaxWorkers: runtime.NumCPU() / 2},
 		"transcode_asset": {MaxWorkers: 1},
