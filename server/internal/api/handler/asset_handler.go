@@ -1284,6 +1284,139 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 	api.GinSuccess(c, response)
 }
 
+// GetFeaturedAssets returns deterministic curated featured photos.
+// @Summary Get featured photos
+// @Description Select a small set of featured photos using deterministic weighted sampling (A-ES) with diversity constraints.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param count query int false "Number of featured photos to return" default(8)
+// @Param candidate_limit query int false "Max candidate photos considered before selection" default(240)
+// @Param days query int false "Only consider photos from the last N days (0 disables date cutoff)" default(3650)
+// @Param seed query string false "Deterministic seed (default: current UTC date YYYY-MM-DD)"
+// @Param repository_id query string false "Optional repository UUID filter"
+// @Success 200 {object} api.Result{data=dto.FeaturedAssetsResponseDTO} "Featured photos selected successfully"
+// @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/featured [get]
+func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
+	count, err := parseIntQueryWithRange(c, "count", 8, 1, 24)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid count parameter")
+		return
+	}
+
+	candidateLimit, err := parseIntQueryWithRange(c, "candidate_limit", 240, 16, 1000)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid candidate_limit parameter")
+		return
+	}
+
+	days, err := parseIntQueryWithRange(c, "days", 3650, 0, 36500)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid days parameter")
+		return
+	}
+
+	seed := strings.TrimSpace(c.Query("seed"))
+	now := time.Now().UTC()
+	if seed == "" {
+		seed = now.Format("2006-01-02")
+	}
+
+	var repositoryID *string
+	if rawRepoID := strings.TrimSpace(c.Query("repository_id")); rawRepoID != "" {
+		if _, err := uuid.Parse(rawRepoID); err != nil {
+			api.GinBadRequest(c, err, "Invalid repository_id parameter")
+			return
+		}
+		repositoryID = &rawRepoID
+	}
+
+	var dateFrom *time.Time
+	if days > 0 {
+		from := now.AddDate(0, 0, -days)
+		dateFrom = &from
+	}
+
+	photoType := service.AssetTypePhoto
+	params := service.QueryAssetsParams{
+		SearchType:   "filename",
+		RepositoryID: repositoryID,
+		AssetType:    &photoType,
+		DateFrom:     dateFrom,
+		Limit:        candidateLimit,
+		Offset:       0,
+	}
+
+	assets, _, err := h.assetService.QueryAssets(c.Request.Context(), params)
+	if err != nil {
+		log.Printf("Failed to query featured candidate assets: %v", err)
+		api.GinInternalError(c, err, "Failed to build featured photos")
+		return
+	}
+
+	selected := service.SelectFeaturedPhotos(assets, service.FeaturedSelectionOptions{
+		Count: count,
+		Seed:  seed,
+		Now:   now,
+	})
+
+	uniqueCandidates := countUniqueAssets(assets)
+
+	dtos := make([]dto.AssetDTO, len(selected))
+	for i, a := range selected {
+		dtos[i] = dto.ToAssetDTO(a)
+	}
+
+	response := dto.FeaturedAssetsResponseDTO{
+		Assets:          dtos,
+		Count:           len(dtos),
+		CandidateCount:  uniqueCandidates,
+		Seed:            seed,
+		Strategy:        "weighted_aes_v1",
+		GeneratedAtTime: now,
+	}
+	api.GinSuccess(c, response)
+}
+
+func parseIntQueryWithRange(
+	c *gin.Context,
+	name string,
+	defaultValue int,
+	minValue int,
+	maxValue int,
+) (int, error) {
+	raw := strings.TrimSpace(c.Query(name))
+	if raw == "" {
+		return defaultValue, nil
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, err
+	}
+	if value < minValue || value > maxValue {
+		return 0, fmt.Errorf("%s must be between %d and %d", name, minValue, maxValue)
+	}
+	return value, nil
+}
+
+func countUniqueAssets(assets []repo.Asset) int {
+	seen := make(map[string]struct{}, len(assets))
+	for _, asset := range assets {
+		if !asset.AssetID.Valid {
+			continue
+		}
+		id, err := uuid.FromBytes(asset.AssetID.Bytes[:])
+		if err != nil {
+			continue
+		}
+		seen[id.String()] = struct{}{}
+	}
+	return len(seen)
+}
+
 // GetFilterOptions returns available options for filters
 // @Summary Get filter options
 // @Description Get available camera makes and lenses for filter dropdowns

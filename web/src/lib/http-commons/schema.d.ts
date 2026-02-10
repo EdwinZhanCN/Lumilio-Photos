@@ -2621,6 +2621,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/featured": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get featured photos
+         * @description Select a small set of featured photos using deterministic weighted sampling (A-ES) with diversity constraints.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Number of featured photos to return */
+                    count?: number;
+                    /** @description Max candidate photos considered before selection */
+                    candidate_limit?: number;
+                    /** @description Only consider photos from the last N days (0 disables date cutoff) */
+                    days?: number;
+                    /** @description Deterministic seed (default: current UTC date YYYY-MM-DD) */
+                    seed?: string;
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Featured photos selected successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/filter-options": {
         parameters: {
             query?: never;
@@ -4102,6 +4192,19 @@ export interface components {
         "dto.DateRangeDTO": {
             from?: string;
             to?: string;
+        };
+        "dto.FeaturedAssetsResponseDTO": {
+            assets?: components["schemas"]["dto.AssetDTO"][];
+            /** @example 240 */
+            candidate_count?: number;
+            /** @example 8 */
+            count?: number;
+            /** @example 2026-02-10T12:00:00Z */
+            generated_at_time?: string;
+            /** @example 2026-02-10 */
+            seed?: string;
+            /** @example weighted_aes_v1 */
+            strategy?: string;
         };
         "dto.FilenameFilterDTO": {
             /**

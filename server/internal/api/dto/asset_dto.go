@@ -181,6 +181,16 @@ type AssetListResponseDTO struct {
 	Offset int        `json:"offset" example:"0"`
 }
 
+// FeaturedAssetsResponseDTO represents curated featured photos for home/gallery use.
+type FeaturedAssetsResponseDTO struct {
+	Assets          []AssetDTO `json:"assets"`
+	Count           int        `json:"count" example:"8"`
+	CandidateCount  int        `json:"candidate_count" example:"240"`
+	Seed            string     `json:"seed" example:"2026-02-10"`
+	Strategy        string     `json:"strategy" example:"weighted_aes_v1"`
+	GeneratedAtTime time.Time  `json:"generated_at_time" example:"2026-02-10T12:00:00Z"`
+}
+
 // UpdateAssetRequestDTO represents the request structure for updating asset metadata
 type UpdateAssetRequestDTO struct {
 	Metadata dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object" oneOf:"dbtypes.PhotoSpecificMetadata,dbtypes.VideoSpecificMetadata,dbtypes.AudioSpecificMetadata"`
@@ -347,9 +357,9 @@ type PaginationDTO struct {
 // AssetQueryRequestDTO is the unified request for listing/searching/filtering assets
 // This replaces the separate ListAssets, FilterAssets, and SearchAssets endpoints
 type AssetQueryRequestDTO struct {
-	Query      string         `json:"query,omitempty" example:"sunset photo"`         // Search keyword (optional)
+	Query      string         `json:"query,omitempty" example:"sunset photo"`                             // Search keyword (optional)
 	SearchType string         `json:"search_type,omitempty" example:"filename" enums:"filename,semantic"` // "filename" (default) | "semantic"
-	Filter     AssetFilterDTO `json:"filter,omitempty"`                              // Unified filter options
-	GroupBy    string         `json:"group_by,omitempty" example:"type" enums:"date,type,album"` // Grouping strategy for server-side sorting
-	Pagination PaginationDTO  `json:"pagination"`                                    // limit, offset
+	Filter     AssetFilterDTO `json:"filter,omitempty"`                                                   // Unified filter options
+	GroupBy    string         `json:"group_by,omitempty" example:"type" enums:"date,type,album"`          // Grouping strategy for server-side sorting
+	Pagination PaginationDTO  `json:"pagination"`                                                         // limit, offset
 }

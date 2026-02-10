@@ -22,8 +22,9 @@ type AssetControllerInterface interface {
 	GetAssetThumbnail(c *gin.Context)
 
 	// New filtering and search operations
-	QueryAssets(c *gin.Context)      // POST /assets/list - Unified asset listing, filtering, and search
-	GetFilterOptions(c *gin.Context) // GET /assets/filter-options - Get available filter options
+	QueryAssets(c *gin.Context)       // POST /assets/list - Unified asset listing, filtering, and search
+	GetFilterOptions(c *gin.Context)  // GET /assets/filter-options - Get available filter options
+	GetFeaturedAssets(c *gin.Context) // GET /assets/featured - Curated featured photos for home/gallery
 
 	// Rating management operations
 	UpdateAssetRating(c *gin.Context)        // PUT /assets/:id/rating - Update asset rating
@@ -124,6 +125,7 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			assets.POST("", assetController.UploadAsset)
 			assets.GET("/types", assetController.GetAssetTypes)
 			assets.GET("/filter-options", assetController.GetFilterOptions)
+			assets.GET("/featured", assetController.GetFeaturedAssets)
 			assets.POST("/list", assetController.QueryAssets)
 			assets.POST("/batch", assetController.BatchUploadAssets)
 			assets.GET("/:id", assetController.GetAsset)

@@ -1,5 +1,13 @@
 import React, { useState } from "react";
 import { ExifInfo } from "@/lib/utils/exif-info.ts";
+import {
+  Camera,
+  ScanSearch,
+  Aperture,
+  Clock,
+  Ruler,
+  Gauge,
+} from "lucide-react";
 
 export type GalleryGridProps = {
   /**
@@ -69,6 +77,47 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
     };
   };
 
+  const renderExifOverlay = (index: number) => {
+    const exif = resolveExif(index);
+    const rows = [
+      { icon: Camera, label: "Camera", value: exif.camera },
+      { icon: ScanSearch, label: "Lens", value: exif.lens },
+      { icon: Aperture, label: "Aperture", value: `f/${exif.aperture}` },
+      { icon: Clock, label: "Shutter", value: exif.shutter },
+      { icon: Ruler, label: "Focal", value: exif.focalLength },
+      { icon: Gauge, label: "ISO", value: exif.iso },
+    ];
+
+    return (
+      <div className="absolute inset-0 p-3 bg-black/80 backdrop-blur-sm flex flex-col justify-center">
+        <div className="text-[10px] uppercase tracking-[0.2em] text-white/70 mb-3">
+          Exif
+        </div>
+        <div className="space-y-1.5 text-white/90">
+          {rows.map((row) => {
+            const Icon = row.icon;
+            return (
+              <div
+                key={row.label}
+                className="flex items-center justify-between rounded-md bg-white/5 px-2 py-1"
+              >
+                <div className="flex items-center gap-1.5 text-white/70 min-w-0">
+                  <Icon className="size-3.5 flex-shrink-0" />
+                  <span className="text-[10px] tracking-wide uppercase truncate">
+                    {row.label}
+                  </span>
+                </div>
+                <span className="text-[11px] font-mono font-medium text-white/95 ml-2 truncate">
+                  {row.value}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <section className={`min-h-[60vh] relative group ${className}`}>
       {/* Accent gradient background */}
@@ -90,33 +139,23 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
                 if (e.key === "Enter" || e.key === " ") onItemClick?.(i);
               }}
             >
-              {/* Placeholder for image area */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-
               {/* Custom item renderer */}
               {renderItem ? (
-                <div className="absolute inset-0">{renderItem(i, isHovered)}</div>
+                <>
+                  <div className="absolute inset-0">{renderItem(i, isHovered)}</div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+                  {isHovered && renderExifOverlay(i)}
+                  <div className="absolute bottom-2 left-2 text-white text-sm">
+                    {titlePrefix} {i + 1}
+                  </div>
+                </>
               ) : (
                 <>
+                  {/* Placeholder for image area */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+
                   {/* Hover overlay with EXIF details */}
-                  {isHovered && (
-                    <div className="absolute inset-0 p-3 bg-black/80 backdrop-blur-sm flex flex-col justify-center">
-                      <div className="text-xs text-white/80 mb-2">摄影参数</div>
-                      {(() => {
-                        const exif = resolveExif(i);
-                        return (
-                          <div className="text-[11px] space-y-1 text-white/80">
-                            <div>📷 {exif.camera}</div>
-                            <div>🔍 {exif.lens}</div>
-                            <div>⭕ ƒ/{exif.aperture}</div>
-                            <div>⏱️ {exif.shutter}</div>
-                            <div>📏 {exif.focalLength}</div>
-                            <div>✨ {exif.iso}</div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
+                  {isHovered && renderExifOverlay(i)}
 
                   {/* Bottom-left label */}
                   <div className="absolute bottom-2 left-2 text-white text-sm">
