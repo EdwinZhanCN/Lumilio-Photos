@@ -20,6 +20,7 @@ import (
 	"server/internal/queue"
 	"server/internal/service"
 	"server/internal/storage"
+	"server/internal/storage/monitor"
 	"server/internal/storage/repocfg"
 
 	"github.com/riverqueue/river"
@@ -152,6 +153,7 @@ func main() {
 
 	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, appConfig, lumenService)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
+	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})
 	river.AddWorker[queue.MetadataArgs](workers, &queue.MetadataWorker{Process: assetProcessor.ProcessMetadataTask})
 	river.AddWorker[queue.ThumbnailArgs](workers, &queue.ThumbnailWorker{Process: assetProcessor.ProcessThumbnailTask})
 	river.AddWorker[queue.TranscodeArgs](workers, &queue.TranscodeWorker{Process: assetProcessor.ProcessTranscodeTask})
@@ -164,6 +166,12 @@ func main() {
 	}()
 
 	log.Println("✅ Queues initialized successfully")
+
+	repoMonitor := monitor.NewWatchmanMonitor(queries, queueClient, appConfig.WatchmanConfig)
+	if err := repoMonitor.Start(ctx); err != nil {
+		log.Fatalf("Failed to start watchman monitor: %v", err)
+	}
+	defer repoMonitor.Stop()
 
 	// Initialize controllers with new storage system
 	assetController := handler.NewAssetHandler(assetService, queries, repoManager, stagingManager, queueClient)

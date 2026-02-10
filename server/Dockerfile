@@ -46,7 +46,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-ENV STORAGE_PATH=/data/storage \
+ENV STORAGE_PATH=/data/storage/primary \
     SERVER_PORT=8080 \
     SERVER_ENV=production \
     PATH="/usr/local/bin:${PATH}"

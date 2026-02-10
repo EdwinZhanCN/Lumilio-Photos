@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -20,9 +21,10 @@ type DatabaseConfig struct {
 
 // AppConfig holds general application configuration
 type AppConfig struct {
-	ServerConfig ServerConfig
-	LLMConfig    LLMConfig
-	MLConfig     MLConfig
+	ServerConfig   ServerConfig
+	LLMConfig      LLMConfig
+	MLConfig       MLConfig
+	WatchmanConfig WatchmanConfig
 }
 
 type ServerConfig struct {
@@ -43,6 +45,14 @@ type MLConfig struct {
 	OCREnabled     bool `env:"ML_OCR_ENABLED,default=false"`
 	CaptionEnabled bool `env:"ML_CAPTION_ENABLED,default=false"`
 	FaceEnabled    bool `env:"ML_FACE_ENABLED,default=false"`
+}
+
+// WatchmanConfig controls repository file tree monitoring.
+type WatchmanConfig struct {
+	Enabled       bool
+	SocketPath    string
+	SettleSeconds int
+	InitialScan   bool
 }
 
 // IsDevelopmentMode checks if the application is running in development mode
@@ -135,6 +145,7 @@ func LoadAppConfig() AppConfig {
 	cfg.ServerConfig = LoadServerConfig()
 	cfg.MLConfig = LoadMLConfig()
 	cfg.LLMConfig = LoadLLMConfig()
+	cfg.WatchmanConfig = LoadWatchmanConfig()
 
 	return cfg
 }
@@ -241,6 +252,36 @@ func LoadLLMConfig() LLMConfig {
 
 	if baseURL := os.Getenv("LLM_BASE_URL"); baseURL != "" {
 		cfg.BaseURL = baseURL
+	}
+
+	return cfg
+}
+
+// LoadWatchmanConfig loads file tree monitoring settings.
+func LoadWatchmanConfig() WatchmanConfig {
+	cfg := WatchmanConfig{
+		Enabled:       false,
+		SocketPath:    "",
+		SettleSeconds: 3,
+		InitialScan:   true,
+	}
+
+	if enabled := strings.ToLower(strings.TrimSpace(os.Getenv("WATCHMAN_ENABLED"))); enabled == "true" {
+		cfg.Enabled = true
+	}
+
+	if socketPath := strings.TrimSpace(os.Getenv("WATCHMAN_SOCK")); socketPath != "" {
+		cfg.SocketPath = socketPath
+	}
+
+	if settleRaw := strings.TrimSpace(os.Getenv("WATCHMAN_SETTLE_SECONDS")); settleRaw != "" {
+		if settleSeconds, err := strconv.Atoi(settleRaw); err == nil && settleSeconds > 0 {
+			cfg.SettleSeconds = settleSeconds
+		}
+	}
+
+	if initialScanRaw := strings.ToLower(strings.TrimSpace(os.Getenv("WATCHMAN_INITIAL_SCAN"))); initialScanRaw == "false" {
+		cfg.InitialScan = false
 	}
 
 	return cfg
