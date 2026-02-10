@@ -86,6 +86,7 @@ type AssetService interface {
 
 	// Unified query API
 	QueryAssets(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
+	QueryPhotoMapPoints(ctx context.Context, params QueryPhotoMapPointsParams) ([]PhotoMapPoint, int64, error)
 }
 
 // QueryAssetsParams contains all parameters for the unified asset query
@@ -107,6 +108,21 @@ type QueryAssetsParams struct {
 	GroupBy      string // Grouping strategy for server-side sorting (e.g., "type")
 	Limit        int
 	Offset       int
+}
+
+type QueryPhotoMapPointsParams struct {
+	RepositoryID *string
+	Limit        int
+	Offset       int
+}
+
+type PhotoMapPoint struct {
+	AssetID          string
+	OriginalFilename string
+	UploadTime       time.Time
+	TakenTime        *time.Time
+	GPSLatitude      float64
+	GPSLongitude     float64
 }
 
 type assetService struct {
@@ -1210,4 +1226,58 @@ func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssets
 		}
 	}
 	return assets, countResult, nil
+}
+
+func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhotoMapPointsParams) ([]PhotoMapPoint, int64, error) {
+	var repoUUID pgtype.UUID
+	if params.RepositoryID != nil && *params.RepositoryID != "" {
+		parsedUUID, err := uuid.Parse(*params.RepositoryID)
+		if err != nil {
+			return nil, 0, fmt.Errorf("invalid repository ID: %w", err)
+		}
+		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
+	}
+
+	total, err := s.queries.CountPhotoMapPoints(ctx, repoUUID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count photo map points: %w", err)
+	}
+
+	rows, err := s.queries.GetPhotoMapPoints(ctx, repo.GetPhotoMapPointsParams{
+		RepositoryID: repoUUID,
+		Limit:        int32(params.Limit),
+		Offset:       int32(params.Offset),
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to query photo map points: %w", err)
+	}
+
+	points := make([]PhotoMapPoint, 0, len(rows))
+	for _, row := range rows {
+		if !row.AssetID.Valid || !row.UploadTime.Valid {
+			continue
+		}
+
+		assetID, err := uuid.FromBytes(row.AssetID.Bytes[:])
+		if err != nil {
+			continue
+		}
+
+		var takenTime *time.Time
+		if row.TakenTime.Valid {
+			t := row.TakenTime.Time
+			takenTime = &t
+		}
+
+		points = append(points, PhotoMapPoint{
+			AssetID:          assetID.String(),
+			OriginalFilename: row.OriginalFilename,
+			UploadTime:       row.UploadTime.Time,
+			TakenTime:        takenTime,
+			GPSLatitude:      row.GpsLatitude,
+			GPSLongitude:     row.GpsLongitude,
+		})
+	}
+
+	return points, total, nil
 }

@@ -1380,6 +1380,74 @@ func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
 	api.GinSuccess(c, response)
 }
 
+// GetPhotoMapPoints returns lightweight photo map points with valid GPS coordinates.
+// @Summary Get photo map points
+// @Description Return lightweight paginated photo records containing only map-related fields (asset ID, filename, times, GPS lat/lon).
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param limit query int false "Page size (1-5000)" default(1000)
+// @Param offset query int false "Page offset" default(0)
+// @Param repository_id query string false "Optional repository UUID filter"
+// @Success 200 {object} api.Result{data=dto.AssetMapPointListResponseDTO} "Map points retrieved successfully"
+// @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/map-points [get]
+func (h *AssetHandler) GetPhotoMapPoints(c *gin.Context) {
+	limit, err := parseIntQueryWithRange(c, "limit", 1000, 1, 5000)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid limit parameter")
+		return
+	}
+
+	offset, err := parseIntQueryWithRange(c, "offset", 0, 0, 10000000)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid offset parameter")
+		return
+	}
+
+	var repositoryID *string
+	if rawRepoID := strings.TrimSpace(c.Query("repository_id")); rawRepoID != "" {
+		if _, err := uuid.Parse(rawRepoID); err != nil {
+			api.GinBadRequest(c, err, "Invalid repository_id parameter")
+			return
+		}
+		repositoryID = &rawRepoID
+	}
+
+	points, total, err := h.assetService.QueryPhotoMapPoints(c.Request.Context(), service.QueryPhotoMapPointsParams{
+		RepositoryID: repositoryID,
+		Limit:        limit,
+		Offset:       offset,
+	})
+	if err != nil {
+		log.Printf("Failed to query photo map points: %v", err)
+		api.GinInternalError(c, err, "Failed to query photo map points")
+		return
+	}
+
+	pointDTOs := make([]dto.AssetMapPointDTO, len(points))
+	for i, point := range points {
+		pointDTOs[i] = dto.AssetMapPointDTO{
+			AssetID:          point.AssetID,
+			OriginalFilename: point.OriginalFilename,
+			UploadTime:       point.UploadTime,
+			TakenTime:        point.TakenTime,
+			GPSLatitude:      point.GPSLatitude,
+			GPSLongitude:     point.GPSLongitude,
+		}
+	}
+
+	totalInt := int(total)
+	response := dto.AssetMapPointListResponseDTO{
+		Points: pointDTOs,
+		Total:  &totalInt,
+		Limit:  limit,
+		Offset: offset,
+	}
+	api.GinSuccess(c, response)
+}
+
 func parseIntQueryWithRange(
 	c *gin.Context,
 	name string,

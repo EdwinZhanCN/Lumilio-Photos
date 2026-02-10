@@ -361,6 +361,26 @@ func (q *Queries) CountLikedAssets(ctx context.Context, ownerID *int32) (int64, 
 	return count, err
 }
 
+const countPhotoMapPoints = `-- name: CountPhotoMapPoints :one
+SELECT COUNT(*) as count
+FROM assets a
+WHERE a.is_deleted = false
+  AND a.type = 'PHOTO'
+  AND ($1::uuid IS NULL OR a.repository_id = $1)
+  AND jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
+  AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
+  AND (a.specific_metadata->>'gps_latitude')::double precision BETWEEN -90 AND 90
+  AND (a.specific_metadata->>'gps_longitude')::double precision BETWEEN -180 AND 180
+`
+
+// Count query matching GetPhotoMapPoints.
+func (q *Queries) CountPhotoMapPoints(ctx context.Context, repositoryID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPhotoMapPoints, repositoryID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAsset = `-- name: CreateAsset :one
 INSERT INTO assets (
     owner_id, type, original_filename, storage_path, mime_type,
@@ -1916,6 +1936,69 @@ func (q *Queries) GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsBy
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPhotoMapPoints = `-- name: GetPhotoMapPoints :many
+SELECT
+  a.asset_id,
+  a.original_filename,
+  a.upload_time,
+  a.taken_time,
+  (a.specific_metadata->>'gps_latitude')::double precision AS gps_latitude,
+  (a.specific_metadata->>'gps_longitude')::double precision AS gps_longitude
+FROM assets a
+WHERE a.is_deleted = false
+  AND a.type = 'PHOTO'
+  AND ($1::uuid IS NULL OR a.repository_id = $1)
+  AND jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
+  AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
+  AND (a.specific_metadata->>'gps_latitude')::double precision BETWEEN -90 AND 90
+  AND (a.specific_metadata->>'gps_longitude')::double precision BETWEEN -180 AND 180
+ORDER BY COALESCE(a.taken_time, a.upload_time) DESC
+LIMIT $3 OFFSET $2
+`
+
+type GetPhotoMapPointsParams struct {
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	Offset       int32       `db:"offset" json:"offset"`
+	Limit        int32       `db:"limit" json:"limit"`
+}
+
+type GetPhotoMapPointsRow struct {
+	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	OriginalFilename string             `db:"original_filename" json:"original_filename"`
+	UploadTime       pgtype.Timestamptz `db:"upload_time" json:"upload_time"`
+	TakenTime        pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
+	GpsLatitude      float64            `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude     float64            `db:"gps_longitude" json:"gps_longitude"`
+}
+
+// Lightweight photo locations for map clustering/rendering.
+func (q *Queries) GetPhotoMapPoints(ctx context.Context, arg GetPhotoMapPointsParams) ([]GetPhotoMapPointsRow, error) {
+	rows, err := q.db.Query(ctx, getPhotoMapPoints, arg.RepositoryID, arg.Offset, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPhotoMapPointsRow
+	for rows.Next() {
+		var i GetPhotoMapPointsRow
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OriginalFilename,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
 		); err != nil {
 			return nil, err
 		}

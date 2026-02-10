@@ -22,14 +22,17 @@ export const assetToPhotoLocation = (
     return null;
   }
 
-  if (!metadata.gps_latitude || !metadata.gps_longitude) {
+  const latitude = metadata.gps_latitude;
+  const longitude = metadata.gps_longitude;
+
+  if (typeof latitude !== "number" || typeof longitude !== "number") {
     return null;
   }
 
   // Convert coordinates if using Gaode Map and location is in China
   const convertedCoords = autoConvertCoordinates(
-    metadata.gps_longitude,
-    metadata.gps_latitude,
+    longitude,
+    latitude,
     useGaodeMap,
   );
 
