@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // ValidationResult represents the result of repository validation
@@ -73,18 +72,14 @@ type DefaultRepositoryManager struct {
 	queries        *repo.Queries
 	dirManager     DirectoryManager
 	stagingManager StagingManager
-
-	pool *pgxpool.Pool
 }
 
 // NewRepositoryManager creates a new repository manager instance
-// If pool is nil, sync will be disabled
-func NewRepositoryManager(queries *repo.Queries, pool *pgxpool.Pool) (RepositoryManager, error) {
+func NewRepositoryManager(queries *repo.Queries) (RepositoryManager, error) {
 	rm := &DefaultRepositoryManager{
 		queries:        queries,
 		dirManager:     NewDirectoryManager(),
 		stagingManager: NewStagingManager(),
-		pool:           pool,
 	}
 
 	return rm, nil

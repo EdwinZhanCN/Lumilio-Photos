@@ -37,7 +37,7 @@ type pendingEntry struct {
 	Attempts    int
 }
 
-// WatchmanMonitor monitors repository inbox trees and enqueues discovery jobs.
+// WatchmanMonitor monitors repository workspace trees and enqueues discovery jobs.
 type WatchmanMonitor struct {
 	queries    *repo.Queries
 	queue      *river.Client[pgx.Tx]

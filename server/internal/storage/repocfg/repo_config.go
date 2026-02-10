@@ -10,38 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DefaultIgnorePatterns provides a comprehensive list of files and patterns to ignore during scanning
-var DefaultIgnorePatterns = []string{
-	".DS_Store",
-	"Thumbs.db",
-	"ehthumbs.db",
-	"Icon?",
-	"Icon\r",
-	"*.tmp",
-	"*.temp",
-	"*.part",
-	"*.partial",
-	"*.wbk",
-	"*.bak",
-	"*.orig",
-	"*~",
-	"~$*",
-	"*.swp",
-	"*.swo",
-	".*.swp",
-	".lumilio",
-	".Trash",
-	".Trashes",
-	".fseventsd",
-	".Spotlight-V100",
-	".TemporaryItems",
-	"lost+found",
-	"desktop.ini",
-	"*._*",
-	"npm-debug.log",
-	"yarn-error.log",
-}
-
 // RepositoryConfig represents the complete .lumiliorepo configuration file structure
 type RepositoryConfig struct {
 	Version   string    `yaml:"version" json:"version"`
@@ -51,18 +19,7 @@ type RepositoryConfig struct {
 
 	// Storage configuration
 	StorageStrategy string        `yaml:"storage_strategy" json:"storage_strategy"` // "date", "cas", "flat" date -> yyyy/mm/IMG_001.jpg (month based)
-	SyncSettings    SyncSettings  `yaml:"sync_settings" json:"sync_settings"`
 	LocalSettings   LocalSettings `yaml:"local_settings" json:"local_settings"`
-}
-
-// SyncSettings configures how the repository synchronizes with the filesystem
-type SyncSettings struct {
-	// QuickScanInterval how often to perform quick metadata scans (e.g., "5m", "2m")
-	QuickScanInterval string `yaml:"quick_scan_interval" json:"quick_scan_interval"`
-	// FullScanInterval how often to perform full content verification (e.g., "30m", "1h")
-	FullScanInterval string `yaml:"full_scan_interval" json:"full_scan_interval"`
-	// IgnorePatterns list of file patterns to ignore during scanning
-	IgnorePatterns []string `yaml:"ignore_patterns" json:"ignore_patterns"`
 }
 
 // LocalSettings configures repository-specific behavior
@@ -88,11 +45,6 @@ func DefaultRepositoryConfig() *RepositoryConfig {
 	return &RepositoryConfig{
 		Version:         "1.0",
 		StorageStrategy: "date",
-		SyncSettings: SyncSettings{
-			QuickScanInterval: "5m",
-			FullScanInterval:  "30m",
-			IgnorePatterns:    DefaultIgnorePatterns,
-		},
 		LocalSettings: LocalSettings{
 			PreserveOriginalFilename: true,
 			HandleDuplicateFilenames: "uuid",
@@ -110,17 +62,6 @@ type RepositoryConfigOption func(*RepositoryConfig)
 func WithStorageStrategy(strategy string) RepositoryConfigOption {
 	return func(config *RepositoryConfig) {
 		config.StorageStrategy = strategy
-	}
-}
-
-// WithSyncSettings sets the sync settings for the repository
-func WithSyncSettings(quickInterval, fullInterval string, ignorePatterns []string) RepositoryConfigOption {
-	return func(config *RepositoryConfig) {
-		config.SyncSettings.QuickScanInterval = quickInterval
-		config.SyncSettings.FullScanInterval = fullInterval
-		if ignorePatterns != nil {
-			config.SyncSettings.IgnorePatterns = ignorePatterns
-		}
 	}
 }
 
@@ -151,7 +92,6 @@ func WithBackupPath(path string) RepositoryConfigOption {
 //
 // User-configurable fields via options:
 //   - StorageStrategy: How files are organized ("date", "cas", "flat")
-//   - SyncSettings: Scan intervals and ignore patterns
 //   - LocalSettings: File handling preferences
 //
 // Additional options can be provided to customize the configuration
@@ -246,15 +186,6 @@ func (rc *RepositoryConfig) Validate() error {
 		return fmt.Errorf("invalid storage strategy '%s', must be one of: date, cas, flat", rc.StorageStrategy)
 	}
 
-	// Validate sync intervals
-	if _, err := time.ParseDuration(rc.SyncSettings.QuickScanInterval); err != nil {
-		return fmt.Errorf("invalid quick_scan_interval: %w", err)
-	}
-
-	if _, err := time.ParseDuration(rc.SyncSettings.FullScanInterval); err != nil {
-		return fmt.Errorf("invalid full_scan_interval: %w", err)
-	}
-
 	// Validate duplicate handling strategy
 	validDuplicateStrategies := map[string]bool{
 		"rename":    true,
@@ -280,26 +211,9 @@ func IsRepositoryRoot(path string) bool {
 	return err == nil
 }
 
-// GetQuickScanDuration returns the parsed quick scan interval duration
-func (rc *RepositoryConfig) GetQuickScanDuration() (time.Duration, error) {
-	return time.ParseDuration(rc.SyncSettings.QuickScanInterval)
-}
-
-// GetFullScanDuration returns the parsed full scan interval duration
-func (rc *RepositoryConfig) GetFullScanDuration() (time.Duration, error) {
-	return time.ParseDuration(rc.SyncSettings.FullScanInterval)
-}
-
 // Clone creates a deep copy of the repository configuration
 func (rc *RepositoryConfig) Clone() *RepositoryConfig {
 	clone := *rc
-
-	// Deep copy slices
-	if rc.SyncSettings.IgnorePatterns != nil {
-		clone.SyncSettings.IgnorePatterns = make([]string, len(rc.SyncSettings.IgnorePatterns))
-		copy(clone.SyncSettings.IgnorePatterns, rc.SyncSettings.IgnorePatterns)
-	}
-
 	return &clone
 }
 
@@ -312,15 +226,6 @@ func (rc *RepositoryConfig) MergeWithDefaults() {
 	}
 	if rc.StorageStrategy == "" {
 		rc.StorageStrategy = defaults.StorageStrategy
-	}
-	if rc.SyncSettings.QuickScanInterval == "" {
-		rc.SyncSettings.QuickScanInterval = defaults.SyncSettings.QuickScanInterval
-	}
-	if rc.SyncSettings.FullScanInterval == "" {
-		rc.SyncSettings.FullScanInterval = defaults.SyncSettings.FullScanInterval
-	}
-	if rc.SyncSettings.IgnorePatterns == nil {
-		rc.SyncSettings.IgnorePatterns = DefaultIgnorePatterns
 	}
 	if rc.LocalSettings.HandleDuplicateFilenames == "" {
 		rc.LocalSettings.HandleDuplicateFilenames = defaults.LocalSettings.HandleDuplicateFilenames
