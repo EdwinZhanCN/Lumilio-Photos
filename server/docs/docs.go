@@ -372,6 +372,16 @@ const docTemplate = `{
                     "filter": {
                         "$ref": "#/components/schemas/dto.AssetFilterDTO"
                     },
+                    "group_by": {
+                        "description": "Grouping strategy for server-side sorting",
+                        "enum": [
+                            "date",
+                            "type",
+                            "album"
+                        ],
+                        "example": "type",
+                        "type": "string"
+                    },
                     "pagination": {
                         "$ref": "#/components/schemas/dto.PaginationDTO"
                     },
