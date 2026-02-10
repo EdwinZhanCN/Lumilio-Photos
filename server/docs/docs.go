@@ -3569,7 +3569,7 @@ const docTemplate = `{
                 ]
             },
             "get": {
-                "description": "Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and AI descriptions.",
+                "description": "Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and captions.",
                 "parameters": [
                     {
                         "description": "Asset ID (UUID format)",
@@ -3636,9 +3636,9 @@ const docTemplate = `{
                         }
                     },
                     {
-                        "description": "Include AI descriptions",
+                        "description": "Include captions",
                         "in": "query",
-                        "name": "include_ai_descriptions",
+                        "name": "include_captions",
                         "schema": {
                             "default": false,
                             "type": "boolean"

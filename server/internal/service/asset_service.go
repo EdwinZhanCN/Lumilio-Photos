@@ -40,7 +40,7 @@ var (
 // AssetService defines the interface for asset-related operations
 type AssetService interface {
 	GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error)
-	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies, includeOCR, includeFaces, includeAIDescriptions bool) (interface{}, error)
+	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies, includeOCR, includeFaces, includeCaptions bool) (interface{}, error)
 	GetAssetsByType(ctx context.Context, assetType string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwner(ctx context.Context, ownerID int, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortOrder string, limit, offset int) ([]repo.Asset, error)
@@ -156,14 +156,14 @@ func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset,
 	return &dbAsset, nil
 }
 
-func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies, includeOCR, includeFaces, includeAIDescriptions bool) (interface{}, error) {
+func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies, includeOCR, includeFaces, includeCaptions bool) (interface{}, error) {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
 		return nil, fmt.Errorf("invalid UUID: %w", err)
 	}
 
 	// 1) Full relations (thumbnails + tags + albums) OR species predictions OR any AI data requested
-	if includeSpecies || includeOCR || includeFaces || includeAIDescriptions || (includeThumbnails && includeTags && includeAlbums) {
+	if includeSpecies || includeOCR || includeFaces || includeCaptions || (includeThumbnails && includeTags && includeAlbums) {
 		dbAsset, err := s.queries.GetAssetWithRelations(ctx, pgUUID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get asset with relations: %w", err)
@@ -204,8 +204,8 @@ func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, in
 		if includeFaces {
 			result["face_result"] = dbAsset.FaceResult
 		}
-		if includeAIDescriptions {
-			result["ai_description"] = dbAsset.AiDescription
+		if includeCaptions {
+			result["caption"] = dbAsset.Caption
 		}
 
 		return result, nil

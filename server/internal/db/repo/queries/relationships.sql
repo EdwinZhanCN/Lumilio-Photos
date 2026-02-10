@@ -141,19 +141,19 @@ SELECT
     ) as face_result,
     COALESCE(
         jsonb_build_object(
-            'model_id', ai_desc.model_id,
-            'description', ai_desc.description,
-            'summary', ai_desc.summary,
-            'confidence', ai_desc.confidence,
-            'tokens_generated', ai_desc.tokens_generated,
-            'processing_time_ms', ai_desc.processing_time_ms,
-            'prompt_used', ai_desc.prompt_used,
-            'finish_reason', ai_desc.finish_reason,
-            'created_at', ai_desc.created_at,
-            'updated_at', ai_desc.updated_at
-        ) FILTER (WHERE ai_desc.asset_id IS NOT NULL),
+            'model_id', cap.model_id,
+            'description', cap.description,
+            'summary', cap.summary,
+            'confidence', cap.confidence,
+            'tokens_generated', cap.tokens_generated,
+            'processing_time_ms', cap.processing_time_ms,
+            'prompt_used', cap.prompt_used,
+            'finish_reason', cap.finish_reason,
+            'created_at', cap.created_at,
+            'updated_at', cap.updated_at
+        ) FILTER (WHERE cap.asset_id IS NOT NULL),
         NULL
-    ) as ai_description
+    ) as caption
 FROM assets a
 LEFT JOIN thumbnails t ON a.asset_id = t.asset_id
 LEFT JOIN asset_tags at ON a.asset_id = at.asset_id
@@ -167,11 +167,11 @@ LEFT JOIN face_results fr ON a.asset_id = fr.asset_id
 LEFT JOIN face_items fi ON a.asset_id = fi.asset_id
 LEFT JOIN face_cluster_members fcm ON fi.id = fcm.face_id
 LEFT JOIN face_clusters fc ON fcm.cluster_id = fc.cluster_id
-LEFT JOIN ai_descriptions ai_desc ON a.asset_id = ai_desc.asset_id
+LEFT JOIN captions cap ON a.asset_id = cap.asset_id
 WHERE a.asset_id = $1 AND a.is_deleted = false
 GROUP BY a.asset_id, a.rating, a.liked,
          ocr.asset_id, ocr.model_id, ocr.total_count, ocr.processing_time_ms, ocr.created_at, ocr.updated_at,
          fr.asset_id, fr.model_id, fr.total_faces, fr.processing_time_ms, fr.created_at, fr.updated_at,
-         ai_desc.asset_id, ai_desc.model_id, ai_desc.description, ai_desc.summary,
-         ai_desc.confidence, ai_desc.tokens_generated, ai_desc.processing_time_ms,
-         ai_desc.prompt_used, ai_desc.finish_reason, ai_desc.created_at, ai_desc.updated_at;
+         cap.asset_id, cap.model_id, cap.description, cap.summary,
+         cap.confidence, cap.tokens_generated, cap.processing_time_ms,
+         cap.prompt_used, cap.finish_reason, cap.created_at, cap.updated_at;

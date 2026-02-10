@@ -232,7 +232,7 @@ func initMLServices(
 
 	var embeddingService service.EmbeddingService
 	var speciesService service.SpeciesService
-	var aiDescriptionService service.AIDescriptionService
+	var captionService service.CaptionService
 	var ocrService service.OCRService
 	var faceService service.FaceService
 
@@ -249,11 +249,11 @@ func initMLServices(
 	}
 
 	if mlConfig.CaptionEnabled {
-		aiDescriptionService = service.NewAIDescriptionService(queries, lumenService)
+		captionService = service.NewCaptionService(queries, lumenService)
 
 		river.AddWorker[queue.ProcessCaptionArgs](workers, &queue.ProcessCaptionWorker{
-			AIDescriptionService: aiDescriptionService,
-			LumenService:         lumenService,
+			CaptionService: captionService,
+			LumenService:   lumenService,
 		})
 		log.Println("✅ Caption Service and Worker Registered")
 	}

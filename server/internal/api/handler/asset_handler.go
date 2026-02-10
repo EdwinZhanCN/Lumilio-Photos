@@ -663,7 +663,7 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 
 // GetAsset retrieves a single asset by ID
 // @Summary Get asset by ID
-// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and AI descriptions.
+// @Description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and captions.
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -674,7 +674,7 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 // @Param include_species query bool false "Include species predictions" default(true)
 // @Param include_ocr query bool false "Include OCR results" default(false)
 // @Param include_faces query bool false "Include face recognition" default(false)
-// @Param include_ai_descriptions query bool false "Include AI descriptions" default(false)
+// @Param include_captions query bool false "Include captions" default(false)
 // @Success 200 {object} api.Result{data=dto.AssetDTO} "Asset details with optional relationships"
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 404 {object} api.Result "Asset not found"
@@ -696,7 +696,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 	// New AI includes - default to false to avoid performance impact
 	includeOCR := c.DefaultQuery("include_ocr", "false") == "true"
 	includeFaces := c.DefaultQuery("include_faces", "false") == "true"
-	includeAIDescriptions := c.DefaultQuery("include_ai_descriptions", "false") == "true"
+	includeCaptions := c.DefaultQuery("include_captions", "false") == "true"
 
 	asset, err := h.assetService.GetAssetWithOptions(
 		c.Request.Context(),
@@ -707,7 +707,7 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 		includeSpecies,
 		includeOCR,
 		includeFaces,
-		includeAIDescriptions,
+		includeCaptions,
 	)
 	if err != nil {
 		api.GinNotFound(c, err, "Asset not found")

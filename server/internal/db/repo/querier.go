@@ -32,9 +32,9 @@ type Querier interface {
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
-	CreateAIDescription(ctx context.Context, arg CreateAIDescriptionParams) (AiDescription, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
+	CreateCaption(ctx context.Context, arg CreateCaptionParams) (Caption, error)
 	CreateFaceCluster(ctx context.Context, arg CreateFaceClusterParams) (FaceCluster, error)
 	CreateFaceClusterMember(ctx context.Context, arg CreateFaceClusterMemberParams) (FaceClusterMember, error)
 	CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) (FaceItem, error)
@@ -47,10 +47,10 @@ type Querier interface {
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
 	CreateThumbnail(ctx context.Context, arg CreateThumbnailParams) (Thumbnail, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
-	DeleteAIDescriptionByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAlbum(ctx context.Context, albumID int32) error
 	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteCaptionByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
 	DeleteFaceCluster(ctx context.Context, clusterID int32) error
 	DeleteFaceClusterMember(ctx context.Context, arg DeleteFaceClusterMemberParams) error
@@ -65,9 +65,6 @@ type Querier interface {
 	DeleteUser(ctx context.Context, userID int32) error
 	FilterAlbumAssets(ctx context.Context, arg FilterAlbumAssetsParams) ([]Asset, error)
 	FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]Asset, error)
-	GetAIDescriptionByAsset(ctx context.Context, assetID pgtype.UUID) (AiDescription, error)
-	GetAIDescriptionStatsByModel(ctx context.Context) ([]GetAIDescriptionStatsByModelRow, error)
-	GetAIDescriptionsByModel(ctx context.Context, arg GetAIDescriptionsByModelParams) ([]AiDescription, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error)
 	GetAlbumByID(ctx context.Context, albumID int32) (Album, error)
@@ -107,6 +104,9 @@ type Querier interface {
 	GetAvailableYears(ctx context.Context) ([]int32, error)
 	// 获取相机+镜头组合统计
 	GetCameraLensStats(ctx context.Context, limit int32) ([]GetCameraLensStatsRow, error)
+	GetCaptionByAsset(ctx context.Context, assetID pgtype.UUID) (Caption, error)
+	GetCaptionStatsByModel(ctx context.Context) ([]GetCaptionStatsByModelRow, error)
+	GetCaptionsByModel(ctx context.Context, arg GetCaptionsByModelParams) ([]Caption, error)
 	GetCheckpoint(ctx context.Context, id string) ([]byte, error)
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
 	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
@@ -136,7 +136,7 @@ type Querier interface {
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
-	GetLongAIDescriptions(ctx context.Context, arg GetLongAIDescriptionsParams) ([]AiDescription, error)
+	GetLongCaptions(ctx context.Context, arg GetLongCaptionsParams) ([]Caption, error)
 	GetOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) (OcrResult, error)
 	GetOCRStatsByModel(ctx context.Context) ([]GetOCRStatsByModelRow, error)
 	GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetOCRTextItemStatsByAssetRow, error)
@@ -163,7 +163,7 @@ type Querier interface {
 	GetTimeDistributionHourly(ctx context.Context) ([]GetTimeDistributionHourlyRow, error)
 	// 获取按月的拍摄时间分布
 	GetTimeDistributionMonthly(ctx context.Context) ([]GetTimeDistributionMonthlyRow, error)
-	GetTopAIDescriptionsByTokens(ctx context.Context, limit int32) ([]AiDescription, error)
+	GetTopCaptionsByTokens(ctx context.Context, limit int32) ([]Caption, error)
 	GetTopFacesByQuality(ctx context.Context, arg GetTopFacesByQualityParams) ([]FaceItem, error)
 	GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsParams) ([]Asset, error)
 	GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesForAssetParams) ([]SpeciesPrediction, error)
@@ -185,9 +185,9 @@ type Querier interface {
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
 	SearchAllEmbeddingsByType(ctx context.Context, arg SearchAllEmbeddingsByTypeParams) ([]SearchAllEmbeddingsByTypeRow, error)
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
-	SearchAssetsByAIDescription(ctx context.Context, arg SearchAssetsByAIDescriptionParams) ([]Asset, error)
-	SearchAssetsByAIDescriptionWithConfidence(ctx context.Context, arg SearchAssetsByAIDescriptionWithConfidenceParams) ([]Asset, error)
-	SearchAssetsByAISummary(ctx context.Context, arg SearchAssetsByAISummaryParams) ([]Asset, error)
+	SearchAssetsByCaption(ctx context.Context, arg SearchAssetsByCaptionParams) ([]Asset, error)
+	SearchAssetsByCaptionSummary(ctx context.Context, arg SearchAssetsByCaptionSummaryParams) ([]Asset, error)
+	SearchAssetsByCaptionWithConfidence(ctx context.Context, arg SearchAssetsByCaptionWithConfidenceParams) ([]Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
 	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)
 	SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error)
@@ -202,8 +202,6 @@ type Querier interface {
 	SearchEmbeddingsByType(ctx context.Context, arg SearchEmbeddingsByTypeParams) ([]SearchEmbeddingsByTypeRow, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
-	UpdateAIDescription(ctx context.Context, arg UpdateAIDescriptionParams) (AiDescription, error)
-	UpdateAIDescriptionStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
 	UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error
@@ -218,6 +216,8 @@ type Querier interface {
 	UpdateAssetStatus(ctx context.Context, arg UpdateAssetStatusParams) (Asset, error)
 	UpdateAssetStatusWithErrors(ctx context.Context, arg UpdateAssetStatusWithErrorsParams) (Asset, error)
 	UpdateAssetStoragePathAndStatus(ctx context.Context, arg UpdateAssetStoragePathAndStatusParams) (Asset, error)
+	UpdateCaption(ctx context.Context, arg UpdateCaptionParams) (Caption, error)
+	UpdateCaptionStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateFaceCluster(ctx context.Context, arg UpdateFaceClusterParams) (FaceCluster, error)
 	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)
 	UpdateFaceResultStats(ctx context.Context, assetID pgtype.UUID) error

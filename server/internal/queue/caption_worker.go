@@ -18,8 +18,8 @@ type ProcessCaptionArgs = jobs.ProcessCaptionArgs
 type ProcessCaptionWorker struct {
 	river.WorkerDefaults[ProcessCaptionArgs]
 
-	AIDescriptionService service.AIDescriptionService
-	LumenService         service.LumenService
+	CaptionService service.CaptionService
+	LumenService   service.LumenService
 }
 
 func (w *ProcessCaptionWorker) Work(ctx context.Context, job *river.Job[ProcessCaptionArgs]) error {
@@ -36,10 +36,10 @@ func (w *ProcessCaptionWorker) Work(ctx context.Context, job *river.Job[ProcessC
 		return river.JobSnooze(30 * time.Second)
 	}
 
-	// Save AI description using AIDescriptionService
-	_, err := w.AIDescriptionService.GenerateAndSaveDescription(ctx, pgUUID, args.ImageData, args.CustomPrompt)
+	// Save caption using CaptionService
+	_, err := w.CaptionService.GenerateAndSaveCaption(ctx, pgUUID, args.ImageData, args.CustomPrompt)
 	if err != nil {
-		return fmt.Errorf("failed to save AI description: %w", err)
+		return fmt.Errorf("failed to save caption: %w", err)
 	}
 
 	return nil

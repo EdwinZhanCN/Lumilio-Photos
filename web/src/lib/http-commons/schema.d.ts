@@ -1292,7 +1292,7 @@ export interface paths {
         };
         /**
          * Get asset by ID
-         * @description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and AI descriptions.
+         * @description Retrieve detailed information about a specific asset. Optionally include thumbnails, tags, albums, species predictions, OCR results, face recognition, and captions.
          */
         get: {
             parameters: {
@@ -1309,8 +1309,8 @@ export interface paths {
                     include_ocr?: boolean;
                     /** @description Include face recognition */
                     include_faces?: boolean;
-                    /** @description Include AI descriptions */
-                    include_ai_descriptions?: boolean;
+                    /** @description Include captions */
+                    include_captions?: boolean;
                 };
                 header?: never;
                 path: {
@@ -4002,6 +4002,12 @@ export interface components {
         };
         "dto.AssetQueryRequestDTO": {
             filter?: components["schemas"]["dto.AssetFilterDTO"];
+            /**
+             * @description Grouping strategy for server-side sorting
+             * @example type
+             * @enum {string}
+             */
+            group_by?: "date" | "type" | "album";
             pagination?: components["schemas"]["dto.PaginationDTO"];
             /**
              * @description Search keyword (optional)
