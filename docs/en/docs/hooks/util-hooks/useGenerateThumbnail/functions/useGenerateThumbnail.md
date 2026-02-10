@@ -4,7 +4,7 @@
 
 > **useGenerateThumbnail**(): [`UseGenerateThumbnailReturn`](../interfaces/UseGenerateThumbnailReturn.md)
 
-Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:40](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/2e1dabc4b81eb0ab6047f103f52245f09e6ea56f/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L40)
+Defined in: [hooks/util-hooks/useGenerateThumbnail.tsx:40](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/f13175206e08d524f3e55e943038759f4e537ede/web/src/hooks/util-hooks/useGenerateThumbnail.tsx#L40)
 
 Custom hook to generate thumbnails using a Web Worker.
 It manages its own state and uses the shared worker client.
