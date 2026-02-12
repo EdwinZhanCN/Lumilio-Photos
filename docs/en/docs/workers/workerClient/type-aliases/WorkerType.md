@@ -4,4 +4,4 @@
 
 > **WorkerType** = `"thumbnail"` \| `"hash"` \| `"border"` \| `"export"` \| `"exif"` \| `"justified"`
 
-Defined in: [workers/workerClient.ts:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6d000357c834a430242d1a1190bfbf277df2763b/web/src/workers/workerClient.ts#L17)
+Defined in: [workers/workerClient.ts:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87550f699d3d5501c5ee53bfa6a214c4b59cf82a/web/src/workers/workerClient.ts#L17)
