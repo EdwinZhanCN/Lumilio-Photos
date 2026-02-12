@@ -2,7 +2,7 @@
 
 # Interface: SingleHashResult
 
-Defined in: [workers/workerClient.ts:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6d000357c834a430242d1a1190bfbf277df2763b/web/src/workers/workerClient.ts#L29)
+Defined in: [workers/workerClient.ts:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87550f699d3d5501c5ee53bfa6a214c4b59cf82a/web/src/workers/workerClient.ts#L29)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [workers/workerClient.ts:29](https://github.com/EdwinZhanCN/Lumilio-
 
 > `optional` **error**: `string`
 
-Defined in: [workers/workerClient.ts:33](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6d000357c834a430242d1a1190bfbf277df2763b/web/src/workers/workerClient.ts#L33)
+Defined in: [workers/workerClient.ts:33](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87550f699d3d5501c5ee53bfa6a214c4b59cf82a/web/src/workers/workerClient.ts#L33)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [workers/workerClient.ts:33](https://github.com/EdwinZhanCN/Lumilio-
 
 > `optional` **file**: `File`
 
-Defined in: [workers/workerClient.ts:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6d000357c834a430242d1a1190bfbf277df2763b/web/src/workers/workerClient.ts#L32)
+Defined in: [workers/workerClient.ts:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87550f699d3d5501c5ee53bfa6a214c4b59cf82a/web/src/workers/workerClient.ts#L32)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [workers/workerClient.ts:32](https://github.com/EdwinZhanCN/Lumilio-
 
 > **hash**: `string`
 
-Defined in: [workers/workerClient.ts:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6d000357c834a430242d1a1190bfbf277df2763b/web/src/workers/workerClient.ts#L31)
+Defined in: [workers/workerClient.ts:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87550f699d3d5501c5ee53bfa6a214c4b59cf82a/web/src/workers/workerClient.ts#L31)
 
 ***
 
@@ -34,4 +34,4 @@ Defined in: [workers/workerClient.ts:31](https://github.com/EdwinZhanCN/Lumilio-
 
 > **index**: `number`
 
-Defined in: [workers/workerClient.ts:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6d000357c834a430242d1a1190bfbf277df2763b/web/src/workers/workerClient.ts#L30)
+Defined in: [workers/workerClient.ts:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87550f699d3d5501c5ee53bfa6a214c4b59cf82a/web/src/workers/workerClient.ts#L30)
