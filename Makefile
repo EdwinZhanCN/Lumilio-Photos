@@ -38,7 +38,7 @@ env-dev:
 		"DB_NAME=lumiliophotos" \
 		"DB_SSL=disable" \
 		"" \
-		"STORAGE_PATH=./data/storage/primary" \
+		"STORAGE_PATH=./data/storage" \
 		"STORAGE_STRATEGY=date" \
 		"STORAGE_PRESERVE_FILENAME=true" \
 		"STORAGE_DUPLICATE_HANDLING=rename" \
@@ -47,6 +47,7 @@ env-dev:
 		"WATCHMAN_SOCK=" \
 		"WATCHMAN_SETTLE_SECONDS=3" \
 		"WATCHMAN_INITIAL_SCAN=true" \
+		"WATCHMAN_POLL_FALLBACK_SECONDS=0" \
 		"" \
 		"ML_CLIP_ENABLED=false" \
 		"ML_OCR_ENABLED=false" \

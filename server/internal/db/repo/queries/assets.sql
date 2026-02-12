@@ -143,6 +143,31 @@ WHERE hash = $1 AND is_deleted = false;
 SELECT * FROM assets
 WHERE hash = $1 AND repository_id = $2 AND is_deleted = false;
 
+-- name: GetAssetByRepositoryAndStoragePathAny :one
+SELECT * FROM assets
+WHERE repository_id = $1 AND storage_path = $2
+LIMIT 1;
+
+-- name: SoftDeleteAssetByRepositoryAndStoragePath :execrows
+UPDATE assets
+SET is_deleted = true, deleted_at = CURRENT_TIMESTAMP
+WHERE repository_id = $1
+  AND storage_path = $2
+  AND is_deleted = false;
+
+-- name: UpdateDiscoveredAssetByID :one
+UPDATE assets
+SET original_filename = $2,
+    mime_type = $3,
+    file_size = $4,
+    hash = $5,
+    taken_time = $6,
+    status = $7,
+    is_deleted = false,
+    deleted_at = NULL
+WHERE asset_id = $1
+RETURNING *;
+
 -- name: CreateThumbnail :one
 INSERT INTO thumbnails (asset_id, size, storage_path, mime_type)
 VALUES ($1, $2, $3, $4)

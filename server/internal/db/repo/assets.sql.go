@@ -681,6 +681,45 @@ func (q *Queries) GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset,
 	return i, err
 }
 
+const getAssetByRepositoryAndStoragePathAny = `-- name: GetAssetByRepositoryAndStoragePathAny :one
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status FROM assets
+WHERE repository_id = $1 AND storage_path = $2
+LIMIT 1
+`
+
+type GetAssetByRepositoryAndStoragePathAnyParams struct {
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	StoragePath  *string     `db:"storage_path" json:"storage_path"`
+}
+
+func (q *Queries) GetAssetByRepositoryAndStoragePathAny(ctx context.Context, arg GetAssetByRepositoryAndStoragePathAnyParams) (Asset, error) {
+	row := q.db.QueryRow(ctx, getAssetByRepositoryAndStoragePathAny, arg.RepositoryID, arg.StoragePath)
+	var i Asset
+	err := row.Scan(
+		&i.AssetID,
+		&i.OwnerID,
+		&i.Type,
+		&i.OriginalFilename,
+		&i.StoragePath,
+		&i.MimeType,
+		&i.FileSize,
+		&i.Hash,
+		&i.Width,
+		&i.Height,
+		&i.Duration,
+		&i.UploadTime,
+		&i.TakenTime,
+		&i.IsDeleted,
+		&i.DeletedAt,
+		&i.SpecificMetadata,
+		&i.Rating,
+		&i.Liked,
+		&i.RepositoryID,
+		&i.Status,
+	)
+	return i, err
+}
+
 const getAssetStatsForOwner = `-- name: GetAssetStatsForOwner :one
 SELECT
   COUNT(*) as total_assets,
@@ -2747,6 +2786,27 @@ func (q *Queries) SearchAssetsVectorUnified(ctx context.Context, arg SearchAsset
 	return items, nil
 }
 
+const softDeleteAssetByRepositoryAndStoragePath = `-- name: SoftDeleteAssetByRepositoryAndStoragePath :execrows
+UPDATE assets
+SET is_deleted = true, deleted_at = CURRENT_TIMESTAMP
+WHERE repository_id = $1
+  AND storage_path = $2
+  AND is_deleted = false
+`
+
+type SoftDeleteAssetByRepositoryAndStoragePathParams struct {
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	StoragePath  *string     `db:"storage_path" json:"storage_path"`
+}
+
+func (q *Queries) SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error) {
+	result, err := q.db.Exec(ctx, softDeleteAssetByRepositoryAndStoragePath, arg.RepositoryID, arg.StoragePath)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateAsset = `-- name: UpdateAsset :one
 UPDATE assets
 SET original_filename = $2, specific_metadata = $3, updated_at = CURRENT_TIMESTAMP
@@ -3025,6 +3085,66 @@ type UpdateAssetStoragePathAndStatusParams struct {
 
 func (q *Queries) UpdateAssetStoragePathAndStatus(ctx context.Context, arg UpdateAssetStoragePathAndStatusParams) (Asset, error) {
 	row := q.db.QueryRow(ctx, updateAssetStoragePathAndStatus, arg.AssetID, arg.StoragePath, arg.Status)
+	var i Asset
+	err := row.Scan(
+		&i.AssetID,
+		&i.OwnerID,
+		&i.Type,
+		&i.OriginalFilename,
+		&i.StoragePath,
+		&i.MimeType,
+		&i.FileSize,
+		&i.Hash,
+		&i.Width,
+		&i.Height,
+		&i.Duration,
+		&i.UploadTime,
+		&i.TakenTime,
+		&i.IsDeleted,
+		&i.DeletedAt,
+		&i.SpecificMetadata,
+		&i.Rating,
+		&i.Liked,
+		&i.RepositoryID,
+		&i.Status,
+	)
+	return i, err
+}
+
+const updateDiscoveredAssetByID = `-- name: UpdateDiscoveredAssetByID :one
+UPDATE assets
+SET original_filename = $2,
+    mime_type = $3,
+    file_size = $4,
+    hash = $5,
+    taken_time = $6,
+    status = $7,
+    is_deleted = false,
+    deleted_at = NULL
+WHERE asset_id = $1
+RETURNING asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status
+`
+
+type UpdateDiscoveredAssetByIDParams struct {
+	AssetID          pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	OriginalFilename string             `db:"original_filename" json:"original_filename"`
+	MimeType         string             `db:"mime_type" json:"mime_type"`
+	FileSize         int64              `db:"file_size" json:"file_size"`
+	Hash             *string            `db:"hash" json:"hash"`
+	TakenTime        pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
+	Status           []byte             `db:"status" json:"status"`
+}
+
+func (q *Queries) UpdateDiscoveredAssetByID(ctx context.Context, arg UpdateDiscoveredAssetByIDParams) (Asset, error) {
+	row := q.db.QueryRow(ctx, updateDiscoveredAssetByID,
+		arg.AssetID,
+		arg.OriginalFilename,
+		arg.MimeType,
+		arg.FileSize,
+		arg.Hash,
+		arg.TakenTime,
+		arg.Status,
+	)
 	var i Asset
 	err := row.Scan(
 		&i.AssetID,

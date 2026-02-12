@@ -92,6 +92,34 @@ func TestStagingManager_BasicOperations(t *testing.T) {
 		_, err = os.Stat(staging3.Path)
 		assert.NoError(t, err)
 	})
+
+	t.Run("move staging file to failed directory", func(t *testing.T) {
+		stagingFile, err := sm.CreateStagingFile(testDir, "failed-upload.jpg")
+		require.NoError(t, err)
+
+		err = os.WriteFile(stagingFile.Path, []byte("broken data"), 0644)
+		require.NoError(t, err)
+
+		err = sm.MoveStagingToFailed(stagingFile)
+		require.NoError(t, err)
+
+		_, err = os.Stat(stagingFile.Path)
+		assert.True(t, os.IsNotExist(err))
+
+		failedDir := filepath.Join(testDir, DefaultStructure.FailedDir)
+		entries, err := os.ReadDir(failedDir)
+		require.NoError(t, err)
+		require.NotEmpty(t, entries)
+
+		found := false
+		for _, entry := range entries {
+			if strings.Contains(entry.Name(), "failed-upload") {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "failed upload file should be moved into failed directory")
+	})
 }
 
 func TestStagingManager_InboxIntegration(t *testing.T) {

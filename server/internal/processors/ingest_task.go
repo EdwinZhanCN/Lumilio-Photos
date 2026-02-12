@@ -3,8 +3,10 @@ package processors
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +19,7 @@ import (
 	"server/internal/queue/jobs"
 	"server/internal/storage"
 	"server/internal/utils/file"
+	"server/internal/utils/hash"
 )
 
 // IngestAsset performs initial staging validation, asset record creation, commits the
@@ -41,6 +44,18 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 		return nil, fmt.Errorf("staged file not found: %w", err)
 	}
 	fileSize := info.Size()
+
+	normalizedHash := strings.ToLower(strings.TrimSpace(task.ClientHash))
+	if normalizedHash == "" {
+		hashResult, hashErr := hash.CalculateFileHash(task.StagedPath, hash.AlgorithmBLAKE3, true)
+		if hashErr != nil {
+			return nil, fmt.Errorf("calculate hash: %w", hashErr)
+		}
+		normalizedHash = strings.ToLower(strings.TrimSpace(hashResult.Hash))
+	}
+	if normalizedHash == "" {
+		return nil, fmt.Errorf("asset hash is empty")
+	}
 
 	// Prepare staging file struct
 	stagingFile := &storage.StagingFile{
@@ -85,7 +100,7 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 		StoragePath:      nil,
 		MimeType:         task.ContentType,
 		FileSize:         fileSize,
-		Hash:             &task.ClientHash,
+		Hash:             &normalizedHash,
 		TakenTime:        pgtype.Timestamptz{Time: time.Now(), Valid: true},
 		Rating:           func() *int32 { r := int32(0); return &r }(),
 		RepositoryID:     repository.RepoID,
@@ -96,9 +111,21 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 	}
 
 	// Commit file to inbox now so downstream workers can access it
-	storageRelPath, err := ap.stagingManager.CommitStagingFileToInbox(stagingFile, "")
+	storageRelPath, err := ap.stagingManager.CommitStagingFileToInbox(stagingFile, normalizedHash)
 	if err != nil {
-		return nil, fmt.Errorf("commit staging: %w", err)
+		failureDetail := fmt.Sprintf("commit staging to inbox failed: %v", err)
+		if moveErr := ap.stagingManager.MoveStagingToFailed(stagingFile); moveErr != nil {
+			log.Printf("Failed to move staging file %s to failed dir: %v", stagingFile.Path, moveErr)
+			if removeErr := os.Remove(stagingFile.Path); removeErr != nil && !os.IsNotExist(removeErr) {
+				log.Printf("Failed to remove staging file %s after move failure: %v", stagingFile.Path, removeErr)
+			}
+			failureDetail = fmt.Sprintf("%s; move to failed dir failed: %v", failureDetail, moveErr)
+		}
+
+		if markErr := ap.markAssetFailed(ctx, asset.AssetID, "commit_staging", failureDetail); markErr != nil {
+			log.Printf("Failed to mark asset %s as failed after staging commit error: %v", asset.AssetID.String(), markErr)
+		}
+		return asset, nil
 	}
 
 	// Update storage path + keep status processing
@@ -175,6 +202,29 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 	}
 
 	return asset, nil
+}
+
+func (ap *AssetProcessor) markAssetFailed(ctx context.Context, assetID pgtype.UUID, taskName string, detail string) error {
+	failedStatus := status.NewFailedStatus("Asset ingestion failed", []status.ErrorDetail{
+		{
+			Task:  taskName,
+			Error: detail,
+			Time:  time.Now().Format(time.RFC3339),
+		},
+	})
+	statusJSON, err := failedStatus.ToJSONB()
+	if err != nil {
+		return fmt.Errorf("marshal failed status: %w", err)
+	}
+
+	_, err = ap.queries.UpdateAssetStatusWithErrors(ctx, repo.UpdateAssetStatusWithErrorsParams{
+		AssetID: assetID,
+		Status:  statusJSON,
+	})
+	if err != nil {
+		return fmt.Errorf("update asset status: %w", err)
+	}
+	return nil
 }
 
 // resolveRepository resolves repository by ID or fallback to first available.

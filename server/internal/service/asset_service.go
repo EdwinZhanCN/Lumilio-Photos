@@ -435,6 +435,35 @@ func (s *assetService) DeleteAsset(ctx context.Context, id uuid.UUID) error {
 		return fmt.Errorf("invalid UUID: %w", err)
 	}
 
+	asset, err := s.queries.GetAssetByID(ctx, pgUUID)
+	if err != nil {
+		return fmt.Errorf("failed to get asset: %w", err)
+	}
+
+	if asset.StoragePath != nil && strings.TrimSpace(*asset.StoragePath) != "" {
+		repository, err := s.queries.GetRepository(ctx, asset.RepositoryID)
+		if err != nil {
+			return fmt.Errorf("failed to get repository for asset deletion: %w", err)
+		}
+
+		storagePath := strings.TrimSpace(*asset.StoragePath)
+		metadata := &storage.DeleteMetadata{
+			DeletedAt:    time.Now().UTC(),
+			OriginalPath: storagePath,
+			Reason:       "asset_delete",
+			AssetID:      func() *string { s := id.String(); return &s }(),
+		}
+
+		moveErr := storage.NewDirectoryManager().MoveToTrash(repository.Path, storagePath, metadata)
+		if moveErr != nil {
+			if errors.Is(moveErr, os.ErrNotExist) {
+				log.Printf("DeleteAsset: file already missing for asset %s at path %s, continuing soft delete", id.String(), storagePath)
+			} else {
+				return fmt.Errorf("move asset file to trash: %w", moveErr)
+			}
+		}
+	}
+
 	return s.queries.DeleteAsset(ctx, pgUUID)
 }
 

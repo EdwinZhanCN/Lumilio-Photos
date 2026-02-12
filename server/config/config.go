@@ -49,10 +49,11 @@ type MLConfig struct {
 
 // WatchmanConfig controls repository file tree monitoring.
 type WatchmanConfig struct {
-	Enabled       bool
-	SocketPath    string
-	SettleSeconds int
-	InitialScan   bool
+	Enabled             bool
+	SocketPath          string
+	SettleSeconds       int
+	InitialScan         bool
+	PollFallbackSeconds int
 }
 
 // IsDevelopmentMode checks if the application is running in development mode
@@ -260,10 +261,11 @@ func LoadLLMConfig() LLMConfig {
 // LoadWatchmanConfig loads file tree monitoring settings.
 func LoadWatchmanConfig() WatchmanConfig {
 	cfg := WatchmanConfig{
-		Enabled:       false,
-		SocketPath:    "",
-		SettleSeconds: 3,
-		InitialScan:   true,
+		Enabled:             false,
+		SocketPath:          "",
+		SettleSeconds:       3,
+		InitialScan:         true,
+		PollFallbackSeconds: 0,
 	}
 
 	if enabled := strings.ToLower(strings.TrimSpace(os.Getenv("WATCHMAN_ENABLED"))); enabled == "true" {
@@ -282,6 +284,12 @@ func LoadWatchmanConfig() WatchmanConfig {
 
 	if initialScanRaw := strings.ToLower(strings.TrimSpace(os.Getenv("WATCHMAN_INITIAL_SCAN"))); initialScanRaw == "false" {
 		cfg.InitialScan = false
+	}
+
+	if pollRaw := strings.TrimSpace(os.Getenv("WATCHMAN_POLL_FALLBACK_SECONDS")); pollRaw != "" {
+		if pollSeconds, err := strconv.Atoi(pollRaw); err == nil && pollSeconds >= 0 {
+			cfg.PollFallbackSeconds = pollSeconds
+		}
 	}
 
 	return cfg

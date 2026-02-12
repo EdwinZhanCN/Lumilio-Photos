@@ -78,10 +78,16 @@ type IngestAssetArgs struct {
 
 func (IngestAssetArgs) Kind() string { return "ingest_asset" }
 
+const (
+	DiscoverOperationUpsert = "upsert"
+	DiscoverOperationDelete = "delete"
+)
+
 // DiscoverAssetArgs handles repository file-tree discovery ingestion.
 type DiscoverAssetArgs struct {
 	RepositoryID string    `json:"repositoryId" river:"unique"`
-	RelativePath string    `json:"relativePath" river:"unique"` // repository-relative user workspace path, e.g. albums/2026/02/a.jpg
+	RelativePath string    `json:"relativePath" river:"unique"`        // repository-relative user workspace path, e.g. albums/2026/02/a.jpg
+	Operation    string    `json:"operation,omitempty" river:"unique"` // upsert (default) or delete
 	FileName     string    `json:"fileName"`
 	ContentType  string    `json:"contentType,omitempty"`
 	FileSize     int64     `json:"fileSize,omitempty"`
