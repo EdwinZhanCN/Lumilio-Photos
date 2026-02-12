@@ -202,7 +202,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	osFile.Close()
 	if err != nil {
 		log.Printf("Failed to copy file to staging: %v", err)
-		os.Remove(stagingFile.Path)
+		h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "copy upload data to staging")
 		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
@@ -213,7 +213,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		hashResult, err := hash.CalculateFileHash(stagingFile.Path, hash.AlgorithmBLAKE3, true)
 		if err != nil {
 			log.Printf("Failed to calculate hash: %v", err)
-			os.Remove(stagingFile.Path)
+			h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "calculate upload hash")
 			api.GinInternalError(c, err, "Failed to calculate file hash")
 			return
 		}
@@ -258,11 +258,13 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 
 	if err != nil {
 		log.Printf("Failed to enqueue task: %v", err)
+		h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "enqueue ingest task")
 		api.GinInternalError(c, err, "Upload failed")
 		return
 	}
 	if jobInsetResult == nil || jobInsetResult.Job == nil {
 		log.Printf("Failed to enqueue task: empty result")
+		h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "enqueue ingest task returned empty result")
 		api.GinInternalError(c, fmt.Errorf("enqueue failed"), "Upload failed")
 		return
 	}
@@ -429,6 +431,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		dst, err := os.Create(stagingFile.Path)
 		if err != nil {
 			part.Close()
+			h.handleUploadFailureFile(repository.Path, stagingFile.Path, targetName, "open batch staging file")
 			api.GinInternalError(c, err, "Failed to open staging file")
 			return
 		}
@@ -437,6 +440,7 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 		dst.Close()
 		part.Close()
 		if err != nil {
+			h.handleUploadFailureFile(repository.Path, stagingFile.Path, targetName, "save batch upload data")
 			api.GinInternalError(c, err, "Failed to save upload data")
 			return
 		}
@@ -747,8 +751,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 		return
 	}
 
-	// First verify asset exists without loading full data
-	_, err = h.assetService.GetAssetWithOptions(c.Request.Context(), assetID, false, false, false, false, false, false, false)
+	asset, err := h.assetService.GetAsset(c.Request.Context(), assetID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found"})
@@ -771,19 +774,13 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 		return
 	}
 
-	// Thumbnail paths are repository-relative, stored in .lumilio/assets/thumbnails/
-	// For now, we need to find which repository this asset belongs to
-	// Since we don't track asset->repository mapping yet, we'll try to construct the path
-	// This is a temporary solution until we implement proper file_records lookup
-	fullPath := thumbnail.StoragePath
-	if !filepath.IsAbs(fullPath) {
-		// Try to find the repository by listing all repositories
-		repositories, err := h.queries.ListRepositories(c.Request.Context())
-		if err == nil && len(repositories) > 0 {
-			// Use first repository for now - proper implementation needs file_records
-			fullPath = filepath.Join(repositories[0].Path, thumbnail.StoragePath)
-		}
+	repository, err := h.getRepositoryForAsset(c.Request.Context(), asset)
+	if err != nil {
+		log.Printf("Failed to resolve repository for thumbnail request: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to resolve repository"})
+		return
 	}
+	fullPath := h.resolveRepositoryPath(repository.Path, thumbnail.StoragePath)
 
 	// Get file info for proper cache control
 	fileInfo, err := os.Stat(fullPath)
@@ -854,18 +851,18 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 		return
 	}
 
-	// Construct full file path from repository-relative storage path
-	// Asset paths are stored relative to repository root (e.g., "inbox/2024/01/photo.jpg")
-	fullPathPtr := asset.StoragePath
-	fullPath := *fullPathPtr
-	if !filepath.IsAbs(fullPath) {
-		// Try to find the repository by listing all repositories
-		repositories, err := h.queries.ListRepositories(ctx)
-		if err == nil && len(repositories) > 0 {
-			// Use first repository for now - proper implementation needs file_records
-			fullPath = filepath.Join(repositories[0].Path, *asset.StoragePath)
-		}
+	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
+		api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Original file not found")
+		return
 	}
+
+	repository, err := h.getRepositoryForAsset(ctx, asset)
+	if err != nil {
+		log.Printf("Failed to resolve repository for original file: %v", err)
+		api.GinInternalError(c, err, "Failed to access repository")
+		return
+	}
+	fullPath := h.resolveRepositoryPath(repository.Path, *asset.StoragePath)
 
 	// Check if file exists
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
@@ -923,13 +920,17 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 		return
 	}
 
-	// Get repository path for this asset
-	repositories, err := h.queries.ListRepositories(ctx)
-	if err != nil || len(repositories) == 0 {
+	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
+		api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Video file not found")
+		return
+	}
+
+	repository, err := h.getRepositoryForAsset(ctx, asset)
+	if err != nil {
 		api.GinInternalError(c, err, "Failed to access repository")
 		return
 	}
-	repoPath := repositories[0].Path
+	repoPath := repository.Path
 
 	// Construct web video file path in .lumilio/assets/videos/web/
 	var fullPath string
@@ -948,10 +949,7 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	// Check if web version exists, fallback to original
 	if !webVersionExists {
 		// Fallback to original file
-		fullPath = *asset.StoragePath
-		if !filepath.IsAbs(fullPath) {
-			fullPath = filepath.Join(repoPath, *asset.StoragePath)
-		}
+		fullPath = h.resolveRepositoryPath(repoPath, *asset.StoragePath)
 		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			log.Printf("Video file not found at path: %s", fullPath)
 			api.GinNotFound(c, err, "Video file not found")
@@ -1008,13 +1006,17 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 		return
 	}
 
-	// Get repository path for this asset
-	repositories, err := h.queries.ListRepositories(ctx)
-	if err != nil || len(repositories) == 0 {
+	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
+		api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Audio file not found")
+		return
+	}
+
+	repository, err := h.getRepositoryForAsset(ctx, asset)
+	if err != nil {
 		api.GinInternalError(c, err, "Failed to access repository")
 		return
 	}
-	repoPath := repositories[0].Path
+	repoPath := repository.Path
 
 	// Construct web audio file path in .lumilio/assets/audios/web/
 	var fullPath string
@@ -1033,10 +1035,7 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	// Check if web version exists, fallback to original
 	if !webVersionExists {
 		// Fallback to original file
-		fullPath = *asset.StoragePath
-		if !filepath.IsAbs(fullPath) {
-			fullPath = filepath.Join(repoPath, *asset.StoragePath)
-		}
+		fullPath = h.resolveRepositoryPath(repoPath, *asset.StoragePath)
 		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			log.Printf("Audio file not found at path: %s", fullPath)
 			api.GinNotFound(c, err, "Audio file not found")
@@ -1901,6 +1900,76 @@ func (h *AssetHandler) cleanupOrphanedChunks() {
 	log.Printf("✅ Orphaned chunk cleanup completed: %d errors", errorCount)
 }
 
+func (h *AssetHandler) getRepositoryForAsset(ctx context.Context, asset *repo.Asset) (*repo.Repository, error) {
+	if asset == nil {
+		return nil, fmt.Errorf("asset is nil")
+	}
+	if !asset.RepositoryID.Valid {
+		return nil, fmt.Errorf("asset repository id is invalid")
+	}
+
+	repository, err := h.queries.GetRepository(ctx, asset.RepositoryID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repository by id: %w", err)
+	}
+	return &repository, nil
+}
+
+func (h *AssetHandler) resolveRepositoryPath(repositoryPath string, storagePath string) string {
+	trimmed := strings.TrimSpace(storagePath)
+	if filepath.IsAbs(trimmed) {
+		return trimmed
+	}
+	return filepath.Join(repositoryPath, trimmed)
+}
+
+func (h *AssetHandler) handleUploadFailureFile(repoPath, filePath, filename, reason string) {
+	if strings.TrimSpace(filePath) == "" {
+		return
+	}
+
+	if h.isStagingIncomingPath(repoPath, filePath) {
+		stagingFile := &storage.StagingFile{
+			ID:        filepath.Base(filePath),
+			RepoPath:  repoPath,
+			Path:      filePath,
+			Filename:  filename,
+			CreatedAt: time.Now(),
+		}
+		if err := h.stagingManager.MoveStagingToFailed(stagingFile); err != nil {
+			log.Printf("Failed to move upload file to failed dir (%s): %v", reason, err)
+			h.removeUploadTempFile(filePath)
+		}
+		return
+	}
+
+	h.removeUploadTempFile(filePath)
+}
+
+func (h *AssetHandler) removeUploadTempFile(filePath string) {
+	if strings.TrimSpace(filePath) == "" {
+		return
+	}
+	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+		log.Printf("Failed to remove temporary upload file %s: %v", filePath, err)
+	}
+}
+
+func (h *AssetHandler) isStagingIncomingPath(repoPath string, filePath string) bool {
+	repoAbs, repoErr := filepath.Abs(repoPath)
+	pathAbs, pathErr := filepath.Abs(filePath)
+	if repoErr != nil || pathErr != nil {
+		return false
+	}
+
+	incomingDir := filepath.Join(repoAbs, storage.DefaultStructure.IncomingDir)
+	rel, err := filepath.Rel(incomingDir, pathAbs)
+	if err != nil || rel == "." {
+		return err == nil && rel == "."
+	}
+	return !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".."
+}
+
 // stringPtr returns a pointer to a string
 func stringPtr(s string) *string {
 	return &s
@@ -2196,7 +2265,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 
 		_, err = io.Copy(osFile, file)
 		if err != nil {
-			os.Remove(stagingFilePath)
+			h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "copy completed upload to staging")
 			return nil, fmt.Errorf("failed to copy file to staging: %w", err)
 		}
 	}
@@ -2214,7 +2283,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 		hashResult, err := hash.CalculateFileHash(stagingFilePath, hash.AlgorithmBLAKE3, true)
 		if err != nil {
 			log.Printf("Failed to calculate hash for %s: %v", stagingFilePath, err)
-			os.Remove(stagingFilePath)
+			h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "calculate completed upload hash")
 			return nil, fmt.Errorf("failed to calculate file hash: %w", err)
 		}
 
@@ -2230,7 +2299,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	// Read only the first 512 bytes for efficient detection
 	file, err := os.Open(stagingFilePath)
 	if err != nil {
-		os.Remove(stagingFilePath)
+		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "open file for MIME detection")
 		return nil, fmt.Errorf("failed to open file for MIME detection: %w", err)
 	}
 	defer file.Close()
@@ -2239,7 +2308,7 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	headerBuf := make([]byte, 1024)
 	n, err := file.Read(headerBuf)
 	if err != nil && err != io.EOF {
-		os.Remove(stagingFilePath)
+		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "read file header for MIME detection")
 		return nil, fmt.Errorf("failed to read file header for MIME detection: %w", err)
 	}
 	headerBuf = headerBuf[:n]
@@ -2260,12 +2329,12 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	// Check for hash collision before enqueueing
 	collision, err := h.checkHashCollisionBeforeEnqueue(ctx, finalHash, header.Filename, uuid.UUID(repository.RepoID.Bytes).String())
 	if err != nil {
-		os.Remove(stagingFilePath)
+		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "check hash collision before enqueue")
 		return nil, fmt.Errorf("failed to check hash collision: %w", err)
 	}
 
 	if collision {
-		os.Remove(stagingFilePath)
+		h.removeUploadTempFile(stagingFilePath)
 		return &dto.BatchUploadResultDTO{
 			Success:     false,
 			FileName:    header.Filename,
@@ -2287,13 +2356,13 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 	}, &river.InsertOpts{Queue: "ingest_asset"})
 
 	if err != nil {
-		os.Remove(stagingFilePath)
+		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "enqueue ingest task")
 		return nil, fmt.Errorf("failed to enqueue task: %w", err)
 	}
 
 	if jobResult == nil || jobResult.Job == nil {
 		log.Printf("Failed to enqueue task: empty result for file: %s", stagingFilePath)
-		os.Remove(stagingFilePath)
+		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "enqueue ingest task returned empty result")
 		return nil, errors.New("failed to enqueue task: empty result")
 	}
 

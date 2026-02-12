@@ -3,6 +3,8 @@ package processors
 import (
 	"testing"
 
+	"server/internal/queue/jobs"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,4 +21,13 @@ func TestSanitizeDiscoveredPath(t *testing.T) {
 
 	_, err = sanitizeDiscoveredPath("../escape/a.jpg")
 	require.Error(t, err)
+}
+
+func TestNormalizeDiscoverOperation(t *testing.T) {
+	require.Equal(t, jobs.DiscoverOperationUpsert, normalizeDiscoverOperation(""))
+	require.Equal(t, jobs.DiscoverOperationUpsert, normalizeDiscoverOperation("upsert"))
+	require.Equal(t, jobs.DiscoverOperationUpsert, normalizeDiscoverOperation(" UPSERT "))
+	require.Equal(t, jobs.DiscoverOperationDelete, normalizeDiscoverOperation("delete"))
+	require.Equal(t, jobs.DiscoverOperationDelete, normalizeDiscoverOperation(" DELETE "))
+	require.Equal(t, jobs.DiscoverOperationUpsert, normalizeDiscoverOperation("unsupported"))
 }

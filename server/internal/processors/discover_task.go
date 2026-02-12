@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
@@ -28,15 +29,29 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 		return fmt.Errorf("invalid repository id: %w", err)
 	}
 
-	repository, err := ap.queries.GetRepository(ctx, pgtype.UUID{Bytes: repoUUID, Valid: true})
-	if err != nil {
-		return fmt.Errorf("get repository: %w", err)
-	}
-
 	storagePath, err := sanitizeDiscoveredPath(args.RelativePath)
 	if err != nil {
 		return err
 	}
+	repoID := pgtype.UUID{Bytes: repoUUID, Valid: true}
+	operation := normalizeDiscoverOperation(args.Operation)
+
+	if operation == jobs.DiscoverOperationDelete {
+		_, err = ap.queries.SoftDeleteAssetByRepositoryAndStoragePath(ctx, repo.SoftDeleteAssetByRepositoryAndStoragePathParams{
+			RepositoryID: repoID,
+			StoragePath:  &storagePath,
+		})
+		if err != nil {
+			return fmt.Errorf("soft delete discovered asset (%s): %w", storagePath, err)
+		}
+		return nil
+	}
+
+	repository, err := ap.queries.GetRepository(ctx, repoID)
+	if err != nil {
+		return fmt.Errorf("get repository: %w", err)
+	}
+
 	fullPath := filepath.Join(repository.Path, filepath.FromSlash(storagePath))
 
 	info, err := os.Stat(fullPath)
@@ -80,24 +95,86 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 	rating := int32(0)
 	storagePathPtr := storagePath
 	hashPtr := hashResult.Hash
-	asset, err := ap.assetService.CreateAssetRecord(ctx, repo.CreateAssetParams{
-		OwnerID:          nil,
-		Type:             string(validation.AssetType),
-		OriginalFilename: filename,
-		StoragePath:      &storagePathPtr,
-		MimeType:         contentType,
-		FileSize:         info.Size(),
-		Hash:             &hashPtr,
-		TakenTime:        pgtype.Timestamptz{Time: info.ModTime().UTC(), Valid: true},
-		Rating:           &rating,
-		RepositoryID:     repository.RepoID,
-		Status:           statusJSON,
+	createdOrUpdatedAsset := (*repo.Asset)(nil)
+
+	existing, err := ap.queries.GetAssetByRepositoryAndStoragePathAny(ctx, repo.GetAssetByRepositoryAndStoragePathAnyParams{
+		RepositoryID: repoID,
+		StoragePath:  &storagePath,
 	})
-	if err != nil {
-		if isUniqueConstraintViolation(err) {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("find discovered asset by path: %w", err)
+	}
+	if err == nil {
+		wasDeleted := isSoftDeleted(existing)
+		hashUnchanged := existing.Hash != nil && *existing.Hash == hashResult.Hash
+		if !wasDeleted && hashUnchanged && existing.FileSize == info.Size() && strings.EqualFold(existing.MimeType, contentType) {
 			return nil
 		}
-		return fmt.Errorf("create discovered asset: %w", err)
+
+		updated, updateErr := ap.queries.UpdateDiscoveredAssetByID(ctx, repo.UpdateDiscoveredAssetByIDParams{
+			AssetID:          existing.AssetID,
+			OriginalFilename: filename,
+			MimeType:         contentType,
+			FileSize:         info.Size(),
+			Hash:             &hashPtr,
+			TakenTime:        pgtype.Timestamptz{Time: info.ModTime().UTC(), Valid: true},
+			Status:           statusJSON,
+		})
+		if updateErr != nil {
+			return fmt.Errorf("update discovered asset: %w", updateErr)
+		}
+		createdOrUpdatedAsset = &updated
+	}
+
+	if createdOrUpdatedAsset == nil {
+		asset, err := ap.assetService.CreateAssetRecord(ctx, repo.CreateAssetParams{
+			OwnerID:          nil,
+			Type:             string(validation.AssetType),
+			OriginalFilename: filename,
+			StoragePath:      &storagePathPtr,
+			MimeType:         contentType,
+			FileSize:         info.Size(),
+			Hash:             &hashPtr,
+			TakenTime:        pgtype.Timestamptz{Time: info.ModTime().UTC(), Valid: true},
+			Rating:           &rating,
+			RepositoryID:     repository.RepoID,
+			Status:           statusJSON,
+		})
+		if err != nil {
+			if isUniqueConstraintViolation(err) {
+				latestAsset, fetchErr := ap.queries.GetAssetByRepositoryAndStoragePathAny(ctx, repo.GetAssetByRepositoryAndStoragePathAnyParams{
+					RepositoryID: repoID,
+					StoragePath:  &storagePath,
+				})
+				if fetchErr == nil {
+					createdOrUpdatedAsset = &latestAsset
+				} else if !errors.Is(fetchErr, pgx.ErrNoRows) {
+					return fmt.Errorf("fetch discovered asset after unique conflict: %w", fetchErr)
+				}
+			} else {
+				return fmt.Errorf("create discovered asset: %w", err)
+			}
+		}
+		if createdOrUpdatedAsset == nil {
+			if asset == nil {
+				return nil
+			}
+			createdOrUpdatedAsset = asset
+		}
+	}
+
+	return ap.enqueueDiscoveredDownstream(ctx, repository, createdOrUpdatedAsset, storagePath, fullPath)
+}
+
+func (ap *AssetProcessor) enqueueDiscoveredDownstream(
+	ctx context.Context,
+	repository repo.Repository,
+	asset *repo.Asset,
+	storagePath string,
+	fullPath string,
+) error {
+	if asset == nil {
+		return fmt.Errorf("discovered asset is nil")
 	}
 
 	pgID := asset.AssetID
@@ -124,7 +201,7 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 		AssetType:   assetType,
 	}
 
-	_, err = ap.queueClient.Insert(ctx, commonMeta, &river.InsertOpts{Queue: "metadata_asset"})
+	_, err := ap.queueClient.Insert(ctx, commonMeta, &river.InsertOpts{Queue: "metadata_asset"})
 	if err != nil {
 		return fmt.Errorf("enqueue metadata: %w", err)
 	}
@@ -160,6 +237,18 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 	return nil
 }
 
+func normalizeDiscoverOperation(raw string) string {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	switch normalized {
+	case "", jobs.DiscoverOperationUpsert:
+		return jobs.DiscoverOperationUpsert
+	case jobs.DiscoverOperationDelete:
+		return jobs.DiscoverOperationDelete
+	default:
+		return jobs.DiscoverOperationUpsert
+	}
+}
+
 func sanitizeDiscoveredPath(path string) (string, error) {
 	raw := strings.TrimSpace(path)
 	if raw == "" {
@@ -185,6 +274,10 @@ func sanitizeDiscoveredPath(path string) (string, error) {
 	}
 
 	return normalized, nil
+}
+
+func isSoftDeleted(asset repo.Asset) bool {
+	return asset.IsDeleted != nil && *asset.IsDeleted
 }
 
 func isUniqueConstraintViolation(err error) bool {

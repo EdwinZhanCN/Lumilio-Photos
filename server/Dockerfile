@@ -51,10 +51,14 @@ ENV STORAGE_PATH=/data/storage/primary \
     SERVER_ENV=production \
     PATH="/usr/local/bin:${PATH}"
 
+ARG APP_UID=10001
+ARG APP_GID=10001
+
 WORKDIR /app
 
 # Create non-root user
-RUN addgroup --system app && adduser --system --ingroup app app
+RUN groupadd --gid ${APP_GID} app \
+    && useradd --uid ${APP_UID} --gid ${APP_GID} --create-home --shell /usr/sbin/nologin app
 
 # App artifacts
 COPY --from=builder /out/server /usr/local/bin/server
@@ -62,7 +66,7 @@ COPY --from=builder /go/bin/river /usr/local/bin/river
 COPY --from=builder /app/migrations ./migrations
 
 # Prepare storage path
-RUN mkdir -p "${STORAGE_PATH}" && chown -R app:app /data /app
+RUN mkdir -p "${STORAGE_PATH}" /watchman-sock && chown -R app:app /data /app /watchman-sock
 
 USER app
 

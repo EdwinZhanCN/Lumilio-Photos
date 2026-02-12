@@ -76,6 +76,7 @@ type Querier interface {
 	GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]GetAssetAlbumsRow, error)
 	GetAssetByHashAndRepository(ctx context.Context, arg GetAssetByHashAndRepositoryParams) (Asset, error)
 	GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset, error)
+	GetAssetByRepositoryAndStoragePathAny(ctx context.Context, arg GetAssetByRepositoryAndStoragePathAnyParams) (Asset, error)
 	GetAssetStatsForOwner(ctx context.Context, ownerID int32) (GetAssetStatsForOwnerRow, error)
 	GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error)
 	GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error)
@@ -206,6 +207,7 @@ type Querier interface {
 	SearchEmbeddingsByType(ctx context.Context, arg SearchEmbeddingsByTypeParams) ([]SearchEmbeddingsByTypeRow, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
+	SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error)
 	UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
 	UpdateAssetDescription(ctx context.Context, arg UpdateAssetDescriptionParams) error
@@ -222,6 +224,7 @@ type Querier interface {
 	UpdateAssetStoragePathAndStatus(ctx context.Context, arg UpdateAssetStoragePathAndStatusParams) (Asset, error)
 	UpdateCaption(ctx context.Context, arg UpdateCaptionParams) (Caption, error)
 	UpdateCaptionStats(ctx context.Context, assetID pgtype.UUID) error
+	UpdateDiscoveredAssetByID(ctx context.Context, arg UpdateDiscoveredAssetByIDParams) (Asset, error)
 	UpdateFaceCluster(ctx context.Context, arg UpdateFaceClusterParams) (FaceCluster, error)
 	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)
 	UpdateFaceResultStats(ctx context.Context, assetID pgtype.UUID) error

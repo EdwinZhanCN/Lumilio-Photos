@@ -22,8 +22,7 @@ services:
             dockerfile: server/watchman.Dockerfile
         restart: unless-stopped
         volumes:
-            # Replace /PATH/TO/YOUR/ASSETS with your host storage root directory.
-            - /Users/zhanzihao/LumilioData:/data/storage
+            - server_storage:/data/storage
             - watchman_socket:/watchman-sock
         healthcheck:
             test: ["CMD-SHELL", "test -S /watchman-sock/watchman.sock"]
@@ -69,8 +68,7 @@ services:
             LLM_MODEL_NAME: your-model-name
             LLM_BASE_URL: your-openai-compatiable-base-url
         volumes:
-            # Replace /PATH/TO/YOUR/ASSETS with your host storage root directory.
-            - /Users/zhanzihao/LumilioData:/data/storage
+            - server_storage:/data/storage
             - watchman_socket:/watchman-sock
         ports:
             - "8080:8080"
@@ -89,4 +87,5 @@ services:
 
 volumes:
     db_data:
+    server_storage:
     watchman_socket:

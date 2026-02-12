@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"server/config"
@@ -28,6 +30,14 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 )
+
+const primaryRepositoryFolderName = "primary"
+
+type primaryStorageRepositoryManager interface {
+	GetRepositoryByPath(path string) (*repo.Repository, error)
+	AddRepository(path string) (*repo.Repository, error)
+	InitializeRepository(path string, config repocfg.RepositoryConfig) (*repo.Repository, error)
+}
 
 func init() {
 	log.SetOutput(os.Stdout)
@@ -90,8 +100,7 @@ func main() {
 	// Initialize primary storage repository
 	log.Println("📁 Initializing primary storage repository...")
 	if err := initPrimaryStorage(repoManager); err != nil {
-		log.Printf("Warning: Failed to initialize primary storage: %v", err)
-		log.Println("Please ensure STORAGE_PATH environment variable is set")
+		log.Fatalf("Failed to initialize primary storage: %v", err)
 	}
 
 	zapLogger, err := zap.NewProduction()
@@ -282,11 +291,15 @@ func initMLServices(
 	return lumenService, embeddingService, nil
 }
 
-func initPrimaryStorage(repoManager storage.RepositoryManager) error {
+func initPrimaryStorage(repoManager primaryStorageRepositoryManager) error {
 	// Load environment variables
 	storagePath := os.Getenv("STORAGE_PATH")
-	if storagePath == "" {
-		return fmt.Errorf("STORAGE_PATH environment variable is required")
+	storageRootPath, primaryRepoPath, err := resolvePrimaryStoragePaths(storagePath)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(storageRootPath, 0755); err != nil {
+		return fmt.Errorf("failed to create storage root path %s: %w", storageRootPath, err)
 	}
 
 	storageStrategy := os.Getenv("STORAGE_STRATEGY")
@@ -302,22 +315,28 @@ func initPrimaryStorage(repoManager storage.RepositoryManager) error {
 		duplicateHandling = "rename" // Default to rename
 	}
 
-	// If a repository already exists at the storage path, register it if needed
-	if repocfg.IsRepositoryRoot(storagePath) {
+	// Strict mode: repository root must not be STORAGE_PATH itself.
+	// Primary repository is always STORAGE_PATH/primary.
+	if repocfg.IsRepositoryRoot(storageRootPath) {
+		return fmt.Errorf("legacy repository detected at STORAGE_PATH root (%s); move repository to %s", storageRootPath, primaryRepoPath)
+	}
+
+	// If a repository already exists at the primary path, register it if needed.
+	if repocfg.IsRepositoryRoot(primaryRepoPath) {
 		// If it's already registered in DB, we're done
-		if existing, err := repoManager.GetRepositoryByPath(storagePath); err == nil {
-			log.Printf("✅ Primary storage already initialized at: %s", storagePath)
+		if existing, err := repoManager.GetRepositoryByPath(primaryRepoPath); err == nil {
+			log.Printf("✅ Primary storage already initialized at: %s", primaryRepoPath)
 			log.Printf("   Repository ID: %s", existing.RepoID)
 			return nil
 		}
 
 		// Otherwise, register the existing repository
-		existingRepo, err := repoManager.AddRepository(storagePath)
+		existingRepo, err := repoManager.AddRepository(primaryRepoPath)
 		if err != nil {
 			return fmt.Errorf("failed to register existing primary storage repository: %w", err)
 		}
 
-		log.Printf("✅ Primary storage registered at: %s", storagePath)
+		log.Printf("✅ Primary storage registered at: %s", primaryRepoPath)
 		log.Printf("   Repository ID: %s", existingRepo.RepoID)
 		return nil
 	}
@@ -330,16 +349,31 @@ func initPrimaryStorage(repoManager storage.RepositoryManager) error {
 	)
 
 	// Initialize a new repository with the configuration
-	repo, err := repoManager.InitializeRepository(storagePath, *cfg)
+	repo, err := repoManager.InitializeRepository(primaryRepoPath, *cfg)
 	if err != nil {
 		return fmt.Errorf("failed to initialize primary storage repository: %w", err)
 	}
 
-	log.Printf("✅ Primary storage initialized at: %s", storagePath)
+	log.Printf("✅ Primary storage initialized at: %s", primaryRepoPath)
 	log.Printf("   Repository ID: %s", repo.RepoID)
 	log.Printf("   Storage Strategy: %s", storageStrategy)
 	log.Printf("   Duplicate Handling: %s", duplicateHandling)
 	log.Printf("   Preserve Filename: %v", preserve)
 
 	return nil
+}
+
+func resolvePrimaryStoragePaths(storagePath string) (string, string, error) {
+	trimmed := strings.TrimSpace(storagePath)
+	if trimmed == "" {
+		return "", "", fmt.Errorf("STORAGE_PATH environment variable is required")
+	}
+
+	storageRootPath, err := filepath.Abs(filepath.Clean(trimmed))
+	if err != nil {
+		return "", "", fmt.Errorf("invalid STORAGE_PATH %q: %w", storagePath, err)
+	}
+
+	primaryRepoPath := filepath.Join(storageRootPath, primaryRepositoryFolderName)
+	return storageRootPath, primaryRepoPath, nil
 }

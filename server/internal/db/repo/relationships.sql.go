@@ -56,8 +56,8 @@ SELECT
         ) FILTER (WHERE sp.label IS NOT NULL),
         '[]'
     ) as species_predictions,
-    COALESCE(
-        jsonb_build_object(
+    CASE
+        WHEN ocr.asset_id IS NOT NULL THEN jsonb_build_object(
             'model_id', ocr.model_id,
             'total_count', ocr.total_count,
             'processing_time_ms', ocr.processing_time_ms,
@@ -76,11 +76,11 @@ SELECT
                 ) FILTER (WHERE ocr_ti.id IS NOT NULL),
                 '[]'::json
             )
-        ) FILTER (WHERE ocr.asset_id IS NOT NULL),
-        NULL
-    ) as ocr_result,
-    COALESCE(
-        jsonb_build_object(
+        )
+        ELSE NULL
+    END as ocr_result,
+    CASE
+        WHEN fr.asset_id IS NOT NULL THEN jsonb_build_object(
             'model_id', fr.model_id,
             'total_faces', fr.total_faces,
             'processing_time_ms', fr.processing_time_ms,
@@ -104,11 +104,11 @@ SELECT
                 ) FILTER (WHERE fi.id IS NOT NULL),
                 '[]'::json
             )
-        ) FILTER (WHERE fr.asset_id IS NOT NULL),
-        NULL
-    ) as face_result,
-    COALESCE(
-        jsonb_build_object(
+        )
+        ELSE NULL
+    END as face_result,
+    CASE
+        WHEN cap.asset_id IS NOT NULL THEN jsonb_build_object(
             'model_id', cap.model_id,
             'description', cap.description,
             'summary', cap.summary,
@@ -119,9 +119,9 @@ SELECT
             'finish_reason', cap.finish_reason,
             'created_at', cap.created_at,
             'updated_at', cap.updated_at
-        ) FILTER (WHERE cap.asset_id IS NOT NULL),
-        NULL
-    ) as caption
+        )
+        ELSE NULL
+    END as caption
 FROM assets a
 LEFT JOIN thumbnails t ON a.asset_id = t.asset_id
 LEFT JOIN asset_tags at ON a.asset_id = at.asset_id
