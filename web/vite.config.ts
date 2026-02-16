@@ -36,7 +36,8 @@ export default defineConfig({
           name: "happy-dom",
           environment: "happy-dom",
           setupFiles: ["./setup.happy-dom.ts"],
-          exclude: ["src/workers/*"],
+          include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          exclude: ["src/workers/*", "**/node_modules/**"],
         }
       },
       {
@@ -44,6 +45,7 @@ export default defineConfig({
         test: {
           name: "browser",
           include: ["src/workers/*"],
+          exclude: ["**/node_modules/**"],
           browser: {
             provider: preview(),
             instances: [

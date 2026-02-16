@@ -63,6 +63,8 @@
         "untitled": "未命名相册",
         "createSuccess": "相册创建成功",
         "deleteSuccess": "相册删除成功",
+        "deleteError": "删除相册失败",
+        "newAlbum": "新建相册",
         "updateSuccess": "相册更新成功"
     },
     "assets": {
@@ -249,12 +251,139 @@
             "item_count": "{{count}} 项",
             "item_count_plural": "{{count}} 项",
             "loading_more": "正在加载更多"
+        },
+        "mediaViewer": {
+            "video_title": "视频",
+            "audio_title": "音频",
+            "asset_alt_text": "资产",
+            "media_not_available": "媒体不可用",
+            "unknown_file": "未知文件",
+            "unknown_type": "未知类型"
+        },
+        "mediaThumbnail": {
+            "asset_alt_text": "资产",
+            "video_sr_only": "视频",
+            "audio_sr_only": "音频",
+            "audio_file_fallback": "音频文件",
+            "asset_aria_label_prefix": "资产",
+            "unknown_file_fallback": "未知文件",
+            "no_preview": "无预览",
+            "unknown_mime_fallback": "未知类型"
+        },
+        "assetsPageHeader": {
+            "messages": {
+                "deleteSuccess": "成功删除 {{count}} 项资产",
+                "deleteError": "删除资产失败",
+                "downloadStart": "开始下载",
+                "downloadError": "开始下载失败",
+                "loadAlbumsError": "加载相册失败",
+                "addToAlbumSuccess": "已将 {{count}} 项添加到相册",
+                "addToAlbumError": "添加到相册失败"
+            },
+            "groupBy": "分组方式：{{groupBy}}",
+            "groupByOptions": {
+                "date": "日期",
+                "type": "类型",
+                "album": "相册",
+                "flat": "平铺"
+            },
+            "selectionMode": {
+                "exit": "退出选择模式",
+                "enter": "进入选择模式"
+            },
+            "actions": {
+                "title": "操作",
+                "applyToItems": "应用于 {{count}} 项",
+      "like": "喜欢",
+      "unlike": "取消喜欢",
+      "toggleLike": "切换喜欢",
+      "setRating": "设置评分",
+                "clearRating": "清除评分",
+                "addToAlbum": "添加到相册",
+                "downloadAll": "下载全部",
+                "deleteSelected": "删除所选"
+            },
+            "deleteConfirmModal": {
+                "title": "确认删除",
+                "message": "确定要删除已选择的 {{count}} 项资产吗？此操作将标记为已删除，并且它们将不再出现在库中。",
+                "cancelButton": "取消",
+                "deleteButton": "删除资产"
+            },
+            "addToAlbumModal": {
+                "title": "添加到相册",
+                "message": "选择一个相册以添加 {{count}} 项。",
+                "loadingAlbums": "正在加载相册...",
+                "itemCount": "{{count}} 项",
+                "noAlbumsFound": "未找到相册",
+                "createNewAlbum": "新建相册"
+            }
         }
     },
     "upload": {
         "title": "上传照片",
         "button": "上传",
-        "dragDrop": "将文件拖放到此处"
+        "dragDrop": "将文件拖放到此处",
+        "UploadAssets": {
+            "processing_files": "正在处理 {{count}} 个文件...",
+            "files_ready_to_upload": "{{count}} 个文件准备上传",
+            "no_files_selected": "未选择文件",
+            "page_title": "上传素材",
+            "supported_formats_button": "支持格式",
+            "error_boundary_title": "上传区域出错！",
+            "error_boundary_message": "上传区域加载失败或运行时发生错误。"
+        },
+        "SupportedFormatsModal": {
+            "title": "支持的文件格式",
+            "close_button_aria_label": "关闭",
+            "summary_message": "{{summary}}",
+            "category_photos": "照片",
+            "category_raw_formats": "RAW 格式",
+            "category_videos": "视频",
+            "category_audio": "音频",
+            "formats_count": "{{count}} 种格式",
+            "got_it_button": "知道了"
+        },
+        "UnifiedUploadSection": {
+            "no_valid_files_selected": "未选择有效文件",
+            "cannot_clear_while_processing": "处理过程中无法清空文件",
+            "no_files_selected_for_upload": "未选择要上传的文件",
+            "drag_drop_or_click": "拖拽或点击上传",
+            "supported_file_types_description": "支持图片、RAW 格式、视频与音频文件",
+            "upload_information_title": "上传信息",
+            "max_files_label": "最大文件数：",
+            "change_limits_settings_hint": "可在 设置 → 界面设置 中修改限制。",
+            "add_files_button": "添加文件",
+            "clear_button": "清空",
+            "uploading_status": "上传中...",
+            "upload_button": "上传 {{count > 0 ? '(' + count + ')' : ''}}",
+            "selected_files_title": "已选文件",
+            "overall_progress_label": "整体进度",
+            "server_progress_label": "服务器处理进度",
+            "server_chunk_size": "服务器分片大小",
+            "server_concurrency": "服务器并发数",
+            "server_in_flight": "并发请求",
+            "server_active_sessions": "活跃会话",
+            "server_completed_files": "完成文件数",
+            "server_failed_sessions": "失败会话"
+        },
+        "FileUploadProgress": {
+            "title": "文件上传进度",
+            "status_completed": "已完成",
+            "status_uploading": "上传中",
+            "status_failed": "失败",
+            "status_pending": "等待中",
+            "chunked_badge": "分片"
+        },
+        "ProgressIndicator": {
+            "progress_display": "{{processed}}/{{total}}{{label ? ' - ' + label : ''}}"
+        },
+        "UploadProvider": {
+            "max_files_allowed": "最多允许上传 {{count}} 个文件",
+            "files_exceeded_limit": "超出限制 {{count}} 个文件，未被添加",
+            "no_files_selected_for_upload_message": "未选择要上传的文件",
+            "upload_completed_success": "上传完成",
+            "upload_failed_generic": "上传失败"
+        }
     },
     "updates": {
         "title": "更新",
@@ -288,25 +417,18 @@
         },
         "frames": {
             "title": "照片边框",
-            "tabs": {
-                "color": "纯色",
-                "frosted": "毛玻璃",
-                "vignette": "暗角"
-            },
-            "colored": {
-                "borderWidth": "边框宽度",
-                "borderColor": "边框颜色"
-            },
-            "frosted": {
-                "blur": "模糊",
-                "brightness": "亮度",
-                "cornerRadius": "圆角半径"
-            },
-            "vignette": {
-                "strength": "强度"
-            },
-            "apply": "应用边框",
-            "cancel": "取消生成"
+            "plugin": {
+                "market": "插件市场",
+                "catalogLoading": "正在加载插件目录...",
+                "install": "安装",
+                "uninstall": "移除",
+                "installed": "已安装插件",
+                "selectPlaceholder": "选择已安装插件",
+                "loading": "正在加载插件界面...",
+                "runtimeDisabled": "Studio 插件运行时已禁用。请启用 VITE_STUDIO_PLUGIN_RUNTIME_ENABLED 来使用边框插件。",
+                "apply": "应用插件",
+                "cancel": "取消插件执行"
+            }
         }
     },
     "settings": {
@@ -365,6 +487,8 @@
         "edit": "编辑",
         "delete": "删除",
         "confirm": "确认",
+        "select": "选择",
+        "selected": "已选择 {{count}} 项",
         "na": "无",
         "uploaded": "上传于",
         "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
@@ -389,6 +513,10 @@
         "notLiked": "未喜欢",
         "updateSuccess": "评分更新成功",
         "updateError": "更新评分失败"
+    },
+    "bulk": {
+        "updateSuccess": "已更新 {{count}} 项",
+        "updateError": "批量更新失败"
     },
     "delete": {
         "confirmTitle": "删除照片",

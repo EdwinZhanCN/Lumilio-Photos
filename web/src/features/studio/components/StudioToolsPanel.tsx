@@ -2,13 +2,20 @@ import { PanelType } from "../routes/Studio";
 import { ExifDataDisplay } from "./panels/ExifDataDisplay";
 import { DevelopPanel } from "./panels/DevelopPanel";
 import { FramesPanel } from "./panels/FramesPanel";
-import {
-  BorderOptions,
-  BorderParams,
-  BorderGenerationProgress,
-} from "@/hooks/util-hooks/useGenerateBorder";
 import { ExifExtractionProgress } from "@/hooks/util-hooks/useExtractExifdata";
 import { useI18n } from "@/lib/i18n.tsx";
+import type {
+  CatalogPluginSummary,
+  InstalledPluginRecord,
+  StudioPluginUiModule,
+} from "@/features/studio/plugins/types";
+
+export type StudioFrameProgress = {
+  processed: number;
+  total: number;
+  error?: string;
+  failedAt?: number | null;
+} | null;
 
 type StudioToolsPanelProps = {
   selectedFile: File | null;
@@ -17,14 +24,26 @@ type StudioToolsPanelProps = {
   exifProgress: ExifExtractionProgress;
   exifToDisplay: Record<string, any> | null;
   onExtractExif: () => void;
-  isGeneratingBorders: boolean;
-  borderProgress: BorderGenerationProgress;
-  onGenerateBorders: (
-    option: BorderOptions,
-    param: BorderParams[BorderOptions],
-  ) => Promise<void>;
-  onCancelGeneration?: () => void;
-  isCancelling?: boolean;
+  isGeneratingPlugin: boolean;
+  pluginProgress: StudioFrameProgress;
+  onGeneratePlugin: () => Promise<void>;
+  pluginRuntimeEnabled: boolean;
+  installedPlugins: InstalledPluginRecord[];
+  catalogPlugins: CatalogPluginSummary[];
+  selectedPluginId: string | null;
+  onSelectPlugin: (pluginId: string) => void;
+  onInstallPlugin: (pluginId: string, version: string) => void;
+  onUninstallPlugin: (pluginId: string) => void;
+  isPluginInstalled: (pluginId: string, version?: string) => boolean;
+  pluginUiModule: StudioPluginUiModule | null;
+  pluginParams: Record<string, unknown>;
+  onPluginParamsChange: (next: Record<string, unknown>) => void;
+  pluginLoading: boolean;
+  pluginError: string | null;
+  catalogLoading: boolean;
+  catalogError: string | null;
+  onCancelPluginGeneration?: () => void;
+  isCancellingPlugin?: boolean;
   onCancelExtraction?: () => void;
   isCancellingExif?: boolean;
 };
@@ -36,15 +55,39 @@ export function StudioToolsPanel({
   exifProgress,
   exifToDisplay,
   onExtractExif,
-  isGeneratingBorders,
-  borderProgress,
-  onGenerateBorders,
-  onCancelGeneration,
-  isCancelling = false,
+  isGeneratingPlugin,
+  pluginProgress,
+  onGeneratePlugin,
+  pluginRuntimeEnabled,
+  installedPlugins,
+  catalogPlugins,
+  selectedPluginId,
+  onSelectPlugin,
+  onInstallPlugin,
+  onUninstallPlugin,
+  isPluginInstalled,
+  pluginUiModule,
+  pluginParams,
+  onPluginParamsChange,
+  pluginLoading,
+  pluginError,
+  catalogLoading,
+  catalogError,
+  onCancelPluginGeneration,
+  isCancellingPlugin = false,
   onCancelExtraction,
   isCancellingExif = false,
 }: StudioToolsPanelProps) {
   const { t } = useI18n();
+
+  const isLoading = isExtracting || isGeneratingPlugin;
+  const currentProgress =
+    activePanel === "exif"
+      ? exifProgress
+      : activePanel === "frames"
+        ? pluginProgress
+        : null;
+
   const renderPanelContent = () => {
     switch (activePanel) {
       case "exif":
@@ -56,22 +99,29 @@ export function StudioToolsPanel({
       case "frames":
         return (
           <FramesPanel
-            isGenerating={isGeneratingBorders}
-            onGenerate={onGenerateBorders}
+            isGenerating={isGeneratingPlugin}
+            onGeneratePlugin={onGeneratePlugin}
+            pluginRuntimeEnabled={pluginRuntimeEnabled}
+            installedPlugins={installedPlugins}
+            catalogPlugins={catalogPlugins}
+            selectedPluginId={selectedPluginId}
+            onSelectPlugin={onSelectPlugin}
+            onInstallPlugin={onInstallPlugin}
+            onUninstallPlugin={onUninstallPlugin}
+            isPluginInstalled={isPluginInstalled}
+            pluginUiModule={pluginUiModule}
+            pluginParams={pluginParams}
+            onPluginParamsChange={onPluginParamsChange}
+            pluginLoading={pluginLoading}
+            pluginError={pluginError}
+            catalogLoading={catalogLoading}
+            catalogError={catalogError}
           />
         );
       default:
         return null;
     }
   };
-
-  const isLoading = isExtracting || isGeneratingBorders;
-  const currentProgress =
-    activePanel === "exif"
-      ? exifProgress
-      : activePanel === "frames"
-        ? borderProgress
-        : null;
 
   return (
     <div className="bg-base-200 border-l border-base-content/10 w-80 overflow-y-auto">
@@ -103,11 +153,9 @@ export function StudioToolsPanel({
                 max={currentProgress.total}
               ></progress>
               {currentProgress.error && (
-                <p className="text-xs text-error mt-1">
-                  {currentProgress.error}
-                </p>
+                <p className="text-xs text-error mt-1">{currentProgress.error}</p>
               )}
-              {/* Show appropriate cancel button based on current operation */}
+
               {isExtracting && onCancelExtraction && (
                 <button
                   onClick={onCancelExtraction}
@@ -119,15 +167,16 @@ export function StudioToolsPanel({
                     : t("studio.exif.cancel")}
                 </button>
               )}
-              {isGeneratingBorders && onCancelGeneration && (
+
+              {isGeneratingPlugin && (
                 <button
-                  onClick={onCancelGeneration}
+                  onClick={onCancelPluginGeneration}
                   className="btn btn-xs btn-outline btn-error mt-2"
-                  disabled={isCancelling}
+                  disabled={isCancellingPlugin}
                 >
-                  {isCancelling
+                  {isCancellingPlugin
                     ? t("studio.cancelling")
-                    : t("studio.frames.cancel")}
+                    : t("studio.frames.plugin.cancel")}
                 </button>
               )}
             </div>
