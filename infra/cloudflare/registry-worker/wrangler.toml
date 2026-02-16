@@ -1,0 +1,21 @@
+name = "lumilio-plugin-registry"
+main = "src/index.ts"
+compatibility_date = "2026-02-13"
+workers_dev = true
+
+[vars]
+ALLOWED_ORIGIN = "https://app.example.com"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lumilio_plugin_registry"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "lumilio-plugin-artifacts"
+preview_bucket_name = "lumilio-plugin-artifacts-preview"
