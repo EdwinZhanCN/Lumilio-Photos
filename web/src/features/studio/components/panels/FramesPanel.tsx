@@ -1,58 +1,65 @@
-import { useState } from "react";
 import { RectangleGroupIcon } from "@heroicons/react/24/outline";
 import { useI18n } from "@/lib/i18n.tsx";
-import {
-  BorderOptions,
-  BorderParams,
-} from "@/hooks/util-hooks/useGenerateBorder";
+import type {
+  CatalogPluginSummary,
+  InstalledPluginRecord,
+  StudioPluginUiModule,
+} from "@/features/studio/plugins/types";
 
 type FramesPanelProps = {
   isGenerating: boolean;
-  onGenerate: (
-    option: BorderOptions,
-    param: BorderParams[BorderOptions],
-  ) => void;
+  onGeneratePlugin: () => void;
+  pluginRuntimeEnabled: boolean;
+  installedPlugins: InstalledPluginRecord[];
+  catalogPlugins: CatalogPluginSummary[];
+  selectedPluginId: string | null;
+  onSelectPlugin: (pluginId: string) => void;
+  onInstallPlugin: (pluginId: string, version: string) => void;
+  onUninstallPlugin: (pluginId: string) => void;
+  isPluginInstalled: (pluginId: string, version?: string) => boolean;
+  pluginUiModule: StudioPluginUiModule | null;
+  pluginParams: Record<string, unknown>;
+  onPluginParamsChange: (next: Record<string, unknown>) => void;
+  pluginLoading: boolean;
+  pluginError: string | null;
+  catalogLoading: boolean;
+  catalogError: string | null;
 };
 
-export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
+export function FramesPanel({
+  isGenerating,
+  onGeneratePlugin,
+  pluginRuntimeEnabled,
+  installedPlugins,
+  catalogPlugins,
+  selectedPluginId,
+  onSelectPlugin,
+  onInstallPlugin,
+  onUninstallPlugin,
+  isPluginInstalled,
+  pluginUiModule,
+  pluginParams,
+  onPluginParamsChange,
+  pluginLoading,
+  pluginError,
+  catalogLoading,
+  catalogError,
+}: FramesPanelProps) {
   const { t } = useI18n();
-  const [activeFrame, setActiveFrame] = useState<BorderOptions>("COLORED");
 
-  const [coloredParams, setColoredParams] = useState<BorderParams["COLORED"]>({
-    border_width: 20,
-    r: 255,
-    g: 255,
-    b: 255,
-    jpeg_quality: 90,
-  });
-
-  const [frostedParams, setFrostedParams] = useState<BorderParams["FROSTED"]>({
-    blur_sigma: 15.0,
-    brightness_adjustment: -40,
-    corner_radius: 30,
-    jpeg_quality: 90,
-  });
-
-  const [vignetteParams, setVignetteParams] = useState<
-    BorderParams["VIGNETTE"]
-  >({
-    strength: 0.7,
-    jpeg_quality: 90,
-  });
-
-  const handleGenerateClick = () => {
-    switch (activeFrame) {
-      case "COLORED":
-        onGenerate("COLORED", coloredParams);
-        break;
-      case "FROSTED":
-        onGenerate("FROSTED", frostedParams);
-        break;
-      case "VIGNETTE":
-        onGenerate("VIGNETTE", vignetteParams);
-        break;
-    }
-  };
+  if (!pluginRuntimeEnabled) {
+    return (
+      <div>
+        <div className="flex items-center mb-4">
+          <RectangleGroupIcon className="w-5 h-5 mr-2" />
+          <h2 className="text-lg font-semibold">{t("studio.frames.title")}</h2>
+        </div>
+        <div className="rounded-lg bg-base-100 p-4 text-sm text-base-content/70">
+          {t("studio.frames.plugin.runtimeDisabled")}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -61,158 +68,98 @@ export function FramesPanel({ isGenerating, onGenerate }: FramesPanelProps) {
         <h2 className="text-lg font-semibold">{t("studio.frames.title")}</h2>
       </div>
 
-      <div className="tabs tabs-boxed mb-4">
-        <a
-          className={`tab ${activeFrame === "COLORED" ? "tab-active" : ""}`}
-          onClick={() => setActiveFrame("COLORED")}
-        >
-          {t("studio.frames.tabs.color")}
-        </a>
-        <a
-          className={`tab ${activeFrame === "FROSTED" ? "tab-active" : ""}`}
-          onClick={() => setActiveFrame("FROSTED")}
-        >
-          {t("studio.frames.tabs.frosted")}
-        </a>
-        <a
-          className={`tab ${activeFrame === "VIGNETTE" ? "tab-active" : ""}`}
-          onClick={() => setActiveFrame("VIGNETTE")}
-        >
-          {t("studio.frames.tabs.vignette")}
-        </a>
-      </div>
+      <div className="space-y-4">
+        {catalogLoading && (
+          <p className="text-sm text-base-content/70">
+            {t("studio.frames.plugin.catalogLoading")}
+          </p>
+        )}
 
-      <div className="space-y-4 p-4 rounded-lg bg-base-100">
-        {activeFrame === "COLORED" && (
-          <div>
-            <label className="label">
-              {t("studio.frames.colored.borderWidth")}:{" "}
-              {coloredParams.border_width}
-            </label>
-            <input
-              type="range"
-              min={5}
-              max={100}
-              value={coloredParams.border_width}
-              className="range range-primary"
-              onChange={(e) =>
-                setColoredParams((p) => ({
-                  ...p,
-                  border_width: Number(e.target.value),
-                }))
-              }
-            />
-            <label className="label mt-2">
-              {t("studio.frames.colored.borderColor")}
-            </label>
-            <input
-              type="color"
-              value={`#${coloredParams.r.toString(16).padStart(2, "0")}${coloredParams.g.toString(16).padStart(2, "0")}${coloredParams.b.toString(16).padStart(2, "0")}`}
-              className="w-full h-10 p-1"
-              onChange={(e) => {
-                const hex = e.target.value;
-                setColoredParams((p) => ({
-                  ...p,
-                  r: parseInt(hex.slice(1, 3), 16),
-                  g: parseInt(hex.slice(3, 5), 16),
-                  b: parseInt(hex.slice(5, 7), 16),
-                }));
-              }}
-            />
-          </div>
+        {catalogError && (
+          <p className="text-sm text-error">{catalogError}</p>
         )}
-        {activeFrame === "FROSTED" && (
-          <div>
-            <label className="label">
-              {t("studio.frames.frosted.blur")}:{" "}
-              {frostedParams.blur_sigma.toFixed(1)}
-            </label>
-            <input
-              type="range"
-              min={1}
-              max={50}
-              step={0.5}
-              value={frostedParams.blur_sigma}
-              className="range range-primary"
-              onChange={(e) =>
-                setFrostedParams((p) => ({
-                  ...p,
-                  blur_sigma: Number(e.target.value),
-                }))
-              }
-            />
-            <label className="label">
-              {t("studio.frames.frosted.brightness")}:{" "}
-              {frostedParams.brightness_adjustment}
-            </label>
-            <input
-              type="range"
-              min={-100}
-              max={0}
-              value={frostedParams.brightness_adjustment}
-              className="range range-primary"
-              onChange={(e) =>
-                setFrostedParams((p) => ({
-                  ...p,
-                  brightness_adjustment: Number(e.target.value),
-                }))
-              }
-            />
-            <label className="label">
-              {t("studio.frames.frosted.cornerRadius")}:{" "}
-              {frostedParams.corner_radius}
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={frostedParams.corner_radius}
-              className="range range-primary"
-              onChange={(e) =>
-                setFrostedParams((p) => ({
-                  ...p,
-                  corner_radius: Number(e.target.value),
-                }))
-              }
-            />
-          </div>
-        )}
-        {activeFrame === "VIGNETTE" && (
-          <div>
-            <label className="label">
-              {t("studio.frames.vignette.strength")}:{" "}
-              {vignetteParams.strength.toFixed(2)}
-            </label>
-            <input
-              type="range"
-              min={0.1}
-              max={1.5}
-              step={0.05}
-              value={vignetteParams.strength}
-              className="range range-primary"
-              onChange={(e) =>
-                setVignetteParams((p) => ({
-                  ...p,
-                  strength: Number(e.target.value),
-                }))
-              }
-            />
-          </div>
-        )}
-      </div>
 
-      <div className="mt-6">
-        <button
-          className="btn btn-primary w-full"
-          onClick={handleGenerateClick}
-          disabled={isGenerating}
-        >
-          {isGenerating ? (
-            <span className="loading loading-spinner"></span>
-          ) : (
-            t("studio.frames.apply")
+        {catalogPlugins.length > 0 && (
+          <div className="rounded-lg bg-base-100 p-4 space-y-2">
+            <h3 className="font-semibold text-sm">{t("studio.frames.plugin.market")}</h3>
+            {catalogPlugins.map((plugin) => (
+              <div
+                key={`${plugin.id}@${plugin.latestVersion}`}
+                className="flex items-center justify-between gap-2"
+              >
+                <div>
+                  <p className="text-sm font-medium">{plugin.displayName}</p>
+                  <p className="text-xs text-base-content/60">{plugin.id}@{plugin.latestVersion}</p>
+                </div>
+                {isPluginInstalled(plugin.id, plugin.latestVersion) ? (
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-outline"
+                    onClick={() => onUninstallPlugin(plugin.id)}
+                    disabled={isGenerating}
+                  >
+                    {t("studio.frames.plugin.uninstall")}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-xs btn-secondary"
+                    onClick={() => onInstallPlugin(plugin.id, plugin.latestVersion)}
+                    disabled={isGenerating}
+                  >
+                    {t("studio.frames.plugin.install")}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="rounded-lg bg-base-100 p-4 space-y-3">
+          <label className="label">{t("studio.frames.plugin.installed")}</label>
+          <select
+            className="select select-bordered w-full"
+            value={selectedPluginId || ""}
+            onChange={(e) => onSelectPlugin(e.target.value)}
+            disabled={isGenerating || installedPlugins.length === 0}
+          >
+            <option value="">{t("studio.frames.plugin.selectPlaceholder")}</option>
+            {installedPlugins.map((item) => (
+              <option key={`${item.pluginId}@${item.version}`} value={item.pluginId}>
+                {item.pluginId}@{item.version}
+              </option>
+            ))}
+          </select>
+
+          {pluginLoading && (
+            <p className="text-sm text-base-content/70">
+              {t("studio.frames.plugin.loading")}
+            </p>
           )}
-        </button>
+
+          {pluginError && <p className="text-sm text-error">{pluginError}</p>}
+
+          {pluginUiModule && !pluginLoading && (
+            <pluginUiModule.Panel
+              value={pluginParams}
+              onChange={onPluginParamsChange}
+              disabled={isGenerating}
+            />
+          )}
+
+          <button
+            type="button"
+            className="btn btn-primary w-full"
+            onClick={onGeneratePlugin}
+            disabled={isGenerating || !pluginUiModule || !selectedPluginId}
+          >
+            {isGenerating ? (
+              <span className="loading loading-spinner"></span>
+            ) : (
+              t("studio.frames.plugin.apply")
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,0 +1,23 @@
+{
+  "name": "@lumilio/plugin-border",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/ui.mjs",
+  "exports": {
+    ".": "./dist/ui.mjs",
+    "./ui": "./dist/ui.mjs",
+    "./runner": "./dist/runner.mjs"
+  },
+  "files": [
+    "manifest.json",
+    "dist/ui.mjs",
+    "dist/runner.mjs",
+    "dist/border_wasm.js",
+    "dist/border_wasm_bg.wasm"
+  ],
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

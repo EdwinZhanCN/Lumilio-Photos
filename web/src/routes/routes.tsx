@@ -82,7 +82,7 @@ export const routes = [
   {
     path: "/studio",
     element: (
-      <WorkerProvider preload={["exif", "border"]}>
+      <WorkerProvider preload={["exif", "plugin"]}>
         <Studio />
       </WorkerProvider>
     ),

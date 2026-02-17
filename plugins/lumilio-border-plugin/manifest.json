@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "com.lumilio.border",
+  "version": "0.1.0",
+  "displayName": "Lumilio Border",
+  "description": "Official border effects plugin for Studio frames panel.",
+  "mount": {
+    "panel": "frames",
+    "order": 10
+  },
+  "entries": {
+    "ui": "https://cdn.example.com/plugins/com.lumilio.border/0.1.0/ui.mjs",
+    "runner": "https://cdn.example.com/plugins/com.lumilio.border/0.1.0/runner.mjs"
+  },
+  "permissions": [
+    "image.read",
+    "image.write"
+  ],
+  "compatibility": {
+    "studioApi": "1"
+  },
+  "signature": {
+    "keyId": "lumilio-dev-1",
+    "algorithm": "ECDSA_P256_SHA256",
+    "value": "REPLACE_WITH_SIGNED_BASE64URL_SIGNATURE"
+  }
+}

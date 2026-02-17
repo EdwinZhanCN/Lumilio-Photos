@@ -64,6 +64,8 @@
         "untitled": "Untitled Album",
         "createSuccess": "Album created successfully",
         "deleteSuccess": "Album deleted successfully",
+        "deleteError": "Failed to delete albums",
+        "newAlbum": "New Album",
         "updateSuccess": "Album updated successfully"
     },
     "assets": {
@@ -260,6 +262,16 @@
             "unknown_file": "Unknown file",
             "unknown_type": "Unknown type"
         },
+        "mediaThumbnail": {
+            "asset_alt_text": "Asset",
+            "video_sr_only": "Video",
+            "audio_sr_only": "Audio",
+            "audio_file_fallback": "Audio file",
+            "asset_aria_label_prefix": "Asset",
+            "unknown_file_fallback": "Unknown file",
+            "no_preview": "No preview",
+            "unknown_mime_fallback": "Unknown type"
+        },
         "assetsPageHeader": {
             "messages": {
                 "deleteSuccess": "Successfully deleted {{count}} assets",
@@ -284,6 +296,8 @@
             "actions": {
                 "title": "Actions",
                 "applyToItems": "Apply to {{count}} items",
+                "like": "Like",
+                "unlike": "Unlike",
                 "toggleLike": "Toggle Like",
                 "setRating": "Set Rating",
                 "clearRating": "Clear Rating",
@@ -345,10 +359,32 @@
             "uploading_status": "Uploading...",
             "upload_button": "Upload {{count > 0 ? '(' + count + ')' : ''}}",
             "selected_files_title": "Selected Files",
-            "overall_progress_label": "Overall Progress"
+            "overall_progress_label": "Overall Progress",
+            "server_progress_label": "Server processing",
+            "server_chunk_size": "Server chunk size",
+            "server_concurrency": "Server concurrency",
+            "server_in_flight": "In-flight requests",
+            "server_active_sessions": "Active sessions",
+            "server_completed_files": "Completed files",
+            "server_failed_sessions": "Failed sessions"
+        },
+        "FileUploadProgress": {
+            "title": "File Upload Progress",
+            "status_completed": "Completed",
+            "status_uploading": "Uploading",
+            "status_failed": "Failed",
+            "status_pending": "Pending",
+            "chunked_badge": "Chunked"
         },
         "ProgressIndicator": {
             "progress_display": "{{processed}}/{{total}}{{label ? ' - ' + label : ''}}"
+        },
+        "UploadProvider": {
+            "max_files_allowed": "Maximum of {{count}} files allowed",
+            "files_exceeded_limit": "{{count}} files exceeded the limit and were not added",
+            "no_files_selected_for_upload_message": "No files selected for upload",
+            "upload_completed_success": "Upload completed successfully",
+            "upload_failed_generic": "Upload failed"
         }
     },
     "updates": {
@@ -383,25 +419,18 @@
         },
         "frames": {
             "title": "Photo Frames",
-            "tabs": {
-                "color": "Color",
-                "frosted": "Frosted",
-                "vignette": "Vignette"
-            },
-            "colored": {
-                "borderWidth": "Border Width",
-                "borderColor": "Border Color"
-            },
-            "frosted": {
-                "blur": "Blur",
-                "brightness": "Brightness",
-                "cornerRadius": "Corner Radius"
-            },
-            "vignette": {
-                "strength": "Strength"
-            },
-            "apply": "Apply Border",
-            "cancel": "Cancel Generation"
+            "plugin": {
+                "market": "Plugin Marketplace",
+                "catalogLoading": "Loading plugin catalog...",
+                "install": "Install",
+                "uninstall": "Remove",
+                "installed": "Installed Plugins",
+                "selectPlaceholder": "Select an installed plugin",
+                "loading": "Loading plugin UI...",
+                "runtimeDisabled": "Studio plugin runtime is disabled. Enable VITE_STUDIO_PLUGIN_RUNTIME_ENABLED to use border plugins.",
+                "apply": "Apply Plugin",
+                "cancel": "Cancel Plugin Run"
+            }
         }
     },
     "settings": {
@@ -460,6 +489,8 @@
         "edit": "Edit",
         "delete": "Delete",
         "confirm": "Confirm",
+        "select": "Select",
+        "selected": "{{count}} selected",
         "na": "N/A",
         "uploaded": "Uploaded",
         "pressCtrlEnterToSave": "Press Ctrl+Enter to save",
@@ -484,6 +515,10 @@
         "notLiked": "Not liked",
         "updateSuccess": "Rating updated successfully",
         "updateError": "Failed to update rating"
+    },
+    "bulk": {
+        "updateSuccess": "Updated {{count}} items",
+        "updateError": "Failed to update items"
     },
     "delete": {
         "confirmTitle": "Delete Photo",
