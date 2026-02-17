@@ -2,7 +2,7 @@
 
 # Interface: WorkerMessage
 
-Defined in: [workers/hash.worker.ts:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87550f699d3d5501c5ee53bfa6a214c4b59cf82a/web/src/workers/hash.worker.ts#L11)
+Defined in: [workers/hash.worker.ts:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d0b4da507ab9c0740bf81054daa3d8ad6a258681/web/src/workers/hash.worker.ts#L11)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [workers/hash.worker.ts:11](https://github.com/EdwinZhanCN/Lumilio-P
 
 > `optional` **config**: `object`
 
-Defined in: [workers/hash.worker.ts:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87550f699d3d5501c5ee53bfa6a214c4b59cf82a/web/src/workers/hash.worker.ts#L14)
+Defined in: [workers/hash.worker.ts:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d0b4da507ab9c0740bf81054daa3d8ad6a258681/web/src/workers/hash.worker.ts#L14)
 
 #### memoryMultiplier?
 
@@ -22,7 +22,7 @@ Defined in: [workers/hash.worker.ts:14](https://github.com/EdwinZhanCN/Lumilio-P
 
 > `optional` **data**: `File`[]
 
-Defined in: [workers/hash.worker.ts:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87550f699d3d5501c5ee53bfa6a214c4b59cf82a/web/src/workers/hash.worker.ts#L13)
+Defined in: [workers/hash.worker.ts:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d0b4da507ab9c0740bf81054daa3d8ad6a258681/web/src/workers/hash.worker.ts#L13)
 
 ***
 
@@ -30,4 +30,4 @@ Defined in: [workers/hash.worker.ts:13](https://github.com/EdwinZhanCN/Lumilio-P
 
 > **type**: `"ABORT"` \| `"GENERATE_HASH"`
 
-Defined in: [workers/hash.worker.ts:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/87550f699d3d5501c5ee53bfa6a214c4b59cf82a/web/src/workers/hash.worker.ts#L12)
+Defined in: [workers/hash.worker.ts:12](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/d0b4da507ab9c0740bf81054daa3d8ad6a258681/web/src/workers/hash.worker.ts#L12)
