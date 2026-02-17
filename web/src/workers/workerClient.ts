@@ -13,14 +13,15 @@ import type {
   LayoutConfig,
   LayoutResult,
 } from "@/lib/layout/justifiedLayout";
+import type { RuntimeManifestV1 } from "@/features/studio/plugins/types";
 
 export type WorkerType =
   | "thumbnail"
   | "hash"
-  | "border"
   | "export"
   | "exif"
-  | "justified";
+  | "justified"
+  | "plugin";
 
 export interface WorkerClientOptions {
   preload?: WorkerType[];
@@ -36,12 +37,14 @@ export interface SingleHashResult {
 export class AppWorkerClient {
   private generateThumbnailworker: Worker | null = null;
   private hashWorkers: Worker[] = [];
-  private generateBorderworker: Worker | null = null;
   private exportWorker: Worker | null = null;
   private extractExifWorker: Worker | null = null;
   private justifiedLayoutWorker: Worker | null = null;
+  private studioPluginWorker: Worker | null = null;
   private justifiedInitPromise: Promise<void> | null = null;
   private justifiedRequestId = 0;
+  private studioPluginRequestId = 0;
+  private studioPluginLoadedRunners: Set<string> = new Set();
 
   private eventTarget: EventTarget;
 
@@ -79,15 +82,6 @@ export class AppWorkerClient {
         }
         return this.hashWorkers[index];
 
-      case "border":
-        if (!this.generateBorderworker) {
-          this.generateBorderworker = new Worker(
-            new URL("./border.worker.ts", import.meta.url),
-            { type: "module" },
-          );
-        }
-        return this.generateBorderworker;
-
       case "export":
         if (!this.exportWorker) {
           this.exportWorker = new Worker(
@@ -115,6 +109,15 @@ export class AppWorkerClient {
         }
         return this.justifiedLayoutWorker;
 
+      case "plugin":
+        if (!this.studioPluginWorker) {
+          this.studioPluginWorker = new Worker(
+            new URL("./plugin.worker.ts", import.meta.url),
+            { type: "module" },
+          );
+        }
+        return this.studioPluginWorker;
+
       default:
         throw new Error(`Unknown worker type: ${type}`);
     }
@@ -138,6 +141,15 @@ export class AppWorkerClient {
   private nextJustifiedRequestId(): number {
     this.justifiedRequestId += 1;
     return this.justifiedRequestId;
+  }
+
+  private nextStudioPluginRequestId(): number {
+    this.studioPluginRequestId += 1;
+    return this.studioPluginRequestId;
+  }
+
+  private getStudioPluginRunnerKey(manifest: RuntimeManifestV1): string {
+    return `${manifest.id}@${manifest.version}`;
   }
 
   async initializeJustifiedLayout(): Promise<void> {
@@ -356,46 +368,139 @@ export class AppWorkerClient {
     this.hashWorkers.forEach(w => w.postMessage({ type: "ABORT" }));
   }
 
-  // --- Border Generation ---
-  async generateBorders(
-    files: File[],
-    option: "COLORED" | "FROSTED" | "VIGNETTE",
-    param: object,
-  ): Promise<{
-    [uuid: string]: {
-      originalFileName: string;
-      borderedFileURL?: string;
-      error?: string;
-    };
-  }> {
-    const worker = this.getOrInitializeWorker("border");
+  // --- Studio Plugin Runtime ---
+  async loadStudioPluginRunner(manifest: RuntimeManifestV1): Promise<void> {
+    const runnerKey = this.getStudioPluginRunnerKey(manifest);
+    if (this.studioPluginLoadedRunners.has(runnerKey)) {
+      return;
+    }
 
-    return new Promise((resolve, reject) => {
-      const handler = (e: MessageEvent) => {
-        switch (e.data.type) {
-          case "GENERATE_BORDER_COMPLETE":
-            worker.removeEventListener("message", handler);
-            resolve(e.data.data);
-            break;
-          case "ERROR":
-            worker.removeEventListener("message", handler);
-            reject(new Error(e.data.payload.error));
-            break;
+    const worker = this.getOrInitializeWorker("plugin");
+
+    await new Promise<void>((resolve, reject) => {
+      const timeoutId = globalThis.setTimeout(() => {
+        worker.removeEventListener("message", handler);
+        reject(new Error(`Timed out loading plugin runner: ${runnerKey}`));
+      }, 15000);
+
+      const handler = (event: MessageEvent) => {
+        const { type, payload } = event.data || {};
+
+        if (
+          type === "RUNNER_LOADED" &&
+          payload?.pluginId === manifest.id &&
+          payload?.version === manifest.version
+        ) {
+          globalThis.clearTimeout(timeoutId);
+          worker.removeEventListener("message", handler);
+          this.studioPluginLoadedRunners.add(runnerKey);
+          resolve();
+          return;
+        }
+
+        if (
+          type === "ERROR" &&
+          payload?.stage === "load_runner" &&
+          payload?.pluginId === manifest.id &&
+          payload?.version === manifest.version
+        ) {
+          globalThis.clearTimeout(timeoutId);
+          worker.removeEventListener("message", handler);
+          reject(new Error(payload?.error || `Failed to load plugin runner: ${runnerKey}`));
         }
       };
+
       worker.addEventListener("message", handler);
       worker.postMessage({
-        type: "GENERATE_BORDER",
-        data: { files },
-        option,
-        param,
+        type: "LOAD_RUNNER",
+        payload: {
+          pluginId: manifest.id,
+          version: manifest.version,
+          runnerUrl: manifest.entries.runner,
+        },
       });
     });
   }
 
-  abortGenerateBorders() {
-    if (this.generateBorderworker) {
-      this.generateBorderworker.postMessage({ type: "ABORT" });
+  async runStudioPlugin(
+    manifest: RuntimeManifestV1,
+    file: File,
+    params: Record<string, unknown>,
+  ): Promise<{
+    fileName: string;
+    mimeType: string;
+    blob: Blob;
+  }> {
+    await this.loadStudioPluginRunner(manifest);
+    const worker = this.getOrInitializeWorker("plugin");
+    const requestId = this.nextStudioPluginRequestId();
+
+    return new Promise((resolve, reject) => {
+      const handler = (event: MessageEvent) => {
+        const { type, payload } = event.data || {};
+
+        if (!payload || payload.requestId !== requestId) {
+          return;
+        }
+
+        if (type === "PLUGIN_PROGRESS") {
+          this.eventTarget.dispatchEvent(
+            new CustomEvent("progress", {
+              detail: {
+                operation: "plugin",
+                processed: payload.processed,
+                total: payload.total,
+              },
+            }),
+          );
+          return;
+        }
+
+        if (type === "PLUGIN_COMPLETE") {
+          worker.removeEventListener("message", handler);
+          const bytes = payload.bytes instanceof Uint8Array
+            ? payload.bytes
+            : new Uint8Array(payload.bytes);
+
+          resolve({
+            fileName: payload.fileName || "plugin-output.bin",
+            mimeType: payload.mimeType || "application/octet-stream",
+            blob: new Blob([bytes], {
+              type: payload.mimeType || "application/octet-stream",
+            }),
+          });
+          return;
+        }
+
+        if (type === "ERROR" && payload.stage === "run_plugin") {
+          worker.removeEventListener("message", handler);
+          reject(
+            new Error(
+              payload.error ||
+                `Plugin execution failed: ${manifest.id}@${manifest.version}`,
+            ),
+          );
+        }
+      };
+
+      worker.addEventListener("message", handler);
+      worker.postMessage({
+        type: "RUN_PLUGIN",
+        payload: {
+          requestId,
+          pluginId: manifest.id,
+          version: manifest.version,
+          manifest,
+          file,
+          params,
+        },
+      });
+    });
+  }
+
+  abortStudioPlugin(): void {
+    if (this.studioPluginWorker) {
+      this.studioPluginWorker.postMessage({ type: "ABORT" });
     }
   }
 
@@ -509,11 +614,6 @@ export class AppWorkerClient {
       if (w) w.terminate();
     });
     this.hashWorkers = [];
-
-    if (this.generateBorderworker) {
-      this.generateBorderworker.terminate();
-      this.generateBorderworker = null;
-    }
     if (this.exportWorker) {
       this.exportWorker.terminate();
       this.exportWorker = null;
@@ -526,7 +626,12 @@ export class AppWorkerClient {
       this.justifiedLayoutWorker.terminate();
       this.justifiedLayoutWorker = null;
     }
+    if (this.studioPluginWorker) {
+      this.studioPluginWorker.terminate();
+      this.studioPluginWorker = null;
+    }
     this.justifiedInitPromise = null;
+    this.studioPluginLoadedRunners.clear();
     console.log("All workers terminated.");
   }
 }

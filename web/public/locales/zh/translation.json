@@ -249,12 +249,105 @@
             "item_count": "{{count}} 项",
             "item_count_plural": "{{count}} 项",
             "loading_more": "正在加载更多"
+        },
+        "mediaViewer": {
+            "video_title": "视频",
+            "audio_title": "音频",
+            "asset_alt_text": "资产",
+            "media_not_available": "媒体不可用",
+            "unknown_file": "未知文件",
+            "unknown_type": "未知类型"
+        },
+        "assetsPageHeader": {
+            "messages": {
+                "deleteSuccess": "已成功删除 {{count}} 个资产",
+                "deleteError": "删除资产失败",
+                "downloadStart": "下载已开始",
+                "downloadError": "启动下载失败",
+                "loadAlbumsError": "加载相册失败",
+                "addToAlbumSuccess": "已将 {{count}} 项添加到相册",
+                "addToAlbumError": "添加到相册失败"
+            },
+            "groupBy": "按 {{groupBy}} 分组",
+            "groupByOptions": {
+                "date": "日期",
+                "type": "类型",
+                "album": "相册",
+                "flat": "平铺"
+            },
+            "selectionMode": {
+                "exit": "退出选择模式",
+                "enter": "进入选择模式"
+            },
+            "actions": {
+                "title": "操作",
+                "applyToItems": "应用到 {{count}} 项",
+                "toggleLike": "切换喜欢",
+                "setRating": "设置评分",
+                "clearRating": "清除评分",
+                "addToAlbum": "添加到相册",
+                "downloadAll": "下载全部",
+                "deleteSelected": "删除所选"
+            },
+            "deleteConfirmModal": {
+                "title": "确认删除",
+                "message": "确定要删除选中的 {{count}} 个资产吗？此操作会将它们标记为已删除，且不会再出现在你的资源库中。",
+                "cancelButton": "取消",
+                "deleteButton": "删除资产"
+            },
+            "addToAlbumModal": {
+                "title": "添加到相册",
+                "message": "选择一个相册以添加 {{count}} 项。",
+                "loadingAlbums": "正在加载相册...",
+                "itemCount": "{{count}} 项",
+                "noAlbumsFound": "未找到相册",
+                "createNewAlbum": "创建新相册"
+            }
         }
     },
     "upload": {
         "title": "上传照片",
         "button": "上传",
-        "dragDrop": "将文件拖放到此处"
+        "dragDrop": "将文件拖放到此处",
+        "UploadAssets": {
+            "processing_files": "正在处理 {{count}} 个文件...",
+            "files_ready_to_upload": "已有 {{count}} 个文件可上传",
+            "no_files_selected": "未选择文件",
+            "page_title": "上传资产",
+            "supported_formats_button": "支持的格式",
+            "error_boundary_title": "上传区域错误！",
+            "error_boundary_message": "上传区域加载失败或在操作过程中发生错误。"
+        },
+        "SupportedFormatsModal": {
+            "title": "支持的文件格式",
+            "close_button_aria_label": "关闭",
+            "summary_message": "{{summary}}",
+            "category_photos": "照片",
+            "category_raw_formats": "RAW 格式",
+            "category_videos": "视频",
+            "category_audio": "音频",
+            "formats_count": "{{count}} 种格式",
+            "got_it_button": "知道了！"
+        },
+        "UnifiedUploadSection": {
+            "no_valid_files_selected": "未选择有效文件",
+            "cannot_clear_while_processing": "处理过程中无法清除文件",
+            "no_files_selected_for_upload": "未选择要上传的文件",
+            "drag_drop_or_click": "拖拽或点击上传",
+            "supported_file_types_description": "支持图片、RAW 格式、视频和音频文件",
+            "upload_information_title": "上传信息",
+            "max_files_label": "最大文件数：",
+            "change_limits_settings_hint": "在设置 → 界面设置中更改限制。",
+            "add_files_button": "添加文件",
+            "clear_button": "清除",
+            "uploading_status": "上传中...",
+            "upload_button": "上传 {{count > 0 ? '(' + count + ')' : ''}}",
+            "selected_files_title": "已选文件",
+            "overall_progress_label": "总体进度"
+        },
+        "ProgressIndicator": {
+            "progress_display": "{{processed}}/{{total}}{{label ? ' - ' + label : ''}}"
+        }
     },
     "updates": {
         "title": "更新",
