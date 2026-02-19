@@ -63,7 +63,8 @@
         "untitled": "未命名相册",
         "createSuccess": "相册创建成功",
         "deleteSuccess": "相册删除成功",
-        "updateSuccess": "相册更新成功"
+        "updateSuccess": "相册更新成功",
+        "newAlbum": "新建相册"
     },
     "assets": {
         "errorFallback": {
@@ -258,6 +259,16 @@
             "unknown_file": "未知文件",
             "unknown_type": "未知类型"
         },
+        "mediaThumbnail": {
+            "asset_alt_text": "资产",
+            "video_sr_only": "视频",
+            "audio_sr_only": "音频",
+            "audio_file_fallback": "音频文件",
+            "asset_aria_label_prefix": "资产",
+            "unknown_file_fallback": "未知文件",
+            "no_preview": "无预览",
+            "unknown_mime_fallback": "未知类型"
+        },
         "assetsPageHeader": {
             "messages": {
                 "deleteSuccess": "已成功删除 {{count}} 个资产",
@@ -282,6 +293,8 @@
             "actions": {
                 "title": "操作",
                 "applyToItems": "应用到 {{count}} 项",
+                "like": "喜欢",
+                "unlike": "取消喜欢",
                 "toggleLike": "切换喜欢",
                 "setRating": "设置评分",
                 "clearRating": "清除评分",
@@ -343,10 +356,32 @@
             "uploading_status": "上传中...",
             "upload_button": "上传 {{count > 0 ? '(' + count + ')' : ''}}",
             "selected_files_title": "已选文件",
-            "overall_progress_label": "总体进度"
+            "overall_progress_label": "总体进度",
+            "server_progress_label": "服务器处理",
+            "server_chunk_size": "服务器分块大小",
+            "server_concurrency": "服务器并发数",
+            "server_in_flight": "进行中的请求",
+            "server_active_sessions": "活跃会话",
+            "server_completed_files": "已完成文件",
+            "server_failed_sessions": "失败会话"
+        },
+        "FileUploadProgress": {
+            "title": "文件上传进度",
+            "status_completed": "已完成",
+            "status_uploading": "上传中",
+            "status_failed": "失败",
+            "status_pending": "待处理",
+            "chunked_badge": "分块"
         },
         "ProgressIndicator": {
             "progress_display": "{{processed}}/{{total}}{{label ? ' - ' + label : ''}}"
+        },
+        "UploadProvider": {
+            "max_files_allowed": "最多允许 {{count}} 个文件",
+            "files_exceeded_limit": "{{count}} 个文件超出限制，未添加",
+            "no_files_selected_for_upload_message": "未选择要上传的文件",
+            "upload_completed_success": "上传成功完成",
+            "upload_failed_generic": "上传失败"
         }
     },
     "updates": {
@@ -381,6 +416,18 @@
         },
         "frames": {
             "title": "照片边框",
+            "plugin": {
+                "market": "插件市场",
+                "catalogLoading": "正在加载插件目录...",
+                "install": "安装",
+                "uninstall": "移除",
+                "installed": "已安装插件",
+                "selectPlaceholder": "选择已安装的插件",
+                "loading": "正在加载插件界面...",
+                "runtimeDisabled": "工作室插件运行时已禁用。启用 VITE_STUDIO_PLUGIN_RUNTIME_ENABLED 以使用边框插件。",
+                "apply": "应用插件",
+                "cancel": "取消插件运行"
+            },
             "tabs": {
                 "color": "纯色",
                 "frosted": "毛玻璃",
@@ -458,6 +505,7 @@
         "edit": "编辑",
         "delete": "删除",
         "confirm": "确认",
+        "select": "选择",
         "na": "无",
         "uploaded": "上传于",
         "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
@@ -482,6 +530,10 @@
         "notLiked": "未喜欢",
         "updateSuccess": "评分更新成功",
         "updateError": "更新评分失败"
+    },
+    "bulk": {
+        "updateSuccess": "已更新 {{count}} 项",
+        "updateError": "更新失败"
     },
     "delete": {
         "confirmTitle": "删除照片",
