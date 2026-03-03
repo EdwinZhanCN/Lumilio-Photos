@@ -1,7 +1,8 @@
 import { PanelType } from "../routes/Studio";
 import { ExifDataDisplay } from "./panels/ExifDataDisplay";
 import { DevelopPanel } from "./panels/DevelopPanel";
-import { FramesPanel } from "./panels/FramesPanel";
+import { MarketplacePanel } from "./panels/MarketplacePanel";
+import { PluginsWorkspacePanel } from "./panels/PluginsWorkspacePanel";
 import { ExifExtractionProgress } from "@/hooks/util-hooks/useExtractExifdata";
 import { useI18n } from "@/lib/i18n.tsx";
 import type {
@@ -42,6 +43,7 @@ type StudioToolsPanelProps = {
   pluginError: string | null;
   catalogLoading: boolean;
   catalogError: string | null;
+  onOpenMarketplace: () => void;
   onCancelPluginGeneration?: () => void;
   isCancellingPlugin?: boolean;
   onCancelExtraction?: () => void;
@@ -73,6 +75,7 @@ export function StudioToolsPanel({
   pluginError,
   catalogLoading,
   catalogError,
+  onOpenMarketplace,
   onCancelPluginGeneration,
   isCancellingPlugin = false,
   onCancelExtraction,
@@ -84,7 +87,7 @@ export function StudioToolsPanel({
   const currentProgress =
     activePanel === "exif"
       ? exifProgress
-      : activePanel === "frames"
+      : activePanel === "plugins"
         ? pluginProgress
         : null;
 
@@ -96,26 +99,35 @@ export function StudioToolsPanel({
         );
       case "develop":
         return <DevelopPanel />;
-      case "frames":
+      case "marketplace":
         return (
-          <FramesPanel
+          <MarketplacePanel
+            isGenerating={isGeneratingPlugin}
+            pluginRuntimeEnabled={pluginRuntimeEnabled}
+            installedPlugins={installedPlugins}
+            catalogPlugins={catalogPlugins}
+            onInstallPlugin={onInstallPlugin}
+            onUninstallPlugin={onUninstallPlugin}
+            isPluginInstalled={isPluginInstalled}
+            catalogLoading={catalogLoading}
+            catalogError={catalogError}
+          />
+        );
+      case "plugins":
+        return (
+          <PluginsWorkspacePanel
             isGenerating={isGeneratingPlugin}
             onGeneratePlugin={onGeneratePlugin}
             pluginRuntimeEnabled={pluginRuntimeEnabled}
             installedPlugins={installedPlugins}
-            catalogPlugins={catalogPlugins}
             selectedPluginId={selectedPluginId}
             onSelectPlugin={onSelectPlugin}
-            onInstallPlugin={onInstallPlugin}
-            onUninstallPlugin={onUninstallPlugin}
-            isPluginInstalled={isPluginInstalled}
             pluginUiModule={pluginUiModule}
             pluginParams={pluginParams}
             onPluginParamsChange={onPluginParamsChange}
             pluginLoading={pluginLoading}
             pluginError={pluginError}
-            catalogLoading={catalogLoading}
-            catalogError={catalogError}
+            onOpenMarketplace={onOpenMarketplace}
           />
         );
       default:
@@ -176,7 +188,7 @@ export function StudioToolsPanel({
                 >
                   {isCancellingPlugin
                     ? t("studio.cancelling")
-                    : t("studio.frames.plugin.cancel")}
+                    : t("studio.plugins.cancel")}
                 </button>
               )}
             </div>

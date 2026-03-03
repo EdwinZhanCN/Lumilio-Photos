@@ -401,7 +401,8 @@
         "nav": {
             "exif": "EXIF",
             "develop": "Develop",
-            "frames": "Frames"
+            "marketplace": "Marketplace",
+            "plugins": "Plugins"
         },
         "develop": {
             "title": "Development Tools",
@@ -417,20 +418,27 @@
             "cancel": "Cancel Extraction",
             "download": "Download JSON"
         },
-        "frames": {
-            "title": "Photo Frames",
-            "plugin": {
-                "market": "Plugin Marketplace",
-                "catalogLoading": "Loading plugin catalog...",
-                "install": "Install",
-                "uninstall": "Remove",
-                "installed": "Installed Plugins",
-                "selectPlaceholder": "Select an installed plugin",
-                "loading": "Loading plugin UI...",
-                "runtimeDisabled": "Studio plugin runtime is disabled. Enable VITE_STUDIO_PLUGIN_RUNTIME_ENABLED to use border plugins.",
-                "apply": "Apply Plugin",
-                "cancel": "Cancel Plugin Run"
-            }
+        "marketplace": {
+            "title": "Marketplace",
+            "runtimeDisabled": "Studio plugin runtime is disabled. Enable VITE_STUDIO_PLUGIN_RUNTIME_ENABLED to browse plugins.",
+            "searchPlaceholder": "Search plugins by name, id, or description",
+            "installedOnly": "Installed only",
+            "summary": "Showing {{visible}} of {{total}} plugins ({{installed}} installed)",
+            "catalogLoading": "Loading plugin catalog...",
+            "empty": "No plugins match the current filters.",
+            "install": "Install",
+            "uninstall": "Remove",
+            "statusInstalled": "Installed",
+            "statusNotInstalled": "Not installed"
+        },
+        "plugins": {
+            "title": "Plugins Workspace",
+            "runtimeDisabled": "Studio plugin runtime is disabled. Enable VITE_STUDIO_PLUGIN_RUNTIME_ENABLED to run plugins.",
+            "emptyInstalled": "No plugins installed yet.",
+            "openMarketplace": "Open Marketplace",
+            "loading": "Loading plugin UI...",
+            "apply": "Apply Plugin",
+            "cancel": "Cancel Plugin Run"
         }
     },
     "settings": {

@@ -3,7 +3,7 @@
 import init, { ImageProcessor } from "../wasm/export/export_wasm";
 import type { ExportOptions } from "@/types/Export.d.ts";
 
-const initializationPromise: Promise<void> | null = null;
+let initializationPromise: Promise<void> | null = null;
 let abortController = new AbortController();
 
 interface WorkerMessage {
@@ -24,19 +24,115 @@ function initialize(): Promise<void> {
   if (initializationPromise) {
     return initializationPromise;
   }
-  return new Promise((resolve, reject) => {
-    init()
-      .then(() => {
-        self.postMessage({ type: "WASM_READY" });
-        resolve();
-      })
-      .catch((error: unknown) => {
-        const errMsg = (error as Error).message ?? "Unknown worker error";
-        console.error("Error initializing export WebAssembly module:", error);
-        self.postMessage({ type: "ERROR", payload: { error: errMsg } });
-        reject(new Error(errMsg));
-      });
-  });
+
+  initializationPromise = new Promise((resolve, reject) => {
+    init().then(resolve).catch(reject);
+  })
+    .then(() => {
+      self.postMessage({ type: "WASM_READY" });
+    })
+    .catch((error: unknown) => {
+      const errMsg = (error as Error).message ?? "Unknown worker error";
+      console.error("Error initializing export WebAssembly module:", error);
+      self.postMessage({ type: "ERROR", payload: { error: errMsg } });
+      initializationPromise = null;
+      throw new Error(errMsg);
+    });
+
+  return initializationPromise;
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+function isOperationAbortedError(error: unknown): boolean {
+  return (
+    isAbortError(error) ||
+    (error instanceof Error && error.message.toLowerCase().includes("aborted"))
+  );
+}
+
+function getOriginalFilename(imageUrl: string, options: ExportOptions): string {
+  if (options.filename) {
+    return options.filename;
+  }
+
+  return extractFilenameFromUrl(imageUrl);
+}
+
+function buildWasmOptions(options: ExportOptions) {
+  // Runtime supports only lossless WebP currently.
+  const quality = options.format === "webp" ? 1 : options.quality;
+
+  return {
+    format: options.format,
+    quality,
+    max_width: options.maxWidth || null,
+    max_height: options.maxHeight || null,
+    filename: options.filename || null,
+  };
+}
+
+function getResultBytes(resultData: unknown): Uint8Array<ArrayBuffer> {
+  if (resultData instanceof Uint8Array) {
+    return Uint8Array.from(resultData);
+  }
+  if (resultData instanceof ArrayBuffer) {
+    return new Uint8Array(resultData);
+  }
+  if (ArrayBuffer.isView(resultData)) {
+    const view = new Uint8Array(
+      resultData.buffer.slice(
+        resultData.byteOffset,
+        resultData.byteOffset + resultData.byteLength,
+      ),
+    );
+    return Uint8Array.from(view);
+  }
+  throw new Error("Invalid export result bytes");
+}
+
+async function processWithWasm(
+  imageBlob: Blob,
+  options: ExportOptions,
+  signal: AbortSignal,
+): Promise<WorkerExportResult> {
+  if (signal.aborted) {
+    throw new Error("Operation aborted");
+  }
+
+  const imageArrayBuffer = await imageBlob.arrayBuffer();
+  const imageBytes = new Uint8Array(imageArrayBuffer);
+
+  const processor = new ImageProcessor();
+  try {
+    const loadSuccess = processor.load_from_bytes(imageBytes);
+    if (!loadSuccess) {
+      throw new Error("Failed to load image in WASM module");
+    }
+    self.postMessage({ type: "PROGRESS", payload: { processed: 70 } });
+
+    const result = processor.export_image(buildWasmOptions(options));
+    self.postMessage({ type: "PROGRESS", payload: { processed: 90 } });
+
+    if (!result.success) {
+      throw new Error(result.error || "Export failed");
+    }
+    if (!result.data) {
+      throw new Error("Export produced no data");
+    }
+
+    const mimeType = getMimeType(options.format);
+    const outputBytes = getResultBytes(result.data);
+    const blob = new Blob([outputBytes], { type: mimeType });
+    const filename = result.filename || generateFilename(options);
+
+    self.postMessage({ type: "PROGRESS", payload: { processed: 100 } });
+    return { blob, filename };
+  } finally {
+    processor.free();
+  }
 }
 
 async function exportImage(
@@ -56,51 +152,19 @@ async function exportImage(
     const imageBlob = await response.blob();
     self.postMessage({ type: "PROGRESS", payload: { processed: 30 } });
 
-    if (
-      options.format === "original" &&
-      !options.maxWidth &&
-      !options.maxHeight
-    ) {
-      const filename = options.filename || extractFilenameFromUrl(imageUrl);
-      return { blob: imageBlob, filename };
+    if (options.format === "original") {
+      return {
+        blob: imageBlob,
+        filename: getOriginalFilename(imageUrl, options),
+      };
     }
 
     if (signal.aborted) throw new Error("Operation aborted");
     self.postMessage({ type: "PROGRESS", payload: { processed: 50 } });
 
-    const imageArrayBuffer = await imageBlob.arrayBuffer();
-    const imageBytes = new Uint8Array(imageArrayBuffer);
-    const processor = new ImageProcessor();
-
-    const loadSuccess = processor.load_from_bytes(imageBytes);
-    if (!loadSuccess) {
-      throw new Error("Failed to load image in WASM module");
-    }
-    self.postMessage({ type: "PROGRESS", payload: { processed: 70 } });
-
-    const wasmOptions = {
-      format: options.format,
-      quality: options.quality,
-      max_width: options.maxWidth || null,
-      max_height: options.maxHeight || null,
-      filename: options.filename || null,
-    };
-
-    const result = processor.export_image(wasmOptions);
-    self.postMessage({ type: "PROGRESS", payload: { processed: 90 } });
-
-    if (!result.success) {
-      throw new Error(result.error || "Export failed");
-    }
-
-    const mimeType = getMimeType(options.format);
-    const blob = new Blob([new Uint8Array(result.data)], { type: mimeType });
-    const filename = result.filename || generateFilename(options);
-
-    self.postMessage({ type: "PROGRESS", payload: { processed: 100 } });
-    return { blob, filename };
+    return processWithWasm(imageBlob, options, signal);
   } catch (error: unknown) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (isAbortError(error)) {
       console.log("Export fetch aborted");
     } else {
       console.error(`Error exporting image from ${imageUrl}`, error);
@@ -178,13 +242,15 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         );
         self.postMessage({ type: "EXPORT_COMPLETE", result });
       } catch (err: unknown) {
-        if (!(err instanceof Error && err.name === "AbortError")) {
+        if (!isOperationAbortedError(err)) {
           console.error("Error exporting image:", err);
-          self.postMessage({
-            type: "ERROR",
-            error: (err as Error).message,
-          });
         }
+        self.postMessage({
+          type: "ERROR",
+          error: isOperationAbortedError(err)
+            ? "Operation aborted"
+            : (err as Error).message,
+        });
       }
       break;
 

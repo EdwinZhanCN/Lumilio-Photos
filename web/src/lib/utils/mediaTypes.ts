@@ -2,7 +2,7 @@
  * Utility functions for media type detection and classification
  */
 
-import type { Asset } from "@/lib/http-commons";
+import { isPhotoMetadata, type Asset } from "@/lib/http-commons";
 
 /**
  * Determines if an asset is a video based on MIME type or legacy type
@@ -32,6 +32,26 @@ export const isPhoto = (asset: Asset): boolean => {
     return asset.mime_type.startsWith("image/");
   }
   return asset.type === "PHOTO";
+};
+
+/**
+ * Determines if a photo asset is RAW.
+ * Supports both legacy `asset.isRAW` and schema-driven `specific_metadata.is_raw`.
+ */
+export const isRawPhoto = (asset: Asset): boolean => {
+  const legacyRaw = (asset as Asset & { isRAW?: boolean }).isRAW === true;
+  const metadataRaw =
+    isPhotoMetadata(asset.type, asset.specific_metadata) &&
+    asset.specific_metadata?.is_raw === true;
+
+  return legacyRaw || metadataRaw;
+};
+
+/**
+ * Browser-side export conversion is only available for non-RAW photo assets.
+ */
+export const isBrowserExportSupported = (asset: Asset): boolean => {
+  return isPhoto(asset) && !isRawPhoto(asset);
 };
 
 /**

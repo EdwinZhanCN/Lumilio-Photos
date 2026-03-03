@@ -363,7 +363,8 @@
         "nav": {
             "exif": "EXIF",
             "develop": "显影",
-            "frames": "边框"
+            "marketplace": "插件市场",
+            "plugins": "插件"
         },
         "develop": {
             "title": "显影工具",
@@ -379,27 +380,27 @@
             "cancel": "取消提取",
             "download": "下载 JSON"
         },
-        "frames": {
-            "title": "照片边框",
-            "tabs": {
-                "color": "纯色",
-                "frosted": "毛玻璃",
-                "vignette": "暗角"
-            },
-            "colored": {
-                "borderWidth": "边框宽度",
-                "borderColor": "边框颜色"
-            },
-            "frosted": {
-                "blur": "模糊",
-                "brightness": "亮度",
-                "cornerRadius": "圆角半径"
-            },
-            "vignette": {
-                "strength": "强度"
-            },
-            "apply": "应用边框",
-            "cancel": "取消生成"
+        "marketplace": {
+            "title": "插件市场",
+            "runtimeDisabled": "Studio 插件运行时已禁用。启用 VITE_STUDIO_PLUGIN_RUNTIME_ENABLED 后可浏览插件。",
+            "searchPlaceholder": "按名称、ID 或描述搜索插件",
+            "installedOnly": "仅已安装",
+            "summary": "显示 {{visible}} / {{total}} 个插件（已安装 {{installed}} 个）",
+            "catalogLoading": "正在加载插件目录…",
+            "empty": "当前筛选条件下没有插件。",
+            "install": "安装",
+            "uninstall": "移除",
+            "statusInstalled": "已安装",
+            "statusNotInstalled": "未安装"
+        },
+        "plugins": {
+            "title": "插件工作区",
+            "runtimeDisabled": "Studio 插件运行时已禁用。启用 VITE_STUDIO_PLUGIN_RUNTIME_ENABLED 后可运行插件。",
+            "emptyInstalled": "尚未安装任何插件。",
+            "openMarketplace": "打开插件市场",
+            "loading": "正在加载插件 UI…",
+            "apply": "应用插件",
+            "cancel": "取消插件执行"
         }
     },
     "settings": {
