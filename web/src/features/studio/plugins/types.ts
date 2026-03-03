@@ -1,6 +1,6 @@
 import type React from "react";
 
-export type StudioPluginPanel = "frames" | "develop";
+export type StudioPluginPanel = "plugins";
 
 export interface RuntimeManifestMount {
   panel: StudioPluginPanel;

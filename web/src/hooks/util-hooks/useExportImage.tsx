@@ -7,6 +7,7 @@ import {
   ProcessingPriority,
 } from "@/lib/utils/smartBatchSizing.ts";
 import { Asset } from "@/lib/assets/types";
+import { isBrowserExportSupported } from "@/lib/utils/mediaTypes";
 
 export interface ExportOptions {
   format: "jpeg" | "png" | "webp" | "original";
@@ -128,6 +129,13 @@ export const useExportImage = (): useExportImageReturn => {
         showMessage("error", "No image path available for export");
         return;
       }
+      if (!isBrowserExportSupported(asset)) {
+        showMessage(
+          "info",
+          "Export conversion is unavailable for RAW, video, and audio assets.",
+        );
+        return;
+      }
 
       setIsExporting(true);
       setExportProgress({
@@ -152,6 +160,9 @@ export const useExportImage = (): useExportImageReturn => {
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Export failed";
+        if (message.toLowerCase().includes("aborted")) {
+          return;
+        }
         showMessage("error", message);
         setExportProgress((prev) =>
           prev ? { ...prev, error: message } : null,
@@ -207,6 +218,11 @@ export const useExportImage = (): useExportImageReturn => {
 
             if (!asset.storage_path) {
               batchErrors++;
+              continue;
+            }
+            if (!isBrowserExportSupported(asset)) {
+              batchErrors++;
+              totalErrors++;
               continue;
             }
 

@@ -1,8 +1,15 @@
-# Source Vendor Placeholders
+# Source Vendor Artifacts
 
-For source-level development, place wasm-bindgen outputs here if you plan to build from `src/*` directly.
+This folder stores the wasm-bindgen outputs consumed by `src/runner.ts`:
 
-The runnable CDN sample artifacts are already prepared under:
+- `border_wasm.js`
+- `border_wasm_bg.wasm`
 
-- `../dist/border_wasm.js`
-- `../dist/border_wasm_bg.wasm`
+Refresh from the Rust crate when `wasm/border-wasm/src/lib.rs` changes:
+
+```bash
+cd /Users/zhanzihao/Lumilio-Photos/wasm/border-wasm
+wasm-pack build --target web --release --out-dir pkg --mode no-install --no-opt
+cp pkg/border_wasm.js /Users/zhanzihao/Lumilio-Photos/plugins/lumilio-border-plugin/src/vendor/border_wasm.js
+cp pkg/border_wasm_bg.wasm /Users/zhanzihao/Lumilio-Photos/plugins/lumilio-border-plugin/src/vendor/border_wasm_bg.wasm
+```
