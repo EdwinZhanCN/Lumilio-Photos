@@ -24,7 +24,7 @@ type FrameProcessingProgress = {
   failedAt?: number | null;
 } | null;
 
-export type PanelType = "exif" | "develop" | "frames";
+export type PanelType = "exif" | "develop" | "marketplace" | "plugins";
 
 const pluginRuntimeEnabled =
   import.meta.env.VITE_STUDIO_PLUGIN_RUNTIME_ENABLED !== "false";
@@ -66,7 +66,7 @@ export function Studio() {
     catalog: pluginCatalog,
     isLoading: isCatalogLoading,
     error: catalogError,
-  } = useStudioPluginCatalog("frames", pluginRuntimeEnabled);
+  } = useStudioPluginCatalog("plugins", pluginRuntimeEnabled);
 
   const { installed, install, uninstall, isInstalled } = useStudioPluginInstall();
 
@@ -134,9 +134,9 @@ export function Studio() {
           selectedInstalledPluginRecord.version,
         );
 
-        if (manifest.mount.panel !== "frames") {
+        if (manifest.mount.panel !== "plugins") {
           throw new Error(
-            `Plugin ${manifest.id} cannot mount on frames panel (${manifest.mount.panel})`,
+            `Plugin ${manifest.id} cannot mount on plugins workspace (${manifest.mount.panel})`,
           );
         }
 
@@ -338,6 +338,7 @@ export function Studio() {
     (pluginId: string, version: string) => {
       install(pluginId, version);
       setSelectedPluginId(pluginId);
+      setActivePanel("plugins");
     },
     [install],
   );
@@ -416,6 +417,7 @@ export function Studio() {
           pluginError={pluginError}
           catalogLoading={isCatalogLoading}
           catalogError={catalogError}
+          onOpenMarketplace={() => setActivePanel("marketplace")}
           onCancelPluginGeneration={handleCancelPluginGeneration}
           isCancellingPlugin={isCancellingPlugin}
           onCancelExtraction={handleCancelExtraction}
