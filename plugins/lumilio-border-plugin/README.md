@@ -36,13 +36,17 @@ Where `ctx` includes:
 
 ## Publish paths (example)
 
-- `https://cdn.example.com/plugins/com.lumilio.border/0.1.0/ui.mjs`
-- `https://cdn.example.com/plugins/com.lumilio.border/0.1.0/runner.mjs`
-- `https://cdn.example.com/plugins/com.lumilio.border/0.1.0/border_wasm.js`
-- `https://cdn.example.com/plugins/com.lumilio.border/0.1.0/border_wasm_bg.wasm`
-- `https://cdn.example.com/plugins/com.lumilio.border/0.1.0/manifest.json`
+- `https://cdn.example.com/plugins/com.lumilio.border/0.2.0/ui.mjs`
+- `https://cdn.example.com/plugins/com.lumilio.border/0.2.0/runner.mjs`
+- `https://cdn.example.com/plugins/com.lumilio.border/0.2.0/border_wasm.js`
+- `https://cdn.example.com/plugins/com.lumilio.border/0.2.0/border_wasm_bg.wasm`
+- `https://cdn.example.com/plugins/com.lumilio.border/0.2.0/manifest.json`
 
 ## Notes
 
 - `manifest.signature.value` must be replaced with a real signature before publishing.
 - `react` and `react-dom` remain peer dependencies to avoid duplicate React runtime.
+- Runner output is now always `image/png` to preserve alpha channel.
+- Runner fallback is now resilient: decode failures trigger browser-side PNG transcode and retry.
+- Heavy modes (`FROSTED`/`VIGNETTE`) auto-downscale very large images (PNG path) before wasm processing to reduce latency and OOM risk.
+- For Cloudflare publish, pass `--cdn-origin` so runtime entry URLs are rewritten to your real CDN origin.
