@@ -75,8 +75,8 @@ export function validateRuntimeManifest(
   }
 
   const panel = input.mount.panel;
-  if (panel !== "frames" && panel !== "develop") {
-    throw new Error("Manifest mount.panel must be 'frames' or 'develop'");
+  if (panel !== "plugins") {
+    throw new Error("Manifest mount.panel must be 'plugins'");
   }
 
   if (options.expectedPanel && panel !== options.expectedPanel) {
