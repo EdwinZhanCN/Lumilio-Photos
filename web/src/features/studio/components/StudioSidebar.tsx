@@ -1,10 +1,11 @@
 import {
-  DocumentTextIcon,
-  AdjustmentsHorizontalIcon,
-  RectangleGroupIcon,
-  ArrowLeftIcon,
-  ArrowRightIcon,
-} from "@heroicons/react/24/outline";
+  Blocks,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Plug,
+  SlidersHorizontal,
+} from "lucide-react";
 import { PanelType } from "../routes/Studio";
 import { useI18n } from "@/lib/i18n.tsx";
 
@@ -23,13 +24,14 @@ export function StudioSidebar({
 }: StudioSidebarProps) {
   const { t } = useI18n();
   const navItems = [
-    { id: "exif", label: t("studio.nav.exif"), icon: DocumentTextIcon },
+    { id: "exif", label: t("studio.nav.exif"), icon: FileText },
     {
       id: "develop",
       label: t("studio.nav.develop"),
-      icon: AdjustmentsHorizontalIcon,
+      icon: SlidersHorizontal,
     },
-    { id: "frames", label: t("studio.nav.frames"), icon: RectangleGroupIcon },
+    { id: "marketplace", label: t("studio.nav.marketplace"), icon: Blocks },
+    { id: "plugins", label: t("studio.nav.plugins"), icon: Plug },
   ];
 
   return (
@@ -42,9 +44,9 @@ export function StudioSidebar({
           onClick={onToggle}
         >
           {isCollapsed ? (
-            <ArrowRightIcon className="w-5 h-5 flex-shrink-0" />
+            <ChevronRight className="w-5 h-5 flex-shrink-0" />
           ) : (
-            <ArrowLeftIcon className="w-5 h-5 flex-shrink-0" />
+            <ChevronLeft className="w-5 h-5 flex-shrink-0" />
           )}
         </button>
       </div>
