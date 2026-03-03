@@ -186,9 +186,7 @@ impl ImageProcessor {
             "png" => self.encode_png(&img)?,
             "webp" => self.encode_webp(&img, options.quality)?,
             "original" => {
-                // For original, we would need the original bytes
-                // This is a simplified version that converts to PNG
-                self.encode_png(&img)?
+                return Err("Format 'original' must be handled as passthrough".to_string())
             }
             _ => return Err(format!("Unsupported format: {}", options.format)),
         };
@@ -305,9 +303,14 @@ impl ImageProcessor {
     }
 
     fn encode_webp(&self, img: &DynamicImage, quality: f32) -> Result<Vec<u8>, String> {
-        let mut buffer = Vec::new();
-        let _quality_f32 = quality * 100.0;
+        if quality < 1.0 {
+            return Err(
+                "Current WebP encoder supports lossless output only (quality must be 1.0)"
+                    .to_string(),
+            );
+        }
 
+        let mut buffer = Vec::new();
         let encoder = WebPEncoder::new_lossless(&mut buffer);
 
         match img.color() {
@@ -363,14 +366,27 @@ pub fn get_supported_formats() -> Array {
 pub fn validate_export_options(options_js: &JsValue) -> bool {
     match serde_wasm_bindgen::from_value::<ExportOptions>(options_js.clone()) {
         Ok(options) => {
+            let format = options.format.to_lowercase();
+
             // Validate format
             let valid_formats = ["jpeg", "jpg", "png", "webp", "original"];
-            if !valid_formats.contains(&options.format.to_lowercase().as_str()) {
+            if !valid_formats.contains(&format.as_str()) {
                 return false;
             }
 
             // Validate quality
             if options.quality < 0.1 || options.quality > 1.0 {
+                return false;
+            }
+
+            // Current runtime only supports lossless WebP encoding.
+            if format == "webp" && options.quality < 1.0 {
+                return false;
+            }
+
+            // "original" must stay passthrough.
+            if format == "original" && (options.max_width.is_some() || options.max_height.is_some())
+            {
                 return false;
             }
 

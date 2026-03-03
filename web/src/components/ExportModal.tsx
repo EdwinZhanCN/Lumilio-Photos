@@ -18,6 +18,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { PaintBrushIcon } from "@heroicons/react/24/outline";
 import { Asset } from "@/lib/assets/types";
 import { RETRY_TASKS_BY_CATEGORY } from "@/config/retryTasks";
+import { isBrowserExportSupported } from "@/lib/utils/mediaTypes";
 
 type ExportFormat = "png" | "jpeg" | "webp";
 
@@ -69,6 +70,7 @@ export default function ExportModal({
   }, [asset?.asset_id]);
 
   const canAct = !!asset && !isExporting;
+  const canBrowserExport = !!asset && isBrowserExportSupported(asset);
 
   const handleDownloadOriginal = useCallback(async () => {
     if (!asset) return;
@@ -104,7 +106,7 @@ export default function ExportModal({
       case "webp":
         return {
           format: "webp",
-          quality: 0.92,
+          quality: 1,
         };
       default:
         return { format: "png", quality: 1 };
@@ -112,7 +114,7 @@ export default function ExportModal({
   }, [format]);
 
   const handleExport = useCallback(async () => {
-    if (!asset) return;
+    if (!asset || !canBrowserExport) return;
     const options = buildExportOptions();
     if (onExport) {
       await onExport(asset, options);
@@ -124,7 +126,7 @@ export default function ExportModal({
       "export_modal",
     ) as HTMLDialogElement | null;
     modal?.close();
-  }, [asset, buildExportOptions, exportImage, onExport]);
+  }, [asset, canBrowserExport, buildExportOptions, exportImage, onExport]);
 
   const handleRetry = useCallback(async () => {
     if (!asset?.asset_id || selectedTasks.length === 0) return;
@@ -244,36 +246,45 @@ export default function ExportModal({
           </div>
         </div>
 
-        <fieldset className="fieldset">
-          <legend className="fieldset-legend">Export Format</legend>
-          <select
-            className="select mb-2"
-            value={format}
-            onChange={(e) => setFormat(e.target.value as ExportFormat)}
-            disabled={!canAct}
-          >
-            <option value="png">PNG</option>
-            <option value="jpeg">JPEG (80%)</option>
-            <option value="webp">WebP</option>
-          </select>
-          <span className="label">Optional</span>
-          <button
-            className="btn btn-soft btn-primary"
-            onClick={handleExport}
-            disabled={!canAct}
-          >
-            {isExporting ? (
-              <>
-                <span className="loading loading-spinner loading-xs" />
-                Exporting...
-              </>
-            ) : (
-              <>
-                <ImageDown /> Export
-              </>
-            )}
-          </button>
-        </fieldset>
+        {canBrowserExport && (
+          <fieldset className="fieldset">
+            <legend className="fieldset-legend">Export Format</legend>
+            <select
+              className="select mb-2"
+              value={format}
+              onChange={(e) => setFormat(e.target.value as ExportFormat)}
+              disabled={!canAct}
+            >
+              <option value="png">PNG</option>
+              <option value="jpeg">JPEG (80%)</option>
+              <option value="webp">WebP</option>
+            </select>
+            <span className="label">Optional</span>
+            <button
+              className="btn btn-soft btn-primary"
+              onClick={handleExport}
+              disabled={!canAct}
+            >
+              {isExporting ? (
+                <>
+                  <span className="loading loading-spinner loading-xs" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <ImageDown /> Export
+                </>
+              )}
+            </button>
+          </fieldset>
+        )}
+
+        {asset && !canBrowserExport && (
+          <div className="mt-3 text-sm opacity-70">
+            Export conversion is unavailable for RAW, video, and audio assets.
+            You can still download the original file.
+          </div>
+        )}
 
         {!asset && (
           <div className="mt-3 text-xs opacity-70">

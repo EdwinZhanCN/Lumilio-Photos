@@ -399,7 +399,8 @@
         "nav": {
             "exif": "EXIF",
             "develop": "显影",
-            "frames": "边框"
+            "marketplace": "插件市场",
+            "plugins": "插件"
         },
         "develop": {
             "title": "显影工具",

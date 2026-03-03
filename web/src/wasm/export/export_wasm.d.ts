@@ -1,12 +1,9 @@
 /* tslint:disable */
- 
-export function get_supported_formats(): Array<any>;
-export function validate_export_options(options_js: any): boolean;
-export function greet(name: string): string;
-export function create_blob(data: Uint8Array, mime_type: string): Blob;
-export function get_memory_usage(): number;
+/* eslint-disable */
+
 export class ImageProcessor {
   free(): void;
+  [Symbol.dispose](): void;
   constructor();
   /**
    * Load image from byte array
@@ -21,6 +18,16 @@ export class ImageProcessor {
    */
   export_image(options_js: any): any;
 }
+
+export function create_blob(data: Uint8Array, mime_type: string): Blob;
+
+export function get_memory_usage(): number;
+
+export function get_supported_formats(): Array<any>;
+
+export function greet(name: string): string;
+
+export function validate_export_options(options_js: any): boolean;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
@@ -41,12 +48,13 @@ export interface InitOutput {
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;
   readonly __externref_table_alloc: () => number;
-  readonly __wbindgen_export_5: WebAssembly.Table;
+  readonly __wbindgen_externrefs: WebAssembly.Table;
   readonly __externref_table_dealloc: (a: number) => void;
   readonly __wbindgen_start: () => void;
 }
 
 export type SyncInitInput = BufferSource | WebAssembly.Module;
+
 /**
 * Instantiates the given `module`, which can either be bytes or
 * a precompiled `WebAssembly.Module`.

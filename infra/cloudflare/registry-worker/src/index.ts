@@ -5,6 +5,8 @@ export interface Env {
   ALLOWED_ORIGIN: string;
 }
 
+type StudioPluginPanel = "plugins";
+
 interface CatalogRow {
   id: string;
   displayName: string;
@@ -21,15 +23,39 @@ interface RevocationRow {
   id: string;
   version: string;
   reason: string | null;
-  active: number;
+  active: boolean;
+}
+
+class HttpError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+const REGISTRY_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+};
+
+function parseAllowedOrigins(env: Env): string[] {
+  const raw = typeof env.ALLOWED_ORIGIN === "string" ? env.ALLOWED_ORIGIN : "";
+  return raw.split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 }
 
 function buildCorsHeaders(request: Request, env: Env): HeadersInit {
+  const allowedOrigins = parseAllowedOrigins(env);
+  const allowAnyOrigin = allowedOrigins.length === 0 || allowedOrigins.includes("*");
   const requestOrigin = request.headers.get("Origin");
-  const allowOrigin =
-    requestOrigin && requestOrigin === env.ALLOWED_ORIGIN
+
+  const allowOrigin = allowAnyOrigin
+    ? "*"
+    : requestOrigin && allowedOrigins.includes(requestOrigin)
       ? requestOrigin
-      : env.ALLOWED_ORIGIN;
+      : allowedOrigins[0];
 
   return {
     "Access-Control-Allow-Origin": allowOrigin,
@@ -93,6 +119,20 @@ async function getCatalog(env: Env, panel: string | null): Promise<CatalogRow[]>
   return rows.results;
 }
 
+function decodePathSegment(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new HttpError(400, "Malformed path segment");
+  }
+}
+
+function parsePanelFilter(panel: string | null): StudioPluginPanel | null {
+  if (!panel) return null;
+  if (panel === "plugins") return panel;
+  throw new HttpError(400, `Unsupported panel '${panel}'`);
+}
+
 async function getManifest(
   env: Env,
   pluginId: string,
@@ -125,7 +165,11 @@ async function getManifest(
     return null;
   }
 
-  return JSON.parse(row.manifest_json) as Record<string, unknown>;
+  try {
+    return JSON.parse(row.manifest_json) as Record<string, unknown>;
+  } catch {
+    throw new HttpError(500, `Invalid manifest_json for ${pluginId}`);
+  }
 }
 
 async function getRevocations(env: Env): Promise<RevocationRow[]> {
@@ -140,8 +184,19 @@ async function getRevocations(env: Env): Promise<RevocationRow[]> {
     ORDER BY created_at DESC
   `;
 
-  const rows = await env.DB.prepare(sql).all<RevocationRow>();
-  return rows.results;
+  const rows = await env.DB.prepare(sql).all<{
+    id: string;
+    version: string;
+    reason: string | null;
+    active: number;
+  }>();
+
+  return rows.results.map((item) => ({
+    id: item.id,
+    version: item.version,
+    reason: item.reason,
+    active: item.active === 1,
+  }));
 }
 
 async function route(request: Request, env: Env): Promise<Response> {
@@ -161,37 +216,29 @@ async function route(request: Request, env: Env): Promise<Response> {
   const cacheKey = buildCacheKey(url.pathname, url.search);
 
   if (url.pathname === "/v1/catalog") {
-    const panel = url.searchParams.get("panel");
+    const panel = parsePanelFilter(url.searchParams.get("panel"));
 
     const cached = await maybeGetCachedJson<CatalogRow[]>(env, cacheKey);
     if (cached) {
-      return jsonResponse(request, env, cached, 200, {
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
-      });
+      return jsonResponse(request, env, cached, 200, REGISTRY_CACHE_HEADERS);
     }
 
     const catalog = await getCatalog(env, panel);
     await cacheJson(env, cacheKey, catalog, 60);
 
-    return jsonResponse(request, env, catalog, 200, {
-      "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
-    });
+    return jsonResponse(request, env, catalog, 200, REGISTRY_CACHE_HEADERS);
   }
 
   if (url.pathname === "/v1/revocations") {
     const cached = await maybeGetCachedJson<RevocationRow[]>(env, cacheKey);
     if (cached) {
-      return jsonResponse(request, env, cached, 200, {
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
-      });
+      return jsonResponse(request, env, cached, 200, REGISTRY_CACHE_HEADERS);
     }
 
     const revocations = await getRevocations(env);
     await cacheJson(env, cacheKey, revocations, 60);
 
-    return jsonResponse(request, env, revocations, 200, {
-      "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
-    });
+    return jsonResponse(request, env, revocations, 200, REGISTRY_CACHE_HEADERS);
   }
 
   const manifestVersionMatch = url.pathname.match(
@@ -199,14 +246,12 @@ async function route(request: Request, env: Env): Promise<Response> {
   );
 
   if (manifestVersionMatch) {
-    const pluginId = decodeURIComponent(manifestVersionMatch[1]);
-    const version = decodeURIComponent(manifestVersionMatch[2]);
+    const pluginId = decodePathSegment(manifestVersionMatch[1]);
+    const version = decodePathSegment(manifestVersionMatch[2]);
 
     const cached = await maybeGetCachedJson<Record<string, unknown>>(env, cacheKey);
     if (cached) {
-      return jsonResponse(request, env, cached, 200, {
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
-      });
+      return jsonResponse(request, env, cached, 200, REGISTRY_CACHE_HEADERS);
     }
 
     const manifest = await getManifest(env, pluginId, version);
@@ -216,20 +261,16 @@ async function route(request: Request, env: Env): Promise<Response> {
 
     await cacheJson(env, cacheKey, manifest, 60);
 
-    return jsonResponse(request, env, manifest, 200, {
-      "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
-    });
+    return jsonResponse(request, env, manifest, 200, REGISTRY_CACHE_HEADERS);
   }
 
   const manifestActiveMatch = url.pathname.match(/^\/v1\/plugins\/([^/]+)\/manifest$/);
   if (manifestActiveMatch) {
-    const pluginId = decodeURIComponent(manifestActiveMatch[1]);
+    const pluginId = decodePathSegment(manifestActiveMatch[1]);
 
     const cached = await maybeGetCachedJson<Record<string, unknown>>(env, cacheKey);
     if (cached) {
-      return jsonResponse(request, env, cached, 200, {
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
-      });
+      return jsonResponse(request, env, cached, 200, REGISTRY_CACHE_HEADERS);
     }
 
     const manifest = await getManifest(env, pluginId, null);
@@ -239,16 +280,23 @@ async function route(request: Request, env: Env): Promise<Response> {
 
     await cacheJson(env, cacheKey, manifest, 60);
 
-    return jsonResponse(request, env, manifest, 200, {
-      "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
-    });
+    return jsonResponse(request, env, manifest, 200, REGISTRY_CACHE_HEADERS);
   }
 
   return jsonResponse(request, env, { error: "Not found" }, 404);
 }
 
 export default {
-  fetch(request: Request, env: Env): Promise<Response> {
-    return route(request, env);
+  async fetch(request: Request, env: Env): Promise<Response> {
+    try {
+      return await route(request, env);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return jsonResponse(request, env, { error: error.message }, error.status);
+      }
+
+      console.error("Unhandled registry worker error", error);
+      return jsonResponse(request, env, { error: "Internal server error" }, 500);
+    }
   },
 };

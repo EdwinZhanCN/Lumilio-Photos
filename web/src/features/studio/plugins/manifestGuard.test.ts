@@ -9,7 +9,7 @@ function createManifest(): RuntimeManifestV1 {
     version: "0.1.0",
     displayName: "Lumilio Border",
     mount: {
-      panel: "frames",
+      panel: "plugins",
       order: 10,
     },
     entries: {
@@ -33,7 +33,7 @@ describe("validateRuntimeManifest", () => {
     const manifest = createManifest();
     const output = validateRuntimeManifest(manifest, {
       allowOrigin: "https://cdn.example.com",
-      expectedPanel: "frames",
+      expectedPanel: "plugins",
     });
 
     expect(output.id).toBe("com.lumilio.border");
@@ -41,13 +41,13 @@ describe("validateRuntimeManifest", () => {
 
   it("rejects wrong panel", () => {
     const manifest = createManifest();
-    manifest.mount.panel = "develop";
+    manifest.mount.panel = "frames" as unknown as RuntimeManifestV1["mount"]["panel"];
 
     expect(() =>
       validateRuntimeManifest(manifest, {
-        expectedPanel: "frames",
+        expectedPanel: "plugins",
       }),
-    ).toThrow(/panel mismatch/i);
+    ).toThrow(/must be 'plugins'/i);
   });
 
   it("rejects disallowed origin", () => {

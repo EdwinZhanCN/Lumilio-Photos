@@ -8,7 +8,6 @@ export type BorderParams = {
   brightness_adjustment: number;
   corner_radius: number;
   strength: number;
-  jpeg_quality: number;
 };
 
 export const DEFAULT_PARAMS: BorderParams = {
@@ -19,7 +18,6 @@ export const DEFAULT_PARAMS: BorderParams = {
   brightness_adjustment: -40,
   corner_radius: 30,
   strength: 0.7,
-  jpeg_quality: 90,
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -56,7 +54,6 @@ export function normalizeParams(raw: Record<string, unknown>): BorderParams {
     ),
     corner_radius: clamp(toNumber(raw.corner_radius, DEFAULT_PARAMS.corner_radius), 0, 100),
     strength: clamp(toNumber(raw.strength, DEFAULT_PARAMS.strength), 0.1, 2.0),
-    jpeg_quality: clamp(toNumber(raw.jpeg_quality, DEFAULT_PARAMS.jpeg_quality), 1, 100),
   };
 }
 
