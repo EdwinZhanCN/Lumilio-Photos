@@ -62,6 +62,7 @@
         "emptyMessage": "创建你的第一个相册以开始使用",
         "untitled": "未命名相册",
         "createSuccess": "相册创建成功",
+        "deleteError": "相册删除失败",
         "deleteSuccess": "相册删除成功",
         "updateSuccess": "相册更新成功",
         "newAlbum": "新建相册"
@@ -506,6 +507,7 @@
         "delete": "删除",
         "confirm": "确认",
         "select": "选择",
+        "selected": "已选择 {{count}} 项",
         "na": "无",
         "uploaded": "上传于",
         "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
