@@ -86,8 +86,8 @@ export const EXPORT_FORMATS = {
     label: "WebP",
     extension: "webp",
     mimeType: "image/webp",
-    supportsQuality: true,
-    description: "Modern format with excellent compression",
+    supportsQuality: false,
+    description: "Modern format with lossless compression in current runtime",
   },
 } as const;
 

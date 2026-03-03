@@ -22,7 +22,7 @@ function createUnsignedManifest(): RuntimeManifestV1 {
     version: "0.1.0",
     displayName: "Lumilio Border",
     mount: {
-      panel: "frames",
+      panel: "plugins",
       order: 10,
     },
     entries: {

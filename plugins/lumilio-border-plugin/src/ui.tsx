@@ -3,10 +3,10 @@ import { DEFAULT_PARAMS, type BorderParams, normalizeParams } from "./types";
 
 export const meta = {
   id: "com.lumilio.border",
-  version: "0.1.0",
+  version: "0.2.0",
   displayName: "Lumilio Border",
   mount: {
-    panel: "frames" as const,
+    panel: "plugins" as const,
     order: 10,
   },
 };
@@ -132,19 +132,6 @@ const BorderPanel: React.FC<{
           />
         </div>
       )}
-
-      <div className="space-y-2">
-        <label className="label">JPEG Quality: {p.jpeg_quality}</label>
-        <input
-          className="range range-primary"
-          type="range"
-          min={1}
-          max={100}
-          value={p.jpeg_quality}
-          disabled={disabled}
-          onChange={(e) => update({ jpeg_quality: Number(e.target.value) })}
-        />
-      </div>
     </div>
   );
 };
