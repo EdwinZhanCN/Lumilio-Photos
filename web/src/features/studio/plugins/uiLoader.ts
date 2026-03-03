@@ -15,7 +15,7 @@ function isUiModuleShape(value: unknown): value is StudioPluginUiModule {
   if (typeof meta.displayName !== "string") return false;
 
   if (!isRecord(meta.mount)) return false;
-  if (meta.mount.panel !== "frames" && meta.mount.panel !== "develop") return false;
+  if (meta.mount.panel !== "plugins") return false;
 
   if (!isRecord(value.defaultParams)) return false;
   if (typeof value.Panel !== "function") return false;
