@@ -23,7 +23,7 @@ services:
         restart: unless-stopped
         volumes:
             # Replace /PATH/TO/YOUR/ASSETS with your host storage root directory.
-            - /Users/zhanzihao/LumilioData:/data/storage
+            - /PATH/TO/YOUR/ASSETS:/data/storage
             - watchman_socket:/watchman-sock
         healthcheck:
             test: ["CMD-SHELL", "test -S /watchman-sock/watchman.sock"]
@@ -70,7 +70,7 @@ services:
             LLM_BASE_URL: your-openai-compatiable-base-url
         volumes:
             # Replace /PATH/TO/YOUR/ASSETS with your host storage root directory.
-            - /Users/zhanzihao/LumilioData:/data/storage
+            - /PATH/TO/YOUR/ASSETS:/data/storage
             - watchman_socket:/watchman-sock
         ports:
             - "8080:8080"
