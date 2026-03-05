@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
 import { useKeyboardSelection } from "@/features/assets";
 import { assetUrls } from "@/lib/assets/assetUrls";
@@ -10,6 +16,7 @@ import {
 } from "@/lib/layout/justifiedLayout";
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
+import { Camera } from "lucide-react";
 
 interface JustifiedGalleryProps {
   groupedPhotos: Record<string, Asset[]>;
@@ -71,8 +78,7 @@ const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
   );
 
   const totalAssetCount = useMemo(
-    () =>
-      groupEntries.reduce((count, [, assets]) => count + assets.length, 0),
+    () => groupEntries.reduce((count, [, assets]) => count + assets.length, 0),
     [groupEntries],
   );
 
@@ -159,7 +165,12 @@ const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [calculateMultipleLayouts, groupEntries.length, layoutConfig, layoutInputs]);
+  }, [
+    calculateMultipleLayouts,
+    groupEntries.length,
+    layoutConfig,
+    layoutInputs,
+  ]);
 
   const handleAssetClick = useCallback(
     (asset: Asset, event: React.MouseEvent | React.KeyboardEvent) => {
@@ -236,8 +247,13 @@ const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
 
   if (!isLoading && totalAssetCount === 0) {
     return (
-      <div className={`w-full p-8 text-center text-base-content/60 ${className}`}>
-        {t("assets.justifiedGallery.no_assets_found")}
+      <div
+        className={`w-full p-8 text-center text-base-content/60 ${className}`}
+      >
+        <div className="flex flex-col items-center justify-center gap-3 py-8">
+          <Camera className="size-12 text-base-300" />
+          <span>{t("assets.justifiedGallery.no_assets_found")}</span>
+        </div>
       </div>
     );
   }
@@ -316,7 +332,9 @@ const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
                         asset={asset}
                         thumbnailUrl={thumbnailUrl}
                         onClick={(event) => handleAssetClick(asset, event)}
-                        isSelected={assetId ? selection.isSelected(assetId) : false}
+                        isSelected={
+                          assetId ? selection.isSelected(assetId) : false
+                        }
                         isSelectionMode={selection.enabled}
                         className="rounded-lg shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                       />

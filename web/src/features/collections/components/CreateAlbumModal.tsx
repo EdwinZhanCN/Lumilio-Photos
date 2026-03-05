@@ -4,7 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n.tsx";
 import { X, FolderPlus, Image as ImageIcon, MoveLeft } from "lucide-react";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
-import { useGroupBy, useUIActions, useFilterActions, useSelectionActions } from "@/features/assets/selectors";
+import {
+  useGroupBy,
+  useUIActions,
+  useFilterActions,
+  useSelectionActions,
+} from "@/features/assets/selectors";
 import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
@@ -13,12 +18,16 @@ import { $api } from "@/lib/http-commons/queryClient";
 import type { ApiResult } from "@/lib/albums/types";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { getFlatAssetsFromGrouped } from "@/lib/utils/assetGrouping";
+import { assetUrls } from "@/lib/assets/assetUrls";
 
-const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect }) => {
+const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
+  onSelect,
+}) => {
   const groupBy = useGroupBy();
   const { setGroupBy, setSearchQuery } = useUIActions();
   const { resetFilters } = useFilterActions();
-  const { clear: clearSelection, setEnabled: setSelectionEnabled } = useSelectionActions();
+  const { clear: clearSelection, setEnabled: setSelectionEnabled } =
+    useSelectionActions();
   const selection = useSelection();
 
   const {
@@ -80,7 +89,7 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({ onSelect })
         <JustifiedGallery
           groupedPhotos={groupedAssets || {}}
           key={layoutKey}
-          openCarousel={() => { }}
+          openCarousel={() => {}}
           onLoadMore={fetchMore}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
@@ -157,19 +166,27 @@ const CreateAlbumModal: React.FC = () => {
             <FolderPlus size={24} />
             <h3 className="font-bold text-lg">{t("collections.newAlbum")}</h3>
           </div>
-          <button className="btn btn-sm btn-circle btn-ghost" onClick={handleClose}>
+          <button
+            className="btn btn-sm btn-circle btn-ghost"
+            onClick={handleClose}
+          >
             <X size={20} />
           </button>
         </div>
 
         <div className="flex-1 overflow-hidden relative bg-base-200/30">
-          <form onSubmit={handleSubmit} className="h-full flex flex-col p-8 space-y-8 overflow-y-auto">
+          <form
+            onSubmit={handleSubmit}
+            className="h-full flex flex-col p-8 space-y-8 overflow-y-auto"
+          >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               {/* Left Column: Details */}
               <div className="space-y-6">
                 <div className="form-control w-full">
                   <label className="label">
-                    <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">Album Name</span>
+                    <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">
+                      Album Name
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -183,7 +200,9 @@ const CreateAlbumModal: React.FC = () => {
 
                 <div className="form-control w-full">
                   <label className="label">
-                    <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">Description</span>
+                    <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">
+                      Description
+                    </span>
                   </label>
                   <textarea
                     className="textarea textarea-bordered h-40 focus:textarea-primary resize-none bg-base-100"
@@ -197,24 +216,31 @@ const CreateAlbumModal: React.FC = () => {
               {/* Right Column: Cover Selection Preview */}
               <div className="flex flex-col">
                 <label className="label">
-                  <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">Album Cover</span>
+                  <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">
+                    Album Cover
+                  </span>
                 </label>
 
                 <div
                   className={`flex-1 min-h-[250px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 transition-all cursor-pointer overflow-hidden relative group
-                    ${selectedCoverId ? 'border-primary bg-base-100 shadow-inner' : 'border-base-300 bg-base-100 hover:border-primary/50 hover:bg-base-200/50'}
+                    ${selectedCoverId ? "border-primary bg-base-100 shadow-inner" : "border-base-300 bg-base-100 hover:border-primary/50 hover:bg-base-200/50"}
                   `}
                   onClick={() => setIsChoosingCover(true)}
                 >
                   {selectedCoverId ? (
                     <>
                       <img
-                        src={`http://localhost:8080/api/v1/assets/${selectedCoverId}/thumbnail?size=medium`}
+                        src={assetUrls.getThumbnailUrl(
+                          selectedCoverId,
+                          "medium",
+                        )}
                         className="w-full h-full object-cover"
                         alt="Selected cover"
                       />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                        <span className="text-white text-sm font-bold bg-primary px-4 py-2 rounded-full shadow-lg">Change Cover</span>
+                        <span className="text-white text-sm font-bold bg-primary px-4 py-2 rounded-full shadow-lg">
+                          Change Cover
+                        </span>
                       </div>
                     </>
                   ) : (
@@ -223,8 +249,12 @@ const CreateAlbumModal: React.FC = () => {
                         <ImageIcon size={40} />
                       </div>
                       <div className="text-center">
-                        <span className="block text-sm font-bold text-base-content/70">Choose a cover photo</span>
-                        <span className="text-xs text-base-content/40 mt-1 block">Required for new albums</span>
+                        <span className="block text-sm font-bold text-base-content/70">
+                          Choose a cover photo
+                        </span>
+                        <span className="text-xs text-base-content/40 mt-1 block">
+                          Required for new albums
+                        </span>
                       </div>
                     </>
                   )}
@@ -233,15 +263,19 @@ const CreateAlbumModal: React.FC = () => {
             </div>
 
             <div className="flex justify-end gap-4 pt-6 mt-auto">
-              <button type="button" className="btn btn-ghost px-8" onClick={handleClose}>
+              <button
+                type="button"
+                className="btn btn-ghost px-8"
+                onClick={handleClose}
+              >
                 Cancel
               </button>
               <button
                 type="submit"
-                className={`btn btn-primary px-12 shadow-lg shadow-primary/20 ${isSubmitting ? 'loading' : ''}`}
+                className={`btn btn-primary px-12 shadow-lg shadow-primary/20 ${isSubmitting ? "loading" : ""}`}
                 disabled={isSubmitting || !name.trim() || !selectedCoverId}
               >
-                {isSubmitting ? 'Creating...' : 'Create Album'}
+                {isSubmitting ? "Creating..." : "Create Album"}
               </button>
             </div>
           </form>
@@ -270,7 +304,10 @@ const CreateAlbumModal: React.FC = () => {
           )}
         </div>
       </div>
-      <div className="modal-backdrop bg-black/60 backdrop-blur-sm" onClick={handleClose}></div>
+      <div
+        className="modal-backdrop bg-black/60 backdrop-blur-sm"
+        onClick={handleClose}
+      ></div>
     </div>
   );
 };

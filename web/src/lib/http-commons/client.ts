@@ -1,14 +1,16 @@
 /**
  * openapi-fetch client with authentication middleware
- * 
+ *
  * This client provides type-safe API requests using the generated OpenAPI schema.
  * It handles JWT token management and automatic token refresh.
  */
-import createClient, { type Middleware } from "@/lib/http-commons/openapi-fetch";
+import createClient, {
+  type Middleware,
+} from "@/lib/http-commons/openapi-fetch";
 import type { paths } from "./schema";
 import { getToken, getRefreshToken, saveToken, removeToken } from "./auth.ts";
 
-export const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+export const baseUrl = import.meta.env.VITE_API_URL ?? "";
 
 /**
  * Auth middleware - adds Bearer token to requests and handles 401 refresh
@@ -33,11 +35,14 @@ const authMiddleware: Middleware = {
       try {
         const refreshToken = getRefreshToken();
         if (refreshToken) {
-          const refreshResponse = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ refreshToken }),
-          });
+          const refreshResponse = await fetch(
+            `${baseUrl}/api/v1/auth/refresh`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ refreshToken }),
+            },
+          );
 
           if (refreshResponse.ok) {
             const data = await refreshResponse.json();
@@ -67,7 +72,7 @@ const authMiddleware: Middleware = {
 
 /**
  * Typed openapi-fetch client
- * 
+ *
  * Usage:
  * ```ts
  * const { data, error } = await client.GET("/api/v1/health");

@@ -29,7 +29,7 @@ import type {
 } from "./schema";
 import type { MentionEntity } from "./components/RichInput";
 
-const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const baseUrl = import.meta.env.VITE_API_URL ?? "";
 
 const parseAgentStreamEvent = (
   message: EventSourceMessage,
@@ -96,9 +96,14 @@ export const LumilioChatContext = createContext<
 export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(lumilioReducer, initialState);
 
-  const toolsQuery = $api.useQuery("get", "/api/v1/agent/tools", {}, {
-    retry: false,
-  });
+  const toolsQuery = $api.useQuery(
+    "get",
+    "/api/v1/agent/tools",
+    {},
+    {
+      retry: false,
+    },
+  );
   const toolsLoadingRef = useRef(false);
 
   useEffect(() => {
@@ -120,8 +125,9 @@ export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
 
     if (!toolsQuery.data) return;
 
-    const response =
-      toolsQuery.data as ApiResult<ToolInfoResponse[]> | undefined;
+    const response = toolsQuery.data as
+      | ApiResult<ToolInfoResponse[]>
+      | undefined;
     const commands = buildSlashCommands(response?.data);
     dispatch({ type: "FETCH_TOOLS_SUCCESS", payload: commands });
   }, [toolsQuery.data, toolsQuery.isError, toolsQuery.error, dispatch]);
@@ -142,7 +148,8 @@ export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
 
       const interrupt =
         eventData.action?.interrupted ??
-        (eventData.action as { Interrupted?: unknown } | undefined)?.Interrupted;
+        (eventData.action as { Interrupted?: unknown } | undefined)
+          ?.Interrupted;
       if (isInterruptInfo(interrupt)) {
         dispatch({ type: "RECEIVE_INTERRUPT", payload: interrupt });
       }

@@ -9,7 +9,7 @@ import type {
   ChunkedUploadOptions,
 } from "@/lib/upload/types";
 
-const baseURL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+const baseURL = import.meta.env.VITE_API_URL ?? "";
 
 const attachAuthHeader = (headers: Record<string, string>) => {
   const token = getToken();
@@ -35,7 +35,7 @@ export const uploadFile = async (
   if (options?.onUploadProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${baseURL}/assets`);
+      xhr.open("POST", `${baseURL}/api/v1/assets`);
 
       Object.entries(headers).forEach(([key, value]) => {
         xhr.setRequestHeader(key, value);
@@ -70,7 +70,7 @@ export const uploadFile = async (
     });
   }
 
-  const response = await fetch(`${baseURL}/assets`, {
+  const response = await fetch(`${baseURL}/api/v1/assets`, {
     method: "POST",
     headers,
     body: formData,
@@ -120,7 +120,7 @@ export const batchUploadFiles = async (
   if (options?.onUploadProgress) {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", `${baseURL}/assets/batch`);
+      xhr.open("POST", `${baseURL}/api/v1/assets/batch`);
 
       Object.entries(headers).forEach(([key, value]) => {
         xhr.setRequestHeader(key, value);
@@ -155,7 +155,7 @@ export const batchUploadFiles = async (
     });
   }
 
-  const response = await fetch(`${baseURL}/assets/batch`, {
+  const response = await fetch(`${baseURL}/api/v1/assets/batch`, {
     method: "POST",
     headers,
     body: formData,

@@ -326,8 +326,8 @@
         "button": "Upload",
         "dragDrop": "Drag and drop files here",
         "UploadAssets": {
-            "processing_files": "Processing {{count}} file{{count === 1 ? '' : 's'}}...",
-            "files_ready_to_upload": "{{count}} file{{count === 1 ? '' : 's'}} ready to upload",
+            "processing_files": "Processing {{count}} files...",
+            "files_ready_to_upload": "{{count}} files ready to upload",
             "no_files_selected": "No files selected",
             "page_title": "Upload Assets",
             "supported_formats_button": "Supported Formats",
@@ -357,7 +357,7 @@
             "add_files_button": "Add Files",
             "clear_button": "Clear",
             "uploading_status": "Uploading...",
-            "upload_button": "Upload {{count > 0 ? '(' + count + ')' : ''}}",
+            "upload_button": "Upload{{countLabel}}",
             "selected_files_title": "Selected Files",
             "overall_progress_label": "Overall Progress",
             "server_progress_label": "Server processing",
@@ -377,7 +377,7 @@
             "chunked_badge": "Chunked"
         },
         "ProgressIndicator": {
-            "progress_display": "{{processed}}/{{total}}{{label ? ' - ' + label : ''}}"
+            "progress_display": "{{processed}}/{{total}}{{labelSuffix}}"
         },
         "UploadProvider": {
             "max_files_allowed": "Maximum of {{count}} files allowed",

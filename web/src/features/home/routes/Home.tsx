@@ -5,9 +5,8 @@ import {
   CameraIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
+import PageHeader from "@/components/PageHeader";
 import GalleryGrid from "../components/GalleryGrid";
-import AICategoryCarousel from "../components/AICategoryCarousel";
-import FiltersCarousel from "../components/FiltersCarousel";
 import StatsCards from "../components/StatsCards";
 import SpacetimeMapCard from "../components/SpacetimeMapCard";
 import InfoCard from "../components/InfoCard";
@@ -33,8 +32,6 @@ function Home() {
 
   const {
     assets: featuredAssets,
-    candidateCount,
-    seed,
     isLoading,
     isError,
     error,
@@ -61,116 +58,128 @@ function Home() {
         : "暂无带地理位置的照片";
 
   return (
-    <div className="flex flex-col gap-8 p-6 relative">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">{t("routes.home")}</h1>
-        <div className="tabs tabs-boxed bg-base-100/20 w-max backdrop-blur-lg rounded-box p-1 shadow-lg">
-          <a
-            className={`tab tab-lg rounded-box p-1 m-1 ${displayMode === "gallery" ? "tab-active bg-primary/20 text-primary" : ""}`}
+    <div className="flex flex-col h-full min-h-0">
+      <PageHeader
+        title={t("routes.home")}
+        icon={<SparklesIcon className="w-6 h-6 text-primary" />}
+      >
+        <div className="tabs tabs-boxed bg-base-200/60 rounded-lg p-1">
+          <button
+            type="button"
+            className={`tab tab-sm md:tab-md rounded-md gap-2 ${
+              displayMode === "gallery" ? "tab-active" : ""
+            }`}
             onClick={() => setDisplayMode("gallery")}
           >
-            <SparklesIcon className="size-5 mr-2" />
+            <SparklesIcon className="size-4" />
             {t("home.tabs.gallery", { defaultValue: "Gallery" })}
-          </a>
-          <a
-            className={`tab tab-lg rounded-box p-1 m-1 ${displayMode === "stats" ? "tab-active bg-primary/20 text-primary" : ""}`}
+          </button>
+          <button
+            type="button"
+            className={`tab tab-sm md:tab-md rounded-md gap-2 ${
+              displayMode === "stats" ? "tab-active" : ""
+            }`}
             onClick={() => setDisplayMode("stats")}
           >
-            <CameraIcon className="size-5 mr-2" />
+            <CameraIcon className="size-4" />
             {t("home.tabs.stats", { defaultValue: "Stats" })}
-          </a>
+          </button>
         </div>
-      </div>
+      </PageHeader>
 
-      {displayMode === "gallery" && (
-        <>
-          {isError && (
-            <div className="alert alert-warning">
-              <ExclamationTriangleIcon className="size-5" />
-              <span>
-                featured 接口加载失败：
-                {error instanceof Error ? error.message : "Unknown error"}
-              </span>
-            </div>
-          )}
+      <div className="flex-1 overflow-y-auto p-4 space-y-8">
+        {displayMode === "gallery" && (
+          <div className="space-y-4">
+            {isError && (
+              <div className="alert alert-warning">
+                <ExclamationTriangleIcon className="size-5" />
+                <span>
+                  featured 接口加载失败：
+                  {error instanceof Error ? error.message : "Unknown error"}
+                </span>
+              </div>
+            )}
 
-          <GalleryGrid
-            items={galleryItems}
-            titlePrefix={featuredAssets.length > 0 ? "精选照片" : "示例照片"}
-            getExif={(index) => {
-              const asset = featuredAssets[index];
-              if (!asset || !isPhotoMetadata(asset.type, asset.specific_metadata)) {
-                return EMPTY_EXIF;
-              }
+            <GalleryGrid
+              items={galleryItems}
+              titlePrefix={featuredAssets.length > 0 ? "精选照片" : "示例照片"}
+              getExif={(index) => {
+                const asset = featuredAssets[index];
+                if (
+                  !asset ||
+                  !isPhotoMetadata(asset.type, asset.specific_metadata)
+                ) {
+                  return EMPTY_EXIF;
+                }
 
-              const metadata = asset.specific_metadata;
-              return {
-                camera: metadata.camera_model || EMPTY_EXIF.camera,
-                lens: metadata.lens_model || EMPTY_EXIF.lens,
-                aperture:
-                  typeof metadata.f_number === "number"
-                    ? metadata.f_number.toFixed(1)
-                    : EMPTY_EXIF.aperture,
-                shutter: metadata.exposure_time || EMPTY_EXIF.shutter,
-                focalLength:
-                  typeof metadata.focal_length === "number"
-                    ? `${Math.round(metadata.focal_length)}mm`
-                    : EMPTY_EXIF.focalLength,
-                iso:
-                  typeof metadata.iso_speed === "number"
-                    ? metadata.iso_speed
-                    : EMPTY_EXIF.iso,
-              };
-            }}
-            renderItem={
-              featuredAssets.length > 0
-                ? (index) => {
-                    const asset = featuredAssets[index];
-                    if (!asset?.asset_id) {
-                      return <div className="absolute inset-0 bg-base-300" />;
+                const metadata = asset.specific_metadata;
+                return {
+                  camera: metadata.camera_model || EMPTY_EXIF.camera,
+                  lens: metadata.lens_model || EMPTY_EXIF.lens,
+                  aperture:
+                    typeof metadata.f_number === "number"
+                      ? metadata.f_number.toFixed(1)
+                      : EMPTY_EXIF.aperture,
+                  shutter: metadata.exposure_time || EMPTY_EXIF.shutter,
+                  focalLength:
+                    typeof metadata.focal_length === "number"
+                      ? `${Math.round(metadata.focal_length)}mm`
+                      : EMPTY_EXIF.focalLength,
+                  iso:
+                    typeof metadata.iso_speed === "number"
+                      ? metadata.iso_speed
+                      : EMPTY_EXIF.iso,
+                };
+              }}
+              renderItem={
+                featuredAssets.length > 0
+                  ? (index) => {
+                      const asset = featuredAssets[index];
+                      if (!asset?.asset_id) {
+                        return <div className="absolute inset-0 bg-base-300" />;
+                      }
+                      return (
+                        <img
+                          src={assetUrls.getThumbnailUrl(
+                            asset.asset_id,
+                            "medium",
+                          )}
+                          alt={
+                            asset.original_filename || `featured-${index + 1}`
+                          }
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      );
                     }
-                    return (
-                      <img
-                        src={assetUrls.getThumbnailUrl(asset.asset_id, "medium")}
-                        alt={asset.original_filename || `featured-${index + 1}`}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    );
-                  }
-                : undefined
-            }
-            onItemClick={(index) => {
-              const asset = featuredAssets[index];
-              if (!asset?.asset_id) return;
-              navigate(`/assets/photos/${asset.asset_id}?groupBy=date`);
-            }}
-          />
+                  : undefined
+              }
+              onItemClick={(index) => {
+                const asset = featuredAssets[index];
+                if (!asset?.asset_id) return;
+                navigate(`/assets/photos/${asset.asset_id}?groupBy=date`);
+              }}
+            />
 
-          <div className="text-xs text-base-content/60 px-1">
-            {isLoading
-              ? "正在加载精选照片..."
-              : featuredAssets.length > 0
-                ? `featured: ${featuredAssets.length} / candidate: ${candidateCount} / seed: ${seed}`
-                : "暂无可展示照片"}
+            <div className="text-xs text-base-content/60 px-1">
+              {isLoading
+                ? "正在加载精选照片..."
+                : featuredAssets.length > 0
+                  ? `已展示 ${featuredAssets.length} 张照片`
+                  : "暂无可展示照片"}
+            </div>
           </div>
+        )}
 
-          <AICategoryCarousel />
-          <FiltersCarousel />
-        </>
-      )}
+        {displayMode === "stats" && (
+          <div className="space-y-8 animate-fadeIn">
+            <StatsCards />
+            <InfoCard />
+          </div>
+        )}
 
-      {displayMode === "stats" && (
-        <div className="space-y-8 animate-fadeIn">
-          <StatsCards />
-          <InfoCard />
-        </div>
-      )}
-
-      <SpacetimeMapCard
-        points={mapPoints}
-        subtitle={mapSubtitle}
-      />
+        <SpacetimeMapCard points={mapPoints} subtitle={mapSubtitle} />
+      </div>
     </div>
   );
 }

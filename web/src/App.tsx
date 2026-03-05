@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import SideBar from "@/components/SideBar";
 import NavBar from "@/components/NavBar";
@@ -20,15 +20,31 @@ function HealthPoller(): React.ReactNode {
   const { setOnline } = useGlobal();
 
   const intervalSec = state.server?.update_timespan ?? 5;
-  const intervalMs = Math.max(1000, Math.min(50, Math.max(1, intervalSec)) * 1000);
+  const intervalMs = Math.max(
+    1000,
+    Math.min(50, Math.max(1, intervalSec)) * 1000,
+  );
 
-  $api.useQuery("get", "/api/v1/health", {}, {
-    refetchInterval: intervalMs,
-    refetchIntervalInBackground: true,
-    retry: false,
-    onSuccess: () => setOnline(true),
-    onError: () => setOnline(false),
-  });
+  const healthQuery = $api.useQuery(
+    "get",
+    "/api/v1/health",
+    {},
+    {
+      refetchInterval: intervalMs,
+      refetchIntervalInBackground: true,
+      retry: false,
+    },
+  );
+
+  useEffect(() => {
+    if (healthQuery.isSuccess) {
+      setOnline(true);
+      return;
+    }
+    if (healthQuery.isError) {
+      setOnline(false);
+    }
+  }, [healthQuery.isSuccess, healthQuery.isError, setOnline]);
 
   return null;
 }
@@ -56,8 +72,9 @@ function App(): React.ReactNode {
                   >
                     <Routes>
                       {routes.map((route) => {
-                        const isPublic = route.path === "/login" || route.path === "/register";
-                        
+                        const isPublic =
+                          route.path === "/login" || route.path === "/register";
+
                         return (
                           <Route
                             key={route.path}
@@ -78,7 +95,9 @@ function App(): React.ReactNode {
                 <footer className="bg-base-100 text-base-content text-xs">
                   <div className="container mx-auto py-0.5">
                     <p className="text-center">
-                      {t("footer.copyright", { year: new Date().getFullYear() })}
+                      {t("footer.copyright", {
+                        year: new Date().getFullYear(),
+                      })}
                     </p>
                   </div>
                 </footer>
