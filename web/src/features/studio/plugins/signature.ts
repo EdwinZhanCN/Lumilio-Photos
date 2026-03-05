@@ -43,7 +43,9 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 
-export function canonicalizeManifestPayload(manifest: RuntimeManifestV1): string {
+export function canonicalizeManifestPayload(
+  manifest: RuntimeManifestV1,
+): string {
   const manifestWithoutSignature: Omit<RuntimeManifestV1, "signature"> = {
     schemaVersion: manifest.schemaVersion,
     id: manifest.id,
@@ -52,6 +54,7 @@ export function canonicalizeManifestPayload(manifest: RuntimeManifestV1): string
     description: manifest.description,
     mount: manifest.mount,
     entries: manifest.entries,
+    io: manifest.io,
     permissions: manifest.permissions,
     compatibility: manifest.compatibility,
   };
@@ -89,7 +92,9 @@ export async function verifyRuntimeManifestSignature(
   try {
     const key = await importSpkiPublicKey(keyBase64);
     const signatureBytes = base64ToBytes(manifest.signature.value);
-    const payload = new TextEncoder().encode(canonicalizeManifestPayload(manifest));
+    const payload = new TextEncoder().encode(
+      canonicalizeManifestPayload(manifest),
+    );
 
     return crypto.subtle.verify(
       {

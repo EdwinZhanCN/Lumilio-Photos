@@ -1,27 +1,33 @@
 {
-  "schemaVersion": 1,
-  "id": "com.lumilio.border",
-  "version": "0.2.0",
-  "displayName": "Lumilio Border",
-  "description": "Official border effects plugin for Studio plugin workspace.",
-  "mount": {
-    "panel": "plugins",
-    "order": 10
-  },
-  "entries": {
-    "ui": "https://cdn.example.com/plugins/com.lumilio.border/0.2.0/ui.mjs",
-    "runner": "https://cdn.example.com/plugins/com.lumilio.border/0.2.0/runner.mjs"
-  },
-  "permissions": [
-    "image.read",
-    "image.write"
-  ],
-  "compatibility": {
-    "studioApi": "1"
-  },
-  "signature": {
-    "keyId": "lumilio-prod-1",
-    "algorithm": "ECDSA_P256_SHA256",
-    "value": "REPLACE_WITH_SIGNED_BASE64URL_SIGNATURE"
-  }
+    "schemaVersion": 1,
+    "id": "com.lumilio.border",
+    "version": "0.2.3",
+    "displayName": "Lumilio Border",
+    "description": "Official border effects plugin for Studio plugin workspace.",
+    "mount": {
+        "panel": "plugins",
+        "order": 10
+    },
+    "entries": {
+        "ui": "https://cdn.example.com/plugins/com.lumilio.border/0.2.3/ui.mjs",
+        "runner": "https://cdn.example.com/plugins/com.lumilio.border/0.2.3/runner.mjs"
+    },
+    "io": {
+        "input": {
+            "mimeTypes": ["image/jpeg", "image/png", "image/webp"]
+        },
+        "output": {
+            "mimeTypes": ["image/png", "image/jpeg", "image/webp"],
+            "preferredMimeType": "image/png"
+        }
+    },
+    "permissions": ["image.read", "image.write"],
+    "compatibility": {
+        "studioApi": "1"
+    },
+    "signature": {
+        "keyId": "lumilio-prod-1",
+        "algorithm": "ECDSA_P256_SHA256",
+        "value": "REPLACE_WITH_SIGNED_BASE64URL_SIGNATURE"
+    }
 }

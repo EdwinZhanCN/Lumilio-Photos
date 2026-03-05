@@ -53,6 +53,7 @@ export function Studio() {
   const [pluginLoading, setPluginLoading] = useState(false);
   const [pluginError, setPluginError] = useState<string | null>(null);
   const [pluginResultUrl, setPluginResultUrl] = useState<string | null>(null);
+  const [pluginResultFileName, setPluginResultFileName] = useState<string | null>(null);
   const [isGeneratingPlugin, setIsGeneratingPlugin] = useState(false);
   const [pluginProgress, setPluginProgress] =
     useState<FrameProcessingProgress>(null);
@@ -240,6 +241,7 @@ export function Studio() {
       }
       return null;
     });
+    setPluginResultFileName(null);
 
     const newUrl = URL.createObjectURL(file);
     setImageUrl(newUrl);
@@ -286,6 +288,7 @@ export function Studio() {
         }
         return resultUrl;
       });
+      setPluginResultFileName(result.fileName);
 
       showMessage("success", `Plugin processing complete: ${result.fileName}`);
     } catch (error) {
@@ -360,6 +363,23 @@ export function Studio() {
   const handleSelectPlugin = useCallback((pluginId: string) => {
     setSelectedPluginId(pluginId || null);
   }, []);
+
+  const handleExportPluginResult = useCallback(() => {
+    if (!pluginResultUrl) {
+      return;
+    }
+
+    try {
+      const link = document.createElement("a");
+      link.href = pluginResultUrl;
+      link.download = pluginResultFileName || "plugin-output.png";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch {
+      showMessage("error", "Failed to export plugin output image");
+    }
+  }, [pluginResultUrl, pluginResultFileName, showMessage]);
   //#endregion
 
   const triggerFileInput = () => {
@@ -373,6 +393,8 @@ export function Studio() {
     <div className="flex flex-col h-[calc(85vh)] bg-base-100 overflow-hidden">
       <StudioHeader
         onOpenFile={triggerFileInput}
+        onExportImage={handleExportPluginResult}
+        hasExportImage={Boolean(pluginResultUrl)}
         fileInputRef={fileInputRef}
         onFileChange={handleFileChange}
       />

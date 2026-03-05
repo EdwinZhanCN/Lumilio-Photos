@@ -29,3 +29,27 @@ This directory contains Cloudflare deployment assets for the Studio plugin runti
   - uses D1 binding `DB` when `--db` is omitted
 - Uploaded artifacts are written with immutable cache headers:
   - `Cache-Control: public, max-age=31536000, immutable`
+
+## R2 CORS for plugin runtime
+
+Studio loads plugin UI modules via cross-origin dynamic import. The R2 bucket
+behind `cdn.lumilio.org` must return CORS headers for browser module loading.
+
+For Docker/multi-domain frontend deployments, apply the wildcard CORS profile:
+
+```bash
+wrangler r2 bucket cors set lumilio-plugin-artifacts \
+  --file infra/cloudflare/r2-cors.public.json
+```
+
+Verify:
+
+```bash
+wrangler r2 bucket cors list lumilio-plugin-artifacts
+curl -I \
+  -H 'Origin: https://example.invalid' \
+  https://cdn.lumilio.org/plugins/com.lumilio.border/0.2.0/ui.mjs
+```
+
+Expected response header includes:
+- `Access-Control-Allow-Origin: *`

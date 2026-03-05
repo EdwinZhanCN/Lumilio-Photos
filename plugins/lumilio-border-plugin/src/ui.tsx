@@ -3,7 +3,7 @@ import { DEFAULT_PARAMS, type BorderParams, normalizeParams } from "./types";
 
 export const meta = {
   id: "com.lumilio.border",
-  version: "0.2.0",
+  version: "0.2.3",
   displayName: "Lumilio Border",
   mount: {
     panel: "plugins" as const,
