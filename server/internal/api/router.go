@@ -2,6 +2,8 @@ package api
 
 import (
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -91,10 +93,11 @@ type AgentControllerInterface interface {
 
 func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface, queueController QueueControllerInterface, statsController StatsControllerInterface, agentController AgentControllerInterface) *gin.Engine {
 	r := gin.Default()
+	allowedOrigins := loadAllowedCORSOrigins()
 
 	// Add CORS middleware
 	r.Use(func(c *gin.Context) {
-		corsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		corsMiddleware(allowedOrigins, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			c.Next()
 		})).ServeHTTP(c.Writer, c.Request)
 	})
@@ -207,15 +210,54 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 	return r
 }
 
+func loadAllowedCORSOrigins() map[string]struct{} {
+	origins := map[string]struct{}{
+		"http://localhost:6657":  {},
+		"https://localhost:6657": {},
+	}
+
+	rawOrigins := strings.TrimSpace(os.Getenv("SERVER_CORS_ALLOWED_ORIGINS"))
+	if rawOrigins == "" {
+		return origins
+	}
+
+	customOrigins := make(map[string]struct{})
+	for _, origin := range strings.Split(rawOrigins, ",") {
+		normalized := strings.TrimSpace(origin)
+		if normalized != "" {
+			customOrigins[normalized] = struct{}{}
+		}
+	}
+
+	if len(customOrigins) == 0 {
+		return origins
+	}
+
+	return customOrigins
+}
+
 // corsMiddleware handles CORS headers
-func corsMiddleware(next http.Handler) http.Handler {
+func corsMiddleware(allowedOrigins map[string]struct{}, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:6657")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-content-hash")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Vary", "Origin")
+
+		origin := strings.TrimSpace(r.Header.Get("Origin"))
+		if origin != "" {
+			if _, allowed := allowedOrigins[origin]; allowed {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+		}
 
 		if r.Method == "OPTIONS" {
+			if origin != "" {
+				if _, allowed := allowedOrigins[origin]; !allowed {
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
+			}
 			w.WriteHeader(http.StatusOK)
 			return
 		}

@@ -44,6 +44,7 @@ MANIFEST
 
 # Production
 *.env
+docker-compose.yml
 
 # Develpoment
 *.development

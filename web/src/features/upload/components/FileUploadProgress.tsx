@@ -2,10 +2,10 @@ import React from "react";
 import type { FileUploadProgress } from "../hooks/useUploadProcess";
 import {
   CheckCircleIcon,
-  XCircleIcon,
   ArrowPathIcon,
   ClockIcon,
 } from "@heroicons/react/24/outline";
+import { XCircle } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 
 interface FileUploadProgressProps {
@@ -42,7 +42,7 @@ const FileUploadProgress: React.FC<FileUploadProgressProps> = ({
       case "uploading":
         return <ArrowPathIcon className="w-5 h-5 text-primary animate-spin" />;
       case "failed":
-        return <XCircleIcon className="w-5 h-5 text-error" />;
+        return <XCircle className="w-5 h-5 text-error" />;
       case "pending":
       default:
         return <ClockIcon className="w-5 h-5 text-base-content/50" />;
@@ -66,14 +66,14 @@ const FileUploadProgress: React.FC<FileUploadProgressProps> = ({
   const getStatusText = (status: FileUploadProgress["status"]) => {
     switch (status) {
       case "completed":
-        return t('upload.FileUploadProgress.status_completed');
+        return t("upload.FileUploadProgress.status_completed");
       case "uploading":
-        return t('upload.FileUploadProgress.status_uploading');
+        return t("upload.FileUploadProgress.status_uploading");
       case "failed":
-        return t('upload.FileUploadProgress.status_failed');
+        return t("upload.FileUploadProgress.status_failed");
       case "pending":
       default:
-        return t('upload.FileUploadProgress.status_pending');
+        return t("upload.FileUploadProgress.status_pending");
     }
   };
 
@@ -81,7 +81,7 @@ const FileUploadProgress: React.FC<FileUploadProgressProps> = ({
     <div className="card bg-base-200 shadow-lg">
       <div className="card-body p-4">
         <h3 className="card-title text-base mb-2">
-          {t('upload.FileUploadProgress.title')}
+          {t("upload.FileUploadProgress.title")}
           <div className="badge badge-primary badge-sm">
             {fileProgress.length}
           </div>
@@ -114,7 +114,7 @@ const FileUploadProgress: React.FC<FileUploadProgressProps> = ({
                     </span>
                     {file.isChunked && (
                       <span className="badge badge-xs badge-outline">
-                        {t('upload.FileUploadProgress.chunked_badge')}
+                        {t("upload.FileUploadProgress.chunked_badge")}
                       </span>
                     )}
                   </div>
@@ -140,7 +140,7 @@ const FileUploadProgress: React.FC<FileUploadProgressProps> = ({
               {/* Error Message */}
               {file.error && (
                 <div className="mt-2 alert alert-error py-2 px-3">
-                  <XCircleIcon className="w-4 h-4 flex-shrink-0" />
+                  <XCircle className="w-4 h-4 flex-shrink-0" />
                   <span className="text-xs">{file.error}</span>
                 </div>
               )}

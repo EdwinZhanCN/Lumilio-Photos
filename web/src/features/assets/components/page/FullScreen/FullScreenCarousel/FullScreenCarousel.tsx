@@ -1,8 +1,14 @@
-import { useMemo, useRef, useEffect, useState, useOptimistic, useTransition } from "react";
+import {
+  useMemo,
+  useRef,
+  useEffect,
+  useState,
+  useOptimistic,
+  useTransition,
+} from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Virtual, Navigation, Pagination } from "swiper/modules";
-import { XMarkIcon } from "@heroicons/react/24/outline";
-import { Ellipsis, Info, Share, Heart, Trash2 } from "lucide-react";
+import { Ellipsis, Info, Share, Heart, Trash2, X } from "lucide-react";
 import ExportModal from "@/components/ExportModal";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -114,7 +120,7 @@ const FullScreenCarousel = ({
   const [, startTransition] = useTransition();
   const [optimisticLiked, setOptimisticLiked] = useOptimistic(
     currentAsset?.liked ?? false,
-    (_state, newLiked: boolean) => newLiked
+    (_state, newLiked: boolean) => newLiked,
   );
 
   const handleLikeToggle = () => {
@@ -166,7 +172,7 @@ const FullScreenCarousel = ({
         onClick={handleClose}
         className="btn btn-ghost btn-sm absolute top-2 left-4 text-white z-20"
       >
-        <XMarkIcon className="w-6 h-6" />
+        <X className="w-6 h-6" />
       </button>
       <Swiper
         ref={swiperRef}
@@ -252,8 +258,9 @@ const FullScreenCarousel = ({
 
         {/* Like / Favorite */}
         <button
-          className={`btn btn-circle btn-lg ${optimisticLiked ? "text-red-500" : ""
-            }`}
+          className={`btn btn-circle btn-lg ${
+            optimisticLiked ? "text-red-500" : ""
+          }`}
           onClick={handleLikeToggle}
         >
           <Heart className={`${optimisticLiked ? "fill-red-500" : ""}`} />

@@ -1,5 +1,5 @@
 import ImgStackView from "../ImgStackView/ImgStackView";
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle, Album as AlbumIcon } from "lucide-react";
 
 export interface Album {
   id: string;
@@ -57,7 +57,7 @@ function ImgStackGrid({
       <div
         className={`flex flex-col items-center justify-center p-12 text-center min-h-[400px] ${className}`}
       >
-        <div className="text-6xl mb-4 text-base-300">📁</div>
+        <AlbumIcon className="mb-4 size-16 text-base-300" />
         <h3 className="text-lg font-medium mb-2">No Albums</h3>
         <p className="text-base-content/60">{emptyMessage}</p>
       </div>
@@ -70,37 +70,42 @@ function ImgStackGrid({
     >
       {albums.map((album) => {
         const isSelected = selectedIds.includes(album.id);
-        
+
         return (
           <div
             key={album.id}
             className={`group relative cursor-pointer transition-all duration-200 flex flex-col items-center text-center p-2 rounded-xl
-              ${isSelectionMode ? 'scale-95' : 'hover:scale-105'}
+              ${isSelectionMode ? "scale-95" : "hover:scale-105"}
             `}
             onClick={() => onAlbumClick?.(album)}
           >
             {isSelectionMode && (
               <div className="absolute top-1 right-1 z-10">
                 {isSelected ? (
-                  <CheckCircle2 className="text-primary fill-base-100" size={22} />
+                  <CheckCircle2
+                    className="text-primary fill-base-100"
+                    size={22}
+                  />
                 ) : (
                   <Circle className="text-base-content/30" size={22} />
                 )}
               </div>
             )}
-            
+
             <div className="mb-3">
-              <ImgStackView 
-                coverImages={album.coverImages} 
-                albumName={album.name} 
+              <ImgStackView
+                coverImages={album.coverImages}
+                albumName={album.name}
                 isSelected={isSelected}
               />
             </div>
-            
+
             <div className="space-y-1 w-full px-1">
-              <h3 className={`font-semibold text-sm truncate transition-colors
-                ${isSelected ? 'text-primary' : 'group-hover:text-primary'}
-              `}>
+              <h3
+                className={`font-semibold text-sm truncate transition-colors
+                ${isSelected ? "text-primary" : "group-hover:text-primary"}
+              `}
+              >
                 {album.name}
               </h3>
               <p className="text-xs text-base-content/50 font-medium">

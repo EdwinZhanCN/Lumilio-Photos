@@ -27,7 +27,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
         </div>
       </div>
       {children && (
-        <div className="flex items-center space-x-2 mx-2">{children}</div>
+        <div className="flex items-center space-x-2 ml-auto">{children}</div>
       )}
     </header>
   );
