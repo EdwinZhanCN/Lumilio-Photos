@@ -4,7 +4,7 @@
 
 > **useMessage**(`timeout?`): (`type`, `message`) => `void`
 
-Defined in: [hooks/util-hooks/useMessage.tsx:4](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ca75377bce4e204cc757dc6c0c5454349e2c428c/web/src/hooks/util-hooks/useMessage.tsx#L4)
+Defined in: [hooks/util-hooks/useMessage.tsx:4](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/1bf5156c0f88b980eeb4441bf2726a04ead746b6/web/src/hooks/util-hooks/useMessage.tsx#L4)
 
 ## Parameters
 
