@@ -34,13 +34,18 @@ Where `ctx` includes:
 - `signal`
 - `manifest`
 
+Manifest must declare `io.input.mimeTypes` and `io.output.mimeTypes` using:
+- `image/jpeg`
+- `image/png`
+- `image/webp`
+
 ## Publish paths (example)
 
-- `https://cdn.example.com/plugins/com.lumilio.border/0.2.0/ui.mjs`
-- `https://cdn.example.com/plugins/com.lumilio.border/0.2.0/runner.mjs`
-- `https://cdn.example.com/plugins/com.lumilio.border/0.2.0/border_wasm.js`
-- `https://cdn.example.com/plugins/com.lumilio.border/0.2.0/border_wasm_bg.wasm`
-- `https://cdn.example.com/plugins/com.lumilio.border/0.2.0/manifest.json`
+- `https://cdn.example.com/plugins/com.lumilio.border/0.2.3/ui.mjs`
+- `https://cdn.example.com/plugins/com.lumilio.border/0.2.3/runner.mjs`
+- `https://cdn.example.com/plugins/com.lumilio.border/0.2.3/border_wasm.js`
+- `https://cdn.example.com/plugins/com.lumilio.border/0.2.3/border_wasm_bg.wasm`
+- `https://cdn.example.com/plugins/com.lumilio.border/0.2.3/manifest.json`
 
 ## Notes
 

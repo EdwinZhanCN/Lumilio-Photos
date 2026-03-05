@@ -1,16 +1,24 @@
 import React from "react";
-import { PaintBrushIcon, ArrowUpTrayIcon } from "@heroicons/react/24/outline";
+import {
+  PaintBrushIcon,
+  ArrowUpTrayIcon,
+  ArrowDownTrayIcon,
+} from "@heroicons/react/24/outline";
 import { PageHeader } from "@/components/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
 
 type StudioHeaderProps = {
   onOpenFile: () => void;
+  onExportImage?: () => void;
+  hasExportImage?: boolean;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 };
 
 export function StudioHeader({
   onOpenFile,
+  onExportImage,
+  hasExportImage = false,
   fileInputRef,
   onFileChange,
 }: StudioHeaderProps) {
@@ -31,6 +39,12 @@ export function StudioHeader({
         <ArrowUpTrayIcon className="w-4 h-4 mr-1" />
         {t("studio.imgOpen")}
       </button>
+      {hasExportImage && onExportImage && (
+        <button onClick={onExportImage} className="btn btn-sm btn-outline ml-2">
+          <ArrowDownTrayIcon className="w-4 h-4 mr-1" />
+          {t("common.save")}
+        </button>
+      )}
     </PageHeader>
   );
 }

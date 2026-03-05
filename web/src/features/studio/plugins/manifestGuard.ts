@@ -1,4 +1,12 @@
-import type { RuntimeManifestV1, StudioPluginPanel } from "./types";
+import {
+  STUDIO_PLUGIN_IMAGE_MIME_TYPES,
+  type RuntimeManifestIo,
+  type RuntimeManifestIoInput,
+  type RuntimeManifestIoOutput,
+  type RuntimeManifestV1,
+  type StudioPluginImageMimeType,
+  type StudioPluginPanel,
+} from "./types";
 
 const SUPPORTED_SCHEMA_VERSION = 1;
 const SUPPORTED_STUDIO_API = "1";
@@ -12,8 +20,14 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
 }
+
+const STUDIO_PLUGIN_IMAGE_MIME_TYPE_SET = new Set<string>(
+  STUDIO_PLUGIN_IMAGE_MIME_TYPES,
+);
 
 function isUrlAllowed(urlText: string, allowOrigin?: string): boolean {
   try {
@@ -43,6 +57,131 @@ export interface ManifestGuardOptions {
   allowOrigin?: string;
 }
 
+function normalizeManifestMimeTypes(
+  value: unknown,
+  fieldPath: string,
+): StudioPluginImageMimeType[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!isStringArray(value)) {
+    throw new Error(`${fieldPath} must be string[]`);
+  }
+
+  if (value.length === 0) {
+    throw new Error(`${fieldPath} cannot be empty`);
+  }
+
+  const seen = new Set<string>();
+  const out: StudioPluginImageMimeType[] = [];
+  for (const raw of value) {
+    const mimeType = raw.trim().toLowerCase();
+    if (!STUDIO_PLUGIN_IMAGE_MIME_TYPE_SET.has(mimeType)) {
+      throw new Error(
+        `${fieldPath} contains unsupported mime type '${raw}'. Supported: ${STUDIO_PLUGIN_IMAGE_MIME_TYPES.join(", ")}`,
+      );
+    }
+    if (seen.has(mimeType)) {
+      continue;
+    }
+    seen.add(mimeType);
+    out.push(mimeType as StudioPluginImageMimeType);
+  }
+
+  if (out.length === 0) {
+    throw new Error(`${fieldPath} cannot be empty`);
+  }
+
+  return out;
+}
+
+function normalizeManifestIo(input: unknown): RuntimeManifestIo | undefined {
+  if (input === undefined) {
+    return undefined;
+  }
+
+  if (!isRecord(input)) {
+    throw new Error("Manifest field 'io' must be an object");
+  }
+
+  let ioInput: RuntimeManifestIoInput | undefined;
+  if (input.input !== undefined) {
+    if (!isRecord(input.input)) {
+      throw new Error("Manifest field 'io.input' must be an object");
+    }
+
+    const mimeTypes = normalizeManifestMimeTypes(
+      input.input.mimeTypes,
+      "Manifest io.input.mimeTypes",
+    );
+
+    ioInput = {
+      ...(mimeTypes ? { mimeTypes } : {}),
+    };
+  }
+
+  let ioOutput: RuntimeManifestIoOutput | undefined;
+  if (input.output !== undefined) {
+    if (!isRecord(input.output)) {
+      throw new Error("Manifest field 'io.output' must be an object");
+    }
+
+    const mimeTypes = normalizeManifestMimeTypes(
+      input.output.mimeTypes,
+      "Manifest io.output.mimeTypes",
+    );
+
+    if (
+      input.output.preferredMimeType !== undefined &&
+      !isNonEmptyString(input.output.preferredMimeType)
+    ) {
+      throw new Error(
+        "Manifest io.output.preferredMimeType must be a non-empty string",
+      );
+    }
+
+    const preferredMimeTypeRaw = input.output.preferredMimeType
+      ?.trim()
+      .toLowerCase();
+    if (
+      preferredMimeTypeRaw !== undefined &&
+      !STUDIO_PLUGIN_IMAGE_MIME_TYPE_SET.has(preferredMimeTypeRaw)
+    ) {
+      throw new Error(
+        `Manifest io.output.preferredMimeType '${input.output.preferredMimeType}' is unsupported`,
+      );
+    }
+
+    if (
+      preferredMimeTypeRaw !== undefined &&
+      mimeTypes &&
+      !mimeTypes.includes(preferredMimeTypeRaw as StudioPluginImageMimeType)
+    ) {
+      throw new Error(
+        "Manifest io.output.preferredMimeType must be one of io.output.mimeTypes",
+      );
+    }
+
+    ioOutput = {
+      ...(mimeTypes ? { mimeTypes } : {}),
+      ...(preferredMimeTypeRaw
+        ? {
+            preferredMimeType:
+              preferredMimeTypeRaw as StudioPluginImageMimeType,
+          }
+        : {}),
+    };
+  }
+
+  const io: RuntimeManifestIo = {
+    ...(ioInput ? { input: ioInput } : {}),
+    ...(ioOutput ? { output: ioOutput } : {}),
+  };
+
+  return io;
+}
+
 export function validateRuntimeManifest(
   input: unknown,
   options: ManifestGuardOptions = {},
@@ -52,7 +191,9 @@ export function validateRuntimeManifest(
   }
 
   if (input.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
-    throw new Error(`Unsupported schemaVersion: ${String(input.schemaVersion)}`);
+    throw new Error(
+      `Unsupported schemaVersion: ${String(input.schemaVersion)}`,
+    );
   }
 
   if (!isNonEmptyString(input.id)) {
@@ -93,7 +234,10 @@ export function validateRuntimeManifest(
     throw new Error("Manifest field 'entries' is required");
   }
 
-  if (!isNonEmptyString(input.entries.ui) || !isUrlAllowed(input.entries.ui, options.allowOrigin)) {
+  if (
+    !isNonEmptyString(input.entries.ui) ||
+    !isUrlAllowed(input.entries.ui, options.allowOrigin)
+  ) {
     throw new Error("Manifest entries.ui is invalid or not allowed");
   }
   const entryUi = input.entries.ui;
@@ -105,6 +249,7 @@ export function validateRuntimeManifest(
     throw new Error("Manifest entries.runner is invalid or not allowed");
   }
   const entryRunner = input.entries.runner;
+  const io = normalizeManifestIo(input.io);
 
   if (!isRecord(input.compatibility)) {
     throw new Error("Manifest field 'compatibility' is required");
@@ -146,7 +291,9 @@ export function validateRuntimeManifest(
   }
   const signatureValue = input.signature.value;
 
-  const description = isNonEmptyString(input.description) ? input.description : undefined;
+  const description = isNonEmptyString(input.description)
+    ? input.description
+    : undefined;
   const minHostVersion = isNonEmptyString(input.compatibility.minHostVersion)
     ? input.compatibility.minHostVersion
     : undefined;
@@ -168,6 +315,7 @@ export function validateRuntimeManifest(
       ui: entryUi,
       runner: entryRunner,
     },
+    ...(io ? { io } : {}),
     permissions,
     compatibility: {
       studioApi,

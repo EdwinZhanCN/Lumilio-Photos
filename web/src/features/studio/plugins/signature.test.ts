@@ -7,7 +7,10 @@ import type { RuntimeManifestV1 } from "./types";
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   const binary = String.fromCharCode(...bytes);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -27,7 +30,17 @@ function createUnsignedManifest(): RuntimeManifestV1 {
     },
     entries: {
       ui: "https://cdn.example.com/plugins/com.lumilio.border/0.1.0/ui.mjs",
-      runner: "https://cdn.example.com/plugins/com.lumilio.border/0.1.0/runner.mjs",
+      runner:
+        "https://cdn.example.com/plugins/com.lumilio.border/0.1.0/runner.mjs",
+    },
+    io: {
+      input: {
+        mimeTypes: ["image/jpeg", "image/png", "image/webp"],
+      },
+      output: {
+        mimeTypes: ["image/png"],
+        preferredMimeType: "image/png",
+      },
     },
     permissions: ["image.read", "image.write"],
     compatibility: {
@@ -56,7 +69,9 @@ describe("verifyRuntimeManifestSignature", () => {
     const publicSpkiBase64 = bytesToBase64(new Uint8Array(publicSpki));
 
     const manifest = createUnsignedManifest();
-    const payload = new TextEncoder().encode(canonicalizeManifestPayload(manifest));
+    const payload = new TextEncoder().encode(
+      canonicalizeManifestPayload(manifest),
+    );
 
     const signatureBuffer = await crypto.subtle.sign(
       {
@@ -67,7 +82,9 @@ describe("verifyRuntimeManifestSignature", () => {
       payload,
     );
 
-    manifest.signature.value = bytesToBase64Url(new Uint8Array(signatureBuffer));
+    manifest.signature.value = bytesToBase64Url(
+      new Uint8Array(signatureBuffer),
+    );
 
     const ok = await verifyRuntimeManifestSignature(manifest, {
       "test-key": publicSpkiBase64,
@@ -81,7 +98,8 @@ describe("verifyRuntimeManifestSignature", () => {
     manifest.signature.value = "dGFtcGVyZWQ";
 
     const ok = await verifyRuntimeManifestSignature(manifest, {
-      "test-key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEU4eRYQnB+vMSlySsDzaORNOvQyHZYwj9tnjBfa9mIly5JnE16aTSpwzRU/7kiHyhcHdXJrsydD2u3IGUxcN5zw==",
+      "test-key":
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEU4eRYQnB+vMSlySsDzaORNOvQyHZYwj9tnjBfa9mIly5JnE16aTSpwzRU/7kiHyhcHdXJrsydD2u3IGUxcN5zw==",
     });
 
     expect(ok).toBe(false);

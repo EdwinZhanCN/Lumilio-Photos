@@ -1,6 +1,17 @@
 import type React from "react";
 
 export type StudioPluginPanel = "plugins";
+export const STUDIO_PLUGIN_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
+export type StudioPluginImageMimeType =
+  (typeof STUDIO_PLUGIN_IMAGE_MIME_TYPES)[number];
+export const DEFAULT_STUDIO_PLUGIN_INPUT_MIME_TYPES: readonly StudioPluginImageMimeType[] =
+  STUDIO_PLUGIN_IMAGE_MIME_TYPES;
+export const DEFAULT_STUDIO_PLUGIN_OUTPUT_MIME_TYPES: readonly StudioPluginImageMimeType[] =
+  ["image/png", "image/jpeg", "image/webp"];
 
 export interface RuntimeManifestMount {
   panel: StudioPluginPanel;
@@ -18,6 +29,20 @@ export interface RuntimeManifestCompatibility {
   maxHostVersion?: string;
 }
 
+export interface RuntimeManifestIoInput {
+  mimeTypes?: StudioPluginImageMimeType[];
+}
+
+export interface RuntimeManifestIoOutput {
+  mimeTypes?: StudioPluginImageMimeType[];
+  preferredMimeType?: StudioPluginImageMimeType;
+}
+
+export interface RuntimeManifestIo {
+  input?: RuntimeManifestIoInput;
+  output?: RuntimeManifestIoOutput;
+}
+
 export interface RuntimeManifestSignature {
   keyId: string;
   algorithm: "ECDSA_P256_SHA256";
@@ -32,6 +57,7 @@ export interface RuntimeManifestV1 {
   description?: string;
   mount: RuntimeManifestMount;
   entries: RuntimeManifestEntries;
+  io?: RuntimeManifestIo;
   permissions: string[];
   compatibility: RuntimeManifestCompatibility;
   signature: RuntimeManifestSignature;
@@ -39,7 +65,7 @@ export interface RuntimeManifestV1 {
 
 export interface PluginRunResult {
   bytes: Uint8Array;
-  mimeType: string;
+  mimeType: StudioPluginImageMimeType;
   fileName: string;
 }
 
