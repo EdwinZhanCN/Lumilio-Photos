@@ -1,10 +1,16 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { 
-  PerformancePreferencesManager, 
+import { renderHook, act } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import {
+  PerformancePreferencesManager,
   PerformanceProfile,
   globalPerformancePreferences,
-  usePerformancePreferences
-} from './performancePreferences.ts';
+  usePerformancePreferences,
+} from "./performancePreferences.ts";
+import {
+  LEGACY_PERFORMANCE_PREFERENCES_STORAGE_KEY,
+  PERFORMANCE_PREFERENCES_STORAGE_KEY,
+  PERFORMANCE_PREFERENCES_STORAGE_VERSION,
+} from "@/lib/settings/registry";
 
 // Mock localStorage
 const localStorageMock = {
@@ -14,12 +20,12 @@ const localStorageMock = {
   clear: vi.fn(),
 };
 
-Object.defineProperty(window, 'localStorage', {
+Object.defineProperty(window, "localStorage", {
   value: localStorageMock,
   configurable: true,
 });
 
-describe('PerformancePreferencesManager', () => {
+describe("PerformancePreferencesManager", () => {
   let manager: PerformancePreferencesManager;
 
   beforeEach(() => {
@@ -28,8 +34,8 @@ describe('PerformancePreferencesManager', () => {
     manager = new PerformancePreferencesManager();
   });
 
-  describe('initialization', () => {
-    it('should initialize with default preferences', () => {
+  describe("initialization", () => {
+    it("should initialize with default preferences", () => {
       const preferences = manager.getPreferences();
       expect(preferences.profile).toBe(PerformanceProfile.ADAPTIVE);
       expect(preferences.respectMemoryLimits).toBe(true);
@@ -37,208 +43,278 @@ describe('PerformancePreferencesManager', () => {
       expect(preferences.maxConcurrentOperations).toBe(3);
     });
 
-    it('should load preferences from localStorage if available', () => {
+    it("should load preferences from localStorage if available", () => {
       const storedPreferences = {
         profile: PerformanceProfile.SPEED_OPTIMIZED,
         respectMemoryLimits: false,
         maxConcurrentOperations: 5,
       };
-      
-      localStorageMock.getItem.mockReturnValue(JSON.stringify(storedPreferences));
-      
+
+      localStorageMock.getItem.mockImplementation((key: string) => {
+        if (key === PERFORMANCE_PREFERENCES_STORAGE_KEY) {
+          return JSON.stringify({
+            version: PERFORMANCE_PREFERENCES_STORAGE_VERSION,
+            data: storedPreferences,
+          });
+        }
+        return null;
+      });
+
       const newManager = new PerformancePreferencesManager();
       const preferences = newManager.getPreferences();
-      
+
       expect(preferences.profile).toBe(PerformanceProfile.SPEED_OPTIMIZED);
       expect(preferences.respectMemoryLimits).toBe(false);
       expect(preferences.maxConcurrentOperations).toBe(5);
       expect(preferences.prioritizeUserOperations).toBe(true); // Should merge with defaults
     });
+
+    it("should migrate legacy key data to the new versioned key", () => {
+      const storedPreferences = {
+        profile: PerformanceProfile.MEMORY_SAVER,
+        respectMemoryLimits: false,
+        maxConcurrentOperations: 4,
+      };
+
+      localStorageMock.getItem.mockImplementation((key: string) => {
+        if (key === PERFORMANCE_PREFERENCES_STORAGE_KEY) {
+          return null;
+        }
+        if (key === LEGACY_PERFORMANCE_PREFERENCES_STORAGE_KEY) {
+          return JSON.stringify(storedPreferences);
+        }
+        return null;
+      });
+
+      const newManager = new PerformancePreferencesManager();
+      const preferences = newManager.getPreferences();
+
+      expect(preferences.profile).toBe(PerformanceProfile.MEMORY_SAVER);
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        PERFORMANCE_PREFERENCES_STORAGE_KEY,
+        expect.stringContaining(
+          `"version":${PERFORMANCE_PREFERENCES_STORAGE_VERSION}`,
+        ),
+      );
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
+        LEGACY_PERFORMANCE_PREFERENCES_STORAGE_KEY,
+      );
+    });
   });
 
-  describe('updatePreferences', () => {
-    it('should update preferences and save to localStorage', () => {
+  describe("updatePreferences", () => {
+    it("should update preferences and save to localStorage", () => {
       manager.updatePreferences({ profile: PerformanceProfile.MEMORY_SAVER });
-      
+
       const preferences = manager.getPreferences();
       expect(preferences.profile).toBe(PerformanceProfile.MEMORY_SAVER);
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        'lumilio_performance_preferences',
-        expect.stringContaining(PerformanceProfile.MEMORY_SAVER)
+        PERFORMANCE_PREFERENCES_STORAGE_KEY,
+        expect.stringContaining(PerformanceProfile.MEMORY_SAVER),
       );
     });
 
-    it('should notify listeners when preferences change', () => {
+    it("should notify listeners when preferences change", () => {
       const listener = vi.fn();
       const removeListener = manager.addListener(listener);
-      
-      manager.updatePreferences({ profile: PerformanceProfile.SPEED_OPTIMIZED });
-      
+
+      manager.updatePreferences({
+        profile: PerformanceProfile.SPEED_OPTIMIZED,
+      });
+
       expect(listener).toHaveBeenCalledWith(
-        expect.objectContaining({ profile: PerformanceProfile.SPEED_OPTIMIZED })
+        expect.objectContaining({
+          profile: PerformanceProfile.SPEED_OPTIMIZED,
+        }),
       );
-      
+
       removeListener();
     });
   });
 
-  describe('getBatchSizeMultiplier', () => {
-    it('should return correct multiplier for MEMORY_SAVER', () => {
+  describe("getBatchSizeMultiplier", () => {
+    it("should return correct multiplier for MEMORY_SAVER", () => {
       manager.updatePreferences({ profile: PerformanceProfile.MEMORY_SAVER });
       expect(manager.getBatchSizeMultiplier()).toBe(0.6);
     });
 
-    it('should return correct multiplier for BALANCED', () => {
+    it("should return correct multiplier for BALANCED", () => {
       manager.updatePreferences({ profile: PerformanceProfile.BALANCED });
       expect(manager.getBatchSizeMultiplier()).toBe(1.0);
     });
 
-    it('should return correct multiplier for SPEED_OPTIMIZED', () => {
-      manager.updatePreferences({ profile: PerformanceProfile.SPEED_OPTIMIZED });
+    it("should return correct multiplier for SPEED_OPTIMIZED", () => {
+      manager.updatePreferences({
+        profile: PerformanceProfile.SPEED_OPTIMIZED,
+      });
       expect(manager.getBatchSizeMultiplier()).toBe(1.5);
     });
 
-    it('should return correct multiplier for ADAPTIVE', () => {
+    it("should return correct multiplier for ADAPTIVE", () => {
       manager.updatePreferences({ profile: PerformanceProfile.ADAPTIVE });
       expect(manager.getBatchSizeMultiplier()).toBe(1.0);
     });
 
-    it('should use custom multiplier when provided', () => {
-      manager.updatePreferences({ 
+    it("should use custom multiplier when provided", () => {
+      manager.updatePreferences({
         profile: PerformanceProfile.BALANCED, // This will be overridden
-        customBatchSizeMultiplier: 1.3 
+        customBatchSizeMultiplier: 1.3,
       });
       expect(manager.getBatchSizeMultiplier()).toBe(1.3);
     });
   });
 
-  describe('getMemoryConstraintMultiplier', () => {
-    it('should return 1.0 when respectMemoryLimits is false', () => {
+  describe("getMemoryConstraintMultiplier", () => {
+    it("should return 1.0 when respectMemoryLimits is false", () => {
       manager.updatePreferences({ respectMemoryLimits: false });
       expect(manager.getMemoryConstraintMultiplier()).toBe(1.0);
     });
 
-    it('should return correct multiplier for MEMORY_SAVER when respecting limits', () => {
-      manager.updatePreferences({ 
+    it("should return correct multiplier for MEMORY_SAVER when respecting limits", () => {
+      manager.updatePreferences({
         profile: PerformanceProfile.MEMORY_SAVER,
-        respectMemoryLimits: true 
+        respectMemoryLimits: true,
       });
       expect(manager.getMemoryConstraintMultiplier()).toBe(0.5);
     });
 
-    it('should return correct multiplier for SPEED_OPTIMIZED when respecting limits', () => {
-      manager.updatePreferences({ 
+    it("should return correct multiplier for SPEED_OPTIMIZED when respecting limits", () => {
+      manager.updatePreferences({
         profile: PerformanceProfile.SPEED_OPTIMIZED,
-        respectMemoryLimits: true 
+        respectMemoryLimits: true,
       });
       expect(manager.getMemoryConstraintMultiplier()).toBe(1.2);
     });
   });
 
-  describe('resetToDefaults', () => {
-    it('should reset all preferences to defaults', () => {
+  describe("resetToDefaults", () => {
+    it("should reset all preferences to defaults", () => {
       // Change some preferences
-      manager.updatePreferences({ 
+      manager.updatePreferences({
         profile: PerformanceProfile.SPEED_OPTIMIZED,
         respectMemoryLimits: false,
-        maxConcurrentOperations: 8 
+        maxConcurrentOperations: 8,
       });
-      
+
       // Reset to defaults
       manager.resetToDefaults();
-      
+
       const preferences = manager.getPreferences();
       expect(preferences.profile).toBe(PerformanceProfile.ADAPTIVE);
       expect(preferences.respectMemoryLimits).toBe(true);
       expect(preferences.maxConcurrentOperations).toBe(3);
     });
 
-    it('should notify listeners when reset', () => {
+    it("should notify listeners when reset", () => {
       const listener = vi.fn();
       manager.addListener(listener);
-      
+
       manager.resetToDefaults();
-      
+
       expect(listener).toHaveBeenCalledWith(
-        expect.objectContaining({ profile: PerformanceProfile.ADAPTIVE })
+        expect.objectContaining({ profile: PerformanceProfile.ADAPTIVE }),
       );
     });
   });
 
-  describe('listener management', () => {
-    it('should add and remove listeners correctly', () => {
+  describe("listener management", () => {
+    it("should add and remove listeners correctly", () => {
       const listener1 = vi.fn();
       const listener2 = vi.fn();
-      
+
       const remove1 = manager.addListener(listener1);
       const remove2 = manager.addListener(listener2);
-      
+
       manager.updatePreferences({ profile: PerformanceProfile.MEMORY_SAVER });
-      
+
       expect(listener1).toHaveBeenCalledTimes(1);
       expect(listener2).toHaveBeenCalledTimes(1);
-      
+
       // Remove one listener
       remove1();
-      
+
       manager.updatePreferences({ profile: PerformanceProfile.BALANCED });
-      
+
       expect(listener1).toHaveBeenCalledTimes(1); // Not called again
       expect(listener2).toHaveBeenCalledTimes(2); // Called again
-      
+
       remove2();
     });
 
-    it('should handle listener errors gracefully', () => {
+    it("should handle listener errors gracefully", () => {
       const errorListener = vi.fn().mockImplementation(() => {
-        throw new Error('Listener error');
+        throw new Error("Listener error");
       });
       const workingListener = vi.fn();
-      
+
       manager.addListener(errorListener);
       manager.addListener(workingListener);
-      
+
       // Should not throw even if one listener errors
       expect(() => {
         manager.updatePreferences({ profile: PerformanceProfile.MEMORY_SAVER });
       }).not.toThrow();
-      
+
       expect(workingListener).toHaveBeenCalled();
     });
   });
 });
 
-describe('Global instance', () => {
-  it('should provide a global instance', () => {
-    expect(globalPerformancePreferences).toBeInstanceOf(PerformancePreferencesManager);
+describe("Global instance", () => {
+  it("should provide a global instance", () => {
+    expect(globalPerformancePreferences).toBeInstanceOf(
+      PerformancePreferencesManager,
+    );
   });
 
-  it('should maintain state across calls', () => {
-    globalPerformancePreferences.updatePreferences({ profile: PerformanceProfile.SPEED_OPTIMIZED });
-    
+  it("should maintain state across calls", () => {
+    globalPerformancePreferences.updatePreferences({
+      profile: PerformanceProfile.SPEED_OPTIMIZED,
+    });
+
     const preferences1 = globalPerformancePreferences.getPreferences();
     const preferences2 = globalPerformancePreferences.getPreferences();
-    
+
     expect(preferences1.profile).toBe(PerformanceProfile.SPEED_OPTIMIZED);
     expect(preferences2.profile).toBe(PerformanceProfile.SPEED_OPTIMIZED);
   });
 });
 
-describe('usePerformancePreferences hook', () => {
-  it('should return preferences and update functions', () => {
-    const hookResult = usePerformancePreferences();
-    
-    expect(hookResult).toHaveProperty('preferences');
-    expect(hookResult).toHaveProperty('updatePreferences');
-    expect(hookResult).toHaveProperty('resetToDefaults');
-    expect(typeof hookResult.updatePreferences).toBe('function');
-    expect(typeof hookResult.resetToDefaults).toBe('function');
+describe("usePerformancePreferences hook", () => {
+  it("should return preferences and update functions", () => {
+    const { result } = renderHook(() => usePerformancePreferences());
+    const hookResult = result.current;
+
+    expect(hookResult).toHaveProperty("preferences");
+    expect(hookResult).toHaveProperty("updatePreferences");
+    expect(hookResult).toHaveProperty("resetToDefaults");
+    expect(typeof hookResult.updatePreferences).toBe("function");
+    expect(typeof hookResult.resetToDefaults).toBe("function");
   });
 
-  it('should use the global instance', () => {
-    const hookResult = usePerformancePreferences();
-    
+  it("should use the global instance", () => {
+    const { result } = renderHook(() => usePerformancePreferences());
+    const hookResult = result.current;
+
     // Should match global preferences
-    expect(hookResult.preferences).toEqual(globalPerformancePreferences.getPreferences());
+    expect(hookResult.preferences).toEqual(
+      globalPerformancePreferences.getPreferences(),
+    );
+  });
+
+  it("should rerender only when the global store changes", () => {
+    const { result } = renderHook(() => usePerformancePreferences());
+    const firstPreferences = result.current.preferences;
+
+    act(() => {
+      globalPerformancePreferences.updatePreferences({
+        profile: PerformanceProfile.MEMORY_SAVER,
+      });
+    });
+
+    expect(result.current.preferences).not.toBe(firstPreferences);
+    expect(result.current.preferences.profile).toBe(
+      PerformanceProfile.MEMORY_SAVER,
+    );
   });
 });

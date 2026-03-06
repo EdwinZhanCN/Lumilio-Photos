@@ -3596,6 +3596,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get public runtime capabilities
+         * @description Return a de-sensitized view of backend ML and LLM runtime capabilities without exposing secrets.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Capabilities retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -3651,6 +3712,246 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/system": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get system settings
+         * @description Return persisted system settings without exposing secret values.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description System settings retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update system settings
+         * @description Update persisted system settings. API keys are write-only and never returned.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description System settings patch */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateSystemSettingsDTO"];
+                };
+            };
+            responses: {
+                /** @description System settings updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request data */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/settings/system/validate-llm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate LLM settings
+         * @description Validate the persisted LLM configuration by issuing a lightweight test request.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description LLM settings validated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description LLM validation failed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -4293,6 +4594,10 @@ export interface components {
              */
             total?: number;
         };
+        "dto.CapabilitiesResponseDTO": {
+            llm?: components["schemas"]["dto.LLMCapabilitiesDTO"];
+            ml?: components["schemas"]["dto.MLCapabilitiesDTO"];
+        };
         "dto.CreateAlbumRequestDTO": {
             album_name: string;
             cover_asset_id?: string;
@@ -4334,6 +4639,24 @@ export interface components {
             updated_at?: string;
             user_id?: number;
         };
+        "dto.LLMCapabilitiesDTO": {
+            agent_enabled?: boolean;
+            configured?: boolean;
+            /** @example gpt-4.1-mini */
+            model_name?: string;
+            /** @example openai */
+            provider?: string;
+        };
+        "dto.LLMSettingsDTO": {
+            agent_enabled?: boolean;
+            api_key_configured?: boolean;
+            /** @example https://api.openai.com/v1 */
+            base_url?: string;
+            /** @example gpt-4.1-mini */
+            model_name?: string;
+            /** @example openai */
+            provider?: string;
+        };
         "dto.ListAlbumsResponseDTO": {
             albums?: components["schemas"]["dto.GetAlbumResponseDTO"][];
             limit?: number;
@@ -4343,6 +4666,33 @@ export interface components {
         "dto.LoginRequestDTO": {
             password: string;
             username: string;
+        };
+        "dto.MLCapabilitiesDTO": {
+            /** @example 1 */
+            active_node_count?: number;
+            /** @example enable */
+            auto_mode?: string;
+            /** @example 2 */
+            discovered_node_count?: number;
+            tasks?: components["schemas"]["dto.MLTaskSetDTO"];
+        };
+        "dto.MLSettingsDTO": {
+            /** @example disable */
+            auto_mode?: string;
+            caption_enabled?: boolean;
+            clip_enabled?: boolean;
+            face_enabled?: boolean;
+            ocr_enabled?: boolean;
+        };
+        "dto.MLTaskCapabilityDTO": {
+            available?: boolean;
+            enabled?: boolean;
+        };
+        "dto.MLTaskSetDTO": {
+            clip_image_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+            face_detect_and_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+            ocr?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+            vlm_generate?: components["schemas"]["dto.MLTaskCapabilityDTO"];
         };
         "dto.MessageResponseDTO": {
             /** @example Operation completed successfully */
@@ -4419,6 +4769,12 @@ export interface components {
             status?: string;
             total_chunks?: number;
         };
+        "dto.SystemSettingsDTO": {
+            llm?: components["schemas"]["dto.LLMSettingsDTO"];
+            ml?: components["schemas"]["dto.MLSettingsDTO"];
+            updated_at?: string;
+            updated_by?: number;
+        };
         "dto.UpdateAlbumRequestDTO": {
             album_name?: string;
             cover_asset_id?: string;
@@ -4434,9 +4790,25 @@ export interface components {
             /** @example A beautiful sunset photo */
             description?: string;
         };
+        "dto.UpdateLLMSettingsDTO": {
+            agent_enabled?: boolean;
+            api_key?: string;
+            base_url?: string;
+            model_name?: string;
+            /** @enum {string} */
+            provider?: "ark" | "openai" | "deepseek" | "ollama";
+        };
         "dto.UpdateLikeRequestDTO": {
             /** @example true */
             liked?: boolean;
+        };
+        "dto.UpdateMLSettingsDTO": {
+            /** @enum {string} */
+            auto_mode?: "enable" | "disable";
+            caption_enabled?: boolean;
+            clip_enabled?: boolean;
+            face_enabled?: boolean;
+            ocr_enabled?: boolean;
         };
         "dto.UpdateRatingAndLikeRequestDTO": {
             /** @example true */
@@ -4447,6 +4819,10 @@ export interface components {
         "dto.UpdateRatingRequestDTO": {
             /** @example 5 */
             rating?: number;
+        };
+        "dto.UpdateSystemSettingsDTO": {
+            llm?: components["schemas"]["dto.UpdateLLMSettingsDTO"];
+            ml?: components["schemas"]["dto.UpdateMLSettingsDTO"];
         };
         "dto.UploadConfigResponseDTO": {
             chunk_size?: number;
@@ -4480,6 +4856,9 @@ export interface components {
             last_login?: string;
             user_id?: number;
             username?: string;
+        };
+        "dto.ValidateLLMSettingsResponseDTO": {
+            valid?: boolean;
         };
         "handler.AgentChatRequest": {
             query: string;

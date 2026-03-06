@@ -17,6 +17,16 @@ import { useSettingsContext } from "@/features/settings";
 import { useAssetsStore } from "./assets.store";
 import { useShallow } from "zustand/react/shallow";
 import { isGroupByType, resolveGroupByFromUrl } from "./utils/groupBy";
+import {
+  ASSETS_STATE_STORAGE_KEY,
+  ASSETS_STATE_STORAGE_VERSION,
+  LEGACY_ASSETS_STATE_STORAGE_KEY,
+} from "@/lib/settings/registry";
+import {
+  isRecord,
+  readVersionedStorageCandidate,
+  writeVersionedStorageData,
+} from "@/lib/settings/storage";
 
 // Context for navigation helpers which depend on router
 interface AssetsNavigationContextValue {
@@ -29,8 +39,45 @@ export const AssetsNavigationContext = createContext<
   AssetsNavigationContextValue | undefined
 >(undefined);
 
-const STORAGE_KEY = "assets_state_v1";
 const STORAGE_FIELDS = ["filters", "selection"] as const;
+
+function toStorageSnapshot(
+  state: Record<string, unknown>,
+): Record<string, unknown> {
+  const toSave: Record<string, unknown> = {};
+
+  STORAGE_FIELDS.forEach((field) => {
+    if (state[field]) {
+      if (field === "selection" && isRecord(state.selection)) {
+        const rawSelectedIds = state.selection.selectedIds;
+        const selectedIds =
+          rawSelectedIds instanceof Set
+            ? Array.from(rawSelectedIds)
+            : Array.isArray(rawSelectedIds)
+              ? rawSelectedIds
+              : [];
+
+        toSave[field] = {
+          ...state.selection,
+          selectedIds,
+        };
+      } else {
+        toSave[field] = state[field];
+      }
+    }
+  });
+
+  return toSave;
+}
+
+function writeStateToStorage(state: Record<string, unknown>) {
+  writeVersionedStorageData(
+    ASSETS_STATE_STORAGE_KEY,
+    ASSETS_STATE_STORAGE_VERSION,
+    toStorageSnapshot(state),
+  );
+  localStorage.removeItem(LEGACY_ASSETS_STATE_STORAGE_KEY);
+}
 
 interface AssetsProviderProps {
   children: ReactNode;
@@ -41,24 +88,47 @@ interface AssetsProviderProps {
 
 function loadPersistedState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const restored: any = {};
+    if (typeof localStorage === "undefined") {
+      return {};
+    }
+
+    const parseCandidate = (candidate: unknown): Record<string, unknown> => {
+      if (!isRecord(candidate)) return {};
+      const restored: Record<string, unknown> = {};
 
       STORAGE_FIELDS.forEach((field) => {
-        if (parsed[field]) {
-          if (field === "selection") {
-            restored[field] = {
-              ...parsed[field],
-              selectedIds: new Set(parsed[field].selectedIds || []),
-            };
-          } else {
-            restored[field] = parsed[field];
-          }
+        if (!candidate[field]) return;
+
+        if (field === "selection" && isRecord(candidate.selection)) {
+          const rawSelectedIds = candidate.selection.selectedIds;
+          const selectedIds = Array.isArray(rawSelectedIds)
+            ? rawSelectedIds
+            : rawSelectedIds instanceof Set
+              ? Array.from(rawSelectedIds)
+              : [];
+
+          restored[field] = {
+            ...candidate.selection,
+            selectedIds: new Set(selectedIds),
+          };
+        } else {
+          restored[field] = candidate[field];
         }
       });
 
+      return restored;
+    };
+
+    const readResult = readVersionedStorageCandidate({
+      key: ASSETS_STATE_STORAGE_KEY,
+      version: ASSETS_STATE_STORAGE_VERSION,
+      legacyKeys: [LEGACY_ASSETS_STATE_STORAGE_KEY],
+    });
+    if (readResult.candidate !== null) {
+      const restored = parseCandidate(readResult.candidate);
+      if (readResult.needsRewrite) {
+        writeStateToStorage(restored);
+      }
       return restored;
     }
   } catch (e) {
@@ -69,22 +139,11 @@ function loadPersistedState() {
 
 function saveStateToStorage(state: any) {
   try {
-    const toSave: any = {};
+    if (typeof localStorage === "undefined") {
+      return;
+    }
 
-    STORAGE_FIELDS.forEach((field) => {
-      if (state[field]) {
-        if (field === "selection") {
-          toSave[field] = {
-            ...state[field],
-            selectedIds: Array.from(state[field].selectedIds),
-          };
-        } else {
-          toSave[field] = state[field];
-        }
-      }
-    });
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    writeStateToStorage(state);
   } catch (e) {
     console.warn("[AssetsProvider] Failed to persist state", e);
   }
@@ -136,9 +195,10 @@ export const AssetsProvider = ({
     if (initialized.current) return;
     initialized.current = true;
 
+    let persistedState: Record<string, any> = {};
     // Load persisted state
     if (persist) {
-      const persistedState = loadPersistedState();
+      persistedState = loadPersistedState();
       if (persistedState.filters) {
         batchUpdateFilters(persistedState.filters);
       }
@@ -158,7 +218,7 @@ export const AssetsProvider = ({
     }
 
     // Set default selection mode
-    if (!persist || !loadPersistedState().selection) {
+    if (!persist || !persistedState.selection) {
       setSelectionMode(defaultSelectionMode);
     }
   }, [
@@ -233,7 +293,6 @@ export const AssetsProvider = ({
     hydrateUIFromURL,
     setSearchParams,
   ]);
-
 
   const openCarousel = useCallback(
     (assetId: string) => {

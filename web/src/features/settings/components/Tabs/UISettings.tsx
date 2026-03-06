@@ -1,30 +1,21 @@
 import React from "react";
-import { LayoutDashboard } from "lucide-react";
-import { useI18n, changeLanguage, getCurrentLanguage } from "@/lib/i18n.tsx";
+import { useI18n } from "@/lib/i18n.tsx";
 import { useSettingsContext } from "@/features/settings";
 import {
   PhotoIcon,
   GlobeAltIcon,
-  CursorArrowRippleIcon,
-  ArrowUpTrayIcon,
+  PaintBrushIcon,
 } from "@heroicons/react/24/outline";
 
 export default function UISettings() {
   const { t } = useI18n();
 
   const { state, dispatch } = useSettingsContext();
-
-  React.useEffect(() => {
-    const lng = state.ui.language ?? getCurrentLanguage();
-    document.documentElement.setAttribute("lang", lng);
-    changeLanguage(lng);
-  }, [state.ui.language]);
+  const currentLayout = state.ui.asset_page?.layout ?? "full";
 
   const onChangeLanguage = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const lng = e.target.value as "en" | "zh";
     dispatch({ type: "SET_LANGUAGE", payload: lng });
-    document.documentElement.setAttribute("lang", lng);
-    changeLanguage(lng);
   };
 
   const onChangeRegion = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -32,14 +23,43 @@ export default function UISettings() {
     dispatch({ type: "SET_REGION", payload: region });
   };
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-2">
-        <CursorArrowRippleIcon className="size-6 text-primary" />
-        <h2 className="text-2xl font-bold">{t("settings.ui")}</h2>
-      </div>
+  const layoutOptions = [
+    {
+      value: "compact" as const,
+      label: t("settings.appearanceSettings.layoutOptions.compact.label"),
+      description: t(
+        "settings.appearanceSettings.layoutOptions.compact.description",
+      ),
+    },
+    {
+      value: "wide" as const,
+      label: t("settings.appearanceSettings.layoutOptions.wide.label"),
+      description: t(
+        "settings.appearanceSettings.layoutOptions.wide.description",
+      ),
+    },
+    {
+      value: "full" as const,
+      label: t("settings.appearanceSettings.layoutOptions.full.label"),
+      description: t(
+        "settings.appearanceSettings.layoutOptions.full.description",
+      ),
+    },
+  ];
 
-      <section className="space-y-4">
+  return (
+    <div className="space-y-6">
+      <header className="space-y-2">
+        <div className="flex items-center gap-2">
+          <PaintBrushIcon className="size-6 text-primary" />
+          <h2 className="text-2xl font-bold">{t("settings.appearance")}</h2>
+        </div>
+        <p className="text-base-content/70">
+          {t("settings.appearanceSettings.description")}
+        </p>
+      </header>
+
+      <section className="rounded-2xl border border-base-300 bg-base-100 p-5 space-y-4">
         <div className="flex items-center gap-2">
           <GlobeAltIcon className="size-6 text-primary" />
           <h3 className="text-lg font-semibold">
@@ -47,14 +67,14 @@ export default function UISettings() {
           </h3>
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <label className="font-semibold min-w-32">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <label className="font-semibold block">
               {t("settings.language")}
             </label>
             <select
-              className="select select-bordered"
-              value={state.ui.language ?? getCurrentLanguage()}
+              className="select select-bordered w-full"
+              value={state.ui.language}
               onChange={onChangeLanguage}
             >
               <option value="en">English</option>
@@ -62,12 +82,12 @@ export default function UISettings() {
             </select>
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="font-semibold min-w-32">
+          <div className="space-y-2">
+            <label className="font-semibold block">
               {t("settings.region")}
             </label>
             <select
-              className="select select-bordered"
+              className="select select-bordered w-full"
               value={state.ui.region ?? "other"}
               onChange={onChangeRegion}
             >
@@ -78,127 +98,44 @@ export default function UISettings() {
         </div>
       </section>
 
-      <section className="space-y-4">
+      <section className="rounded-2xl border border-base-300 bg-base-100 p-5 space-y-4">
         <div className="flex items-center gap-2">
           <PhotoIcon className="size-6 text-primary" />
-          <h3 className="text-lg font-semibold">{t("settings.assetPage")}</h3>
+          <div>
+            <h3 className="text-lg font-semibold">{t("settings.assetPage")}</h3>
+            <p className="text-sm text-base-content/70">
+              {t("settings.appearanceSettings.layoutDescription")}
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <LayoutDashboard className="size-6 text-primary" />
-          <h4 className="text-base font-medium">{t("settings.pageLayout")}</h4>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex items-center gap-2">
-          <ArrowUpTrayIcon className="size-6 text-primary" />
-          <h3 className="text-lg font-semibold">Upload Settings</h3>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <label className="font-semibold min-w-40">Max Total Files</label>
-            <input
-              type="number"
-              className="input input-bordered w-32"
-              min="1"
-              max="500"
-              value={state.ui.upload?.max_total_files ?? 100}
-              onChange={(e) => {
-                const value = parseInt(e.target.value) || 1;
-                dispatch({
-                  type: "SET_UPLOAD_MAX_TOTAL_FILES",
-                  payload: value,
-                });
-              }}
-            />
-            <span className="text-sm text-base-content/70">
-              Maximum number of files that can be uploaded at once
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <label className="font-semibold min-w-40">Low Power Mode</label>
-            <input
-              type="checkbox"
-              className="toggle"
-              checked={state.ui.upload?.low_power_mode ?? false}
-              onChange={(e) =>
-                dispatch({
-                  type: "SET_UPLOAD_LOW_POWER_MODE",
-                  payload: e.target.checked,
-                })
-              }
-            />
-            <span className="text-sm text-base-content/70">
-              Reduce CPU by larger chunks + lower concurrency
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <label className="font-semibold min-w-40">Chunk Size (MB)</label>
-            <input
-              type="number"
-              className="input input-bordered w-32"
-              min="1"
-              max="128"
-              value={state.ui.upload?.chunk_size_mb ?? 24}
-              onChange={(e) => {
-                const value = parseInt(e.target.value) || 1;
-                dispatch({
-                  type: "SET_UPLOAD_CHUNK_SIZE_MB",
-                  payload: value,
-                });
-              }}
-            />
-            <span className="text-sm text-base-content/70">
-              Default 24 MB when low power mode is on
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <label className="font-semibold min-w-40">
-              Max Concurrent Chunks
-            </label>
-            <input
-              type="number"
-              className="input input-bordered w-32"
-              min="1"
-              max="6"
-              value={state.ui.upload?.max_concurrent_chunks ?? 2}
-              onChange={(e) => {
-                const value = parseInt(e.target.value) || 1;
-                dispatch({
-                  type: "SET_UPLOAD_MAX_CONCURRENT_CHUNKS",
-                  payload: value,
-                });
-              }}
-            />
-            <span className="text-sm text-base-content/70">
-              Concurrent uploads per file
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <label className="font-semibold min-w-40">
-              Use Server Upload Config
-            </label>
-            <input
-              type="checkbox"
-              className="toggle"
-              checked={state.ui.upload?.use_server_config ?? true}
-              onChange={(e) =>
-                dispatch({
-                  type: "SET_UPLOAD_USE_SERVER_CONFIG",
-                  payload: e.target.checked,
-                })
-              }
-            />
-            <span className="text-sm text-base-content/70">
-              Auto-apply backend chunk size/concurrency hints
-            </span>
-          </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          {layoutOptions.map((option) => {
+            const isActive = currentLayout === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={[
+                  "rounded-2xl border p-4 text-left transition",
+                  isActive
+                    ? "border-primary bg-primary/8 shadow-sm"
+                    : "border-base-300 bg-base-100 hover:border-base-content/30",
+                ].join(" ")}
+                onClick={() =>
+                  dispatch({
+                    type: "SET_ASSETS_LAYOUT",
+                    payload: option.value,
+                  })
+                }
+              >
+                <div className="font-semibold">{option.label}</div>
+                <div className="mt-2 text-sm text-base-content/70">
+                  {option.description}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </section>
     </div>

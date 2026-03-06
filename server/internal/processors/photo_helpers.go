@@ -102,28 +102,16 @@ func (ap *AssetProcessor) extractRAWPreview(ctx context.Context, fullPath string
 	return result.PreviewData, nil
 }
 
-// enqueueMLJobs enqueues enabled ML jobs based on appConfig.MLConfig.
+// enqueueMLJobs enqueues enabled ML jobs based on runtime settings.
 // This is called during ingestion for photos to enqueue ML processing tasks.
 func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset, fullPath string) error {
-	mlConfig := ap.appConfig.MLConfig
-
-	// Gate by Lumen task availability if Lumen is present
-	if ap.lumenService != nil {
-		if mlConfig.CLIPEnabled && !ap.lumenService.IsTaskAvailable("clip_image_embed") {
-			mlConfig.CLIPEnabled = false
-		}
-		if mlConfig.OCREnabled && !ap.lumenService.IsTaskAvailable("ocr") {
-			mlConfig.OCREnabled = false
-		}
-		if mlConfig.CaptionEnabled && !ap.lumenService.IsTaskAvailable("vlm_generate") {
-			mlConfig.CaptionEnabled = false
-		}
-		if mlConfig.FaceEnabled && !ap.lumenService.IsTaskAvailable("face_detect_and_embed") {
-			mlConfig.FaceEnabled = false
-		}
+	mlConfig, err := ap.settingsService.GetEffectiveMLConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("load ML settings: %w", err)
 	}
 
-	// Early return if no ML services enabled or available
+	// Early return if no ML services are enabled by runtime config.
+	// Runtime task availability is handled by per-task workers via snooze/retry.
 	if !mlConfig.CLIPEnabled && !mlConfig.OCREnabled && !mlConfig.CaptionEnabled && !mlConfig.FaceEnabled {
 		return nil
 	}

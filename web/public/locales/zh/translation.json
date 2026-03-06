@@ -4,6 +4,11 @@
         "tagline": "照片"
     },
     "navbar": {
+        "agent": {
+            "label": "Lumilio Agent",
+            "open": "打开 Lumilio Agent",
+            "disabled": "Lumilio Agent 已在服务器设置中禁用。"
+        },
         "theme": {
             "light": "浅色",
             "dark": "深色"
@@ -454,6 +459,10 @@
     "settings": {
         "title": "设置",
         "ui": "界面",
+        "appearance": "外观",
+        "upload": "上传",
+        "ai": "AI",
+        "performance": "性能",
         "server": "服务器",
         "lumen": "Lumen",
         "language": "语言",
@@ -465,11 +474,173 @@
         },
         "assetPage": "资源页面",
         "pageLayout": "页面布局",
+        "appearanceSettings": {
+            "description": "配置当前浏览器的语言、地区和资源页默认布局。",
+            "layoutDescription": "设置资源页使用的默认布局。",
+            "layoutOptions": {
+                "compact": {
+                    "label": "紧凑",
+                    "description": "提高信息密度并缩小间距。"
+                },
+                "wide": {
+                    "label": "宽幅",
+                    "description": "采用较均衡的间距，并默认按类型分组。"
+                },
+                "full": {
+                    "label": "舒展",
+                    "description": "提供更宽松的留白和更大的布局间距。"
+                }
+            }
+        },
+        "uploadSettings": {
+            "description": "配置当前浏览器的上传设置。",
+            "controlModeTitle": "上传调优来源",
+            "controlModeDescription": "设置上传分片大小和并发参数的来源。",
+            "serverMode": "后端管理",
+            "localMode": "本地覆盖",
+            "recommended": "推荐",
+            "serverModeHint": "分片大小和并发将使用后端建议值。本地高级值会保留，但不会生效。",
+            "localModeHint": "分片大小和并发将使用本地配置值。",
+            "basicTitle": "基础控制",
+            "basicDescription": "配置上传限制和默认行为。",
+            "maxTotalFiles": "单次最多文件数",
+            "maxTotalFilesDescription": "一次上传批次中允许加入的最大文件数量。",
+            "lowPowerMode": "低功耗模式",
+            "lowPowerModeDescription": "使用更保守的默认值，以降低上传期间的 CPU 和内存占用。",
+            "advancedTitle": "高级本地覆盖",
+            "advancedDescription": "配置本地上传参数。",
+            "advancedDisabledHint": "启用后端管理上传配置时，这些字段不可用。",
+            "chunkSize": "分片大小",
+            "chunkSizeDescription": "浏览器上传器对单个文件使用的分片大小。",
+            "chunkSizeUnit": "MB",
+            "maxConcurrentChunks": "最大并发分片数",
+            "maxConcurrentChunksDescription": "浏览器对每个文件可并行上传的分片数量。"
+        },
+        "performanceSettings": {
+            "description": "配置本地处理任务的性能策略。",
+            "currentProfile": "当前预设",
+            "cpuCores": "CPU 核心数",
+            "availableMemory": "可用内存",
+            "deviceType": "设备类型",
+            "maxConcurrency": "最大并发",
+            "deviceTypeValues": {
+                "mobile": "移动端",
+                "desktop": "桌面端",
+                "lowEnd": "低配"
+            },
+            "profileTitle": "性能预设",
+            "profileDescription": "选择并发和内存使用的默认预设。",
+            "advancedTitle": "高级控制",
+            "advancedDescription": "配置更细的性能参数。",
+            "respectMemoryLimits": "遵守内存限制",
+            "respectMemoryLimitsDescription": "当可用内存受限时，降低处理强度。",
+            "prioritizeUserOperations": "优先用户操作",
+            "prioritizeUserOperationsDescription": "优先处理与当前用户交互相关的操作。",
+            "maxConcurrentOperations": "最大并发操作数",
+            "maxConcurrentOperationsDescription": "浏览器同时运行的重处理任务上限。",
+            "changesApply": "更改会立即作用于新的处理任务。",
+            "reset": "恢复默认",
+            "profiles": {
+                "memory_saver": {
+                    "label": "节省内存",
+                    "description": "降低内存占用和处理并发。"
+                },
+                "balanced": {
+                    "label": "平衡",
+                    "description": "在处理速度和内存占用之间保持平衡。"
+                },
+                "speed": {
+                    "label": "优先速度",
+                    "description": "提高并发，以优先提升处理速度。"
+                },
+                "adaptive": {
+                    "label": "自适应",
+                    "description": "根据检测到的设备能力自动调整处理策略。"
+                }
+            }
+        },
+        "aiSettings": {
+            "description": "管理 Lumilio Agent 和 ML 服务设置。",
+            "saveSuccess": "设置已保存。",
+            "saveError": "保存设置失败。",
+            "validationSuccess": "LLM 配置验证成功。",
+            "validationError": "LLM 配置验证失败。",
+            "loadError": "加载 AI 设置失败。",
+            "agentTitle": "Lumilio Agent",
+            "agentDescription": "配置 Agent 使用的服务端 LLM 提供方和凭据。",
+            "enabled": "启用 Agent",
+            "provider": "提供方",
+            "modelName": "模型名称",
+            "baseUrl": "Base URL",
+            "baseUrlDescription": "可选，用于覆盖兼容提供方的接口地址。",
+            "apiKey": "API Key",
+            "apiKeyDescription": "API Key 为只写字段。留空时会保留当前已保存的 Key。",
+            "apiKeyPlaceholder": "输入新的 API Key",
+            "apiKeyConfigured": "已保存 API Key",
+            "clearStoredKey": "清除已保存的 API Key",
+            "validate": "验证连接",
+            "mlTitle": "ML 服务",
+            "mlDescription": "配置服务发现模式和手动任务开关。",
+            "autoMode": "自动发现",
+            "autoModeDescription": "使用已发现 ML 服务提供的全部能力。",
+            "manualMode": "手动选择",
+            "manualModeDescription": "仅使用下方启用的任务类型。",
+            "tasksTitle": "任务选择",
+            "tasksDescription": "自动发现关闭时，选择要启用的 ML 任务。",
+            "autoOverrideHint": "自动发现模式会启用所有已发现任务。",
+            "providerOptions": {
+                "unset": "未设置",
+                "ark": "Ark",
+                "openai": "OpenAI",
+                "deepseek": "DeepSeek",
+                "ollama": "Ollama"
+            },
+            "taskNames": {
+                "clip": "CLIP 图像嵌入",
+                "ocr": "OCR",
+                "caption": "VLM 描述",
+                "face": "人脸检测与嵌入"
+            }
+        },
         "serverSettings": {
             "healthCheckInterval": "健康检查间隔",
             "healthCheckDescription": "控制应用程序检测服务器健康状态的频率。较低的数值会更频繁地更新，但可能增加网络使用量。",
             "presets": "预设值：",
-            "reset": "重置"
+            "reset": "重置",
+            "capabilitiesTitle": "能力状态",
+            "capabilitiesDescription": "只读展示后端当前的 ML 发现状态与 LLM Agent 运行状态。",
+            "refresh": "刷新",
+            "capabilitiesError": "加载能力状态失败。",
+            "mlTitle": "ML 服务",
+            "llmTitle": "LLM Agent",
+            "autoMode": "自动模式",
+            "discoveredNodes": "已发现节点",
+            "activeNodes": "活跃节点",
+            "taskAvailability": "任务可用性",
+            "nodesSummary": "活跃 / 已发现节点",
+            "agentEnabled": "Agent 已启用",
+            "configured": "已配置",
+            "provider": "提供方",
+            "model": "模型",
+            "openMonitor": "打开服务器监控",
+            "enabled": "启用",
+            "disabled": "禁用",
+            "available": "可用",
+            "unavailable": "不可用",
+            "autoModeValues": {
+                "enable": "自动发现",
+                "disable": "手动"
+            },
+            "booleanValues": {
+                "true": "是",
+                "false": "否"
+            },
+            "taskNames": {
+                "clipImageEmbed": "CLIP 图像嵌入",
+                "ocr": "OCR",
+                "vlmGenerate": "VLM 描述",
+                "faceDetectAndEmbed": "人脸检测与嵌入"
+            }
         },
         "lumenSettings": {
             "title": "浏览器端 Lumen",
@@ -517,6 +688,18 @@
     },
     "monitor": {
         "title": "服务器监控",
+        "subtitles": {
+            "queue": "实时任务队列监控",
+            "capabilities": "ML 自动发现与 LLM Agent 运行状态"
+        },
+        "tabs": {
+            "queue": "队列",
+            "capabilities": "能力"
+        },
+        "sections": {
+            "activeQueues": "活跃队列",
+            "recentJobs": "最近任务"
+        },
         "status": {
             "online": "在线",
             "offline": "离线"

@@ -62,6 +62,7 @@ services:
             ML_OCR_ENABLED: "false"
             ML_CAPTION_ENABLED: "false"
             ML_FACE_ENABLED: "false"
+            LUMILIO_SECRET_KEY: /data/storage/.secrets/lumilio_secret_key
             LLM_AGENT_ENABLED: "false"
             LLM_PROVIDER: your-llm-provider
             LLM_API_KEY: your-api-key-here

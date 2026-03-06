@@ -47,6 +47,11 @@ Access:
 - API: http://localhost:8080
 - API Docs: http://localhost:8080/swagger/index.html
 
+Security key behavior:
+- `LUMILIO_SECRET_KEY` is treated as a key file path (not raw key text).
+- If the file does not exist, server auto-generates and persists it.
+- The same key file is used to derive JWT signing key and settings encryption key.
+
 ### Development
 
 **Prerequisites:** Go 1.24+, Node.js 23+, Docker, Make
@@ -67,6 +72,8 @@ Access:
 - API Docs: http://localhost:8080/swagger/index.html
 
 **Note:** Database runs on port 5433
+Development database uses the standalone image defined in `server/db.Dockerfile`; it is not started via `docker compose`.
+`LUMILIO_SECRET_KEY` defaults to `./data/storage/.secrets/lumilio_secret_key` in local dev templates.
 
 ### Make Commands
 
