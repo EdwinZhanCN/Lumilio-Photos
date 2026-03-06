@@ -22,6 +22,8 @@ export interface RichInputProps {
   onSubmit?: (payload: string) => void;
   /** Whether submission is disabled. */
   isSubmitting?: boolean;
+  /** Whether the input is read-only. */
+  isDisabled?: boolean;
   /** Custom CSS class name. */
   className?: string;
 }
@@ -33,6 +35,7 @@ export const RichInput: React.FC<RichInputProps> = ({
   commands = [],
   onSubmit,
   isSubmitting = false,
+  isDisabled = false,
   className = "",
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -58,12 +61,12 @@ export const RichInput: React.FC<RichInputProps> = ({
    * clears the editor, and resets the payload state.
    */
   const handleSubmitClick = useCallback(() => {
-    if (state.payload.trim() && !isSubmitting && onSubmit) {
+    if (state.payload.trim() && !isSubmitting && !isDisabled && onSubmit) {
       onSubmit(state.payload);
       clearEditor(editorRef);
       dispatch({ type: "SET_PAYLOAD", payload: "" });
     }
-  }, [state.payload, isSubmitting, onSubmit, dispatch]);
+  }, [state.payload, isSubmitting, isDisabled, onSubmit, dispatch]);
 
   /** Handles keyboard events in the rich input editor.
    *
@@ -75,6 +78,11 @@ export const RichInput: React.FC<RichInputProps> = ({
    */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (isDisabled) {
+        e.preventDefault();
+        return;
+      }
+
       const { phase, options, selectedIndex } = state;
 
       if (phase !== "IDLE" && options.length > 0) {
@@ -117,7 +125,7 @@ export const RichInput: React.FC<RichInputProps> = ({
         }
       }
     },
-    [state, dispatch, updatePayloadPreview, handleSubmitClick],
+    [isDisabled, state, dispatch, updatePayloadPreview, handleSubmitClick],
   );
 
   /** Handles input events in the rich content editable editor.
@@ -127,6 +135,10 @@ export const RichInput: React.FC<RichInputProps> = ({
    * when a space is detected.
    */
   const handleInput = useCallback(() => {
+    if (isDisabled) {
+      return;
+    }
+
     updatePayloadPreview();
 
     const selection = window.getSelection();
@@ -153,7 +165,7 @@ export const RichInput: React.FC<RichInputProps> = ({
     } else if (state.phase !== "IDLE" && content.includes(" ")) {
       dispatch({ type: "RESET_EDITOR" });
     }
-  }, [updatePayloadPreview, state.phase, dispatch]);
+  }, [isDisabled, updatePayloadPreview, state.phase, dispatch]);
 
   /** Handles clicking on a menu option (mention type, entity, or command).
    *
@@ -164,6 +176,10 @@ export const RichInput: React.FC<RichInputProps> = ({
    */
   const handleOptionClick = useCallback(
     (option: MentionEntity) => {
+      if (isDisabled) {
+        return;
+      }
+
       if (state.phase === "SELECT_TYPE") {
         dispatch({
           type: "SET_ACTIVE_MENTION_TYPE",
@@ -186,7 +202,7 @@ export const RichInput: React.FC<RichInputProps> = ({
         });
       }
     },
-    [state.phase, dispatch, updatePayloadPreview],
+    [isDisabled, state.phase, dispatch, updatePayloadPreview],
   );
 
   /** Handles mouse enter event on a menu option.
@@ -236,14 +252,25 @@ export const RichInput: React.FC<RichInputProps> = ({
   return (
     <div className={`relative ${className}`}>
       {/* Input container */}
-      <div className="relative bg-base-200 rounded-xl border border-base-300 focus-within:ring-2 focus-within:ring-primary focus-within:bg-base-100 transition-all">
+      <div
+        className={[
+          "relative rounded-xl border border-base-300 transition-all",
+          isDisabled
+            ? "bg-base-200/60 opacity-70"
+            : "bg-base-200 focus-within:ring-2 focus-within:ring-primary focus-within:bg-base-100",
+        ].join(" ")}
+      >
         {/* ContentEditable Input */}
         <div
           ref={editorRef}
-          contentEditable
+          contentEditable={!isDisabled}
           onInput={handleInput}
           onKeyDown={handleKeyDown}
-          className="w-full max-h-40 overflow-y-auto p-4 pr-14 focus:outline-none text-base leading-relaxed empty:before:content-[attr(data-placeholder)] empty:before:text-base-content/50"
+          aria-disabled={isDisabled}
+          className={[
+            "w-full max-h-40 overflow-y-auto p-4 pr-14 focus:outline-none text-base leading-relaxed empty:before:content-[attr(data-placeholder)] empty:before:text-base-content/50",
+            isDisabled ? "cursor-not-allowed select-none" : "",
+          ].join(" ")}
           data-placeholder={placeholder}
           suppressContentEditableWarning
         />
@@ -252,7 +279,7 @@ export const RichInput: React.FC<RichInputProps> = ({
         <div className="absolute right-3 bottom-3 flex items-center">
           <button
             onClick={handleSubmitClick}
-            disabled={isSubmitting || !state.payload.trim()}
+            disabled={isDisabled || isSubmitting || !state.payload.trim()}
             className="btn btn-primary btn-square btn-sm"
           >
             {isSubmitting ? (
@@ -272,7 +299,7 @@ export const RichInput: React.FC<RichInputProps> = ({
       </div>
 
       {/* Floating Menu */}
-      {state.phase !== "IDLE" && state.menuPos && (
+      {!isDisabled && state.phase !== "IDLE" && state.menuPos && (
         <div
           className="absolute z-50 w-72 bg-base-100 rounded-lg shadow-xl border border-base-300 overflow-hidden"
           style={{

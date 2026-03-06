@@ -10,6 +10,8 @@ interface LumilioInputProps {
   isInitializing: boolean;
   onSubmit: (value: string) => void;
   commands?: MentionEntity[];
+  disabled?: boolean;
+  disabledHint?: string;
 }
 
 export function LumilioInput({
@@ -17,6 +19,8 @@ export function LumilioInput({
   isInitializing,
   onSubmit,
   commands = [],
+  disabled = false,
+  disabledHint,
 }: LumilioInputProps) {
   // Mention feature remains a placeholder for now
   const mentionTypes: MentionTypeOption[] = [
@@ -40,17 +44,24 @@ export function LumilioInput({
     <RichInputProvider>
       <div className="p-4 border-t border-base-300">
         <RichInput
-          placeholder="Ask Lumilio Agent... (Type @ or /)"
+          placeholder={
+            disabled
+              ? "Lumilio Agent is unavailable."
+              : "Ask Lumilio Agent... (Type @ or /)"
+          }
           onSubmit={onSubmit}
           mentionTypes={mentionTypes}
           getEntitiesByType={getEntitiesByType}
           commands={commands}
           isSubmitting={isGenerating || isInitializing}
+          isDisabled={disabled}
         />
 
         {/* Status info */}
         <div className="text-xs text-base-content/60 mt-2">
-          {isGenerating && "Generating response..."}
+          {disabled
+            ? (disabledHint ?? "Lumilio Agent is unavailable.")
+            : isGenerating && "Generating response..."}
         </div>
       </div>
     </RichInputProvider>
