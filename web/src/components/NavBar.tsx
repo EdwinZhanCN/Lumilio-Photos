@@ -2,24 +2,107 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n.tsx";
 import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/LumilioAvatar";
+import {
+  LEGACY_THEME_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  THEME_STORAGE_VERSION,
+} from "@/lib/settings/registry";
+
+type ThemeMode = "dark" | "light";
+
+interface ThemeEnvelope {
+  version: number;
+  data: ThemeMode;
+}
+
+function asThemeMode(value: unknown): ThemeMode | null {
+  return value === "dark" || value === "light" ? value : null;
+}
+
+function parseStoredTheme(raw: string | null): {
+  theme: ThemeMode | null;
+  needsRewrite: boolean;
+} {
+  if (!raw) return { theme: null, needsRewrite: false };
+
+  const literalTheme = asThemeMode(raw);
+  if (literalTheme) {
+    return { theme: literalTheme, needsRewrite: true };
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    const parsedTheme = asThemeMode(parsed);
+    if (parsedTheme) {
+      return { theme: parsedTheme, needsRewrite: true };
+    }
+
+    if (typeof parsed === "object" && parsed !== null) {
+      const maybeEnvelope = parsed as Partial<ThemeEnvelope> & {
+        theme?: unknown;
+      };
+      const envelopeTheme = asThemeMode(maybeEnvelope.data);
+      if (envelopeTheme) {
+        return {
+          theme: envelopeTheme,
+          needsRewrite: maybeEnvelope.version !== THEME_STORAGE_VERSION,
+        };
+      }
+
+      const legacyObjectTheme = asThemeMode(maybeEnvelope.theme);
+      if (legacyObjectTheme) {
+        return { theme: legacyObjectTheme, needsRewrite: true };
+      }
+    }
+  } catch {
+    return { theme: null, needsRewrite: false };
+  }
+
+  return { theme: null, needsRewrite: false };
+}
+
+function persistTheme(theme: ThemeMode): void {
+  if (typeof localStorage === "undefined") return;
+  const payload: ThemeEnvelope = {
+    version: THEME_STORAGE_VERSION,
+    data: theme,
+  };
+  localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(payload));
+  localStorage.removeItem(LEGACY_THEME_STORAGE_KEY);
+}
+
+function resolveInitialTheme(): ThemeMode {
+  if (typeof localStorage === "undefined") return "light";
+
+  const primary = parseStoredTheme(localStorage.getItem(THEME_STORAGE_KEY));
+  if (primary.theme) {
+    if (primary.needsRewrite) {
+      persistTheme(primary.theme);
+    }
+    return primary.theme;
+  }
+
+  const legacy = parseStoredTheme(
+    localStorage.getItem(LEGACY_THEME_STORAGE_KEY),
+  );
+  if (legacy.theme) {
+    persistTheme(legacy.theme);
+    return legacy.theme;
+  }
+
+  return "light";
+}
 
 function NavBar() {
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isLumilioHovered, setIsLumilioHovered] = useState(false);
   const { t } = useI18n();
 
   // Initialize theme on component mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme");
-    const isDark = savedTheme === "dark";
-
-    if (savedTheme) {
-      document.documentElement.setAttribute("data-theme", savedTheme);
-      setIsDarkMode(isDark);
-    } else {
-      // Default to light theme if no theme is saved
-      document.documentElement.setAttribute("data-theme", "light");
-      setIsDarkMode(false);
-    }
+    const initialTheme = resolveInitialTheme();
+    document.documentElement.setAttribute("data-theme", initialTheme);
+    setIsDarkMode(initialTheme === "dark");
   }, []);
 
   return (
@@ -36,24 +119,16 @@ function NavBar() {
         </Link>
       </div>
 
-      <div>
-        {(() => {
-          const [start, setStart] = useState(false);
-          return (
-            <Link to={"/lumilio"}>
-              <div
-                onMouseEnter={() => setStart(true)}
-                onMouseLeave={() => setStart(false)}
-              >
-                <LumilioAvatar
-                  className="mb-2 pointer-cursor"
-                  size={0.2}
-                  start={start}
-                />
-              </div>
-            </Link>
-          );
-        })()}
+      <div className="tooltip tooltip-bottom" data-tip={t("navbar.agent.open")}>
+        <Link
+          to="/lumilio"
+          className="inline-flex items-center justify-center rounded-full p-1"
+          aria-label={t("navbar.agent.label")}
+          onMouseEnter={() => setIsLumilioHovered(true)}
+          onMouseLeave={() => setIsLumilioHovered(false)}
+        >
+          <LumilioAvatar className="mb-2" size={0.2} start={isLumilioHovered} />
+        </Link>
       </div>
 
       {/* Theme Controller */}
@@ -66,7 +141,7 @@ function NavBar() {
           checked={isDarkMode}
           onChange={(e) => {
             const newTheme = e.target.checked ? "dark" : "light";
-            localStorage.setItem("theme", newTheme);
+            persistTheme(newTheme);
             document.documentElement.setAttribute("data-theme", newTheme);
             setIsDarkMode(e.target.checked);
           }}
