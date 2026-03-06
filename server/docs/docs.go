@@ -589,6 +589,17 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.CapabilitiesResponseDTO": {
+                "properties": {
+                    "llm": {
+                        "$ref": "#/components/schemas/dto.LLMCapabilitiesDTO"
+                    },
+                    "ml": {
+                        "$ref": "#/components/schemas/dto.MLCapabilitiesDTO"
+                    }
+                },
+                "type": "object"
+            },
             "dto.CreateAlbumRequestDTO": {
                 "properties": {
                     "album_name": {
@@ -697,6 +708,48 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.LLMCapabilitiesDTO": {
+                "properties": {
+                    "agent_enabled": {
+                        "type": "boolean"
+                    },
+                    "configured": {
+                        "type": "boolean"
+                    },
+                    "model_name": {
+                        "example": "gpt-4.1-mini",
+                        "type": "string"
+                    },
+                    "provider": {
+                        "example": "openai",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LLMSettingsDTO": {
+                "properties": {
+                    "agent_enabled": {
+                        "type": "boolean"
+                    },
+                    "api_key_configured": {
+                        "type": "boolean"
+                    },
+                    "base_url": {
+                        "example": "https://api.openai.com/v1",
+                        "type": "string"
+                    },
+                    "model_name": {
+                        "example": "gpt-4.1-mini",
+                        "type": "string"
+                    },
+                    "provider": {
+                        "example": "openai",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.ListAlbumsResponseDTO": {
                 "properties": {
                     "albums": {
@@ -731,6 +784,75 @@ const docTemplate = `{
                     "password",
                     "username"
                 ],
+                "type": "object"
+            },
+            "dto.MLCapabilitiesDTO": {
+                "properties": {
+                    "active_node_count": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "auto_mode": {
+                        "example": "enable",
+                        "type": "string"
+                    },
+                    "discovered_node_count": {
+                        "example": 2,
+                        "type": "integer"
+                    },
+                    "tasks": {
+                        "$ref": "#/components/schemas/dto.MLTaskSetDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MLSettingsDTO": {
+                "properties": {
+                    "auto_mode": {
+                        "example": "disable",
+                        "type": "string"
+                    },
+                    "caption_enabled": {
+                        "type": "boolean"
+                    },
+                    "clip_enabled": {
+                        "type": "boolean"
+                    },
+                    "face_enabled": {
+                        "type": "boolean"
+                    },
+                    "ocr_enabled": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MLTaskCapabilityDTO": {
+                "properties": {
+                    "available": {
+                        "type": "boolean"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MLTaskSetDTO": {
+                "properties": {
+                    "clip_image_embed": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    },
+                    "face_detect_and_embed": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    },
+                    "ocr": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    },
+                    "vlm_generate": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    }
+                },
                 "type": "object"
             },
             "dto.MessageResponseDTO": {
@@ -923,6 +1045,23 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.SystemSettingsDTO": {
+                "properties": {
+                    "llm": {
+                        "$ref": "#/components/schemas/dto.LLMSettingsDTO"
+                    },
+                    "ml": {
+                        "$ref": "#/components/schemas/dto.MLSettingsDTO"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "updated_by": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.UpdateAlbumRequestDTO": {
                 "properties": {
                     "album_name": {
@@ -976,10 +1115,60 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.UpdateLLMSettingsDTO": {
+                "properties": {
+                    "agent_enabled": {
+                        "type": "boolean"
+                    },
+                    "api_key": {
+                        "type": "string"
+                    },
+                    "base_url": {
+                        "type": "string"
+                    },
+                    "model_name": {
+                        "type": "string"
+                    },
+                    "provider": {
+                        "enum": [
+                            "ark",
+                            "openai",
+                            "deepseek",
+                            "ollama"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.UpdateLikeRequestDTO": {
                 "properties": {
                     "liked": {
                         "example": true,
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateMLSettingsDTO": {
+                "properties": {
+                    "auto_mode": {
+                        "enum": [
+                            "enable",
+                            "disable"
+                        ],
+                        "type": "string"
+                    },
+                    "caption_enabled": {
+                        "type": "boolean"
+                    },
+                    "clip_enabled": {
+                        "type": "boolean"
+                    },
+                    "face_enabled": {
+                        "type": "boolean"
+                    },
+                    "ocr_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -1007,6 +1196,17 @@ const docTemplate = `{
                         "maximum": 5,
                         "minimum": 0,
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateSystemSettingsDTO": {
+                "properties": {
+                    "llm": {
+                        "$ref": "#/components/schemas/dto.UpdateLLMSettingsDTO"
+                    },
+                    "ml": {
+                        "$ref": "#/components/schemas/dto.UpdateMLSettingsDTO"
                     }
                 },
                 "type": "object"
@@ -1094,6 +1294,14 @@ const docTemplate = `{
                     },
                     "username": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ValidateLLMSettingsResponseDTO": {
+                "properties": {
+                    "valid": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -5533,6 +5741,63 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/capabilities": {
+            "get": {
+                "description": "Return a de-sensitized view of backend ML and LLM runtime capabilities without exposing secrets.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Capabilities retrieved successfully"
+                    }
+                },
+                "summary": "Get public runtime capabilities",
+                "tags": [
+                    "capabilities"
+                ]
+            }
+        },
         "/api/v1/health": {
             "get": {
                 "description": "Check if the server is healthy",
@@ -5587,6 +5852,281 @@ const docTemplate = `{
                 "summary": "Health check",
                 "tags": [
                     "Health"
+                ]
+            }
+        },
+        "/api/v1/settings/system": {
+            "get": {
+                "description": "Return persisted system settings without exposing secret values.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "System settings retrieved successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get system settings",
+                "tags": [
+                    "settings"
+                ]
+            },
+            "patch": {
+                "description": "Update persisted system settings. API keys are write-only and never returned.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateSystemSettingsDTO",
+                                        "summary": "request",
+                                        "description": "System settings patch"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "System settings patch",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "System settings updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update system settings",
+                "tags": [
+                    "settings"
+                ]
+            }
+        },
+        "/api/v1/settings/system/validate-llm": {
+            "post": {
+                "description": "Validate the persisted LLM configuration by issuing a lightweight test request.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "LLM settings validated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "LLM validation failed"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Validate LLM settings",
+                "tags": [
+                    "settings"
                 ]
             }
         },

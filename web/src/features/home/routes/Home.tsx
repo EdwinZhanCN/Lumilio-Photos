@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   SparklesIcon,
   CameraIcon,
@@ -26,9 +25,22 @@ const EMPTY_EXIF = {
 };
 
 function Home() {
-  const [displayMode, setDisplayMode] = useState("gallery");
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const displayMode = searchParams.get("tab") === "stats" ? "stats" : "gallery";
+
+  const setDisplayMode = (nextMode: "gallery" | "stats") => {
+    const params = new URLSearchParams(searchParams);
+
+    if (nextMode === "gallery") {
+      params.delete("tab");
+    } else {
+      params.set("tab", nextMode);
+    }
+
+    setSearchParams(params, { replace: true });
+  };
 
   const {
     assets: featuredAssets,

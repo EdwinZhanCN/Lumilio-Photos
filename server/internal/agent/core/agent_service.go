@@ -3,28 +3,21 @@ package core
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"server/config"
 	"server/internal/db/repo"
+	"server/internal/llm"
 
-	"github.com/cloudwego/eino-ext/components/model/ark"
-	"github.com/cloudwego/eino-ext/components/model/deepseek"
-	"github.com/cloudwego/eino-ext/components/model/ollama"
-	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 )
 
-const (
-	arkProvider      = "ark"
-	openAIProvider   = "openai"
-	deepseekProvider = "deepseek"
-	ollamaProvider   = "ollama"
-)
+type LLMConfigProvider interface {
+	GetLLMConfig(ctx context.Context) (config.LLMConfig, error)
+}
 
 type AgentService interface {
 	// AskAgent 执行 Agent 查询或开启新会话
@@ -41,23 +34,23 @@ type AgentService interface {
 }
 
 type agentService struct {
-	queries  *repo.Queries
-	registry *ToolRegistry
-	config   config.LLMConfig
-	store    *PostgresStore
+	queries        *repo.Queries
+	registry       *ToolRegistry
+	configProvider LLMConfigProvider
+	store          *PostgresStore
 }
 
-func NewAgentService(queries *repo.Queries, llmConfig config.LLMConfig) AgentService {
+func NewAgentService(queries *repo.Queries, configProvider LLMConfigProvider) AgentService {
 	// 注册核心工具
 	// 注意：在实际启动时应该统一注册
 	// tools.RegisterFilterAsset()
 	// tools.RegisterBulkLikeTool()
 
 	return &agentService{
-		queries:  queries,
-		registry: GetRegistry(),
-		config:   llmConfig,
-		store:    NewPostgresStore(queries), // 初始化 Store
+		queries:        queries,
+		registry:       GetRegistry(),
+		configProvider: configProvider,
+		store:          NewPostgresStore(queries), // 初始化 Store
 	}
 }
 
@@ -66,34 +59,12 @@ func (s *agentService) GetAvailableTools() []*schema.ToolInfo {
 }
 
 func (s *agentService) newChatModel(ctx context.Context) (model.ToolCallingChatModel, error) {
-	switch strings.ToLower(s.config.Provider) {
-	case openAIProvider:
-		return openai.NewChatModel(ctx, &openai.ChatModelConfig{
-			APIKey: s.config.APIKey,
-			Model:  s.config.ModelName,
-		})
-	case deepseekProvider:
-		return deepseek.NewChatModel(ctx, &deepseek.ChatModelConfig{
-			APIKey: s.config.APIKey,
-			Model:  s.config.ModelName,
-		})
-	case arkProvider:
-		return ark.NewChatModel(ctx, &ark.ChatModelConfig{
-			APIKey: s.config.APIKey,
-			Model:  s.config.ModelName,
-		})
-	case ollamaProvider:
-		return ollama.NewChatModel(ctx, &ollama.ChatModelConfig{
-			BaseURL: s.config.BaseURL,
-			Model:   s.config.ModelName,
-		})
-	default:
-		// 默认回退到 ark
-		return ark.NewChatModel(ctx, &ark.ChatModelConfig{
-			APIKey: s.config.APIKey,
-			Model:  s.config.ModelName,
-		})
+	cfg, err := s.configProvider.GetLLMConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load llm settings: %w", err)
 	}
+
+	return llm.NewChatModel(ctx, cfg)
 }
 
 // buildAgent 是一个辅助方法，用于构建 Agent 实例。

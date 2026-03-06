@@ -7,6 +7,20 @@
  * @since 1.1.0
  */
 
+import { useCallback, useSyncExternalStore } from "react";
+
+import {
+  LEGACY_PERFORMANCE_PREFERENCES_STORAGE_KEY,
+  PERFORMANCE_PREFERENCES_STORAGE_KEY,
+  PERFORMANCE_PREFERENCES_STORAGE_VERSION,
+} from "@/lib/settings/registry";
+import {
+  isRecord,
+  readVersionedStorageCandidate,
+  removeStorageKeys,
+  writeVersionedStorageData,
+} from "@/lib/settings/storage";
+
 export enum PerformanceProfile {
   MEMORY_SAVER = "memory_saver", // Optimize for low memory usage
   BALANCED = "balanced", // Balance memory and speed
@@ -29,7 +43,59 @@ const DEFAULT_PREFERENCES: PerformancePreferences = {
   maxConcurrentOperations: 3,
 };
 
-const STORAGE_KEY = "lumilio_performance_preferences";
+function clampInt(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  const n = Math.floor(value);
+  return Math.min(max, Math.max(min, n));
+}
+
+function asProfile(
+  value: unknown,
+  fallback: PerformanceProfile,
+): PerformanceProfile {
+  return value === PerformanceProfile.MEMORY_SAVER ||
+    value === PerformanceProfile.BALANCED ||
+    value === PerformanceProfile.SPEED_OPTIMIZED ||
+    value === PerformanceProfile.ADAPTIVE
+    ? value
+    : fallback;
+}
+
+function sanitizePreferences(candidate: unknown): PerformancePreferences {
+  if (!isRecord(candidate)) {
+    return { ...DEFAULT_PREFERENCES };
+  }
+
+  const customBatchSizeMultiplier =
+    typeof candidate.customBatchSizeMultiplier === "number" &&
+    Number.isFinite(candidate.customBatchSizeMultiplier)
+      ? Math.min(2.0, Math.max(0.5, candidate.customBatchSizeMultiplier))
+      : undefined;
+
+  return {
+    profile: asProfile(candidate.profile, DEFAULT_PREFERENCES.profile),
+    customBatchSizeMultiplier,
+    respectMemoryLimits:
+      typeof candidate.respectMemoryLimits === "boolean"
+        ? candidate.respectMemoryLimits
+        : DEFAULT_PREFERENCES.respectMemoryLimits,
+    prioritizeUserOperations:
+      typeof candidate.prioritizeUserOperations === "boolean"
+        ? candidate.prioritizeUserOperations
+        : DEFAULT_PREFERENCES.prioritizeUserOperations,
+    maxConcurrentOperations: clampInt(
+      candidate.maxConcurrentOperations,
+      1,
+      8,
+      DEFAULT_PREFERENCES.maxConcurrentOperations,
+    ),
+  };
+}
 
 /**
  * Performance Preferences Manager
@@ -47,6 +113,13 @@ export class PerformancePreferencesManager {
    */
   getPreferences(): PerformancePreferences {
     return { ...this.preferences };
+  }
+
+  /**
+   * Gets the current immutable snapshot for React subscriptions.
+   */
+  getSnapshot(): PerformancePreferences {
+    return this.preferences;
   }
 
   /**
@@ -135,16 +208,32 @@ export class PerformancePreferencesManager {
   }
 
   /**
+   * Subscribes to any preference change, for useSyncExternalStore.
+   */
+  subscribe(onStoreChange: () => void): () => void {
+    return this.addListener(() => {
+      onStoreChange();
+    });
+  }
+
+  /**
    * Loads preferences from localStorage
    */
   private loadPreferences(): PerformancePreferences {
     try {
-      if (typeof localStorage !== "undefined") {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          return { ...DEFAULT_PREFERENCES, ...parsed };
+      const readResult = readVersionedStorageCandidate({
+        key: PERFORMANCE_PREFERENCES_STORAGE_KEY,
+        version: PERFORMANCE_PREFERENCES_STORAGE_VERSION,
+        legacyKeys: [LEGACY_PERFORMANCE_PREFERENCES_STORAGE_KEY],
+      });
+
+      if (readResult.candidate !== null) {
+        const normalized = sanitizePreferences(readResult.candidate);
+        if (readResult.needsRewrite) {
+          this.writePreferencesEnvelope(normalized);
+          removeStorageKeys([LEGACY_PERFORMANCE_PREFERENCES_STORAGE_KEY]);
         }
+        return normalized;
       }
     } catch (error) {
       console.warn("Failed to load performance preferences:", error);
@@ -157,12 +246,19 @@ export class PerformancePreferencesManager {
    */
   private savePreferences(): void {
     try {
-      if (typeof localStorage !== "undefined") {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.preferences));
-      }
+      this.writePreferencesEnvelope(this.preferences);
+      removeStorageKeys([LEGACY_PERFORMANCE_PREFERENCES_STORAGE_KEY]);
     } catch (error) {
       console.warn("Failed to save performance preferences:", error);
     }
+  }
+
+  private writePreferencesEnvelope(preferences: PerformancePreferences): void {
+    writeVersionedStorageData<PerformancePreferences>(
+      PERFORMANCE_PREFERENCES_STORAGE_KEY,
+      PERFORMANCE_PREFERENCES_STORAGE_VERSION,
+      preferences,
+    );
   }
 
   /**
@@ -186,10 +282,26 @@ export const globalPerformancePreferences = new PerformancePreferencesManager();
  * React hook for using performance preferences
  */
 export function usePerformancePreferences() {
-  return {
-    preferences: globalPerformancePreferences.getPreferences(),
-    updatePreferences: (updates: Partial<PerformancePreferences>) =>
+  const preferences = useSyncExternalStore(
+    (onStoreChange) => globalPerformancePreferences.subscribe(onStoreChange),
+    () => globalPerformancePreferences.getSnapshot(),
+    () => globalPerformancePreferences.getSnapshot(),
+  );
+
+  const updatePreferences = useCallback(
+    (updates: Partial<PerformancePreferences>) =>
       globalPerformancePreferences.updatePreferences(updates),
-    resetToDefaults: () => globalPerformancePreferences.resetToDefaults(),
+    [],
+  );
+
+  const resetToDefaults = useCallback(
+    () => globalPerformancePreferences.resetToDefaults(),
+    [],
+  );
+
+  return {
+    preferences,
+    updatePreferences,
+    resetToDefaults,
   };
 }

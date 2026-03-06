@@ -5,6 +5,11 @@
     },
 
     "navbar": {
+        "agent": {
+            "label": "Lumilio Agent",
+            "open": "Open Lumilio Agent",
+            "disabled": "Lumilio Agent is disabled in server settings."
+        },
         "theme": {
             "light": "Light",
             "dark": "Dark"
@@ -444,6 +449,10 @@
     "settings": {
         "title": "Settings",
         "ui": "UI",
+        "appearance": "Appearance",
+        "upload": "Upload",
+        "ai": "AI",
+        "performance": "Performance",
         "server": "Server",
         "lumen": "Lumen",
         "language": "Language",
@@ -455,11 +464,173 @@
         },
         "assetPage": "Asset Page",
         "pageLayout": "Page Layout",
+        "appearanceSettings": {
+            "description": "Configure language, region, and the default asset page layout for this browser.",
+            "layoutDescription": "Set the default layout used on the asset page.",
+            "layoutOptions": {
+                "compact": {
+                    "label": "Compact",
+                    "description": "Higher information density with tighter spacing."
+                },
+                "wide": {
+                    "label": "Wide",
+                    "description": "Balanced spacing with grouping by type as the default."
+                },
+                "full": {
+                    "label": "Full",
+                    "description": "More spacious spacing for a larger browsing layout."
+                }
+            }
+        },
+        "uploadSettings": {
+            "description": "Configure upload settings for this browser.",
+            "controlModeTitle": "Upload tuning source",
+            "controlModeDescription": "Select the source used for upload chunk size and concurrency.",
+            "serverMode": "Server managed",
+            "localMode": "Local overrides",
+            "recommended": "Recommended",
+            "serverModeHint": "Chunk size and concurrency use backend recommendations. Local advanced values remain saved but inactive.",
+            "localModeHint": "Chunk size and concurrency use locally configured values.",
+            "basicTitle": "Basic controls",
+            "basicDescription": "Configure upload limits and default behavior.",
+            "maxTotalFiles": "Max total files",
+            "maxTotalFilesDescription": "Maximum number of files you can add to one upload batch.",
+            "lowPowerMode": "Low power mode",
+            "lowPowerModeDescription": "Use more conservative defaults to reduce CPU and memory usage during uploads.",
+            "advancedTitle": "Advanced local overrides",
+            "advancedDescription": "Configure local upload parameters.",
+            "advancedDisabledHint": "These fields are unavailable while server-managed upload configuration is enabled.",
+            "chunkSize": "Chunk size",
+            "chunkSizeDescription": "Per-file chunk size used by the browser uploader.",
+            "chunkSizeUnit": "MB",
+            "maxConcurrentChunks": "Max concurrent chunks",
+            "maxConcurrentChunksDescription": "Number of chunk uploads the browser may run in parallel for each file."
+        },
+        "performanceSettings": {
+            "description": "Configure local processing performance.",
+            "currentProfile": "Current profile",
+            "cpuCores": "CPU cores",
+            "availableMemory": "Available memory",
+            "deviceType": "Device type",
+            "maxConcurrency": "Max concurrency",
+            "deviceTypeValues": {
+                "mobile": "Mobile",
+                "desktop": "Desktop",
+                "lowEnd": "Low-end"
+            },
+            "profileTitle": "Performance profile",
+            "profileDescription": "Select the default profile for concurrency and memory usage.",
+            "advancedTitle": "Advanced controls",
+            "advancedDescription": "Configure detailed performance parameters.",
+            "respectMemoryLimits": "Respect memory limits",
+            "respectMemoryLimitsDescription": "Reduce processing intensity when available memory is limited.",
+            "prioritizeUserOperations": "Prioritize user operations",
+            "prioritizeUserOperationsDescription": "Prioritize operations related to active user interactions.",
+            "maxConcurrentOperations": "Max concurrent operations",
+            "maxConcurrentOperationsDescription": "Maximum number of heavy processing jobs the browser may run at once.",
+            "changesApply": "Changes take effect immediately for new processing operations.",
+            "reset": "Reset to defaults",
+            "profiles": {
+                "memory_saver": {
+                    "label": "Memory Saver",
+                    "description": "Reduce memory usage and processing concurrency."
+                },
+                "balanced": {
+                    "label": "Balanced",
+                    "description": "Balance processing speed and memory usage."
+                },
+                "speed": {
+                    "label": "Speed Optimized",
+                    "description": "Increase concurrency to favor processing speed."
+                },
+                "adaptive": {
+                    "label": "Adaptive",
+                    "description": "Adjust processing behavior based on detected device capabilities."
+                }
+            }
+        },
+        "aiSettings": {
+            "description": "Manage the Lumilio Agent and ML service settings.",
+            "saveSuccess": "Settings saved.",
+            "saveError": "Failed to save settings.",
+            "validationSuccess": "LLM configuration validated successfully.",
+            "validationError": "Failed to validate LLM configuration.",
+            "loadError": "Failed to load AI settings.",
+            "agentTitle": "Lumilio Agent",
+            "agentDescription": "Configure the server-side LLM provider and credentials used by the agent.",
+            "enabled": "Enable agent",
+            "provider": "Provider",
+            "modelName": "Model name",
+            "baseUrl": "Base URL",
+            "baseUrlDescription": "Optional override for provider-compatible endpoints.",
+            "apiKey": "API key",
+            "apiKeyDescription": "API keys are write-only. Leaving this field empty keeps the stored key unchanged.",
+            "apiKeyPlaceholder": "Enter a new API key",
+            "apiKeyConfigured": "Stored API key",
+            "clearStoredKey": "Clear stored API key",
+            "validate": "Validate connection",
+            "mlTitle": "ML Services",
+            "mlDescription": "Configure service discovery mode and manual task toggles.",
+            "autoMode": "Automatic discovery",
+            "autoModeDescription": "Use all capabilities discovered from available ML services.",
+            "manualMode": "Manual selection",
+            "manualModeDescription": "Use only the task types enabled below.",
+            "tasksTitle": "Task selection",
+            "tasksDescription": "Choose which ML tasks are enabled when automatic discovery is disabled.",
+            "autoOverrideHint": "Automatic discovery enables all discovered tasks.",
+            "providerOptions": {
+                "unset": "Not set",
+                "ark": "Ark",
+                "openai": "OpenAI",
+                "deepseek": "DeepSeek",
+                "ollama": "Ollama"
+            },
+            "taskNames": {
+                "clip": "CLIP image embed",
+                "ocr": "OCR",
+                "caption": "VLM caption",
+                "face": "Face detect & embed"
+            }
+        },
         "serverSettings": {
             "healthCheckInterval": "Health check interval",
             "healthCheckDescription": "Control how often the app pings the server for health status. Lower values update more frequently but may increase network usage.",
             "presets": "Presets:",
-            "reset": "Reset"
+            "reset": "Reset",
+            "capabilitiesTitle": "Capabilities",
+            "capabilitiesDescription": "Read-only backend runtime status for ML discovery and the LLM agent.",
+            "refresh": "Refresh",
+            "capabilitiesError": "Failed to load capabilities.",
+            "mlTitle": "ML Services",
+            "llmTitle": "LLM Agent",
+            "autoMode": "Auto mode",
+            "discoveredNodes": "Discovered nodes",
+            "activeNodes": "Active nodes",
+            "taskAvailability": "Task availability",
+            "nodesSummary": "Active / discovered nodes",
+            "agentEnabled": "Agent enabled",
+            "configured": "Configured",
+            "provider": "Provider",
+            "model": "Model",
+            "openMonitor": "Open Server Monitor",
+            "enabled": "Enabled",
+            "disabled": "Disabled",
+            "available": "Available",
+            "unavailable": "Unavailable",
+            "autoModeValues": {
+                "enable": "Auto discovery",
+                "disable": "Manual"
+            },
+            "booleanValues": {
+                "true": "Yes",
+                "false": "No"
+            },
+            "taskNames": {
+                "clipImageEmbed": "CLIP image embed",
+                "ocr": "OCR",
+                "vlmGenerate": "VLM caption",
+                "faceDetectAndEmbed": "Face detect & embed"
+            }
         },
         "lumenSettings": {
             "title": "Lumen on Browser",
@@ -507,6 +678,18 @@
     },
     "monitor": {
         "title": "Server Monitor",
+        "subtitles": {
+            "queue": "Real-time job queue monitoring",
+            "capabilities": "Runtime ML discovery and LLM agent status"
+        },
+        "tabs": {
+            "queue": "Queue",
+            "capabilities": "Capabilities"
+        },
+        "sections": {
+            "activeQueues": "Active Queues",
+            "recentJobs": "Recent Jobs"
+        },
         "status": {
             "online": "Online",
             "offline": "Offline"

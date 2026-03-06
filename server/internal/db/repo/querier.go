@@ -154,6 +154,7 @@ type Querier interface {
 	// Repository Asset Statistics (kept for repository management)
 	GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error)
 	GetRepositoryByPath(ctx context.Context, path string) (Repository, error)
+	GetSettings(ctx context.Context) (Setting, error)
 	GetSimilarFaces(ctx context.Context, arg GetSimilarFacesParams) ([]GetSimilarFacesRow, error)
 	GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]SpeciesPrediction, error)
 	GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeciesPredictionsByLabelParams) ([]SpeciesPrediction, error)
@@ -237,6 +238,7 @@ type Querier interface {
 	UpsertCheckpoint(ctx context.Context, arg UpsertCheckpointParams) error
 	// Unified embeddings table queries
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
+	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error)
 }
 
 var _ Querier = (*Queries)(nil)

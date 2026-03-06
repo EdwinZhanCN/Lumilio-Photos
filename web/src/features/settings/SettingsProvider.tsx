@@ -1,64 +1,40 @@
 // src/features/settings/SettingsProvider.tsx
 import { createContext, useReducer, ReactNode, useEffect } from "react";
-import { SettingsContextValue, SettingsState } from "./settings.type.ts";
+import { SettingsContextValue } from "./settings.type.ts";
 import { SettingsReducer, initialState } from "./settings.reducer";
-import { getCurrentLanguage, changeLanguage } from "@/lib/i18n.tsx";
+import { changeLanguage, getCurrentLanguage } from "@/lib/i18n.tsx";
+import {
+  persistSettingsState,
+  resolveInitialSettingsState,
+} from "./settings.persistence";
 
 export const SettingsContext = createContext<SettingsContextValue | undefined>(
   undefined,
 );
 
-const STORAGE_KEY = "app_settings_v1";
-
-function loadPersisted(): SettingsState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<SettingsState>;
-      return {
-        server: { ...initialState.server, ...parsed.server },
-        ui: {
-          ...initialState.ui,
-          ...parsed.ui,
-          language: parsed.ui?.language ?? getCurrentLanguage(),
-          region: parsed.ui?.region ?? "other",
-        },
-      };
-    }
-  } catch (e) {
-    console.warn("[SettingsProvider] Failed to parse stored settings", e);
-  }
-  return {
-    ...initialState,
-    ui: {
-      ...initialState.ui,
-      language: getCurrentLanguage(),
-      region: "other",
-    },
-  };
-}
-
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(
     SettingsReducer,
-    undefined,
-    loadPersisted,
+    initialState,
+    resolveInitialSettingsState,
   );
 
   // Persist settings to localStorage on any change
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
-      console.warn("[SettingsProvider] Failed to persist settings", e);
-    }
+    persistSettingsState(state);
   }, [state]);
 
   // Sync <html lang="..."> attribute globally
   useEffect(() => {
-    if (state.ui.language) {
-      document.documentElement.setAttribute("lang", state.ui.language);
-      changeLanguage(state.ui.language);
+    const nextLanguage = state.ui.language;
+    if (!nextLanguage) return;
+
+    if (document.documentElement.lang !== nextLanguage) {
+      document.documentElement.setAttribute("lang", nextLanguage);
+    }
+
+    if (getCurrentLanguage() !== nextLanguage) {
+      void changeLanguage(nextLanguage);
     }
   }, [state.ui.language]);
 

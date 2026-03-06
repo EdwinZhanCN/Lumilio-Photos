@@ -18,13 +18,22 @@ type ProcessOcrArgs = jobs.ProcessOcrArgs
 type ProcessOcrWorker struct {
 	river.WorkerDefaults[ProcessOcrArgs]
 
-	OCRService   service.OCRService
-	LumenService service.LumenService
+	OCRService     service.OCRService
+	LumenService   service.LumenService
+	ConfigProvider MLConfigProvider
 }
 
 func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrArgs]) error {
 	args := job.Args
 	assetID := args.AssetID
+
+	enabled, err := isMLTaskEnabled(ctx, w.ConfigProvider, "process_ocr")
+	if err != nil {
+		return fmt.Errorf("load ml settings: %w", err)
+	}
+	if !enabled {
+		return nil
+	}
 
 	// Convert UUID to pgtype.UUID for database operations
 	pgUUID := pgtype.UUID{}
@@ -33,6 +42,9 @@ func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrAr
 	}
 
 	// If task temporarily unavailable, snooze
+	if w.LumenService == nil {
+		return river.JobSnooze(30 * time.Second)
+	}
 	if !w.LumenService.IsTaskAvailable("ocr") {
 		return river.JobSnooze(30 * time.Second)
 	}
