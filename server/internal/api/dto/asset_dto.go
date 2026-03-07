@@ -36,6 +36,52 @@ type ReprocessAssetResponseDTO struct {
 	RetryTasks  []string `json:"retry_tasks,omitempty" example:"thumbnail_small,transcode_1080p"`
 }
 
+type RebuildAssetIndexesRequestDTO struct {
+	RepositoryID string   `json:"repository_id,omitempty" binding:"omitempty,uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Tasks        []string `json:"tasks,omitempty" example:"clip,ocr"`
+	Limit        int      `json:"limit,omitempty" minimum:"1" maximum:"500" example:"200"`
+	MissingOnly  *bool    `json:"missing_only,omitempty" example:"true"`
+}
+
+type RebuildAssetIndexesResponseDTO struct {
+	Status         string   `json:"status" example:"queued"`
+	Message        string   `json:"message" example:"Index rebuild job queued successfully"`
+	JobID          int64    `json:"job_id" example:"123"`
+	RequestedTasks []string `json:"requested_tasks"`
+	Limit          int      `json:"limit" example:"200"`
+	MissingOnly    bool     `json:"missing_only" example:"true"`
+	RepositoryID   *string  `json:"repository_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+}
+
+type IndexingRepositoryOptionDTO struct {
+	ID        string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name      string `json:"name" example:"Photos Library"`
+	Path      string `json:"path" example:"/Volumes/Media/Photos"`
+	IsPrimary bool   `json:"is_primary" example:"false"`
+}
+
+type IndexingRepositoryListResponseDTO struct {
+	Repositories []IndexingRepositoryOptionDTO `json:"repositories"`
+}
+
+type AssetIndexingTaskStatsDTO struct {
+	IndexedCount int `json:"indexed_count" example:"1200"`
+	QueuedJobs   int `json:"queued_jobs" example:"12"`
+}
+
+type AssetIndexingTaskSetStatsDTO struct {
+	Clip    AssetIndexingTaskStatsDTO `json:"clip"`
+	OCR     AssetIndexingTaskStatsDTO `json:"ocr"`
+	Caption AssetIndexingTaskStatsDTO `json:"caption"`
+	Face    AssetIndexingTaskStatsDTO `json:"face"`
+}
+
+type AssetIndexingStatsResponseDTO struct {
+	PhotoTotal  int                          `json:"photo_total" example:"2400"`
+	ReindexJobs int                          `json:"reindex_jobs" example:"1"`
+	Tasks       AssetIndexingTaskSetStatsDTO `json:"tasks"`
+}
+
 // UploadResponseDTO represents the response structure for file upload
 type UploadResponseDTO struct {
 	TaskID      int64  `json:"task_id" example:"12345"`
@@ -321,11 +367,28 @@ type FilterAssetsRequestDTO struct {
 
 // SearchAssetsRequestDTO represents the request structure for searching assets
 type SearchAssetsRequestDTO struct {
-	Query      string         `json:"query" binding:"required" example:"red bird on branch"`
-	SearchType string         `json:"search_type" binding:"required" example:"filename" enums:"filename,semantic"`
-	Filter     AssetFilterDTO `json:"filter,omitempty"`
-	Limit      int            `json:"limit" example:"20" minimum:"1" maximum:"100"`
-	Offset     int            `json:"offset" example:"0" minimum:"0"`
+	Query           string         `json:"query" binding:"required" example:"red bird on branch"`
+	Filter          AssetFilterDTO `json:"filter,omitempty"`
+	GroupBy         string         `json:"group_by,omitempty" example:"type" enums:"date,type,album"`
+	Pagination      PaginationDTO  `json:"pagination"`
+	EnhancementMode string         `json:"enhancement_mode,omitempty" example:"auto" enums:"auto,off,only"`
+	TopResultsLimit int            `json:"top_results_limit,omitempty" example:"12" minimum:"1" maximum:"50"`
+}
+
+type SearchTopResultsMetaDTO struct {
+	Enabled     bool     `json:"enabled"`
+	Degraded    bool     `json:"degraded"`
+	Reason      string   `json:"reason,omitempty" example:"runtime_unavailable"`
+	SourceTypes []string `json:"source_types" example:"clip"`
+}
+
+type SearchAssetsResponseDTO struct {
+	TopResults     []AssetDTO              `json:"top_results"`
+	TopResultsMeta SearchTopResultsMetaDTO `json:"top_results_meta"`
+	Results        []AssetDTO              `json:"results"`
+	ResultsTotal   *int                    `json:"results_total,omitempty" example:"150"`
+	Limit          int                     `json:"limit" example:"20"`
+	Offset         int                     `json:"offset" example:"0"`
 }
 
 // OptionsResponseDTO represents the response for filter options

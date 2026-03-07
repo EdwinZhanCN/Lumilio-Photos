@@ -19,7 +19,6 @@ export interface AssetViewDefinition {
   /** Search configuration */
   search?: {
     query: string;
-    mode: "filename" | "semantic";
   };
   /** Grouping strategy */
   groupBy?: GroupByType;
@@ -60,7 +59,6 @@ export interface UIState {
   currentTab: TabType;
   groupBy: GroupByType;
   searchQuery: string;
-  searchMode: "filename" | "semantic";
   isCarouselOpen: boolean;
   activeAssetId?: string;
 }

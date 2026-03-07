@@ -86,6 +86,7 @@ type AssetService interface {
 
 	// Unified query API
 	QueryAssets(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
+	SearchAssets(ctx context.Context, params SearchAssetsParams) (SearchAssetsResult, error)
 	QueryPhotoMapPoints(ctx context.Context, params QueryPhotoMapPointsParams) ([]PhotoMapPoint, int64, error)
 }
 
@@ -110,6 +111,34 @@ type QueryAssetsParams struct {
 	Offset       int
 }
 
+type SearchEnhancementMode string
+
+const (
+	SearchEnhancementModeAuto SearchEnhancementMode = "auto"
+	SearchEnhancementModeOff  SearchEnhancementMode = "off"
+	SearchEnhancementModeOnly SearchEnhancementMode = "only"
+)
+
+type SearchAssetsParams struct {
+	QueryAssetsParams
+	EnhancementMode SearchEnhancementMode
+	TopResultsLimit int
+}
+
+type SearchTopResultsMeta struct {
+	Enabled     bool
+	Degraded    bool
+	Reason      string
+	SourceTypes []string
+}
+
+type SearchAssetsResult struct {
+	TopResults     []repo.Asset
+	TopResultsMeta SearchTopResultsMeta
+	Results        []repo.Asset
+	ResultsTotal   int64
+}
+
 type QueryPhotoMapPointsParams struct {
 	RepositoryID *string
 	Limit        int
@@ -126,10 +155,12 @@ type PhotoMapPoint struct {
 }
 
 type assetService struct {
-	queries          *repo.Queries
-	lumen            LumenService
-	repoManager      *storage.RepositoryManager
-	embeddingService EmbeddingService
+	queries                      *repo.Queries
+	lumen                        LumenService
+	repoManager                  *storage.RepositoryManager
+	embeddingService             EmbeddingService
+	queryAssetsUnifiedFn         func(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
+	searchAssetsClipTopResultsFn func(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta)
 }
 
 func NewAssetService(q *repo.Queries, l LumenService, r *storage.RepositoryManager, e EmbeddingService) (AssetService, error) {
@@ -1051,12 +1082,199 @@ func (s *assetService) UpdateAssetDimensions(ctx context.Context, id uuid.UUID, 
 // Unified Query API
 // ================================
 
+func normalizeSearchEnhancementMode(raw SearchEnhancementMode) SearchEnhancementMode {
+	switch strings.ToLower(strings.TrimSpace(string(raw))) {
+	case string(SearchEnhancementModeOff):
+		return SearchEnhancementModeOff
+	case string(SearchEnhancementModeOnly):
+		return SearchEnhancementModeOnly
+	default:
+		return SearchEnhancementModeAuto
+	}
+}
+
+func normalizeSearchAssetsParams(params SearchAssetsParams) SearchAssetsParams {
+	params.Query = strings.TrimSpace(params.Query)
+	params.EnhancementMode = normalizeSearchEnhancementMode(params.EnhancementMode)
+	if params.TopResultsLimit <= 0 || params.TopResultsLimit > 50 {
+		params.TopResultsLimit = 12
+	}
+	return params
+}
+
+func cloneStringSlice(values []string) []string {
+	if len(values) == 0 {
+		return []string{}
+	}
+	cloned := make([]string, len(values))
+	copy(cloned, values)
+	return cloned
+}
+
+func filterOutAssetsByID(assets []repo.Asset, excluded []repo.Asset) ([]repo.Asset, int) {
+	if len(assets) == 0 || len(excluded) == 0 {
+		return assets, 0
+	}
+
+	excludedIDs := make(map[[16]byte]struct{}, len(excluded))
+	for _, asset := range excluded {
+		if asset.AssetID.Valid {
+			excludedIDs[asset.AssetID.Bytes] = struct{}{}
+		}
+	}
+
+	filtered := make([]repo.Asset, 0, len(assets))
+	removed := 0
+	for _, asset := range assets {
+		if asset.AssetID.Valid {
+			if _, ok := excludedIDs[asset.AssetID.Bytes]; ok {
+				removed++
+				continue
+			}
+		}
+		filtered = append(filtered, asset)
+	}
+
+	return filtered, removed
+}
+
+func classifySearchEnhancementError(err error, ctx context.Context) string {
+	switch {
+	case errors.Is(err, ErrSemanticSearchUnavailable):
+		return "runtime_unavailable"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case ctx != nil && errors.Is(ctx.Err(), context.DeadlineExceeded):
+		return "timeout"
+	default:
+		return "internal_error"
+	}
+}
+
+func mapVectorSearchRowToAsset(r repo.SearchAssetsVectorUnifiedRow) repo.Asset {
+	return repo.Asset{
+		AssetID:          r.AssetID,
+		OwnerID:          r.OwnerID,
+		Type:             r.Type,
+		OriginalFilename: r.OriginalFilename,
+		StoragePath:      r.StoragePath,
+		MimeType:         r.MimeType,
+		FileSize:         r.FileSize,
+		Hash:             r.Hash,
+		Width:            r.Width,
+		Height:           r.Height,
+		Duration:         r.Duration,
+		TakenTime:        r.TakenTime,
+		UploadTime:       r.UploadTime,
+		IsDeleted:        r.IsDeleted,
+		DeletedAt:        r.DeletedAt,
+		SpecificMetadata: r.SpecificMetadata,
+		Rating:           r.Rating,
+		Liked:            r.Liked,
+		RepositoryID:     r.RepositoryID,
+		Status:           r.Status,
+	}
+}
+
+func (s *assetService) runQueryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
+	if s.queryAssetsUnifiedFn != nil {
+		return s.queryAssetsUnifiedFn(ctx, params)
+	}
+	return s.queryAssetsUnified(ctx, params)
+}
+
+func (s *assetService) runSearchAssetsClipTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
+	if s.searchAssetsClipTopResultsFn != nil {
+		return s.searchAssetsClipTopResultsFn(ctx, params)
+	}
+	return s.searchAssetsClipTopResults(ctx, params)
+}
+
+func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsParams) (SearchAssetsResult, error) {
+	params = normalizeSearchAssetsParams(params)
+
+	result := SearchAssetsResult{
+		TopResults: []repo.Asset{},
+		TopResultsMeta: SearchTopResultsMeta{
+			Enabled:     false,
+			SourceTypes: []string{},
+		},
+		Results: []repo.Asset{},
+	}
+
+	query := strings.TrimSpace(params.Query)
+	topResultsEnabled := query != "" && params.EnhancementMode != SearchEnhancementModeOff
+
+	if topResultsEnabled {
+		topResults, meta := s.runSearchAssetsClipTopResults(ctx, params)
+		result.TopResults = topResults
+		result.TopResultsMeta = meta
+	}
+
+	if params.EnhancementMode != SearchEnhancementModeOnly {
+		filenameParams := params.QueryAssetsParams
+		filenameParams.Query = query
+		filenameParams.SearchType = "filename"
+
+		filenameResults, total, err := s.runQueryAssetsUnified(ctx, filenameParams)
+		if err != nil {
+			return SearchAssetsResult{}, err
+		}
+
+		filenameResults, removed := filterOutAssetsByID(filenameResults, result.TopResults)
+		if removed > 0 && total >= int64(removed) {
+			total -= int64(removed)
+		}
+
+		result.Results = filenameResults
+		result.ResultsTotal = total
+	}
+
+	if !topResultsEnabled {
+		switch {
+		case params.EnhancementMode == SearchEnhancementModeOff:
+			result.TopResultsMeta = SearchTopResultsMeta{
+				Enabled:     false,
+				Reason:      "disabled",
+				SourceTypes: []string{},
+			}
+		case query == "":
+			result.TopResultsMeta = SearchTopResultsMeta{
+				Enabled:     false,
+				Reason:      "empty_query",
+				SourceTypes: []string{},
+			}
+		}
+	}
+
+	return result, nil
+}
+
 // QueryAssets is the unified method for listing, filtering, and searching assets.
 func (s *assetService) QueryAssets(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
 	if params.SearchType == "semantic" && params.Query != "" {
 		return s.queryAssetsVector(ctx, params)
 	}
 	return s.queryAssetsUnified(ctx, params)
+}
+
+func (s *assetService) searchAssetsClipTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
+	meta := SearchTopResultsMeta{
+		Enabled:     true,
+		SourceTypes: []string{"clip"},
+	}
+
+	searchCtx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
+	defer cancel()
+
+	results, err := s.queryAssetsVectorTopResults(searchCtx, params.QueryAssetsParams, params.TopResultsLimit)
+	if err != nil {
+		meta.Degraded = true
+		meta.Reason = classifySearchEnhancementError(err, searchCtx)
+		return []repo.Asset{}, meta
+	}
+
+	return results, meta
 }
 
 func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
@@ -1143,6 +1361,87 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 	}
 
 	return assets, countResult, nil
+}
+
+func (s *assetService) queryAssetsVectorTopResults(ctx context.Context, params QueryAssetsParams, limit int) ([]repo.Asset, error) {
+	if s.lumen == nil {
+		return nil, fmt.Errorf("%w: lumen service not available", ErrSemanticSearchUnavailable)
+	}
+	if !s.lumen.IsTaskAvailable("clip_text_embed") {
+		return nil, fmt.Errorf("%w: clip_text_embed task not available", ErrSemanticSearchUnavailable)
+	}
+
+	embeddingResult, err := s.lumen.ClipTextEmbedFast(ctx, []byte(params.Query))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get query embedding: %w", err)
+	}
+
+	queryVector := make([]float32, len(embeddingResult.Vector))
+	for i, v := range embeddingResult.Vector {
+		queryVector[i] = float32(v)
+	}
+
+	pgVector := pgvector.NewVector(queryVector)
+
+	var repoUUID pgtype.UUID
+	if params.RepositoryID != nil && *params.RepositoryID != "" {
+		parsedUUID, err := uuid.Parse(*params.RepositoryID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid repository ID: %w", err)
+		}
+		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
+	}
+
+	maxDistance := 0.5
+	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			maxDistance = f
+		}
+	}
+
+	var ratingPtr *int32
+	if params.Rating != nil {
+		r := int32(*params.Rating)
+		ratingPtr = &r
+	}
+
+	var fromTime, toTime pgtype.Timestamptz
+	if params.DateFrom != nil {
+		fromTime = pgtype.Timestamptz{Time: *params.DateFrom, Valid: true}
+	}
+	if params.DateTo != nil {
+		toTime = pgtype.Timestamptz{Time: *params.DateTo, Valid: true}
+	}
+
+	results, err := s.queries.SearchAssetsVectorUnified(ctx, repo.SearchAssetsVectorUnifiedParams{
+		Embedding:     &pgVector,
+		EmbeddingType: string(EmbeddingTypeCLIP),
+		MaxDistance:   &maxDistance,
+		AssetType:     params.AssetType,
+		AssetTypes:    params.AssetTypes,
+		RepositoryID:  repoUUID,
+		OwnerID:       params.OwnerID,
+		AlbumID:       params.AlbumID,
+		IsRaw:         params.IsRaw,
+		Rating:        ratingPtr,
+		Liked:         params.Liked,
+		CameraModel:   params.CameraModel,
+		LensModel:     params.LensModel,
+		DateFrom:      fromTime,
+		DateTo:        toTime,
+		Limit:         int32(limit),
+		Offset:        0,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to search assets: %w", err)
+	}
+
+	assets := make([]repo.Asset, len(results))
+	for i, r := range results {
+		assets[i] = mapVectorSearchRowToAsset(r)
+	}
+
+	return assets, nil
 }
 
 func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {

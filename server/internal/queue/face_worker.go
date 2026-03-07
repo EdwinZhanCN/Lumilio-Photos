@@ -18,13 +18,22 @@ type ProcessFaceArgs = jobs.ProcessFaceArgs
 type ProcessFaceWorker struct {
 	river.WorkerDefaults[ProcessFaceArgs]
 
-	FaceService  service.FaceService
-	LumenService service.LumenService
+	FaceService    service.FaceService
+	LumenService   service.LumenService
+	ConfigProvider MLConfigProvider
 }
 
 func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFaceArgs]) error {
 	args := job.Args
 	assetID := args.AssetID
+
+	enabled, err := isMLTaskEnabled(ctx, w.ConfigProvider, "process_face")
+	if err != nil {
+		return fmt.Errorf("load ml settings: %w", err)
+	}
+	if !enabled {
+		return nil
+	}
 
 	// Convert UUID to pgtype.UUID for database operations
 	pgUUID := pgtype.UUID{}
@@ -33,6 +42,9 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	}
 
 	// If task temporarily unavailable, snooze
+	if w.LumenService == nil {
+		return river.JobSnooze(30 * time.Second)
+	}
 	if !w.LumenService.IsTaskAvailable("face_detect_and_embed") {
 		return river.JobSnooze(30 * time.Second)
 	}

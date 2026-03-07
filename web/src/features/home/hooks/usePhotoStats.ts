@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
 
@@ -21,6 +21,7 @@ interface UsePhotoStatsOptions {
   autoFetch?: boolean;
   cameraLensLimit?: number;
   timeDistributionType?: TimeDistributionType;
+  repositoryId?: string;
 }
 
 interface UsePhotoStatsReturn {
@@ -48,6 +49,7 @@ export function usePhotoStats(
     autoFetch = true,
     cameraLensLimit = 10,
     timeDistributionType = "hourly",
+    repositoryId,
   } = options;
 
   const [focalLengthData, setFocalLengthData] =
@@ -83,6 +85,11 @@ export function usePhotoStats(
     "/api/v1/stats/daily-activity",
   );
 
+  const repositoryScope = useMemo(
+    () => (repositoryId ? { repository_id: repositoryId } : undefined),
+    [repositoryId],
+  );
+
   const fetchAllStats = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -90,39 +97,58 @@ export function usePhotoStats(
     try {
       const [focalResponse, cameraLensResponse, timeResponse, yearsResponse] =
         await Promise.all([
-          fetchFocalLength({}),
+          fetchFocalLength({
+            params: { query: repositoryScope },
+          }),
           fetchCameraLensStats({
-            params: { query: { limit: cameraLensLimit } },
+            params: {
+              query: {
+                limit: cameraLensLimit,
+                ...repositoryScope,
+              },
+            },
           }),
           fetchTimeDistribution({
-            params: { query: { type: timeDistributionType } },
+            params: {
+              query: {
+                type: timeDistributionType,
+                ...repositoryScope,
+              },
+            },
           }),
-          fetchAvailableYears({}),
+          fetchAvailableYears({
+            params: { query: repositoryScope },
+          }),
         ]);
 
       // Check focal length response (openapi-fetch format)
-      const focalData = focalResponse as ApiResult<FocalLengthDistributionResponse> | undefined;
+      const focalData = focalResponse as
+        | ApiResult<FocalLengthDistributionResponse>
+        | undefined;
       if (focalData?.code === 0 && focalData.data) {
         setFocalLengthData(focalData.data);
       }
 
       // Check camera lens response
-      const cameraLensData =
-        cameraLensResponse as ApiResult<CameraLensStatsResponse> | undefined;
+      const cameraLensData = cameraLensResponse as
+        | ApiResult<CameraLensStatsResponse>
+        | undefined;
       if (cameraLensData?.code === 0 && cameraLensData.data) {
         setCameraLensData(cameraLensData.data);
       }
 
       // Check time distribution response
-      const timeDistributionData =
-        timeResponse as ApiResult<TimeDistributionResponse> | undefined;
+      const timeDistributionData = timeResponse as
+        | ApiResult<TimeDistributionResponse>
+        | undefined;
       if (timeDistributionData?.code === 0 && timeDistributionData.data) {
         setTimeDistributionData(timeDistributionData.data);
       }
 
       // Check years response
-      const yearsData =
-        yearsResponse as ApiResult<AvailableYearsResponse> | undefined;
+      const yearsData = yearsResponse as
+        | ApiResult<AvailableYearsResponse>
+        | undefined;
       if (yearsData?.code === 0 && yearsData.data) {
         const years = yearsData.data.years ?? [];
         setAvailableYears(years);
@@ -139,10 +165,16 @@ export function usePhotoStats(
             );
 
             const heatmapResponse = await fetchDailyActivity({
-              params: { query: { days: daysDiff + 365 } },
+              params: {
+                query: {
+                  days: daysDiff + 365,
+                  ...repositoryScope,
+                },
+              },
             });
-            const heatmapData =
-              heatmapResponse as ApiResult<HeatmapResponse> | undefined;
+            const heatmapData = heatmapResponse as
+              | ApiResult<HeatmapResponse>
+              | undefined;
             if (heatmapData?.code === 0 && heatmapData.data) {
               setHeatmapData(heatmapData.data);
             }
@@ -162,6 +194,7 @@ export function usePhotoStats(
   }, [
     cameraLensLimit,
     timeDistributionType,
+    repositoryScope,
     fetchAvailableYears,
     fetchCameraLensStats,
     fetchDailyActivity,
@@ -169,35 +202,44 @@ export function usePhotoStats(
     fetchTimeDistribution,
   ]);
 
-  const refetchHeatmap = useCallback(async (year: number) => {
-    setHeatmapLoading(true);
-    setError(null);
+  const refetchHeatmap = useCallback(
+    async (year: number) => {
+      setHeatmapLoading(true);
+      setError(null);
 
-    try {
-      const startDate = new Date(year, 0, 1);
-      const endDate = new Date(year, 11, 31);
-      const daysDiff = Math.ceil(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      try {
+        const startDate = new Date(year, 0, 1);
+        const endDate = new Date(year, 11, 31);
+        const daysDiff = Math.ceil(
+          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+        );
 
-      const heatmapResponse = await fetchDailyActivity({
-        params: { query: { days: daysDiff + 365 } },
-      });
-      const heatmapData =
-        heatmapResponse as ApiResult<HeatmapResponse> | undefined;
+        const heatmapResponse = await fetchDailyActivity({
+          params: {
+            query: {
+              days: daysDiff + 365,
+              ...repositoryScope,
+            },
+          },
+        });
+        const heatmapData = heatmapResponse as
+          | ApiResult<HeatmapResponse>
+          | undefined;
 
-      if (heatmapData?.code === 0 && heatmapData.data) {
-        setHeatmapData(heatmapData.data);
+        if (heatmapData?.code === 0 && heatmapData.data) {
+          setHeatmapData(heatmapData.data);
+        }
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to fetch heatmap";
+        setError(errorMessage);
+        console.error("Error fetching heatmap:", err);
+      } finally {
+        setHeatmapLoading(false);
       }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch heatmap";
-      setError(errorMessage);
-      console.error("Error fetching heatmap:", err);
-    } finally {
-      setHeatmapLoading(false);
-    }
-  }, [fetchDailyActivity]);
+    },
+    [fetchDailyActivity, repositoryScope],
+  );
 
   useEffect(() => {
     if (autoFetch) {

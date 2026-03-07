@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"server/internal/db/repo"
@@ -75,10 +77,11 @@ type JWTClaims struct {
 
 // NewAuthService creates a new authentication service
 func NewAuthService(queries *repo.Queries) *AuthService {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "default-secret-key-change-in-production" // Default for development
+	rootSecret, err := loadOrCreateLumilioSecretKey(strings.TrimSpace(os.Getenv("LUMILIO_SECRET_KEY")))
+	if err != nil {
+		panic(fmt.Sprintf("failed to initialize JWT secret from LUMILIO_SECRET_KEY: %v", err))
 	}
+	jwtSecret := deriveScopedSecret(rootSecret, "jwt.signing.v1")
 
 	// Access token TTL (default: 15 minutes)
 	accessTokenTTL := 15 * time.Minute
@@ -98,10 +101,17 @@ func NewAuthService(queries *repo.Queries) *AuthService {
 
 	return &AuthService{
 		queries:         queries,
-		jwtSecret:       []byte(jwtSecret),
+		jwtSecret:       jwtSecret,
 		accessTokenTTL:  accessTokenTTL,
 		refreshTokenTTL: refreshTokenTTL,
 	}
+}
+
+func deriveScopedSecret(rootSecret string, scope string) []byte {
+	sum := sha256.Sum256([]byte(scope + "\x00" + rootSecret))
+	derived := make([]byte, len(sum))
+	copy(derived, sum[:])
+	return derived
 }
 
 // Register creates a new user account

@@ -5,9 +5,13 @@ import { usePhotoStats } from "../hooks/usePhotoStats";
 
 export type StatsCardsProps = {
   className?: string;
+  repositoryId?: string;
 };
 
-const StatsCards: React.FC<StatsCardsProps> = ({ className = "" }) => {
+const StatsCards: React.FC<StatsCardsProps> = ({
+  className = "",
+  repositoryId,
+}) => {
   const {
     focalLengthData,
     cameraLensData,
@@ -22,6 +26,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "" }) => {
     autoFetch: true,
     cameraLensLimit: 5,
     timeDistributionType: "hourly",
+    repositoryId,
   });
 
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
@@ -32,6 +37,10 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "" }) => {
       setSelectedYear(availableYears[0]);
     }
   }, [availableYears, selectedYear]);
+
+  useEffect(() => {
+    setSelectedYear(null);
+  }, [repositoryId]);
 
   // 当选择年份改变时重新获取热力图数据
   const handleYearChange = (year: number) => {
@@ -56,7 +65,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "" }) => {
     if (!cameraLensData || total === 0) return [];
 
     return (cameraLensData.data ?? []).map((item) => ({
-      combo: `${item.camera_model ?? 'Unknown'} + ${item.lens_model ?? 'Unknown'}`,
+      combo: `${item.camera_model ?? "Unknown"} + ${item.lens_model ?? "Unknown"}`,
       rate: Math.round(((item.count ?? 0) / total) * 100),
     }));
   }, [cameraLensData]);
@@ -310,8 +319,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({ className = "" }) => {
                       key={year}
                       onClick={() => handleYearChange(year)}
                       disabled={heatmapLoading}
-                      className={`btn btn-xs ${selectedYear === year ? "btn-primary" : "btn-ghost"
-                        } ${heatmapLoading ? "btn-disabled" : ""}`}
+                      className={`btn btn-xs ${
+                        selectedYear === year ? "btn-primary" : "btn-ghost"
+                      } ${heatmapLoading ? "btn-disabled" : ""}`}
                     >
                       {heatmapLoading && selectedYear === year ? (
                         <span className="loading loading-spinner loading-xs" />

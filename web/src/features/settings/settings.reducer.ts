@@ -9,6 +9,7 @@ export const initialState: SettingsState = {
   ui: {
     language: defaultLanguage,
     region: "other",
+    working_repository_id: undefined,
     asset_page: {
       layout: "full",
     },

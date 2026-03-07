@@ -32,7 +32,6 @@ classDiagram
         +TabType currentTab
         +GroupByType groupBy
         +string searchQuery
-        +SearchMode searchMode
         +boolean isCarouselOpen
         +string activeAssetId
         
@@ -40,7 +39,6 @@ classDiagram
         +setCurrentTab(tab)
         +setGroupBy(groupBy)
         +setSearchQuery(query)
-        +setSearchMode(mode)
         +setCarouselOpen(isOpen)
         +setActiveAssetId(id)
         +hydrateUIFromURL(params)
@@ -105,7 +103,6 @@ classDiagram
         +useCurrentTab()
         +useGroupBy()
         +useSearchQuery()
-        +useSearchMode()
         +useIsCarouselOpen()
         +useActiveAssetId()
         
