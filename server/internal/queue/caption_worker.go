@@ -20,11 +20,20 @@ type ProcessCaptionWorker struct {
 
 	CaptionService service.CaptionService
 	LumenService   service.LumenService
+	ConfigProvider MLConfigProvider
 }
 
 func (w *ProcessCaptionWorker) Work(ctx context.Context, job *river.Job[ProcessCaptionArgs]) error {
 	args := job.Args
 	assetID := args.AssetID
+
+	enabled, err := isMLTaskEnabled(ctx, w.ConfigProvider, "process_caption")
+	if err != nil {
+		return fmt.Errorf("load ml settings: %w", err)
+	}
+	if !enabled {
+		return nil
+	}
 
 	// Convert UUID to pgtype.UUID for database operations
 	pgUUID := pgtype.UUID{}
@@ -32,12 +41,15 @@ func (w *ProcessCaptionWorker) Work(ctx context.Context, job *river.Job[ProcessC
 		return fmt.Errorf("invalid UUID: %w", err)
 	}
 
+	if w.LumenService == nil {
+		return river.JobSnooze(30 * time.Second)
+	}
 	if !w.LumenService.IsTaskAvailable("vlm_generate") {
 		return river.JobSnooze(30 * time.Second)
 	}
 
 	// Save caption using CaptionService
-	_, err := w.CaptionService.GenerateAndSaveCaption(ctx, pgUUID, args.ImageData, args.CustomPrompt)
+	_, err = w.CaptionService.GenerateAndSaveCaption(ctx, pgUUID, args.ImageData, args.CustomPrompt)
 	if err != nil {
 		return fmt.Errorf("failed to save caption: %w", err)
 	}

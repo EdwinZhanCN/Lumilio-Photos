@@ -19,15 +19,21 @@ type AssetControllerInterface interface {
 	UpdateAsset(c *gin.Context)
 	DeleteAsset(c *gin.Context)
 	BatchUploadAssets(c *gin.Context)
+	GetUploadConfig(c *gin.Context)
+	GetUploadProgress(c *gin.Context)
 	AddAssetToAlbum(c *gin.Context)
 	GetAssetTypes(c *gin.Context)
 	GetAssetThumbnail(c *gin.Context)
 
 	// New filtering and search operations
-	QueryAssets(c *gin.Context)       // POST /assets/list - Unified asset listing, filtering, and search
-	GetFilterOptions(c *gin.Context)  // GET /assets/filter-options - Get available filter options
-	GetFeaturedAssets(c *gin.Context) // GET /assets/featured - Curated featured photos for home/gallery
-	GetPhotoMapPoints(c *gin.Context) // GET /assets/map-points - Lightweight photo map points with GPS
+	QueryAssets(c *gin.Context)              // POST /assets/list - Unified asset listing, filtering, and search
+	SearchAssets(c *gin.Context)             // POST /assets/search - Sectioned search with top results and fallback results
+	ListIndexingRepositories(c *gin.Context) // GET /assets/indexing/repositories - List repositories for indexing filters
+	GetIndexingStats(c *gin.Context)         // GET /assets/indexing/stats - Index coverage and queue status
+	RebuildAssetIndexes(c *gin.Context)      // POST /assets/indexing/rebuild - Queue reindex backfill for existing assets
+	GetFilterOptions(c *gin.Context)         // GET /assets/filter-options - Get available filter options
+	GetFeaturedAssets(c *gin.Context)        // GET /assets/featured - Curated featured photos for home/gallery
+	GetPhotoMapPoints(c *gin.Context)        // GET /assets/map-points - Lightweight photo map points with GPS
 
 	// Rating management operations
 	UpdateAssetRating(c *gin.Context)        // PUT /assets/:id/rating - Update asset rating
@@ -91,7 +97,28 @@ type AgentControllerInterface interface {
 	GetToolSchemas(c *gin.Context) // GET /agent/schemas - Get tool DTO schemas
 }
 
-func NewRouter(assetController AssetControllerInterface, authController AuthControllerInterface, albumController AlbumControllerInterface, queueController QueueControllerInterface, statsController StatsControllerInterface, agentController AgentControllerInterface) *gin.Engine {
+// CapabilitiesControllerInterface defines the interface for public system capability controllers.
+type CapabilitiesControllerInterface interface {
+	GetCapabilities(c *gin.Context) // GET /capabilities - Get de-sensitized runtime capabilities
+}
+
+type SettingsControllerInterface interface {
+	GetSystemSettings(c *gin.Context)
+	UpdateSystemSettings(c *gin.Context)
+	ValidateLLMSettings(c *gin.Context)
+}
+
+func NewRouter(
+	assetController AssetControllerInterface,
+	authController AuthControllerInterface,
+	albumController AlbumControllerInterface,
+	queueController QueueControllerInterface,
+	statsController StatsControllerInterface,
+	agentController AgentControllerInterface,
+	capabilitiesController CapabilitiesControllerInterface,
+	settingsController SettingsControllerInterface,
+	agentAvailabilityMiddleware gin.HandlerFunc,
+) *gin.Engine {
 	r := gin.Default()
 	allowedOrigins := loadAllowedCORSOrigins()
 
@@ -112,6 +139,16 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 		v1.GET("/health", func(c *gin.Context) {
 			GinSuccess(c, gin.H{"status": "ok"})
 		})
+		v1.GET("/capabilities", authController.OptionalAuthMiddleware(), capabilitiesController.GetCapabilities)
+
+		settings := v1.Group("/settings")
+		settings.Use(authController.AuthMiddleware())
+		{
+			settings.GET("/system", settingsController.GetSystemSettings)
+			settings.PATCH("/system", settingsController.UpdateSystemSettings)
+			settings.POST("/system/validate-llm", settingsController.ValidateLLMSettings)
+		}
+
 		// Authentication routes
 		auth := v1.Group("/auth")
 		{
@@ -131,8 +168,14 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 			assets.GET("/filter-options", assetController.GetFilterOptions)
 			assets.GET("/featured", assetController.GetFeaturedAssets)
 			assets.GET("/map-points", assetController.GetPhotoMapPoints)
+			assets.GET("/indexing/repositories", authController.AuthMiddleware(), assetController.ListIndexingRepositories)
+			assets.GET("/indexing/stats", authController.AuthMiddleware(), assetController.GetIndexingStats)
+			assets.POST("/indexing/rebuild", authController.AuthMiddleware(), assetController.RebuildAssetIndexes)
 			assets.POST("/list", assetController.QueryAssets)
+			assets.POST("/search", assetController.SearchAssets)
 			assets.POST("/batch", assetController.BatchUploadAssets)
+			assets.GET("/batch/config", assetController.GetUploadConfig)
+			assets.GET("/batch/progress", assetController.GetUploadProgress)
 			assets.GET("/:id", assetController.GetAsset)
 			assets.GET("/:id/original", assetController.GetOriginalFile)
 			assets.HEAD("/:id/original", assetController.GetOriginalFile)
@@ -198,7 +241,7 @@ func NewRouter(assetController AssetControllerInterface, authController AuthCont
 
 		// Agent routes - with optional authentication
 		agent := v1.Group("/agent")
-		agent.Use(authController.OptionalAuthMiddleware())
+		agent.Use(agentAvailabilityMiddleware, authController.OptionalAuthMiddleware())
 		{
 			agent.POST("/chat", agentController.Chat)
 			agent.POST("/chat/resume", agentController.ResumeChat)
@@ -239,7 +282,7 @@ func loadAllowedCORSOrigins() map[string]struct{} {
 // corsMiddleware handles CORS headers
 func corsMiddleware(allowedOrigins map[string]struct{}, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, HEAD")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-content-hash")
 		w.Header().Set("Vary", "Origin")
 

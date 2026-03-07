@@ -3,7 +3,6 @@ package processors
 import (
 	"time"
 
-	"server/config"
 	"server/internal/db/repo"
 	"server/internal/service"
 	"server/internal/storage"
@@ -25,13 +24,13 @@ type AssetPayload struct {
 
 // AssetProcessor holds shared dependencies for per-task processors.
 type AssetProcessor struct {
-	assetService   service.AssetService
-	queries        *repo.Queries
-	repoManager    storage.RepositoryManager
-	stagingManager storage.StagingManager
-	queueClient    *river.Client[pgx.Tx]
-	appConfig      config.AppConfig
-	lumenService   service.LumenService
+	assetService    service.AssetService
+	queries         *repo.Queries
+	repoManager     storage.RepositoryManager
+	stagingManager  storage.StagingManager
+	queueClient     *river.Client[pgx.Tx]
+	settingsService service.SettingsService
+	lumenService    service.LumenService
 }
 
 // NewAssetProcessor constructs the processor with required dependencies.
@@ -41,16 +40,16 @@ func NewAssetProcessor(
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
 	queueClient *river.Client[pgx.Tx],
-	appConfig config.AppConfig,
+	settingsService service.SettingsService,
 	lumenService service.LumenService,
 ) *AssetProcessor {
 	return &AssetProcessor{
-		assetService:   assetService,
-		queries:        queries,
-		repoManager:    repoManager,
-		stagingManager: stagingManager,
-		queueClient:    queueClient,
-		appConfig:      appConfig,
-		lumenService:   lumenService,
+		assetService:    assetService,
+		queries:         queries,
+		repoManager:     repoManager,
+		stagingManager:  stagingManager,
+		queueClient:     queueClient,
+		settingsService: settingsService,
+		lumenService:    lumenService,
 	}
 }

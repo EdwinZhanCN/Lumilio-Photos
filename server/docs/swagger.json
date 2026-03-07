@@ -336,6 +336,52 @@
                 },
                 "type": "object"
             },
+            "dto.AssetIndexingStatsResponseDTO": {
+                "properties": {
+                    "photo_total": {
+                        "example": 2400,
+                        "type": "integer"
+                    },
+                    "reindex_jobs": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "tasks": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskSetStatsDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetIndexingTaskSetStatsDTO": {
+                "properties": {
+                    "caption": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
+                    "clip": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
+                    "face": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
+                    "ocr": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetIndexingTaskStatsDTO": {
+                "properties": {
+                    "indexed_count": {
+                        "example": 1200,
+                        "type": "integer"
+                    },
+                    "queued_jobs": {
+                        "example": 12,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetListResponseDTO": {
                 "properties": {
                     "assets": {
@@ -582,6 +628,17 @@
                 },
                 "type": "object"
             },
+            "dto.CapabilitiesResponseDTO": {
+                "properties": {
+                    "llm": {
+                        "$ref": "#/components/schemas/dto.LLMCapabilitiesDTO"
+                    },
+                    "ml": {
+                        "$ref": "#/components/schemas/dto.MLCapabilitiesDTO"
+                    }
+                },
+                "type": "object"
+            },
             "dto.CreateAlbumRequestDTO": {
                 "properties": {
                     "album_name": {
@@ -681,11 +738,89 @@
                     "description": {
                         "type": "string"
                     },
+                    "display_cover_asset_id": {
+                        "type": "string"
+                    },
                     "updated_at": {
                         "type": "string"
                     },
                     "user_id": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.IndexingRepositoryListResponseDTO": {
+                "properties": {
+                    "repositories": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.IndexingRepositoryOptionDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.IndexingRepositoryOptionDTO": {
+                "properties": {
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "is_primary": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "example": "Photos Library",
+                        "type": "string"
+                    },
+                    "path": {
+                        "example": "/Volumes/Media/Photos",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LLMCapabilitiesDTO": {
+                "properties": {
+                    "agent_enabled": {
+                        "type": "boolean"
+                    },
+                    "configured": {
+                        "type": "boolean"
+                    },
+                    "model_name": {
+                        "example": "gpt-4.1-mini",
+                        "type": "string"
+                    },
+                    "provider": {
+                        "example": "openai",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LLMSettingsDTO": {
+                "properties": {
+                    "agent_enabled": {
+                        "type": "boolean"
+                    },
+                    "api_key_configured": {
+                        "type": "boolean"
+                    },
+                    "base_url": {
+                        "example": "https://api.openai.com/v1",
+                        "type": "string"
+                    },
+                    "model_name": {
+                        "example": "gpt-4.1-mini",
+                        "type": "string"
+                    },
+                    "provider": {
+                        "example": "openai",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -724,6 +859,78 @@
                     "password",
                     "username"
                 ],
+                "type": "object"
+            },
+            "dto.MLCapabilitiesDTO": {
+                "properties": {
+                    "active_node_count": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "auto_mode": {
+                        "example": "enable",
+                        "type": "string"
+                    },
+                    "discovered_node_count": {
+                        "example": 2,
+                        "type": "integer"
+                    },
+                    "tasks": {
+                        "$ref": "#/components/schemas/dto.MLTaskSetDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MLSettingsDTO": {
+                "properties": {
+                    "auto_mode": {
+                        "example": "disable",
+                        "type": "string"
+                    },
+                    "caption_enabled": {
+                        "type": "boolean"
+                    },
+                    "clip_enabled": {
+                        "type": "boolean"
+                    },
+                    "face_enabled": {
+                        "type": "boolean"
+                    },
+                    "ocr_enabled": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MLTaskCapabilityDTO": {
+                "properties": {
+                    "available": {
+                        "type": "boolean"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MLTaskSetDTO": {
+                "properties": {
+                    "clip_image_embed": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    },
+                    "clip_text_embed": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    },
+                    "face_detect_and_embed": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    },
+                    "ocr": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    },
+                    "vlm_generate": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    }
+                },
                 "type": "object"
             },
             "dto.MessageResponseDTO": {
@@ -787,6 +994,72 @@
                     },
                     "total_sessions": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RebuildAssetIndexesRequestDTO": {
+                "properties": {
+                    "limit": {
+                        "example": 200,
+                        "maximum": 500,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "missing_only": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "tasks": {
+                        "example": [
+                            "clip",
+                            "ocr"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RebuildAssetIndexesResponseDTO": {
+                "properties": {
+                    "job_id": {
+                        "example": 123,
+                        "type": "integer"
+                    },
+                    "limit": {
+                        "example": 200,
+                        "type": "integer"
+                    },
+                    "message": {
+                        "example": "Index rebuild job queued successfully",
+                        "type": "string"
+                    },
+                    "missing_only": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "requested_tasks": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "status": {
+                        "example": "queued",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -884,6 +1157,107 @@
                 },
                 "type": "object"
             },
+            "dto.SearchAssetsRequestDTO": {
+                "properties": {
+                    "enhancement_mode": {
+                        "enum": [
+                            "auto",
+                            "off",
+                            "only"
+                        ],
+                        "example": "auto",
+                        "type": "string"
+                    },
+                    "filter": {
+                        "$ref": "#/components/schemas/dto.AssetFilterDTO"
+                    },
+                    "group_by": {
+                        "enum": [
+                            "date",
+                            "type",
+                            "album"
+                        ],
+                        "example": "type",
+                        "type": "string"
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/dto.PaginationDTO"
+                    },
+                    "query": {
+                        "example": "red bird on branch",
+                        "type": "string"
+                    },
+                    "top_results_limit": {
+                        "example": 12,
+                        "maximum": 50,
+                        "minimum": 1,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "query"
+                ],
+                "type": "object"
+            },
+            "dto.SearchAssetsResponseDTO": {
+                "properties": {
+                    "limit": {
+                        "example": 20,
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "results": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "results_total": {
+                        "example": 150,
+                        "type": "integer"
+                    },
+                    "top_results": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "top_results_meta": {
+                        "$ref": "#/components/schemas/dto.SearchTopResultsMetaDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.SearchTopResultsMetaDTO": {
+                "properties": {
+                    "degraded": {
+                        "type": "boolean"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "reason": {
+                        "example": "runtime_unavailable",
+                        "type": "string"
+                    },
+                    "source_types": {
+                        "example": [
+                            "clip"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
             "dto.SessionProgressDTO": {
                 "properties": {
                     "bytes_done": {
@@ -911,6 +1285,23 @@
                         "type": "string"
                     },
                     "total_chunks": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.SystemSettingsDTO": {
+                "properties": {
+                    "llm": {
+                        "$ref": "#/components/schemas/dto.LLMSettingsDTO"
+                    },
+                    "ml": {
+                        "$ref": "#/components/schemas/dto.MLSettingsDTO"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "updated_by": {
                         "type": "integer"
                     }
                 },
@@ -969,10 +1360,60 @@
                 },
                 "type": "object"
             },
+            "dto.UpdateLLMSettingsDTO": {
+                "properties": {
+                    "agent_enabled": {
+                        "type": "boolean"
+                    },
+                    "api_key": {
+                        "type": "string"
+                    },
+                    "base_url": {
+                        "type": "string"
+                    },
+                    "model_name": {
+                        "type": "string"
+                    },
+                    "provider": {
+                        "enum": [
+                            "ark",
+                            "openai",
+                            "deepseek",
+                            "ollama"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.UpdateLikeRequestDTO": {
                 "properties": {
                     "liked": {
                         "example": true,
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateMLSettingsDTO": {
+                "properties": {
+                    "auto_mode": {
+                        "enum": [
+                            "enable",
+                            "disable"
+                        ],
+                        "type": "string"
+                    },
+                    "caption_enabled": {
+                        "type": "boolean"
+                    },
+                    "clip_enabled": {
+                        "type": "boolean"
+                    },
+                    "face_enabled": {
+                        "type": "boolean"
+                    },
+                    "ocr_enabled": {
                         "type": "boolean"
                     }
                 },
@@ -1000,6 +1441,17 @@
                         "maximum": 5,
                         "minimum": 0,
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.UpdateSystemSettingsDTO": {
+                "properties": {
+                    "llm": {
+                        "$ref": "#/components/schemas/dto.UpdateLLMSettingsDTO"
+                    },
+                    "ml": {
+                        "$ref": "#/components/schemas/dto.UpdateMLSettingsDTO"
                     }
                 },
                 "type": "object"
@@ -1087,6 +1539,14 @@
                     },
                     "username": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ValidateLLMSettingsResponseDTO": {
+                "properties": {
+                    "valid": {
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -1978,6 +2438,14 @@
                             "default": 0,
                             "type": "integer"
                         }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "requestBody": {
@@ -2276,6 +2744,14 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "requestBody": {
@@ -2500,6 +2976,14 @@
                         "required": true,
                         "schema": {
                             "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 ],
@@ -3332,6 +3816,247 @@
                 ]
             }
         },
+        "/api/v1/assets/indexing/rebuild": {
+            "post": {
+                "description": "Queue a background batch that backfills AI indexing for existing photos.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RebuildAssetIndexesRequestDTO",
+                                        "summary": "request",
+                                        "description": "Reindex request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Reindex request"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Reindex job queued successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Queue asset index rebuild",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/indexing/repositories": {
+            "get": {
+                "description": "Return repositories that can be used to scope indexing stats and reindex requests.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Repository options retrieved successfully"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "List indexing repositories",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/indexing/stats": {
+            "get": {
+                "description": "Return indexing coverage and queued job counts for photo AI tasks.",
+                "parameters": [
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Indexing stats retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid repository ID"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get asset indexing stats",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/api/v1/assets/liked": {
             "get": {
                 "description": "Get all assets that have been liked/favorited",
@@ -3723,6 +4448,94 @@
                     }
                 },
                 "summary": "Get assets by rating",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/search": {
+            "post": {
+                "description": "Search assets with optional top results enhancement and filename fallback.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.SearchAssetsRequestDTO",
+                                        "summary": "request",
+                                        "description": "Search parameters"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Search parameters",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Assets searched successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Search assets",
                 "tags": [
                     "assets"
                 ]
@@ -5526,6 +6339,63 @@
                 ]
             }
         },
+        "/api/v1/capabilities": {
+            "get": {
+                "description": "Return a de-sensitized view of backend ML and LLM runtime capabilities without exposing secrets.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Capabilities retrieved successfully"
+                    }
+                },
+                "summary": "Get public runtime capabilities",
+                "tags": [
+                    "capabilities"
+                ]
+            }
+        },
         "/api/v1/health": {
             "get": {
                 "description": "Check if the server is healthy",
@@ -5583,9 +6453,294 @@
                 ]
             }
         },
+        "/api/v1/settings/system": {
+            "get": {
+                "description": "Return persisted system settings without exposing secret values.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "System settings retrieved successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get system settings",
+                "tags": [
+                    "settings"
+                ]
+            },
+            "patch": {
+                "description": "Update persisted system settings. API keys are write-only and never returned.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateSystemSettingsDTO",
+                                        "summary": "request",
+                                        "description": "System settings patch"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "System settings patch",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "System settings updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update system settings",
+                "tags": [
+                    "settings"
+                ]
+            }
+        },
+        "/api/v1/settings/system/validate-llm": {
+            "post": {
+                "description": "Validate the persisted LLM configuration by issuing a lightweight test request.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "LLM settings validated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "LLM validation failed"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Validate LLM settings",
+                "tags": [
+                    "settings"
+                ]
+            }
+        },
         "/api/v1/stats/available-years": {
             "get": {
                 "description": "Get list of years that have photo data",
+                "parameters": [
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -5624,6 +6779,16 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -5652,6 +6817,14 @@
                         "schema": {
                             "default": 20,
                             "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 ],
@@ -5732,6 +6905,14 @@
                             "default": 365,
                             "type": "integer"
                         }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -5802,6 +6983,16 @@
         "/api/v1/stats/focal-length": {
             "get": {
                 "description": "Get distribution of commonly used focal lengths",
+                "parameters": [
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -5840,6 +7031,16 @@
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -5871,6 +7072,14 @@
                                 "hourly",
                                 "monthly"
                             ],
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
                             "type": "string"
                         }
                     }

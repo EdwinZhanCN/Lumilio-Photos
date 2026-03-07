@@ -1,6 +1,10 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { ApiResult, Album as AlbumDTO, ListAlbumsResponse } from "@/lib/albums/types";
+import type {
+  ApiResult,
+  Album as AlbumDTO,
+  ListAlbumsResponse,
+} from "@/lib/albums/types";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Album as ImgStackAlbum } from "../components/ImgStackGrid/ImgStackGrid";
 
@@ -11,8 +15,10 @@ const PAGE_SIZE = 60;
  */
 export const mapAlbumToUI = (
   album: AlbumDTO,
-  t: (key: string, options?: any) => string
+  t: (key: string, options?: any) => string,
 ): ImgStackAlbum => {
+  const coverAssetId = album.display_cover_asset_id ?? album.cover_asset_id;
+
   return {
     id: String(album.album_id),
     name:
@@ -20,8 +26,8 @@ export const mapAlbumToUI = (
       t("collections.untitled", { defaultValue: "Untitled Album" }),
     description: album.description ?? "",
     imageCount: album.asset_count ?? 0,
-    coverImages: album.cover_asset_id
-      ? [assetUrls.getThumbnailUrl(album.cover_asset_id, "medium")]
+    coverImages: coverAssetId
+      ? [assetUrls.getThumbnailUrl(coverAssetId, "medium")]
       : undefined,
     createdAt: album.created_at ? new Date(album.created_at) : new Date(),
     updatedAt: album.updated_at ? new Date(album.updated_at) : new Date(),
@@ -31,24 +37,39 @@ export const mapAlbumToUI = (
 /**
  * Hook for fetching albums with infinite scrolling/pagination
  */
-export function useAlbums(t: (key: string, options?: any) => string) {
-  const { mutateAsync: fetchAlbums } = $api.useMutation("get", "/api/v1/albums");
+export function useAlbums(
+  t: (key: string, options?: any) => string,
+  repositoryId?: string,
+) {
+  const { mutateAsync: fetchAlbums } = $api.useMutation(
+    "get",
+    "/api/v1/albums",
+  );
 
   return useInfiniteQuery({
-    queryKey: ["albums"],
+    queryKey: ["albums", repositoryId ?? "all"],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       const response = await fetchAlbums({
-        params: { query: { limit: PAGE_SIZE, offset: pageParam } },
+        params: {
+          query: {
+            limit: PAGE_SIZE,
+            offset: pageParam,
+            repository_id: repositoryId,
+          },
+        },
       });
-      const responseData = response as ApiResult<ListAlbumsResponse> | undefined;
+      const responseData = response as
+        | ApiResult<ListAlbumsResponse>
+        | undefined;
       const payload = responseData?.data;
       const total = payload?.total ?? 0;
 
       return {
         albums: (payload?.albums ?? []).map((album) => mapAlbumToUI(album, t)),
         total,
-        nextOffset: pageParam + PAGE_SIZE < total ? pageParam + PAGE_SIZE : null,
+        nextOffset:
+          pageParam + PAGE_SIZE < total ? pageParam + PAGE_SIZE : null,
       };
     },
     getNextPageParam: (lastPage) => lastPage.nextOffset ?? undefined,

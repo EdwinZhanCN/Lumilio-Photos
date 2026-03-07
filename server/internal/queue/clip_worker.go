@@ -21,11 +21,20 @@ type ProcessClipWorker struct {
 	EmbeddingService service.EmbeddingService
 	LumenService     service.LumenService
 	SpeciesService   service.SpeciesService
+	ConfigProvider   MLConfigProvider
 }
 
 func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClipArgs]) error {
 	args := job.Args
 	assetID := args.AssetID
+
+	enabled, err := isMLTaskEnabled(ctx, w.ConfigProvider, "process_clip")
+	if err != nil {
+		return fmt.Errorf("load ml settings: %w", err)
+	}
+	if !enabled {
+		return nil
+	}
 
 	// Convert UUID to pgtype.UUID for database operations
 	pgUUID := pgtype.UUID{}
@@ -34,6 +43,9 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 	}
 
 	// If tasks are temporarily unavailable, snooze for a short period
+	if w.LumenService == nil {
+		return river.JobSnooze(30 * time.Second)
+	}
 	if !w.LumenService.IsTaskAvailable("clip_image_embed") || !w.LumenService.IsTaskAvailable("bioclip_classify") {
 		return river.JobSnooze(30 * time.Second)
 	}

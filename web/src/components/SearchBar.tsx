@@ -1,25 +1,22 @@
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline/index.js";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
-import { useSearchMode, useUIActions } from "@/features/assets/selectors";
+import {
+  useCurrentTab,
+  useSearchQuery,
+  useUIActions,
+} from "@/features/assets/selectors";
 
-interface SearchBarProps {
-  enableSemanticSearch?: boolean;
-}
-
-export default function SearchBar({
-  enableSemanticSearch = false,
-}: SearchBarProps) {
+export default function SearchBar() {
   const { t } = useI18n();
-  const searchMode = useSearchMode();
-  const { setSearchQuery, setSearchMode: setSearchModeAction, setGroupBy } = useUIActions();
+  const currentTab = useCurrentTab();
+  const searchQuery = useSearchQuery();
+  const { setSearchQuery, setGroupBy } = useUIActions();
 
   const [searchText, setSearchText] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [active, setActive] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const isSemanticMode = searchMode === "semantic";
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
@@ -27,7 +24,7 @@ export default function SearchBar({
 
   // Debounced search function
   const performSearch = useCallback(
-    async (query: string, isSemanticSearch: boolean) => {
+    async (query: string) => {
       if (!query.trim()) {
         setSearchQuery("");
         return;
@@ -35,10 +32,6 @@ export default function SearchBar({
 
       setIsSearching(true);
       try {
-        // Update search mode based on semantic toggle
-        const newSearchMode = isSemanticSearch ? "semantic" : "filename";
-        setSearchModeAction(newSearchMode);
-
         // Set search query
         setSearchQuery(query.trim());
 
@@ -50,19 +43,25 @@ export default function SearchBar({
         setIsSearching(false);
       }
     },
-    [setSearchQuery, setSearchModeAction, setGroupBy],
+    [setSearchQuery, setGroupBy],
   );
 
   // Debounce search execution
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchText || searchText === "") {
-        performSearch(searchText, isSemanticMode);
+        performSearch(searchText);
       }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchText, isSemanticMode, performSearch]);
+  }, [searchText, performSearch]);
+
+  useEffect(() => {
+    const nextQuery = searchQuery.trim();
+    setSearchText(nextQuery);
+    setActive(nextQuery.length > 0);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (active) {
@@ -73,14 +72,9 @@ export default function SearchBar({
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      performSearch(searchText, isSemanticMode);
+      performSearch(searchText);
     }
   };
-
-  const toggleSemanticSearch = useCallback(() => {
-    const newMode = isSemanticMode ? "filename" : "semantic";
-    setSearchModeAction(newMode);
-  }, [isSemanticMode, setSearchModeAction]);
 
   return (
     <div className="flex-1">
@@ -116,13 +110,13 @@ export default function SearchBar({
                   name="search"
                   type="text"
                   placeholder={
-                    isSemanticMode && enableSemanticSearch
+                    currentTab === "photos"
                       ? t("search.placeholderai", {
-                        defaultValue: "Describe what you're looking for...",
-                      })
+                          defaultValue: "Search photos, scenes, and text...",
+                        })
                       : t("search.placeholder", {
-                        defaultValue: "Search by filename...",
-                      })
+                          defaultValue: "Search by filename...",
+                        })
                   }
                   value={searchText}
                   className="input input-sm input-bordered search-input pr-8"
@@ -136,41 +130,6 @@ export default function SearchBar({
                   </div>
                 )}
               </div>
-
-              {enableSemanticSearch && (
-                <div
-                  className="tooltip tooltip-bottom"
-                  data-tip={
-                    isSemanticMode
-                      ? t("search.option.semantic")
-                      : t("search.option.filename")
-                  }
-                >
-                  <label className="toggle animate-fade-in-x cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isSemanticMode}
-                      onChange={toggleSemanticSearch}
-                      disabled={isSearching}
-                    />
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="lucide lucide-sparkles"
-                    >
-                      <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
-                      <path d="M20 2v4" />
-                      <path d="M22 4h-4" />
-                      <circle cx="4" cy="20" r="2" />
-                    </svg>
-                  </label>
-                </div>
-              )}
             </div>
           )}
         </div>

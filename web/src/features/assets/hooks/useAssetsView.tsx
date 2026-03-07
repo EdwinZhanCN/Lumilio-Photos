@@ -1,4 +1,8 @@
 import { useCallback, useMemo } from "react";
+import type {
+  InfiniteData,
+  UseInfiniteQueryResult,
+} from "@tanstack/react-query";
 import { useAssetsStore } from "../assets.store";
 import { useGroupBy } from "../selectors";
 import {
@@ -13,12 +17,29 @@ import {
   selectFiltersEnabled,
 } from "../slices/filters.slice";
 import { $api } from "@/lib/http-commons/queryClient";
-import type { components } from "@/lib/http-commons/schema.d.ts";
+import type { components, paths } from "@/lib/http-commons/schema.d.ts";
 import { groupAssets } from "@/lib/utils/assetGrouping";
 import { Asset } from "@/lib/assets/types";
+import { useWorkingRepository } from "@/features/settings";
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
 type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
+type SearchAssetsRequest = components["schemas"]["dto.SearchAssetsRequestDTO"];
+type SearchAssetsResponse =
+  components["schemas"]["dto.SearchAssetsResponseDTO"];
+type SearchAssetsApiResult = Omit<
+  paths["/api/v1/assets/search"]["post"]["responses"][200]["content"]["application/json"],
+  "data"
+> & {
+  data?: SearchAssetsResponse;
+};
+
+type SearchTopResultsMeta = {
+  enabled: boolean;
+  degraded: boolean;
+  reason?: string;
+  source_types: string[];
+};
 
 type AssetsViewQueryResult = {
   assets: Asset[];
@@ -33,21 +54,44 @@ type AssetsViewQueryResult = {
   pageInfo: { cursor?: string; page: number; total?: number };
 };
 
+type PhotoSearchViewResult = AssetsViewResult & {
+  topResults: Asset[];
+  resultAssets: Asset[];
+  topResultsMeta: SearchTopResultsMeta;
+};
 
+const DEFAULT_TOP_RESULTS_META: SearchTopResultsMeta = {
+  enabled: false,
+  degraded: false,
+  source_types: [],
+};
 
-/**
- * Converts tab types to their corresponding API MIME type strings.
- * 
- * @param tabTypes - Array of tab types to convert
- * @returns Array of MIME type strings compatible with the API
- * 
- * @example
- * ```ts
- * const mimeTypes = getApiMimeTypes(['photos', 'videos']);
- * // Returns: ['PHOTO', 'VIDEO']
- * ```
- */
-const getApiMimeTypes = (tabTypes: TabType[]): ("PHOTO" | "VIDEO" | "AUDIO")[] => {
+const EMPTY_ASSETS_VIEW_RESULT: AssetsViewResult = {
+  assets: [],
+  groups: undefined,
+  isLoading: false,
+  isLoadingMore: false,
+  isFetched: false,
+  error: null,
+  fetchMore: async () => {},
+  refetch: async () => {},
+  hasMore: false,
+  viewKey: "",
+  pageInfo: { page: 1 },
+};
+
+const EMPTY_PHOTO_SEARCH_VIEW_RESULT: PhotoSearchViewResult = {
+  ...EMPTY_ASSETS_VIEW_RESULT,
+  topResults: [],
+  resultAssets: [],
+  topResultsMeta: DEFAULT_TOP_RESULTS_META,
+};
+
+const TOP_RESULTS_LIMIT = 12;
+
+const getApiMimeTypes = (
+  tabTypes: TabType[],
+): ("PHOTO" | "VIDEO" | "AUDIO")[] => {
   const mimeTypes: ("PHOTO" | "VIDEO" | "AUDIO")[] = [];
   tabTypes.forEach((type) => {
     switch (type) {
@@ -65,44 +109,54 @@ const getApiMimeTypes = (tabTypes: TabType[]): ("PHOTO" | "VIDEO" | "AUDIO")[] =
   return mimeTypes;
 };
 
-/**
- * React Query hook for fetching assets with view-aware filtering and pagination.
- * 
- * This hook handles different API endpoints based on the view definition:
- * - Regular asset listing for simple queries
- * - Album-specific filtering when album_id is present
- * - Search endpoint when search query is provided
- * - Filter endpoint for complex filtering
- * 
- * @param definition - The asset view definition containing filters, sorting, and pagination settings
- * @param options - Additional options for the view behavior
- * @param options.autoFetch - Whether to automatically fetch data (default: true)
- * @param options.disabled - Whether the view is disabled (default: false)
- * 
- * @returns AssetsViewQueryResult containing assets, loading states, and pagination controls
- * 
- * @example
- * ```ts
- * const result = useAssetsViewQuery({
- *   types: ['photos'],
- *   filter: { album_id: '123' },
- *   sort: { field: 'taken_time', direction: 'desc' },
- *   pageSize: 50
- * });
- * 
- * const { assets, isLoading, fetchMore, hasMore } = result;
- * ```
- */
-export const useAssetsViewQuery = (
-  definition: AssetViewDefinition,
-  options: ViewDefinitionOptions = {},
-): AssetsViewQueryResult => {
-  const { autoFetch = true, disabled = false } = options;
-  const viewKey = useMemo(() => generateViewKey(definition), [definition]);
+const normalizeVisibleAssets = (assets: Asset[]): Asset[] =>
+  assets.filter((asset) => !asset.is_deleted && !asset.deleted_at);
 
+const mergeUniqueAssets = (...assetCollections: Asset[][]): Asset[] => {
+  const seen = new Set<string>();
+  const merged: Asset[] = [];
+
+  assetCollections.forEach((collection) => {
+    collection.forEach((asset) => {
+      const key = asset.asset_id;
+      if (!key || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      merged.push(asset);
+    });
+  });
+
+  return merged;
+};
+
+const normalizeTopResultsMeta = (
+  meta?: SearchAssetsResponse["top_results_meta"],
+): SearchTopResultsMeta => ({
+  enabled: Boolean(meta?.enabled),
+  degraded: Boolean(meta?.degraded),
+  reason: meta?.reason,
+  source_types: meta?.source_types ?? [],
+});
+
+const normalizeSearchGroupBy = (
+  groupBy?: AssetViewDefinition["groupBy"],
+): SearchAssetsRequest["group_by"] | undefined => {
+  switch (groupBy) {
+    case "date":
+    case "type":
+    case "album":
+      return groupBy;
+    default:
+      return undefined;
+  }
+};
+
+const useEffectiveFilter = (definition: AssetViewDefinition): AssetFilter => {
   const filtersState = useAssetsStore((state) => state.filters);
+  const { scopedRepositoryId } = useWorkingRepository();
 
-  const effectiveFilter = useMemo(() => {
+  return useMemo(() => {
     const globalFilter = selectFiltersEnabled({ filters: filtersState } as any)
       ? selectFilterAsAssetFilter({ filters: filtersState } as any)
       : {};
@@ -110,61 +164,79 @@ export const useAssetsViewQuery = (
     const baseFilter =
       definition.inheritGlobalFilter !== false ? globalFilter : {};
 
-    return {
+    const mergedFilter: AssetFilter = {
       ...baseFilter,
       ...definition.filter,
     };
-  }, [definition.filter, definition.inheritGlobalFilter, filtersState]);
 
+    if (mergedFilter.repository_id === undefined && scopedRepositoryId) {
+      mergedFilter.repository_id = scopedRepositoryId;
+    }
+
+    return mergedFilter;
+  }, [
+    definition.filter,
+    definition.inheritGlobalFilter,
+    filtersState,
+    scopedRepositoryId,
+  ]);
+};
+
+const buildApiFilter = (
+  definition: AssetViewDefinition,
+  effectiveFilter: AssetFilter,
+): AssetFilter => {
+  const filter: AssetFilter = { ...effectiveFilter };
+
+  if (definition.types && definition.types.length > 0) {
+    const mimeTypes = getApiMimeTypes(definition.types);
+    if (mimeTypes.length === 1) {
+      filter.type = mimeTypes[0];
+    } else if (mimeTypes.length > 1) {
+      filter.types = mimeTypes;
+    }
+  }
+
+  return filter;
+};
+
+export const useAssetsViewQuery = (
+  definition: AssetViewDefinition,
+  options: ViewDefinitionOptions = {},
+): AssetsViewQueryResult => {
+  const { autoFetch = true, disabled = false } = options;
+  const viewKey = useMemo(() => generateViewKey(definition), [definition]);
+  const effectiveFilter = useEffectiveFilter(definition);
   const pageSize = definition.pageSize || 50;
 
-  /**
-   * Creates a unified request body for the /api/v1/assets/list endpoint.
-   * Handles all query types: listing, filtering, and searching.
-   */
-  const createUnifiedRequest = useCallback(
-    (): AssetQueryRequest => {
-      const filter: AssetFilter = { ...effectiveFilter };
+  const createUnifiedRequest = useCallback((): AssetQueryRequest => {
+    const request: AssetQueryRequest = {
+      filter: buildApiFilter(definition, effectiveFilter),
+      pagination: {
+        limit: pageSize,
+        offset: 0,
+      },
+    };
 
-      // Add asset type filters
-      if (definition.types && definition.types.length > 0) {
-        const mimeTypes = getApiMimeTypes(definition.types);
-        if (mimeTypes.length === 1) {
-          filter.type = mimeTypes[0];
-        } else if (mimeTypes.length > 1) {
-          filter.types = mimeTypes;
-        }
-      }
+    if (definition.search?.query) {
+      request.query = definition.search.query;
+    }
 
-      const request: AssetQueryRequest = {
-        filter,
-        pagination: {
-          limit: pageSize,
-          offset: 0,
+    return request;
+  }, [definition, effectiveFilter, pageSize]);
+
+  const requestConfig = useMemo(
+    () =>
+      ({
+        method: "post",
+        path: "/api/v1/assets/list",
+        init: {
+          body: createUnifiedRequest(),
         },
-      };
-
-      // Add search parameters if present
-      if (definition.search?.query) {
-        request.query = definition.search.query;
-        request.search_type =
-          definition.search.mode === "semantic" ? "semantic" : "filename";
-      }
-
-      return request;
-    },
-    [definition, effectiveFilter, pageSize],
+        pageParamName: "offset",
+      }) as const,
+    [createUnifiedRequest],
   );
-  // All queries use the unified /api/v1/assets/list endpoint
-  // Album filtering is handled via filter.album_id
-  const requestConfig = useMemo(() => ({
-    method: "post",
-    path: "/api/v1/assets/list",
-    init: {
-      body: createUnifiedRequest(),
-    },
-    pageParamName: "offset",
-  } as const), [createUnifiedRequest]);
 
   const query = $api.useInfiniteQuery(
     requestConfig.method as any,
@@ -230,8 +302,6 @@ export const useAssetsViewQuery = (
         ? String(query.error)
         : null;
 
-
-
   return {
     assets,
     isLoading: query.isLoading,
@@ -250,24 +320,6 @@ export const useAssetsViewQuery = (
   };
 };
 
-/**
- * Groups assets based on the specified grouping criteria.
- * 
- * This hook applies asset grouping logic when enabled, organizing assets
- * into logical groups (e.g., by date, location, or custom criteria).
- * 
- * @param assets - The array of assets to group
- * @param definition - The view definition containing grouping configuration
- * @param withGroups - Whether grouping should be applied
- * 
- * @returns Grouped assets structure or undefined if grouping is disabled
- * 
- * @example
- * ```ts
- * const groups = useAssetsViewGrouping(assets, { groupBy: 'date' }, true);
- * // Returns: { '2024-01-01': [asset1, asset2], '2024-01-02': [asset3] }
- * ```
- */
 const useAssetsViewGrouping = (
   assets: Asset[],
   definition: AssetViewDefinition,
@@ -281,45 +333,6 @@ const useAssetsViewGrouping = (
   }, [withGroups, definition.groupBy, assets]);
 };
 
-/**
- * Primary hook for accessing and managing asset data through view definitions.
- * 
- * This is the main entry point for working with assets in the application.
- * It combines data fetching, caching, pagination, filtering, and optional grouping
- * into a single, easy-to-use interface.
- * 
- * Features:
- * - Automatic data fetching with React Query
- * - Pagination with infinite scroll support
- * - View-aware filtering and sorting
- * - Optional asset grouping
- * - Error handling and loading states
- * 
- * @param definition - The asset view definition specifying what data to fetch
- * @param options - Additional configuration options
- * @param options.withGroups - Whether to return grouped assets (default: false)
- * @param options.autoFetch - Whether to automatically fetch data (default: true)
- * @param options.disabled - Whether the view is disabled (default: false)
- * 
- * @returns AssetsViewResult containing assets, groups, loading states, and controls
- * 
- * @example
- * ```ts
- * // Basic usage for photos
- * const { assets, isLoading, fetchMore } = useAssetsView({
- *   types: ['photos'],
- *   pageSize: 50
- * });
- * 
- * // Advanced usage with filtering and grouping
- * const { assets, groups, hasMore } = useAssetsView({
- *   types: ['photos', 'videos'],
- *   filter: { album_id: '123' },
- *   sort: { field: 'taken_time', direction: 'desc' },
- *   groupBy: 'date'
- * }, { withGroups: true });
- * ```
- */
 export const useAssetsView = (
   definition: AssetViewDefinition,
   options: ViewDefinitionOptions = {},
@@ -328,10 +341,7 @@ export const useAssetsView = (
   const queryResult = useAssetsViewQuery(definition, options);
 
   const filteredAssets = useMemo(
-    () =>
-      queryResult.assets.filter(
-        (asset) => !asset.is_deleted && !asset.deleted_at,
-      ),
+    () => normalizeVisibleAssets(queryResult.assets),
     [queryResult.assets],
   );
   const groups = useAssetsViewGrouping(filteredAssets, definition, withGroups);
@@ -351,42 +361,183 @@ export const useAssetsView = (
   };
 };
 
-/**
- * Hook for accessing assets from the currently active tab in the UI.
- * 
- * This hook automatically reads the current tab state from the store
- * and creates an appropriate view definition. It's commonly used in
- * components that need to display assets based on the user's current
- * tab selection (photos, videos, audios).
- * 
- * Features:
- * - Automatic tab type detection
- * - Search query integration
- * - UI grouping preferences
- * - Default sorting by taken time
- * - Automatic grouping enabled
- * 
- * @param options - Configuration options for the current tab view
- * @param options.groupBy - Override the UI grouping preference
- * @param options.pageSize - Custom page size (default: 50)
- * @param options.withGroups - Whether to return grouped assets (default: true)
- * @param options.autoFetch - Whether to automatically fetch data (default: true)
- * @param options.disabled - Whether the view is disabled (default: false)
- * 
- * @returns AssetsViewResult for the current tab's assets
- * 
- * @example
- * ```ts
- * // Simple usage - gets current tab assets
- * const { assets, isLoading } = useCurrentTabAssets();
- * 
- * // Custom page size and grouping
- * const { assets, groups } = useCurrentTabAssets({
- *   pageSize: 100,
- *   groupBy: 'location'
- * });
- * ```
- */
+export const usePhotoSearchView = (
+  definition: AssetViewDefinition,
+  options: ViewDefinitionOptions = {},
+): PhotoSearchViewResult => {
+  const { autoFetch = true, disabled = false, withGroups = false } = options;
+  const effectiveFilter = useEffectiveFilter(definition);
+  const pageSize = definition.pageSize || 50;
+  const queryText = definition.search?.query?.trim() ?? "";
+  const viewKey = useMemo(
+    () => `${generateViewKey(definition)}:photo-search`,
+    [definition],
+  );
+
+  const createSearchRequest = useCallback(
+    (): SearchAssetsRequest => ({
+      query: queryText,
+      filter: buildApiFilter(definition, effectiveFilter),
+      pagination: {
+        limit: pageSize,
+        offset: 0,
+      },
+      enhancement_mode: "auto",
+      top_results_limit: TOP_RESULTS_LIMIT,
+      group_by: normalizeSearchGroupBy(definition.groupBy),
+    }),
+    [definition, effectiveFilter, pageSize, queryText],
+  );
+
+  const request = useMemo(() => createSearchRequest(), [createSearchRequest]);
+
+  const query = $api.useInfiniteQuery(
+    "post",
+    "/api/v1/assets/search",
+    {
+      body: request,
+    },
+    {
+      enabled: autoFetch && !disabled && queryText.length > 0,
+      initialPageParam: 0,
+      pageParamName: "offset",
+      getNextPageParam: (lastPage, _allPages, lastPageParam) => {
+        const responseData = (lastPage as SearchAssetsApiResult | undefined)
+          ?.data;
+        const results = responseData?.results ?? [];
+        const total = responseData?.results_total;
+        const offset = Number(lastPageParam ?? 0) || 0;
+        const hasMore =
+          typeof total === "number"
+            ? offset + results.length < total
+            : results.length >= pageSize;
+
+        return hasMore ? offset + pageSize : undefined;
+      },
+    },
+  ) as UseInfiniteQueryResult<InfiniteData<SearchAssetsApiResult>, unknown>;
+
+  const searchPages = useMemo(() => {
+    const pages = (query.data?.pages ?? []) as SearchAssetsApiResult[];
+    const pageParams = query.data?.pageParams ?? [];
+
+    return pages.map((page, index) => {
+      const responseData = page?.data;
+      const offset = Number(pageParams[index] ?? 0) || 0;
+      const results = responseData?.results ?? [];
+      const total = responseData?.results_total;
+      const hasMore =
+        typeof total === "number"
+          ? offset + results.length < total
+          : results.length >= pageSize;
+
+      return {
+        topResults: responseData?.top_results ?? [],
+        topResultsMeta: normalizeTopResultsMeta(responseData?.top_results_meta),
+        results,
+        total,
+        offset,
+        hasMore,
+      };
+    });
+  }, [pageSize, query.data?.pageParams, query.dataUpdatedAt]);
+
+  const firstPage = searchPages[0];
+  const topResults = useMemo(
+    () => normalizeVisibleAssets(firstPage?.topResults ?? []),
+    [firstPage?.topResults],
+  );
+  const resultAssets = useMemo(
+    () => normalizeVisibleAssets(searchPages.flatMap((page) => page.results)),
+    [searchPages],
+  );
+  const assets = useMemo(
+    () => mergeUniqueAssets(topResults, resultAssets),
+    [resultAssets, topResults],
+  );
+  const groups = useAssetsViewGrouping(assets, definition, withGroups);
+
+  const lastPage =
+    searchPages.length > 0 ? searchPages[searchPages.length - 1] : undefined;
+  const pageInfo = useMemo(
+    () => ({
+      cursor: undefined,
+      page: lastPage ? Math.floor(lastPage.offset / pageSize) + 1 : 1,
+      total: lastPage?.total,
+    }),
+    [lastPage, pageSize],
+  );
+
+  const error =
+    query.error instanceof Error
+      ? query.error.message
+      : query.error
+        ? String(query.error)
+        : null;
+
+  if (queryText.length === 0) {
+    return {
+      ...EMPTY_PHOTO_SEARCH_VIEW_RESULT,
+      viewKey,
+    };
+  }
+
+  return {
+    assets,
+    topResults,
+    resultAssets,
+    topResultsMeta: firstPage?.topResultsMeta ?? DEFAULT_TOP_RESULTS_META,
+    groups,
+    isLoading: query.isLoading,
+    isLoadingMore: query.isFetchingNextPage,
+    error,
+    fetchMore: async () => {
+      await query.fetchNextPage();
+    },
+    refetch: async () => {
+      await query.refetch();
+    },
+    hasMore: query.hasNextPage ?? false,
+    isFetched: query.isFetched,
+    viewKey,
+    pageInfo,
+  };
+};
+
+export const useCurrentTabPhotoSearchView = (
+  options: ViewDefinitionOptions & {
+    groupBy?: string;
+    pageSize?: number;
+  } = {},
+): PhotoSearchViewResult => {
+  const currentTab = useAssetsStore((state) => state.ui.currentTab);
+  const uiGroupBy = useGroupBy();
+  const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
+  const { groupBy, pageSize, ...viewOptions } = options;
+
+  const definition: AssetViewDefinition = useMemo(
+    () => ({
+      types: [currentTab],
+      groupBy: (groupBy as any) || uiGroupBy,
+      pageSize: pageSize || 50,
+      sort: { field: "taken_time", direction: "desc" },
+      search: searchQuery.trim()
+        ? {
+            query: searchQuery.trim(),
+          }
+        : undefined,
+    }),
+    [currentTab, uiGroupBy, searchQuery, groupBy, pageSize],
+  );
+
+  const enabled = currentTab === "photos" && searchQuery.trim().length > 0;
+  return usePhotoSearchView(definition, {
+    ...viewOptions,
+    withGroups: viewOptions.withGroups ?? true,
+    disabled: viewOptions.disabled || !enabled,
+  });
+};
+
 export const useCurrentTabAssets = (
   options: ViewDefinitionOptions & {
     groupBy?: string;
@@ -396,7 +547,6 @@ export const useCurrentTabAssets = (
   const currentTab = useAssetsStore((state) => state.ui.currentTab);
   const uiGroupBy = useGroupBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
-  const searchMode = useAssetsStore((state) => state.ui.searchMode);
 
   const { groupBy, pageSize, ...viewOptions } = options;
 
@@ -408,16 +558,22 @@ export const useCurrentTabAssets = (
       sort: { field: "taken_time", direction: "desc" },
       search: searchQuery.trim()
         ? {
-          query: searchQuery.trim(),
-          mode: currentTab === "photos" ? searchMode : "filename",
-        }
+            query: searchQuery.trim(),
+          }
         : undefined,
     }),
-    [currentTab, uiGroupBy, searchQuery, searchMode, groupBy, pageSize],
+    [currentTab, uiGroupBy, searchQuery, groupBy, pageSize],
   );
 
-  return useAssetsView(definition, {
+  const standardView = useAssetsView(definition, {
     ...viewOptions,
     withGroups: true,
   });
+  const photoSearchView = useCurrentTabPhotoSearchView(options);
+
+  if (currentTab === "photos" && searchQuery.trim()) {
+    return photoSearchView;
+  }
+
+  return standardView;
 };

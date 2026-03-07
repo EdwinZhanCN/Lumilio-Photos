@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   SparklesIcon,
   CameraIcon,
@@ -15,6 +14,7 @@ import { isPhotoMetadata } from "@/lib/http-commons";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
+import { useWorkingRepository } from "@/features/settings";
 
 const EMPTY_EXIF = {
   camera: "-",
@@ -26,9 +26,23 @@ const EMPTY_EXIF = {
 };
 
 function Home() {
-  const [displayMode, setDisplayMode] = useState("gallery");
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { scopedRepositoryId } = useWorkingRepository();
+  const displayMode = searchParams.get("tab") === "stats" ? "stats" : "gallery";
+
+  const setDisplayMode = (nextMode: "gallery" | "stats") => {
+    const params = new URLSearchParams(searchParams);
+
+    if (nextMode === "gallery") {
+      params.delete("tab");
+    } else {
+      params.set("tab", nextMode);
+    }
+
+    setSearchParams(params, { replace: true });
+  };
 
   const {
     assets: featuredAssets,
@@ -39,6 +53,7 @@ function Home() {
     count: 8,
     candidateLimit: 240,
     days: 3650,
+    repositoryId: scopedRepositoryId,
   });
   const {
     points: mapPoints,
@@ -47,7 +62,7 @@ function Home() {
     isLoading: isMapLoading,
     isFetchingNextPage: isMapFetchingNextPage,
     hasNextPage: mapHasNextPage,
-  } = useMapPhotoAssets();
+  } = useMapPhotoAssets({ repositoryId: scopedRepositoryId });
 
   const galleryItems = featuredAssets.length > 0 ? featuredAssets.length : 8;
   const mapSubtitle =
@@ -173,7 +188,7 @@ function Home() {
 
         {displayMode === "stats" && (
           <div className="space-y-8 animate-fadeIn">
-            <StatsCards />
+            <StatsCards repositoryId={scopedRepositoryId} />
             <InfoCard />
           </div>
         )}

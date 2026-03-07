@@ -1,289 +1,246 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
+import { useI18n } from "@/lib/i18n.tsx";
 import {
   usePerformancePreferences,
   PerformanceProfile,
-  PerformancePreferences,
 } from "@/lib/utils/performancePreferences.ts";
 import { detectDeviceCapabilities } from "@/lib/utils/smartBatchSizing.ts";
 
 export default function PerformanceSettings() {
+  const { t } = useI18n();
   const { preferences, updatePreferences, resetToDefaults } =
     usePerformancePreferences();
-  const [localPreferences, setLocalPreferences] =
-    useState<PerformancePreferences>(preferences);
-  const deviceInfo = detectDeviceCapabilities();
-
-  useEffect(() => {
-    setLocalPreferences(preferences);
-  }, [preferences]);
+  const deviceInfo = useMemo(() => detectDeviceCapabilities(), []);
 
   const handleProfileChange = (profile: PerformanceProfile) => {
-    const updated = { ...localPreferences, profile };
-    setLocalPreferences(updated);
-    updatePreferences(updated);
+    updatePreferences({ profile });
   };
 
   const handleToggleChange = (
-    key: keyof PerformancePreferences,
+    key: "respectMemoryLimits" | "prioritizeUserOperations",
     value: boolean,
   ) => {
-    const updated = { ...localPreferences, [key]: value };
-    setLocalPreferences(updated);
-    updatePreferences(updated);
+    updatePreferences({ [key]: value });
   };
 
   const handleNumberChange = (
-    key: keyof PerformancePreferences,
+    key: "maxConcurrentOperations",
     value: number,
   ) => {
-    const updated = { ...localPreferences, [key]: value };
-    setLocalPreferences(updated);
-    updatePreferences(updated);
+    updatePreferences({ [key]: value });
   };
 
   const handleReset = () => {
     resetToDefaults();
   };
 
+  const profileOptions = [
+    {
+      value: PerformanceProfile.MEMORY_SAVER,
+      label: t("settings.performanceSettings.profiles.memory_saver.label"),
+      description: t(
+        "settings.performanceSettings.profiles.memory_saver.description",
+      ),
+    },
+    {
+      value: PerformanceProfile.BALANCED,
+      label: t("settings.performanceSettings.profiles.balanced.label"),
+      description: t(
+        "settings.performanceSettings.profiles.balanced.description",
+      ),
+    },
+    {
+      value: PerformanceProfile.SPEED_OPTIMIZED,
+      label: t("settings.performanceSettings.profiles.speed.label"),
+      description: t("settings.performanceSettings.profiles.speed.description"),
+    },
+    {
+      value: PerformanceProfile.ADAPTIVE,
+      label: t("settings.performanceSettings.profiles.adaptive.label"),
+      description: t(
+        "settings.performanceSettings.profiles.adaptive.description",
+      ),
+    },
+  ];
+
+  const currentProfile =
+    profileOptions.find((option) => option.value === preferences.profile) ??
+    profileOptions[0];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold mb-2">Performance Settings</h1>
-        <p className="text-base-content/70">
-          Configure how Lumilio processes images to balance memory usage and
-          speed based on your device capabilities and preferences.
-        </p>
-      </div>
-
-      {/* Device Information */}
-      <div className="card bg-base-100 shadow-sm">
-        <div className="card-body">
-          <h2 className="card-title text-lg">Device Information</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="font-medium">CPU Cores:</span>{" "}
-              {deviceInfo.cpuCores}
-            </div>
-            <div>
-              <span className="font-medium">Available Memory:</span> ~
-              {deviceInfo.availableMemoryMB}MB
-            </div>
-            <div>
-              <span className="font-medium">Device Type:</span>
-              {deviceInfo.isMobile ? " Mobile" : " Desktop"}
-              {deviceInfo.isLowEndDevice && " (Low-end)"}
-            </div>
-            <div>
-              <span className="font-medium">Max Concurrency:</span>{" "}
-              {deviceInfo.maxConcurrency}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Performance Profile */}
-      <div className="card bg-base-100 shadow-sm">
-        <div className="card-body">
-          <h2 className="card-title text-lg">Performance Profile</h2>
-          <p className="text-sm text-base-content/70 mb-4">
-            Choose how to balance memory usage and processing speed
+      <header className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold">{t("settings.performance")}</h2>
+          <p className="text-base-content/70 max-w-2xl">
+            {t("settings.performanceSettings.description")}
           </p>
-
-          <div className="space-y-3">
-            <label className="flex items-center gap-3">
-              <input
-                type="radio"
-                name="performance-profile"
-                className="radio radio-primary"
-                checked={
-                  localPreferences.profile === PerformanceProfile.MEMORY_SAVER
-                }
-                onChange={() =>
-                  handleProfileChange(PerformanceProfile.MEMORY_SAVER)
-                }
-              />
-              <div>
-                <div className="font-medium">Memory Saver</div>
-                <div className="text-sm text-base-content/70">
-                  Minimize memory usage, slower processing
-                </div>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3">
-              <input
-                type="radio"
-                name="performance-profile"
-                className="radio radio-primary"
-                checked={
-                  localPreferences.profile === PerformanceProfile.BALANCED
-                }
-                onChange={() =>
-                  handleProfileChange(PerformanceProfile.BALANCED)
-                }
-              />
-              <div>
-                <div className="font-medium">Balanced</div>
-                <div className="text-sm text-base-content/70">
-                  Balance between memory usage and speed
-                </div>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3">
-              <input
-                type="radio"
-                name="performance-profile"
-                className="radio radio-primary"
-                checked={
-                  localPreferences.profile ===
-                  PerformanceProfile.SPEED_OPTIMIZED
-                }
-                onChange={() =>
-                  handleProfileChange(PerformanceProfile.SPEED_OPTIMIZED)
-                }
-              />
-              <div>
-                <div className="font-medium">Speed Optimized</div>
-                <div className="text-sm text-base-content/70">
-                  Maximize processing speed, higher memory usage
-                </div>
-              </div>
-            </label>
-
-            <label className="flex items-center gap-3">
-              <input
-                type="radio"
-                name="performance-profile"
-                className="radio radio-primary"
-                checked={
-                  localPreferences.profile === PerformanceProfile.ADAPTIVE
-                }
-                onChange={() =>
-                  handleProfileChange(PerformanceProfile.ADAPTIVE)
-                }
-              />
-              <div>
-                <div className="font-medium">Adaptive (Recommended)</div>
-                <div className="text-sm text-base-content/70">
-                  Automatically adjust based on device capabilities
-                </div>
-              </div>
-            </label>
-          </div>
         </div>
-      </div>
 
-      {/* Advanced Settings */}
-      <div className="card bg-base-100 shadow-sm">
-        <div className="card-body">
-          <h2 className="card-title text-lg">Advanced Settings</h2>
-
-          <div className="space-y-4">
-            <div className="form-control">
-              <label className="label cursor-pointer">
-                <span className="label-text">
-                  <div className="font-medium">Respect Memory Limits</div>
-                  <div className="text-sm text-base-content/70">
-                    Reduce processing when memory usage is high
-                  </div>
-                </span>
-                <input
-                  type="checkbox"
-                  className="toggle toggle-primary"
-                  checked={localPreferences.respectMemoryLimits}
-                  onChange={(e) =>
-                    handleToggleChange("respectMemoryLimits", e.target.checked)
-                  }
-                />
-              </label>
-            </div>
-
-            <div className="form-control">
-              <label className="label cursor-pointer">
-                <span className="label-text">
-                  <div className="font-medium">Prioritize User Operations</div>
-                  <div className="text-sm text-base-content/70">
-                    Give priority to user-visible operations
-                  </div>
-                </span>
-                <input
-                  type="checkbox"
-                  className="toggle toggle-primary"
-                  checked={localPreferences.prioritizeUserOperations}
-                  onChange={(e) =>
-                    handleToggleChange(
-                      "prioritizeUserOperations",
-                      e.target.checked,
-                    )
-                  }
-                />
-              </label>
-            </div>
-
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">
-                  <div className="font-medium">Max Concurrent Operations</div>
-                  <div className="text-sm text-base-content/70">
-                    Maximum number of processing operations running at once
-                  </div>
-                </span>
-              </label>
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min={1}
-                  max={8}
-                  value={localPreferences.maxConcurrentOperations}
-                  onChange={(e) =>
-                    handleNumberChange(
-                      "maxConcurrentOperations",
-                      parseInt(e.target.value),
-                    )
-                  }
-                  className="range range-primary flex-1"
-                />
-                <span className="w-8 text-center font-mono">
-                  {localPreferences.maxConcurrentOperations}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Performance Tips */}
-      <div className="alert alert-info">
-        <div>
-          <h3 className="font-bold">Performance Tips</h3>
-          <div className="text-sm mt-1">
-            <ul className="list-disc list-inside space-y-1">
-              <li>
-                <strong>Memory Saver:</strong> Best for older devices or when
-                running many apps
-              </li>
-              <li>
-                <strong>Speed Optimized:</strong> Best for high-end devices with
-                plenty of RAM
-              </li>
-              <li>
-                <strong>Adaptive:</strong> Automatically adjusts to your device
-                capabilities
-              </li>
-              <li>
-                Changes take effect immediately for new processing operations
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Reset Button */}
-      <div className="flex justify-end">
-        <button className="btn btn-outline" onClick={handleReset}>
-          Reset to Defaults
+        <button className="btn btn-outline btn-sm" onClick={handleReset}>
+          {t("settings.performanceSettings.reset")}
         </button>
+      </header>
+
+      <section className="rounded-2xl border border-base-300 bg-base-100 p-5 space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="badge badge-primary badge-outline">
+            {t("settings.performanceSettings.currentProfile")}:{" "}
+            {currentProfile.label}
+          </span>
+          <span className="badge badge-ghost">
+            {t("settings.performanceSettings.cpuCores")}: {deviceInfo.cpuCores}
+          </span>
+          <span className="badge badge-ghost">
+            {t("settings.performanceSettings.availableMemory")}: ~
+            {deviceInfo.availableMemoryMB}MB
+          </span>
+          <span className="badge badge-ghost">
+            {t("settings.performanceSettings.deviceType")}:{" "}
+            {deviceInfo.isMobile
+              ? t("settings.performanceSettings.deviceTypeValues.mobile")
+              : t("settings.performanceSettings.deviceTypeValues.desktop")}
+            {deviceInfo.isLowEndDevice
+              ? ` · ${t("settings.performanceSettings.deviceTypeValues.lowEnd")}`
+              : ""}
+          </span>
+          <span className="badge badge-ghost">
+            {t("settings.performanceSettings.maxConcurrency")}:{" "}
+            {deviceInfo.maxConcurrency}
+          </span>
+        </div>
+
+        <p className="text-sm text-base-content/70">
+          {currentProfile.description}
+        </p>
+      </section>
+
+      <section className="rounded-2xl border border-base-300 bg-base-100 p-5 space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-lg font-semibold">
+            {t("settings.performanceSettings.profileTitle")}
+          </h3>
+          <p className="text-sm text-base-content/70">
+            {t("settings.performanceSettings.profileDescription")}
+          </p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {profileOptions.map((option) => {
+            const isActive = preferences.profile === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={[
+                  "rounded-2xl border p-4 text-left transition",
+                  isActive
+                    ? "border-primary bg-primary/8 shadow-sm"
+                    : "border-base-300 bg-base-100 hover:border-base-content/30",
+                ].join(" ")}
+                onClick={() => handleProfileChange(option.value)}
+              >
+                <div className="font-semibold">{option.label}</div>
+                <div className="mt-2 text-sm text-base-content/70">
+                  {option.description}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <div className="collapse collapse-arrow rounded-2xl border border-base-300 bg-base-100">
+        <input
+          type="checkbox"
+          aria-label={t("settings.performanceSettings.advancedTitle")}
+        />
+        <div className="collapse-title">
+          <div className="font-semibold">
+            {t("settings.performanceSettings.advancedTitle")}
+          </div>
+          <div className="text-sm text-base-content/70">
+            {t("settings.performanceSettings.advancedDescription")}
+          </div>
+        </div>
+        <div className="collapse-content space-y-4">
+          <div className="rounded-2xl border border-base-300 bg-base-100 p-4 flex items-start justify-between gap-4">
+            <div>
+              <div className="font-semibold">
+                {t("settings.performanceSettings.respectMemoryLimits")}
+              </div>
+              <div className="mt-1 text-sm text-base-content/70">
+                {t(
+                  "settings.performanceSettings.respectMemoryLimitsDescription",
+                )}
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={preferences.respectMemoryLimits}
+              onChange={(e) =>
+                handleToggleChange("respectMemoryLimits", e.target.checked)
+              }
+            />
+          </div>
+
+          <div className="rounded-2xl border border-base-300 bg-base-100 p-4 flex items-start justify-between gap-4">
+            <div>
+              <div className="font-semibold">
+                {t("settings.performanceSettings.prioritizeUserOperations")}
+              </div>
+              <div className="mt-1 text-sm text-base-content/70">
+                {t(
+                  "settings.performanceSettings.prioritizeUserOperationsDescription",
+                )}
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={preferences.prioritizeUserOperations}
+              onChange={(e) =>
+                handleToggleChange("prioritizeUserOperations", e.target.checked)
+              }
+            />
+          </div>
+
+          <div className="rounded-2xl border border-base-300 bg-base-100 p-4 space-y-3">
+            <div>
+              <div className="font-semibold">
+                {t("settings.performanceSettings.maxConcurrentOperations")}
+              </div>
+              <div className="mt-1 text-sm text-base-content/70">
+                {t(
+                  "settings.performanceSettings.maxConcurrentOperationsDescription",
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <input
+                type="range"
+                min={1}
+                max={8}
+                value={preferences.maxConcurrentOperations}
+                onChange={(e) =>
+                  handleNumberChange(
+                    "maxConcurrentOperations",
+                    parseInt(e.target.value),
+                  )
+                }
+                className="range range-primary flex-1"
+              />
+              <span className="w-8 text-center font-mono">
+                {preferences.maxConcurrentOperations}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="alert alert-info">
+        <span>{t("settings.performanceSettings.changesApply")}</span>
       </div>
     </div>
   );

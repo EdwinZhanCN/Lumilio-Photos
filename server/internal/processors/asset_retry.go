@@ -220,7 +220,10 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 
 // retryMLJobs re-enqueues specific ML jobs that failed
 func (ap *AssetProcessor) retryMLJobs(ctx context.Context, asset *repo.Asset, fullPath string, taskSet map[string]bool) error {
-	mlConfig := ap.appConfig.MLConfig
+	mlConfig, err := ap.settingsService.GetEffectiveMLConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("load ML settings: %w", err)
+	}
 
 	// Extract RAW preview once (shared by all ML jobs if needed)
 	previewData, err := ap.extractRAWPreview(ctx, fullPath, asset.OriginalFilename)

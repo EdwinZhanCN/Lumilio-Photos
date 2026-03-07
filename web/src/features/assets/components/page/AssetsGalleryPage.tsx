@@ -1,4 +1,3 @@
-
 import { useMemo, useCallback, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
@@ -6,171 +5,276 @@ import FullScreenCarousel from "@/features/assets/components/page/FullScreen/Ful
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
-import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
 import {
-    useGroupBy,
-    useIsCarouselOpen,
-    useUIActions
+  useCurrentTabAssets,
+  useCurrentTabPhotoSearchView,
+} from "@/features/assets/hooks/useAssetsView";
+import {
+  useGroupBy,
+  useIsCarouselOpen,
+  useSearchQuery,
+  useUIActions,
 } from "@/features/assets/selectors";
 import {
-    groupAssets,
-    getFlatAssetsFromGrouped,
-    findAssetIndex,
+  groupAssets,
+  getFlatAssetsFromGrouped,
+  findAssetIndex,
 } from "@/lib/utils/assetGrouping.ts";
 import { useI18n } from "@/lib/i18n";
 
-
-
-export type AssetCategory = 'photos' | 'videos' | 'audios';
+export type AssetCategory = "photos" | "videos" | "audios";
 
 interface AssetsGalleryPageProps {
-    category: AssetCategory;
+  category: AssetCategory;
 }
 
 export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
-    const { assetId } = useParams<{ assetId: string }>();
-    const { openCarousel, closeCarousel } = useAssetsNavigation();
-    const { t } = useI18n();
+  const { assetId } = useParams<{ assetId: string }>();
+  const { openCarousel, closeCarousel } = useAssetsNavigation();
+  const { t } = useI18n();
 
-    // Selectors
-    const groupBy = useGroupBy();
-    const isCarouselOpen = useIsCarouselOpen();
-    const { setGroupBy } = useUIActions();
+  // Selectors
+  const groupBy = useGroupBy();
+  const searchQuery = useSearchQuery();
+  const isCarouselOpen = useIsCarouselOpen();
+  const { setGroupBy } = useUIActions();
+  const isPhotoSearchActive =
+    category === "photos" && searchQuery.trim().length > 0;
 
-    // Get assets for current view using the new hook
-    const {
-        assets: allAssets,
-        groups: groupedAssets,
-        isLoading: isFetching,
-        isLoadingMore: isFetchingNextPage,
-        fetchMore: fetchNextPage,
-        hasMore: hasNextPage,
-        isFetched,
-        error,
+  const {
+    assets: allAssets,
+    groups: groupedAssets,
+    isLoading: isFetching,
+    isLoadingMore: isFetchingNextPage,
+    fetchMore: fetchNextPage,
+    hasMore: hasNextPage,
+    isFetched,
+    error,
+  } = useCurrentTabAssets({
+    withGroups: true,
+    groupBy,
+  });
+  const photoSearchView = useCurrentTabPhotoSearchView({
+    withGroups: false,
+    groupBy,
+  });
 
-    } = useCurrentTabAssets({
-        withGroups: true,
-        groupBy,
-    });
+  const hasFetchedOnce = isFetched;
 
-    const hasFetchedOnce = isFetched;
+  const handleLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-    const handleLoadMore = useCallback(() => {
-        if (hasNextPage && !isFetchingNextPage) {
-            fetchNextPage();
-        }
-    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const topResultsGroup = useMemo(
+    () => ({
+      [t("search.topResults", { defaultValue: "Top Results" })]:
+        photoSearchView.topResults,
+    }),
+    [photoSearchView.topResults, t],
+  );
+  const resultsGroup = useMemo(
+    () => ({
+      [t("search.results", { defaultValue: "Results" })]:
+        photoSearchView.resultAssets,
+    }),
+    [photoSearchView.resultAssets, t],
+  );
 
-    // Use grouped assets if available, otherwise group manually
-    const finalGroupedAssets = useMemo(() => {
-        if (groupedAssets && Object.keys(groupedAssets).length > 0) {
-            return groupedAssets;
-        }
-        return groupAssets(allAssets, groupBy);
-    }, [groupedAssets, allAssets, groupBy]);
+  const finalGroupedAssets = useMemo(() => {
+    if (isPhotoSearchActive) {
+      return undefined;
+    }
+    if (groupedAssets && Object.keys(groupedAssets).length > 0) {
+      return groupedAssets;
+    }
+    return groupAssets(allAssets, groupBy);
+  }, [groupedAssets, allAssets, groupBy, isPhotoSearchActive]);
 
-    const flatAssets = useMemo(() => {
-        return getFlatAssetsFromGrouped(finalGroupedAssets);
-    }, [finalGroupedAssets]);
+  const flatAssets = useMemo(() => {
+    if (isPhotoSearchActive) {
+      return allAssets;
+    }
+    return getFlatAssetsFromGrouped(finalGroupedAssets ?? {});
+  }, [allAssets, finalGroupedAssets, isPhotoSearchActive]);
 
-
-
-    // Carousel positioning logic
-    const [slideIndex, setSlideIndex] = useState<number>(-1);
-    const [isLocatingAsset, setIsLocatingAsset] = useState(false);
-
-
-
-    useEffect(() => {
-        if (!isCarouselOpen) return;
-        if (assetId && hasFetchedOnce) {
-            const index = findAssetIndex(flatAssets, assetId);
-            if (index >= 0) {
-                setSlideIndex(index);
-                setIsLocatingAsset(false);
-                return;
-            }
-            setIsLocatingAsset(true);
-            if (hasNextPage && !isFetching && !isFetchingNextPage) {
-                fetchNextPage();
-                return;
-            }
-            if (!hasNextPage && !isFetching && !isFetchingNextPage) {
-                const timer = setTimeout(() => closeCarousel(), 500);
-                return () => clearTimeout(timer);
-            }
-        }
-    }, [assetId, flatAssets, isCarouselOpen, hasFetchedOnce, hasNextPage, isFetching, isFetchingNextPage, fetchNextPage, closeCarousel]);
-
-    useEffect(() => {
-        if (assetId && flatAssets.length > 0) {
-            const index = findAssetIndex(flatAssets, assetId);
-            if (index >= 0) {
-                setSlideIndex(index);
-                setIsLocatingAsset(false);
-            }
-        }
-    }, [assetId, flatAssets]);
-
-    if (error) throw new Error(error);
+  const renderSearchSections = () => {
+    if (isFetching && allAssets.length === 0) {
+      return <PhotosLoadingSkeleton />;
+    }
 
     return (
-        <div>
-            <AssetsPageHeader groupBy={groupBy} onGroupByChange={setGroupBy} onFiltersChange={() => { }} />
+      <div className="space-y-6">
+        {photoSearchView.topResultsMeta.degraded && (
+          <div className="px-4">
+            <div className="alert alert-info border border-info/20 bg-info/10 text-info-content">
+              <span>
+                {t("search.degraded", {
+                  defaultValue:
+                    "Top results are temporarily unavailable. Showing regular results instead.",
+                })}
+              </span>
+            </div>
+          </div>
+        )}
 
-            {isFetching && allAssets.length === 0 ? (
-                <PhotosLoadingSkeleton />
-            ) : (
-                <JustifiedGallery
-                    groupedPhotos={finalGroupedAssets}
-                    openCarousel={openCarousel}
-                    onLoadMore={handleLoadMore}
-                    hasMore={hasNextPage}
-                    isLoadingMore={isFetchingNextPage}
-                />
-            )}
+        {error && (
+          <div className="px-4">
+            <div className="alert alert-warning">
+              <span>
+                {t("search.error", {
+                  defaultValue:
+                    "Search is temporarily unavailable. Try again in a moment.",
+                })}
+              </span>
+            </div>
+          </div>
+        )}
 
-            {!hasNextPage && allAssets.length > 0 && (
-                <div className="text-center p-4 text-gray-500">{t(`assets.${category}.end_of_results`)}</div>
-            )}
+        {photoSearchView.topResults.length > 0 && (
+          <JustifiedGallery
+            groupedPhotos={topResultsGroup}
+            openCarousel={openCarousel}
+            onLoadMore={() => {}}
+            hasMore={false}
+            isLoadingMore={false}
+          />
+        )}
 
-            {isCarouselOpen && (
-                flatAssets.length > 0 ? (
-                    <>
-                        <FullScreenCarousel
-                            photos={flatAssets}
-                            initialSlide={slideIndex >= 0 ? slideIndex : 0}
-                            slideIndex={slideIndex >= 0 ? slideIndex : undefined}
-                            onClose={closeCarousel}
-                            onNavigate={openCarousel}
-                        />
-                        {isLocatingAsset && (
-                            <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center">
-                                <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
-                                    <div className="loading loading-spinner loading-lg mb-4"></div>
-                                    <p className="text-lg font-medium mb-2">{t(`assets.${category}.locating_asset`)}</p>
-                                    {hasNextPage && !isFetching && !isFetchingNextPage ? (
-                                        <p className="text-sm text-gray-300">
-                                            {t(`assets.${category}.loading_more_data`)}
-                                        </p>
-                                    ) : (
-                                        <p className="text-sm text-gray-300">
-                                            {t(`assets.${category}.asset_not_available`)}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-                        <div className="text-white text-center">
-                            <div className="loading loading-spinner loading-lg mb-4"></div>
-                            <p>{t(`assets.${category}.loading_assets`)}</p>
-                        </div>
-                    </div>
-                )
-            )}
-        </div>
+        {(!error || photoSearchView.resultAssets.length > 0) && (
+          <JustifiedGallery
+            groupedPhotos={resultsGroup}
+            openCarousel={openCarousel}
+            onLoadMore={handleLoadMore}
+            hasMore={hasNextPage}
+            isLoadingMore={isFetchingNextPage}
+            isLoading={isFetching && photoSearchView.resultAssets.length === 0}
+          />
+        )}
+      </div>
     );
+  };
+
+  // Carousel positioning logic
+  const [slideIndex, setSlideIndex] = useState<number>(-1);
+  const [isLocatingAsset, setIsLocatingAsset] = useState(false);
+
+  useEffect(() => {
+    if (!isCarouselOpen) return;
+    if (assetId && hasFetchedOnce) {
+      const index = findAssetIndex(flatAssets, assetId);
+      if (index >= 0) {
+        setSlideIndex(index);
+        setIsLocatingAsset(false);
+        return;
+      }
+      setIsLocatingAsset(true);
+      if (hasNextPage && !isFetching && !isFetchingNextPage) {
+        fetchNextPage();
+        return;
+      }
+      if (!hasNextPage && !isFetching && !isFetchingNextPage) {
+        const timer = setTimeout(() => closeCarousel(), 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [
+    assetId,
+    flatAssets,
+    isCarouselOpen,
+    hasFetchedOnce,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    fetchNextPage,
+    closeCarousel,
+  ]);
+
+  useEffect(() => {
+    if (assetId && flatAssets.length > 0) {
+      const index = findAssetIndex(flatAssets, assetId);
+      if (index >= 0) {
+        setSlideIndex(index);
+        setIsLocatingAsset(false);
+      }
+    }
+  }, [assetId, flatAssets]);
+
+  if (error && !isPhotoSearchActive) throw new Error(error);
+
+  const showEndOfResults =
+    !hasNextPage &&
+    (isPhotoSearchActive
+      ? photoSearchView.resultAssets.length > 0
+      : allAssets.length > 0);
+
+  return (
+    <div>
+      <AssetsPageHeader
+        groupBy={groupBy}
+        onGroupByChange={setGroupBy}
+        onFiltersChange={() => {}}
+      />
+
+      {isPhotoSearchActive ? (
+        renderSearchSections()
+      ) : isFetching && allAssets.length === 0 ? (
+        <PhotosLoadingSkeleton />
+      ) : (
+        <JustifiedGallery
+          groupedPhotos={finalGroupedAssets ?? {}}
+          openCarousel={openCarousel}
+          onLoadMore={handleLoadMore}
+          hasMore={hasNextPage}
+          isLoadingMore={isFetchingNextPage}
+        />
+      )}
+
+      {showEndOfResults && (
+        <div className="text-center p-4 text-gray-500">
+          {t(`assets.${category}.end_of_results`)}
+        </div>
+      )}
+
+      {isCarouselOpen &&
+        (flatAssets.length > 0 ? (
+          <>
+            <FullScreenCarousel
+              photos={flatAssets}
+              initialSlide={slideIndex >= 0 ? slideIndex : 0}
+              slideIndex={slideIndex >= 0 ? slideIndex : undefined}
+              onClose={closeCarousel}
+              onNavigate={openCarousel}
+            />
+            {isLocatingAsset && (
+              <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center">
+                <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
+                  <div className="loading loading-spinner loading-lg mb-4"></div>
+                  <p className="text-lg font-medium mb-2">
+                    {t(`assets.${category}.locating_asset`)}
+                  </p>
+                  {hasNextPage && !isFetching && !isFetchingNextPage ? (
+                    <p className="text-sm text-gray-300">
+                      {t(`assets.${category}.loading_more_data`)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-300">
+                      {t(`assets.${category}.asset_not_available`)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+            <div className="text-white text-center">
+              <div className="loading loading-spinner loading-lg mb-4"></div>
+              <p>{t(`assets.${category}.loading_assets`)}</p>
+            </div>
+          </div>
+        ))}
+    </div>
+  );
 }

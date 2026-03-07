@@ -1,3 +1,5 @@
 export { StatMonitor } from "./StatMonitor";
 export { TaskMonitor } from "./TaskMonitor";
 export { QueueList } from "./QueueList";
+export { CapabilitiesMonitor } from "./CapabilitiesMonitor";
+export { MLMonitor } from "./MLMonitor";

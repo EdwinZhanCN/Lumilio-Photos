@@ -1,9 +1,11 @@
 // src/features/lumilio/routes/LumilioChat.tsx
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { LumilioChatProvider } from "../LumilioChatProvider";
 
 import { useLumilioChat } from "../hooks/useLumilioChat";
 import { LumilioInput, LumilioMessages } from "../components/LumilioChat";
+import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 
 /** Main chat interface component that displays conversation and handles user input.
  *
@@ -14,10 +16,17 @@ import { LumilioInput, LumilioMessages } from "../components/LumilioChat";
 const ChatInterface: React.FC = () => {
   const { state, sendMessage, resumeConversation, dispatch } = useLumilioChat();
   const [activeTool, setActiveTool] = useState<string | null>(null);
+  const { capabilities } = useCapabilities(5000);
 
   const rootCauseInterrupt = state.interrupt?.InterruptContexts?.find(
     (ctx) => ctx.IsRootCause,
   );
+  const agentDisabledReason =
+    capabilities && !capabilities.llm.agentEnabled
+      ? "Lumilio Agent is disabled. Enable it in Settings > AI."
+      : capabilities && !capabilities.llm.configured
+        ? "Lumilio Agent is not configured. Complete provider, model and API key in Settings > AI."
+        : null;
 
   /** Handles submission of user messages to the agent.
    *
@@ -69,6 +78,15 @@ const ChatInterface: React.FC = () => {
 
       {/* Fixed Input Area at the bottom */}
       <div className="shrink-0 bg-base-100/80 backdrop-blur-sm border-t border-base-300">
+        {agentDisabledReason && (
+          <div className="px-4 py-3 border-b border-base-300 bg-warning/10 text-sm">
+            <span>{agentDisabledReason}</span>{" "}
+            <Link className="link link-hover" to="/settings?tab=ai">
+              Open AI settings
+            </Link>
+          </div>
+        )}
+
         {rootCauseInterrupt?.Info && (
           <div className="p-4 border-b border-base-300 bg-warning/10">
             <h4 className="font-bold text-warning">Confirmation Required</h4>
@@ -94,6 +112,8 @@ const ChatInterface: React.FC = () => {
           isGenerating={state.isGenerating}
           isInitializing={state.connection.status === "connecting"}
           commands={state.tools.available}
+          disabled={Boolean(agentDisabledReason)}
+          disabledHint={agentDisabledReason ?? undefined}
           onSubmit={handleSubmit}
         />
       </div>
