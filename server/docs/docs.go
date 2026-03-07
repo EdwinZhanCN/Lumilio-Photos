@@ -343,6 +343,52 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.AssetIndexingStatsResponseDTO": {
+                "properties": {
+                    "photo_total": {
+                        "example": 2400,
+                        "type": "integer"
+                    },
+                    "reindex_jobs": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "tasks": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskSetStatsDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetIndexingTaskSetStatsDTO": {
+                "properties": {
+                    "caption": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
+                    "clip": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
+                    "face": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
+                    "ocr": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AssetIndexingTaskStatsDTO": {
+                "properties": {
+                    "indexed_count": {
+                        "example": 1200,
+                        "type": "integer"
+                    },
+                    "queued_jobs": {
+                        "example": 12,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetListResponseDTO": {
                 "properties": {
                     "assets": {
@@ -699,11 +745,47 @@ const docTemplate = `{
                     "description": {
                         "type": "string"
                     },
+                    "display_cover_asset_id": {
+                        "type": "string"
+                    },
                     "updated_at": {
                         "type": "string"
                     },
                     "user_id": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.IndexingRepositoryListResponseDTO": {
+                "properties": {
+                    "repositories": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.IndexingRepositoryOptionDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.IndexingRepositoryOptionDTO": {
+                "properties": {
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "is_primary": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "example": "Photos Library",
+                        "type": "string"
+                    },
+                    "path": {
+                        "example": "/Volumes/Media/Photos",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -843,6 +925,9 @@ const docTemplate = `{
                     "clip_image_embed": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     },
+                    "clip_text_embed": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    },
                     "face_detect_and_embed": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     },
@@ -916,6 +1001,72 @@ const docTemplate = `{
                     },
                     "total_sessions": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RebuildAssetIndexesRequestDTO": {
+                "properties": {
+                    "limit": {
+                        "example": 200,
+                        "maximum": 500,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "missing_only": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "tasks": {
+                        "example": [
+                            "clip",
+                            "ocr"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RebuildAssetIndexesResponseDTO": {
+                "properties": {
+                    "job_id": {
+                        "example": 123,
+                        "type": "integer"
+                    },
+                    "limit": {
+                        "example": 200,
+                        "type": "integer"
+                    },
+                    "message": {
+                        "example": "Index rebuild job queued successfully",
+                        "type": "string"
+                    },
+                    "missing_only": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "requested_tasks": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "status": {
+                        "example": "queued",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -1009,6 +1160,107 @@ const docTemplate = `{
                     "status": {
                         "example": "queued",
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.SearchAssetsRequestDTO": {
+                "properties": {
+                    "enhancement_mode": {
+                        "enum": [
+                            "auto",
+                            "off",
+                            "only"
+                        ],
+                        "example": "auto",
+                        "type": "string"
+                    },
+                    "filter": {
+                        "$ref": "#/components/schemas/dto.AssetFilterDTO"
+                    },
+                    "group_by": {
+                        "enum": [
+                            "date",
+                            "type",
+                            "album"
+                        ],
+                        "example": "type",
+                        "type": "string"
+                    },
+                    "pagination": {
+                        "$ref": "#/components/schemas/dto.PaginationDTO"
+                    },
+                    "query": {
+                        "example": "red bird on branch",
+                        "type": "string"
+                    },
+                    "top_results_limit": {
+                        "example": 12,
+                        "maximum": 50,
+                        "minimum": 1,
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "query"
+                ],
+                "type": "object"
+            },
+            "dto.SearchAssetsResponseDTO": {
+                "properties": {
+                    "limit": {
+                        "example": 20,
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "results": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "results_total": {
+                        "example": 150,
+                        "type": "integer"
+                    },
+                    "top_results": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "top_results_meta": {
+                        "$ref": "#/components/schemas/dto.SearchTopResultsMetaDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.SearchTopResultsMetaDTO": {
+                "properties": {
+                    "degraded": {
+                        "type": "boolean"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "reason": {
+                        "example": "runtime_unavailable",
+                        "type": "string"
+                    },
+                    "source_types": {
+                        "example": [
+                            "clip"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -2193,6 +2445,14 @@ const docTemplate = `{
                             "default": 0,
                             "type": "integer"
                         }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "requestBody": {
@@ -2491,6 +2751,14 @@ const docTemplate = `{
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "requestBody": {
@@ -2715,6 +2983,14 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 ],
@@ -3547,6 +3823,247 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/assets/indexing/rebuild": {
+            "post": {
+                "description": "Queue a background batch that backfills AI indexing for existing photos.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RebuildAssetIndexesRequestDTO",
+                                        "summary": "request",
+                                        "description": "Reindex request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Reindex request"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Reindex job queued successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Queue asset index rebuild",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/indexing/repositories": {
+            "get": {
+                "description": "Return repositories that can be used to scope indexing stats and reindex requests.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Repository options retrieved successfully"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "List indexing repositories",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/indexing/stats": {
+            "get": {
+                "description": "Return indexing coverage and queued job counts for photo AI tasks.",
+                "parameters": [
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Indexing stats retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid repository ID"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get asset indexing stats",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
         "/api/v1/assets/liked": {
             "get": {
                 "description": "Get all assets that have been liked/favorited",
@@ -3938,6 +4455,94 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Get assets by rating",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/search": {
+            "post": {
+                "description": "Search assets with optional top results enhancement and filename fallback.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.SearchAssetsRequestDTO",
+                                        "summary": "request",
+                                        "description": "Search parameters"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Search parameters",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Assets searched successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Search assets",
                 "tags": [
                     "assets"
                 ]
@@ -6133,6 +6738,16 @@ const docTemplate = `{
         "/api/v1/stats/available-years": {
             "get": {
                 "description": "Get list of years that have photo data",
+                "parameters": [
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -6171,6 +6786,16 @@ const docTemplate = `{
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -6199,6 +6824,14 @@ const docTemplate = `{
                         "schema": {
                             "default": 20,
                             "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 ],
@@ -6279,6 +6912,14 @@ const docTemplate = `{
                             "default": 365,
                             "type": "integer"
                         }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -6349,6 +6990,16 @@ const docTemplate = `{
         "/api/v1/stats/focal-length": {
             "get": {
                 "description": "Get distribution of commonly used focal lengths",
+                "parameters": [
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -6387,6 +7038,16 @@ const docTemplate = `{
                         },
                         "description": "OK"
                     },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
                     "500": {
                         "content": {
                             "application/json": {
@@ -6418,6 +7079,14 @@ const docTemplate = `{
                                 "hourly",
                                 "monthly"
                             ],
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
                             "type": "string"
                         }
                     }

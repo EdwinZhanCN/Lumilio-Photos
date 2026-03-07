@@ -24,6 +24,7 @@ export type Capabilities = {
     activeNodeCount: number;
     tasks: {
       clipImageEmbed: MLTaskCapability;
+      clipTextEmbed: MLTaskCapability;
       ocr: MLTaskCapability;
       vlmGenerate: MLTaskCapability;
       faceDetectAndEmbed: MLTaskCapability;
@@ -67,6 +68,7 @@ function normalizeCapabilities(
         clipImageEmbed: normalizeTaskCapability(
           data.ml?.tasks?.clip_image_embed,
         ),
+        clipTextEmbed: normalizeTaskCapability(data.ml?.tasks?.clip_text_embed),
         ocr: normalizeTaskCapability(data.ml?.tasks?.ocr),
         vlmGenerate: normalizeTaskCapability(data.ml?.tasks?.vlm_generate),
         faceDetectAndEmbed: normalizeTaskCapability(
@@ -83,10 +85,11 @@ function normalizeCapabilities(
   };
 }
 
-export function useCapabilities(refetchInterval?: number | false): UseQueryResult<
-  CapabilitiesApiResult,
-  unknown
-> & { capabilities?: Capabilities } {
+export function useCapabilities(
+  refetchInterval?: number | false,
+): UseQueryResult<CapabilitiesApiResult, unknown> & {
+  capabilities?: Capabilities;
+} {
   const query = $api.useQuery(
     "get",
     "/api/v1/capabilities",

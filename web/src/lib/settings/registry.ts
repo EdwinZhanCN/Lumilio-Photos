@@ -1,6 +1,6 @@
 export const SETTINGS_STORAGE_KEY = "app_settings";
 export const LEGACY_SETTINGS_STORAGE_KEY = "app_settings_v1";
-export const SETTINGS_STORAGE_VERSION = 2 as const;
+export const SETTINGS_STORAGE_VERSION = 3 as const;
 
 export const THEME_STORAGE_KEY = "lumilio.settings.theme";
 export const THEME_STORAGE_VERSION = 1 as const;
@@ -43,6 +43,12 @@ export const SETTINGS_REGISTRY: readonly SettingRegistryEntry[] = [
     precedence: ["user local setting", "other"],
   },
   {
+    path: "ui.working_repository_id",
+    truthSource: "web_local_preference",
+    description: "Current working repository scope for repository-aware views",
+    precedence: ["user local setting", "all repositories"],
+  },
+  {
     path: "ui.asset_page.layout",
     truthSource: "web_local_preference",
     description: "Asset page layout preference",
@@ -73,7 +79,8 @@ export const SETTINGS_REGISTRY: readonly SettingRegistryEntry[] = [
   {
     path: "ui.upload.max_concurrent_chunks",
     truthSource: "server_runtime_capability",
-    description: "Chunk concurrency override used when server config is disabled",
+    description:
+      "Chunk concurrency override used when server config is disabled",
     precedence: [
       "server runtime config when use_server_config=true",
       "user local override",

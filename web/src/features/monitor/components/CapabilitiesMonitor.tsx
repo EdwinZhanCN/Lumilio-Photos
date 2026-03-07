@@ -10,7 +10,10 @@ import {
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 import { useI18n } from "@/lib/i18n.tsx";
 
-function availabilityBadgeClass(task: { enabled: boolean; available: boolean }) {
+function availabilityBadgeClass(task: {
+  enabled: boolean;
+  available: boolean;
+}) {
   if (!task.enabled) {
     return "badge badge-ghost";
   }
@@ -22,13 +25,7 @@ function enabledBadgeClass(enabled: boolean) {
   return enabled ? "badge badge-success badge-outline" : "badge badge-ghost";
 }
 
-function CapabilityRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function CapabilityRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
       <span className="opacity-60">{label}</span>
@@ -63,9 +60,14 @@ export function CapabilitiesMonitor() {
 
   const mlTasks = [
     {
-      key: "clip",
+      key: "clip-image",
       label: t("settings.serverSettings.taskNames.clipImageEmbed"),
       capability: capabilities.ml.tasks.clipImageEmbed,
+    },
+    {
+      key: "clip-text",
+      label: t("settings.serverSettings.taskNames.clipTextEmbed"),
+      capability: capabilities.ml.tasks.clipTextEmbed,
     },
     {
       key: "ocr",
@@ -144,7 +146,8 @@ export function CapabilitiesMonitor() {
             {mlTasks.filter((task) => task.capability.available).length}
           </div>
           <div className="stat-desc">
-            / {mlTasks.length} {t("settings.serverSettings.available").toLowerCase()}
+            / {mlTasks.length}{" "}
+            {t("settings.serverSettings.available").toLowerCase()}
           </div>
         </div>
 

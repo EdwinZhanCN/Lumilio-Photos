@@ -8,6 +8,12 @@ import {
   type SystemSettings,
   type UpdateSystemSettingsPayload,
 } from "@/features/settings/hooks/useSystemSettings";
+import { useCapabilities } from "@/features/settings/hooks/useCapabilities";
+import {
+  useAssetIndexingStats,
+  useRebuildAssetIndexes,
+} from "@/features/settings/hooks/useAssetIndexing";
+import { useWorkingRepository } from "@/features/settings/hooks/useWorkingRepository";
 
 type AgentProvider = SystemSettings["llm"]["provider"];
 type AutoMode = SystemSettings["ml"]["autoMode"];
@@ -34,6 +40,54 @@ type FeedbackState = {
   tone: "success" | "error";
   message: string;
 } | null;
+
+type RuntimeCapability = {
+  enabled: boolean;
+  available: boolean;
+};
+
+type ReindexTaskId = "clip" | "ocr" | "caption" | "face";
+
+function configuredBadgeClass(enabled: boolean): string {
+  return enabled ? "badge badge-success badge-outline" : "badge badge-ghost";
+}
+
+function runtimeBadgeClass(capability?: RuntimeCapability): string {
+  if (!capability?.enabled) {
+    return "badge badge-ghost";
+  }
+
+  return capability.available
+    ? "badge badge-success badge-outline"
+    : "badge badge-warning badge-outline";
+}
+
+function coverageBadgeClass(coverage: number): string {
+  if (coverage >= 0.9) {
+    return "badge badge-success badge-outline";
+  }
+  if (coverage > 0) {
+    return "badge badge-warning badge-outline";
+  }
+  return "badge badge-ghost";
+}
+
+function formatCoveragePercent(coverage: number): string {
+  return `${Math.round(coverage * 100)}%`;
+}
+
+function deriveDefaultReindexTasks(form: AIFormState): ReindexTaskId[] {
+  if (form.ml.autoMode === "enable") {
+    return ["clip", "ocr", "caption", "face"];
+  }
+
+  const tasks: ReindexTaskId[] = [];
+  if (form.ml.clipEnabled) tasks.push("clip");
+  if (form.ml.ocrEnabled) tasks.push("ocr");
+  if (form.ml.captionEnabled) tasks.push("caption");
+  if (form.ml.faceEnabled) tasks.push("face");
+  return tasks;
+}
 
 function createFormState(settings: SystemSettings): AIFormState {
   return {
@@ -111,10 +165,20 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 export default function AISettings() {
   const { t } = useI18n();
+  const [selectedReindexTasks, setSelectedReindexTasks] = useState<
+    ReindexTaskId[]
+  >([]);
   const settingsQuery = useSystemSettings();
   const updateMutation = useUpdateSystemSettings();
   const validateMutation = useValidateLLMSettings();
+  const capabilitiesQuery = useCapabilities();
+  const { scopeLabel, scopeDescription, scopedRepositoryId } =
+    useWorkingRepository();
+  const indexingStatsQuery = useAssetIndexingStats(scopedRepositoryId);
+  const rebuildMutation = useRebuildAssetIndexes();
   const settings = settingsQuery.settings;
+  const capabilities = capabilitiesQuery.capabilities;
+  const indexingStats = indexingStatsQuery.stats;
   const [form, setForm] = useState<AIFormState | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
 
@@ -132,6 +196,20 @@ export default function AISettings() {
     settings?.ml.ocrEnabled,
     settings?.ml.captionEnabled,
     settings?.ml.faceEnabled,
+  ]);
+
+  useEffect(() => {
+    if (!form) {
+      return;
+    }
+
+    setSelectedReindexTasks(deriveDefaultReindexTasks(form));
+  }, [
+    form?.ml.autoMode,
+    form?.ml.clipEnabled,
+    form?.ml.ocrEnabled,
+    form?.ml.captionEnabled,
+    form?.ml.faceEnabled,
   ]);
 
   const isDirty = useMemo(() => {
@@ -155,6 +233,59 @@ export default function AISettings() {
   }, [form, settings]);
 
   const isBusy = updateMutation.isPending || validateMutation.isPending;
+  const semanticSearchRuntimeReady = Boolean(
+    capabilities?.ml.tasks.clipImageEmbed.available &&
+      capabilities.ml.tasks.clipTextEmbed.available,
+  );
+
+  const runtimeAvailabilityLabel = (capability?: RuntimeCapability): string => {
+    if (!capability) {
+      if (capabilitiesQuery.isLoading) {
+        return t("common.loading");
+      }
+
+      return t("common.na");
+    }
+
+    return capability.available
+      ? t("settings.serverSettings.available")
+      : t("settings.serverSettings.unavailable");
+  };
+
+  const mlTasks = [
+    {
+      statsKey: "clip",
+      key: "clipEnabled",
+      label: t("settings.aiSettings.taskNames.clip"),
+      description: t("settings.aiSettings.taskDescriptions.clip"),
+      runtime: capabilities?.ml.tasks.clipImageEmbed,
+      queryRuntime: capabilities?.ml.tasks.clipTextEmbed,
+    },
+    {
+      statsKey: "ocr",
+      key: "ocrEnabled",
+      label: t("settings.aiSettings.taskNames.ocr"),
+      description: t("settings.aiSettings.taskDescriptions.ocr"),
+      runtime: capabilities?.ml.tasks.ocr,
+      queryRuntime: undefined,
+    },
+    {
+      statsKey: "caption",
+      key: "captionEnabled",
+      label: t("settings.aiSettings.taskNames.caption"),
+      description: t("settings.aiSettings.taskDescriptions.caption"),
+      runtime: capabilities?.ml.tasks.vlmGenerate,
+      queryRuntime: undefined,
+    },
+    {
+      statsKey: "face",
+      key: "faceEnabled",
+      label: t("settings.aiSettings.taskNames.face"),
+      description: t("settings.aiSettings.taskDescriptions.face"),
+      runtime: capabilities?.ml.tasks.faceDetectAndEmbed,
+      queryRuntime: undefined,
+    },
+  ] as const;
 
   const persistSettings = async (): Promise<boolean> => {
     if (!form) {
@@ -215,6 +346,56 @@ export default function AISettings() {
         ),
       });
     }
+  };
+
+  const handleQueueReindex = async () => {
+    if (isDirty) {
+      setFeedback({
+        tone: "error",
+        message: t("settings.aiSettings.saveBeforeReindexHint"),
+      });
+      return;
+    }
+    if (selectedReindexTasks.length === 0) {
+      setFeedback({
+        tone: "error",
+        message: t("settings.aiSettings.selectAtLeastOneTask"),
+      });
+      return;
+    }
+
+    try {
+      await rebuildMutation.mutateAsync({
+        body: {
+          missing_only: true,
+          limit: 200,
+          repository_id: scopedRepositoryId,
+          tasks: selectedReindexTasks,
+        },
+      });
+      setFeedback({
+        tone: "success",
+        message: t("settings.aiSettings.reindexQueuedSuccess"),
+      });
+      await indexingStatsQuery.refetch();
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        message: getErrorMessage(
+          error,
+          t("settings.aiSettings.reindexQueuedError"),
+        ),
+      });
+    }
+  };
+
+  const toggleReindexTask = (task: ReindexTaskId, checked: boolean) => {
+    setSelectedReindexTasks((current) => {
+      if (checked) {
+        return Array.from(new Set([...current, task])) as ReindexTaskId[];
+      }
+      return current.filter((value) => value !== task);
+    });
   };
 
   if (settingsQuery.isLoading || !form) {
@@ -486,6 +667,174 @@ export default function AISettings() {
           </p>
         </div>
 
+        <div className="rounded-2xl border border-base-300 bg-base-100 p-4 space-y-3">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-1">
+              <h4 className="font-semibold">
+                {t("settings.aiSettings.runtimeTitle")}
+              </h4>
+              <p className="text-sm text-base-content/70">
+                {t("settings.aiSettings.runtimeDescription")}
+              </p>
+            </div>
+
+            {capabilities && (
+              <span className="badge badge-outline">
+                {t("settings.aiSettings.nodesSummary", {
+                  active: capabilities.ml.activeNodeCount,
+                  discovered: capabilities.ml.discoveredNodeCount,
+                })}
+              </span>
+            )}
+          </div>
+
+          {capabilities ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={runtimeBadgeClass({
+                  enabled: true,
+                  available: semanticSearchRuntimeReady,
+                })}
+              >
+                {t("settings.aiSettings.searchRuntime")}:{" "}
+                {semanticSearchRuntimeReady
+                  ? t("settings.serverSettings.available")
+                  : t("settings.serverSettings.unavailable")}
+              </span>
+              <span className="badge badge-outline">
+                {t(
+                  `settings.serverSettings.autoModeValues.${capabilities.ml.autoMode}`,
+                )}
+              </span>
+            </div>
+          ) : (
+            <div className="text-sm text-base-content/70">
+              {capabilitiesQuery.isError
+                ? t("settings.aiSettings.runtimeUnavailable")
+                : t("common.loading")}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-base-300 bg-base-100 p-4 space-y-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-1">
+              <h4 className="font-semibold">
+                {t("settings.aiSettings.coverageTitle")}
+              </h4>
+              <p className="text-sm text-base-content/70">
+                {t("settings.aiSettings.coverageDescription")}
+              </p>
+            </div>
+
+            {indexingStats && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="badge badge-outline">
+                  {t("settings.aiSettings.photoTotalStatus")}:{" "}
+                  {indexingStats.photoTotal}
+                </span>
+                <span className="badge badge-outline">
+                  {t("settings.aiSettings.reindexJobsStatus")}:{" "}
+                  {indexingStats.reindexJobs}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {indexingStatsQuery.isError ? (
+            <div className="text-sm text-base-content/70">
+              {t("settings.aiSettings.indexingStatsUnavailable")}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-base-content/70">
+                {t("settings.aiSettings.queueMissingAssetsHint", {
+                  limit: 200,
+                })}
+              </p>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <span className="font-semibold">
+                    {t("settings.aiSettings.repositoryScopeLabel")}
+                  </span>
+                  <div className="rounded-xl border border-base-300 bg-base-100 px-4 py-3">
+                    <div className="font-medium">{scopeLabel}</div>
+                    <div className="mt-1 text-sm text-base-content/70">
+                      {scopeDescription}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="font-semibold">
+                    {t("settings.aiSettings.reindexTasksLabel")}
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {mlTasks.map(({ statsKey, key, label }) => {
+                      const selectable =
+                        form.ml.autoMode === "enable" || form.ml[key];
+                      const checked = selectedReindexTasks.includes(statsKey);
+
+                      return (
+                        <label
+                          key={`reindex-${statsKey}`}
+                          className={[
+                            "flex items-center gap-2 rounded-xl border px-3 py-2 text-sm",
+                            selectable
+                              ? "border-base-300 bg-base-100"
+                              : "border-base-200 bg-base-200 text-base-content/50",
+                          ].join(" ")}
+                        >
+                          <input
+                            type="checkbox"
+                            className="checkbox checkbox-primary checkbox-sm"
+                            checked={checked}
+                            disabled={!selectable || rebuildMutation.isPending}
+                            onChange={(event) =>
+                              toggleReindexTask(statsKey, event.target.checked)
+                            }
+                          />
+                          <span>{label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-sm text-base-content/70">
+                    {form.ml.autoMode === "enable"
+                      ? t("settings.aiSettings.reindexTasksAutoHint")
+                      : t("settings.aiSettings.reindexTasksManualHint")}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={
+                rebuildMutation.isPending ||
+                indexingStatsQuery.isLoading ||
+                isDirty ||
+                selectedReindexTasks.length === 0
+              }
+              onClick={() => void handleQueueReindex()}
+            >
+              {rebuildMutation.isPending
+                ? t("settings.aiSettings.queueMissingAssetsPending")
+                : t("settings.aiSettings.queueMissingAssets")}
+            </button>
+
+            <span className="text-sm text-base-content/70">
+              {isDirty
+                ? t("settings.aiSettings.saveBeforeReindexHint")
+                : t("settings.aiSettings.existingAssetsHint")}
+            </span>
+          </div>
+        </div>
+
         <div className="grid gap-3 md:grid-cols-2">
           <button
             type="button"
@@ -568,42 +917,95 @@ export default function AISettings() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            {(
-              [
-                ["clipEnabled", t("settings.aiSettings.taskNames.clip")],
-                ["ocrEnabled", t("settings.aiSettings.taskNames.ocr")],
-                ["captionEnabled", t("settings.aiSettings.taskNames.caption")],
-                ["faceEnabled", t("settings.aiSettings.taskNames.face")],
-              ] as const
-            ).map(([key, label]) => (
-              <div
-                key={key}
-                className="rounded-2xl border border-base-300 bg-base-100 p-4 flex items-start justify-between gap-4"
-              >
-                <div className="font-semibold">{label}</div>
-                <input
-                  type="checkbox"
-                  className="toggle toggle-primary"
-                  checked={form.ml[key]}
-                  disabled={form.ml.autoMode === "enable"}
-                  onChange={(event) => {
-                    const checked = event.target.checked;
-                    setFeedback(null);
-                    setForm((current) =>
-                      current
-                        ? {
-                            ...current,
-                            ml: {
-                              ...current.ml,
-                              [key]: checked,
-                            },
-                          }
-                        : current,
-                    );
-                  }}
-                />
-              </div>
-            ))}
+            {mlTasks.map(
+              ({
+                statsKey,
+                key,
+                label,
+                description,
+                runtime,
+                queryRuntime,
+              }) => {
+                const taskStats = indexingStats?.tasks[statsKey];
+
+                return (
+                  <div
+                    key={key}
+                    className="rounded-2xl border border-base-300 bg-base-100 p-4 flex items-start justify-between gap-4"
+                  >
+                    <div className="space-y-3">
+                      <div>
+                        <div className="font-semibold">{label}</div>
+                        <p className="mt-1 text-sm text-base-content/70">
+                          {description}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <span className={configuredBadgeClass(form.ml[key])}>
+                          {t("settings.aiSettings.configuredStatus")}:{" "}
+                          {form.ml[key]
+                            ? t("settings.serverSettings.enabled")
+                            : t("settings.serverSettings.disabled")}
+                        </span>
+                        <span className={runtimeBadgeClass(runtime)}>
+                          {t("settings.aiSettings.runtimeStatus")}:{" "}
+                          {runtimeAvailabilityLabel(runtime)}
+                        </span>
+                        {queryRuntime && (
+                          <span className={runtimeBadgeClass(queryRuntime)}>
+                            {t("settings.aiSettings.queryRuntimeStatus")}:{" "}
+                            {runtimeAvailabilityLabel(queryRuntime)}
+                          </span>
+                        )}
+                        {taskStats && (
+                          <span
+                            className={coverageBadgeClass(taskStats.coverage)}
+                          >
+                            {t("settings.aiSettings.coverageStatus")}:{" "}
+                            {t("settings.aiSettings.coverageValue", {
+                              indexed: taskStats.indexedCount,
+                              total: indexingStats.photoTotal,
+                              percent: formatCoveragePercent(
+                                taskStats.coverage,
+                              ),
+                            })}
+                          </span>
+                        )}
+                        {taskStats && (
+                          <span className="badge badge-outline">
+                            {t("settings.aiSettings.queuedJobsStatus")}:{" "}
+                            {taskStats.queuedJobs}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <input
+                      type="checkbox"
+                      className="toggle toggle-primary"
+                      checked={form.ml[key]}
+                      disabled={form.ml.autoMode === "enable"}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setFeedback(null);
+                        setForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                ml: {
+                                  ...current.ml,
+                                  [key]: checked,
+                                },
+                              }
+                            : current,
+                        );
+                      }}
+                    />
+                  </div>
+                );
+              },
+            )}
           </div>
         </div>
       </section>

@@ -4,6 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
 import {
   CapabilitiesMonitor,
+  MLMonitor,
   StatMonitor,
   TaskMonitor,
   QueueList,
@@ -12,10 +13,13 @@ import {
 export default function Monitor() {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
+  const requestedView = searchParams.get("tab");
   const view =
-    searchParams.get("tab") === "capabilities" ? "capabilities" : "queue";
+    requestedView === "capabilities" || requestedView === "ml"
+      ? requestedView
+      : "queue";
 
-  const setView = (nextView: "queue" | "capabilities") => {
+  const setView = (nextView: "queue" | "ml" | "capabilities") => {
     const params = new URLSearchParams(searchParams);
 
     if (nextView === "queue") {
@@ -34,7 +38,9 @@ export default function Monitor() {
         subtitle={
           view === "queue"
             ? t("monitor.subtitles.queue")
-            : t("monitor.subtitles.capabilities")
+            : view === "ml"
+              ? t("monitor.subtitles.ml")
+              : t("monitor.subtitles.capabilities")
         }
         icon={<Activity className="w-6 h-6 text-primary" />}
       >
@@ -45,6 +51,13 @@ export default function Monitor() {
             onClick={() => setView("queue")}
           >
             {t("monitor.tabs.queue")}
+          </button>
+          <button
+            role="tab"
+            className={`tab ${view === "ml" ? "tab-active" : ""}`}
+            onClick={() => setView("ml")}
+          >
+            {t("monitor.tabs.ml")}
           </button>
           <button
             role="tab"
@@ -81,6 +94,8 @@ export default function Monitor() {
               </div>
             </div>
           </>
+        ) : view === "ml" ? (
+          <MLMonitor />
         ) : (
           <CapabilitiesMonitor />
         )}

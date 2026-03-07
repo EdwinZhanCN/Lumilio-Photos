@@ -534,6 +534,8 @@ export interface paths {
                     limit?: number;
                     /** @description Number of results to skip for pagination */
                     offset?: number;
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
                 };
                 header?: never;
                 path?: never;
@@ -695,7 +697,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
                 header?: never;
                 path: {
                     /** @description Album ID */
@@ -946,7 +951,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
                 header?: never;
                 path: {
                     /** @description Album ID */
@@ -2781,6 +2789,238 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/indexing/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue asset index rebuild
+         * @description Queue a background batch that backfills AI indexing for existing photos.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Reindex request */
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.RebuildAssetIndexesRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Reindex job queued successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/indexing/repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List indexing repositories
+         * @description Return repositories that can be used to scope indexing stats and reindex requests.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Repository options retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/indexing/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get asset indexing stats
+         * @description Return indexing coverage and queued job counts for photo AI tasks.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Indexing stats retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid repository ID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/liked": {
         parameters: {
             query?: never;
@@ -3112,6 +3352,86 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search assets
+         * @description Search assets with optional top results enhancement and filename fallback.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Search parameters */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.SearchAssetsRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Assets searched successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -3971,7 +4291,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -4003,6 +4326,15 @@ export interface paths {
                              */
                             message?: string;
                         } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -4040,6 +4372,8 @@ export interface paths {
                 query?: {
                     /** @description Number of results to return */
                     limit?: number;
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
                 };
                 header?: never;
                 path?: never;
@@ -4118,6 +4452,8 @@ export interface paths {
                 query?: {
                     /** @description Number of days to look back */
                     days?: number;
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
                 };
                 header?: never;
                 path?: never;
@@ -4193,7 +4529,10 @@ export interface paths {
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -4225,6 +4564,15 @@ export interface paths {
                              */
                             message?: string;
                         } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Internal Server Error */
@@ -4262,6 +4610,8 @@ export interface paths {
                 query?: {
                     /** @description Distribution type: hourly or monthly */
                     type?: "hourly" | "monthly";
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
                 };
                 header?: never;
                 path?: never;
@@ -4468,6 +4818,25 @@ export interface components {
              */
             types?: string[];
         };
+        "dto.AssetIndexingStatsResponseDTO": {
+            /** @example 2400 */
+            photo_total?: number;
+            /** @example 1 */
+            reindex_jobs?: number;
+            tasks?: components["schemas"]["dto.AssetIndexingTaskSetStatsDTO"];
+        };
+        "dto.AssetIndexingTaskSetStatsDTO": {
+            caption?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
+            clip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
+            face?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
+            ocr?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
+        };
+        "dto.AssetIndexingTaskStatsDTO": {
+            /** @example 1200 */
+            indexed_count?: number;
+            /** @example 12 */
+            queued_jobs?: number;
+        };
         "dto.AssetListResponseDTO": {
             assets?: components["schemas"]["dto.AssetDTO"][];
             /** @example 20 */
@@ -4636,8 +5005,22 @@ export interface components {
             cover_asset_id?: string;
             created_at?: string;
             description?: string;
+            display_cover_asset_id?: string;
             updated_at?: string;
             user_id?: number;
+        };
+        "dto.IndexingRepositoryListResponseDTO": {
+            repositories?: components["schemas"]["dto.IndexingRepositoryOptionDTO"][];
+        };
+        "dto.IndexingRepositoryOptionDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /** @example false */
+            is_primary?: boolean;
+            /** @example Photos Library */
+            name?: string;
+            /** @example /Volumes/Media/Photos */
+            path?: string;
         };
         "dto.LLMCapabilitiesDTO": {
             agent_enabled?: boolean;
@@ -4690,6 +5073,7 @@ export interface components {
         };
         "dto.MLTaskSetDTO": {
             clip_image_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+            clip_text_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             face_detect_and_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             ocr?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             vlm_generate?: components["schemas"]["dto.MLTaskCapabilityDTO"];
@@ -4715,6 +5099,36 @@ export interface components {
             failed_sessions?: number;
             overall_progress?: number;
             total_sessions?: number;
+        };
+        "dto.RebuildAssetIndexesRequestDTO": {
+            /** @example 200 */
+            limit?: number;
+            /** @example true */
+            missing_only?: boolean;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            /**
+             * @example [
+             *       "clip",
+             *       "ocr"
+             *     ]
+             */
+            tasks?: string[];
+        };
+        "dto.RebuildAssetIndexesResponseDTO": {
+            /** @example 123 */
+            job_id?: number;
+            /** @example 200 */
+            limit?: number;
+            /** @example Index rebuild job queued successfully */
+            message?: string;
+            /** @example true */
+            missing_only?: boolean;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            requested_tasks?: string[];
+            /** @example queued */
+            status?: string;
         };
         "dto.RefreshTokenRequestDTO": {
             refreshToken: string;
@@ -4757,6 +5171,47 @@ export interface components {
             retry_tasks?: string[];
             /** @example queued */
             status?: string;
+        };
+        "dto.SearchAssetsRequestDTO": {
+            /**
+             * @example auto
+             * @enum {string}
+             */
+            enhancement_mode?: "auto" | "off" | "only";
+            filter?: components["schemas"]["dto.AssetFilterDTO"];
+            /**
+             * @example type
+             * @enum {string}
+             */
+            group_by?: "date" | "type" | "album";
+            pagination?: components["schemas"]["dto.PaginationDTO"];
+            /** @example red bird on branch */
+            query: string;
+            /** @example 12 */
+            top_results_limit?: number;
+        };
+        "dto.SearchAssetsResponseDTO": {
+            /** @example 20 */
+            limit?: number;
+            /** @example 0 */
+            offset?: number;
+            results?: components["schemas"]["dto.AssetDTO"][];
+            /** @example 150 */
+            results_total?: number;
+            top_results?: components["schemas"]["dto.AssetDTO"][];
+            top_results_meta?: components["schemas"]["dto.SearchTopResultsMetaDTO"];
+        };
+        "dto.SearchTopResultsMetaDTO": {
+            degraded?: boolean;
+            enabled?: boolean;
+            /** @example runtime_unavailable */
+            reason?: string;
+            /**
+             * @example [
+             *       "clip"
+             *     ]
+             */
+            source_types?: string[];
         };
         "dto.SessionProgressDTO": {
             bytes_done?: number;

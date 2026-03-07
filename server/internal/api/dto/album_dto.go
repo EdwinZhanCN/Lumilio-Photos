@@ -63,7 +63,8 @@ func ToAlbumDTO(a repo.Album) AlbumDTO {
 // GetAlbumResponseDTO represents the response structure for getting an album
 type GetAlbumResponseDTO struct {
 	AlbumDTO
-	AssetCount int64 `json:"asset_count"`
+	AssetCount          int64   `json:"asset_count"`
+	DisplayCoverAssetID *string `json:"display_cover_asset_id,omitempty"`
 }
 
 // ListAlbumsResponseDTO represents the response structure for listing albums

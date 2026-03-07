@@ -9,114 +9,118 @@ import { resolveGroupByFromUrl } from "./utils/groupBy";
 
 // ===== Selection Selectors =====
 export const useSelectionEnabled = () =>
-    useAssetsStore((s) => s.selection.enabled);
+  useAssetsStore((s) => s.selection.enabled);
 
 export const useSelectedIds = () =>
-    useAssetsStore((s) => s.selection.selectedIds);
+  useAssetsStore((s) => s.selection.selectedIds);
 
 export const useSelectedCount = () =>
-    useAssetsStore((s) => s.selection.selectedIds.size);
+  useAssetsStore((s) => s.selection.selectedIds.size);
 
 export const useIsAssetSelected = (assetId: string) =>
-    useAssetsStore((s) => s.selection.selectedIds.has(assetId));
+  useAssetsStore((s) => s.selection.selectedIds.has(assetId));
 
 export const useSelectionMode = () =>
-    useAssetsStore((s) => s.selection.selectionMode);
+  useAssetsStore((s) => s.selection.selectionMode);
 
 // ===== UI Selectors =====
-export const useCurrentTab = () =>
-    useAssetsStore((s) => s.ui.currentTab);
+export const useCurrentTab = () => useAssetsStore((s) => s.ui.currentTab);
 
 export const useGroupBy = (): GroupByType => {
-    const [searchParams] = useSearchParams();
-    const { state: settingsState } = useSettingsContext();
-    return resolveGroupByFromUrl(
-        searchParams.get("groupBy"),
-        settingsState.ui.asset_page?.layout,
-    );
+  const [searchParams] = useSearchParams();
+  const { state: settingsState } = useSettingsContext();
+  return resolveGroupByFromUrl(
+    searchParams.get("groupBy"),
+    settingsState.ui.asset_page?.layout,
+  );
 };
 
-export const useSearchQuery = () =>
-    useAssetsStore((s) => s.ui.searchQuery);
-
-export const useSearchMode = () =>
-    useAssetsStore((s) => s.ui.searchMode);
+export const useSearchQuery = () => useAssetsStore((s) => s.ui.searchQuery);
 
 export const useIsCarouselOpen = () =>
-    useAssetsStore((s) => s.ui.isCarouselOpen);
+  useAssetsStore((s) => s.ui.isCarouselOpen);
 
-export const useActiveAssetId = () =>
-    useAssetsStore((s) => s.ui.activeAssetId);
+export const useActiveAssetId = () => useAssetsStore((s) => s.ui.activeAssetId);
 
 // ===== Filter Selectors =====
-export const useFiltersEnabled = () =>
-    useAssetsStore((s) => s.filters.enabled);
+export const useFiltersEnabled = () => useAssetsStore((s) => s.filters.enabled);
 
 export const useActiveFilterCount = () =>
-    useAssetsStore((s) => selectActiveFilterCount(s.filters));
+  useAssetsStore((s) => selectActiveFilterCount(s.filters));
 
 export const useFilterState = () =>
-    useAssetsStore(useShallow((s) => s.filters));
+  useAssetsStore(useShallow((s) => s.filters));
 
 // ===== Actions (stable references) =====
 export const useSelectionActions = () =>
-    useAssetsStore(useShallow((s) => ({
-        toggle: s.toggleAssetSelection,
-        select: s.selectAsset,
-        deselect: s.deselectAsset,
-        selectAll: s.selectAll,
-        clear: s.clearSelection,
-        setEnabled: s.setSelectionEnabled,
-        setMode: s.setSelectionMode,
-    })));
+  useAssetsStore(
+    useShallow((s) => ({
+      toggle: s.toggleAssetSelection,
+      select: s.selectAsset,
+      deselect: s.deselectAsset,
+      selectAll: s.selectAll,
+      clear: s.clearSelection,
+      setEnabled: s.setSelectionEnabled,
+      setMode: s.setSelectionMode,
+    })),
+  );
 
 export const useUIActions = () => {
-    const store = useAssetsStore(useShallow((s) => ({
-        setTab: s.setCurrentTab,
-        setSearchQuery: s.setSearchQuery,
-        setSearchMode: s.setSearchMode,
-    })));
+  const store = useAssetsStore(
+    useShallow((s) => ({
+      setTab: s.setCurrentTab,
+      setSearchQuery: s.setSearchQuery,
+    })),
+  );
 
-    const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-    const setGroupBy = useCallback((groupBy: GroupByType) => {
-        const params = new URLSearchParams(searchParams);
-        params.set("groupBy", groupBy);
-        setSearchParams(params, { replace: true });
-    }, [searchParams, setSearchParams]);
+  const setGroupBy = useCallback(
+    (groupBy: GroupByType) => {
+      const params = new URLSearchParams(searchParams);
+      params.set("groupBy", groupBy);
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
-    const setSearchQuery = useCallback((query: string) => {
-        store.setSearchQuery(query);
+  const setSearchQuery = useCallback(
+    (query: string) => {
+      store.setSearchQuery(query);
 
-        // Sync to URL
-        const params = new URLSearchParams(searchParams);
+      // Sync to URL
+      const params = new URLSearchParams(searchParams);
 
-        if (query.trim()) {
-            params.set("q", query);
-        } else {
-            params.delete("q");
-        }
+      if (query.trim()) {
+        params.set("q", query);
+      } else {
+        params.delete("q");
+      }
 
-        setSearchParams(params, { replace: true });
-    }, [store.setSearchQuery, searchParams, setSearchParams]);
+      setSearchParams(params, { replace: true });
+    },
+    [store.setSearchQuery, searchParams, setSearchParams],
+  );
 
-    return {
-        ...store,
-        setGroupBy,
-        setSearchQuery,
-    };
+  return {
+    ...store,
+    setGroupBy,
+    setSearchQuery,
+  };
 };
 
 export const useFilterActions = () =>
-    useAssetsStore(useShallow((s) => ({
-        setFiltersEnabled: s.setFiltersEnabled,
-        setRaw: s.setFilterRaw,
-        setRating: s.setFilterRating,
-        setLiked: s.setFilterLiked,
-        setFilename: s.setFilterFilename,
-        setDate: s.setFilterDate,
-        setCameraMake: s.setFilterCameraMake,
-        setLens: s.setFilterLens,
-        resetFilters: s.resetFilters,
-        batchUpdateFilters: s.batchUpdateFilters,
-    })));
+  useAssetsStore(
+    useShallow((s) => ({
+      setFiltersEnabled: s.setFiltersEnabled,
+      setRaw: s.setFilterRaw,
+      setRating: s.setFilterRating,
+      setLiked: s.setFilterLiked,
+      setFilename: s.setFilterFilename,
+      setDate: s.setFilterDate,
+      setCameraMake: s.setFilterCameraMake,
+      setLens: s.setFilterLens,
+      resetFilters: s.resetFilters,
+      batchUpdateFilters: s.batchUpdateFilters,
+    })),
+  );

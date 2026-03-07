@@ -65,6 +65,16 @@ type ProcessFaceArgs struct {
 
 func (ProcessFaceArgs) Kind() string { return "process_face" }
 
+// ReindexAssetsArgs queues a batch backfill for existing photo indexing tasks.
+type ReindexAssetsArgs struct {
+	RepositoryID *string  `json:"repositoryId,omitempty"`
+	Tasks        []string `json:"tasks,omitempty"`
+	Limit        int      `json:"limit,omitempty"`
+	MissingOnly  bool     `json:"missingOnly,omitempty"`
+}
+
+func (ReindexAssetsArgs) Kind() string { return "reindex_assets" }
+
 // IngestAssetArgs handles initial staging ingestion and asset creation.
 type IngestAssetArgs struct {
 	ClientHash   string    `json:"clientHash" river:"unique"`

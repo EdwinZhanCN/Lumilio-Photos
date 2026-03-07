@@ -49,6 +49,7 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 	activeNodeCount := 0
 	taskAvailability := map[string]bool{
 		"clip_image_embed":      false,
+		"clip_text_embed":       false,
 		"ocr":                   false,
 		"vlm_generate":          false,
 		"face_detect_and_embed": false,
@@ -79,6 +80,10 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 				ClipImageEmbed: dto.MLTaskCapabilityDTO{
 					Enabled:   effectiveMLConfig.CLIPEnabled,
 					Available: taskAvailability["clip_image_embed"],
+				},
+				ClipTextEmbed: dto.MLTaskCapabilityDTO{
+					Enabled:   effectiveMLConfig.CLIPEnabled,
+					Available: taskAvailability["clip_text_embed"],
 				},
 				OCR: dto.MLTaskCapabilityDTO{
 					Enabled:   effectiveMLConfig.OCREnabled,

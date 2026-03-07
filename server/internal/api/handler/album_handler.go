@@ -15,6 +15,55 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+func optionalUUIDToString(value pgtype.UUID) *string {
+	if !value.Valid {
+		return nil
+	}
+
+	id := uuid.UUID(value.Bytes).String()
+	return &id
+}
+
+func toAlbumResponseDTO(album dto.AlbumDTO, assetCount int64, displayCoverAssetID *string) dto.GetAlbumResponseDTO {
+	return dto.GetAlbumResponseDTO{
+		AlbumDTO:            album,
+		AssetCount:          assetCount,
+		DisplayCoverAssetID: displayCoverAssetID,
+	}
+}
+
+func toScopedAlbumResponseDTO(row repo.GetAlbumByIDScopedRow) dto.GetAlbumResponseDTO {
+	return toAlbumResponseDTO(
+		dto.ToAlbumDTO(repo.Album{
+			AlbumID:      row.AlbumID,
+			UserID:       row.UserID,
+			AlbumName:    row.AlbumName,
+			CreatedAt:    row.CreatedAt,
+			UpdatedAt:    row.UpdatedAt,
+			Description:  row.Description,
+			CoverAssetID: row.CoverAssetID,
+		}),
+		row.AssetCount,
+		optionalUUIDToString(row.DisplayCoverAssetID),
+	)
+}
+
+func toScopedAlbumListItemDTO(row repo.GetAlbumsByUserScopedRow) dto.GetAlbumResponseDTO {
+	return toAlbumResponseDTO(
+		dto.ToAlbumDTO(repo.Album{
+			AlbumID:      row.AlbumID,
+			UserID:       row.UserID,
+			AlbumName:    row.AlbumName,
+			CreatedAt:    row.CreatedAt,
+			UpdatedAt:    row.UpdatedAt,
+			Description:  row.Description,
+			CoverAssetID: row.CoverAssetID,
+		}),
+		row.AssetCount,
+		optionalUUIDToString(row.DisplayCoverAssetID),
+	)
+}
+
 type AlbumHandler struct {
 	albumService *service.AlbumService
 	queries      *repo.Queries
@@ -82,10 +131,11 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 	// Get asset count for the new album (should be 0 for new album)
 	count, _ := h.queries.GetAlbumAssetCount(c.Request.Context(), album.AlbumID)
 
-	response := dto.GetAlbumResponseDTO{
-		AlbumDTO:   dto.ToAlbumDTO(album),
-		AssetCount: count,
-	}
+	response := toAlbumResponseDTO(
+		dto.ToAlbumDTO(album),
+		count,
+		optionalUUIDToString(album.CoverAssetID),
+	)
 
 	api.GinSuccess(c, response)
 }
@@ -97,6 +147,7 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Album ID"
+// @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} api.Result{data=dto.GetAlbumResponseDTO} "Album retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid album ID"
 // @Failure 404 {object} api.Result "Album not found"
@@ -110,25 +161,21 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 		return
 	}
 
-	album, err := h.queries.GetAlbumByID(c.Request.Context(), int32(albumID))
+	repositoryID, ok := parseOptionalRepositoryUUID(c)
+	if !ok {
+		return
+	}
+
+	album, err := h.queries.GetAlbumByIDScoped(c.Request.Context(), repo.GetAlbumByIDScopedParams{
+		AlbumID:      int32(albumID),
+		RepositoryID: repositoryID,
+	})
 	if err != nil {
 		api.GinNotFound(c, err, "Album not found")
 		return
 	}
 
-	// Get asset count for the album
-	count, err := h.queries.GetAlbumAssetCount(c.Request.Context(), album.AlbumID)
-	if err != nil {
-		log.Printf("Failed to get asset count for album %d: %v", album.AlbumID, err)
-		count = 0 // Default to 0 if count fails
-	}
-
-	response := dto.GetAlbumResponseDTO{
-		AlbumDTO:   dto.ToAlbumDTO(album),
-		AssetCount: count,
-	}
-
-	api.GinSuccess(c, response)
+	api.GinSuccess(c, toScopedAlbumResponseDTO(album))
 }
 
 // ListAlbums retrieves albums for the authenticated user
@@ -139,6 +186,7 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 // @Produce json
 // @Param limit query int false "Maximum number of results (max 100)" default(20)
 // @Param offset query int false "Number of results to skip for pagination" default(0)
+// @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} api.Result{data=dto.ListAlbumsResponseDTO} "Albums retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid parameters"
 // @Failure 401 {object} api.Result "Unauthorized"
@@ -170,37 +218,41 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 		offset = 0
 	}
 
-	params := repo.GetAlbumsByUserParams{
-		UserID: int32(userID.(int)),
-		Limit:  int32(limit),
-		Offset: int32(offset),
+	repositoryID, ok := parseOptionalRepositoryUUID(c)
+	if !ok {
+		return
 	}
 
-	albums, err := h.queries.GetAlbumsByUser(c.Request.Context(), params)
+	totalCount, err := h.queries.CountAlbumsByUserScoped(c.Request.Context(), repo.CountAlbumsByUserScopedParams{
+		UserID:       int32(userID.(int)),
+		RepositoryID: repositoryID,
+	})
+	if err != nil {
+		log.Printf("Failed to count albums for user %d: %v", userID.(int), err)
+		api.GinInternalError(c, err, "Failed to retrieve albums")
+		return
+	}
+
+	albums, err := h.queries.GetAlbumsByUserScoped(c.Request.Context(), repo.GetAlbumsByUserScopedParams{
+		UserID:       int32(userID.(int)),
+		RepositoryID: repositoryID,
+		Limit:        int32(limit),
+		Offset:       int32(offset),
+	})
 	if err != nil {
 		log.Printf("Failed to retrieve albums for user %d: %v", userID.(int), err)
 		api.GinInternalError(c, err, "Failed to retrieve albums")
 		return
 	}
 
-	// Get asset counts for each album
 	albumResponses := make([]dto.GetAlbumResponseDTO, len(albums))
 	for i, album := range albums {
-		count, err := h.queries.GetAlbumAssetCount(c.Request.Context(), album.AlbumID)
-		if err != nil {
-			log.Printf("Failed to get asset count for album %d: %v", album.AlbumID, err)
-			count = 0
-		}
-
-		albumResponses[i] = dto.GetAlbumResponseDTO{
-			AlbumDTO:   dto.ToAlbumDTO(album),
-			AssetCount: count,
-		}
+		albumResponses[i] = toScopedAlbumListItemDTO(album)
 	}
 
 	response := dto.ListAlbumsResponseDTO{
 		Albums: albumResponses,
-		Total:  len(albumResponses),
+		Total:  int(totalCount),
 		Limit:  int(limit),
 		Offset: int(offset),
 	}
@@ -290,10 +342,11 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		count = 0
 	}
 
-	response := dto.GetAlbumResponseDTO{
-		AlbumDTO:   dto.ToAlbumDTO(updatedAlbum),
-		AssetCount: count,
-	}
+	response := toAlbumResponseDTO(
+		dto.ToAlbumDTO(updatedAlbum),
+		count,
+		optionalUUIDToString(updatedAlbum.CoverAssetID),
+	)
 
 	api.GinSuccess(c, response)
 }
@@ -352,6 +405,7 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param id path int true "Album ID"
+// @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} api.Result "Assets retrieved successfully"
 // @Failure 400 {object} api.Result "Invalid album ID"
 // @Failure 404 {object} api.Result "Album not found"
@@ -366,6 +420,11 @@ func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 		return
 	}
 
+	repositoryID, ok := parseOptionalRepositoryUUID(c)
+	if !ok {
+		return
+	}
+
 	// Verify album exists
 	_, err = h.queries.GetAlbumByID(c.Request.Context(), int32(albumID))
 	if err != nil {
@@ -373,7 +432,10 @@ func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 		return
 	}
 
-	assets, err := h.queries.GetAlbumAssets(c.Request.Context(), int32(albumID))
+	assets, err := h.queries.GetAlbumAssetsScoped(c.Request.Context(), repo.GetAlbumAssetsScopedParams{
+		AlbumID:      int32(albumID),
+		RepositoryID: repositoryID,
+	})
 	if err != nil {
 		log.Printf("Failed to retrieve assets for album %d: %v", albumID, err)
 		api.GinInternalError(c, err, "Failed to retrieve album assets")

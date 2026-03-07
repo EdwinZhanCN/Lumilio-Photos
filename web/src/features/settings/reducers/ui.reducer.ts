@@ -11,6 +11,11 @@ export const uiReducer = (
       return { ...state, language: action.payload };
     case "SET_REGION":
       return { ...state, region: action.payload };
+    case "SET_WORKING_REPOSITORY_ID":
+      return {
+        ...state,
+        working_repository_id: action.payload || undefined,
+      };
     case "SET_UPLOAD_MAX_TOTAL_FILES":
       return {
         ...state,

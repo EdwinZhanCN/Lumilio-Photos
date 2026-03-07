@@ -161,6 +161,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
+	indexingService := service.NewAssetIndexingService(queries, settingsService, queueClient, pgxPool)
 	authService := service.NewAuthService(queries)
 	albumService := service.NewAlbumService(queries)
 
@@ -180,6 +181,7 @@ func main() {
 	river.AddWorker[queue.ThumbnailArgs](workers, &queue.ThumbnailWorker{Process: assetProcessor.ProcessThumbnailTask})
 	river.AddWorker[queue.TranscodeArgs](workers, &queue.TranscodeWorker{Process: assetProcessor.ProcessTranscodeTask})
 	river.AddWorker[queue.AssetRetryArgs](workers, &queue.AssetRetryWorker{ProcessRetry: assetProcessor.ProcessRetryTask})
+	river.AddWorker[queue.ReindexAssetsArgs](workers, &queue.ReindexAssetsWorker{IndexingService: indexingService})
 
 	go func() {
 		if err := queueClient.Start(context.Background()); err != nil {
@@ -196,7 +198,7 @@ func main() {
 	defer repoMonitor.Stop()
 
 	// Initialize controllers with new storage system
-	assetController := handler.NewAssetHandler(assetService, queries, repoManager, stagingManager, queueClient)
+	assetController := handler.NewAssetHandler(assetService, indexingService, queries, repoManager, stagingManager, queueClient)
 	authController := handler.NewAuthHandler(authService)
 	albumController := handler.NewAlbumHandler(&albumService, queries)
 	queueController := handler.NewQueueHandler(queueClient, pgxPool)

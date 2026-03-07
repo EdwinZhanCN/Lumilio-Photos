@@ -39,20 +39,22 @@ import (
 
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
-	assetService   service.AssetService
-	queries        *repo.Queries
-	repoManager    storage.RepositoryManager
-	stagingManager storage.StagingManager
-	queueClient    *river.Client[pgx.Tx]
-	memoryMonitor  *memory.MemoryMonitor
-	sessionManager *upload.SessionManager
-	chunkMerger    *upload.ChunkMerger
-	uploadLimiter  chan struct{}
+	assetService    service.AssetService
+	indexingService service.AssetIndexingService
+	queries         *repo.Queries
+	repoManager     storage.RepositoryManager
+	stagingManager  storage.StagingManager
+	queueClient     *river.Client[pgx.Tx]
+	memoryMonitor   *memory.MemoryMonitor
+	sessionManager  *upload.SessionManager
+	chunkMerger     *upload.ChunkMerger
+	uploadLimiter   chan struct{}
 }
 
 // NewAssetHandler creates a new AssetHandler instance
 func NewAssetHandler(
 	assetService service.AssetService,
+	indexingService service.AssetIndexingService,
 	queries *repo.Queries,
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
@@ -65,15 +67,16 @@ func NewAssetHandler(
 	uploadLimiter := make(chan struct{}, 32)
 
 	handler := &AssetHandler{
-		assetService:   assetService,
-		queries:        queries,
-		repoManager:    repoManager,
-		stagingManager: stagingManager,
-		queueClient:    queueClient,
-		memoryMonitor:  memoryMonitor,
-		sessionManager: sessionManager,
-		chunkMerger:    chunkMerger,
-		uploadLimiter:  uploadLimiter,
+		assetService:    assetService,
+		indexingService: indexingService,
+		queries:         queries,
+		repoManager:     repoManager,
+		stagingManager:  stagingManager,
+		queueClient:     queueClient,
+		memoryMonitor:   memoryMonitor,
+		sessionManager:  sessionManager,
+		chunkMerger:     chunkMerger,
+		uploadLimiter:   uploadLimiter,
 	}
 
 	// Start background cleanup tasks
@@ -1171,6 +1174,191 @@ func (h *AssetHandler) GetAssetTypes(c *gin.Context) {
 	api.GinSuccess(c, dto.AssetTypesResponseDTO{Types: types})
 }
 
+func normalizeAssetQueryPagination(pagination *dto.PaginationDTO) {
+	if pagination.Limit <= 0 || pagination.Limit > 100 {
+		pagination.Limit = 20
+	}
+	if pagination.Offset < 0 {
+		pagination.Offset = 0
+	}
+}
+
+func validateAssetQuerySearchType(searchType string) error {
+	if searchType == "" || searchType == "filename" || searchType == "semantic" {
+		return nil
+	}
+	return errors.New("invalid search type")
+}
+
+func validateSearchEnhancementMode(mode string) error {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", "auto", "off", "only":
+		return nil
+	default:
+		return errors.New("invalid enhancement mode")
+	}
+}
+
+func normalizeRebuildIndexLimit(limit int) int {
+	switch {
+	case limit <= 0:
+		return 200
+	case limit > 500:
+		return 500
+	default:
+		return limit
+	}
+}
+
+func parseIndexingTasks(tasks []string) ([]service.AssetIndexingTask, error) {
+	if len(tasks) == 0 {
+		return nil, nil
+	}
+
+	result := make([]service.AssetIndexingTask, 0, len(tasks))
+	for _, rawTask := range tasks {
+		task := service.AssetIndexingTask(strings.ToLower(strings.TrimSpace(rawTask)))
+		switch task {
+		case service.AssetIndexingTaskClip,
+			service.AssetIndexingTaskOCR,
+			service.AssetIndexingTaskCaption,
+			service.AssetIndexingTaskFace:
+			result = append(result, task)
+		default:
+			return nil, fmt.Errorf("invalid indexing task: %s", rawTask)
+		}
+	}
+	return result, nil
+}
+
+func toIndexingStatsResponseDTO(stats service.AssetIndexingStats) dto.AssetIndexingStatsResponseDTO {
+	return dto.AssetIndexingStatsResponseDTO{
+		PhotoTotal:  int(stats.PhotoTotal),
+		ReindexJobs: int(stats.ReindexJobs),
+		Tasks: dto.AssetIndexingTaskSetStatsDTO{
+			Clip: dto.AssetIndexingTaskStatsDTO{
+				IndexedCount: int(stats.Tasks.Clip.IndexedCount),
+				QueuedJobs:   int(stats.Tasks.Clip.QueuedJobs),
+			},
+			OCR: dto.AssetIndexingTaskStatsDTO{
+				IndexedCount: int(stats.Tasks.OCR.IndexedCount),
+				QueuedJobs:   int(stats.Tasks.OCR.QueuedJobs),
+			},
+			Caption: dto.AssetIndexingTaskStatsDTO{
+				IndexedCount: int(stats.Tasks.Caption.IndexedCount),
+				QueuedJobs:   int(stats.Tasks.Caption.QueuedJobs),
+			},
+			Face: dto.AssetIndexingTaskStatsDTO{
+				IndexedCount: int(stats.Tasks.Face.IndexedCount),
+				QueuedJobs:   int(stats.Tasks.Face.QueuedJobs),
+			},
+		},
+	}
+}
+
+func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository) dto.IndexingRepositoryListResponseDTO {
+	items := make([]dto.IndexingRepositoryOptionDTO, 0, len(repositories))
+	for _, repository := range repositories {
+		if repository == nil {
+			continue
+		}
+		items = append(items, dto.IndexingRepositoryOptionDTO{
+			ID:        uuid.UUID(repository.RepoID.Bytes).String(),
+			Name:      repository.Name,
+			Path:      repository.Path,
+			IsPrimary: isPrimaryRepository(repository.Name, repository.Path),
+		})
+	}
+
+	return dto.IndexingRepositoryListResponseDTO{
+		Repositories: items,
+	}
+}
+
+func isPrimaryRepository(name string, path string) bool {
+	if strings.EqualFold(strings.TrimSpace(name), "primary") {
+		return true
+	}
+
+	base := filepath.Base(strings.TrimSpace(path))
+	return strings.EqualFold(base, "primary")
+}
+
+func buildQueryAssetsParams(query, searchType, groupBy string, filter dto.AssetFilterDTO, pagination dto.PaginationDTO) service.QueryAssetsParams {
+	var dateFrom, dateTo *time.Time
+	if filter.Date != nil {
+		dateFrom = filter.Date.From
+		dateTo = filter.Date.To
+
+		// Normalize date-only inputs to inclusive end-of-day
+		if dateFrom != nil && dateTo == nil {
+			end := time.Date(dateFrom.Year(), dateFrom.Month(), dateFrom.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), dateFrom.Location())
+			dateTo = &end
+		} else if dateTo != nil {
+			end := time.Date(dateTo.Year(), dateTo.Month(), dateTo.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), dateTo.Location())
+			dateTo = &end
+		}
+	}
+
+	var albumIDPtr *int32
+	if filter.AlbumID != nil {
+		id := int32(*filter.AlbumID)
+		albumIDPtr = &id
+	}
+
+	return service.QueryAssetsParams{
+		Query:        query,
+		SearchType:   searchType,
+		RepositoryID: filter.RepositoryID,
+		AssetType:    filter.Type,
+		AssetTypes:   filter.Types,
+		OwnerID:      filter.OwnerID,
+		AlbumID:      albumIDPtr,
+		DateFrom:     dateFrom,
+		DateTo:       dateTo,
+		IsRaw:        filter.RAW,
+		Rating:       filter.Rating,
+		Liked:        filter.Liked,
+		CameraModel:  filter.CameraMake,
+		LensModel:    filter.Lens,
+		GroupBy:      groupBy,
+		Limit:        pagination.Limit,
+		Offset:       pagination.Offset,
+	}
+}
+
+func toSearchAssetsResponseDTO(result service.SearchAssetsResult, limit, offset int) dto.SearchAssetsResponseDTO {
+	topResults := make([]dto.AssetDTO, len(result.TopResults))
+	for i, asset := range result.TopResults {
+		topResults[i] = dto.ToAssetDTO(asset)
+	}
+
+	results := make([]dto.AssetDTO, len(result.Results))
+	for i, asset := range result.Results {
+		results[i] = dto.ToAssetDTO(asset)
+	}
+
+	var total *int
+	if result.ResultsTotal >= 0 {
+		totalValue := int(result.ResultsTotal)
+		total = &totalValue
+	}
+
+	return dto.SearchAssetsResponseDTO{
+		TopResults: topResults,
+		TopResultsMeta: dto.SearchTopResultsMetaDTO{
+			Enabled:     result.TopResultsMeta.Enabled,
+			Degraded:    result.TopResultsMeta.Degraded,
+			Reason:      result.TopResultsMeta.Reason,
+			SourceTypes: append([]string{}, result.TopResultsMeta.SourceTypes...),
+		},
+		Results:      results,
+		ResultsTotal: total,
+		Limit:        limit,
+		Offset:       offset,
+	}
+}
+
 // QueryAssets handles unified asset listing, filtering, and searching
 // @Summary Query assets (unified endpoint)
 // @Description Unified endpoint for listing, filtering, and searching assets. Replaces separate /filter and /search endpoints.
@@ -1190,17 +1378,10 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		return
 	}
 
-	// Validate and set defaults for pagination
-	if req.Pagination.Limit <= 0 || req.Pagination.Limit > 100 {
-		req.Pagination.Limit = 20
-	}
-	if req.Pagination.Offset < 0 {
-		req.Pagination.Offset = 0
-	}
+	normalizeAssetQueryPagination(&req.Pagination)
 
-	// Validate search type if provided
-	if req.SearchType != "" && req.SearchType != "filename" && req.SearchType != "semantic" {
-		api.GinBadRequest(c, errors.New("invalid search type"), "Search type must be 'filename' or 'semantic'")
+	if err := validateAssetQuerySearchType(req.SearchType); err != nil {
+		api.GinBadRequest(c, err, "Search type must be 'filename' or 'semantic'")
 		return
 	}
 
@@ -1209,54 +1390,9 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		req.SearchType = "filename"
 	}
 
-	ctx := c.Request.Context()
-	filter := req.Filter
+	params := buildQueryAssetsParams(req.Query, req.SearchType, req.GroupBy, req.Filter, req.Pagination)
 
-	// Convert filter parameters
-	var dateFrom, dateTo *time.Time
-	if filter.Date != nil {
-		dateFrom = filter.Date.From
-		dateTo = filter.Date.To
-
-		// Normalize date-only inputs to inclusive end-of-day
-		if dateFrom != nil && dateTo == nil {
-			end := time.Date(dateFrom.Year(), dateFrom.Month(), dateFrom.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), dateFrom.Location())
-			dateTo = &end
-		} else if dateTo != nil {
-			end := time.Date(dateTo.Year(), dateTo.Month(), dateTo.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), dateTo.Location())
-			dateTo = &end
-		}
-	}
-
-	// Get album ID from filter if provided
-	var albumIDPtr *int32
-	if filter.AlbumID != nil {
-		id := int32(*filter.AlbumID)
-		albumIDPtr = &id
-	}
-
-	// Build unified query params
-	params := service.QueryAssetsParams{
-		Query:        req.Query,
-		SearchType:   req.SearchType,
-		RepositoryID: filter.RepositoryID,
-		AssetType:    filter.Type,
-		AssetTypes:   filter.Types,
-		OwnerID:      filter.OwnerID,
-		AlbumID:      albumIDPtr,
-		DateFrom:     dateFrom,
-		DateTo:       dateTo,
-		IsRaw:        filter.RAW,
-		Rating:       filter.Rating,
-		Liked:        filter.Liked,
-		CameraModel:  filter.CameraMake,
-		LensModel:    filter.Lens,
-		GroupBy:      req.GroupBy,
-		Limit:        req.Pagination.Limit,
-		Offset:       req.Pagination.Offset,
-	}
-
-	assets, total, err := h.assetService.QueryAssets(ctx, params)
+	assets, total, err := h.assetService.QueryAssets(c.Request.Context(), params)
 	if err != nil {
 		// Check for semantic search unavailable error
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
@@ -1281,6 +1417,164 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		Offset: req.Pagination.Offset,
 	}
 	api.GinSuccess(c, response)
+}
+
+// SearchAssets handles sectioned asset search with best-effort top results.
+// @Summary Search assets
+// @Description Search assets with optional top results enhancement and filename fallback.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param request body dto.SearchAssetsRequestDTO true "Search parameters"
+// @Success 200 {object} api.Result{data=dto.SearchAssetsResponseDTO} "Assets searched successfully"
+// @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/search [post]
+func (h *AssetHandler) SearchAssets(c *gin.Context) {
+	var req dto.SearchAssetsRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	normalizeAssetQueryPagination(&req.Pagination)
+
+	if err := validateSearchEnhancementMode(req.EnhancementMode); err != nil {
+		api.GinBadRequest(c, err, "Enhancement mode must be 'auto', 'off', or 'only'")
+		return
+	}
+	if strings.TrimSpace(req.EnhancementMode) == "" {
+		req.EnhancementMode = string(service.SearchEnhancementModeAuto)
+	}
+
+	params := buildQueryAssetsParams(req.Query, "filename", req.GroupBy, req.Filter, req.Pagination)
+
+	result, err := h.assetService.SearchAssets(c.Request.Context(), service.SearchAssetsParams{
+		QueryAssetsParams: params,
+		EnhancementMode:   service.SearchEnhancementMode(req.EnhancementMode),
+		TopResultsLimit:   req.TopResultsLimit,
+	})
+	if err != nil {
+		log.Printf("Failed to search assets: %v", err)
+		api.GinInternalError(c, err, "Failed to search assets")
+		return
+	}
+
+	api.GinSuccess(c, toSearchAssetsResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset))
+}
+
+// ListIndexingRepositories returns repository options for indexing filters and reindex scope selection.
+// @Summary List indexing repositories
+// @Description Return repositories that can be used to scope indexing stats and reindex requests.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.Result{data=dto.IndexingRepositoryListResponseDTO} "Repository options retrieved successfully"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/indexing/repositories [get]
+func (h *AssetHandler) ListIndexingRepositories(c *gin.Context) {
+	repositories, err := h.repoManager.ListRepositories()
+	if err != nil {
+		log.Printf("Failed to list repositories for indexing: %v", err)
+		api.GinInternalError(c, err, "Failed to list repositories")
+		return
+	}
+
+	api.GinSuccess(c, toIndexingRepositoryListResponseDTO(repositories))
+}
+
+// GetIndexingStats returns indexing coverage and queue status for photo AI tasks.
+// @Summary Get asset indexing stats
+// @Description Return indexing coverage and queued job counts for photo AI tasks.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param repository_id query string false "Optional repository UUID filter"
+// @Success 200 {object} api.Result{data=dto.AssetIndexingStatsResponseDTO} "Indexing stats retrieved successfully"
+// @Failure 400 {object} api.Result "Invalid repository ID"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/indexing/stats [get]
+func (h *AssetHandler) GetIndexingStats(c *gin.Context) {
+	repositoryID := strings.TrimSpace(c.Query("repository_id"))
+	var repositoryIDPtr *string
+	if repositoryID != "" {
+		if _, err := uuid.Parse(repositoryID); err != nil {
+			api.GinBadRequest(c, err, "Invalid repository ID")
+			return
+		}
+		repositoryIDPtr = &repositoryID
+	}
+
+	stats, err := h.indexingService.GetIndexingStats(c.Request.Context(), repositoryIDPtr)
+	if err != nil {
+		log.Printf("Failed to load indexing stats: %v", err)
+		api.GinInternalError(c, err, "Failed to load indexing stats")
+		return
+	}
+
+	api.GinSuccess(c, toIndexingStatsResponseDTO(stats))
+}
+
+// RebuildAssetIndexes queues a background indexing backfill batch for existing photos.
+// @Summary Queue asset index rebuild
+// @Description Queue a background batch that backfills AI indexing for existing photos.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param request body dto.RebuildAssetIndexesRequestDTO false "Reindex request"
+// @Success 200 {object} api.Result{data=dto.RebuildAssetIndexesResponseDTO} "Reindex job queued successfully"
+// @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/indexing/rebuild [post]
+func (h *AssetHandler) RebuildAssetIndexes(c *gin.Context) {
+	var req dto.RebuildAssetIndexesRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	tasks, err := parseIndexingTasks(req.Tasks)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid indexing task list")
+		return
+	}
+
+	var repositoryIDPtr *string
+	if trimmedRepositoryID := strings.TrimSpace(req.RepositoryID); trimmedRepositoryID != "" {
+		repositoryIDPtr = &trimmedRepositoryID
+	}
+
+	missingOnly := true
+	if req.MissingOnly != nil {
+		missingOnly = *req.MissingOnly
+	}
+
+	result, err := h.indexingService.EnqueueReindexAssets(c.Request.Context(), service.ReindexAssetsInput{
+		RepositoryID: repositoryIDPtr,
+		Tasks:        tasks,
+		Limit:        normalizeRebuildIndexLimit(req.Limit),
+		MissingOnly:  missingOnly,
+	})
+	if err != nil {
+		log.Printf("Failed to queue reindex job: %v", err)
+		api.GinInternalError(c, err, "Failed to queue reindex job")
+		return
+	}
+
+	requestedTasks := make([]string, 0, len(result.Requested))
+	for _, task := range result.Requested {
+		requestedTasks = append(requestedTasks, string(task))
+	}
+
+	api.GinSuccess(c, dto.RebuildAssetIndexesResponseDTO{
+		Status:         "queued",
+		Message:        "Index rebuild job queued successfully",
+		JobID:          result.JobID,
+		RequestedTasks: requestedTasks,
+		Limit:          result.Limit,
+		MissingOnly:    result.MissingOnly,
+		RepositoryID:   result.RepositoryID,
+	})
 }
 
 // GetFeaturedAssets returns deterministic curated featured photos.

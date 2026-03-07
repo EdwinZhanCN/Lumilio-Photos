@@ -1,7 +1,14 @@
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
 import { ErrorBoundary } from "react-error-boundary";
-import { Album, Plus, Trash2, X, SquareMousePointer, AlertTriangle } from "lucide-react";
+import {
+  Album,
+  Plus,
+  Trash2,
+  X,
+  SquareMousePointer,
+  AlertTriangle,
+} from "lucide-react";
 import { ImgStackGrid } from "../components/ImgStackGrid";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAlbums } from "../hooks/useAlbums";
@@ -12,20 +19,25 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { $api } from "@/lib/http-commons/queryClient";
+import { useWorkingRepository } from "@/features/settings";
 
 function CollectionsContent() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const showMessage = useMessage();
-  const { 
-    selectedAlbumIds, 
-    isSelectionMode, 
-    dispatch 
-  } = useCollections();
+  const { scopedRepositoryId } = useWorkingRepository();
+  const { selectedAlbumIds, isSelectionMode, dispatch } = useCollections();
   const deleteAlbumMutation = $api.useMutation("delete", "/api/v1/albums/{id}");
-  
-  const { data, isPending, isFetching, hasNextPage, fetchNextPage, isFetchingNextPage } = useAlbums(t);
+
+  const {
+    data,
+    isPending,
+    isFetching,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useAlbums(t, scopedRepositoryId);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -66,15 +78,25 @@ function CollectionsContent() {
           deleteAlbumMutation.mutateAsync({ params: { path: { id } } }),
         ),
       );
-      
+
       await queryClient.invalidateQueries({ queryKey: ["albums"] });
-      showMessage("success", t("collections.deleteSuccess", { defaultValue: "Albums deleted successfully" }));
+      showMessage(
+        "success",
+        t("collections.deleteSuccess", {
+          defaultValue: "Albums deleted successfully",
+        }),
+      );
       dispatch({ type: "CLEAR_SELECTION" });
       dispatch({ type: "TOGGLE_SELECTION_MODE" });
       setIsDeleteConfirmOpen(false);
     } catch (error) {
       console.error("Failed to delete albums:", error);
-      showMessage("error", t("collections.deleteError", { defaultValue: "Failed to delete albums" }));
+      showMessage(
+        "error",
+        t("collections.deleteError", {
+          defaultValue: "Failed to delete albums",
+        }),
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -95,15 +117,15 @@ function CollectionsContent() {
               <span className="text-sm font-medium mr-2">
                 {t("common.selected", { count: selectedAlbumIds.length })}
               </span>
-              <button 
-                className={`btn btn-sm btn-circle btn-error ${selectedAlbumIds.length === 0 ? 'btn-disabled opacity-50' : ''}`}
+              <button
+                className={`btn btn-sm btn-circle btn-error ${selectedAlbumIds.length === 0 ? "btn-disabled opacity-50" : ""}`}
                 onClick={handleDeleteSelected}
                 disabled={selectedAlbumIds.length === 0}
                 title={t("common.delete")}
               >
                 <Trash2 className="w-4 h-4" />
               </button>
-              <button 
+              <button
                 className="btn btn-soft btn-sm btn-circle btn-accent"
                 onClick={toggleSelectionMode}
                 title={t("common.cancel")}
@@ -113,14 +135,14 @@ function CollectionsContent() {
             </>
           ) : (
             <>
-              <button 
+              <button
                 className="btn btn-sm btn-soft btn-info"
                 onClick={handleCreateAlbum}
               >
                 <Plus className="w-4 h-4" />
                 {t("collections.newAlbum")}
               </button>
-              <button 
+              <button
                 className="btn btn-sm btn-soft btn-info btn-circle"
                 onClick={toggleSelectionMode}
                 title={t("common.select")}
@@ -177,24 +199,32 @@ function CollectionsContent() {
               <h3 className="font-bold text-lg">Delete Albums</h3>
             </div>
             <p className="py-4">
-              Are you sure you want to delete <strong>{selectedAlbumIds.length}</strong> selected albums? 
-              This will only delete the collections, your photos will remain safe in your library.
+              Are you sure you want to delete{" "}
+              <strong>{selectedAlbumIds.length}</strong> selected albums? This
+              will only delete the collections, your photos will remain safe in
+              your library.
             </p>
             <div className="modal-action">
-              <button className="btn btn-ghost" onClick={() => setIsDeleteConfirmOpen(false)}>
+              <button
+                className="btn btn-ghost"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+              >
                 Cancel
               </button>
-              <button 
-                className={`btn btn-error gap-2 ${isDeleting ? 'loading' : ''}`} 
+              <button
+                className={`btn btn-error gap-2 ${isDeleting ? "loading" : ""}`}
                 onClick={confirmDelete}
                 disabled={isDeleting}
               >
                 {!isDeleting && <Trash2 size={18} />}
-                {isDeleting ? 'Deleting...' : 'Delete Collections'}
+                {isDeleting ? "Deleting..." : "Delete Collections"}
               </button>
             </div>
           </div>
-          <div className="modal-backdrop" onClick={() => setIsDeleteConfirmOpen(false)}></div>
+          <div
+            className="modal-backdrop"
+            onClick={() => setIsDeleteConfirmOpen(false)}
+          ></div>
         </div>
       )}
     </div>
