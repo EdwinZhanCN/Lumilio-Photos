@@ -1,22 +1,34 @@
 package handler
 
 import (
+	"context"
 	"server/internal/api"
 	"server/internal/db/repo"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type statsQuerier interface {
+	GetFocalLengthDistribution(ctx context.Context, repositoryID pgtype.UUID) ([]repo.GetFocalLengthDistributionRow, error)
+	GetCameraLensStats(ctx context.Context, arg repo.GetCameraLensStatsParams) ([]repo.GetCameraLensStatsRow, error)
+	GetTimeDistributionHourly(ctx context.Context, repositoryID pgtype.UUID) ([]repo.GetTimeDistributionHourlyRow, error)
+	GetTimeDistributionMonthly(ctx context.Context, repositoryID pgtype.UUID) ([]repo.GetTimeDistributionMonthlyRow, error)
+	GetDailyActivityHeatmap(ctx context.Context, arg repo.GetDailyActivityHeatmapParams) ([]repo.GetDailyActivityHeatmapRow, error)
+	GetAvailableYears(ctx context.Context, repositoryID pgtype.UUID) ([]int32, error)
+}
+
 // StatsHandler handles HTTP requests for photo statistics
 type StatsHandler struct {
-	queries *repo.Queries
+	queries statsQuerier
 }
 
 // NewStatsHandler creates a new StatsHandler instance
-func NewStatsHandler(queries *repo.Queries) *StatsHandler {
+func NewStatsHandler(queries statsQuerier) *StatsHandler {
 	return &StatsHandler{
 		queries: queries,
 	}
@@ -81,11 +93,18 @@ type AvailableYearsResponse struct {
 // @Description Get distribution of commonly used focal lengths
 // @Tags stats
 // @Produce json
+// @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} api.Result{data=FocalLengthDistributionResponse}
+// @Failure 400 {object} api.Result
 // @Failure 500 {object} api.Result
 // @Router /api/v1/stats/focal-length [get]
 func (h *StatsHandler) GetFocalLengthDistribution(c *gin.Context) {
-	rows, err := h.queries.GetFocalLengthDistribution(c.Request.Context())
+	repositoryID, ok := parseOptionalRepositoryUUID(c)
+	if !ok {
+		return
+	}
+
+	rows, err := h.queries.GetFocalLengthDistribution(c.Request.Context(), repositoryID)
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to fetch focal length distribution")
 		return
@@ -123,6 +142,7 @@ func (h *StatsHandler) GetFocalLengthDistribution(c *gin.Context) {
 // @Tags stats
 // @Produce json
 // @Param limit query int false "Number of results to return" default(20)
+// @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} api.Result{data=CameraLensStatsResponse}
 // @Failure 400 {object} api.Result
 // @Failure 500 {object} api.Result
@@ -136,7 +156,15 @@ func (h *StatsHandler) GetCameraLensStats(c *gin.Context) {
 		return
 	}
 
-	rows, err := h.queries.GetCameraLensStats(c.Request.Context(), int32(limit))
+	repositoryID, ok := parseOptionalRepositoryUUID(c)
+	if !ok {
+		return
+	}
+
+	rows, err := h.queries.GetCameraLensStats(c.Request.Context(), repo.GetCameraLensStatsParams{
+		RepositoryID: repositoryID,
+		Limit:        int32(limit),
+	})
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to fetch camera lens stats")
 		return
@@ -180,21 +208,26 @@ func (h *StatsHandler) GetCameraLensStats(c *gin.Context) {
 // @Tags stats
 // @Produce json
 // @Param type query string false "Distribution type: hourly or monthly" default(hourly) Enums(hourly, monthly)
+// @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} api.Result{data=TimeDistributionResponse}
 // @Failure 400 {object} api.Result
 // @Failure 500 {object} api.Result
 // @Router /api/v1/stats/time-distribution [get]
 func (h *StatsHandler) GetTimeDistribution(c *gin.Context) {
 	distType := c.DefaultQuery("type", "hourly")
+	repositoryID, ok := parseOptionalRepositoryUUID(c)
+	if !ok {
+		return
+	}
 
 	var data []TimeBucket
 	var err error
 
 	switch distType {
 	case "hourly":
-		data, err = h.getHourlyDistribution(c)
+		data, err = h.getHourlyDistribution(c, repositoryID)
 	case "monthly":
-		data, err = h.getMonthlyDistribution(c)
+		data, err = h.getMonthlyDistribution(c, repositoryID)
 	default:
 		api.GinBadRequest(c, nil, "Invalid type parameter. Must be 'hourly' or 'monthly'")
 		return
@@ -214,8 +247,8 @@ func (h *StatsHandler) GetTimeDistribution(c *gin.Context) {
 }
 
 // getHourlyDistribution fetches hourly time distribution
-func (h *StatsHandler) getHourlyDistribution(c *gin.Context) ([]TimeBucket, error) {
-	rows, err := h.queries.GetTimeDistributionHourly(c.Request.Context())
+func (h *StatsHandler) getHourlyDistribution(c *gin.Context, repositoryID pgtype.UUID) ([]TimeBucket, error) {
+	rows, err := h.queries.GetTimeDistributionHourly(c.Request.Context(), repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -234,8 +267,8 @@ func (h *StatsHandler) getHourlyDistribution(c *gin.Context) ([]TimeBucket, erro
 }
 
 // getMonthlyDistribution fetches monthly time distribution
-func (h *StatsHandler) getMonthlyDistribution(c *gin.Context) ([]TimeBucket, error) {
-	rows, err := h.queries.GetTimeDistributionMonthly(c.Request.Context())
+func (h *StatsHandler) getMonthlyDistribution(c *gin.Context, repositoryID pgtype.UUID) ([]TimeBucket, error) {
+	rows, err := h.queries.GetTimeDistributionMonthly(c.Request.Context(), repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -263,6 +296,7 @@ func (h *StatsHandler) getMonthlyDistribution(c *gin.Context) ([]TimeBucket, err
 // @Tags stats
 // @Produce json
 // @Param days query int false "Number of days to look back" default(365)
+// @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} api.Result{data=HeatmapResponse}
 // @Failure 400 {object} api.Result
 // @Failure 500 {object} api.Result
@@ -276,17 +310,23 @@ func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
 		return
 	}
 
+	repositoryID, ok := parseOptionalRepositoryUUID(c)
+	if !ok {
+		return
+	}
+
 	// Calculate date range
 	endDate := time.Now()
 	startDate := endDate.AddDate(0, 0, -days)
 
 	// Convert to pgtype.Timestamptz
 	params := repo.GetDailyActivityHeatmapParams{
-		TakenTime: pgtype.Timestamptz{
+		RepositoryID: repositoryID,
+		StartTime: pgtype.Timestamptz{
 			Time:  startDate,
 			Valid: true,
 		},
-		TakenTime_2: pgtype.Timestamptz{
+		EndTime: pgtype.Timestamptz{
 			Time:  endDate,
 			Valid: true,
 		},
@@ -320,11 +360,18 @@ func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
 // @Description Get list of years that have photo data
 // @Tags stats
 // @Produce json
+// @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} api.Result{data=AvailableYearsResponse}
+// @Failure 400 {object} api.Result
 // @Failure 500 {object} api.Result
 // @Router /api/v1/stats/available-years [get]
 func (h *StatsHandler) GetAvailableYears(c *gin.Context) {
-	rows, err := h.queries.GetAvailableYears(c.Request.Context())
+	repositoryID, ok := parseOptionalRepositoryUUID(c)
+	if !ok {
+		return
+	}
+
+	rows, err := h.queries.GetAvailableYears(c.Request.Context(), repositoryID)
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to fetch available years")
 		return
@@ -340,4 +387,19 @@ func (h *StatsHandler) GetAvailableYears(c *gin.Context) {
 	}
 
 	api.GinSuccess(c, response)
+}
+
+func parseOptionalRepositoryUUID(c *gin.Context) (pgtype.UUID, bool) {
+	rawRepositoryID := strings.TrimSpace(c.Query("repository_id"))
+	if rawRepositoryID == "" {
+		return pgtype.UUID{}, true
+	}
+
+	repositoryID, err := uuid.Parse(rawRepositoryID)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid repository_id parameter")
+		return pgtype.UUID{}, false
+	}
+
+	return pgtype.UUID{Bytes: repositoryID, Valid: true}, true
 }

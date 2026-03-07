@@ -65,6 +65,23 @@ function asLayout(
     : fallback;
 }
 
+function asWorkingRepositoryID(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    normalized,
+  )
+    ? normalized
+    : undefined;
+}
+
 function defaultedState(base: SettingsState): SettingsState {
   const language = getCurrentLanguage();
   return {
@@ -73,6 +90,7 @@ function defaultedState(base: SettingsState): SettingsState {
       ...base.ui,
       language,
       region: "other",
+      working_repository_id: base.ui.working_repository_id,
       asset_page: {
         layout: base.ui.asset_page?.layout ?? "full",
       },
@@ -107,6 +125,7 @@ function sanitizeSettings(
     ui: {
       language: asLanguage(ui.language, defaults.ui.language!),
       region: asRegion(ui.region, defaults.ui.region!),
+      working_repository_id: asWorkingRepositoryID(ui.working_repository_id),
       asset_page: {
         layout: asLayout(
           isRecord(ui.asset_page) ? ui.asset_page.layout : undefined,

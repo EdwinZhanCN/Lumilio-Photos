@@ -12,6 +12,42 @@ import (
 	"server/internal/db/dbtypes"
 )
 
+const countAlbumsByUserScoped = `-- name: CountAlbumsByUserScoped :one
+SELECT COUNT(*)
+FROM albums al
+WHERE al.user_id = $1
+  AND (
+    $2::uuid IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa
+      JOIN assets a ON a.asset_id = aa.asset_id
+      WHERE aa.album_id = al.album_id
+        AND a.is_deleted = false
+        AND a.repository_id = $2
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM assets a_cover
+      WHERE a_cover.asset_id = al.cover_asset_id
+        AND a_cover.is_deleted = false
+        AND a_cover.repository_id = $2
+    )
+  )
+`
+
+type CountAlbumsByUserScopedParams struct {
+	UserID       int32       `db:"user_id" json:"user_id"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+}
+
+func (q *Queries) CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countAlbumsByUserScoped, arg.UserID, arg.RepositoryID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAlbum = `-- name: CreateAlbum :one
 INSERT INTO albums (user_id, album_name, description, cover_asset_id)
 VALUES ($1, $2, $3, $4)
@@ -176,6 +212,30 @@ func (q *Queries) GetAlbumAssetCount(ctx context.Context, albumID int32) (int64,
 	return count, err
 }
 
+const getAlbumAssetCountScoped = `-- name: GetAlbumAssetCountScoped :one
+SELECT COUNT(*) as count
+FROM album_assets aa
+JOIN assets a ON aa.asset_id = a.asset_id
+WHERE aa.album_id = $1
+  AND a.is_deleted = false
+  AND (
+    $2::uuid IS NULL
+    OR a.repository_id = $2
+  )
+`
+
+type GetAlbumAssetCountScopedParams struct {
+	AlbumID      int32       `db:"album_id" json:"album_id"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+}
+
+func (q *Queries) GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAssetCountScopedParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getAlbumAssetCountScoped, arg.AlbumID, arg.RepositoryID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getAlbumAssets = `-- name: GetAlbumAssets :many
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, aa.position, aa.added_time
 FROM assets a
@@ -252,6 +312,92 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 	return items, nil
 }
 
+const getAlbumAssetsScoped = `-- name: GetAlbumAssetsScoped :many
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, aa.position, aa.added_time
+FROM assets a
+JOIN album_assets aa ON a.asset_id = aa.asset_id
+WHERE aa.album_id = $1
+  AND a.is_deleted = false
+  AND (
+    $2::uuid IS NULL
+    OR a.repository_id = $2
+  )
+ORDER BY aa.position ASC, aa.added_time ASC
+`
+
+type GetAlbumAssetsScopedParams struct {
+	AlbumID      int32       `db:"album_id" json:"album_id"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+}
+
+type GetAlbumAssetsScopedRow struct {
+	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
+	Type             string                   `db:"type" json:"type"`
+	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
+	StoragePath      *string                  `db:"storage_path" json:"storage_path"`
+	MimeType         string                   `db:"mime_type" json:"mime_type"`
+	FileSize         int64                    `db:"file_size" json:"file_size"`
+	Hash             *string                  `db:"hash" json:"hash"`
+	Width            *int32                   `db:"width" json:"width"`
+	Height           *int32                   `db:"height" json:"height"`
+	Duration         *float64                 `db:"duration" json:"duration"`
+	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
+	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating           *int32                   `db:"rating" json:"rating"`
+	Liked            *bool                    `db:"liked" json:"liked"`
+	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
+	Status           []byte                   `db:"status" json:"status"`
+	Position         *int32                   `db:"position" json:"position"`
+	AddedTime        pgtype.Timestamptz       `db:"added_time" json:"added_time"`
+}
+
+func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsScopedParams) ([]GetAlbumAssetsScopedRow, error) {
+	rows, err := q.db.Query(ctx, getAlbumAssetsScoped, arg.AlbumID, arg.RepositoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAlbumAssetsScopedRow
+	for rows.Next() {
+		var i GetAlbumAssetsScopedRow
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+			&i.Position,
+			&i.AddedTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getAlbumByID = `-- name: GetAlbumByID :one
 SELECT album_id, user_id, album_name, created_at, updated_at, description, cover_asset_id FROM albums WHERE album_id = $1
 `
@@ -267,6 +413,90 @@ func (q *Queries) GetAlbumByID(ctx context.Context, albumID int32) (Album, error
 		&i.UpdatedAt,
 		&i.Description,
 		&i.CoverAssetID,
+	)
+	return i, err
+}
+
+const getAlbumByIDScoped = `-- name: GetAlbumByIDScoped :one
+SELECT
+  al.album_id,
+  al.user_id,
+  al.album_name,
+  al.created_at,
+  al.updated_at,
+  al.description,
+  al.cover_asset_id,
+  (
+    SELECT COUNT(*)
+    FROM album_assets aa_count
+    JOIN assets a_count ON a_count.asset_id = aa_count.asset_id
+    WHERE aa_count.album_id = al.album_id
+      AND a_count.is_deleted = false
+      AND (
+        $1::uuid IS NULL
+        OR a_count.repository_id = $1
+      )
+  ) AS asset_count,
+  COALESCE(
+    (
+      SELECT a_cover.asset_id
+      FROM assets a_cover
+      WHERE a_cover.asset_id = al.cover_asset_id
+        AND a_cover.is_deleted = false
+        AND (
+          $1::uuid IS NULL
+          OR a_cover.repository_id = $1
+        )
+      LIMIT 1
+    ),
+    (
+      SELECT aa_cover.asset_id
+      FROM album_assets aa_cover
+      JOIN assets a_scope ON a_scope.asset_id = aa_cover.asset_id
+      WHERE aa_cover.album_id = al.album_id
+        AND a_scope.is_deleted = false
+        AND (
+          $1::uuid IS NULL
+          OR a_scope.repository_id = $1
+        )
+      ORDER BY aa_cover.position ASC NULLS LAST, aa_cover.added_time ASC
+      LIMIT 1
+    )
+  )::uuid AS display_cover_asset_id
+FROM albums al
+WHERE al.album_id = $2
+`
+
+type GetAlbumByIDScopedParams struct {
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	AlbumID      int32       `db:"album_id" json:"album_id"`
+}
+
+type GetAlbumByIDScopedRow struct {
+	AlbumID             int32              `db:"album_id" json:"album_id"`
+	UserID              int32              `db:"user_id" json:"user_id"`
+	AlbumName           string             `db:"album_name" json:"album_name"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Description         *string            `db:"description" json:"description"`
+	CoverAssetID        pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
+	AssetCount          int64              `db:"asset_count" json:"asset_count"`
+	DisplayCoverAssetID pgtype.UUID        `db:"display_cover_asset_id" json:"display_cover_asset_id"`
+}
+
+func (q *Queries) GetAlbumByIDScoped(ctx context.Context, arg GetAlbumByIDScopedParams) (GetAlbumByIDScopedRow, error) {
+	row := q.db.QueryRow(ctx, getAlbumByIDScoped, arg.RepositoryID, arg.AlbumID)
+	var i GetAlbumByIDScopedRow
+	err := row.Scan(
+		&i.AlbumID,
+		&i.UserID,
+		&i.AlbumName,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Description,
+		&i.CoverAssetID,
+		&i.AssetCount,
+		&i.DisplayCoverAssetID,
 	)
 	return i, err
 }
@@ -301,6 +531,130 @@ func (q *Queries) GetAlbumsByUser(ctx context.Context, arg GetAlbumsByUserParams
 			&i.UpdatedAt,
 			&i.Description,
 			&i.CoverAssetID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAlbumsByUserScoped = `-- name: GetAlbumsByUserScoped :many
+SELECT
+  al.album_id,
+  al.user_id,
+  al.album_name,
+  al.created_at,
+  al.updated_at,
+  al.description,
+  al.cover_asset_id,
+  (
+    SELECT COUNT(*)
+    FROM album_assets aa_count
+    JOIN assets a_count ON a_count.asset_id = aa_count.asset_id
+    WHERE aa_count.album_id = al.album_id
+      AND a_count.is_deleted = false
+      AND (
+        $1::uuid IS NULL
+        OR a_count.repository_id = $1
+      )
+  ) AS asset_count,
+  COALESCE(
+    (
+      SELECT a_cover.asset_id
+      FROM assets a_cover
+      WHERE a_cover.asset_id = al.cover_asset_id
+        AND a_cover.is_deleted = false
+        AND (
+          $1::uuid IS NULL
+          OR a_cover.repository_id = $1
+        )
+      LIMIT 1
+    ),
+    (
+      SELECT aa_cover.asset_id
+      FROM album_assets aa_cover
+      JOIN assets a_scope ON a_scope.asset_id = aa_cover.asset_id
+      WHERE aa_cover.album_id = al.album_id
+        AND a_scope.is_deleted = false
+        AND (
+          $1::uuid IS NULL
+          OR a_scope.repository_id = $1
+        )
+      ORDER BY aa_cover.position ASC NULLS LAST, aa_cover.added_time ASC
+      LIMIT 1
+    )
+  )::uuid AS display_cover_asset_id
+FROM albums al
+WHERE al.user_id = $2
+  AND (
+    $1::uuid IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa_exists
+      JOIN assets a_exists ON a_exists.asset_id = aa_exists.asset_id
+      WHERE aa_exists.album_id = al.album_id
+        AND a_exists.is_deleted = false
+        AND a_exists.repository_id = $1
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM assets a_cover_exists
+      WHERE a_cover_exists.asset_id = al.cover_asset_id
+        AND a_cover_exists.is_deleted = false
+        AND a_cover_exists.repository_id = $1
+    )
+  )
+ORDER BY al.created_at DESC
+LIMIT $4 OFFSET $3
+`
+
+type GetAlbumsByUserScopedParams struct {
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	UserID       int32       `db:"user_id" json:"user_id"`
+	Offset       int32       `db:"offset" json:"offset"`
+	Limit        int32       `db:"limit" json:"limit"`
+}
+
+type GetAlbumsByUserScopedRow struct {
+	AlbumID             int32              `db:"album_id" json:"album_id"`
+	UserID              int32              `db:"user_id" json:"user_id"`
+	AlbumName           string             `db:"album_name" json:"album_name"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Description         *string            `db:"description" json:"description"`
+	CoverAssetID        pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
+	AssetCount          int64              `db:"asset_count" json:"asset_count"`
+	DisplayCoverAssetID pgtype.UUID        `db:"display_cover_asset_id" json:"display_cover_asset_id"`
+}
+
+func (q *Queries) GetAlbumsByUserScoped(ctx context.Context, arg GetAlbumsByUserScopedParams) ([]GetAlbumsByUserScopedRow, error) {
+	rows, err := q.db.Query(ctx, getAlbumsByUserScoped,
+		arg.RepositoryID,
+		arg.UserID,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAlbumsByUserScopedRow
+	for rows.Next() {
+		var i GetAlbumsByUserScopedRow
+		if err := rows.Scan(
+			&i.AlbumID,
+			&i.UserID,
+			&i.AlbumName,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Description,
+			&i.CoverAssetID,
+			&i.AssetCount,
+			&i.DisplayCoverAssetID,
 		); err != nil {
 			return nil, err
 		}

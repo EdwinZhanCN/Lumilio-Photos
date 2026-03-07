@@ -1,10 +1,19 @@
 import { ServerStackIcon } from "@heroicons/react/24/outline";
 import { useSettingsContext } from "@/features/settings";
+import { useWorkingRepository } from "@/features/settings/hooks/useWorkingRepository";
 import { useI18n } from "@/lib/i18n.tsx";
 
 export default function ServerSettings() {
   const { t } = useI18n();
   const { state, dispatch } = useSettingsContext();
+  const {
+    repositories,
+    repositoriesQuery,
+    workingRepositoryId,
+    selectedRepository,
+    setWorkingRepositoryId,
+    getRepositoryLabel,
+  } = useWorkingRepository();
   const value = state.server.update_timespan;
 
   // Reasonable presets within [1, 50] seconds
@@ -21,6 +30,54 @@ export default function ServerSettings() {
         <ServerStackIcon className="size-6 text-primary" />
         <h2 className="text-2xl font-bold">{t("settings.server")}</h2>
       </div>
+
+      <section className="space-y-2">
+        <h3 className="text-lg font-semibold">
+          {t("settings.serverSettings.workingRepositoryTitle", {
+            defaultValue: "Working repository",
+          })}
+        </h3>
+        <p className="text-sm opacity-70">
+          {t("settings.serverSettings.workingRepositoryDescription", {
+            defaultValue:
+              "Choose the default repository scope for repository-aware pages and actions. Select All repositories to keep global views.",
+          })}
+        </p>
+        <label className="form-control gap-2 max-w-xl">
+          <span className="font-semibold">
+            {t("settings.serverSettings.workingRepositoryLabel", {
+              defaultValue: "Current application repository",
+            })}
+          </span>
+          <select
+            className="select select-bordered w-full"
+            value={workingRepositoryId}
+            disabled={repositoriesQuery.isLoading}
+            onChange={(event) =>
+              setWorkingRepositoryId(event.target.value || null)
+            }
+          >
+            <option value="">{t("navbar.repository.all")}</option>
+            {repositories.map((repository) => (
+              <option key={repository.id} value={repository.id}>
+                {getRepositoryLabel(repository)}
+              </option>
+            ))}
+          </select>
+          <span className="text-sm opacity-70">
+            {selectedRepository?.path ??
+              (repositoriesQuery.isError
+                ? t("settings.serverSettings.workingRepositoryUnavailable", {
+                    defaultValue:
+                      "Repository options are temporarily unavailable.",
+                  })
+                : t("settings.serverSettings.workingRepositoryHint", {
+                    defaultValue:
+                      "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support repository filtering.",
+                  }))}
+          </span>
+        </label>
+      </section>
 
       <section className="space-y-2">
         <h3 className="text-lg font-semibold">

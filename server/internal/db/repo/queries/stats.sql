@@ -6,6 +6,7 @@ SELECT
 FROM assets
 WHERE
     is_deleted = false
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR repository_id = sqlc.narg('repository_id'))
     AND specific_metadata->>'focal_length' IS NOT NULL
     AND specific_metadata->>'focal_length' != ''
     AND (specific_metadata->>'focal_length')::numeric > 0
@@ -22,13 +23,14 @@ SELECT
 FROM assets
 WHERE
     is_deleted = false
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR repository_id = sqlc.narg('repository_id'))
     AND specific_metadata->>'camera_model' IS NOT NULL
     AND specific_metadata->>'camera_model' != ''
     AND specific_metadata->>'lens_model' IS NOT NULL
     AND specific_metadata->>'lens_model' != ''
 GROUP BY camera_model, lens_model
 ORDER BY count DESC
-LIMIT $1;
+LIMIT sqlc.arg('limit');
 
 -- name: GetTimeDistributionHourly :many
 -- 获取按小时的拍摄时间分布
@@ -38,6 +40,7 @@ SELECT
 FROM assets
 WHERE
     is_deleted = false
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR repository_id = sqlc.narg('repository_id'))
     AND (taken_time IS NOT NULL OR upload_time IS NOT NULL)
 GROUP BY hour
 ORDER BY hour;
@@ -50,6 +53,7 @@ SELECT
 FROM assets
 WHERE
     is_deleted = false
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR repository_id = sqlc.narg('repository_id'))
     AND (taken_time IS NOT NULL OR upload_time IS NOT NULL)
 GROUP BY month
 ORDER BY month DESC
@@ -63,9 +67,10 @@ SELECT
 FROM assets
 WHERE
     is_deleted = false
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR repository_id = sqlc.narg('repository_id'))
     AND (taken_time IS NOT NULL OR upload_time IS NOT NULL)
-    AND COALESCE(taken_time, upload_time) >= $1
-    AND COALESCE(taken_time, upload_time) <= $2
+    AND COALESCE(taken_time, upload_time) >= sqlc.arg('start_time')
+    AND COALESCE(taken_time, upload_time) <= sqlc.arg('end_time')
 GROUP BY date
 ORDER BY date;
 
@@ -76,5 +81,6 @@ SELECT DISTINCT
 FROM assets
 WHERE
     is_deleted = false
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR repository_id = sqlc.narg('repository_id'))
     AND (taken_time IS NOT NULL OR upload_time IS NOT NULL)
 ORDER BY year DESC;

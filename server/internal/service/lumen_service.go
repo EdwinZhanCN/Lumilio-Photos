@@ -15,6 +15,7 @@ import (
 // LumenService interface defines the contract for Lumen AI operations
 type LumenService interface {
 	ClipTextEmbed(ctx context.Context, text []byte) (*types.EmbeddingV1, error)
+	ClipTextEmbedFast(ctx context.Context, text []byte) (*types.EmbeddingV1, error)
 	ClipImageEmbed(ctx context.Context, imageData []byte) (*types.EmbeddingV1, error)
 	BioClipClassify(ctx context.Context, imageData []byte, topK int) ([]types.Label, error)
 	FaceDetectEmbed(ctx context.Context, imageData []byte) (*types.FaceV1, error)
@@ -69,6 +70,14 @@ func (s *lumenService) Close() error {
 
 // ClipTextEmbed generates CLIP embeddings for the given image data using the specified model.
 func (s *lumenService) ClipTextEmbed(ctx context.Context, text []byte) (*types.EmbeddingV1, error) {
+	return s.clipTextEmbedWithRetry(ctx, text, 5*time.Second, 3)
+}
+
+func (s *lumenService) ClipTextEmbedFast(ctx context.Context, text []byte) (*types.EmbeddingV1, error) {
+	return s.clipTextEmbedWithRetry(ctx, text, 750*time.Millisecond, 0)
+}
+
+func (s *lumenService) clipTextEmbedWithRetry(ctx context.Context, text []byte, maxWait time.Duration, maxRetries int) (*types.EmbeddingV1, error) {
 	embedReq, err := types.NewEmbeddingRequest(text)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create text embedding request: %w", err)
@@ -79,8 +88,8 @@ func (s *lumenService) ClipTextEmbed(ctx context.Context, text []byte) (*types.E
 		Build()
 
 	resp, err := s.lumenClient.InferWithRetry(ctx, req,
-		client.WithMaxWaitTime(5*time.Second),
-		client.WithMaxRetries(3))
+		client.WithMaxWaitTime(maxWait),
+		client.WithMaxRetries(maxRetries))
 	if err != nil {
 		return nil, fmt.Errorf("failed to infer embedding: %w", err)
 	}

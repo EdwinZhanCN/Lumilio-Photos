@@ -17,6 +17,7 @@ func New(dbpool *pgxpool.Pool, workers *river.Workers) (*river.Client[pgx.Tx], e
 		"thumbnail_asset": {MaxWorkers: runtime.NumCPU() / 2},
 		"transcode_asset": {MaxWorkers: 1},
 		"retry_asset":     {MaxWorkers: 2},
+		"reindex_assets":  {MaxWorkers: 1},
 		"process_clip":    {MaxWorkers: 2},
 		"process_ocr":     {MaxWorkers: 3},
 		"process_caption": {MaxWorkers: 1},

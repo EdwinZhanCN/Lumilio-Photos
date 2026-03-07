@@ -6,7 +6,6 @@ export interface UISlice {
   setCurrentTab: (tab: TabType) => void;
   setGroupBy: (groupBy: GroupByType) => void;
   setSearchQuery: (query: string) => void;
-  setSearchMode: (mode: "filename" | "semantic") => void;
   setCarouselOpen: (isOpen: boolean) => void;
   setActiveAssetId: (assetId: string | undefined) => void;
   hydrateUIFromURL: (
@@ -24,7 +23,6 @@ export const createUISlice: StateCreator<
     currentTab: "photos",
     groupBy: "date",
     searchQuery: "",
-    searchMode: "filename",
     isCarouselOpen: false,
     activeAssetId: undefined,
   },
@@ -42,11 +40,6 @@ export const createUISlice: StateCreator<
   setSearchQuery: (query) =>
     set((state) => {
       state.ui.searchQuery = query;
-    }),
-
-  setSearchMode: (mode) =>
-    set((state) => {
-      state.ui.searchMode = mode;
     }),
 
   setCarouselOpen: (isOpen) =>

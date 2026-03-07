@@ -18,6 +18,7 @@ const baseState: SettingsState = {
   ui: {
     language: "en",
     region: "other",
+    working_repository_id: undefined,
     asset_page: { layout: "full" },
     upload: {
       max_total_files: 100,
@@ -65,6 +66,7 @@ describe("settings.persistence", () => {
     const state = resolveInitialSettingsState(baseState);
 
     expect(state.ui.region).toBe("other");
+    expect(state.ui.working_repository_id).toBeUndefined();
     expect(state.ui.upload?.max_total_files).toBe(100);
     expect(state.ui.upload?.use_server_config).toBe(true);
     expect(state.server.update_timespan).toBe(5);
@@ -77,6 +79,7 @@ describe("settings.persistence", () => {
         ui: {
           language: "zh",
           region: "china",
+          working_repository_id: "550e8400-e29b-41d4-a716-446655440000",
           upload: {
             max_total_files: 999,
             low_power_mode: false,
@@ -92,6 +95,9 @@ describe("settings.persistence", () => {
     const state = resolveInitialSettingsState(baseState);
     expect(state.ui.language).toBe("zh");
     expect(state.ui.region).toBe("china");
+    expect(state.ui.working_repository_id).toBe(
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
     expect(state.ui.upload?.max_total_files).toBe(500);
     expect(state.ui.upload?.chunk_size_mb).toBe(1);
     expect(state.ui.upload?.max_concurrent_chunks).toBe(6);
@@ -112,6 +118,7 @@ describe("settings.persistence", () => {
 
     const state = resolveInitialSettingsState(baseState);
     expect(state.ui.region).toBe("other");
+    expect(state.ui.working_repository_id).toBeUndefined();
     expect(state.server.update_timespan).toBe(5);
   });
 
@@ -123,6 +130,7 @@ describe("settings.persistence", () => {
       ui: {
         ...state.ui,
         region: "china" as const,
+        working_repository_id: "550e8400-e29b-41d4-a716-446655440000",
       },
     };
 
@@ -135,5 +143,8 @@ describe("settings.persistence", () => {
     expect(parsed.version).toBe(SETTINGS_STORAGE_VERSION);
     expect(parsed.data.server.update_timespan).toBe(7.5);
     expect(parsed.data.ui.region).toBe("china");
+    expect(parsed.data.ui.working_repository_id).toBe(
+      "550e8400-e29b-41d4-a716-446655440000",
+    );
   });
 });

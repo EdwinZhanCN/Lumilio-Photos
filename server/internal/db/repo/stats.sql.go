@@ -17,13 +17,14 @@ SELECT DISTINCT
 FROM assets
 WHERE
     is_deleted = false
+    AND ($1::uuid IS NULL OR repository_id = $1)
     AND (taken_time IS NOT NULL OR upload_time IS NOT NULL)
 ORDER BY year DESC
 `
 
 // 获取所有有照片的年份列表
-func (q *Queries) GetAvailableYears(ctx context.Context) ([]int32, error) {
-	rows, err := q.db.Query(ctx, getAvailableYears)
+func (q *Queries) GetAvailableYears(ctx context.Context, repositoryID pgtype.UUID) ([]int32, error) {
+	rows, err := q.db.Query(ctx, getAvailableYears, repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -50,14 +51,20 @@ SELECT
 FROM assets
 WHERE
     is_deleted = false
+    AND ($1::uuid IS NULL OR repository_id = $1)
     AND specific_metadata->>'camera_model' IS NOT NULL
     AND specific_metadata->>'camera_model' != ''
     AND specific_metadata->>'lens_model' IS NOT NULL
     AND specific_metadata->>'lens_model' != ''
 GROUP BY camera_model, lens_model
 ORDER BY count DESC
-LIMIT $1
+LIMIT $2
 `
+
+type GetCameraLensStatsParams struct {
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	Limit        int32       `db:"limit" json:"limit"`
+}
 
 type GetCameraLensStatsRow struct {
 	CameraModel interface{} `db:"camera_model" json:"camera_model"`
@@ -66,8 +73,8 @@ type GetCameraLensStatsRow struct {
 }
 
 // 获取相机+镜头组合统计
-func (q *Queries) GetCameraLensStats(ctx context.Context, limit int32) ([]GetCameraLensStatsRow, error) {
-	rows, err := q.db.Query(ctx, getCameraLensStats, limit)
+func (q *Queries) GetCameraLensStats(ctx context.Context, arg GetCameraLensStatsParams) ([]GetCameraLensStatsRow, error) {
+	rows, err := q.db.Query(ctx, getCameraLensStats, arg.RepositoryID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -93,16 +100,18 @@ SELECT
 FROM assets
 WHERE
     is_deleted = false
+    AND ($1::uuid IS NULL OR repository_id = $1)
     AND (taken_time IS NOT NULL OR upload_time IS NOT NULL)
-    AND COALESCE(taken_time, upload_time) >= $1
-    AND COALESCE(taken_time, upload_time) <= $2
+    AND COALESCE(taken_time, upload_time) >= $2
+    AND COALESCE(taken_time, upload_time) <= $3
 GROUP BY date
 ORDER BY date
 `
 
 type GetDailyActivityHeatmapParams struct {
-	TakenTime   pgtype.Timestamptz `db:"taken_time" json:"taken_time"`
-	TakenTime_2 pgtype.Timestamptz `db:"taken_time_2" json:"taken_time_2"`
+	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	StartTime    pgtype.Timestamptz `db:"start_time" json:"start_time"`
+	EndTime      pgtype.Timestamptz `db:"end_time" json:"end_time"`
 }
 
 type GetDailyActivityHeatmapRow struct {
@@ -112,7 +121,7 @@ type GetDailyActivityHeatmapRow struct {
 
 // 获取每日拍摄活跃度热力图数据
 func (q *Queries) GetDailyActivityHeatmap(ctx context.Context, arg GetDailyActivityHeatmapParams) ([]GetDailyActivityHeatmapRow, error) {
-	rows, err := q.db.Query(ctx, getDailyActivityHeatmap, arg.TakenTime, arg.TakenTime_2)
+	rows, err := q.db.Query(ctx, getDailyActivityHeatmap, arg.RepositoryID, arg.StartTime, arg.EndTime)
 	if err != nil {
 		return nil, err
 	}
@@ -138,6 +147,7 @@ SELECT
 FROM assets
 WHERE
     is_deleted = false
+    AND ($1::uuid IS NULL OR repository_id = $1)
     AND specific_metadata->>'focal_length' IS NOT NULL
     AND specific_metadata->>'focal_length' != ''
     AND (specific_metadata->>'focal_length')::numeric > 0
@@ -152,8 +162,8 @@ type GetFocalLengthDistributionRow struct {
 }
 
 // 获取焦距分布统计
-func (q *Queries) GetFocalLengthDistribution(ctx context.Context) ([]GetFocalLengthDistributionRow, error) {
-	rows, err := q.db.Query(ctx, getFocalLengthDistribution)
+func (q *Queries) GetFocalLengthDistribution(ctx context.Context, repositoryID pgtype.UUID) ([]GetFocalLengthDistributionRow, error) {
+	rows, err := q.db.Query(ctx, getFocalLengthDistribution, repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +189,7 @@ SELECT
 FROM assets
 WHERE
     is_deleted = false
+    AND ($1::uuid IS NULL OR repository_id = $1)
     AND (taken_time IS NOT NULL OR upload_time IS NOT NULL)
 GROUP BY hour
 ORDER BY hour
@@ -190,8 +201,8 @@ type GetTimeDistributionHourlyRow struct {
 }
 
 // 获取按小时的拍摄时间分布
-func (q *Queries) GetTimeDistributionHourly(ctx context.Context) ([]GetTimeDistributionHourlyRow, error) {
-	rows, err := q.db.Query(ctx, getTimeDistributionHourly)
+func (q *Queries) GetTimeDistributionHourly(ctx context.Context, repositoryID pgtype.UUID) ([]GetTimeDistributionHourlyRow, error) {
+	rows, err := q.db.Query(ctx, getTimeDistributionHourly, repositoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +228,7 @@ SELECT
 FROM assets
 WHERE
     is_deleted = false
+    AND ($1::uuid IS NULL OR repository_id = $1)
     AND (taken_time IS NOT NULL OR upload_time IS NOT NULL)
 GROUP BY month
 ORDER BY month DESC
@@ -229,8 +241,8 @@ type GetTimeDistributionMonthlyRow struct {
 }
 
 // 获取按月的拍摄时间分布
-func (q *Queries) GetTimeDistributionMonthly(ctx context.Context) ([]GetTimeDistributionMonthlyRow, error) {
-	rows, err := q.db.Query(ctx, getTimeDistributionMonthly)
+func (q *Queries) GetTimeDistributionMonthly(ctx context.Context, repositoryID pgtype.UUID) ([]GetTimeDistributionMonthlyRow, error) {
+	rows, err := q.db.Query(ctx, getTimeDistributionMonthly, repositoryID)
 	if err != nil {
 		return nil, err
 	}

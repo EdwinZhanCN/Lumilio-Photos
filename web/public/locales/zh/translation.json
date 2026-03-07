@@ -9,6 +9,12 @@
             "open": "打开 Lumilio Agent",
             "disabled": "Lumilio Agent 已在服务器设置中禁用。"
         },
+        "repository": {
+            "label": "工作仓库",
+            "all": "全部仓库",
+            "primary": "主仓库",
+            "unavailable": "仓库选项暂时不可用"
+        },
         "theme": {
             "light": "浅色",
             "dark": "深色"
@@ -18,7 +24,11 @@
         "open": "搜索开启",
         "close": "搜索关闭",
         "placeholder": "搜索",
-        "placeholderai": "搜索：一只猫",
+        "placeholderai": "搜索照片、场景和文字...",
+        "topResults": "最佳结果",
+        "results": "结果",
+        "degraded": "最佳结果暂时不可用，已切换为常规结果。",
+        "error": "搜索暂时不可用，请稍后重试。",
         "option": {
             "semantic": "智能搜索",
             "filename": "文件名搜索"
@@ -560,7 +570,7 @@
             }
         },
         "aiSettings": {
-            "description": "管理 Lumilio Agent 和 ML 服务设置。",
+            "description": "管理 Lumilio Agent 和 AI 索引设置。",
             "saveSuccess": "设置已保存。",
             "saveError": "保存设置失败。",
             "validationSuccess": "LLM 配置验证成功。",
@@ -579,15 +589,46 @@
             "apiKeyConfigured": "已保存 API Key",
             "clearStoredKey": "清除已保存的 API Key",
             "validate": "验证连接",
-            "mlTitle": "ML 服务",
-            "mlDescription": "配置服务发现模式和手动任务开关。",
+            "mlTitle": "AI 索引",
+            "mlDescription": "这些设置决定新导入或重新处理资源时会运行哪些 AI 索引任务。语义运行时不可用时，搜索仍会自动回退到文件名匹配。",
             "autoMode": "自动发现",
-            "autoModeDescription": "使用已发现 ML 服务提供的全部能力。",
+            "autoModeDescription": "让新的索引任务跟随已连接 ML 服务当前可发现的运行时能力。",
             "manualMode": "手动选择",
-            "manualModeDescription": "仅使用下方启用的任务类型。",
-            "tasksTitle": "任务选择",
-            "tasksDescription": "自动发现关闭时，选择要启用的 ML 任务。",
-            "autoOverrideHint": "自动发现模式会启用所有已发现任务。",
+            "manualModeDescription": "明确选择导入或重新处理资源时要运行的索引任务。",
+            "tasksTitle": "索引任务",
+            "tasksDescription": "这些开关控制索引生产策略，不是用户可见的搜索模式。",
+            "autoOverrideHint": "自动发现模式会跟随下方当前可用的运行时任务。",
+            "runtimeTitle": "运行时状态",
+            "runtimeDescription": "当前后端对搜索和索引运行时的可见性。",
+            "runtimeUnavailable": "运行时状态暂时不可用，但仍可保存设置。",
+            "nodesSummary": "{{active}} 个活跃节点 / {{discovered}} 个已发现节点",
+            "searchRuntime": "语义搜索运行时",
+            "coverageTitle": "覆盖率与回填",
+            "coverageDescription": "覆盖率表示现有照片里已有多少资源完成了各类索引。重建索引只会为缺失索引的历史资源排入后台批任务。",
+            "photoTotalStatus": "现有照片",
+            "reindexJobsStatus": "待处理重建任务",
+            "queueMissingAssets": "为缺失资源排队",
+            "queueMissingAssetsPending": "正在排入重建任务...",
+            "queueMissingAssetsHint": "会按当前已保存的索引设置，为最多 {{limit}} 张缺失索引的照片排入后台任务。",
+            "repositoryScopeLabel": "仓库范围",
+            "repositoryScopeHint": "保留为全部仓库时，会对所有仓库统一排入回填批任务。",
+            "repositoryOptionsUnavailable": "仓库选项暂时不可用。",
+            "allRepositories": "全部仓库",
+            "reindexTasksLabel": "回填任务",
+            "reindexTasksAutoHint": "自动模式下可以为任意 ML 任务排队，运行时不可用的任务会由 worker 重试处理。",
+            "reindexTasksManualHint": "手动模式下只允许为当前已配置并已保存的任务排队。",
+            "selectAtLeastOneTask": "请至少选择一个索引任务后再排入回填。",
+            "saveBeforeReindexHint": "请先保存设置，再排入重建索引任务。",
+            "indexingStatsUnavailable": "索引覆盖率暂时不可用。",
+            "reindexQueuedSuccess": "已为历史照片排入重建索引批任务。",
+            "reindexQueuedError": "排入重建索引任务失败。",
+            "existingAssetsHint": "修改这些设置不会自动回填历史资源。已有照片需要单独重建索引后，新的 AI 任务才会生效。",
+            "configuredStatus": "配置状态",
+            "runtimeStatus": "索引运行时",
+            "queryRuntimeStatus": "查询运行时",
+            "coverageStatus": "覆盖率",
+            "coverageValue": "{{indexed}} / {{total}} 已建立索引（{{percent}}）",
+            "queuedJobsStatus": "队列任务",
             "providerOptions": {
                 "unset": "未设置",
                 "ark": "Ark",
@@ -596,13 +637,24 @@
                 "ollama": "Ollama"
             },
             "taskNames": {
-                "clip": "CLIP 图像嵌入",
+                "clip": "CLIP 嵌入",
                 "ocr": "OCR",
                 "caption": "VLM 描述",
                 "face": "人脸检测与嵌入"
+            },
+            "taskDescriptions": {
+                "clip": "生成视觉嵌入，用于最佳结果和后续语义匹配。",
+                "ocr": "提取图片中的文字，让搜索可以命中画面里的文本。",
+                "caption": "生成场景描述，为后续更丰富的搜索能力做准备。",
+                "face": "检测并嵌入人脸，用于人物聚类和未来的人物搜索。"
             }
         },
         "serverSettings": {
+            "workingRepositoryTitle": "工作仓库",
+            "workingRepositoryDescription": "选择支持仓库作用域的页面和操作默认使用哪个仓库。选择全部仓库时保持全局视图。",
+            "workingRepositoryLabel": "当前应用仓库",
+            "workingRepositoryHint": "素材、首页、地图、统计、上传和 ML 索引工具在支持仓库过滤时都会默认使用这个范围。",
+            "workingRepositoryUnavailable": "仓库选项暂时不可用。",
             "healthCheckInterval": "健康检查间隔",
             "healthCheckDescription": "控制应用程序检测服务器健康状态的频率。较低的数值会更频繁地更新，但可能增加网络使用量。",
             "presets": "预设值：",
@@ -637,6 +689,7 @@
             },
             "taskNames": {
                 "clipImageEmbed": "CLIP 图像嵌入",
+                "clipTextEmbed": "CLIP 文本嵌入",
                 "ocr": "OCR",
                 "vlmGenerate": "VLM 描述",
                 "faceDetectAndEmbed": "人脸检测与嵌入"
@@ -690,15 +743,31 @@
         "title": "服务器监控",
         "subtitles": {
             "queue": "实时任务队列监控",
+            "ml": "ML 索引覆盖率与回填进度",
             "capabilities": "ML 自动发现与 LLM Agent 运行状态"
         },
         "tabs": {
             "queue": "队列",
+            "ml": "ML",
             "capabilities": "能力"
         },
         "sections": {
             "activeQueues": "活跃队列",
             "recentJobs": "最近任务"
+        },
+        "ml": {
+            "loadError": "加载 ML 索引统计失败。",
+            "scopeHint": "选择某个仓库后，可只查看该图库的覆盖率。",
+            "existingPhotos": "现有照片",
+            "photoScope": "当前统计范围",
+            "queuedMlJobs": "待处理 ML 任务",
+            "taskWorkers": "任务 worker 队列",
+            "reindexJobs": "待处理重建任务",
+            "batchQueue": "后台回填批任务",
+            "coverageValue": "{{indexed}} / {{total}} 已建立索引（{{percent}}）",
+            "indexedAssets": "已索引",
+            "remainingAssets": "剩余",
+            "queuedJobs": "队列中"
         },
         "status": {
             "online": "在线",

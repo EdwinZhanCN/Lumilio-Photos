@@ -10,6 +10,12 @@
             "open": "Open Lumilio Agent",
             "disabled": "Lumilio Agent is disabled in server settings."
         },
+        "repository": {
+            "label": "Working repository",
+            "all": "All repositories",
+            "primary": "Primary",
+            "unavailable": "Repository options unavailable"
+        },
         "theme": {
             "light": "Light",
             "dark": "Dark"
@@ -19,7 +25,11 @@
         "open": "Search Open",
         "close": "Search Close",
         "placeholder": "Search",
-        "placeholderai": "Try Search: cat",
+        "placeholderai": "Search photos, scenes, and text...",
+        "topResults": "Top Results",
+        "results": "Results",
+        "degraded": "Top results are temporarily unavailable. Showing regular results instead.",
+        "error": "Search is temporarily unavailable. Try again in a moment.",
         "option": {
             "semantic": "AI Search",
             "filename": "Filname Search"
@@ -550,7 +560,7 @@
             }
         },
         "aiSettings": {
-            "description": "Manage the Lumilio Agent and ML service settings.",
+            "description": "Manage the Lumilio Agent and AI indexing settings.",
             "saveSuccess": "Settings saved.",
             "saveError": "Failed to save settings.",
             "validationSuccess": "LLM configuration validated successfully.",
@@ -569,15 +579,46 @@
             "apiKeyConfigured": "Stored API key",
             "clearStoredKey": "Clear stored API key",
             "validate": "Validate connection",
-            "mlTitle": "ML Services",
-            "mlDescription": "Configure service discovery mode and manual task toggles.",
+            "mlTitle": "AI Indexing",
+            "mlDescription": "These settings decide which AI indexing tasks run for new or reprocessed assets. Search still falls back to filename matching when semantic runtime is unavailable.",
             "autoMode": "Automatic discovery",
-            "autoModeDescription": "Use all capabilities discovered from available ML services.",
+            "autoModeDescription": "Follow the AI runtimes discovered from connected ML services for new indexing jobs.",
             "manualMode": "Manual selection",
-            "manualModeDescription": "Use only the task types enabled below.",
-            "tasksTitle": "Task selection",
-            "tasksDescription": "Choose which ML tasks are enabled when automatic discovery is disabled.",
-            "autoOverrideHint": "Automatic discovery enables all discovered tasks.",
+            "manualModeDescription": "Choose exactly which indexing tasks run when assets are imported or reprocessed.",
+            "tasksTitle": "Indexing tasks",
+            "tasksDescription": "These toggles control indexing production, not the search mode shown to users.",
+            "autoOverrideHint": "Automatic discovery uses the runtime tasks currently available below.",
+            "runtimeTitle": "Runtime status",
+            "runtimeDescription": "Current backend runtime visibility for search and indexing.",
+            "runtimeUnavailable": "Runtime status is temporarily unavailable. Saving settings is still available.",
+            "nodesSummary": "{{active}} active / {{discovered}} discovered nodes",
+            "searchRuntime": "Semantic search runtime",
+            "coverageTitle": "Coverage & backfill",
+            "coverageDescription": "Coverage tracks how many existing photos already have each index. Reindex queues a background batch for missing assets only.",
+            "photoTotalStatus": "Existing photos",
+            "reindexJobsStatus": "Queued reindex jobs",
+            "queueMissingAssets": "Queue missing assets",
+            "queueMissingAssetsPending": "Queueing reindex...",
+            "queueMissingAssetsHint": "Queues up to {{limit}} missing photos using the currently saved indexing settings.",
+            "repositoryScopeLabel": "Repository scope",
+            "repositoryScopeHint": "Leave this on All repositories to queue a global backfill batch.",
+            "repositoryOptionsUnavailable": "Repository options are temporarily unavailable.",
+            "allRepositories": "All repositories",
+            "reindexTasksLabel": "Tasks to backfill",
+            "reindexTasksAutoHint": "Auto mode can queue any ML task. Unavailable runtimes will be handled by worker retries.",
+            "reindexTasksManualHint": "Manual mode only allows tasks that are currently configured and saved.",
+            "selectAtLeastOneTask": "Select at least one indexing task before queueing reindex.",
+            "saveBeforeReindexHint": "Save settings before queueing a reindex batch.",
+            "indexingStatsUnavailable": "Indexing coverage is temporarily unavailable.",
+            "reindexQueuedSuccess": "Reindex batch queued for existing photos.",
+            "reindexQueuedError": "Failed to queue reindex batch.",
+            "existingAssetsHint": "Changing these settings does not backfill existing assets. Existing photos need a separate reindex pass to become searchable by new AI tasks.",
+            "configuredStatus": "Configured",
+            "runtimeStatus": "Indexing runtime",
+            "queryRuntimeStatus": "Query runtime",
+            "coverageStatus": "Coverage",
+            "coverageValue": "{{indexed}} / {{total}} indexed ({{percent}})",
+            "queuedJobsStatus": "Queued jobs",
             "providerOptions": {
                 "unset": "Not set",
                 "ark": "Ark",
@@ -586,13 +627,24 @@
                 "ollama": "Ollama"
             },
             "taskNames": {
-                "clip": "CLIP image embed",
+                "clip": "CLIP embeddings",
                 "ocr": "OCR",
                 "caption": "VLM caption",
                 "face": "Face detect & embed"
+            },
+            "taskDescriptions": {
+                "clip": "Generates visual embeddings used for Top Results and future semantic matching.",
+                "ocr": "Extracts text inside images so searches can match visible words.",
+                "caption": "Generates scene descriptions that can support richer search later.",
+                "face": "Detects and embeds faces for clustering and future people search."
             }
         },
         "serverSettings": {
+            "workingRepositoryTitle": "Working repository",
+            "workingRepositoryDescription": "Choose the default repository scope for repository-aware pages and actions. Select All repositories to keep global views.",
+            "workingRepositoryLabel": "Current application repository",
+            "workingRepositoryHint": "This scope is used by assets, home, map, stats, upload, and ML indexing tools when they support repository filtering.",
+            "workingRepositoryUnavailable": "Repository options are temporarily unavailable.",
             "healthCheckInterval": "Health check interval",
             "healthCheckDescription": "Control how often the app pings the server for health status. Lower values update more frequently but may increase network usage.",
             "presets": "Presets:",
@@ -627,6 +679,7 @@
             },
             "taskNames": {
                 "clipImageEmbed": "CLIP image embed",
+                "clipTextEmbed": "CLIP text embed",
                 "ocr": "OCR",
                 "vlmGenerate": "VLM caption",
                 "faceDetectAndEmbed": "Face detect & embed"
@@ -680,15 +733,31 @@
         "title": "Server Monitor",
         "subtitles": {
             "queue": "Real-time job queue monitoring",
+            "ml": "ML indexing coverage and reindex progress",
             "capabilities": "Runtime ML discovery and LLM agent status"
         },
         "tabs": {
             "queue": "Queue",
+            "ml": "ML",
             "capabilities": "Capabilities"
         },
         "sections": {
             "activeQueues": "Active Queues",
             "recentJobs": "Recent Jobs"
+        },
+        "ml": {
+            "loadError": "Failed to load ML indexing stats.",
+            "scopeHint": "Choose a repository to inspect coverage for that library only.",
+            "existingPhotos": "Existing photos",
+            "photoScope": "Current indexing scope",
+            "queuedMlJobs": "Queued ML jobs",
+            "taskWorkers": "Task worker queues",
+            "reindexJobs": "Queued reindex jobs",
+            "batchQueue": "Background backfill batches",
+            "coverageValue": "{{indexed}} / {{total}} indexed ({{percent}})",
+            "indexedAssets": "Indexed",
+            "remainingAssets": "Remaining",
+            "queuedJobs": "Queued"
         },
         "status": {
             "online": "Online",

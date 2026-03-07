@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { useSettingsContext } from "@/features/settings";
+import { useSettingsContext, useWorkingRepository } from "@/features/settings";
 import {
   HashcodeProgress,
   useGenerateHashcode,
@@ -68,6 +68,7 @@ export function useUploadProcess(): useUploadProcessReturn {
   const queryClient = useQueryClient();
   const showMessage = useMessage();
   const { state: settings } = useSettingsContext();
+  const { scopedRepositoryId } = useWorkingRepository();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [fileProgress, setFileProgress] = useState<FileUploadProgress[]>([]);
@@ -205,6 +206,7 @@ export function useUploadProcess(): useUploadProcessReturn {
             file: s.file,
             sessionId: s.sessionId,
           })),
+          repositoryId: scopedRepositoryId,
           options: {
             onUploadProgress: (e) => {
               const p = e.total ? Math.round((e.loaded * 100) / e.total) : 0;
@@ -255,6 +257,7 @@ export function useUploadProcess(): useUploadProcessReturn {
           file: session.file,
           sessionId: session.sessionId,
           hash: session.hash,
+          repositoryId: scopedRepositoryId,
           onProgress: (p) => {
             setUploadProgress(p);
             updateFileProgress(session.file.name, { progress: p });

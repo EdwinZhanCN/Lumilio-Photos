@@ -1,6 +1,7 @@
 export interface UISettings {
   language?: "en" | "zh";
   region?: "china" | "other";
+  working_repository_id?: string;
   asset_page?: {
     layout: "compact" | "wide" | "full";
   };
@@ -27,6 +28,7 @@ export type SettingsAction =
   | { type: "SET_ASSETS_LAYOUT"; payload: "compact" | "wide" | "full" }
   | { type: "SET_LANGUAGE"; payload: "en" | "zh" }
   | { type: "SET_REGION"; payload: "china" | "other" }
+  | { type: "SET_WORKING_REPOSITORY_ID"; payload: string | null }
   // Upload Actions
   | { type: "SET_UPLOAD_MAX_TOTAL_FILES"; payload: number }
   | { type: "SET_UPLOAD_LOW_POWER_MODE"; payload: boolean }

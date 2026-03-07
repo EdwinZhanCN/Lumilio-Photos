@@ -26,10 +26,14 @@ type AssetControllerInterface interface {
 	GetAssetThumbnail(c *gin.Context)
 
 	// New filtering and search operations
-	QueryAssets(c *gin.Context)       // POST /assets/list - Unified asset listing, filtering, and search
-	GetFilterOptions(c *gin.Context)  // GET /assets/filter-options - Get available filter options
-	GetFeaturedAssets(c *gin.Context) // GET /assets/featured - Curated featured photos for home/gallery
-	GetPhotoMapPoints(c *gin.Context) // GET /assets/map-points - Lightweight photo map points with GPS
+	QueryAssets(c *gin.Context)              // POST /assets/list - Unified asset listing, filtering, and search
+	SearchAssets(c *gin.Context)             // POST /assets/search - Sectioned search with top results and fallback results
+	ListIndexingRepositories(c *gin.Context) // GET /assets/indexing/repositories - List repositories for indexing filters
+	GetIndexingStats(c *gin.Context)         // GET /assets/indexing/stats - Index coverage and queue status
+	RebuildAssetIndexes(c *gin.Context)      // POST /assets/indexing/rebuild - Queue reindex backfill for existing assets
+	GetFilterOptions(c *gin.Context)         // GET /assets/filter-options - Get available filter options
+	GetFeaturedAssets(c *gin.Context)        // GET /assets/featured - Curated featured photos for home/gallery
+	GetPhotoMapPoints(c *gin.Context)        // GET /assets/map-points - Lightweight photo map points with GPS
 
 	// Rating management operations
 	UpdateAssetRating(c *gin.Context)        // PUT /assets/:id/rating - Update asset rating
@@ -164,7 +168,11 @@ func NewRouter(
 			assets.GET("/filter-options", assetController.GetFilterOptions)
 			assets.GET("/featured", assetController.GetFeaturedAssets)
 			assets.GET("/map-points", assetController.GetPhotoMapPoints)
+			assets.GET("/indexing/repositories", authController.AuthMiddleware(), assetController.ListIndexingRepositories)
+			assets.GET("/indexing/stats", authController.AuthMiddleware(), assetController.GetIndexingStats)
+			assets.POST("/indexing/rebuild", authController.AuthMiddleware(), assetController.RebuildAssetIndexes)
 			assets.POST("/list", assetController.QueryAssets)
+			assets.POST("/search", assetController.SearchAssets)
 			assets.POST("/batch", assetController.BatchUploadAssets)
 			assets.GET("/batch/config", assetController.GetUploadConfig)
 			assets.GET("/batch/progress", assetController.GetUploadProgress)

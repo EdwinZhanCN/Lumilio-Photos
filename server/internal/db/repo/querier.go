@@ -18,6 +18,7 @@ type Querier interface {
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
 	BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error
+	CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error)
 	CountAssetsByRating(ctx context.Context, ownerID *int32) ([]CountAssetsByRatingRow, error)
 	CountAssetsByStatus(ctx context.Context, status []byte) (int64, error)
 	CountAssetsByStatusAndOwner(ctx context.Context, arg CountAssetsByStatusAndOwnerParams) (int64, error)
@@ -30,6 +31,11 @@ type Querier interface {
 	CountAssetsVectorUnified(ctx context.Context, arg CountAssetsVectorUnifiedParams) (int64, error)
 	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
+	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountPhotoAssetsWithCaptions(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountPhotoAssetsWithEmbeddingType(ctx context.Context, arg CountPhotoAssetsWithEmbeddingTypeParams) (int64, error)
+	CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	// Count query matching GetPhotoMapPoints.
 	CountPhotoMapPoints(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
@@ -68,9 +74,13 @@ type Querier interface {
 	FilterAlbumAssets(ctx context.Context, arg FilterAlbumAssetsParams) ([]Asset, error)
 	FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]Asset, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
+	GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAssetCountScopedParams) (int64, error)
 	GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error)
+	GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsScopedParams) ([]GetAlbumAssetsScopedRow, error)
 	GetAlbumByID(ctx context.Context, albumID int32) (Album, error)
+	GetAlbumByIDScoped(ctx context.Context, arg GetAlbumByIDScopedParams) (GetAlbumByIDScopedRow, error)
 	GetAlbumsByUser(ctx context.Context, arg GetAlbumsByUserParams) ([]Album, error)
+	GetAlbumsByUserScoped(ctx context.Context, arg GetAlbumsByUserScopedParams) ([]GetAlbumsByUserScopedRow, error)
 	GetAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) ([]GetAllEmbeddingsForAssetRow, error)
 	GetAllFaceClusters(ctx context.Context) ([]FaceCluster, error)
 	GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]GetAssetAlbumsRow, error)
@@ -104,9 +114,9 @@ type Querier interface {
 	GetAssetsWithErrors(ctx context.Context, arg GetAssetsWithErrorsParams) ([]Asset, error)
 	GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWarningsParams) ([]Asset, error)
 	// 获取所有有照片的年份列表
-	GetAvailableYears(ctx context.Context) ([]int32, error)
+	GetAvailableYears(ctx context.Context, repositoryID pgtype.UUID) ([]int32, error)
 	// 获取相机+镜头组合统计
-	GetCameraLensStats(ctx context.Context, limit int32) ([]GetCameraLensStatsRow, error)
+	GetCameraLensStats(ctx context.Context, arg GetCameraLensStatsParams) ([]GetCameraLensStatsRow, error)
 	GetCaptionByAsset(ctx context.Context, assetID pgtype.UUID) (Caption, error)
 	GetCaptionStatsByModel(ctx context.Context) ([]GetCaptionStatsByModelRow, error)
 	GetCaptionsByModel(ctx context.Context, arg GetCaptionsByModelParams) ([]Caption, error)
@@ -134,7 +144,7 @@ type Querier interface {
 	GetFaceStatsByModel(ctx context.Context) ([]GetFaceStatsByModelRow, error)
 	GetFacesByExpression(ctx context.Context, arg GetFacesByExpressionParams) ([]FaceItem, error)
 	// 获取焦距分布统计
-	GetFocalLengthDistribution(ctx context.Context) ([]GetFocalLengthDistributionRow, error)
+	GetFocalLengthDistribution(ctx context.Context, repositoryID pgtype.UUID) ([]GetFocalLengthDistributionRow, error)
 	GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
@@ -166,9 +176,9 @@ type Querier interface {
 	GetThumbnailByID(ctx context.Context, thumbnailID int32) (Thumbnail, error)
 	GetThumbnailsByAsset(ctx context.Context, assetID pgtype.UUID) ([]Thumbnail, error)
 	// 获取按小时的拍摄时间分布
-	GetTimeDistributionHourly(ctx context.Context) ([]GetTimeDistributionHourlyRow, error)
+	GetTimeDistributionHourly(ctx context.Context, repositoryID pgtype.UUID) ([]GetTimeDistributionHourlyRow, error)
 	// 获取按月的拍摄时间分布
-	GetTimeDistributionMonthly(ctx context.Context) ([]GetTimeDistributionMonthlyRow, error)
+	GetTimeDistributionMonthly(ctx context.Context, repositoryID pgtype.UUID) ([]GetTimeDistributionMonthlyRow, error)
 	GetTopCaptionsByTokens(ctx context.Context, limit int32) ([]Caption, error)
 	GetTopFacesByQuality(ctx context.Context, arg GetTopFacesByQualityParams) ([]FaceItem, error)
 	GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsParams) ([]Asset, error)
@@ -180,6 +190,11 @@ type Querier interface {
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
 	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
+	ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error)
+	ListPhotoAssetsMissingCaptions(ctx context.Context, arg ListPhotoAssetsMissingCaptionsParams) ([]Asset, error)
+	ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg ListPhotoAssetsMissingEmbeddingTypeParams) ([]Asset, error)
+	ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error)
+	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
