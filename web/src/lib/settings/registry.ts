@@ -1,6 +1,6 @@
 export const SETTINGS_STORAGE_KEY = "app_settings";
 export const LEGACY_SETTINGS_STORAGE_KEY = "app_settings_v1";
-export const SETTINGS_STORAGE_VERSION = 3 as const;
+export const SETTINGS_STORAGE_VERSION = 5 as const;
 
 export const THEME_STORAGE_KEY = "lumilio.settings.theme";
 export const THEME_STORAGE_VERSION = 1 as const;
@@ -43,6 +43,30 @@ export const SETTINGS_REGISTRY: readonly SettingRegistryEntry[] = [
     precedence: ["user local setting", "other"],
   },
   {
+    path: "ui.theme.mode",
+    truthSource: "web_local_preference",
+    description: "Navbar appearance mode preference",
+    precedence: ["user local setting", "light"],
+  },
+  {
+    path: "ui.theme.followSystem",
+    truthSource: "web_local_preference",
+    description: "Whether theme mode follows the operating system preference",
+    precedence: ["user local setting", "true"],
+  },
+  {
+    path: "ui.theme.themes.light",
+    truthSource: "web_local_preference",
+    description: "Concrete daisyUI theme used while light mode is active",
+    precedence: ["user local setting", "light"],
+  },
+  {
+    path: "ui.theme.themes.dark",
+    truthSource: "web_local_preference",
+    description: "Concrete daisyUI theme used while dark mode is active",
+    precedence: ["user local setting", "night"],
+  },
+  {
     path: "ui.working_repository_id",
     truthSource: "web_local_preference",
     description: "Current working repository scope for repository-aware views",
@@ -53,6 +77,12 @@ export const SETTINGS_REGISTRY: readonly SettingRegistryEntry[] = [
     truthSource: "web_local_preference",
     description: "Asset page layout preference",
     precedence: ["user local setting", "full"],
+  },
+  {
+    path: "ui.asset_page.columns",
+    truthSource: "web_local_preference",
+    description: "Square asset page layout column count",
+    precedence: ["user local setting", "6"],
   },
   {
     path: "ui.upload.max_total_files",
@@ -103,7 +133,6 @@ export const SETTINGS_REGISTRY: readonly SettingRegistryEntry[] = [
 
 export type LocalSettingsOwner =
   | "settings_provider"
-  | "theme_preference"
   | "performance_preferences"
   | "assets_provider";
 
@@ -123,13 +152,6 @@ export const LOCAL_STORAGE_REGISTRY: readonly LocalStorageRegistryEntry[] = [
     owner: "settings_provider",
     legacyKeys: [LEGACY_SETTINGS_STORAGE_KEY],
     description: "App-level settings state",
-  },
-  {
-    key: THEME_STORAGE_KEY,
-    version: THEME_STORAGE_VERSION,
-    owner: "theme_preference",
-    legacyKeys: [LEGACY_THEME_STORAGE_KEY],
-    description: "Navbar theme preference",
   },
   {
     key: PERFORMANCE_PREFERENCES_STORAGE_KEY,
