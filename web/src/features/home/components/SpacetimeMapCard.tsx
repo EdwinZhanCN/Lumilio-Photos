@@ -29,6 +29,10 @@ export interface SpacetimeMapCardProps {
    */
   points?: MapPhotoPoint[];
   /**
+   * Navigate to the corresponding asset when a single point is clicked.
+   */
+  onPointClick?: (assetId: string) => void;
+  /**
    * Outer card className.
    */
   className?: string;
@@ -54,6 +58,7 @@ const SpacetimeMapCard: React.FC<SpacetimeMapCardProps> = ({
   icon,
   headerRight,
   points = [],
+  onPointClick,
   className = "",
   aspect = "aspect-[16/9]",
   style,
@@ -63,7 +68,7 @@ const SpacetimeMapCard: React.FC<SpacetimeMapCardProps> = ({
       className={`card bg-base-100 shadow-xl overflow-hidden ${className}`}
       style={style}
     >
-      <div className="card-body p-0">
+      <div>
         <div className="flex items-center justify-between bg-base-200 p-4">
           <div className="flex items-center gap-3">
             <div className="text-primary">
@@ -82,7 +87,13 @@ const SpacetimeMapCard: React.FC<SpacetimeMapCardProps> = ({
         </div>
 
         <div className={aspect}>
-          <PhotoMapView points={points} showViewToggle={false} height="100%" />
+          <PhotoMapView
+            points={points}
+            onPointClick={onPointClick}
+            showViewToggle={false}
+            height="100%"
+            mapRounded={false}
+          />
         </div>
       </div>
     </section>

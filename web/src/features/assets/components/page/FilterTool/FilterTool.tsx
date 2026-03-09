@@ -3,7 +3,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
 
-
 /* =========================
    Types
    ========================= */
@@ -39,8 +38,6 @@ export interface FilterDTO {
   // Extended field to represent spatial filtering
   location?: LocationBBox;
 }
-
-
 
 type FilterToolProps = {
   initial?: FilterDTO;
@@ -129,10 +126,7 @@ function useFilterOptions({
 
   useEffect(() => {
     const shouldFetch =
-      open &&
-      !hasLoaded &&
-      needsOptions &&
-      canUseCustomFetchers;
+      open && !hasLoaded && needsOptions && canUseCustomFetchers;
     if (!shouldFetch) return;
 
     let running = true;
@@ -219,7 +213,9 @@ const SectionShell = memo(function SectionShell({
       <div className="flex items-center justify-between">
         <span className="label-text font-medium">{title}</span>
         <label className="label cursor-pointer p-0 gap-2">
-          <span className="label-text">{t("assets.filterTool.sectionShell.enable")}</span>
+          <span className="label-text">
+            {t("assets.filterTool.sectionShell.enable")}
+          </span>
           <input
             type="checkbox"
             className="toggle toggle-primary"
@@ -404,10 +400,18 @@ const FilenameSection = memo(function FilenameSection({
           value={operator}
           onChange={(e) => onOperatorChange(e.target.value as FilenameOperator)}
         >
-          <option value="contains">{t("assets.filterTool.filenameSection.contains")}</option>
-          <option value="matches">{t("assets.filterTool.filenameSection.matches")}</option>
-          <option value="starts_with">{t("assets.filterTool.filenameSection.starts_with")}</option>
-          <option value="ends_with">{t("assets.filterTool.filenameSection.ends_with")}</option>
+          <option value="contains">
+            {t("assets.filterTool.filenameSection.contains")}
+          </option>
+          <option value="matches">
+            {t("assets.filterTool.filenameSection.matches")}
+          </option>
+          <option value="starts_with">
+            {t("assets.filterTool.filenameSection.starts_with")}
+          </option>
+          <option value="ends_with">
+            {t("assets.filterTool.filenameSection.ends_with")}
+          </option>
         </select>
         <input
           type="text"
@@ -449,7 +453,9 @@ const DateSection = memo(function DateSection({
     >
       <div className="flex gap-2">
         <label className="input input-bordered input-xs flex-1 flex items-center gap-2">
-          <span className="text-xs opacity-70">{t("assets.filterTool.dateSection.from")}</span>
+          <span className="text-xs opacity-70">
+            {t("assets.filterTool.dateSection.from")}
+          </span>
           <input
             type="date"
             className="grow text-xs"
@@ -459,7 +465,9 @@ const DateSection = memo(function DateSection({
           />
         </label>
         <label className="input input-bordered input-xs flex-1 flex items-center gap-2">
-          <span className="text-xs opacity-70">{t("assets.filterTool.dateSection.to")}</span>
+          <span className="text-xs opacity-70">
+            {t("assets.filterTool.dateSection.to")}
+          </span>
           <input
             type="date"
             className="grow text-xs"
@@ -523,7 +531,9 @@ const LocationSection = memo(function LocationSection({
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder={t("assets.filterTool.locationSection.north_placeholder")}
+              placeholder={t(
+                "assets.filterTool.locationSection.north_placeholder",
+              )}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.north}
@@ -534,7 +544,9 @@ const LocationSection = memo(function LocationSection({
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder={t("assets.filterTool.locationSection.south_placeholder")}
+              placeholder={t(
+                "assets.filterTool.locationSection.south_placeholder",
+              )}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.south}
@@ -547,7 +559,9 @@ const LocationSection = memo(function LocationSection({
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder={t("assets.filterTool.locationSection.east_placeholder")}
+              placeholder={t(
+                "assets.filterTool.locationSection.east_placeholder",
+              )}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.east}
@@ -558,7 +572,9 @@ const LocationSection = memo(function LocationSection({
             <input
               type="number"
               className="input input-bordered input-xs w-1/2"
-              placeholder={t("assets.filterTool.locationSection.west_placeholder")}
+              placeholder={t(
+                "assets.filterTool.locationSection.west_placeholder",
+              )}
               step="0.000001"
               disabled={filterDisabled || !enabled}
               value={bbox.west}
@@ -592,14 +608,18 @@ const LocationSection = memo(function LocationSection({
       {mapModalOpen && (
         <dialog className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg">{t("assets.filterTool.locationSection.modal_title")}</h3>
+            <h3 className="font-bold text-lg">
+              {t("assets.filterTool.locationSection.modal_title")}
+            </h3>
             <p className="py-2 text-sm opacity-80">
               {t("assets.filterTool.locationSection.modal_description")}
             </p>
 
             <div className="grid grid-cols-2 gap-2 mt-2">
               <label className="form-control">
-                <span className="label-text">{t("assets.filterTool.locationSection.center_lat")}</span>
+                <span className="label-text">
+                  {t("assets.filterTool.locationSection.center_lat")}
+                </span>
                 <input
                   type="number"
                   className="input input-bordered input-sm"
@@ -610,7 +630,9 @@ const LocationSection = memo(function LocationSection({
               </label>
 
               <label className="form-control">
-                <span className="label-text">{t("assets.filterTool.locationSection.center_lon")}</span>
+                <span className="label-text">
+                  {t("assets.filterTool.locationSection.center_lon")}
+                </span>
                 <input
                   type="number"
                   className="input input-bordered input-sm"
@@ -621,7 +643,9 @@ const LocationSection = memo(function LocationSection({
               </label>
 
               <label className="form-control col-span-2">
-                <span className="label-text">{t("assets.filterTool.locationSection.radius_km")}</span>
+                <span className="label-text">
+                  {t("assets.filterTool.locationSection.radius_km")}
+                </span>
                 <input
                   type="number"
                   className="input input-bordered input-sm"
@@ -651,7 +675,9 @@ const LocationSection = memo(function LocationSection({
             </div>
 
             <div className="mt-4">
-              <div className="text-sm opacity-70 mb-2">{t("assets.filterTool.locationSection.preview_map")}</div>
+              <div className="text-sm opacity-70 mb-2">
+                {t("assets.filterTool.locationSection.preview_map")}
+              </div>
               <div className="w-full h-48 rounded-box overflow-hidden border border-base-300">
                 <iframe
                   title="map"
@@ -701,7 +727,9 @@ const LocationSection = memo(function LocationSection({
             className="modal-backdrop"
             onClick={() => setMapModalOpen(false)}
           >
-            <button>{t("assets.filterTool.locationSection.close_modal")}</button>
+            <button>
+              {t("assets.filterTool.locationSection.close_modal")}
+            </button>
           </form>
         </dialog>
       )}
@@ -740,7 +768,9 @@ const CameraMakeSection = memo(function CameraMakeSection({
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
       >
-        <option value="">{t("assets.filterTool.cameraMakeSection.select_placeholder")}</option>
+        <option value="">
+          {t("assets.filterTool.cameraMakeSection.select_placeholder")}
+        </option>
         {items.map((item) => (
           <option key={item} value={item}>
             {item}
@@ -748,7 +778,9 @@ const CameraMakeSection = memo(function CameraMakeSection({
         ))}
       </select>
       {loading && (
-        <span className="text-xs opacity-70 mt-1 block">{t("assets.filterTool.cameraMakeSection.loading_options")}</span>
+        <span className="text-xs opacity-70 mt-1 block">
+          {t("assets.filterTool.cameraMakeSection.loading_options")}
+        </span>
       )}
     </SectionShell>
   );
@@ -785,7 +817,9 @@ const LensSection = memo(function LensSection({
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
       >
-        <option value="">{t("assets.filterTool.lensSection.select_placeholder")}</option>
+        <option value="">
+          {t("assets.filterTool.lensSection.select_placeholder")}
+        </option>
         {items.map((item) => (
           <option key={item} value={item}>
             {item}
@@ -793,7 +827,9 @@ const LensSection = memo(function LensSection({
         ))}
       </select>
       {loading && (
-        <span className="text-xs opacity-70 mt-1 block">{t("assets.filterTool.lensSection.loading_options")}</span>
+        <span className="text-xs opacity-70 mt-1 block">
+          {t("assets.filterTool.lensSection.loading_options")}
+        </span>
       )}
     </SectionShell>
   );
@@ -812,7 +848,6 @@ export default function FilterTool({
   fetchCameraMakes,
   fetchLenses,
 }: FilterToolProps) {
-
   const { t } = useI18n();
   // Dropdown open state (independent of filter enabled)
   const [open, setOpen] = useState(false);
@@ -828,7 +863,7 @@ export default function FilterTool({
   // Global filter enable/disable
   const [filterEnabled, setFilterEnabled] = useState<boolean>(
     !!initialStableRef.current &&
-    Object.keys(initialStableRef.current).length > 0,
+      Object.keys(initialStableRef.current).length > 0,
   );
 
   // RAW
@@ -1084,7 +1119,7 @@ export default function FilterTool({
 
   return (
     <div
-      className={`dropdown dropdown-start ${open ? "dropdown-open" : ""}`}
+      className={`dropdown dropdown-end ${open ? "dropdown-open" : ""}`}
       ref={rootRef}
     >
       <button
@@ -1106,12 +1141,20 @@ export default function FilterTool({
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span className="font-medium">{t("assets.filterTool.main.filters_header")}</span>
-            <span className="badge badge-ghost">{t("assets.filterTool.main.active_filters_count", { count: enabledCount })}</span>
+            <span className="font-medium">
+              {t("assets.filterTool.main.filters_header")}
+            </span>
+            <span className="badge badge-ghost">
+              {t("assets.filterTool.main.active_filters_count", {
+                count: enabledCount,
+              })}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <label className="label cursor-pointer p-0 gap-2">
-              <span className="label-text">{t("assets.filterTool.main.enable_toggle")}</span>
+              <span className="label-text">
+                {t("assets.filterTool.main.enable_toggle")}
+              </span>
               <input
                 type="checkbox"
                 className="toggle toggle-primary"
