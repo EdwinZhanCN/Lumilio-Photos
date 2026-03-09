@@ -290,9 +290,8 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 	if subClock != "" {
 		_ = m.saveClock(repository.Path, subClock)
 	}
-	log.Printf("✅ Watchman monitor subscribed repo=%s repo_id=%s watch=%s relative_root=%s clock=%s", repository.Name, repoID, wp.Watch, relativeRoot, subClock)
-
 	settle := time.Duration(maxInt(m.cfg.SettleSeconds, 1)) * time.Second
+	log.Printf("✅ Watchman monitor subscribed repo=%s repo_id=%s watch=%s relative_root=%s clock=%s", repository.Name, repoID, wp.Watch, relativeRoot, subClock)
 	pending := make(map[string]*pendingEntry)
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -301,6 +300,27 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 		pollTicker *time.Ticker
 		pollCh     <-chan time.Time
 	)
+	msgCh := make(chan watchman.Response, 1)
+	readErrCh := make(chan error, 1)
+
+	go func() {
+		for {
+			msg, err := client.ReadMessage(0)
+			if err != nil {
+				select {
+				case readErrCh <- err:
+				case <-ctx.Done():
+				}
+				return
+			}
+
+			select {
+			case msgCh <- msg:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	if m.cfg.PollFallbackSeconds > 0 {
 		snapshot, err = snapshotRepositoryFiles(repository.Path)
@@ -316,6 +336,8 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 		select {
 		case <-ctx.Done():
 			return nil
+		case err := <-readErrCh:
+			return err
 		case <-ticker.C:
 			m.flushPending(ctx, repository, pending, settle)
 		case <-pollCh:
@@ -335,15 +357,7 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 			}
 			log.Printf("ℹ️  Watchman poll fallback detected %d change(s) repo=%s", len(changes), repository.Name)
 			m.handleFileEvents(ctx, repository, pending, settle, changes)
-		default:
-			msg, err := client.ReadMessage(1 * time.Second)
-			if err != nil {
-				if watchman.IsTimeoutError(err) {
-					continue
-				}
-				return err
-			}
-
+		case msg := <-msgCh:
 			subName, _ := msg["subscription"].(string)
 			if subName == "" || subName != subscriptionName {
 				continue

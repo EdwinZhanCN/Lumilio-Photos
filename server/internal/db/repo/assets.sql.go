@@ -456,6 +456,10 @@ func (q *Queries) CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset
 const createThumbnail = `-- name: CreateThumbnail :one
 INSERT INTO thumbnails (asset_id, size, storage_path, mime_type)
 VALUES ($1, $2, $3, $4)
+ON CONFLICT (asset_id, size) DO UPDATE
+SET storage_path = EXCLUDED.storage_path,
+    mime_type = EXCLUDED.mime_type,
+    created_at = CURRENT_TIMESTAMP
 RETURNING thumbnail_id, asset_id, size, storage_path, mime_type, created_at
 `
 
