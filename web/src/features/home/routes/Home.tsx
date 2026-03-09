@@ -10,20 +10,9 @@ import StatsCards from "../components/StatsCards";
 import SpacetimeMapCard from "../components/SpacetimeMapCard";
 import InfoCard from "../components/InfoCard";
 import { useI18n } from "@/lib/i18n.tsx";
-import { isPhotoMetadata } from "@/lib/http-commons";
-import { assetUrls } from "@/lib/assets/assetUrls";
 import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
 import { useWorkingRepository } from "@/features/settings";
-
-const EMPTY_EXIF = {
-  camera: "-",
-  lens: "-",
-  aperture: "-",
-  shutter: "-",
-  focalLength: "-",
-  iso: "-",
-};
 
 function Home() {
   const { t } = useI18n();
@@ -46,7 +35,6 @@ function Home() {
 
   const {
     assets: featuredAssets,
-    isLoading,
     isError,
     error,
   } = useFeaturedPhotos({
@@ -64,7 +52,6 @@ function Home() {
     hasNextPage: mapHasNextPage,
   } = useMapPhotoAssets({ repositoryId: scopedRepositoryId });
 
-  const galleryItems = featuredAssets.length > 0 ? featuredAssets.length : 8;
   const mapSubtitle =
     isMapLoading && mapLoadedPhotos === 0
       ? "正在加载地图数据..."
@@ -78,10 +65,16 @@ function Home() {
         title={t("routes.home")}
         icon={<SparklesIcon className="w-6 h-6 text-primary" />}
       >
-        <div className="tabs tabs-boxed bg-base-200/60 rounded-lg p-1">
+        <div
+          role="tablist"
+          aria-label={t("routes.home")}
+          className="tabs tabs-box"
+        >
           <button
             type="button"
-            className={`tab tab-sm md:tab-md rounded-md gap-2 ${
+            role="tab"
+            aria-selected={displayMode === "gallery"}
+            className={`tab gap-2 ${
               displayMode === "gallery" ? "tab-active" : ""
             }`}
             onClick={() => setDisplayMode("gallery")}
@@ -91,7 +84,9 @@ function Home() {
           </button>
           <button
             type="button"
-            className={`tab tab-sm md:tab-md rounded-md gap-2 ${
+            role="tab"
+            aria-selected={displayMode === "stats"}
+            className={`tab gap-2 ${
               displayMode === "stats" ? "tab-active" : ""
             }`}
             onClick={() => setDisplayMode("stats")}
@@ -102,7 +97,7 @@ function Home() {
         </div>
       </PageHeader>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-8">
+      <div>
         {displayMode === "gallery" && (
           <div className="space-y-4">
             {isError && (
@@ -116,84 +111,31 @@ function Home() {
             )}
 
             <GalleryGrid
-              items={galleryItems}
-              titlePrefix={featuredAssets.length > 0 ? "精选照片" : "示例照片"}
-              getExif={(index) => {
-                const asset = featuredAssets[index];
-                if (
-                  !asset ||
-                  !isPhotoMetadata(asset.type, asset.specific_metadata)
-                ) {
-                  return EMPTY_EXIF;
-                }
-
-                const metadata = asset.specific_metadata;
-                return {
-                  camera: metadata.camera_model || EMPTY_EXIF.camera,
-                  lens: metadata.lens_model || EMPTY_EXIF.lens,
-                  aperture:
-                    typeof metadata.f_number === "number"
-                      ? metadata.f_number.toFixed(1)
-                      : EMPTY_EXIF.aperture,
-                  shutter: metadata.exposure_time || EMPTY_EXIF.shutter,
-                  focalLength:
-                    typeof metadata.focal_length === "number"
-                      ? `${Math.round(metadata.focal_length)}mm`
-                      : EMPTY_EXIF.focalLength,
-                  iso:
-                    typeof metadata.iso_speed === "number"
-                      ? metadata.iso_speed
-                      : EMPTY_EXIF.iso,
-                };
-              }}
-              renderItem={
-                featuredAssets.length > 0
-                  ? (index) => {
-                      const asset = featuredAssets[index];
-                      if (!asset?.asset_id) {
-                        return <div className="absolute inset-0 bg-base-300" />;
-                      }
-                      return (
-                        <img
-                          src={assetUrls.getThumbnailUrl(
-                            asset.asset_id,
-                            "medium",
-                          )}
-                          alt={
-                            asset.original_filename || `featured-${index + 1}`
-                          }
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      );
-                    }
-                  : undefined
-              }
-              onItemClick={(index) => {
-                const asset = featuredAssets[index];
+              assets={featuredAssets}
+              placeholderCount={8}
+              onItemClick={(asset) => {
                 if (!asset?.asset_id) return;
                 navigate(`/assets/photos/${asset.asset_id}?groupBy=date`);
               }}
             />
-
-            <div className="text-xs text-base-content/60 px-1">
-              {isLoading
-                ? "正在加载精选照片..."
-                : featuredAssets.length > 0
-                  ? `已展示 ${featuredAssets.length} 张照片`
-                  : "暂无可展示照片"}
-            </div>
           </div>
         )}
 
         {displayMode === "stats" && (
-          <div className="space-y-8 animate-fadeIn">
+          <div className="mx-4 mb-8 space-y-8 animate-fadeIn">
             <StatsCards repositoryId={scopedRepositoryId} />
             <InfoCard />
           </div>
         )}
 
-        <SpacetimeMapCard points={mapPoints} subtitle={mapSubtitle} />
+        <SpacetimeMapCard
+          points={mapPoints}
+          subtitle={mapSubtitle}
+          onPointClick={(assetId) => {
+            navigate(`/assets/photos/${assetId}?groupBy=date`);
+          }}
+          className="mx-4 mb-8"
+        />
       </div>
     </div>
   );

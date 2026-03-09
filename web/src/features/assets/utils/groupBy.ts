@@ -9,8 +9,8 @@ export const isGroupByType = (value: string | null): value is GroupByType => {
   );
 };
 
-export const getDefaultGroupBy = (layout?: string): GroupByType => {
-  return layout === "wide" ? "type" : "date";
+export const getDefaultGroupBy = (_layout?: string): GroupByType => {
+  return "date";
 };
 
 export const resolveGroupByFromUrl = (

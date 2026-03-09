@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
+import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
 import {
@@ -20,7 +21,10 @@ import {
   getFlatAssetsFromGrouped,
   findAssetIndex,
 } from "@/lib/utils/assetGrouping.ts";
+import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
+import { useSettingsContext } from "@/features/settings";
+import type { AssetGalleryProps } from "./gallery.types";
 
 export type AssetCategory = "photos" | "videos" | "audios";
 
@@ -32,6 +36,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
   const { assetId } = useParams<{ assetId: string }>();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { t } = useI18n();
+  const { state: settingsState } = useSettingsContext();
 
   // Selectors
   const groupBy = useGroupBy();
@@ -40,6 +45,10 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
   const { setGroupBy } = useUIActions();
   const isPhotoSearchActive =
     category === "photos" && searchQuery.trim().length > 0;
+  const currentLayout = settingsState.ui.asset_page?.layout ?? "full";
+  const compactColumns = settingsState.ui.asset_page?.columns ?? 6;
+  const GalleryComponent =
+    currentLayout === "compact" ? SquareGallery : JustifiedGallery;
 
   const {
     assets: allAssets,
@@ -58,6 +67,10 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     withGroups: false,
     groupBy,
   });
+  const [lastBrowseGroups, setLastBrowseGroups] = useState<Record<
+    string,
+    Asset[]
+  > | null>(null);
 
   const hasFetchedOnce = isFetched;
 
@@ -99,7 +112,50 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     return getFlatAssetsFromGrouped(finalGroupedAssets ?? {});
   }, [allAssets, finalGroupedAssets, isPhotoSearchActive]);
 
+  useEffect(() => {
+    if (
+      !isPhotoSearchActive &&
+      finalGroupedAssets &&
+      Object.keys(finalGroupedAssets).length > 0
+    ) {
+      setLastBrowseGroups(finalGroupedAssets);
+    }
+  }, [finalGroupedAssets, isPhotoSearchActive]);
+
+  const showSearchTransitionOverlay =
+    isPhotoSearchActive &&
+    isFetching &&
+    allAssets.length === 0 &&
+    lastBrowseGroups !== null &&
+    Object.keys(lastBrowseGroups).length > 0;
+
   const renderSearchSections = () => {
+    if (showSearchTransitionOverlay && lastBrowseGroups) {
+      return (
+        <div className="relative">
+          <GalleryComponent
+            groupedPhotos={lastBrowseGroups}
+            openCarousel={openCarousel}
+            onLoadMore={() => {}}
+            hasMore={false}
+            isLoadingMore={false}
+            columns={compactColumns}
+            className="pointer-events-none opacity-45 transition-opacity duration-200"
+          />
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-base-100/35 backdrop-blur-[2px]">
+            <div className="rounded-full border border-base-300/80 bg-base-100/90 px-4 py-2 shadow-sm">
+              <span className="inline-flex items-center gap-2 text-sm text-base-content/70">
+                <span className="loading loading-spinner loading-sm"></span>
+                {t("search.loading", {
+                  defaultValue: "Searching...",
+                })}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if (isFetching && allAssets.length === 0) {
       return <PhotosLoadingSkeleton />;
     }
@@ -133,23 +189,25 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
         )}
 
         {photoSearchView.topResults.length > 0 && (
-          <JustifiedGallery
+          <GalleryComponent
             groupedPhotos={topResultsGroup}
             openCarousel={openCarousel}
             onLoadMore={() => {}}
             hasMore={false}
             isLoadingMore={false}
+            columns={compactColumns}
           />
         )}
 
         {(!error || photoSearchView.resultAssets.length > 0) && (
-          <JustifiedGallery
+          <GalleryComponent
             groupedPhotos={resultsGroup}
             openCarousel={openCarousel}
             onLoadMore={handleLoadMore}
             hasMore={hasNextPage}
             isLoadingMore={isFetchingNextPage}
             isLoading={isFetching && photoSearchView.resultAssets.length === 0}
+            columns={compactColumns}
           />
         )}
       </div>
@@ -209,6 +267,15 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
       ? photoSearchView.resultAssets.length > 0
       : allAssets.length > 0);
 
+  const browseGalleryProps: AssetGalleryProps = {
+    groupedPhotos: finalGroupedAssets ?? {},
+    openCarousel,
+    onLoadMore: handleLoadMore,
+    hasMore: hasNextPage,
+    isLoadingMore: isFetchingNextPage,
+    columns: compactColumns,
+  };
+
   return (
     <div>
       <AssetsPageHeader
@@ -222,13 +289,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
       ) : isFetching && allAssets.length === 0 ? (
         <PhotosLoadingSkeleton />
       ) : (
-        <JustifiedGallery
-          groupedPhotos={finalGroupedAssets ?? {}}
-          openCarousel={openCarousel}
-          onLoadMore={handleLoadMore}
-          hasMore={hasNextPage}
-          isLoadingMore={isFetchingNextPage}
-        />
+        <GalleryComponent {...browseGalleryProps} />
       )}
 
       {showEndOfResults && (

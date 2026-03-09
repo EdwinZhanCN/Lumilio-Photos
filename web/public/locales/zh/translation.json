@@ -485,21 +485,45 @@
         "assetPage": "资源页面",
         "pageLayout": "页面布局",
         "appearanceSettings": {
-            "description": "配置当前浏览器的语言、地区和资源页默认布局。",
+            "description": "配置当前浏览器的语言、主题、地区和资源页默认布局。",
+            "themes": {
+                "title": "主题配对",
+                "description": "分别为亮色模式和暗色模式选择 daisyUI 主题。导航栏开关只负责切换模式。",
+                "currentMode": "当前模式",
+                "activeBadge": "当前模式",
+                "modeNames": {
+                    "light": "亮色模式",
+                    "dark": "暗色模式"
+                },
+                "light": {
+                    "label": "亮色模式主题",
+                    "description": "导航栏处于亮色模式时使用。"
+                },
+                "dark": {
+                    "label": "暗色模式主题",
+                    "description": "导航栏处于暗色模式时使用。"
+                },
+                "followSystem": {
+                    "label": "跟随系统",
+                    "description": "使用操作系统的外观偏好来决定当前是亮色模式还是暗色模式。",
+                    "status": "系统当前正在使用{{mode}}。",
+                    "navbarHint": "当前主题模式跟随系统。若要手动切换，请先在设置中关闭该选项。"
+                }
+            },
             "layoutDescription": "设置资源页使用的默认布局。",
             "layoutOptions": {
                 "compact": {
                     "label": "紧凑",
-                    "description": "提高信息密度并缩小间距。"
-                },
-                "wide": {
-                    "label": "宽幅",
-                    "description": "采用较均衡的间距，并默认按类型分组。"
+                    "description": "使用可调列数的方形网格布局。"
                 },
                 "full": {
                     "label": "舒展",
-                    "description": "提供更宽松的留白和更大的布局间距。"
+                    "description": "使用沉浸式的 Justified Layout。"
                 }
+            },
+            "compactColumns": {
+                "label": "紧凑布局列数",
+                "description": "设置紧凑布局激活时每行显示的资源数量。"
             }
         },
         "uploadSettings": {

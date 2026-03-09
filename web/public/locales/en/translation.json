@@ -475,21 +475,45 @@
         "assetPage": "Asset Page",
         "pageLayout": "Page Layout",
         "appearanceSettings": {
-            "description": "Configure language, region, and the default asset page layout for this browser.",
+            "description": "Configure language, theme, region, and the default asset page layout for this browser.",
+            "themes": {
+                "title": "Theme pairing",
+                "description": "Pick the daisyUI theme used for light and dark mode. The navbar toggle only switches mode.",
+                "currentMode": "Current mode",
+                "activeBadge": "Current mode",
+                "modeNames": {
+                    "light": "Light mode",
+                    "dark": "Dark mode"
+                },
+                "light": {
+                    "label": "Light mode theme",
+                    "description": "Applied when the navbar is in light mode."
+                },
+                "dark": {
+                    "label": "Dark mode theme",
+                    "description": "Applied when the navbar is in dark mode."
+                },
+                "followSystem": {
+                    "label": "Follow system",
+                    "description": "Use your operating system appearance preference to choose light or dark mode.",
+                    "status": "System is currently using {{mode}}.",
+                    "navbarHint": "Theme mode follows the system preference. Turn this off in Settings to switch manually."
+                }
+            },
             "layoutDescription": "Set the default layout used on the asset page.",
             "layoutOptions": {
                 "compact": {
                     "label": "Compact",
-                    "description": "Higher information density with tighter spacing."
-                },
-                "wide": {
-                    "label": "Wide",
-                    "description": "Balanced spacing with grouping by type as the default."
+                    "description": "Square grid layout with adjustable columns."
                 },
                 "full": {
                     "label": "Full",
-                    "description": "More spacious spacing for a larger browsing layout."
+                    "description": "Justified layout for immersive browsing."
                 }
+            },
+            "compactColumns": {
+                "label": "Compact columns",
+                "description": "Choose how many assets are shown per row when Compact layout is active."
             }
         },
         "uploadSettings": {

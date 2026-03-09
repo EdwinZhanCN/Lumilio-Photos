@@ -149,6 +149,14 @@ function saveStateToStorage(state: any) {
   }
 }
 
+function getLiveSearchParams(fallback: URLSearchParams): URLSearchParams {
+  if (typeof window === "undefined") {
+    return new URLSearchParams(fallback);
+  }
+
+  return new URLSearchParams(window.location.search);
+}
+
 export const AssetsProvider = ({
   children,
   persist = true,
@@ -264,8 +272,9 @@ export const AssetsProvider = ({
 
   // Sync UI state from URL params
   useEffect(() => {
-    const urlGroupBy = searchParams.get("groupBy");
-    const urlQuery = searchParams.get("q");
+    const liveSearchParams = getLiveSearchParams(searchParams);
+    const urlGroupBy = liveSearchParams.get("groupBy");
+    const urlQuery = liveSearchParams.get("q");
     const resolvedGroupBy = resolveGroupByFromUrl(
       urlGroupBy,
       settingsState.ui.asset_page?.layout,
@@ -281,7 +290,7 @@ export const AssetsProvider = ({
     }
 
     if (!isGroupByType(urlGroupBy)) {
-      const params = new URLSearchParams(searchParams);
+      const params = new URLSearchParams(liveSearchParams);
       params.set("groupBy", resolvedGroupBy);
       setSearchParams(params, { replace: true });
     }
@@ -296,7 +305,7 @@ export const AssetsProvider = ({
 
   const openCarousel = useCallback(
     (assetId: string) => {
-      const currentParams = new URLSearchParams(searchParams);
+      const currentParams = getLiveSearchParams(searchParams);
       let path = basePath || "/assets/photos";
 
       if (!basePath) {
@@ -311,7 +320,7 @@ export const AssetsProvider = ({
   );
 
   const closeCarousel = useCallback(() => {
-    const currentParams = new URLSearchParams(searchParams);
+    const currentParams = getLiveSearchParams(searchParams);
     let path = basePath || "/assets/photos";
 
     if (!basePath) {
@@ -325,7 +334,7 @@ export const AssetsProvider = ({
 
   const switchTab = useCallback(
     (tab: TabType) => {
-      const currentParams = new URLSearchParams(searchParams);
+      const currentParams = getLiveSearchParams(searchParams);
       let path = "/assets/photos";
       if (tab === "videos") path = "/assets/videos";
       else if (tab === "audios") path = "/assets/audios";
