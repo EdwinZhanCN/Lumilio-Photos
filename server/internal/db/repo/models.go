@@ -55,6 +55,7 @@ type Asset struct {
 	Liked            *bool                    `db:"liked" json:"liked"`
 	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Status           []byte                   `db:"status" json:"status"`
+	UpdatedAt        pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 }
 
 type AssetTag struct {

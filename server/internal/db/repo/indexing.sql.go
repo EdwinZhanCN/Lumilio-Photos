@@ -98,7 +98,7 @@ func (q *Queries) CountPhotoAssetsWithOCRResults(ctx context.Context, repository
 }
 
 const listPhotoAssetsForIndexingBatch = `-- name: ListPhotoAssetsForIndexingBatch :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
 FROM assets a
 WHERE a.type = 'PHOTO'
   AND a.is_deleted = false
@@ -144,6 +144,7 @@ func (q *Queries) ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListP
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -156,7 +157,7 @@ func (q *Queries) ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListP
 }
 
 const listPhotoAssetsMissingCaptions = `-- name: ListPhotoAssetsMissingCaptions :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
 FROM assets a
 LEFT JOIN captions c ON a.asset_id = c.asset_id
 WHERE a.type = 'PHOTO'
@@ -204,6 +205,7 @@ func (q *Queries) ListPhotoAssetsMissingCaptions(ctx context.Context, arg ListPh
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -216,7 +218,7 @@ func (q *Queries) ListPhotoAssetsMissingCaptions(ctx context.Context, arg ListPh
 }
 
 const listPhotoAssetsMissingEmbeddingType = `-- name: ListPhotoAssetsMissingEmbeddingType :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
 FROM assets a
 LEFT JOIN embeddings e
   ON a.asset_id = e.asset_id
@@ -273,6 +275,7 @@ func (q *Queries) ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg L
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -285,7 +288,7 @@ func (q *Queries) ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg L
 }
 
 const listPhotoAssetsMissingFaceResults = `-- name: ListPhotoAssetsMissingFaceResults :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
 FROM assets a
 LEFT JOIN face_results f ON a.asset_id = f.asset_id
 WHERE a.type = 'PHOTO'
@@ -333,6 +336,7 @@ func (q *Queries) ListPhotoAssetsMissingFaceResults(ctx context.Context, arg Lis
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -345,7 +349,7 @@ func (q *Queries) ListPhotoAssetsMissingFaceResults(ctx context.Context, arg Lis
 }
 
 const listPhotoAssetsMissingOCRResults = `-- name: ListPhotoAssetsMissingOCRResults :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
 FROM assets a
 LEFT JOIN ocr_results o ON a.asset_id = o.asset_id
 WHERE a.type = 'PHOTO'
@@ -393,6 +397,7 @@ func (q *Queries) ListPhotoAssetsMissingOCRResults(ctx context.Context, arg List
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

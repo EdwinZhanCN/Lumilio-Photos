@@ -91,7 +91,7 @@ func (q *Queries) DeleteAlbum(ctx context.Context, albumID int32) error {
 }
 
 const filterAlbumAssets = `-- name: FilterAlbumAssets :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status FROM assets a
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = $1
   AND a.is_deleted = false
@@ -187,6 +187,7 @@ func (q *Queries) FilterAlbumAssets(ctx context.Context, arg FilterAlbumAssetsPa
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -237,7 +238,7 @@ func (q *Queries) GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAsse
 }
 
 const getAlbumAssets = `-- name: GetAlbumAssets :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = $1 AND a.is_deleted = false
@@ -265,6 +266,7 @@ type GetAlbumAssetsRow struct {
 	Liked            *bool                    `db:"liked" json:"liked"`
 	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Status           []byte                   `db:"status" json:"status"`
+	UpdatedAt        pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 	Position         *int32                   `db:"position" json:"position"`
 	AddedTime        pgtype.Timestamptz       `db:"added_time" json:"added_time"`
 }
@@ -299,6 +301,7 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 			&i.Position,
 			&i.AddedTime,
 		); err != nil {
@@ -313,7 +316,7 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 }
 
 const getAlbumAssetsScoped = `-- name: GetAlbumAssetsScoped :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = $1
@@ -351,6 +354,7 @@ type GetAlbumAssetsScopedRow struct {
 	Liked            *bool                    `db:"liked" json:"liked"`
 	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Status           []byte                   `db:"status" json:"status"`
+	UpdatedAt        pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 	Position         *int32                   `db:"position" json:"position"`
 	AddedTime        pgtype.Timestamptz       `db:"added_time" json:"added_time"`
 }
@@ -385,6 +389,7 @@ func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsSc
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 			&i.Position,
 			&i.AddedTime,
 		); err != nil {

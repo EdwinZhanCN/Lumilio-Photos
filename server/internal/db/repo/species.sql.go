@@ -211,7 +211,7 @@ func (q *Queries) GetTopSpeciesLabels(ctx context.Context, limit int32) ([]GetTo
 }
 
 const searchAssetsBySpecies = `-- name: SearchAssetsBySpecies :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status FROM assets a
+SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
 JOIN species_predictions sp ON a.asset_id = sp.asset_id
 WHERE sp.label ILIKE '%' || $1 || '%'
 AND a.is_deleted = false
@@ -255,6 +255,7 @@ func (q *Queries) SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsByS
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}

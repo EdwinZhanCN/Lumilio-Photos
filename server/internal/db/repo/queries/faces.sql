@@ -196,8 +196,7 @@ WHERE asset_id = $1;
 UPDATE face_items
 SET
     embedding = $2,
-    embedding_model = $3,
-    updated_at = CURRENT_TIMESTAMP
+    embedding_model = $3
 WHERE id = $1
 RETURNING *;
 

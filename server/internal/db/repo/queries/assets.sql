@@ -23,7 +23,7 @@ LIMIT $2 OFFSET $3;
 
 -- name: UpdateAsset :one
 UPDATE assets
-SET original_filename = $2, specific_metadata = $3, updated_at = CURRENT_TIMESTAMP
+SET original_filename = $2, specific_metadata = $3
 WHERE asset_id = $1
 RETURNING *;
 
