@@ -1,7 +1,6 @@
 import { useAssetsStore } from "./assets.store";
 import { useShallow } from "zustand/react/shallow";
 import { selectActiveFilterCount } from "./slices/filters.slice";
-import { useSearchParams } from "react-router-dom";
 import { useSettingsContext } from "@/features/settings";
 import { useCallback } from "react";
 import { GroupByType } from "./types/assets.type";
@@ -27,12 +26,9 @@ export const useSelectionMode = () =>
 export const useCurrentTab = () => useAssetsStore((s) => s.ui.currentTab);
 
 export const useGroupBy = (): GroupByType => {
-  const [searchParams] = useSearchParams();
   const { state: settingsState } = useSettingsContext();
-  return resolveGroupByFromUrl(
-    searchParams.get("groupBy"),
-    settingsState.ui.asset_page?.layout,
-  );
+  const groupBy = useAssetsStore((s) => s.ui.groupBy);
+  return resolveGroupByFromUrl(groupBy, settingsState.ui.asset_page?.layout);
 };
 
 export const useSearchQuery = () => useAssetsStore((s) => s.ui.searchQuery);
@@ -69,43 +65,76 @@ export const useUIActions = () => {
   const store = useAssetsStore(
     useShallow((s) => ({
       setTab: s.setCurrentTab,
-      setSearchQuery: s.setSearchQuery,
+      setSearchQueryState: s.setSearchQuery,
+      setGroupByState: s.setGroupBy,
     })),
   );
 
-  const [searchParams, setSearchParams] = useSearchParams();
+  const updateSearchParams = useCallback(
+    (updater: (params: URLSearchParams) => void) => {
+      if (typeof window === "undefined") return;
+
+      const url = new URL(window.location.href);
+      const params = new URLSearchParams(url.search);
+      updater(params);
+
+      const nextSearch = params.toString();
+      const nextUrl = `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash}`;
+      window.history.replaceState(window.history.state, "", nextUrl);
+    },
+    [],
+  );
 
   const setGroupBy = useCallback(
     (groupBy: GroupByType) => {
-      const params = new URLSearchParams(searchParams);
-      params.set("groupBy", groupBy);
-      setSearchParams(params, { replace: true });
+      store.setGroupByState(groupBy);
+      updateSearchParams((params) => {
+        params.set("groupBy", groupBy);
+      });
     },
-    [searchParams, setSearchParams],
+    [store, updateSearchParams],
   );
 
   const setSearchQuery = useCallback(
     (query: string) => {
-      store.setSearchQuery(query);
+      const normalizedQuery = query.trim();
+      store.setSearchQueryState(normalizedQuery);
+      updateSearchParams((params) => {
+        if (normalizedQuery) {
+          params.set("q", normalizedQuery);
+        } else {
+          params.delete("q");
+        }
+      });
+    },
+    [store, updateSearchParams],
+  );
 
-      // Sync to URL
-      const params = new URLSearchParams(searchParams);
-
-      if (query.trim()) {
-        params.set("q", query);
-      } else {
-        params.delete("q");
+  const applySearch = useCallback(
+    (query: string) => {
+      const normalizedQuery = query.trim();
+      store.setSearchQueryState(normalizedQuery);
+      if (normalizedQuery) {
+        store.setGroupByState("flat");
       }
 
-      setSearchParams(params, { replace: true });
+      updateSearchParams((params) => {
+        if (normalizedQuery) {
+          params.set("q", normalizedQuery);
+          params.set("groupBy", "flat");
+        } else {
+          params.delete("q");
+        }
+      });
     },
-    [store.setSearchQuery, searchParams, setSearchParams],
+    [store, updateSearchParams],
   );
 
   return {
     ...store,
     setGroupBy,
     setSearchQuery,
+    applySearch,
   };
 };
 

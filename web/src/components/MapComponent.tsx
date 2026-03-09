@@ -37,10 +37,12 @@ export type PhotoLocation = {
 // Map component props
 interface MapComponentProps {
   photoLocations?: PhotoLocation[];
+  onPointClick?: (assetId: string) => void;
   center?: LatLngTuple;
   zoom?: number;
   height?: string | number;
   className?: string;
+  rounded?: boolean;
   showSinglePhoto?: boolean; // For single photo display (basic info view)
 }
 
@@ -66,7 +68,9 @@ type MapViewport = {
 
 const isClusterResult = (feature: ClusterResult): feature is MapCluster => {
   const properties = feature.properties as Partial<ClusterProperties>;
-  return properties.cluster === true && typeof properties.cluster_id === "number";
+  return (
+    properties.cluster === true && typeof properties.cluster_id === "number"
+  );
 };
 
 const isSameBBox = (left: BBox, right: BBox): boolean =>
@@ -243,10 +247,12 @@ function ClusterMarker({ cluster, clusterIndex, maxZoom }: ClusterMarkerProps) {
 
 function MapComponent({
   photoLocations = [],
+  onPointClick,
   center,
   zoom = 10,
   height = "400px",
   className = "",
+  rounded = true,
   showSinglePhoto = false,
 }: MapComponentProps) {
   const { state } = useSettingsContext();
@@ -340,14 +346,15 @@ function MapComponent({
   );
 
   const clusterIndex = useMemo(() => {
-    const index = new Supercluster<ClusterPointProperties, Record<string, never>>(
-      {
-        radius: 64,
-        minPoints: 2,
-        minZoom: 0,
-        maxZoom: Math.max(0, mapConfig.maxZoom - 1),
-      },
-    );
+    const index = new Supercluster<
+      ClusterPointProperties,
+      Record<string, never>
+    >({
+      radius: 64,
+      minPoints: 2,
+      minZoom: 0,
+      maxZoom: Math.max(0, mapConfig.maxZoom - 1),
+    });
     index.load(points);
     return index;
   }, [mapConfig.maxZoom, points]);
@@ -403,7 +410,11 @@ function MapComponent({
       : undefined;
 
     return (
-      <Popup>
+      <Popup
+        closeButton={false}
+        autoPan={false}
+        className="photo-preview-popup"
+      >
         <div className="photo-popup">
           {(location.thumbnailUrl || thumbnailUrl) && (
             <img
@@ -416,10 +427,13 @@ function MapComponent({
               }}
             />
           )}
-          <h3>{location.title}</h3>
-          {location.description && <p>{location.description}</p>}
+          <div className="photo-popup-body">
+            <div className="photo-popup-kicker">Preview</div>
+            <h3>{location.title}</h3>
+            {location.description && <p>{location.description}</p>}
+          </div>
           {location.asset && (
-            <div className="text-xs text-gray-500 mt-2">
+            <div className="photo-popup-meta">
               {location.asset.original_filename}
               {location.asset.upload_time && (
                 <div>
@@ -435,6 +449,21 @@ function MapComponent({
       </Popup>
     );
   };
+
+  const createPhotoMarkerHandlers = useCallback(
+    (locationId: string) => ({
+      mouseover: (event: any) => {
+        event.target.openPopup();
+      },
+      mouseout: (event: any) => {
+        event.target.closePopup();
+      },
+      click: () => {
+        onPointClick?.(locationId);
+      },
+    }),
+    [onPointClick],
+  );
 
   return (
     <div className={`map-container ${className}`} style={{ height }}>
@@ -460,29 +489,63 @@ function MapComponent({
         .photo-cluster-marker:hover {
           transform: scale(1.08);
         }
+        .photo-preview-popup .leaflet-popup-content-wrapper {
+          border-radius: 18px;
+          padding: 0;
+          box-shadow: 0 22px 44px -24px rgba(15, 23, 42, 0.45);
+          background: rgba(255, 255, 255, 0.94);
+          backdrop-filter: blur(18px);
+        }
+        .photo-preview-popup .leaflet-popup-tip {
+          background: rgba(255, 255, 255, 0.94);
+          box-shadow: none;
+        }
         .leaflet-container {
-          border-radius: 8px;
+          border-radius: ${rounded ? "8px" : "0"};
         }
         .leaflet-popup-content {
-          margin: 8px 12px;
+          margin: 0;
           line-height: 1.4;
         }
+        .photo-popup {
+          overflow: hidden;
+          min-width: 220px;
+        }
+        .photo-popup-body {
+          padding: 12px 14px 10px;
+        }
+        .photo-popup-kicker {
+          margin: 0 0 6px 0;
+          color: rgba(71, 85, 105, 0.9);
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+        }
         .leaflet-popup-content h3 {
-          margin: 0 0 8px 0;
+          margin: 0 0 6px 0;
           font-size: 16px;
           font-weight: 600;
+          color: #0f172a;
         }
         .leaflet-popup-content p {
           margin: 0;
-          color: #666;
-          font-size: 14px;
+          color: #475569;
+          font-size: 13px;
         }
         .photo-popup-image {
-          width: 120px;
-          height: 80px;
+          display: block;
+          width: 100%;
+          height: 132px;
           object-fit: cover;
-          border-radius: 4px;
-          margin-bottom: 8px;
+          margin: 0;
+        }
+        .photo-popup-meta {
+          border-top: 1px solid rgba(148, 163, 184, 0.18);
+          padding: 10px 14px 12px;
+          color: #64748b;
+          font-size: 11px;
+          line-height: 1.45;
         }
       `}</style>
 
@@ -522,6 +585,7 @@ function MapComponent({
                     location.thumbnailUrl || thumbnailUrl,
                     50,
                   )}
+                  eventHandlers={createPhotoMarkerHandlers(location.id)}
                 >
                   {renderPopup(location)}
                 </Marker>
@@ -556,6 +620,7 @@ function MapComponent({
                     location.thumbnailUrl || thumbnailUrl,
                     40,
                   )}
+                  eventHandlers={createPhotoMarkerHandlers(location.id)}
                 >
                   {renderPopup(location)}
                 </Marker>

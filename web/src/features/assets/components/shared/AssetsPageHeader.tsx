@@ -308,6 +308,22 @@ const AssetsPageHeader = ({
         title={title ?? tabTitle}
         icon={icon ?? <TabIcon className="w-6 h-6 text-primary" />}
       >
+        {selection.enabled && (
+          <div className="badge badge-lg badge-soft badge-neutral hidden gap-2 rounded-full px-3 py-3 text-xs font-medium sm:inline-flex">
+            <span
+              className={`size-2 rounded-full ${
+                selection.selectedCount > 0
+                  ? "bg-primary"
+                  : "bg-base-content/20"
+              }`}
+            ></span>
+            {t("assets.assetsPageHeader.selectionMode.selectedCount", {
+              count: selection.selectedCount,
+              defaultValue: "{{count}} selected",
+            })}
+          </div>
+        )}
+
         {/* Group By Dropdown */}
         <div className="dropdown">
           <div
@@ -366,9 +382,10 @@ const AssetsPageHeader = ({
 
         {/* Selection Toggle Button */}
         <button
-          className={`btn btn-sm btn-circle btn-soft btn-info ${
+          type="button"
+          className={`btn btn-sm btn-soft btn-info gap-2 rounded-full ${
             selection.enabled ? "btn-active" : ""
-          } relative`}
+          }`}
           onClick={handleToggleSelection}
           title={
             selection.enabled
@@ -377,11 +394,11 @@ const AssetsPageHeader = ({
           }
         >
           <SquareMousePointer className="w-4 h-4" />
-          {selection.selectedCount > 0 && (
-            <span className="badge badge-xs badge-primary absolute -right-1 -top-1">
-              {selection.selectedCount}
-            </span>
-          )}
+          <span className="hidden md:inline text-xs font-medium">
+            {t("assets.assetsPageHeader.selectionMode.label", {
+              defaultValue: "Select",
+            })}
+          </span>
         </button>
         {/* Quick Actions Rocket Menu - Only in selection mode */}
         {selection.enabled && (
@@ -389,17 +406,24 @@ const AssetsPageHeader = ({
             <div
               tabIndex={0}
               role="button"
-              className={`btn btn-sm btn-accent ${selection.selectedCount === 0 ? "btn-disabled opacity-50" : ""}`}
+              className={`btn btn-sm btn-soft btn-accent gap-2 rounded-full ${
+                selection.selectedCount === 0 ? "btn-disabled opacity-50" : ""
+              }`}
               title={t("assets.assetsPageHeader.actions.title")}
             >
               <Rocket className="size-4" />
-              {t("assets.assetsPageHeader.actions.title")}
+              <span className="hidden md:inline">
+                {t("assets.assetsPageHeader.actions.title")}
+              </span>
+              <span className="rounded-full bg-base-100/90 px-2.5 py-1 text-[11px] font-semibold text-base-content/70">
+                {selection.selectedCount}
+              </span>
             </div>
             <ul
               tabIndex={0}
-              className="dropdown-content menu bg-base-200 rounded-box z-[100] w-52 p-2 shadow-lg mt-2"
+              className="dropdown-content menu z-[100] mt-2 w-64 rounded-[1.25rem] border border-base-300/70 bg-base-100/95 p-3 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.45)] backdrop-blur-xl"
             >
-              <li className="menu-title px-4 py-2 text-xs opacity-50 uppercase tracking-wider">
+              <li className="menu-title px-3 py-2 text-xs uppercase tracking-[0.18em] text-base-content/45">
                 {t("assets.assetsPageHeader.actions.applyToItems", {
                   count: selection.selectedCount,
                 })}
@@ -407,7 +431,8 @@ const AssetsPageHeader = ({
               <li>
                 <div className="flex gap-1 px-4 py-2">
                   <button
-                    className="btn btn-xs btn-ghost flex-1 justify-start gap-2"
+                    type="button"
+                    className="btn btn-sm h-auto flex-1 justify-start gap-2 rounded-xl border-0 bg-base-200/70 px-3 py-2 shadow-none hover:bg-base-200"
                     onClick={() => bulkOps.bulkSetLike(true)}
                   >
                     <Heart size={16} className="fill-error text-error" />
@@ -415,7 +440,8 @@ const AssetsPageHeader = ({
                   </button>
                   <div className="divider divider-horizontal m-0"></div>
                   <button
-                    className="btn btn-xs btn-ghost flex-1 justify-start gap-2"
+                    type="button"
+                    className="btn btn-sm h-auto flex-1 justify-start gap-2 rounded-xl border-0 bg-base-200/70 px-3 py-2 shadow-none hover:bg-base-200"
                     onClick={() => bulkOps.bulkSetLike(false)}
                   >
                     <Heart size={16} className="text-base-content" />
@@ -431,7 +457,8 @@ const AssetsPageHeader = ({
                   </div>
                   <div className="flex justify-around p-2 pt-0">
                     <button
-                      className="btn btn-xs btn-ghost btn-square text-base-content/50"
+                      type="button"
+                      className="btn btn-xs btn-circle border-0 bg-base-200/70 text-base-content/50 shadow-none hover:bg-base-200"
                       onClick={() => bulkOps.bulkUpdateRating(0)}
                       title={t("assets.assetsPageHeader.actions.clearRating")}
                     >
@@ -440,7 +467,8 @@ const AssetsPageHeader = ({
                     {[1, 2, 3, 4, 5].map((r) => (
                       <button
                         key={r}
-                        className="btn btn-xs btn-ghost btn-square"
+                        type="button"
+                        className="btn btn-xs min-h-8 rounded-full border-0 bg-base-200/70 px-3 shadow-none hover:bg-base-200"
                         onClick={() => bulkOps.bulkUpdateRating(r)}
                       >
                         {r}
@@ -451,19 +479,31 @@ const AssetsPageHeader = ({
               </li>
               <div className="divider my-1"></div>
               <li>
-                <button className="text-info" onClick={handleAddToAlbumClick}>
+                <button
+                  type="button"
+                  className="rounded-xl text-info hover:bg-info/10"
+                  onClick={handleAddToAlbumClick}
+                >
                   <FolderPlus size={16} />
                   {t("assets.assetsPageHeader.actions.addToAlbum")}
                 </button>
               </li>
               <li>
-                <button onClick={handleDownloadAll}>
+                <button
+                  type="button"
+                  className="rounded-xl hover:bg-base-200/80"
+                  onClick={handleDownloadAll}
+                >
                   <Download size={16} />
                   {t("assets.assetsPageHeader.actions.downloadAll")}
                 </button>
               </li>
               <li>
-                <button className="text-error" onClick={handleDeleteClick}>
+                <button
+                  type="button"
+                  className="rounded-xl text-error hover:bg-error/10"
+                  onClick={handleDeleteClick}
+                >
                   <Trash2 size={16} />
                   {t("assets.assetsPageHeader.actions.deleteSelected")}
                 </button>

@@ -37,6 +37,8 @@ export type { AssetsContextValue } from "./types/assets.type";
 // Export shared components
 export { default as AssetsPageHeader } from "./components/shared/AssetsPageHeader";
 export { default as JustifiedGallery } from "./components/page/JustifiedGallery/JustifiedGallery";
+export { default as SquareGallery } from "./components/page/SquareGallery/SquareGallery";
+export type { AssetGalleryProps } from "./components/page/gallery.types";
 
 // Export utilities and selectors from slices
 export { generateViewKey } from "./utils/viewKey";
