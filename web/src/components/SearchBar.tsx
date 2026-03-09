@@ -11,7 +11,7 @@ export default function SearchBar() {
   const { t } = useI18n();
   const currentTab = useCurrentTab();
   const searchQuery = useSearchQuery();
-  const { setSearchQuery, setGroupBy } = useUIActions();
+  const { setSearchQuery, applySearch } = useUIActions();
 
   const [searchText, setSearchText] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -24,26 +24,17 @@ export default function SearchBar() {
 
   // Debounced search function
   const performSearch = useCallback(
-    async (query: string) => {
-      if (!query.trim()) {
-        setSearchQuery("");
-        return;
-      }
-
+    (query: string) => {
       setIsSearching(true);
       try {
-        // Set search query
-        setSearchQuery(query.trim());
-
-        // Auto-switch to flat view for better search results display
-        setGroupBy("flat");
+        applySearch(query);
       } catch (error) {
         console.error("Search error:", error);
       } finally {
         setIsSearching(false);
       }
     },
-    [setSearchQuery, setGroupBy],
+    [applySearch],
   );
 
   // Debounce search execution
@@ -60,7 +51,9 @@ export default function SearchBar() {
   useEffect(() => {
     const nextQuery = searchQuery.trim();
     setSearchText(nextQuery);
-    setActive(nextQuery.length > 0);
+    if (nextQuery.length > 0) {
+      setActive(true);
+    }
   }, [searchQuery]);
 
   useEffect(() => {
@@ -72,6 +65,7 @@ export default function SearchBar() {
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
+      e.preventDefault();
       performSearch(searchText);
     }
   };
@@ -81,6 +75,7 @@ export default function SearchBar() {
       <div className="flex justify-center">
         <div className="flex flex-row items-center gap-3 w-full max-w-lg">
           <button
+            type="button"
             className={`btn btn-sm btn-circle btn-soft btn-info ${active ? "btn-active" : ""} ${isSearching ? "loading" : ""}`}
             aria-pressed={active}
             onClick={() =>

@@ -3,6 +3,7 @@ import type {
   InfiniteData,
   UseInfiniteQueryResult,
 } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useAssetsStore } from "../assets.store";
 import { useGroupBy } from "../selectors";
 import {
@@ -244,6 +245,7 @@ export const useAssetsViewQuery = (
     requestConfig.init as any,
     {
       enabled: autoFetch && !disabled,
+      placeholderData: keepPreviousData,
       initialPageParam: 0,
       pageParamName: requestConfig.pageParamName,
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
@@ -399,6 +401,7 @@ export const usePhotoSearchView = (
     },
     {
       enabled: autoFetch && !disabled && queryText.length > 0,
+      placeholderData: keepPreviousData,
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {

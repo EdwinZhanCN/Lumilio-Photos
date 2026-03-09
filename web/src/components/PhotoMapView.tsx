@@ -16,6 +16,7 @@ interface PhotoMapViewProps {
   showViewToggle?: boolean;
   defaultView?: "map" | "list";
   height?: string | number;
+  mapRounded?: boolean;
 }
 
 type ViewMode = "map" | "list";
@@ -27,6 +28,7 @@ export default function PhotoMapView({
   showViewToggle = true,
   defaultView = "map",
   height = "600px",
+  mapRounded = true,
 }: PhotoMapViewProps) {
   const { t } = useI18n();
   const [viewMode, setViewMode] = useState<ViewMode>(defaultView);
@@ -84,8 +86,9 @@ export default function PhotoMapView({
     <div className="relative h-full">
       <MapComponent
         photoLocations={photoLocations}
+        onPointClick={onPointClick}
         height="100%"
-        className="rounded-lg"
+        rounded={mapRounded}
       />
 
       {/* Photo count indicator */}
@@ -101,7 +104,11 @@ export default function PhotoMapView({
   );
 
   const renderListView = () => (
-    <div className="h-full overflow-y-auto bg-base-100 rounded-lg">
+    <div
+      className={`h-full overflow-y-auto bg-base-100 ${
+        mapRounded ? "rounded-lg" : ""
+      }`}
+    >
       {locationGroups.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-full text-base-content/60">
           <MapIcon className="w-16 h-16 mb-4" />

@@ -17,18 +17,7 @@ import {
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 import { Camera } from "lucide-react";
-
-interface JustifiedGalleryProps {
-  groupedPhotos: Record<string, Asset[]>;
-  openCarousel: (assetId: string) => void;
-  onLoadMore: () => void;
-  hasMore: boolean;
-  isLoadingMore: boolean;
-  isLoading?: boolean;
-  className?: string;
-}
-
-const DEFAULT_GROUP_LABELS = new Set(["All Results", "All Assets"]);
+import { AssetGalleryProps, DEFAULT_GROUP_LABELS } from "../gallery.types";
 
 const getThumbnailSize = (width: number) => {
   if (width >= 520) return "large";
@@ -49,7 +38,7 @@ const getScrollParent = (element: HTMLElement | null): HTMLElement | null => {
   return null;
 };
 
-const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
+const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   groupedPhotos,
   openCarousel,
   onLoadMore,
@@ -336,7 +325,7 @@ const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
                           assetId ? selection.isSelected(assetId) : false
                         }
                         isSelectionMode={selection.enabled}
-                        className="rounded-lg shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                        className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                       />
                     </div>
                   );
@@ -351,7 +340,9 @@ const JustifiedGallery: React.FC<JustifiedGalleryProps> = ({
         );
       })}
 
-      <div ref={sentinelRef} className="h-10 w-full" />
+      {hasMore && supportsIntersectionObserver && (
+        <div ref={sentinelRef} className="h-10 w-full" />
+      )}
 
       {hasMore && (isLoadingMore || !supportsIntersectionObserver) && (
         <div

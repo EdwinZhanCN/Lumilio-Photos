@@ -4,6 +4,7 @@ import {
   oneDark,
   oneLight,
 } from "react-syntax-highlighter/dist/cjs/styles/prism";
+import { isDarkDaisyUITheme } from "@/lib/theme/daisyuiThemes";
 
 interface CodeBlockProps {
   inline?: boolean;
@@ -29,10 +30,9 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
     const checkTheme = () => {
       const html = document.documentElement;
       const theme = html.getAttribute("data-theme");
-      const isDarkTheme =
-        theme === "macchiato" ||
-        (!theme &&
-          window.matchMedia("(prefers-color-scheme: macchiato)").matches);
+      const isDarkTheme = theme
+        ? isDarkDaisyUITheme(theme)
+        : window.matchMedia("(prefers-color-scheme: dark)").matches;
       setIsDark(isDarkTheme);
     };
 
