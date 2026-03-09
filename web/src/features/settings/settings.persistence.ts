@@ -5,11 +5,19 @@ import {
   removeStorageKeys,
   writeVersionedStorageData,
 } from "@/lib/settings/storage";
+import {
+  DEFAULT_THEME_PREFERENCES,
+  normalizeThemePreferences,
+  parseLegacyThemeMode,
+  type ThemeMode,
+} from "@/lib/theme/daisyuiThemes";
 import type { SettingsState } from "./settings.type.ts";
 import {
+  LEGACY_THEME_STORAGE_KEY,
   LEGACY_SETTINGS_STORAGE_KEY,
   SETTINGS_STORAGE_KEY,
   SETTINGS_STORAGE_VERSION,
+  THEME_STORAGE_KEY,
 } from "./settings.registry";
 
 function asNumber(value: unknown): number | undefined {
@@ -58,11 +66,17 @@ function asRegion(
 
 function asLayout(
   value: unknown,
-  fallback: "compact" | "wide" | "full",
-): "compact" | "wide" | "full" {
-  return value === "compact" || value === "wide" || value === "full"
-    ? value
-    : fallback;
+  fallback: "compact" | "full",
+): "compact" | "full" {
+  if (value === "compact" || value === "full") {
+    return value;
+  }
+
+  if (value === "wide") {
+    return "full";
+  }
+
+  return fallback;
 }
 
 function asWorkingRepositoryID(value: unknown): string | undefined {
@@ -82,8 +96,35 @@ function asWorkingRepositoryID(value: unknown): string | undefined {
     : undefined;
 }
 
+function resolveLegacyThemeMode(): ThemeMode | null {
+  if (typeof localStorage === "undefined") {
+    return null;
+  }
+
+  return (
+    parseLegacyThemeMode(localStorage.getItem(THEME_STORAGE_KEY)) ??
+    parseLegacyThemeMode(localStorage.getItem(LEGACY_THEME_STORAGE_KEY))
+  );
+}
+
 function defaultedState(base: SettingsState): SettingsState {
   const language = getCurrentLanguage();
+  const baseTheme = normalizeThemePreferences(
+    base.ui.theme,
+    DEFAULT_THEME_PREFERENCES,
+  );
+  const legacyThemeMode = resolveLegacyThemeMode();
+  const theme = normalizeThemePreferences(
+    legacyThemeMode
+      ? {
+          followSystem: false,
+          mode: legacyThemeMode,
+          themes: baseTheme.themes,
+        }
+      : null,
+    baseTheme,
+  );
+
   return {
     ...base,
     ui: {
@@ -91,8 +132,10 @@ function defaultedState(base: SettingsState): SettingsState {
       language,
       region: "other",
       working_repository_id: base.ui.working_repository_id,
+      theme,
       asset_page: {
         layout: base.ui.asset_page?.layout ?? "full",
+        columns: base.ui.asset_page?.columns ?? 6,
       },
       upload: {
         max_total_files: base.ui.upload?.max_total_files ?? 100,
@@ -126,10 +169,17 @@ function sanitizeSettings(
       language: asLanguage(ui.language, defaults.ui.language!),
       region: asRegion(ui.region, defaults.ui.region!),
       working_repository_id: asWorkingRepositoryID(ui.working_repository_id),
+      theme: normalizeThemePreferences(ui.theme, defaults.ui.theme),
       asset_page: {
         layout: asLayout(
           isRecord(ui.asset_page) ? ui.asset_page.layout : undefined,
           defaults.ui.asset_page!.layout,
+        ),
+        columns: clampInt(
+          asNumber(isRecord(ui.asset_page) ? ui.asset_page.columns : undefined),
+          4,
+          10,
+          defaults.ui.asset_page!.columns,
         ),
       },
       upload: {
@@ -194,7 +244,11 @@ export function resolveInitialSettingsState(
     const normalized = sanitizeSettings(readResult.candidate, defaults);
     if (readResult.needsRewrite) {
       writeSettingsEnvelope(normalized);
-      removeStorageKeys([LEGACY_SETTINGS_STORAGE_KEY]);
+      removeStorageKeys([
+        LEGACY_SETTINGS_STORAGE_KEY,
+        THEME_STORAGE_KEY,
+        LEGACY_THEME_STORAGE_KEY,
+      ]);
     }
     return normalized;
   }
@@ -209,7 +263,11 @@ export function persistSettingsState(state: SettingsState): void {
 
   try {
     writeSettingsEnvelope(state);
-    removeStorageKeys([LEGACY_SETTINGS_STORAGE_KEY]);
+    removeStorageKeys([
+      LEGACY_SETTINGS_STORAGE_KEY,
+      THEME_STORAGE_KEY,
+      LEGACY_THEME_STORAGE_KEY,
+    ]);
   } catch (error) {
     console.warn("[SettingsProvider] Failed to persist settings", error);
   }
