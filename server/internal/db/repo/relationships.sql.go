@@ -14,7 +14,7 @@ import (
 
 const getAssetWithRelations = `-- name: GetAssetWithRelations :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at,
     COALESCE(
         json_agg(DISTINCT
             jsonb_build_object(
@@ -166,6 +166,7 @@ type GetAssetWithRelationsRow struct {
 	Liked              *bool                    `db:"liked" json:"liked"`
 	RepositoryID       pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Status             []byte                   `db:"status" json:"status"`
+	UpdatedAt          pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 	Thumbnails         interface{}              `db:"thumbnails" json:"thumbnails"`
 	Tags               interface{}              `db:"tags" json:"tags"`
 	Albums             interface{}              `db:"albums" json:"albums"`
@@ -199,6 +200,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 		&i.Liked,
 		&i.RepositoryID,
 		&i.Status,
+		&i.UpdatedAt,
 		&i.Thumbnails,
 		&i.Tags,
 		&i.Albums,
@@ -212,7 +214,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 
 const getAssetWithTags = `-- name: GetAssetWithTags :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at,
     COALESCE(
         json_agg(
             json_build_object(
@@ -253,6 +255,7 @@ type GetAssetWithTagsRow struct {
 	Liked            *bool                    `db:"liked" json:"liked"`
 	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Status           []byte                   `db:"status" json:"status"`
+	UpdatedAt        pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 	Tags             interface{}              `db:"tags" json:"tags"`
 }
 
@@ -280,6 +283,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 		&i.Liked,
 		&i.RepositoryID,
 		&i.Status,
+		&i.UpdatedAt,
 		&i.Tags,
 	)
 	return i, err
@@ -287,7 +291,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 
 const getAssetWithThumbnails = `-- name: GetAssetWithThumbnails :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at,
     COALESCE(
         json_agg(
             json_build_object(
@@ -332,6 +336,7 @@ type GetAssetWithThumbnailsRow struct {
 	Liked            *bool                    `db:"liked" json:"liked"`
 	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Status           []byte                   `db:"status" json:"status"`
+	UpdatedAt        pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 	Thumbnails       interface{}              `db:"thumbnails" json:"thumbnails"`
 }
 
@@ -359,6 +364,7 @@ func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUI
 		&i.Liked,
 		&i.RepositoryID,
 		&i.Status,
+		&i.UpdatedAt,
 		&i.Thumbnails,
 	)
 	return i, err

@@ -1144,7 +1144,7 @@ func (q *Queries) MergeFaceClusters(ctx context.Context, arg MergeFaceClustersPa
 }
 
 const searchAssetsByFaceCluster = `-- name: SearchAssetsByFaceCluster :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status FROM assets a
+SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
 JOIN face_items fi ON a.asset_id = fi.asset_id
 JOIN face_cluster_members fcm ON fi.id = fcm.face_id
 WHERE fcm.cluster_id = $1
@@ -1188,6 +1188,7 @@ func (q *Queries) SearchAssetsByFaceCluster(ctx context.Context, arg SearchAsset
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1200,7 +1201,7 @@ func (q *Queries) SearchAssetsByFaceCluster(ctx context.Context, arg SearchAsset
 }
 
 const searchAssetsByFaceID = `-- name: SearchAssetsByFaceID :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status FROM assets a
+SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
 JOIN face_items fi ON a.asset_id = fi.asset_id
 WHERE fi.face_id = $1
 ORDER BY a.upload_time DESC
@@ -1243,6 +1244,7 @@ func (q *Queries) SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFa
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1297,8 +1299,7 @@ const updateFaceItemEmbedding = `-- name: UpdateFaceItemEmbedding :one
 UPDATE face_items
 SET
     embedding = $2,
-    embedding_model = $3,
-    updated_at = CURRENT_TIMESTAMP
+    embedding_model = $3
 WHERE id = $1
 RETURNING id, asset_id, face_id, bounding_box, confidence, age_group, gender, ethnicity, expression, face_size, face_image_path, embedding, embedding_model, is_primary, quality_score, blur_score, pose_angles, created_at
 `

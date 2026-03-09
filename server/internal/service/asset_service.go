@@ -1166,6 +1166,7 @@ func mapVectorSearchRowToAsset(r repo.SearchAssetsVectorUnifiedRow) repo.Asset {
 		Duration:         r.Duration,
 		TakenTime:        r.TakenTime,
 		UploadTime:       r.UploadTime,
+		UpdatedAt:        r.UpdatedAt,
 		IsDeleted:        r.IsDeleted,
 		DeletedAt:        r.DeletedAt,
 		SpecificMetadata: r.SpecificMetadata,
@@ -1542,16 +1543,7 @@ func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssets
 
 	assets := make([]repo.Asset, len(results))
 	for i, r := range results {
-		assets[i] = repo.Asset{
-			AssetID: r.AssetID, OwnerID: r.OwnerID, Type: r.Type,
-			OriginalFilename: r.OriginalFilename, StoragePath: r.StoragePath,
-			MimeType: r.MimeType, FileSize: r.FileSize, Hash: r.Hash,
-			Width: r.Width, Height: r.Height, Duration: r.Duration,
-			TakenTime: r.TakenTime, UploadTime: r.UploadTime,
-			IsDeleted: r.IsDeleted, DeletedAt: r.DeletedAt,
-			SpecificMetadata: r.SpecificMetadata, Rating: r.Rating,
-			Liked: r.Liked, RepositoryID: r.RepositoryID, Status: r.Status,
-		}
+		assets[i] = mapVectorSearchRowToAsset(r)
 	}
 	return assets, countResult, nil
 }

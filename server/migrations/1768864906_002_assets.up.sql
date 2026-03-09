@@ -38,8 +38,22 @@ CREATE TABLE assets (
     liked              BOOLEAN       DEFAULT FALSE,
     repository_id      UUID REFERENCES repositories(repo_id),
     status             JSONB NOT NULL DEFAULT '{"state": "processing", "message": "Pending processing"}',
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (repository_id, storage_path)
 );
+
+CREATE OR REPLACE FUNCTION set_assets_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_assets_updated_at
+BEFORE UPDATE ON assets
+FOR EACH ROW
+EXECUTE FUNCTION set_assets_updated_at();
 
 -- Thumbnails table
 CREATE TABLE thumbnails (

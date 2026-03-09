@@ -277,7 +277,7 @@ func (q *Queries) GetTopCaptionsByTokens(ctx context.Context, limit int32) ([]Ca
 }
 
 const searchAssetsByCaption = `-- name: SearchAssetsByCaption :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status FROM assets a
+SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
 JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.description) @@ plainto_tsquery('english', $1)
 ORDER BY a.upload_time DESC
@@ -320,6 +320,7 @@ func (q *Queries) SearchAssetsByCaption(ctx context.Context, arg SearchAssetsByC
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -332,7 +333,7 @@ func (q *Queries) SearchAssetsByCaption(ctx context.Context, arg SearchAssetsByC
 }
 
 const searchAssetsByCaptionSummary = `-- name: SearchAssetsByCaptionSummary :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status FROM assets a
+SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
 JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.summary) @@ plainto_tsquery('english', $1)
 AND d.summary IS NOT NULL
@@ -376,6 +377,7 @@ func (q *Queries) SearchAssetsByCaptionSummary(ctx context.Context, arg SearchAs
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -388,7 +390,7 @@ func (q *Queries) SearchAssetsByCaptionSummary(ctx context.Context, arg SearchAs
 }
 
 const searchAssetsByCaptionWithConfidence = `-- name: SearchAssetsByCaptionWithConfidence :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status FROM assets a
+SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
 JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.description) @@ plainto_tsquery('english', $1)
 AND d.confidence >= $4
@@ -438,6 +440,7 @@ func (q *Queries) SearchAssetsByCaptionWithConfidence(ctx context.Context, arg S
 			&i.Liked,
 			&i.RepositoryID,
 			&i.Status,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
