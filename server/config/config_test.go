@@ -93,3 +93,20 @@ func TestLLMConfig_IsConfigured_OllamaRequiresBaseURL(t *testing.T) {
 		t.Fatalf("expected ollama without base url to be unconfigured, got %+v", cfg)
 	}
 }
+
+func TestLoadWatchmanConfig_DefaultPollFallbackEnabled(t *testing.T) {
+	t.Setenv("WATCHMAN_ENABLED", "")
+	t.Setenv("WATCHMAN_SOCK", "")
+	t.Setenv("WATCHMAN_SETTLE_SECONDS", "")
+	t.Setenv("WATCHMAN_INITIAL_SCAN", "")
+	t.Setenv("WATCHMAN_POLL_FALLBACK_SECONDS", "")
+
+	cfg := LoadWatchmanConfig()
+
+	if cfg.PollFallbackSeconds != 10 {
+		t.Fatalf("expected default poll fallback of 10 seconds, got %d", cfg.PollFallbackSeconds)
+	}
+	if !cfg.InitialScan {
+		t.Fatalf("expected initial scan enabled by default")
+	}
+}

@@ -620,7 +620,7 @@ func (s *assetService) SaveNewAsset(ctx context.Context, fileReader io.Reader, f
 // Thumbnail CRUD Operations
 // ================================
 
-// CreateThumbnail creates a new thumbnail for an asset
+// CreateThumbnail creates or updates a thumbnail record for an asset
 func (s *assetService) CreateThumbnail(ctx context.Context, assetID pgtype.UUID, size string, thumbnailPath string) (*repo.Thumbnail, error) {
 	params := repo.CreateThumbnailParams{
 		AssetID:     assetID,

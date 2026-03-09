@@ -343,7 +343,7 @@ func LoadWatchmanConfig() WatchmanConfig {
 		SocketPath:          "",
 		SettleSeconds:       3,
 		InitialScan:         true,
-		PollFallbackSeconds: 0,
+		PollFallbackSeconds: 10,
 	}
 
 	if enabled := strings.ToLower(strings.TrimSpace(os.Getenv("WATCHMAN_ENABLED"))); enabled == "true" {
