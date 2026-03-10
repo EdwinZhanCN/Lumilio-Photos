@@ -26,26 +26,26 @@ WHERE asset_id = $1
 RETURNING *;
 
 -- name: SearchAssetsByCaption :many
-SELECT DISTINCT a.* FROM assets a
+SELECT a.* FROM assets a
 JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.description) @@ plainto_tsquery('english', $1)
-ORDER BY a.upload_time DESC
+ORDER BY a.upload_time DESC, a.asset_id DESC
 LIMIT $3 OFFSET $2;
 
 -- name: SearchAssetsByCaptionWithConfidence :many
-SELECT DISTINCT a.* FROM assets a
+SELECT a.* FROM assets a
 JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.description) @@ plainto_tsquery('english', $1)
 AND d.confidence >= $4
-ORDER BY a.upload_time DESC
+ORDER BY a.upload_time DESC, a.asset_id DESC
 LIMIT $3 OFFSET $2;
 
 -- name: SearchAssetsByCaptionSummary :many
-SELECT DISTINCT a.* FROM assets a
+SELECT a.* FROM assets a
 JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.summary) @@ plainto_tsquery('english', $1)
 AND d.summary IS NOT NULL
-ORDER BY a.upload_time DESC
+ORDER BY a.upload_time DESC, a.asset_id DESC
 LIMIT $3 OFFSET $2;
 
 -- name: GetCaptionStatsByModel :many

@@ -81,9 +81,9 @@ func (s *speciesService) GetTopSpeciesForAsset(ctx context.Context, assetID pgty
 // SearchAssetsBySpecies searches assets by species label
 func (s *speciesService) SearchAssetsBySpecies(ctx context.Context, query string, limit, offset int) ([]repo.Asset, error) {
 	params := repo.SearchAssetsBySpeciesParams{
-		Column1: &query,
-		Offset:  int32(offset),
-		Limit:   int32(limit),
+		Query:  query,
+		Offset: int32(offset),
+		Limit:  int32(limit),
 	}
 
 	assets, err := s.queries.SearchAssetsBySpecies(ctx, params)

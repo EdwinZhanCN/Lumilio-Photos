@@ -323,22 +323,35 @@ func (q *Queries) GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOC
 }
 
 const searchAssetsByOCRText = `-- name: SearchAssetsByOCRText :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
-JOIN ocr_results r ON a.asset_id = r.asset_id
-JOIN ocr_text_items t ON r.asset_id = t.asset_id
-WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', $1)
-ORDER BY a.upload_time DESC
-LIMIT $3 OFFSET $2
+WITH matched_assets AS MATERIALIZED (
+    SELECT t.asset_id
+    FROM ocr_text_items t
+    WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', $1)
+    GROUP BY t.asset_id
+),
+page_ids AS MATERIALIZED (
+    SELECT
+        m.asset_id,
+        a.upload_time
+    FROM matched_assets m
+    JOIN assets a ON a.asset_id = m.asset_id
+    ORDER BY a.upload_time DESC, m.asset_id DESC
+    LIMIT $3 OFFSET $2
+)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.upload_time DESC, p.asset_id DESC
 `
 
 type SearchAssetsByOCRTextParams struct {
-	PlaintoTsquery string `db:"plainto_tsquery" json:"plainto_tsquery"`
-	Offset         int32  `db:"offset" json:"offset"`
-	Limit          int32  `db:"limit" json:"limit"`
+	SearchText string `db:"search_text" json:"search_text"`
+	Offset     int32  `db:"offset" json:"offset"`
+	Limit      int32  `db:"limit" json:"limit"`
 }
 
 func (q *Queries) SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, searchAssetsByOCRText, arg.PlaintoTsquery, arg.Offset, arg.Limit)
+	rows, err := q.db.Query(ctx, searchAssetsByOCRText, arg.SearchText, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -380,28 +393,41 @@ func (q *Queries) SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByO
 }
 
 const searchAssetsByOCRTextWithConfidence = `-- name: SearchAssetsByOCRTextWithConfidence :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
-JOIN ocr_results r ON a.asset_id = r.asset_id
-JOIN ocr_text_items t ON r.asset_id = t.asset_id
-WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', $1)
-AND t.confidence >= $4
-ORDER BY a.upload_time DESC
-LIMIT $3 OFFSET $2
+WITH matched_assets AS MATERIALIZED (
+    SELECT t.asset_id
+    FROM ocr_text_items t
+    WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', $1)
+      AND t.confidence >= $2
+    GROUP BY t.asset_id
+),
+page_ids AS MATERIALIZED (
+    SELECT
+        m.asset_id,
+        a.upload_time
+    FROM matched_assets m
+    JOIN assets a ON a.asset_id = m.asset_id
+    ORDER BY a.upload_time DESC, m.asset_id DESC
+    LIMIT $4 OFFSET $3
+)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.upload_time DESC, p.asset_id DESC
 `
 
 type SearchAssetsByOCRTextWithConfidenceParams struct {
-	PlaintoTsquery string  `db:"plainto_tsquery" json:"plainto_tsquery"`
-	Offset         int32   `db:"offset" json:"offset"`
-	Limit          int32   `db:"limit" json:"limit"`
-	Confidence     float32 `db:"confidence" json:"confidence"`
+	SearchText string  `db:"search_text" json:"search_text"`
+	Confidence float32 `db:"confidence" json:"confidence"`
+	Offset     int32   `db:"offset" json:"offset"`
+	Limit      int32   `db:"limit" json:"limit"`
 }
 
 func (q *Queries) SearchAssetsByOCRTextWithConfidence(ctx context.Context, arg SearchAssetsByOCRTextWithConfidenceParams) ([]Asset, error) {
 	rows, err := q.db.Query(ctx, searchAssetsByOCRTextWithConfidence,
-		arg.PlaintoTsquery,
+		arg.SearchText,
+		arg.Confidence,
 		arg.Offset,
 		arg.Limit,
-		arg.Confidence,
 	)
 	if err != nil {
 		return nil, err
