@@ -8,11 +8,14 @@ import { AssetFilter } from "@/lib/assets/types";
 import { AssetViewDefinition } from "@/features/assets/types/assets.type";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
-import { findAssetIndex, getFlatAssetsFromGrouped } from "@/lib/utils/assetGrouping";
 import PageHeader from "@/components/PageHeader.tsx";
 import { WorkerProvider } from "@/contexts/WorkerProvider.tsx";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
+import {
+  findAssetIndex,
+  flattenAssetGroups,
+} from "@/features/assets/utils/assetGroups";
 
 interface AssetGalleryRendererProps {
   event: SideChannelEvent;
@@ -131,8 +134,8 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
 
   // Use flat assets from grouped to ensure order consistency with gallery
   const flatAssets = useMemo(() => {
-    if (groups && Object.keys(groups).length > 0) {
-      return getFlatAssetsFromGrouped(groups);
+    if (groups && groups.length > 0) {
+      return flattenAssetGroups(groups);
     }
     return assets;
   }, [groups, assets]);
@@ -163,7 +166,7 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
         <PhotosLoadingSkeleton />
       ) : (
         <JustifiedGallery
-          groupedPhotos={groups || {}}
+          groups={groups || []}
           openCarousel={setCarouselAssetId}
           isLoading={isLoading}
           isLoadingMore={isLoadingMore}

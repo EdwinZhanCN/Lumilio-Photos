@@ -17,7 +17,11 @@ import {
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 import { Camera } from "lucide-react";
-import { AssetGalleryProps, DEFAULT_GROUP_LABELS } from "../gallery.types";
+import { AssetGalleryProps } from "../gallery.types";
+import {
+  DEFAULT_GROUP_KEYS,
+  formatAssetGroupLabel,
+} from "@/features/assets/utils/assetGroups";
 
 const getThumbnailSize = (width: number) => {
   if (width >= 520) return "large";
@@ -39,7 +43,7 @@ const getScrollParent = (element: HTMLElement | null): HTMLElement | null => {
 };
 
 const JustifiedGallery: React.FC<AssetGalleryProps> = ({
-  groupedPhotos,
+  groups,
   openCarousel,
   onLoadMore,
   hasMore,
@@ -47,7 +51,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   isLoading = false,
   className = "",
 }) => {
-  const { t } = useI18n();
+  const { t, i18n } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const layoutRequestRef = useRef(0);
@@ -59,22 +63,20 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     useJustifiedLayoutService();
 
   const groupEntries = useMemo(
-    () =>
-      Object.entries(groupedPhotos).filter(
-        ([, assets]) => assets && assets.length > 0,
-      ),
-    [groupedPhotos],
+    () => groups.filter((group) => group.assets && group.assets.length > 0),
+    [groups],
   );
 
   const totalAssetCount = useMemo(
-    () => groupEntries.reduce((count, [, assets]) => count + assets.length, 0),
+    () =>
+      groupEntries.reduce((count, group) => count + group.assets.length, 0),
     [groupEntries],
   );
 
   const flatAssetIds = useMemo(
     () =>
       groupEntries
-        .flatMap(([, assets]) => assets.map((asset) => asset.asset_id))
+        .flatMap((group) => group.assets.map((asset) => asset.asset_id))
         .filter((id): id is string => Boolean(id)),
     [groupEntries],
   );
@@ -83,8 +85,8 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
 
   const layoutInputs = useMemo(() => {
     const inputs: Record<string, ReturnType<typeof assetsToLayoutBoxes>> = {};
-    groupEntries.forEach(([groupKey, assets]) => {
-      inputs[groupKey] = assetsToLayoutBoxes(assets);
+    groupEntries.forEach((group) => {
+      inputs[group.key] = assetsToLayoutBoxes(group.assets);
     });
     return inputs;
   }, [groupEntries]);
@@ -176,7 +178,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   const isLayoutPending =
     groupEntries.length > 0 &&
     layoutConfig !== null &&
-    groupEntries.some(([groupKey]) => !layouts[groupKey]);
+    groupEntries.some((group) => !layouts[group.key]);
 
   const supportsIntersectionObserver = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -267,19 +269,26 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
         </div>
       )}
 
-      {groupEntries.map(([groupKey, assets]) => {
-        const layout = layouts[groupKey];
-        const showHeader =
-          groupEntries.length > 1 || !DEFAULT_GROUP_LABELS.has(groupKey);
+        {groupEntries.map((group) => {
+          const groupKey = group.key;
+          const assets = group.assets;
+          const layout = layouts[groupKey];
+          const showHeader =
+            groupEntries.length > 1 || !DEFAULT_GROUP_KEYS.has(groupKey);
+          const groupLabel = formatAssetGroupLabel(
+            groupKey,
+            t,
+            i18n.resolvedLanguage || i18n.language,
+          );
 
-        return (
-          <section key={groupKey} className="mb-10 last:mb-0">
-            {showHeader && (
-              <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-widest text-base-content/60">
-                <span className="font-semibold">{groupKey}</span>
-                <span>
-                  {t("assets.justifiedGallery.item_count", {
-                    count: assets.length,
+          return (
+            <section key={groupKey} className="mb-10 last:mb-0">
+              {showHeader && (
+                <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-widest text-base-content/60">
+                  <span className="font-semibold">{groupLabel}</span>
+                  <span>
+                    {t("assets.justifiedGallery.item_count", {
+                      count: assets.length,
                   })}
                 </span>
               </div>

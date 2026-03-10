@@ -46,7 +46,6 @@ import {
   useFilterState,
   useFilterActions,
   useCurrentTab,
-  useSearchQuery,
 } from "@/features/assets/selectors";
 import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
 import { $api } from "@/lib/http-commons/queryClient";
@@ -76,10 +75,6 @@ const AssetsPageHeader = ({
   const filters = useFilterState();
   const { batchUpdateFilters } = useFilterActions();
   const currentTab = useCurrentTab();
-  const searchQuery = useSearchQuery();
-  // We use the prop callback for onGroupByChange, but we might want to dispatch too?
-  // The prop onGroupByChange passed from parent (Photos.tsx) already calls setGroupBy action.
-  // So we just use the prop. But for search effect we need to call it.
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
@@ -130,20 +125,11 @@ const AssetsPageHeader = ({
     }
   }, [currentTab]);
 
-  // Handle search activation (switch to flat view when searching)
-  useEffect(() => {
-    if (searchQuery.trim() && groupBy !== "flat") {
-      onGroupByChangeRef.current("flat");
-    }
-  }, [searchQuery, groupBy]);
-
   // Use ref to store the latest onFiltersChange callback to avoid dependency issues
   const onFiltersChangeRef = useRef(onFiltersChange);
-  const onGroupByChangeRef = useRef(onGroupByChange);
 
   useEffect(() => {
     onFiltersChangeRef.current = onFiltersChange;
-    onGroupByChangeRef.current = onGroupByChange;
   });
 
   // Handle filter changes
@@ -196,14 +182,9 @@ const AssetsPageHeader = ({
 
       batchUpdateFilters(payload);
 
-      // Switch to flat view when filtering for better result visibility
-      if (payload.enabled && groupBy !== "flat") {
-        onGroupByChangeRef.current("flat");
-      }
-
       onFiltersChangeRef.current?.(newFilters);
     },
-    [batchUpdateFilters, groupBy, inboundHash],
+    [batchUpdateFilters, inboundHash],
   );
 
   // Toggle selection mode
@@ -352,14 +333,6 @@ const AssetsPageHeader = ({
                 className={groupBy === "type" ? "active" : ""}
               >
                 {t("assets.assetsPageHeader.groupByOptions.type")}
-              </a>
-            </li>
-            <li>
-              <a
-                onClick={() => onGroupByChange("album")}
-                className={groupBy === "album" ? "active" : ""}
-              >
-                {t("assets.assetsPageHeader.groupByOptions.album")}
               </a>
             </li>
             <li>

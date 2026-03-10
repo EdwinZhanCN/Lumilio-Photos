@@ -232,6 +232,17 @@ components:
           type: array
           uniqueItems: false
       type: object
+    dto.AssetGroupDTO:
+      properties:
+        assets:
+          items:
+            $ref: '#/components/schemas/dto.AssetDTO'
+          type: array
+          uniqueItems: false
+        key:
+          example: date:today
+          type: string
+      type: object
     dto.AssetIndexingStatsResponseDTO:
       properties:
         photo_total:
@@ -327,7 +338,7 @@ components:
           enum:
           - date
           - type
-          - album
+          - flat
           example: type
           type: string
         pagination:
@@ -342,6 +353,9 @@ components:
           - filename
           - semantic
           example: filename
+          type: string
+        viewer_timezone:
+          example: America/New_York
           type: string
       type: object
     dto.AssetTypesResponseDTO:
@@ -694,6 +708,23 @@ components:
         total_sessions:
           type: integer
       type: object
+    dto.QueryAssetsResponseDTO:
+      properties:
+        groups:
+          items:
+            $ref: '#/components/schemas/dto.AssetGroupDTO'
+          type: array
+          uniqueItems: false
+        limit:
+          example: 20
+          type: integer
+        offset:
+          example: 0
+          type: integer
+        total:
+          example: 150
+          type: integer
+      type: object
     dto.RebuildAssetIndexesRequestDTO:
       properties:
         limit:
@@ -823,7 +854,7 @@ components:
           enum:
           - date
           - type
-          - album
+          - flat
           example: type
           type: string
         pagination:
@@ -836,6 +867,9 @@ components:
           maximum: 50
           minimum: 1
           type: integer
+        viewer_timezone:
+          example: America/New_York
+          type: string
       required:
       - query
       type: object
@@ -847,9 +881,9 @@ components:
         offset:
           example: 0
           type: integer
-        results:
+        result_groups:
           items:
-            $ref: '#/components/schemas/dto.AssetDTO'
+            $ref: '#/components/schemas/dto.AssetGroupDTO'
           type: array
           uniqueItems: false
         results_total:

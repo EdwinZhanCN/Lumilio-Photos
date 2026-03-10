@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from "react";
 import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
 import { Asset } from "@/lib/assets/types";
+import type { AssetGroup } from "@/features/assets";
 
 export type GalleryGridProps = {
   assets?: Asset[];
@@ -33,7 +34,10 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
   className = "",
   onItemClick,
 }) => {
-  const groupedPhotos = useMemo(() => ({ "All Assets": assets }), [assets]);
+  const groups = useMemo<AssetGroup[]>(
+    () => [{ key: "flat:all", assets }],
+    [assets],
+  );
 
   const openCarousel = useCallback(
     (assetId: string) => {
@@ -52,7 +56,7 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
 
   return (
     <SquareGallery
-      groupedPhotos={groupedPhotos}
+      groups={groups}
       openCarousel={openCarousel}
       onLoadMore={() => {}}
       hasMore={false}

@@ -28,6 +28,7 @@ export type {
   SelectionResult,
   TabType,
   GroupByType,
+  AssetGroup,
   ViewDefinitionOptions,
 } from "./types/assets.type";
 

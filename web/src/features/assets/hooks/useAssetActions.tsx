@@ -24,6 +24,7 @@ export const useAssetActions = (): AssetActionsResult => {
   // We strictly match these to avoid accidentally updating unrelated queries
   const ASSET_LIST_QUERY_PATHS = new Set([
     "/api/v1/assets/list",
+    "/api/v1/assets/search",
   ]);
 
   /**
@@ -49,6 +50,21 @@ export const useAssetActions = (): AssetActionsResult => {
    * Helper to manually update asset in cache without invalidation
    */
   const updateAssetInCache = useCallback((assetId: string, updateFn: (asset: Asset) => Asset) => {
+    const updateAssetGroups = (groups: any[] | undefined) => {
+      if (!Array.isArray(groups)) return groups;
+      return groups.map((group) => ({
+        ...group,
+        assets: Array.isArray(group.assets)
+          ? group.assets.map((asset: Asset) => {
+              if (asset.asset_id === assetId) {
+                return updateFn(asset);
+              }
+              return asset;
+            })
+          : group.assets,
+      }));
+    };
+
     queryClient.setQueriesData(
       {
         predicate: (query) => {
@@ -70,19 +86,25 @@ export const useAssetActions = (): AssetActionsResult => {
           return {
             ...oldData,
             pages: oldData.pages.map((page: any) => {
-              if (page.data && Array.isArray(page.data.assets)) {
+              if (page.data) {
+                const nextData = {
+                  ...page.data,
+                  groups: updateAssetGroups(page.data.groups),
+                  result_groups: updateAssetGroups(page.data.result_groups),
+                  top_results: Array.isArray(page.data.top_results)
+                    ? page.data.top_results.map((asset: Asset) => {
+                        if (asset.asset_id === assetId) {
+                          return updateFn(asset);
+                        }
+                        return asset;
+                      })
+                    : page.data.top_results,
+                };
+
                 return {
                   ...page,
-                  data: {
-                    ...page.data,
-                    assets: page.data.assets.map((asset: Asset) => {
-                      if (asset.asset_id === assetId) {
-                        return updateFn(asset);
-                      }
-                      return asset;
-                    }),
-                  },
-                };
+                  data: nextData,
+                }
               }
               return page;
             }),
@@ -257,4 +279,3 @@ export const useAssetActions = (): AssetActionsResult => {
  * (This is essentially the same as above now, potentially can be merged or deprecated)
  */
 export const useAssetActionsSimple = useAssetActions;
-

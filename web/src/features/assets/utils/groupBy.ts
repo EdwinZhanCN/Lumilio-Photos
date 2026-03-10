@@ -1,12 +1,7 @@
 import { GroupByType } from "@/features/assets/types/assets.type";
 
 export const isGroupByType = (value: string | null): value is GroupByType => {
-  return (
-    value === "date" ||
-    value === "type" ||
-    value === "album" ||
-    value === "flat"
-  );
+  return value === "date" || value === "type" || value === "flat";
 };
 
 export const getDefaultGroupBy = (_layout?: string): GroupByType => {

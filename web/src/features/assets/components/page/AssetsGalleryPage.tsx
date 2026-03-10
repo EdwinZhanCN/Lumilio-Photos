@@ -16,15 +16,14 @@ import {
   useSearchQuery,
   useUIActions,
 } from "@/features/assets/selectors";
-import {
-  groupAssets,
-  getFlatAssetsFromGrouped,
-  findAssetIndex,
-} from "@/lib/utils/assetGrouping.ts";
-import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 import { useSettingsContext } from "@/features/settings";
+import type { AssetGroup } from "@/features/assets";
 import type { AssetGalleryProps } from "./gallery.types";
+import {
+  findAssetIndex,
+  flattenAssetGroups,
+} from "@/features/assets/utils/assetGroups";
 
 export type AssetCategory = "photos" | "videos" | "audios";
 
@@ -67,10 +66,9 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     withGroups: false,
     groupBy,
   });
-  const [lastBrowseGroups, setLastBrowseGroups] = useState<Record<
-    string,
-    Asset[]
-  > | null>(null);
+  const [lastBrowseGroups, setLastBrowseGroups] = useState<AssetGroup[] | null>(
+    null,
+  );
 
   const hasFetchedOnce = isFetched;
 
@@ -80,44 +78,32 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const topResultsGroup = useMemo(
-    () => ({
-      [t("search.topResults", { defaultValue: "Top Results" })]:
-        photoSearchView.topResults,
-    }),
-    [photoSearchView.topResults, t],
+  const topResultsGroup = useMemo<AssetGroup[]>(
+    () =>
+      photoSearchView.topResults.length > 0
+        ? [
+            {
+              key: "search:top_results",
+              assets: photoSearchView.topResults,
+            },
+          ]
+        : [],
+    [photoSearchView.topResults],
   );
-  const resultsGroup = useMemo(
-    () => ({
-      [t("search.results", { defaultValue: "Results" })]:
-        photoSearchView.resultAssets,
-    }),
-    [photoSearchView.resultAssets, t],
+  const finalGroupedAssets = useMemo(
+    () => (isPhotoSearchActive ? undefined : groupedAssets ?? []),
+    [groupedAssets, isPhotoSearchActive],
   );
-
-  const finalGroupedAssets = useMemo(() => {
-    if (isPhotoSearchActive) {
-      return undefined;
-    }
-    if (groupedAssets && Object.keys(groupedAssets).length > 0) {
-      return groupedAssets;
-    }
-    return groupAssets(allAssets, groupBy);
-  }, [groupedAssets, allAssets, groupBy, isPhotoSearchActive]);
 
   const flatAssets = useMemo(() => {
     if (isPhotoSearchActive) {
       return allAssets;
     }
-    return getFlatAssetsFromGrouped(finalGroupedAssets ?? {});
+    return flattenAssetGroups(finalGroupedAssets ?? []);
   }, [allAssets, finalGroupedAssets, isPhotoSearchActive]);
 
   useEffect(() => {
-    if (
-      !isPhotoSearchActive &&
-      finalGroupedAssets &&
-      Object.keys(finalGroupedAssets).length > 0
-    ) {
+    if (!isPhotoSearchActive && finalGroupedAssets && finalGroupedAssets.length > 0) {
       setLastBrowseGroups(finalGroupedAssets);
     }
   }, [finalGroupedAssets, isPhotoSearchActive]);
@@ -127,14 +113,14 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     isFetching &&
     allAssets.length === 0 &&
     lastBrowseGroups !== null &&
-    Object.keys(lastBrowseGroups).length > 0;
+    lastBrowseGroups.length > 0;
 
   const renderSearchSections = () => {
     if (showSearchTransitionOverlay && lastBrowseGroups) {
       return (
         <div className="relative">
           <GalleryComponent
-            groupedPhotos={lastBrowseGroups}
+            groups={lastBrowseGroups}
             openCarousel={openCarousel}
             onLoadMore={() => {}}
             hasMore={false}
@@ -190,7 +176,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
 
         {photoSearchView.topResults.length > 0 && (
           <GalleryComponent
-            groupedPhotos={topResultsGroup}
+            groups={topResultsGroup}
             openCarousel={openCarousel}
             onLoadMore={() => {}}
             hasMore={false}
@@ -201,7 +187,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
 
         {(!error || photoSearchView.resultAssets.length > 0) && (
           <GalleryComponent
-            groupedPhotos={resultsGroup}
+            groups={photoSearchView.resultGroups}
             openCarousel={openCarousel}
             onLoadMore={handleLoadMore}
             hasMore={hasNextPage}
@@ -268,7 +254,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
       : allAssets.length > 0);
 
   const browseGalleryProps: AssetGalleryProps = {
-    groupedPhotos: finalGroupedAssets ?? {},
+    groups: finalGroupedAssets ?? [],
     openCarousel,
     onLoadMore: handleLoadMore,
     hasMore: hasNextPage,
