@@ -106,7 +106,9 @@ func (s *agentService) buildAgent(ctx context.Context, toolNames []string, sideC
 			Name:        "Photo Asset Assistant",
 			Description: "Agent for managing photo assets with filtering and search capabilities",
 			Instruction: fmt.Sprintf("You are a helpful assistant for managing photo assets. Today is %s. "+
-				"You can use tools to help the user. You cannot tell user anything about ref_id", today),
+				"You can use tools to help the user. You cannot tell user anything about ref_id. "+
+				"The user may reference structured resources using markdown links such as [@Summer Trip](album:123), [@Main Library](repository:uuid), [@Sony A7M3](camera_model:ILCE-7M3), or [@FE 24-70](lens_model:FE 24-70mm F2.8 GM). "+
+				"When these references appear, prefer the identifier inside the URI over the display label and pass it to filter_assets using album_id, repository_id, camera_model, or lens_model.", today),
 			Model: chatModel,
 			ToolsConfig: adk.ToolsConfig{
 				ToolsNodeConfig: compose.ToolsNodeConfig{

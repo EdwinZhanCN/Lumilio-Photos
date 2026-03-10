@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"server/internal/agent/core"
 	"server/internal/api/dto"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -14,13 +15,17 @@ import (
 
 // AssetFilterInput defines how the LLM calls this tool
 type AssetFilterInput struct {
-	DateFrom string `json:"date_from,omitempty" jsonschema:"description=Start date in YYYY-MM-DD format"`
-	DateTo   string `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format"`
-	Type     string `json:"type,omitempty" jsonschema:"description=Asset type (PHOTO | VIDEO | AUDIO)"`
-	Filename string `json:"filename,omitempty" jsonschema:"description=Filename pattern to search for"`
-	Raw      *bool  `json:"raw,omitempty" jsonschema:"description=Filter for RAW photos only"`
-	Rating   *int   `json:"rating,omitempty" jsonschema:"description=Filter by rating (0-5)"`
-	Liked    *bool  `json:"liked,omitempty" jsonschema:"description=Filter for liked/favorited assets"`
+	RepositoryID string `json:"repository_id,omitempty" jsonschema:"description=Repository UUID. Use this when the user provides a structured reference like [@Main Library](repository:uuid)."`
+	AlbumID      *int   `json:"album_id,omitempty" jsonschema:"description=Album ID. Use this when the user provides a structured reference like [@Summer Trip](album:123)."`
+	CameraModel  string `json:"camera_model,omitempty" jsonschema:"description=Exact camera model identifier from a structured reference like [@Sony A7M3](camera_model:ILCE-7M3)."`
+	LensModel    string `json:"lens_model,omitempty" jsonschema:"description=Exact lens model identifier from a structured reference like [@FE 24-70](lens_model:FE 24-70mm F2.8 GM)."`
+	DateFrom     string `json:"date_from,omitempty" jsonschema:"description=Start date in YYYY-MM-DD format"`
+	DateTo       string `json:"date_to,omitempty" jsonschema:"description=End date in YYYY-MM-DD format"`
+	Type         string `json:"type,omitempty" jsonschema:"description=Asset type (PHOTO | VIDEO | AUDIO)"`
+	Filename     string `json:"filename,omitempty" jsonschema:"description=Filename pattern to search for"`
+	Raw          *bool  `json:"raw,omitempty" jsonschema:"description=Filter for RAW photos only"`
+	Rating       *int   `json:"rating,omitempty" jsonschema:"description=Filter by rating (0-5)"`
+	Liked        *bool  `json:"liked,omitempty" jsonschema:"description=Filter for liked/favorited assets"`
 }
 
 // AssetFilterOutput tool execution result
@@ -34,7 +39,9 @@ type AssetFilterOutput struct {
 func RegisterFilterAsset() {
 	info := &schema.ToolInfo{
 		Name: "filter_assets",
-		Desc: "Constructs a filter configuration for assets. You should set Type per user request correctly. Use this to help the user view specific assets. " +
+		Desc: "Constructs a filter configuration for assets. You should set Type per user request correctly. " +
+			"When the user message contains structured references like [@Album](album:123), [@Repository](repository:uuid), [@Camera](camera_model:ILCE-7M3), or [@Lens](lens_model:...), map them to album_id, repository_id, camera_model, or lens_model instead of guessing from the display name. " +
+			"Use this to help the user view specific assets. " +
 			"Returns a ref_id that can be used by other tools (like bulk_like_assets) to act on these criteria.",
 	}
 
@@ -80,6 +87,19 @@ func RegisterFilterAsset() {
 
 func buildFilterDTO(input *AssetFilterInput) dto.AssetFilterDTO {
 	filter := dto.AssetFilterDTO{}
+
+	if trimmedRepositoryID := strings.TrimSpace(input.RepositoryID); trimmedRepositoryID != "" {
+		filter.RepositoryID = &trimmedRepositoryID
+	}
+	if input.AlbumID != nil {
+		filter.AlbumID = input.AlbumID
+	}
+	if trimmedCameraModel := strings.TrimSpace(input.CameraModel); trimmedCameraModel != "" {
+		filter.CameraMake = &trimmedCameraModel
+	}
+	if trimmedLensModel := strings.TrimSpace(input.LensModel); trimmedLensModel != "" {
+		filter.Lens = &trimmedLensModel
+	}
 
 	// Date Range
 	if input.DateFrom != "" || input.DateTo != "" {

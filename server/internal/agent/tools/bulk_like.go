@@ -233,9 +233,13 @@ func convertDTOToParams(f dto.AssetFilterDTO) repo.FilterAssetsParams {
 		params.OwnerID = f.OwnerID
 	}
 	if f.RepositoryID != nil {
-		// Assuming UUID parsing is handled or we need to parse string to pgtype.UUID
-		// For simplicity in this snippet, we might skip complex UUID parsing if not strictly needed or handle it safely
-		// In a real app, parse the UUID string
+		if parsed, err := uuid.Parse(*f.RepositoryID); err == nil {
+			params.RepositoryID = pgtype.UUID{Bytes: [16]byte(parsed), Valid: true}
+		}
+	}
+	if f.AlbumID != nil {
+		albumID := int32(*f.AlbumID)
+		params.AlbumID = &albumID
 	}
 	if f.Filename != nil {
 		params.FilenameVal = &f.Filename.Value

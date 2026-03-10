@@ -1,9 +1,6 @@
 import { RichInput, RichInputProvider } from "../RichInput";
-import {
-  MentionEntity,
-  MentionType,
-  MentionTypeOption,
-} from "../RichInput/types";
+import { MentionEntity, MentionType } from "../RichInput/types";
+import { useMentionCatalog } from "../RichInput/useMentionCatalog";
 
 interface LumilioInputProps {
   isGenerating: boolean;
@@ -22,23 +19,10 @@ export function LumilioInput({
   disabled = false,
   disabledHint,
 }: LumilioInputProps) {
-  // Mention feature remains a placeholder for now
-  const mentionTypes: MentionTypeOption[] = [
-    { type: "placeholder", label: "Placeholder" },
-  ];
+  const { mentionTypes, entitiesByType, isLoading } = useMentionCatalog();
 
-  const getEntitiesByType = (type: MentionType) => {
-    const entities: Record<MentionType, MentionEntity[]> = {
-      placeholder: [
-        {
-          id: "placeholder-123",
-          label: "Placeholder Label",
-          type: "placeholder",
-        },
-      ],
-    };
-    return entities[type] || [];
-  };
+  const getEntitiesByType = (type: MentionType): MentionEntity[] =>
+    entitiesByType[type] ?? [];
 
   return (
     <RichInputProvider>
@@ -61,7 +45,11 @@ export function LumilioInput({
         <div className="text-xs text-base-content/60 mt-2">
           {disabled
             ? (disabledHint ?? "Lumilio Agent is unavailable.")
-            : isGenerating && "Generating response..."}
+            : isGenerating
+              ? "Generating response..."
+              : isLoading
+                ? "Loading mention catalog..."
+                : null}
         </div>
       </div>
     </RichInputProvider>

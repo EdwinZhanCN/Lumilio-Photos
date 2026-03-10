@@ -66,6 +66,8 @@ export interface UIState {
 // ===== Filters State =====
 export interface FiltersState {
   enabled: boolean;
+  repository_id?: string;
+  album_id?: number;
   raw?: boolean;
   rating?: number;
   liked?: boolean;

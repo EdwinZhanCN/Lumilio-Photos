@@ -1,7 +1,7 @@
 import React from "react";
 
 /** 可提及的类型 */
-export type MentionType = "placeholder";
+export type MentionType = "album" | "repository" | "camera" | "lens";
 
 /** 输入触发阶段 */
 export type TriggerPhase = "IDLE" | "SELECT_TYPE" | "SELECT_ENTITY" | "COMMAND";

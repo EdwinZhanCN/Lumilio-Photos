@@ -17,6 +17,7 @@ func init() {
 	// For tool outputs that are stored in ReferenceManager
 	gob.Register(repo.Asset{})
 	gob.Register([]repo.Asset{})
+	gob.Register(dto.AssetFilterDTO{})
 	gob.Register(&dto.BulkLikeUpdateDTO{})
 
 	// For type converters

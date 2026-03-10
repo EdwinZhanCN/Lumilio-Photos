@@ -22,7 +22,7 @@ interface RichInputState {
   options: MentionEntity[];  // 菜单选项列表
   selectedIndex: number;  // 当前选中的选项索引
   menuPos: { top: number; left: number } | null;  // 菜单位置
-  payload: string;  // 解析后的内容（格式：@[Label](Type:ID)）
+  payload: string;  // 解析后的内容（格式：[@Label](type:id)）
 }
 ```
 
@@ -123,7 +123,7 @@ const getEntitiesByType = (type: MentionType) => {
 function ChatInput() {
   const handleSubmit = (payload: string) => {
     console.log("Submitted payload:", payload);
-    // 处理提交，例如：@[Summer Trip](album:1) @[Beach](tag:2)
+    // 处理提交，例如：[@Summer Trip](album:1) [@Sony A7M3](camera_model:ILCE-7M3)
   };
   
   return (
@@ -143,7 +143,7 @@ function ChatInput() {
 提交时，`onSubmit` 回调会收到格式化的 payload：
 
 ```
-Hello @[Summer Trip](album:1) from @[Beach](tag:2)!
+Hello [@Summer Trip](album:1) from [@Sony A7M3](camera_model:ILCE-7M3)!
 ```
 
 这种格式可以被后端轻松解析，提取出所有的提及实体。
@@ -178,4 +178,4 @@ const pill = createPillElement({
 1. **必须包裹在 Provider 中**: 使用 `RichInput` 组件前，必须用 `RichInputProvider` 包裹你的应用
 2. **ContentEditable 限制**: 由于使用原生 DOM API，样式和事件处理需要特别小心
 3. **图标自定义**: 可以通过 `icon` 字段自定义每个实体的图标，不传则使用默认的 @ 图标
-4. **Payload 解析**: payload 格式为 `@[Label](Type:ID)`，后端需要相应处理
+4. **Payload 解析**: payload 格式为 `[@Label](type:id)`，后端需要相应处理

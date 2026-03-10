@@ -4,14 +4,14 @@ import ReactDOMServer from "react-dom/server";
 /** Parses contentEditable container content into a structured payload string.
  *
  * Combines text nodes and mention elements (with data-mention-* attributes) into
- * a formatted string. Mention elements are converted to format: @[Label](Type:ID).
+ * a formatted string. Mention elements are converted to format: [@Label](type:id).
  *
  * @param container - The contentEditable container element.
  * @returns The parsed payload string.
  *
  * @example
- * HTML content: "Hello @[Summer Trip](album:123)!"
- * Returns: "Hello @[Summer Trip](album:123)"
+ * HTML content: "Hello [@Summer Trip](album:123)!"
+ * Returns: "Hello [@Summer Trip](album:123)"
  */
 export const parseContentToPayload = (container: HTMLDivElement): string => {
   let text = "";
@@ -28,7 +28,11 @@ export const parseContentToPayload = (container: HTMLDivElement): string => {
         const label = el.getAttribute("data-mention-label");
 
         if (id && type && label) {
-          text += ` @[${label}](${type}:${id}) `;
+          if (type === "command") {
+            text += ` @[${label}](${type}:${id}) `;
+          } else {
+            text += ` [@${label}](${type}:${id}) `;
+          }
         }
       } else {
         text += el.innerText;
@@ -94,7 +98,7 @@ export const createPillElement = (entity: {
     : getDefaultIconByType(entity.type);
 
   const displayLabel =
-    entity.type === "command" ? `/${entity.label}` : entity.label;
+    entity.type === "command" ? `/${entity.label}` : `@${entity.label}`;
   span.innerHTML = `${iconHtml}${displayLabel}`;
 
   return span;

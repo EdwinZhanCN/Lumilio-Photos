@@ -15,6 +15,8 @@ export const Link: React.FC<LinkBlockProps> = ({
   children,
   ...props
 }) => {
+  const isResourceReference =
+    href && /^(album|repository|camera_model|lens_model):/i.test(href);
   const isExternal =
     href && (href.startsWith("http") || href.startsWith("https"));
   const isEmail = href && href.startsWith("mailto:");
@@ -126,7 +128,9 @@ export const Link: React.FC<LinkBlockProps> = ({
     "inline-flex items-center bg-gray-200 hover:bg-gray-300 text-gray-800/60 px-1 py-1 m-0.5 rounded-full text-xs font-medium transition-all duration-200 hover:shadow-sm no-underline";
 
   const displayText =
-    typeof children === "string" ? truncateText(children) : children;
+    typeof children === "string" && !isResourceReference
+      ? truncateText(children)
+      : children;
 
   const fullText = getFullText();
 
@@ -138,6 +142,19 @@ export const Link: React.FC<LinkBlockProps> = ({
         {...props}
       >
         {displayText}
+      </span>
+    );
+  }
+
+  if (isResourceReference) {
+    return (
+      <span
+        className={`tooltip inline-flex items-center bg-base-300/70 text-base-content px-2 py-1 m-0.5 rounded-full text-xs font-medium ${className}`}
+        data-tip={href}
+        title={title}
+        {...props}
+      >
+        <span>{displayText}</span>
       </span>
     );
   }

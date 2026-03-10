@@ -8,7 +8,10 @@ import { AssetFilter } from "@/lib/assets/types";
 import { AssetViewDefinition } from "@/features/assets/types/assets.type";
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
-import { findAssetIndex, getFlatAssetsFromGrouped } from "@/lib/utils/assetGrouping";
+import {
+  findAssetIndex,
+  getFlatAssetsFromGrouped,
+} from "@/lib/utils/assetGrouping";
 import PageHeader from "@/components/PageHeader.tsx";
 import { WorkerProvider } from "@/contexts/WorkerProvider.tsx";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
@@ -34,13 +37,17 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
     resetFilters();
 
     const payload: any = { enabled: true };
+    if (filterDTO.repository_id)
+      payload.repository_id = filterDTO.repository_id;
+    if (typeof filterDTO.album_id === "number")
+      payload.album_id = filterDTO.album_id;
     if (filterDTO.raw !== undefined) payload.raw = filterDTO.raw;
     if (filterDTO.rating !== undefined) payload.rating = filterDTO.rating;
     if (filterDTO.liked !== undefined) payload.liked = filterDTO.liked;
     if (filterDTO.filename) {
       payload.filename = {
         mode: filterDTO.filename.mode,
-        value: filterDTO.filename.value
+        value: filterDTO.filename.value,
       };
     }
     if (filterDTO.date) {
@@ -70,7 +77,10 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
         <dialog className="modal modal-open">
           <div className="modal-box w-11/12 max-w-7xl h-[90vh] p-5 overflow-hidden flex flex-col bg-base-100 shadow-2xl">
             {/* Header */}
-            <PageHeader title={`${event.tool.name} Results`} icon={<Hammer className="w-6 h-6 text-primary" />}>
+            <PageHeader
+              title={`${event.tool.name} Results`}
+              icon={<Hammer className="w-6 h-6 text-primary" />}
+            >
               <div className="flex items-center gap-4">
                 <button
                   className="btn btn-sm btn-soft btn-info"
@@ -80,13 +90,19 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
                   <ExternalLink className="w-4 h-4 mr-1" />
                   Open Full View
                 </button>
-                <button className="btn btn-sm btn-soft btn-info" onClick={() => setIsModalOpen(false)}>
+                <button
+                  className="btn btn-sm btn-soft btn-info"
+                  onClick={() => setIsModalOpen(false)}
+                >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </PageHeader>
             {/* Content */}
-            <div className="flex-1 overflow-y-auto relative bg-base-100" id="agent-gallery-container">
+            <div
+              className="flex-1 overflow-y-auto relative bg-base-100"
+              id="agent-gallery-container"
+            >
               <WorkerProvider preload={["exif", "export"]}>
                 <AssetsProvider persist={false}>
                   <AgentGallery filter={filterDTO} />
@@ -94,7 +110,11 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
               </WorkerProvider>
             </div>
           </div>
-          <form method="dialog" className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
+          <form
+            method="dialog"
+            className="modal-backdrop"
+            onClick={() => setIsModalOpen(false)}
+          >
             <button>close</button>
           </form>
         </dialog>
@@ -106,15 +126,18 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
 const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
   const [carouselAssetId, setCarouselAssetId] = useState<string | undefined>();
 
-  const viewDefinition = useMemo<AssetViewDefinition>(() => ({
-    filter: filter,
-    // Default to all types to prevent "missing query parameters" error from backend
-    // when filter is empty (which triggers listAssets instead of filterAssets)
-    types: ["photos", "videos", "audios"],
-    groupBy: "date",
-    pageSize: 50,
-    inheritGlobalFilter: false,
-  }), [filter]);
+  const viewDefinition = useMemo<AssetViewDefinition>(
+    () => ({
+      filter: filter,
+      // Default to all types to prevent "missing query parameters" error from backend
+      // when filter is empty (which triggers listAssets instead of filterAssets)
+      types: ["photos", "videos", "audios"],
+      groupBy: "date",
+      pageSize: 50,
+      inheritGlobalFilter: false,
+    }),
+    [filter],
+  );
 
   const {
     assets,
@@ -126,7 +149,7 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
     error,
   } = useAssetsView(viewDefinition, {
     withGroups: true,
-    autoFetch: true
+    autoFetch: true,
   });
 
   // Use flat assets from grouped to ensure order consistency with gallery

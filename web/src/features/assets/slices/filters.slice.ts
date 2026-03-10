@@ -24,6 +24,8 @@ export const createFiltersSlice: StateCreator<
 > = (set) => ({
   filters: {
     enabled: false,
+    repository_id: undefined,
+    album_id: undefined,
     raw: undefined,
     rating: undefined,
     liked: undefined,
@@ -77,6 +79,8 @@ export const createFiltersSlice: StateCreator<
     set((state) => {
       state.filters = {
         enabled: false,
+        repository_id: undefined,
+        album_id: undefined,
         raw: undefined,
         rating: undefined,
         liked: undefined,
@@ -98,7 +102,7 @@ type FiltersInput = FiltersSlice | FiltersState;
 
 // Helper to normalize input
 const getFiltersState = (input: FiltersInput): FiltersState => {
-  if ('filters' in input && input.filters && 'enabled' in input.filters) {
+  if ("filters" in input && input.filters && "enabled" in input.filters) {
     return input.filters;
   }
   return input as FiltersState;
@@ -114,6 +118,8 @@ export const selectActiveFilterCount = (input: FiltersInput): number => {
   if (!state.enabled) return 0;
 
   const activeCriteria = [
+    state.repository_id?.trim(),
+    typeof state.album_id === "number",
     state.raw !== undefined,
     state.rating !== undefined,
     state.liked !== undefined,
@@ -136,6 +142,12 @@ export const selectFilterAsAssetFilter = (input: FiltersInput) => {
 
   const filter: any = {};
 
+  if (state.repository_id && state.repository_id.trim()) {
+    filter.repository_id = state.repository_id.trim();
+  }
+  if (typeof state.album_id === "number") {
+    filter.album_id = state.album_id;
+  }
   if (state.raw !== undefined) {
     filter.raw = state.raw;
   }
