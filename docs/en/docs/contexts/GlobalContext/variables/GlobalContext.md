@@ -4,4 +4,4 @@
 
 > `const` **GlobalContext**: `Context`\<`GlobalContextType`\>
 
-Defined in: [contexts/GlobalContext.tsx:39](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/43e2dfc3fd5f3ba3469ef5348f11dc6290c89e5a/web/src/contexts/GlobalContext.tsx#L39)
+Defined in: [contexts/GlobalContext.tsx:39](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6b7103d63c37471fbdf813781839aa2001f474e0/web/src/contexts/GlobalContext.tsx#L39)
