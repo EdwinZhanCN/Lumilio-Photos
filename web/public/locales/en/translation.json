@@ -75,7 +75,6 @@
         }
     },
     "collections": {
-        "emptyMessage": "Create your first album to get started",
         "untitled": "Untitled Album",
         "createSuccess": "Album created successfully",
         "deleteSuccess": "Album deleted successfully",
@@ -264,7 +263,6 @@
             "unknown_type": "Unknown type"
         },
         "justifiedGallery": {
-            "no_assets_found": "No assets found",
             "item_count": "{{count}} item",
             "item_count_plural": "{{count}} items",
             "loading_more": "Loading more"
@@ -751,7 +749,11 @@
         "uploaded": "Uploaded",
         "pressCtrlEnterToSave": "Press Ctrl+Enter to save",
         "clickToEdit": "Click to edit",
-        "loadMore": "Load More"
+        "loadMore": "Load More",
+        "emptyState": {
+            "title": "Nothing here yet",
+            "description": "Items will appear here when available."
+        }
     },
     "monitor": {
         "title": "Server Monitor",

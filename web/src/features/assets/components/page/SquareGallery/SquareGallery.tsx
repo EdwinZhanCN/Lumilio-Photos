@@ -4,12 +4,12 @@ import { useKeyboardSelection } from "@/features/assets";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
-import { Camera } from "lucide-react";
 import { AssetGalleryProps } from "../gallery.types";
 import {
   DEFAULT_GROUP_KEYS,
   formatAssetGroupLabel,
 } from "@/features/assets/utils/assetGroups";
+import EmptyState from "@/components/EmptyState";
 
 interface SquareGalleryProps extends AssetGalleryProps {
   renderTileCaption?: (
@@ -136,16 +136,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
   }, [supportsIntersectionObserver]);
 
   if (!isLoading && totalAssetCount === 0) {
-    return (
-      <div
-        className={`w-full p-8 text-center text-base-content/60 ${className}`}
-      >
-        <div className="flex flex-col items-center justify-center gap-3 py-8">
-          <Camera className="size-12 text-base-300" />
-          <span>{t("assets.justifiedGallery.no_assets_found")}</span>
-        </div>
-      </div>
-    );
+    return <EmptyState className={className} />;
   }
 
   return (
