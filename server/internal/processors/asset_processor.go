@@ -53,3 +53,7 @@ func NewAssetProcessor(
 		lumenService:    lumenService,
 	}
 }
+
+func (ap *AssetProcessor) runtimeIndexingTaskAvailable(task service.AssetIndexingTask) bool {
+	return service.IsIndexingTaskRuntimeAvailable(ap.lumenService, task)
+}

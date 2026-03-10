@@ -18,6 +18,7 @@ import (
 	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
+	"server/internal/service"
 	"server/internal/utils/imaging"
 )
 
@@ -221,6 +222,27 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, asset *repo.Asset, fu
 		return fmt.Errorf("load ML settings: %w", err)
 	}
 
+	clipEnabled := taskSet["process_clip"] && mlConfig.CLIPEnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskClip)
+	ocrEnabled := taskSet["process_ocr"] && mlConfig.OCREnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskOCR)
+	captionEnabled := taskSet["process_caption"] && mlConfig.CaptionEnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskCaption)
+	faceEnabled := taskSet["process_face"] && mlConfig.FaceEnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskFace)
+
+	if taskSet["process_clip"] && mlConfig.CLIPEnabled && !clipEnabled {
+		log.Printf("Skipping process_clip retry enqueue for asset %s: runtime unavailable", asset.AssetID.String())
+	}
+	if taskSet["process_ocr"] && mlConfig.OCREnabled && !ocrEnabled {
+		log.Printf("Skipping process_ocr retry enqueue for asset %s: runtime unavailable", asset.AssetID.String())
+	}
+	if taskSet["process_caption"] && mlConfig.CaptionEnabled && !captionEnabled {
+		log.Printf("Skipping process_caption retry enqueue for asset %s: runtime unavailable", asset.AssetID.String())
+	}
+	if taskSet["process_face"] && mlConfig.FaceEnabled && !faceEnabled {
+		log.Printf("Skipping process_face retry enqueue for asset %s: runtime unavailable", asset.AssetID.String())
+	}
+	if !clipEnabled && !ocrEnabled && !captionEnabled && !faceEnabled {
+		return nil
+	}
+
 	// Extract RAW preview once (shared by all ML jobs if needed)
 	previewData, err := ap.extractRAWPreview(ctx, fullPath, asset.OriginalFilename)
 	if err != nil {
@@ -245,7 +267,7 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, asset *repo.Asset, fu
 	defer closeFunc()
 
 	// CLIP: process_clip queue
-	if taskSet["process_clip"] && mlConfig.CLIPEnabled {
+	if clipEnabled {
 		clipData, err := imaging.ProcessImageStream(imageInput, bimg.Options{
 			Width:     224,
 			Height:    224,
@@ -269,7 +291,7 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, asset *repo.Asset, fu
 	}
 
 	// OCR: process_ocr queue
-	if taskSet["process_ocr"] && mlConfig.OCREnabled {
+	if ocrEnabled {
 		// Reset reader
 		if previewData != nil {
 			imageInput = bytes.NewReader(previewData)
@@ -303,7 +325,7 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, asset *repo.Asset, fu
 	}
 
 	// Caption: process_caption queue
-	if taskSet["process_caption"] && mlConfig.CaptionEnabled {
+	if captionEnabled {
 		// Reset reader
 		if previewData != nil {
 			imageInput = bytes.NewReader(previewData)
@@ -337,7 +359,7 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, asset *repo.Asset, fu
 	}
 
 	// Face: process_face queue
-	if taskSet["process_face"] && mlConfig.FaceEnabled {
+	if faceEnabled {
 		// Reset reader
 		if previewData != nil {
 			imageInput = bytes.NewReader(previewData)
