@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
+	"server/internal/service"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
 	"server/internal/utils/raw"
@@ -111,8 +113,28 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset, 
 	}
 
 	// Early return if no ML services are enabled by runtime config.
-	// Runtime task availability is handled by per-task workers via snooze/retry.
 	if !mlConfig.CLIPEnabled && !mlConfig.OCREnabled && !mlConfig.CaptionEnabled && !mlConfig.FaceEnabled {
+		return nil
+	}
+
+	clipEnabled := mlConfig.CLIPEnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskClip)
+	ocrEnabled := mlConfig.OCREnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskOCR)
+	captionEnabled := mlConfig.CaptionEnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskCaption)
+	faceEnabled := mlConfig.FaceEnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskFace)
+
+	if mlConfig.CLIPEnabled && !clipEnabled {
+		log.Printf("Skipping process_clip enqueue for asset %s: runtime unavailable", asset.AssetID.String())
+	}
+	if mlConfig.OCREnabled && !ocrEnabled {
+		log.Printf("Skipping process_ocr enqueue for asset %s: runtime unavailable", asset.AssetID.String())
+	}
+	if mlConfig.CaptionEnabled && !captionEnabled {
+		log.Printf("Skipping process_caption enqueue for asset %s: runtime unavailable", asset.AssetID.String())
+	}
+	if mlConfig.FaceEnabled && !faceEnabled {
+		log.Printf("Skipping process_face enqueue for asset %s: runtime unavailable", asset.AssetID.String())
+	}
+	if !clipEnabled && !ocrEnabled && !captionEnabled && !faceEnabled {
 		return nil
 	}
 
@@ -142,7 +164,7 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset, 
 	defer closeFunc()
 
 	// CLIP: requires 224x224 WEBP
-	if mlConfig.CLIPEnabled {
+	if clipEnabled {
 		clipData, err := imaging.ProcessImageStream(imageInput, bimg.Options{
 			Width:     224,
 			Height:    224,
@@ -166,7 +188,7 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset, 
 	}
 
 	// OCR: requires medium resolution for text extraction
-	if mlConfig.OCREnabled {
+	if ocrEnabled {
 		// Reset reader for OCR (need to re-read if already consumed by CLIP)
 		if previewData != nil {
 			imageInput = bytes.NewReader(previewData)
@@ -200,7 +222,7 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset, 
 	}
 
 	// Caption: requires medium-high resolution for AI captioning
-	if mlConfig.CaptionEnabled {
+	if captionEnabled {
 		// Reset reader for Caption
 		if previewData != nil {
 			imageInput = bytes.NewReader(previewData)
@@ -234,7 +256,7 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset, 
 	}
 
 	// Face: requires medium-high resolution for face detection
-	if mlConfig.FaceEnabled {
+	if faceEnabled {
 		// Reset reader for Face
 		if previewData != nil {
 			imageInput = bytes.NewReader(previewData)

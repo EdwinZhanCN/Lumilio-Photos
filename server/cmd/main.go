@@ -161,7 +161,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
-	indexingService := service.NewAssetIndexingService(queries, settingsService, queueClient, pgxPool)
+	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool)
 	authService := service.NewAuthService(queries)
 	albumService := service.NewAlbumService(queries)
 

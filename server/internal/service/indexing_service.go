@@ -78,6 +78,7 @@ type AssetIndexingService interface {
 type assetIndexingService struct {
 	queries         *repo.Queries
 	settingsService SettingsService
+	runtimeChecker  TaskAvailabilityChecker
 	queueClient     *river.Client[pgx.Tx]
 	dbpool          *pgxpool.Pool
 }
@@ -90,12 +91,14 @@ type reindexCandidate struct {
 func NewAssetIndexingService(
 	queries *repo.Queries,
 	settingsService SettingsService,
+	runtimeChecker TaskAvailabilityChecker,
 	queueClient *river.Client[pgx.Tx],
 	dbpool *pgxpool.Pool,
 ) AssetIndexingService {
 	return &assetIndexingService{
 		queries:         queries,
 		settingsService: settingsService,
+		runtimeChecker:  runtimeChecker,
 		queueClient:     queueClient,
 		dbpool:          dbpool,
 	}
@@ -250,6 +253,16 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		log.Printf("reindex: no enabled tasks for request %v", requestedTasks)
 		return nil
 	}
+
+	runtimeAvailableTasks := FilterRuntimeAvailableIndexingTasks(enabledTasks, s.runtimeChecker)
+	if len(runtimeAvailableTasks) == 0 {
+		log.Printf("reindex: no runtime-available tasks for request %v", requestedTasks)
+		return nil
+	}
+	if len(runtimeAvailableTasks) != len(enabledTasks) {
+		log.Printf("reindex: skipping runtime-unavailable tasks (enabled=%v available=%v)", enabledTasks, runtimeAvailableTasks)
+	}
+	enabledTasks = runtimeAvailableTasks
 
 	repositoryUUID, err := parseRepositoryUUID(input.RepositoryID)
 	if err != nil {
