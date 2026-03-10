@@ -71,7 +71,6 @@ type Querier interface {
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteTag(ctx context.Context, tagID int32) error
 	DeleteUser(ctx context.Context, userID int32) error
-	FilterAlbumAssets(ctx context.Context, arg FilterAlbumAssetsParams) ([]Asset, error)
 	FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]Asset, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAssetCountScopedParams) (int64, error)
