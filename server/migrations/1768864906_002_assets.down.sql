@@ -2,6 +2,7 @@
 -- WARNING: This will permanently delete data
 
 DROP INDEX IF EXISTS embeddings_vector_idx;
+DROP INDEX IF EXISTS embeddings_one_primary_per_asset_type_idx;
 DROP INDEX IF EXISTS embeddings_primary_idx;
 DROP INDEX IF EXISTS embeddings_type_model_idx;
 DROP INDEX IF EXISTS embeddings_asset_type_idx;

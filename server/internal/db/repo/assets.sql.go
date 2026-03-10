@@ -202,22 +202,29 @@ func (q *Queries) CountAssetsByStatusAndRepository(ctx context.Context, arg Coun
 }
 
 const countAssetsUnified = `-- name: CountAssetsUnified :one
-SELECT COUNT(DISTINCT a.asset_id) as count
+SELECT COUNT(*) as count
 FROM assets a
-LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE a.is_deleted = false
   AND ($1::text IS NULL OR a.original_filename ILIKE '%' || $1 || '%')
   AND ($2::text IS NULL OR a.type = $2)
   AND ($3::text[] IS NULL OR a.type = ANY($3::text[]))
   AND ($4::integer IS NULL OR a.owner_id = $4)
   AND ($5::uuid IS NULL OR a.repository_id = $5)
-  AND ($6::integer IS NULL OR aa.album_id = $6)
+  AND (
+    $6::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa
+      WHERE aa.asset_id = a.asset_id
+        AND aa.album_id = $6
+    )
+  )
   AND ($7::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $7)
   AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $8)
   AND ($9::boolean IS NULL OR
     CASE
-      WHEN $9 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
-      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+      WHEN $9 = true THEN a.specific_metadata->>'is_raw' = 'true'
+      ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
     END
   )
   AND ($10::integer IS NULL OR
@@ -271,10 +278,9 @@ func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnified
 }
 
 const countAssetsVectorUnified = `-- name: CountAssetsVectorUnified :one
-SELECT COUNT(DISTINCT a.asset_id) as count
+SELECT COUNT(*) as count
 FROM assets a
 JOIN embeddings e ON a.asset_id = e.asset_id
-LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE a.is_deleted = false
   AND e.embedding_type = $1::text
   AND e.is_primary = true
@@ -282,13 +288,21 @@ WHERE a.is_deleted = false
   AND ($3::text[] IS NULL OR a.type = ANY($3::text[]))
   AND ($4::integer IS NULL OR a.owner_id = $4)
   AND ($5::uuid IS NULL OR a.repository_id = $5)
-  AND ($6::integer IS NULL OR aa.album_id = $6)
+  AND (
+    $6::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa
+      WHERE aa.asset_id = a.asset_id
+        AND aa.album_id = $6
+    )
+  )
   AND ($7::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $7)
   AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $8)
   AND ($9::boolean IS NULL OR
     CASE
-      WHEN $9 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
-      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
+      WHEN $9 = true THEN a.specific_metadata->>'is_raw' = 'true'
+      ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
     END
   )
   AND ($10::integer IS NULL OR
@@ -1554,41 +1568,61 @@ func (q *Queries) GetAssetsByTypesSorted(ctx context.Context, arg GetAssetsByTyp
 
 const getAssetsUnified = `-- name: GetAssetsUnified :many
 
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
-LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
-WHERE a.is_deleted = false
-  AND ($1::text IS NULL OR a.original_filename ILIKE '%' || $1 || '%')
-  AND ($2::text IS NULL OR a.type = $2)
-  AND ($3::text[] IS NULL OR a.type = ANY($3::text[]))
-  AND ($4::integer IS NULL OR a.owner_id = $4)
-  AND ($5::uuid IS NULL OR a.repository_id = $5)
-  AND ($6::integer IS NULL OR aa.album_id = $6)
-  AND ($7::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $7)
-  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $8)
-  AND ($9::boolean IS NULL OR
+WITH page_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
     CASE
-      WHEN $9 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
-      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
-    END
-  )
-  AND ($10::integer IS NULL OR
-    CASE
-      WHEN $10 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $10
-    END
-  )
-  AND ($11::boolean IS NULL OR a.liked = $11)
-  AND ($12::text IS NULL OR a.specific_metadata->>'camera_model' = $12)
-  AND ($13::text IS NULL OR a.specific_metadata->>'lens_model' = $13)
-ORDER BY
-  -- When sorting by type, use mime_type for actual file format grouping
-  -- This ensures image/jpeg, image/png, image/heic etc. are grouped together
-  CASE WHEN $14::text = 'type' THEN a.mime_type END ASC,
-  COALESCE(a.taken_time, a.upload_time) DESC
-LIMIT $16 OFFSET $15
+      WHEN $1::text = 'type' THEN a.mime_type
+      ELSE NULL
+    END AS sort_mime,
+    COALESCE(a.taken_time, a.upload_time) AS sort_time
+  FROM assets a
+  WHERE a.is_deleted = false
+    AND ($2::text IS NULL OR a.original_filename ILIKE '%' || $2 || '%')
+    AND ($3::text IS NULL OR a.type = $3)
+    AND ($4::text[] IS NULL OR a.type = ANY($4::text[]))
+    AND ($5::integer IS NULL OR a.owner_id = $5)
+    AND ($6::uuid IS NULL OR a.repository_id = $6)
+    AND (
+      $7::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = $7
+      )
+    )
+    AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $8)
+    AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $9)
+    AND ($10::boolean IS NULL OR
+      CASE
+        WHEN $10 = true THEN a.specific_metadata->>'is_raw' = 'true'
+        ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
+      END
+    )
+    AND ($11::integer IS NULL OR
+      CASE
+        WHEN $11 = 0 THEN a.rating IS NULL
+        ELSE a.rating = $11
+      END
+    )
+    AND ($12::boolean IS NULL OR a.liked = $12)
+    AND ($13::text IS NULL OR a.specific_metadata->>'camera_model' = $13)
+    AND ($14::text IS NULL OR a.specific_metadata->>'lens_model' = $14)
+  ORDER BY
+    CASE WHEN $1::text = 'type' THEN a.mime_type END ASC,
+    COALESCE(a.taken_time, a.upload_time) DESC,
+    a.asset_id DESC
+  LIMIT $16 OFFSET $15
+)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.sort_mime ASC NULLS LAST, p.sort_time DESC, p.asset_id DESC
 `
 
 type GetAssetsUnifiedParams struct {
+	SortBy       *string            `db:"sort_by" json:"sort_by"`
 	Query        *string            `db:"query" json:"query"`
 	AssetType    *string            `db:"asset_type" json:"asset_type"`
 	AssetTypes   []string           `db:"asset_types" json:"asset_types"`
@@ -1602,7 +1636,6 @@ type GetAssetsUnifiedParams struct {
 	Liked        *bool              `db:"liked" json:"liked"`
 	CameraModel  *string            `db:"camera_model" json:"camera_model"`
 	LensModel    *string            `db:"lens_model" json:"lens_model"`
-	SortBy       *string            `db:"sort_by" json:"sort_by"`
 	Offset       int32              `db:"offset" json:"offset"`
 	Limit        int32              `db:"limit" json:"limit"`
 }
@@ -1615,6 +1648,7 @@ type GetAssetsUnifiedParams struct {
 // Use this for most queries unless semantic search is needed
 func (q *Queries) GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedParams) ([]Asset, error) {
 	rows, err := q.db.Query(ctx, getAssetsUnified,
+		arg.SortBy,
 		arg.Query,
 		arg.AssetType,
 		arg.AssetTypes,
@@ -1628,7 +1662,6 @@ func (q *Queries) GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedPara
 		arg.Liked,
 		arg.CameraModel,
 		arg.LensModel,
-		arg.SortBy,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -2680,38 +2713,53 @@ func (q *Queries) SearchAssetsVector(ctx context.Context, arg SearchAssetsVector
 }
 
 const searchAssetsVectorUnified = `-- name: SearchAssetsVectorUnified :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, (e.embedding <-> $1::vector) AS distance
-FROM assets a
-JOIN embeddings e ON a.asset_id = e.asset_id
-LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
-WHERE a.is_deleted = false
-  AND e.embedding_type = $2::text
-  AND e.is_primary = true
-  AND ($3::text IS NULL OR a.type = $3)
-  AND ($4::text[] IS NULL OR a.type = ANY($4::text[]))
-  AND ($5::integer IS NULL OR a.owner_id = $5)
-  AND ($6::uuid IS NULL OR a.repository_id = $6)
-  AND ($7::integer IS NULL OR aa.album_id = $7)
-  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $8)
-  AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $9)
-  AND ($10::boolean IS NULL OR
-    CASE
-      WHEN $10 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
-      ELSE (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
-    END
-  )
-  AND ($11::integer IS NULL OR
-    CASE
-      WHEN $11 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $11
-    END
-  )
-  AND ($12::boolean IS NULL OR a.liked = $12)
-  AND ($13::text IS NULL OR a.specific_metadata->>'camera_model' = $13)
-  AND ($14::text IS NULL OR a.specific_metadata->>'lens_model' = $14)
-  AND (e.embedding <-> $1::vector) <= $15::float8
-ORDER BY (e.embedding <-> $1::vector)
-LIMIT $17 OFFSET $16
+WITH candidate_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    (e.vector <-> $1::vector) AS distance
+  FROM embeddings e
+  JOIN assets a ON a.asset_id = e.asset_id
+  WHERE a.is_deleted = false
+    AND e.embedding_type = $2::text
+    AND e.is_primary = true
+    AND ($3::text IS NULL OR a.type = $3)
+    AND ($4::text[] IS NULL OR a.type = ANY($4::text[]))
+    AND ($5::integer IS NULL OR a.owner_id = $5)
+    AND ($6::uuid IS NULL OR a.repository_id = $6)
+    AND (
+      $7::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = $7
+      )
+    )
+    AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $8)
+    AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $9)
+    AND ($10::boolean IS NULL OR
+      CASE
+        WHEN $10 = true THEN a.specific_metadata->>'is_raw' = 'true'
+        ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
+      END
+    )
+    AND ($11::integer IS NULL OR
+      CASE
+        WHEN $11 = 0 THEN a.rating IS NULL
+        ELSE a.rating = $11
+      END
+    )
+    AND ($12::boolean IS NULL OR a.liked = $12)
+    AND ($13::text IS NULL OR a.specific_metadata->>'camera_model' = $13)
+    AND ($14::text IS NULL OR a.specific_metadata->>'lens_model' = $14)
+    AND (e.vector <-> $1::vector) <= $15::float8
+  ORDER BY (e.vector <-> $1::vector), a.asset_id DESC
+  LIMIT $17 OFFSET $16
+)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, c.distance
+FROM candidate_ids c
+JOIN assets a ON a.asset_id = c.asset_id
+ORDER BY c.distance, c.asset_id DESC
 `
 
 type SearchAssetsVectorUnifiedParams struct {
