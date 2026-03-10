@@ -101,12 +101,26 @@ ORDER BY a.upload_time DESC
 LIMIT $3 OFFSET $2;
 
 -- name: SearchAssetsByFaceCluster :many
-SELECT DISTINCT a.* FROM assets a
-JOIN face_items fi ON a.asset_id = fi.asset_id
-JOIN face_cluster_members fcm ON fi.id = fcm.face_id
-WHERE fcm.cluster_id = $1
-ORDER BY a.upload_time DESC
-LIMIT $3 OFFSET $2;
+WITH matched_assets AS MATERIALIZED (
+    SELECT fi.asset_id
+    FROM face_cluster_members fcm
+    JOIN face_items fi ON fi.id = fcm.face_id
+    WHERE fcm.cluster_id = sqlc.arg('cluster_id')
+    GROUP BY fi.asset_id
+),
+page_ids AS MATERIALIZED (
+    SELECT
+        m.asset_id,
+        a.upload_time
+    FROM matched_assets m
+    JOIN assets a ON a.asset_id = m.asset_id
+    ORDER BY a.upload_time DESC, m.asset_id DESC
+    LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
+)
+SELECT a.*
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.upload_time DESC, p.asset_id DESC;
 
 -- name: GetUnclusteredFaces :many
 SELECT fi.* FROM face_items fi

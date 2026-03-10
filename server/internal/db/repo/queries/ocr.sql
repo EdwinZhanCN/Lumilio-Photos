@@ -30,21 +30,47 @@ LIMIT $2;
 DELETE FROM ocr_text_items WHERE asset_id = $1;
 
 -- name: SearchAssetsByOCRText :many
-SELECT DISTINCT a.* FROM assets a
-JOIN ocr_results r ON a.asset_id = r.asset_id
-JOIN ocr_text_items t ON r.asset_id = t.asset_id
-WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', $1)
-ORDER BY a.upload_time DESC
-LIMIT $3 OFFSET $2;
+WITH matched_assets AS MATERIALIZED (
+    SELECT t.asset_id
+    FROM ocr_text_items t
+    WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', sqlc.arg('search_text'))
+    GROUP BY t.asset_id
+),
+page_ids AS MATERIALIZED (
+    SELECT
+        m.asset_id,
+        a.upload_time
+    FROM matched_assets m
+    JOIN assets a ON a.asset_id = m.asset_id
+    ORDER BY a.upload_time DESC, m.asset_id DESC
+    LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
+)
+SELECT a.*
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.upload_time DESC, p.asset_id DESC;
 
 -- name: SearchAssetsByOCRTextWithConfidence :many
-SELECT DISTINCT a.* FROM assets a
-JOIN ocr_results r ON a.asset_id = r.asset_id
-JOIN ocr_text_items t ON r.asset_id = t.asset_id
-WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', $1)
-AND t.confidence >= $4
-ORDER BY a.upload_time DESC
-LIMIT $3 OFFSET $2;
+WITH matched_assets AS MATERIALIZED (
+    SELECT t.asset_id
+    FROM ocr_text_items t
+    WHERE to_tsvector('simple', t.text_content) @@ plainto_tsquery('simple', sqlc.arg('search_text'))
+      AND t.confidence >= sqlc.arg('confidence')
+    GROUP BY t.asset_id
+),
+page_ids AS MATERIALIZED (
+    SELECT
+        m.asset_id,
+        a.upload_time
+    FROM matched_assets m
+    JOIN assets a ON a.asset_id = m.asset_id
+    ORDER BY a.upload_time DESC, m.asset_id DESC
+    LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
+)
+SELECT a.*
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.upload_time DESC, p.asset_id DESC;
 
 -- name: GetOCRStatsByModel :many
 SELECT

@@ -211,22 +211,33 @@ func (q *Queries) GetTopSpeciesLabels(ctx context.Context, limit int32) ([]GetTo
 }
 
 const searchAssetsBySpecies = `-- name: SearchAssetsBySpecies :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
-JOIN species_predictions sp ON a.asset_id = sp.asset_id
-WHERE sp.label ILIKE '%' || $1 || '%'
-AND a.is_deleted = false
-ORDER BY sp.score DESC
-LIMIT $3 OFFSET $2
+WITH page_ids AS MATERIALIZED (
+    SELECT
+        a.asset_id,
+        MAX(sp.score) AS best_score,
+        a.upload_time
+    FROM assets a
+    JOIN species_predictions sp ON a.asset_id = sp.asset_id
+    WHERE sp.label ILIKE '%' || $1::text || '%'
+      AND a.is_deleted = false
+    GROUP BY a.asset_id, a.upload_time
+    ORDER BY MAX(sp.score) DESC, a.upload_time DESC, a.asset_id DESC
+    LIMIT $3 OFFSET $2
+)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.best_score DESC, p.upload_time DESC, p.asset_id DESC
 `
 
 type SearchAssetsBySpeciesParams struct {
-	Column1 *string `db:"column_1" json:"column_1"`
-	Offset  int32   `db:"offset" json:"offset"`
-	Limit   int32   `db:"limit" json:"limit"`
+	Query  string `db:"query" json:"query"`
+	Offset int32  `db:"offset" json:"offset"`
+	Limit  int32  `db:"limit" json:"limit"`
 }
 
 func (q *Queries) SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, searchAssetsBySpecies, arg.Column1, arg.Offset, arg.Limit)
+	rows, err := q.db.Query(ctx, searchAssetsBySpecies, arg.Query, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

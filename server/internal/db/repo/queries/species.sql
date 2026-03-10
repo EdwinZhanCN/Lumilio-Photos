@@ -24,12 +24,23 @@ ORDER BY score DESC
 LIMIT $3;
 
 -- name: SearchAssetsBySpecies :many
-SELECT DISTINCT a.* FROM assets a
-JOIN species_predictions sp ON a.asset_id = sp.asset_id
-WHERE sp.label ILIKE '%' || $1 || '%'
-AND a.is_deleted = false
-ORDER BY sp.score DESC
-LIMIT $3 OFFSET $2;
+WITH page_ids AS MATERIALIZED (
+    SELECT
+        a.asset_id,
+        MAX(sp.score) AS best_score,
+        a.upload_time
+    FROM assets a
+    JOIN species_predictions sp ON a.asset_id = sp.asset_id
+    WHERE sp.label ILIKE '%' || sqlc.arg('query')::text || '%'
+      AND a.is_deleted = false
+    GROUP BY a.asset_id, a.upload_time
+    ORDER BY MAX(sp.score) DESC, a.upload_time DESC, a.asset_id DESC
+    LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
+)
+SELECT a.*
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.best_score DESC, p.upload_time DESC, p.asset_id DESC;
 
 -- name: GetSpeciesStats :one
 SELECT

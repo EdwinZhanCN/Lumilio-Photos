@@ -107,17 +107,17 @@ func (s *ocrService) SearchAssetsByText(ctx context.Context, searchText string, 
 	if minConfidence > 0 {
 		return s.queries.SearchAssetsByOCRTextWithConfidence(ctx,
 			repo.SearchAssetsByOCRTextWithConfidenceParams{
-				PlaintoTsquery: searchText,
-				Limit:          int32(limit),
-				Offset:         int32(offset),
-				Confidence:     minConfidence,
+				SearchText: searchText,
+				Limit:      int32(limit),
+				Offset:     int32(offset),
+				Confidence: minConfidence,
 			})
 	}
 	return s.queries.SearchAssetsByOCRText(ctx,
 		repo.SearchAssetsByOCRTextParams{
-			PlaintoTsquery: searchText,
-			Limit:          int32(limit),
-			Offset:         int32(offset),
+			SearchText: searchText,
+			Limit:      int32(limit),
+			Offset:     int32(offset),
 		})
 }
 

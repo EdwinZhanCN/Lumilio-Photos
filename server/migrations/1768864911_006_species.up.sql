@@ -13,6 +13,8 @@ CREATE INDEX IF NOT EXISTS idx_species_predictions_asset_id ON species_predictio
 CREATE INDEX IF NOT EXISTS idx_species_predictions_label ON species_predictions(label);
 CREATE INDEX IF NOT EXISTS idx_species_predictions_score ON species_predictions(score DESC);
 CREATE INDEX IF NOT EXISTS idx_species_predictions_label_score ON species_predictions(label, score DESC);
+CREATE INDEX IF NOT EXISTS idx_species_predictions_label_trgm
+    ON species_predictions USING GIN (label gin_trgm_ops);
 
 -- Composite index for efficient label search with high scores
 CREATE INDEX IF NOT EXISTS idx_species_predictions_label_asset_score
