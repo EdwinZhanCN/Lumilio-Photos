@@ -343,6 +343,22 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.AssetGroupDTO": {
+                "properties": {
+                    "assets": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "key": {
+                        "example": "date:today",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetIndexingStatsResponseDTO": {
                 "properties": {
                     "photo_total": {
@@ -476,7 +492,7 @@ const docTemplate = `{
                         "enum": [
                             "date",
                             "type",
-                            "album"
+                            "flat"
                         ],
                         "example": "type",
                         "type": "string"
@@ -496,6 +512,10 @@ const docTemplate = `{
                             "semantic"
                         ],
                         "example": "filename",
+                        "type": "string"
+                    },
+                    "viewer_timezone": {
+                        "example": "America/New_York",
                         "type": "string"
                     }
                 },
@@ -1005,6 +1025,30 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.QueryAssetsResponseDTO": {
+                "properties": {
+                    "groups": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.AssetGroupDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "example": 20,
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "total": {
+                        "example": 150,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.RebuildAssetIndexesRequestDTO": {
                 "properties": {
                     "limit": {
@@ -1182,7 +1226,7 @@ const docTemplate = `{
                         "enum": [
                             "date",
                             "type",
-                            "album"
+                            "flat"
                         ],
                         "example": "type",
                         "type": "string"
@@ -1199,6 +1243,10 @@ const docTemplate = `{
                         "maximum": 50,
                         "minimum": 1,
                         "type": "integer"
+                    },
+                    "viewer_timezone": {
+                        "example": "America/New_York",
+                        "type": "string"
                     }
                 },
                 "required": [
@@ -1216,9 +1264,9 @@ const docTemplate = `{
                         "example": 0,
                         "type": "integer"
                     },
-                    "results": {
+                    "result_groups": {
                         "items": {
-                            "$ref": "#/components/schemas/dto.AssetDTO"
+                            "$ref": "#/components/schemas/dto.AssetGroupDTO"
                         },
                         "type": "array",
                         "uniqueItems": false

@@ -4818,6 +4818,11 @@ export interface components {
              */
             types?: string[];
         };
+        "dto.AssetGroupDTO": {
+            assets?: components["schemas"]["dto.AssetDTO"][];
+            /** @example date:today */
+            key?: string;
+        };
         "dto.AssetIndexingStatsResponseDTO": {
             /** @example 2400 */
             photo_total?: number;
@@ -4876,7 +4881,7 @@ export interface components {
              * @example type
              * @enum {string}
              */
-            group_by?: "date" | "type" | "album";
+            group_by?: "date" | "type" | "flat";
             pagination?: components["schemas"]["dto.PaginationDTO"];
             /**
              * @description Search keyword (optional)
@@ -4889,6 +4894,8 @@ export interface components {
              * @enum {string}
              */
             search_type?: "filename" | "semantic";
+            /** @example America/New_York */
+            viewer_timezone?: string;
         };
         "dto.AssetTypesResponseDTO": {
             types?: components["schemas"]["dbtypes.AssetType"][];
@@ -5100,6 +5107,15 @@ export interface components {
             overall_progress?: number;
             total_sessions?: number;
         };
+        "dto.QueryAssetsResponseDTO": {
+            groups?: components["schemas"]["dto.AssetGroupDTO"][];
+            /** @example 20 */
+            limit?: number;
+            /** @example 0 */
+            offset?: number;
+            /** @example 150 */
+            total?: number;
+        };
         "dto.RebuildAssetIndexesRequestDTO": {
             /** @example 200 */
             limit?: number;
@@ -5183,19 +5199,21 @@ export interface components {
              * @example type
              * @enum {string}
              */
-            group_by?: "date" | "type" | "album";
+            group_by?: "date" | "type" | "flat";
             pagination?: components["schemas"]["dto.PaginationDTO"];
             /** @example red bird on branch */
             query: string;
             /** @example 12 */
             top_results_limit?: number;
+            /** @example America/New_York */
+            viewer_timezone?: string;
         };
         "dto.SearchAssetsResponseDTO": {
             /** @example 20 */
             limit?: number;
             /** @example 0 */
             offset?: number;
-            results?: components["schemas"]["dto.AssetDTO"][];
+            result_groups?: components["schemas"]["dto.AssetGroupDTO"][];
             /** @example 150 */
             results_total?: number;
             top_results?: components["schemas"]["dto.AssetDTO"][];

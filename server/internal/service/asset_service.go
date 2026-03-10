@@ -92,23 +92,24 @@ type AssetService interface {
 
 // QueryAssetsParams contains all parameters for the unified asset query
 type QueryAssetsParams struct {
-	Query        string // Filename search query (empty for list-only)
-	SearchType   string // "filename" (default) | "semantic"
-	RepositoryID *string
-	AssetType    *string  // Single type filter
-	AssetTypes   []string // Multiple types filter
-	OwnerID      *int32
-	AlbumID      *int32
-	DateFrom     *time.Time
-	DateTo       *time.Time
-	IsRaw        *bool
-	Rating       *int
-	Liked        *bool
-	CameraModel  *string
-	LensModel    *string
-	GroupBy      string // Grouping strategy for server-side sorting (e.g., "type")
-	Limit        int
-	Offset       int
+	Query          string // Filename search query (empty for list-only)
+	SearchType     string // "filename" (default) | "semantic"
+	ViewerTimeZone string
+	RepositoryID   *string
+	AssetType      *string  // Single type filter
+	AssetTypes     []string // Multiple types filter
+	OwnerID        *int32
+	AlbumID        *int32
+	DateFrom       *time.Time
+	DateTo         *time.Time
+	IsRaw          *bool
+	Rating         *int
+	Liked          *bool
+	CameraModel    *string
+	LensModel      *string
+	GroupBy        string // Grouping strategy for server-side sorting (e.g., "type")
+	Limit          int
+	Offset         int
 }
 
 type SearchEnhancementMode string
@@ -1315,7 +1316,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		s := "type"
 		sortByPtr = &s
 	}
-	// For other GroupBy values (e.g., "date", "album", or empty),
+	// For other GroupBy values (e.g., "date", "flat", or empty),
 	// sortByPtr remains nil, which defaults to time-based sorting in SQL
 
 	// Get total count

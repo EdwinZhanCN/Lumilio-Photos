@@ -10,11 +10,6 @@ import {
 import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
 import { useAssetsView } from "@/features/assets/hooks/useAssetsView";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
-import {
-  findAssetIndex,
-  getFlatAssetsFromGrouped,
-  groupAssets,
-} from "@/lib/utils/assetGrouping";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import { AssetViewDefinition, JustifiedGallery } from "@/features/assets";
@@ -22,6 +17,10 @@ import { FolderIcon } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult } from "@/lib/albums/types";
 import { useWorkingRepository } from "@/features/settings";
+import {
+  findAssetIndex,
+  flattenAssetGroups,
+} from "@/features/assets/utils/assetGroups";
 
 const AlbumAssetsContent = () => {
   const { albumId, assetId } = useParams<{
@@ -78,21 +77,11 @@ const AlbumAssetsContent = () => {
     error,
   } = useAssetsView(viewDefinition, { withGroups: true });
 
-  // Handle flat grouping - ensure we have a proper groups object
-  const groupedPhotos = useMemo(() => {
-    if (groups && Object.keys(groups).length > 0) {
-      return groups;
-    }
-    return groupAssets(assets, groupBy);
-  }, [groups, assets, groupBy]);
-
-  // Use flat assets from grouped to ensure order consistency with gallery
-  const flatAssets = useMemo(() => {
-    if (groupedPhotos && Object.keys(groupedPhotos).length > 0) {
-      return getFlatAssetsFromGrouped(groupedPhotos);
-    }
-    return assets;
-  }, [groupedPhotos, assets]);
+  const groupedPhotos = groups ?? [];
+  const flatAssets = useMemo(
+    () => flattenAssetGroups(groupedPhotos),
+    [groupedPhotos],
+  );
 
   // Calculate slide index from URL assetId
   const slideIndex = useMemo(() => {
@@ -236,11 +225,11 @@ const AlbumAssetsContent = () => {
           {isInitialLoading ? (
             <PhotosLoadingSkeleton />
           ) : (
-            <JustifiedGallery
-              groupedPhotos={groupedPhotos}
-              openCarousel={openCarousel}
-              onLoadMore={handleLoadMore}
-              hasMore={hasMore}
+              <JustifiedGallery
+                groups={groupedPhotos}
+                openCarousel={openCarousel}
+                onLoadMore={handleLoadMore}
+                hasMore={hasMore}
               isLoadingMore={isLoadingMore}
             />
           )}

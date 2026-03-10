@@ -114,14 +114,10 @@ export const useUIActions = () => {
     (query: string) => {
       const normalizedQuery = query.trim();
       store.setSearchQueryState(normalizedQuery);
-      if (normalizedQuery) {
-        store.setGroupByState("flat");
-      }
 
       updateSearchParams((params) => {
         if (normalizedQuery) {
           params.set("q", normalizedQuery);
-          params.set("groupBy", "flat");
         } else {
           params.delete("q");
         }

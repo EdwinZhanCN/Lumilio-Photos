@@ -7,11 +7,12 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { useAssetsStore } from "../assets.store";
 import { useGroupBy } from "../selectors";
 import {
+  AssetGroup,
   AssetViewDefinition,
   AssetsViewResult,
-  ViewDefinitionOptions,
   TabType,
-} from "@/features/assets";
+  ViewDefinitionOptions,
+} from "@/features/assets/types/assets.type";
 import { generateViewKey } from "../utils/viewKey";
 import {
   selectFilterAsAssetFilter,
@@ -19,15 +20,27 @@ import {
 } from "../slices/filters.slice";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components, paths } from "@/lib/http-commons/schema.d.ts";
-import { groupAssets } from "@/lib/utils/assetGrouping";
 import { Asset } from "@/lib/assets/types";
 import { useWorkingRepository } from "@/features/settings";
+import {
+  flattenAssetGroups,
+  getViewerTimeZone,
+  mergeAdjacentAssetGroups,
+  normalizeAssetGroups,
+} from "@/features/assets/utils/assetGroups";
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
 type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
+type QueryAssetsResponse = components["schemas"]["dto.QueryAssetsResponseDTO"];
 type SearchAssetsRequest = components["schemas"]["dto.SearchAssetsRequestDTO"];
 type SearchAssetsResponse =
   components["schemas"]["dto.SearchAssetsResponseDTO"];
+type QueryAssetsApiResult = Omit<
+  paths["/api/v1/assets/list"]["post"]["responses"][200]["content"]["application/json"],
+  "data"
+> & {
+  data?: QueryAssetsResponse;
+};
 type SearchAssetsApiResult = Omit<
   paths["/api/v1/assets/search"]["post"]["responses"][200]["content"]["application/json"],
   "data"
@@ -44,6 +57,7 @@ type SearchTopResultsMeta = {
 
 type AssetsViewQueryResult = {
   assets: Asset[];
+  groups: AssetGroup[];
   isLoading: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
@@ -58,6 +72,7 @@ type AssetsViewQueryResult = {
 type PhotoSearchViewResult = AssetsViewResult & {
   topResults: Asset[];
   resultAssets: Asset[];
+  resultGroups: AssetGroup[];
   topResultsMeta: SearchTopResultsMeta;
 };
 
@@ -85,6 +100,7 @@ const EMPTY_PHOTO_SEARCH_VIEW_RESULT: PhotoSearchViewResult = {
   ...EMPTY_ASSETS_VIEW_RESULT,
   topResults: [],
   resultAssets: [],
+  resultGroups: [],
   topResultsMeta: DEFAULT_TOP_RESULTS_META,
 };
 
@@ -142,14 +158,14 @@ const normalizeTopResultsMeta = (
 
 const normalizeSearchGroupBy = (
   groupBy?: AssetViewDefinition["groupBy"],
-): SearchAssetsRequest["group_by"] | undefined => {
+): SearchAssetsRequest["group_by"] => {
   switch (groupBy) {
     case "date":
     case "type":
-    case "album":
+    case "flat":
       return groupBy;
     default:
-      return undefined;
+      return "flat";
   }
 };
 
@@ -201,6 +217,8 @@ const buildApiFilter = (
   return filter;
 };
 
+const countGroupedAssets = (groups: AssetGroup[]) => flattenAssetGroups(groups).length;
+
 export const useAssetsViewQuery = (
   definition: AssetViewDefinition,
   options: ViewDefinitionOptions = {},
@@ -209,6 +227,7 @@ export const useAssetsViewQuery = (
   const viewKey = useMemo(() => generateViewKey(definition), [definition]);
   const effectiveFilter = useEffectiveFilter(definition);
   const pageSize = definition.pageSize || 50;
+  const viewerTimeZone = useMemo(() => getViewerTimeZone(), []);
 
   const createUnifiedRequest = useCallback((): AssetQueryRequest => {
     const request: AssetQueryRequest = {
@@ -217,6 +236,8 @@ export const useAssetsViewQuery = (
         limit: pageSize,
         offset: 0,
       },
+      group_by: normalizeSearchGroupBy(definition.groupBy),
+      viewer_timezone: viewerTimeZone,
     };
 
     if (definition.search?.query) {
@@ -224,67 +245,59 @@ export const useAssetsViewQuery = (
     }
 
     return request;
-  }, [definition, effectiveFilter, pageSize]);
-
-  const requestConfig = useMemo(
-    () =>
-      ({
-        method: "post",
-        path: "/api/v1/assets/list",
-        init: {
-          body: createUnifiedRequest(),
-        },
-        pageParamName: "offset",
-      }) as const,
-    [createUnifiedRequest],
-  );
+  }, [definition, effectiveFilter, pageSize, viewerTimeZone]);
 
   const query = $api.useInfiniteQuery(
-    requestConfig.method as any,
-    requestConfig.path as any,
-    requestConfig.init as any,
+    "post",
+    "/api/v1/assets/list",
+    {
+      body: createUnifiedRequest(),
+    },
     {
       enabled: autoFetch && !disabled,
       placeholderData: keepPreviousData,
       initialPageParam: 0,
-      pageParamName: requestConfig.pageParamName,
+      pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = (lastPage as any)?.data;
-        const assets = responseData?.assets || [];
+        const responseData = (lastPage as QueryAssetsApiResult | undefined)?.data;
+        const pageGroups = normalizeAssetGroups(responseData?.groups);
         const total = responseData?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
+        const loadedCount = countGroupedAssets(pageGroups);
         const hasMore =
           typeof total === "number"
-            ? offset + assets.length < total
-            : assets.length >= pageSize;
+            ? offset + loadedCount < total
+            : loadedCount >= pageSize;
 
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  );
+  ) as UseInfiniteQueryResult<InfiniteData<QueryAssetsApiResult>, unknown>;
 
   const assetsPages = useMemo(() => {
-    const pages = query.data?.pages ?? [];
+    const pages = (query.data?.pages ?? []) as QueryAssetsApiResult[];
     const pageParams = query.data?.pageParams ?? [];
 
     return pages.map((page, index) => {
       const offset = Number(pageParams[index] ?? 0) || 0;
-      const responseData = (page as any)?.data;
-      const assets = responseData?.assets || [];
+      const responseData = page?.data;
+      const groups = normalizeAssetGroups(responseData?.groups);
       const total = responseData?.total;
+      const loadedCount = countGroupedAssets(groups);
       const hasMore =
         typeof total === "number"
-          ? offset + assets.length < total
-          : assets.length >= pageSize;
+          ? offset + loadedCount < total
+          : loadedCount >= pageSize;
 
-      return { assets, offset, total, hasMore };
+      return { groups, offset, total, hasMore };
     });
-  }, [query.dataUpdatedAt, pageSize]);
+  }, [query.data?.pageParams, query.dataUpdatedAt, pageSize]);
 
-  const assets = useMemo(
-    () => assetsPages.flatMap((page) => page.assets),
+  const groups = useMemo(
+    () => mergeAdjacentAssetGroups(...assetsPages.map((page) => page.groups)),
     [assetsPages],
   );
+  const assets = useMemo(() => flattenAssetGroups(groups), [groups]);
 
   const lastPage =
     assetsPages.length > 0 ? assetsPages[assetsPages.length - 1] : undefined;
@@ -306,6 +319,7 @@ export const useAssetsViewQuery = (
 
   return {
     assets,
+    groups,
     isLoading: query.isLoading,
     isLoadingMore: query.isFetchingNextPage,
     hasMore: query.hasNextPage ?? true,
@@ -322,35 +336,20 @@ export const useAssetsViewQuery = (
   };
 };
 
-const useAssetsViewGrouping = (
-  assets: Asset[],
-  definition: AssetViewDefinition,
-  withGroups: boolean,
-) => {
-  return useMemo(() => {
-    if (!withGroups || !definition.groupBy || definition.groupBy === "flat") {
-      return undefined;
-    }
-    return groupAssets(assets, definition.groupBy);
-  }, [withGroups, definition.groupBy, assets]);
-};
-
 export const useAssetsView = (
   definition: AssetViewDefinition,
   options: ViewDefinitionOptions = {},
 ): AssetsViewResult => {
   const { withGroups = false } = options;
   const queryResult = useAssetsViewQuery(definition, options);
-
-  const filteredAssets = useMemo(
+  const assets = useMemo(
     () => normalizeVisibleAssets(queryResult.assets),
     [queryResult.assets],
   );
-  const groups = useAssetsViewGrouping(filteredAssets, definition, withGroups);
 
   return {
-    assets: filteredAssets,
-    groups,
+    assets,
+    groups: withGroups ? queryResult.groups : undefined,
     isLoading: queryResult.isLoading,
     isLoadingMore: queryResult.isLoadingMore,
     error: queryResult.error,
@@ -371,6 +370,7 @@ export const usePhotoSearchView = (
   const effectiveFilter = useEffectiveFilter(definition);
   const pageSize = definition.pageSize || 50;
   const queryText = definition.search?.query?.trim() ?? "";
+  const viewerTimeZone = useMemo(() => getViewerTimeZone(), []);
   const viewKey = useMemo(
     () => `${generateViewKey(definition)}:photo-search`,
     [definition],
@@ -387,17 +387,16 @@ export const usePhotoSearchView = (
       enhancement_mode: "auto",
       top_results_limit: TOP_RESULTS_LIMIT,
       group_by: normalizeSearchGroupBy(definition.groupBy),
+      viewer_timezone: viewerTimeZone,
     }),
-    [definition, effectiveFilter, pageSize, queryText],
+    [definition, effectiveFilter, pageSize, queryText, viewerTimeZone],
   );
-
-  const request = useMemo(() => createSearchRequest(), [createSearchRequest]);
 
   const query = $api.useInfiniteQuery(
     "post",
     "/api/v1/assets/search",
     {
-      body: request,
+      body: createSearchRequest(),
     },
     {
       enabled: autoFetch && !disabled && queryText.length > 0,
@@ -405,15 +404,15 @@ export const usePhotoSearchView = (
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = (lastPage as SearchAssetsApiResult | undefined)
-          ?.data;
-        const results = responseData?.results ?? [];
+        const responseData = (lastPage as SearchAssetsApiResult | undefined)?.data;
+        const pageGroups = normalizeAssetGroups(responseData?.result_groups);
         const total = responseData?.results_total;
         const offset = Number(lastPageParam ?? 0) || 0;
+        const loadedCount = countGroupedAssets(pageGroups);
         const hasMore =
           typeof total === "number"
-            ? offset + results.length < total
-            : results.length >= pageSize;
+            ? offset + loadedCount < total
+            : loadedCount >= pageSize;
 
         return hasMore ? offset + pageSize : undefined;
       },
@@ -427,17 +426,18 @@ export const usePhotoSearchView = (
     return pages.map((page, index) => {
       const responseData = page?.data;
       const offset = Number(pageParams[index] ?? 0) || 0;
-      const results = responseData?.results ?? [];
+      const resultGroups = normalizeAssetGroups(responseData?.result_groups);
       const total = responseData?.results_total;
+      const loadedCount = countGroupedAssets(resultGroups);
       const hasMore =
         typeof total === "number"
-          ? offset + results.length < total
-          : results.length >= pageSize;
+          ? offset + loadedCount < total
+          : loadedCount >= pageSize;
 
       return {
         topResults: responseData?.top_results ?? [],
         topResultsMeta: normalizeTopResultsMeta(responseData?.top_results_meta),
-        results,
+        resultGroups,
         total,
         offset,
         hasMore,
@@ -450,15 +450,19 @@ export const usePhotoSearchView = (
     () => normalizeVisibleAssets(firstPage?.topResults ?? []),
     [firstPage?.topResults],
   );
-  const resultAssets = useMemo(
-    () => normalizeVisibleAssets(searchPages.flatMap((page) => page.results)),
+  const resultGroups = useMemo(
+    () =>
+      mergeAdjacentAssetGroups(...searchPages.map((page) => page.resultGroups)),
     [searchPages],
+  );
+  const resultAssets = useMemo(
+    () => flattenAssetGroups(resultGroups),
+    [resultGroups],
   );
   const assets = useMemo(
     () => mergeUniqueAssets(topResults, resultAssets),
     [resultAssets, topResults],
   );
-  const groups = useAssetsViewGrouping(assets, definition, withGroups);
 
   const lastPage =
     searchPages.length > 0 ? searchPages[searchPages.length - 1] : undefined;
@@ -489,8 +493,9 @@ export const usePhotoSearchView = (
     assets,
     topResults,
     resultAssets,
+    resultGroups,
     topResultsMeta: firstPage?.topResultsMeta ?? DEFAULT_TOP_RESULTS_META,
-    groups,
+    groups: withGroups ? resultGroups : undefined,
     isLoading: query.isLoading,
     isLoadingMore: query.isFetchingNextPage,
     error,
@@ -523,7 +528,7 @@ export const useCurrentTabPhotoSearchView = (
       types: [currentTab],
       groupBy: (groupBy as any) || uiGroupBy,
       pageSize: pageSize || 50,
-      sort: { field: "taken_time", direction: "desc" },
+      sort: { direction: "desc" },
       search: searchQuery.trim()
         ? {
             query: searchQuery.trim(),
@@ -558,7 +563,7 @@ export const useCurrentTabAssets = (
       types: [currentTab],
       groupBy: (groupBy as any) || uiGroupBy,
       pageSize: pageSize || 50,
-      sort: { field: "taken_time", direction: "desc" },
+      sort: { direction: "desc" },
       search: searchQuery.trim()
         ? {
             query: searchQuery.trim(),

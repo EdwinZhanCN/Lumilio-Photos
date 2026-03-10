@@ -6,7 +6,11 @@ import type { components } from "@/lib/http-commons";
 // ===== Core Types =====
 export type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
 export type TabType = "photos" | "videos" | "audios";
-export type GroupByType = "date" | "type" | "album" | "flat";
+export type GroupByType = "date" | "type" | "flat";
+export interface AssetGroup {
+  key: string;
+  assets: Asset[];
+}
 
 // ===== Asset View Definition =====
 export interface AssetViewDefinition {
@@ -24,6 +28,7 @@ export interface AssetViewDefinition {
   groupBy?: GroupByType;
   /** Sorting configuration */
   sort?: {
+    field?: "taken_time" | "upload_time" | "type";
     direction: "desc" | "asc";
   };
   /** Page size for pagination */
@@ -100,7 +105,7 @@ export interface AssetsState extends SelectionState {
 // ===== Hook Return Types =====
 export interface AssetsViewResult {
   assets: Asset[];
-  groups?: Record<string, Asset[]>;
+  groups?: AssetGroup[];
   isLoading: boolean;
   isLoadingMore: boolean;
   isFetched: boolean;

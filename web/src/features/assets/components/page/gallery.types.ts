@@ -1,7 +1,7 @@
-import { Asset } from "@/lib/assets/types";
+import { AssetGroup } from "@/features/assets/types/assets.type";
 
 export interface AssetGalleryProps {
-  groupedPhotos: Record<string, Asset[]>;
+  groups: AssetGroup[];
   openCarousel: (assetId: string) => void;
   onLoadMore: () => void;
   hasMore: boolean;
@@ -10,5 +10,3 @@ export interface AssetGalleryProps {
   columns?: number;
   className?: string;
 }
-
-export const DEFAULT_GROUP_LABELS = new Set(["All Results", "All Assets"]);

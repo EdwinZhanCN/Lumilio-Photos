@@ -17,8 +17,8 @@ import { useSelection } from "@/features/assets/hooks/useSelection";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { ApiResult } from "@/lib/albums/types";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
-import { getFlatAssetsFromGrouped } from "@/lib/utils/assetGrouping";
 import { assetUrls } from "@/lib/assets/assetUrls";
+import { flattenAssetGroups } from "@/features/assets/utils/assetGroups";
 
 const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
   onSelect,
@@ -44,8 +44,8 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
   });
 
   const flatAssets = useMemo(() => {
-    if (groupedAssets && Object.keys(groupedAssets).length > 0) {
-      return getFlatAssetsFromGrouped(groupedAssets);
+    if (groupedAssets && groupedAssets.length > 0) {
+      return flattenAssetGroups(groupedAssets);
     }
     return allAssets;
   }, [groupedAssets, allAssets]);
@@ -87,7 +87,7 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
       />
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
         <JustifiedGallery
-          groupedPhotos={groupedAssets || {}}
+          groups={groupedAssets || []}
           key={layoutKey}
           openCarousel={() => {}}
           onLoadMore={fetchMore}

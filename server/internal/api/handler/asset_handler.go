@@ -1190,6 +1190,15 @@ func validateAssetQuerySearchType(searchType string) error {
 	return errors.New("invalid search type")
 }
 
+func validateAssetQueryGroupBy(groupBy string) error {
+	switch strings.ToLower(strings.TrimSpace(groupBy)) {
+	case "", "date", "type", "flat":
+		return nil
+	default:
+		return errors.New("invalid group_by")
+	}
+}
+
 func validateSearchEnhancementMode(mode string) error {
 	switch strings.ToLower(strings.TrimSpace(mode)) {
 	case "", "auto", "off", "only":
@@ -1284,7 +1293,22 @@ func isPrimaryRepository(name string, path string) bool {
 	return strings.EqualFold(base, "primary")
 }
 
-func buildQueryAssetsParams(query, searchType, groupBy string, filter dto.AssetFilterDTO, pagination dto.PaginationDTO) service.QueryAssetsParams {
+func normalizeAssetQueryGroupBy(groupBy, searchType string) string {
+	if searchType == "semantic" {
+		return "flat"
+	}
+
+	switch strings.ToLower(strings.TrimSpace(groupBy)) {
+	case "date":
+		return "date"
+	case "type":
+		return "type"
+	default:
+		return "flat"
+	}
+}
+
+func buildQueryAssetsParams(query, searchType, groupBy, viewerTimeZone string, filter dto.AssetFilterDTO, pagination dto.PaginationDTO) service.QueryAssetsParams {
 	var dateFrom, dateTo *time.Time
 	if filter.Date != nil {
 		dateFrom = filter.Date.From
@@ -1307,35 +1331,47 @@ func buildQueryAssetsParams(query, searchType, groupBy string, filter dto.AssetF
 	}
 
 	return service.QueryAssetsParams{
-		Query:        query,
-		SearchType:   searchType,
-		RepositoryID: filter.RepositoryID,
-		AssetType:    filter.Type,
-		AssetTypes:   filter.Types,
-		OwnerID:      filter.OwnerID,
-		AlbumID:      albumIDPtr,
-		DateFrom:     dateFrom,
-		DateTo:       dateTo,
-		IsRaw:        filter.RAW,
-		Rating:       filter.Rating,
-		Liked:        filter.Liked,
-		CameraModel:  filter.CameraMake,
-		LensModel:    filter.Lens,
-		GroupBy:      groupBy,
-		Limit:        pagination.Limit,
-		Offset:       pagination.Offset,
+		Query:          query,
+		SearchType:     searchType,
+		ViewerTimeZone: viewerTimeZone,
+		RepositoryID:   filter.RepositoryID,
+		AssetType:      filter.Type,
+		AssetTypes:     filter.Types,
+		OwnerID:        filter.OwnerID,
+		AlbumID:        albumIDPtr,
+		DateFrom:       dateFrom,
+		DateTo:         dateTo,
+		IsRaw:          filter.RAW,
+		Rating:         filter.Rating,
+		Liked:          filter.Liked,
+		CameraModel:    filter.CameraMake,
+		LensModel:      filter.Lens,
+		GroupBy:        normalizeAssetQueryGroupBy(groupBy, searchType),
+		Limit:          pagination.Limit,
+		Offset:         pagination.Offset,
 	}
 }
 
-func toSearchAssetsResponseDTO(result service.SearchAssetsResult, limit, offset int) dto.SearchAssetsResponseDTO {
+func toAssetGroupDTOs(groups []service.AssetGroup) []dto.AssetGroupDTO {
+	items := make([]dto.AssetGroupDTO, 0, len(groups))
+	for _, group := range groups {
+		assets := make([]dto.AssetDTO, len(group.Assets))
+		for i, asset := range group.Assets {
+			assets[i] = dto.ToAssetDTO(asset)
+		}
+		items = append(items, dto.AssetGroupDTO{
+			Key:    group.Key,
+			Assets: assets,
+		})
+	}
+
+	return items
+}
+
+func toSearchAssetsResponseDTO(result service.SearchAssetsResult, limit, offset int, groupBy, viewerTimeZone string) dto.SearchAssetsResponseDTO {
 	topResults := make([]dto.AssetDTO, len(result.TopResults))
 	for i, asset := range result.TopResults {
 		topResults[i] = dto.ToAssetDTO(asset)
-	}
-
-	results := make([]dto.AssetDTO, len(result.Results))
-	for i, asset := range result.Results {
-		results[i] = dto.ToAssetDTO(asset)
 	}
 
 	var total *int
@@ -1352,7 +1388,7 @@ func toSearchAssetsResponseDTO(result service.SearchAssetsResult, limit, offset 
 			Reason:      result.TopResultsMeta.Reason,
 			SourceTypes: append([]string{}, result.TopResultsMeta.SourceTypes...),
 		},
-		Results:      results,
+		ResultGroups: toAssetGroupDTOs(service.GroupAssetsPage(result.Results, groupBy, viewerTimeZone)),
 		ResultsTotal: total,
 		Limit:        limit,
 		Offset:       offset,
@@ -1366,7 +1402,7 @@ func toSearchAssetsResponseDTO(result service.SearchAssetsResult, limit, offset 
 // @Accept json
 // @Produce json
 // @Param request body dto.AssetQueryRequestDTO true "Query parameters"
-// @Success 200 {object} api.Result{data=dto.AssetListResponseDTO} "Assets queried successfully"
+// @Success 200 {object} api.Result{data=dto.QueryAssetsResponseDTO} "Assets queried successfully"
 // @Failure 400 {object} api.Result "Invalid request parameters"
 // @Failure 503 {object} api.Result "Semantic search unavailable"
 // @Failure 500 {object} api.Result "Internal server error"
@@ -1384,13 +1420,17 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		api.GinBadRequest(c, err, "Search type must be 'filename' or 'semantic'")
 		return
 	}
+	if err := validateAssetQueryGroupBy(req.GroupBy); err != nil {
+		api.GinBadRequest(c, err, "group_by must be 'date', 'type', or 'flat'")
+		return
+	}
 
 	// Default to filename search if not specified
 	if req.SearchType == "" {
 		req.SearchType = "filename"
 	}
 
-	params := buildQueryAssetsParams(req.Query, req.SearchType, req.GroupBy, req.Filter, req.Pagination)
+	params := buildQueryAssetsParams(req.Query, req.SearchType, req.GroupBy, req.ViewerTimezone, req.Filter, req.Pagination)
 
 	assets, total, err := h.assetService.QueryAssets(c.Request.Context(), params)
 	if err != nil {
@@ -1404,14 +1444,9 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		return
 	}
 
-	dtos := make([]dto.AssetDTO, len(assets))
-	for i, a := range assets {
-		dtos[i] = dto.ToAssetDTO(a)
-	}
-
 	totalInt := int(total)
-	response := dto.AssetListResponseDTO{
-		Assets: dtos,
+	response := dto.QueryAssetsResponseDTO{
+		Groups: toAssetGroupDTOs(service.GroupAssetsPage(assets, params.GroupBy, params.ViewerTimeZone)),
 		Total:  &totalInt,
 		Limit:  req.Pagination.Limit,
 		Offset: req.Pagination.Offset,
@@ -1438,6 +1473,10 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 	}
 
 	normalizeAssetQueryPagination(&req.Pagination)
+	if err := validateAssetQueryGroupBy(req.GroupBy); err != nil {
+		api.GinBadRequest(c, err, "group_by must be 'date', 'type', or 'flat'")
+		return
+	}
 
 	if err := validateSearchEnhancementMode(req.EnhancementMode); err != nil {
 		api.GinBadRequest(c, err, "Enhancement mode must be 'auto', 'off', or 'only'")
@@ -1447,7 +1486,7 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		req.EnhancementMode = string(service.SearchEnhancementModeAuto)
 	}
 
-	params := buildQueryAssetsParams(req.Query, "filename", req.GroupBy, req.Filter, req.Pagination)
+	params := buildQueryAssetsParams(req.Query, "filename", req.GroupBy, req.ViewerTimezone, req.Filter, req.Pagination)
 
 	result, err := h.assetService.SearchAssets(c.Request.Context(), service.SearchAssetsParams{
 		QueryAssetsParams: params,
@@ -1460,7 +1499,7 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, toSearchAssetsResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset))
+	api.GinSuccess(c, toSearchAssetsResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset, params.GroupBy, params.ViewerTimeZone))
 }
 
 // ListIndexingRepositories returns repository options for indexing filters and reindex scope selection.

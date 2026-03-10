@@ -20,7 +20,12 @@ import (
 
 type stubAssetService struct {
 	service.AssetService
+	queryFn  func(ctx context.Context, params service.QueryAssetsParams) ([]repo.Asset, int64, error)
 	searchFn func(ctx context.Context, params service.SearchAssetsParams) (service.SearchAssetsResult, error)
+}
+
+func (s stubAssetService) QueryAssets(ctx context.Context, params service.QueryAssetsParams) ([]repo.Asset, int64, error) {
+	return s.queryFn(ctx, params)
 }
 
 func (s stubAssetService) SearchAssets(ctx context.Context, params service.SearchAssetsParams) (service.SearchAssetsResult, error) {
@@ -93,7 +98,9 @@ func TestAssetHandlerSearchAssets_ReturnsDegradedResultsWithout503(t *testing.T)
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Equal(t, 0, response.Code)
 	require.Empty(t, response.Data.TopResults)
-	require.Len(t, response.Data.Results, 1)
+	require.Len(t, response.Data.ResultGroups, 1)
+	require.Equal(t, "flat:all", response.Data.ResultGroups[0].Key)
+	require.Len(t, response.Data.ResultGroups[0].Assets, 1)
 	require.True(t, response.Data.TopResultsMeta.Enabled)
 	require.True(t, response.Data.TopResultsMeta.Degraded)
 	require.Equal(t, "runtime_unavailable", response.Data.TopResultsMeta.Reason)
@@ -107,6 +114,8 @@ func TestAssetHandlerSearchAssets_ReturnsTopResultsAndResults(t *testing.T) {
 	handler := &AssetHandler{
 		assetService: stubAssetService{
 			searchFn: func(ctx context.Context, params service.SearchAssetsParams) (service.SearchAssetsResult, error) {
+				require.Equal(t, "date", params.GroupBy)
+				require.Equal(t, "America/New_York", params.ViewerTimeZone)
 				require.Equal(t, service.SearchEnhancementModeOnly, params.EnhancementMode)
 				return service.SearchAssetsResult{
 					TopResults: []repo.Asset{topResult},
@@ -123,6 +132,8 @@ func TestAssetHandlerSearchAssets_ReturnsTopResultsAndResults(t *testing.T) {
 
 	body, err := json.Marshal(dto.SearchAssetsRequestDTO{
 		Query:           "owl",
+		GroupBy:         "date",
+		ViewerTimezone:  "America/New_York",
 		EnhancementMode: "only",
 		Pagination: dto.PaginationDTO{
 			Limit:  10,
@@ -147,7 +158,35 @@ func TestAssetHandlerSearchAssets_ReturnsTopResultsAndResults(t *testing.T) {
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Equal(t, 0, response.Code)
 	require.Len(t, response.Data.TopResults, 1)
-	require.Len(t, response.Data.Results, 1)
+	require.Len(t, response.Data.ResultGroups, 1)
+	require.Equal(t, "date:year:2023", response.Data.ResultGroups[0].Key)
+	require.Len(t, response.Data.ResultGroups[0].Assets, 1)
 	require.True(t, response.Data.TopResultsMeta.Enabled)
 	require.False(t, response.Data.TopResultsMeta.Degraded)
+}
+
+func TestAssetHandlerQueryAssets_InvalidAlbumGroupByReturnsBadRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &AssetHandler{
+		assetService: stubAssetService{},
+	}
+
+	body, err := json.Marshal(dto.AssetQueryRequestDTO{
+		GroupBy: "album",
+		Pagination: dto.PaginationDTO{
+			Limit:  20,
+			Offset: 0,
+		},
+	})
+	require.NoError(t, err)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assets/list", bytes.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler.QueryAssets(ctx)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
 }
