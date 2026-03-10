@@ -5,6 +5,7 @@ import (
 	"server/internal/db/dbtypes"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Field priority definitions
@@ -13,12 +14,12 @@ var (
 	// TakenTime priority fields - from most specific to most generic
 	takenTimeFields = []string{
 		"DateTimeOriginal",       // Original capture time - highest priority
+		"SubSecDateTimeOriginal", // High precision original time
 		"CreateDate",             // File creation time
 		"DateTime",               // General datetime
 		"ModifyDate",             // Last modification time
 		"FileModifyDate",         // File system modification time
 		"DateTimeDigitized",      // Digitization time
-		"SubSecDateTimeOriginal", // High precision original time
 		"GPSDateTime",            // GPS timestamp
 	}
 
@@ -105,8 +106,10 @@ var (
 
 	// RecordedTime priority fields for videos
 	recordedTimeFields = []string{
-		"CreateDate",        // Creation date
-		"DateTimeOriginal",  // Original datetime
+		"CreationDate",     // QuickTime creation date with timezone when available
+		"CreateDate",       // Creation date
+		"DateTimeOriginal", // Original datetime
+		"SubSecDateTimeOriginal",
 		"MediaCreateDate",   // Media creation date
 		"TrackCreateDate",   // Track creation date
 		"ModifyDate",        // Modification date
@@ -207,15 +210,12 @@ var (
 func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadata {
 	metadata := &dbtypes.PhotoSpecificMetadata{}
 
-	// Parse TakenTime using priority-based field list
-	for _, field := range takenTimeFields {
-		if dateStr, exists := rawData[field]; exists && dateStr != "" {
-			if parsedTime, err := parseDateTime(dateStr); err == nil {
-				metadata.TakenTime = &parsedTime
-				break
-			}
-		}
-	}
+	metadata.TakenTime, metadata.CaptureOffsetMinutes = parseCaptureTimestamp(rawData, []captureTimePair{
+		{TimeField: "DateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
+		{TimeField: "SubSecDateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
+		{TimeField: "CreateDate", OffsetFields: []string{"OffsetTimeDigitized", "OffsetTime", "TimeZoneOffset"}},
+		{TimeField: "DateTime", OffsetFields: []string{"OffsetTime", "TimeZoneOffset"}},
+	}, takenTimeFields)
 
 	// Parse CameraModel using priority-based field list
 	for _, field := range cameraModelFields {
@@ -475,15 +475,14 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 		}
 	}
 
-	// Parse RecordedTime using priority-based field list
-	for _, field := range recordedTimeFields {
-		if dateStr, exists := rawData[field]; exists && dateStr != "" {
-			if parsedTime, err := parseDateTime(dateStr); err == nil {
-				metadata.RecordedTime = &parsedTime
-				break
-			}
-		}
-	}
+	metadata.RecordedTime, metadata.CaptureOffsetMinutes = parseCaptureTimestamp(rawData, []captureTimePair{
+		{TimeField: "CreationDate", OffsetFields: []string{"TimeZone", "TimeZoneOffset"}},
+		{TimeField: "DateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
+		{TimeField: "SubSecDateTimeOriginal", OffsetFields: []string{"OffsetTimeOriginal", "OffsetTime", "TimeZoneOffset"}},
+		{TimeField: "CreateDate", OffsetFields: []string{"OffsetTimeDigitized", "OffsetTime", "TimeZoneOffset"}},
+		{TimeField: "MediaCreateDate", OffsetFields: []string{"OffsetTime", "TimeZone", "TimeZoneOffset"}},
+		{TimeField: "TrackCreateDate", OffsetFields: []string{"OffsetTime", "TimeZone", "TimeZoneOffset"}},
+	}, recordedTimeFields)
 
 	// Parse CameraModel using priority-based field list
 	for _, field := range videoCameraModelFields {
@@ -639,4 +638,53 @@ func parseAudioMetadata(rawData map[string]string) *dbtypes.AudioSpecificMetadat
 	}
 
 	return metadata
+}
+
+type captureTimePair struct {
+	TimeField    string
+	OffsetFields []string
+}
+
+func parseCaptureTimestamp(
+	rawData map[string]string,
+	pairs []captureTimePair,
+	fallbackFields []string,
+) (*time.Time, *int16) {
+	for _, pair := range pairs {
+		dateStr := strings.TrimSpace(rawData[pair.TimeField])
+		if dateStr == "" {
+			continue
+		}
+
+		for _, offsetField := range pair.OffsetFields {
+			offsetStr := strings.TrimSpace(rawData[offsetField])
+			if offsetStr == "" {
+				continue
+			}
+
+			parsedTime, offsetMinutes, err := parseDateTimeWithCaptureOffset(dateStr, offsetStr)
+			if err == nil {
+				return &parsedTime, offsetMinutes
+			}
+		}
+
+		parsedTime, offsetMinutes, err := parseDateTimeWithCaptureOffset(dateStr, "")
+		if err == nil {
+			return &parsedTime, offsetMinutes
+		}
+	}
+
+	for _, field := range fallbackFields {
+		dateStr := strings.TrimSpace(rawData[field])
+		if dateStr == "" {
+			continue
+		}
+
+		parsedTime, offsetMinutes, err := parseDateTimeWithCaptureOffset(dateStr, "")
+		if err == nil {
+			return &parsedTime, offsetMinutes
+		}
+	}
+
+	return nil, nil
 }

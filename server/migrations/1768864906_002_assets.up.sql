@@ -31,6 +31,10 @@ CREATE TABLE assets (
     duration           DOUBLE PRECISION,
     upload_time        TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
     taken_time         TIMESTAMPTZ,
+    capture_offset_minutes SMALLINT CHECK (
+        capture_offset_minutes IS NULL
+        OR capture_offset_minutes BETWEEN -840 AND 840
+    ),
     is_deleted         BOOLEAN       DEFAULT FALSE,
     deleted_at         TIMESTAMPTZ,
     specific_metadata  JSONB,

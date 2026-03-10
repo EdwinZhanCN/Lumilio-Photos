@@ -84,7 +84,8 @@ func buildAssetGroupKey(
 ) string {
 	switch groupBy {
 	case "date":
-		return buildDateGroupKey(assetTime(asset).In(location), nowLocal)
+		groupTime := assetTimeForGrouping(asset, location)
+		return buildDateGroupKey(groupTime, nowLocal.In(groupTime.Location()))
 	case "type":
 		return buildTypeGroupKey(asset)
 	default:
@@ -100,6 +101,15 @@ func assetTime(asset repo.Asset) time.Time {
 		return asset.UploadTime.Time
 	}
 	return time.Unix(0, 0).UTC()
+}
+
+func assetTimeForGrouping(asset repo.Asset, viewerLocation *time.Location) time.Time {
+	baseTime := assetTime(asset)
+	if asset.CaptureOffsetMinutes != nil {
+		location := time.FixedZone("capture", int(*asset.CaptureOffsetMinutes)*60)
+		return baseTime.In(location)
+	}
+	return baseTime.In(viewerLocation)
 }
 
 func buildDateGroupKey(assetTime time.Time, nowLocal time.Time) string {

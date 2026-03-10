@@ -109,6 +109,9 @@ const docTemplate = `{
                     "camera_model": {
                         "type": "string"
                     },
+                    "capture_offset_minutes": {
+                        "type": "integer"
+                    },
                     "description": {
                         "type": "string"
                     },
@@ -160,6 +163,9 @@ const docTemplate = `{
                     "camera_model": {
                         "example": "Canon EOS 5D Mark IV",
                         "type": "string"
+                    },
+                    "capture_offset_minutes": {
+                        "type": "integer"
                     },
                     "codec": {
                         "example": "H.264",

@@ -34,6 +34,144 @@ func parseDateTime(dateStr string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("unable to parse datetime: %s", dateStr)
 }
 
+func parseDateTimeWithCaptureOffset(dateStr, offsetStr string) (time.Time, *int16, error) {
+	dateStr = strings.TrimSpace(dateStr)
+	offsetStr = strings.TrimSpace(offsetStr)
+
+	if offsetStr != "" {
+		offsetMinutes, err := parseUTCOffsetMinutes(offsetStr)
+		if err == nil {
+			localTime, parseErr := parseLocalDateTime(dateStr)
+			if parseErr == nil {
+				location := time.FixedZone("capture", int(offsetMinutes)*60)
+				captureTime := time.Date(
+					localTime.Year(),
+					localTime.Month(),
+					localTime.Day(),
+					localTime.Hour(),
+					localTime.Minute(),
+					localTime.Second(),
+					localTime.Nanosecond(),
+					location,
+				)
+				return captureTime.UTC(), &offsetMinutes, nil
+			}
+		}
+	}
+
+	parsedTime, err := parseDateTime(dateStr)
+	if err != nil {
+		return time.Time{}, nil, err
+	}
+
+	if hasExplicitUTCOffset(dateStr) {
+		_, offsetSeconds := parsedTime.Zone()
+		offsetMinutes := int16(offsetSeconds / 60)
+		return parsedTime.UTC(), &offsetMinutes, nil
+	}
+
+	return parsedTime.UTC(), nil, nil
+}
+
+func parseLocalDateTime(dateStr string) (time.Time, error) {
+	formats := []string{
+		"2006:01:02 15:04:05",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+		"2006:01:02 15:04:05.000",
+		"2006-01-02T15:04:05.000",
+		"2006:01:02 15:04:05.000000",
+		"2006-01-02T15:04:05.000000",
+	}
+
+	dateStr = strings.TrimSpace(dateStr)
+	for _, format := range formats {
+		if t, err := time.ParseInLocation(format, dateStr, time.UTC); err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse local datetime: %s", dateStr)
+}
+
+func parseUTCOffsetMinutes(offsetStr string) (int16, error) {
+	offsetStr = strings.TrimSpace(offsetStr)
+	if offsetStr == "" {
+		return 0, fmt.Errorf("empty offset")
+	}
+	if fields := strings.Fields(offsetStr); len(fields) > 0 {
+		offsetStr = fields[0]
+	}
+	if strings.Contains(offsetStr, ",") {
+		offsetStr = strings.SplitN(offsetStr, ",", 2)[0]
+	}
+
+	sign := 1
+	switch offsetStr[0] {
+	case '+':
+		offsetStr = offsetStr[1:]
+	case '-':
+		sign = -1
+		offsetStr = offsetStr[1:]
+	default:
+		return 0, fmt.Errorf("invalid offset sign: %s", offsetStr)
+	}
+
+	var hoursStr, minutesStr string
+	switch {
+	case strings.Contains(offsetStr, ":"):
+		parts := strings.SplitN(offsetStr, ":", 2)
+		hoursStr = parts[0]
+		minutesStr = parts[1]
+	case len(offsetStr) == 4:
+		hoursStr = offsetStr[:2]
+		minutesStr = offsetStr[2:]
+	case len(offsetStr) == 1:
+		hoursStr = "0" + offsetStr
+		minutesStr = "00"
+	case len(offsetStr) == 2:
+		hoursStr = offsetStr
+		minutesStr = "00"
+	default:
+		return 0, fmt.Errorf("invalid offset format: %s", offsetStr)
+	}
+
+	hours, err := strconv.Atoi(hoursStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid offset hours: %w", err)
+	}
+	minutes, err := strconv.Atoi(minutesStr)
+	if err != nil {
+		return 0, fmt.Errorf("invalid offset minutes: %w", err)
+	}
+	if hours > 14 || minutes > 59 {
+		return 0, fmt.Errorf("offset out of range: %s", offsetStr)
+	}
+
+	total := sign * ((hours * 60) + minutes)
+	if total < -840 || total > 840 {
+		return 0, fmt.Errorf("offset out of range: %d", total)
+	}
+
+	return int16(total), nil
+}
+
+func hasExplicitUTCOffset(dateStr string) bool {
+	dateStr = strings.TrimSpace(dateStr)
+	if strings.HasSuffix(dateStr, "Z") {
+		return true
+	}
+
+	timeSep := strings.LastIndexAny(dateStr, "T ")
+	if timeSep < 0 || timeSep+1 >= len(dateStr) {
+		return false
+	}
+
+	timePart := dateStr[timeSep+1:]
+	offsetIndex := strings.LastIndexAny(timePart, "+-")
+	return offsetIndex >= 8
+}
+
 // parseGPSCoordinate parses GPS coordinates from various EXIF formats
 func parseGPSCoordinate(coordStr string) (float64, error) {
 	// Clean the input

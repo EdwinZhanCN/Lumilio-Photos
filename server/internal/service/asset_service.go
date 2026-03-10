@@ -426,16 +426,19 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 
 	// Extract taken_time from metadata based on asset type
 	var takenTime *time.Time
+	var captureOffsetMinutes *int16
 	assetType := dbtypes.AssetType(asset.Type)
 
 	switch assetType {
 	case dbtypes.AssetTypePhoto:
 		if photoMeta, err := metadata.UnmarshalPhoto(); err == nil {
 			takenTime = photoMeta.TakenTime
+			captureOffsetMinutes = photoMeta.CaptureOffsetMinutes
 		}
 	case dbtypes.AssetTypeVideo:
 		if videoMeta, err := metadata.UnmarshalVideo(); err == nil {
 			takenTime = videoMeta.RecordedTime
+			captureOffsetMinutes = videoMeta.CaptureOffsetMinutes
 		}
 	case dbtypes.AssetTypeAudio:
 		// Audio doesn't have taken time
@@ -452,9 +455,10 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 	}
 
 	params := repo.UpdateAssetMetadataWithTakenTimeParams{
-		AssetID:          pgUUID,
-		SpecificMetadata: metadata,
-		TakenTime:        takenTimeParam,
+		AssetID:              pgUUID,
+		SpecificMetadata:     metadata,
+		TakenTime:            takenTimeParam,
+		CaptureOffsetMinutes: captureOffsetMinutes,
 	}
 
 	return s.queries.UpdateAssetMetadataWithTakenTime(ctx, params)
