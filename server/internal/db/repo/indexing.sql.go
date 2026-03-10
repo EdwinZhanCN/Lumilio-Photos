@@ -126,7 +126,7 @@ WITH page_ids AS MATERIALIZED (
   LIMIT $3
   OFFSET $2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -169,6 +169,7 @@ func (q *Queries) ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListP
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.CaptureOffsetMinutes,
 		); err != nil {
 			return nil, err
 		}
@@ -198,7 +199,7 @@ WITH page_ids AS MATERIALIZED (
   LIMIT $3
   OFFSET $2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -241,6 +242,7 @@ func (q *Queries) ListPhotoAssetsMissingCaptions(ctx context.Context, arg ListPh
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.CaptureOffsetMinutes,
 		); err != nil {
 			return nil, err
 		}
@@ -272,7 +274,7 @@ WITH page_ids AS MATERIALIZED (
   LIMIT $4
   OFFSET $3
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -321,6 +323,7 @@ func (q *Queries) ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg L
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.CaptureOffsetMinutes,
 		); err != nil {
 			return nil, err
 		}
@@ -350,7 +353,7 @@ WITH page_ids AS MATERIALIZED (
   LIMIT $3
   OFFSET $2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -393,6 +396,7 @@ func (q *Queries) ListPhotoAssetsMissingFaceResults(ctx context.Context, arg Lis
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.CaptureOffsetMinutes,
 		); err != nil {
 			return nil, err
 		}
@@ -422,7 +426,7 @@ WITH page_ids AS MATERIALIZED (
   LIMIT $3
   OFFSET $2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.sort_time DESC, p.asset_id DESC
@@ -465,6 +469,7 @@ func (q *Queries) ListPhotoAssetsMissingOCRResults(ctx context.Context, arg List
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.CaptureOffsetMinutes,
 		); err != nil {
 			return nil, err
 		}

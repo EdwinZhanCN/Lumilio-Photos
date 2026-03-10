@@ -38,7 +38,11 @@ SET specific_metadata = sqlc.arg('specific_metadata'),
     taken_time = CASE
         WHEN sqlc.arg('taken_time')::timestamptz IS NOT NULL THEN sqlc.arg('taken_time')::timestamptz
         ELSE COALESCE(taken_time, upload_time)
-    END
+    END,
+    capture_offset_minutes = COALESCE(
+        sqlc.narg('capture_offset_minutes')::smallint,
+        capture_offset_minutes
+    )
 WHERE asset_id = sqlc.arg('asset_id');
 
 -- name: DeleteAsset :exec

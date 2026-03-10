@@ -14,7 +14,7 @@ import (
 
 const getAssetWithRelations = `-- name: GetAssetWithRelations :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes,
     COALESCE(thumbnails_rel.thumbnails, '[]'::json) as thumbnails,
     COALESCE(tags_rel.tags, '[]'::json) as tags,
     COALESCE(albums_rel.albums, '[]'::json) as albums,
@@ -159,34 +159,35 @@ WHERE a.asset_id = $1 AND a.is_deleted = false
 `
 
 type GetAssetWithRelationsRow struct {
-	AssetID            pgtype.UUID              `db:"asset_id" json:"asset_id"`
-	OwnerID            *int32                   `db:"owner_id" json:"owner_id"`
-	Type               string                   `db:"type" json:"type"`
-	OriginalFilename   string                   `db:"original_filename" json:"original_filename"`
-	StoragePath        *string                  `db:"storage_path" json:"storage_path"`
-	MimeType           string                   `db:"mime_type" json:"mime_type"`
-	FileSize           int64                    `db:"file_size" json:"file_size"`
-	Hash               *string                  `db:"hash" json:"hash"`
-	Width              *int32                   `db:"width" json:"width"`
-	Height             *int32                   `db:"height" json:"height"`
-	Duration           *float64                 `db:"duration" json:"duration"`
-	UploadTime         pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
-	TakenTime          pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
-	IsDeleted          *bool                    `db:"is_deleted" json:"is_deleted"`
-	DeletedAt          pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata   dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating             *int32                   `db:"rating" json:"rating"`
-	Liked              *bool                    `db:"liked" json:"liked"`
-	RepositoryID       pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Status             []byte                   `db:"status" json:"status"`
-	UpdatedAt          pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
-	Thumbnails         []byte                   `db:"thumbnails" json:"thumbnails"`
-	Tags               []byte                   `db:"tags" json:"tags"`
-	Albums             []byte                   `db:"albums" json:"albums"`
-	SpeciesPredictions []byte                   `db:"species_predictions" json:"species_predictions"`
-	OcrResult          []byte                   `db:"ocr_result" json:"ocr_result"`
-	FaceResult         []byte                   `db:"face_result" json:"face_result"`
-	Caption            []byte                   `db:"caption" json:"caption"`
+	AssetID              pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
+	Type                 string                   `db:"type" json:"type"`
+	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
+	StoragePath          *string                  `db:"storage_path" json:"storage_path"`
+	MimeType             string                   `db:"mime_type" json:"mime_type"`
+	FileSize             int64                    `db:"file_size" json:"file_size"`
+	Hash                 *string                  `db:"hash" json:"hash"`
+	Width                *int32                   `db:"width" json:"width"`
+	Height               *int32                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	UploadTime           pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime            pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
+	IsDeleted            *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt            pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating               *int32                   `db:"rating" json:"rating"`
+	Liked                *bool                    `db:"liked" json:"liked"`
+	RepositoryID         pgtype.UUID              `db:"repository_id" json:"repository_id"`
+	Status               []byte                   `db:"status" json:"status"`
+	UpdatedAt            pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	CaptureOffsetMinutes *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	Thumbnails           []byte                   `db:"thumbnails" json:"thumbnails"`
+	Tags                 []byte                   `db:"tags" json:"tags"`
+	Albums               []byte                   `db:"albums" json:"albums"`
+	SpeciesPredictions   []byte                   `db:"species_predictions" json:"species_predictions"`
+	OcrResult            []byte                   `db:"ocr_result" json:"ocr_result"`
+	FaceResult           []byte                   `db:"face_result" json:"face_result"`
+	Caption              []byte                   `db:"caption" json:"caption"`
 }
 
 func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error) {
@@ -214,6 +215,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
+		&i.CaptureOffsetMinutes,
 		&i.Thumbnails,
 		&i.Tags,
 		&i.Albums,
@@ -227,7 +229,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 
 const getAssetWithTags = `-- name: GetAssetWithTags :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes,
     COALESCE((
         SELECT json_agg(
             json_build_object(
@@ -248,28 +250,29 @@ WHERE a.asset_id = $1 AND a.is_deleted = false
 `
 
 type GetAssetWithTagsRow struct {
-	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
-	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
-	Type             string                   `db:"type" json:"type"`
-	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
-	StoragePath      *string                  `db:"storage_path" json:"storage_path"`
-	MimeType         string                   `db:"mime_type" json:"mime_type"`
-	FileSize         int64                    `db:"file_size" json:"file_size"`
-	Hash             *string                  `db:"hash" json:"hash"`
-	Width            *int32                   `db:"width" json:"width"`
-	Height           *int32                   `db:"height" json:"height"`
-	Duration         *float64                 `db:"duration" json:"duration"`
-	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
-	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
-	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
-	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating           *int32                   `db:"rating" json:"rating"`
-	Liked            *bool                    `db:"liked" json:"liked"`
-	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Status           []byte                   `db:"status" json:"status"`
-	UpdatedAt        pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
-	Tags             interface{}              `db:"tags" json:"tags"`
+	AssetID              pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
+	Type                 string                   `db:"type" json:"type"`
+	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
+	StoragePath          *string                  `db:"storage_path" json:"storage_path"`
+	MimeType             string                   `db:"mime_type" json:"mime_type"`
+	FileSize             int64                    `db:"file_size" json:"file_size"`
+	Hash                 *string                  `db:"hash" json:"hash"`
+	Width                *int32                   `db:"width" json:"width"`
+	Height               *int32                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	UploadTime           pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime            pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
+	IsDeleted            *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt            pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating               *int32                   `db:"rating" json:"rating"`
+	Liked                *bool                    `db:"liked" json:"liked"`
+	RepositoryID         pgtype.UUID              `db:"repository_id" json:"repository_id"`
+	Status               []byte                   `db:"status" json:"status"`
+	UpdatedAt            pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	CaptureOffsetMinutes *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	Tags                 interface{}              `db:"tags" json:"tags"`
 }
 
 func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error) {
@@ -297,6 +300,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
+		&i.CaptureOffsetMinutes,
 		&i.Tags,
 	)
 	return i, err
@@ -304,7 +308,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 
 const getAssetWithThumbnails = `-- name: GetAssetWithThumbnails :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes,
     COALESCE((
         SELECT json_agg(
             json_build_object(
@@ -328,28 +332,29 @@ WHERE a.asset_id = $1 AND a.is_deleted = false
 `
 
 type GetAssetWithThumbnailsRow struct {
-	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
-	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
-	Type             string                   `db:"type" json:"type"`
-	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
-	StoragePath      *string                  `db:"storage_path" json:"storage_path"`
-	MimeType         string                   `db:"mime_type" json:"mime_type"`
-	FileSize         int64                    `db:"file_size" json:"file_size"`
-	Hash             *string                  `db:"hash" json:"hash"`
-	Width            *int32                   `db:"width" json:"width"`
-	Height           *int32                   `db:"height" json:"height"`
-	Duration         *float64                 `db:"duration" json:"duration"`
-	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
-	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
-	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
-	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating           *int32                   `db:"rating" json:"rating"`
-	Liked            *bool                    `db:"liked" json:"liked"`
-	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Status           []byte                   `db:"status" json:"status"`
-	UpdatedAt        pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
-	Thumbnails       interface{}              `db:"thumbnails" json:"thumbnails"`
+	AssetID              pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
+	Type                 string                   `db:"type" json:"type"`
+	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
+	StoragePath          *string                  `db:"storage_path" json:"storage_path"`
+	MimeType             string                   `db:"mime_type" json:"mime_type"`
+	FileSize             int64                    `db:"file_size" json:"file_size"`
+	Hash                 *string                  `db:"hash" json:"hash"`
+	Width                *int32                   `db:"width" json:"width"`
+	Height               *int32                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	UploadTime           pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime            pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
+	IsDeleted            *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt            pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating               *int32                   `db:"rating" json:"rating"`
+	Liked                *bool                    `db:"liked" json:"liked"`
+	RepositoryID         pgtype.UUID              `db:"repository_id" json:"repository_id"`
+	Status               []byte                   `db:"status" json:"status"`
+	UpdatedAt            pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	CaptureOffsetMinutes *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	Thumbnails           interface{}              `db:"thumbnails" json:"thumbnails"`
 }
 
 func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUID) (GetAssetWithThumbnailsRow, error) {
@@ -377,6 +382,7 @@ func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUI
 		&i.RepositoryID,
 		&i.Status,
 		&i.UpdatedAt,
+		&i.CaptureOffsetMinutes,
 		&i.Thumbnails,
 	)
 	return i, err

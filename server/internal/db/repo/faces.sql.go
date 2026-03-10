@@ -1160,7 +1160,7 @@ page_ids AS MATERIALIZED (
     ORDER BY a.upload_time DESC, m.asset_id DESC
     LIMIT $3 OFFSET $2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.upload_time DESC, p.asset_id DESC
@@ -1203,6 +1203,7 @@ func (q *Queries) SearchAssetsByFaceCluster(ctx context.Context, arg SearchAsset
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.CaptureOffsetMinutes,
 		); err != nil {
 			return nil, err
 		}
@@ -1215,7 +1216,7 @@ func (q *Queries) SearchAssetsByFaceCluster(ctx context.Context, arg SearchAsset
 }
 
 const searchAssetsByFaceID = `-- name: SearchAssetsByFaceID :many
-SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
+SELECT DISTINCT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes FROM assets a
 JOIN face_items fi ON a.asset_id = fi.asset_id
 WHERE fi.face_id = $1
 ORDER BY a.upload_time DESC
@@ -1259,6 +1260,7 @@ func (q *Queries) SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFa
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.CaptureOffsetMinutes,
 		); err != nil {
 			return nil, err
 		}

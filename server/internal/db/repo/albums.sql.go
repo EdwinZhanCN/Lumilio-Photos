@@ -129,7 +129,7 @@ func (q *Queries) GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAsse
 }
 
 const getAlbumAssets = `-- name: GetAlbumAssets :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = $1 AND a.is_deleted = false
@@ -137,29 +137,30 @@ ORDER BY aa.position ASC, aa.added_time ASC
 `
 
 type GetAlbumAssetsRow struct {
-	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
-	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
-	Type             string                   `db:"type" json:"type"`
-	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
-	StoragePath      *string                  `db:"storage_path" json:"storage_path"`
-	MimeType         string                   `db:"mime_type" json:"mime_type"`
-	FileSize         int64                    `db:"file_size" json:"file_size"`
-	Hash             *string                  `db:"hash" json:"hash"`
-	Width            *int32                   `db:"width" json:"width"`
-	Height           *int32                   `db:"height" json:"height"`
-	Duration         *float64                 `db:"duration" json:"duration"`
-	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
-	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
-	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
-	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating           *int32                   `db:"rating" json:"rating"`
-	Liked            *bool                    `db:"liked" json:"liked"`
-	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Status           []byte                   `db:"status" json:"status"`
-	UpdatedAt        pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
-	Position         *int32                   `db:"position" json:"position"`
-	AddedTime        pgtype.Timestamptz       `db:"added_time" json:"added_time"`
+	AssetID              pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
+	Type                 string                   `db:"type" json:"type"`
+	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
+	StoragePath          *string                  `db:"storage_path" json:"storage_path"`
+	MimeType             string                   `db:"mime_type" json:"mime_type"`
+	FileSize             int64                    `db:"file_size" json:"file_size"`
+	Hash                 *string                  `db:"hash" json:"hash"`
+	Width                *int32                   `db:"width" json:"width"`
+	Height               *int32                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	UploadTime           pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime            pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
+	IsDeleted            *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt            pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating               *int32                   `db:"rating" json:"rating"`
+	Liked                *bool                    `db:"liked" json:"liked"`
+	RepositoryID         pgtype.UUID              `db:"repository_id" json:"repository_id"`
+	Status               []byte                   `db:"status" json:"status"`
+	UpdatedAt            pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	CaptureOffsetMinutes *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	Position             *int32                   `db:"position" json:"position"`
+	AddedTime            pgtype.Timestamptz       `db:"added_time" json:"added_time"`
 }
 
 func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error) {
@@ -193,6 +194,7 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.CaptureOffsetMinutes,
 			&i.Position,
 			&i.AddedTime,
 		); err != nil {
@@ -207,7 +209,7 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 }
 
 const getAlbumAssetsScoped = `-- name: GetAlbumAssetsScoped :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = $1
@@ -225,29 +227,30 @@ type GetAlbumAssetsScopedParams struct {
 }
 
 type GetAlbumAssetsScopedRow struct {
-	AssetID          pgtype.UUID              `db:"asset_id" json:"asset_id"`
-	OwnerID          *int32                   `db:"owner_id" json:"owner_id"`
-	Type             string                   `db:"type" json:"type"`
-	OriginalFilename string                   `db:"original_filename" json:"original_filename"`
-	StoragePath      *string                  `db:"storage_path" json:"storage_path"`
-	MimeType         string                   `db:"mime_type" json:"mime_type"`
-	FileSize         int64                    `db:"file_size" json:"file_size"`
-	Hash             *string                  `db:"hash" json:"hash"`
-	Width            *int32                   `db:"width" json:"width"`
-	Height           *int32                   `db:"height" json:"height"`
-	Duration         *float64                 `db:"duration" json:"duration"`
-	UploadTime       pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
-	TakenTime        pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
-	IsDeleted        *bool                    `db:"is_deleted" json:"is_deleted"`
-	DeletedAt        pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating           *int32                   `db:"rating" json:"rating"`
-	Liked            *bool                    `db:"liked" json:"liked"`
-	RepositoryID     pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Status           []byte                   `db:"status" json:"status"`
-	UpdatedAt        pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
-	Position         *int32                   `db:"position" json:"position"`
-	AddedTime        pgtype.Timestamptz       `db:"added_time" json:"added_time"`
+	AssetID              pgtype.UUID              `db:"asset_id" json:"asset_id"`
+	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
+	Type                 string                   `db:"type" json:"type"`
+	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
+	StoragePath          *string                  `db:"storage_path" json:"storage_path"`
+	MimeType             string                   `db:"mime_type" json:"mime_type"`
+	FileSize             int64                    `db:"file_size" json:"file_size"`
+	Hash                 *string                  `db:"hash" json:"hash"`
+	Width                *int32                   `db:"width" json:"width"`
+	Height               *int32                   `db:"height" json:"height"`
+	Duration             *float64                 `db:"duration" json:"duration"`
+	UploadTime           pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
+	TakenTime            pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
+	IsDeleted            *bool                    `db:"is_deleted" json:"is_deleted"`
+	DeletedAt            pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
+	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
+	Rating               *int32                   `db:"rating" json:"rating"`
+	Liked                *bool                    `db:"liked" json:"liked"`
+	RepositoryID         pgtype.UUID              `db:"repository_id" json:"repository_id"`
+	Status               []byte                   `db:"status" json:"status"`
+	UpdatedAt            pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	CaptureOffsetMinutes *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
+	Position             *int32                   `db:"position" json:"position"`
+	AddedTime            pgtype.Timestamptz       `db:"added_time" json:"added_time"`
 }
 
 func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsScopedParams) ([]GetAlbumAssetsScopedRow, error) {
@@ -281,6 +284,7 @@ func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsSc
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.CaptureOffsetMinutes,
 			&i.Position,
 			&i.AddedTime,
 		); err != nil {

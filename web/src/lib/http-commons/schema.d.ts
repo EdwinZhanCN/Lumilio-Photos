@@ -4727,6 +4727,7 @@ export interface components {
         };
         "dbtypes.PhotoSpecificMetadata": {
             camera_model?: string;
+            capture_offset_minutes?: number;
             description?: string;
             dimensions?: string;
             exposure?: number;
@@ -4746,6 +4747,7 @@ export interface components {
             bitrate?: number;
             /** @example Canon EOS 5D Mark IV */
             camera_model?: string;
+            capture_offset_minutes?: number;
             /** @example H.264 */
             codec?: string;
             /** @example A beautiful sunset over the ocean */

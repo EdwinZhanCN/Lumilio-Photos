@@ -33,6 +33,22 @@ func TestGroupAssetsPageAt_DateUsesTakenTimeWithViewerTimezone(t *testing.T) {
 	require.Equal(t, "date:yesterday", groups[0].Key)
 }
 
+func TestGroupAssetsPageAt_DateUsesPreservedCaptureOffsetOverViewerTimezone(t *testing.T) {
+	now := time.Date(2026, time.March, 10, 10, 0, 0, 0, time.UTC)
+	captureOffsetMinutes := int16(600)
+	asset := testGroupedAsset(
+		time.Date(2026, time.March, 10, 1, 0, 0, 0, time.UTC),
+		time.Date(2026, time.March, 10, 9, 0, 0, 0, time.UTC),
+		"image/jpeg",
+		AssetTypePhoto,
+	)
+	asset.CaptureOffsetMinutes = &captureOffsetMinutes
+
+	groups := groupAssetsPageAt([]repo.Asset{asset}, "date", "America/New_York", now)
+	require.Len(t, groups, 1)
+	require.Equal(t, "date:today", groups[0].Key)
+}
+
 func TestGroupAssetsPageAt_DateFallsBackToUploadTime(t *testing.T) {
 	now := time.Date(2026, time.March, 10, 10, 0, 0, 0, time.UTC)
 	asset := testGroupedAsset(
