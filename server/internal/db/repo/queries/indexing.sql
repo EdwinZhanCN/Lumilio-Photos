@@ -6,96 +6,163 @@ WHERE a.type = 'PHOTO'
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'));
 
 -- name: CountPhotoAssetsWithEmbeddingType :one
-SELECT COUNT(DISTINCT a.asset_id) AS count
+SELECT COUNT(*) AS count
 FROM assets a
-JOIN embeddings e ON a.asset_id = e.asset_id
 WHERE a.type = 'PHOTO'
   AND a.is_deleted = false
-  AND e.embedding_type = sqlc.arg('embedding_type')::text
-  AND e.is_primary = true
+  AND EXISTS (
+    SELECT 1
+    FROM embeddings e
+    WHERE e.asset_id = a.asset_id
+      AND e.embedding_type = sqlc.arg('embedding_type')::text
+      AND e.is_primary = true
+  )
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'));
 
 -- name: CountPhotoAssetsWithOCRResults :one
-SELECT COUNT(DISTINCT a.asset_id) AS count
+SELECT COUNT(*) AS count
 FROM assets a
-JOIN ocr_results o ON a.asset_id = o.asset_id
 WHERE a.type = 'PHOTO'
   AND a.is_deleted = false
+  AND EXISTS (
+    SELECT 1
+    FROM ocr_results o
+    WHERE o.asset_id = a.asset_id
+  )
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'));
 
 -- name: CountPhotoAssetsWithCaptions :one
-SELECT COUNT(DISTINCT a.asset_id) AS count
+SELECT COUNT(*) AS count
 FROM assets a
-JOIN captions c ON a.asset_id = c.asset_id
 WHERE a.type = 'PHOTO'
   AND a.is_deleted = false
+  AND EXISTS (
+    SELECT 1
+    FROM captions c
+    WHERE c.asset_id = a.asset_id
+  )
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'));
 
 -- name: CountPhotoAssetsWithFaceResults :one
-SELECT COUNT(DISTINCT a.asset_id) AS count
+SELECT COUNT(*) AS count
 FROM assets a
-JOIN face_results f ON a.asset_id = f.asset_id
 WHERE a.type = 'PHOTO'
   AND a.is_deleted = false
+  AND EXISTS (
+    SELECT 1
+    FROM face_results f
+    WHERE f.asset_id = a.asset_id
+  )
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'));
 
 -- name: ListPhotoAssetsForIndexingBatch :many
+WITH page_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    COALESCE(a.taken_time, a.upload_time) AS sort_time
+  FROM assets a
+  WHERE a.type = 'PHOTO'
+    AND a.is_deleted = false
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+  LIMIT sqlc.arg('limit')
+  OFFSET sqlc.arg('offset')
+)
 SELECT a.*
-FROM assets a
-WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
-  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
-ORDER BY COALESCE(a.taken_time, a.upload_time) DESC
-LIMIT sqlc.arg('limit')
-OFFSET sqlc.arg('offset');
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.sort_time DESC, p.asset_id DESC;
 
 -- name: ListPhotoAssetsMissingEmbeddingType :many
+WITH page_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    COALESCE(a.taken_time, a.upload_time) AS sort_time
+  FROM assets a
+  WHERE a.type = 'PHOTO'
+    AND a.is_deleted = false
+    AND NOT EXISTS (
+      SELECT 1
+      FROM embeddings e
+      WHERE e.asset_id = a.asset_id
+        AND e.embedding_type = sqlc.arg('embedding_type')::text
+        AND e.is_primary = true
+    )
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+  LIMIT sqlc.arg('limit')
+  OFFSET sqlc.arg('offset')
+)
 SELECT a.*
-FROM assets a
-LEFT JOIN embeddings e
-  ON a.asset_id = e.asset_id
- AND e.embedding_type = sqlc.arg('embedding_type')::text
- AND e.is_primary = true
-WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
-  AND e.asset_id IS NULL
-  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
-ORDER BY COALESCE(a.taken_time, a.upload_time) DESC
-LIMIT sqlc.arg('limit')
-OFFSET sqlc.arg('offset');
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.sort_time DESC, p.asset_id DESC;
 
 -- name: ListPhotoAssetsMissingOCRResults :many
+WITH page_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    COALESCE(a.taken_time, a.upload_time) AS sort_time
+  FROM assets a
+  WHERE a.type = 'PHOTO'
+    AND a.is_deleted = false
+    AND NOT EXISTS (
+      SELECT 1
+      FROM ocr_results o
+      WHERE o.asset_id = a.asset_id
+    )
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+  LIMIT sqlc.arg('limit')
+  OFFSET sqlc.arg('offset')
+)
 SELECT a.*
-FROM assets a
-LEFT JOIN ocr_results o ON a.asset_id = o.asset_id
-WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
-  AND o.asset_id IS NULL
-  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
-ORDER BY COALESCE(a.taken_time, a.upload_time) DESC
-LIMIT sqlc.arg('limit')
-OFFSET sqlc.arg('offset');
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.sort_time DESC, p.asset_id DESC;
 
 -- name: ListPhotoAssetsMissingCaptions :many
+WITH page_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    COALESCE(a.taken_time, a.upload_time) AS sort_time
+  FROM assets a
+  WHERE a.type = 'PHOTO'
+    AND a.is_deleted = false
+    AND NOT EXISTS (
+      SELECT 1
+      FROM captions c
+      WHERE c.asset_id = a.asset_id
+    )
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+  LIMIT sqlc.arg('limit')
+  OFFSET sqlc.arg('offset')
+)
 SELECT a.*
-FROM assets a
-LEFT JOIN captions c ON a.asset_id = c.asset_id
-WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
-  AND c.asset_id IS NULL
-  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
-ORDER BY COALESCE(a.taken_time, a.upload_time) DESC
-LIMIT sqlc.arg('limit')
-OFFSET sqlc.arg('offset');
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.sort_time DESC, p.asset_id DESC;
 
 -- name: ListPhotoAssetsMissingFaceResults :many
+WITH page_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    COALESCE(a.taken_time, a.upload_time) AS sort_time
+  FROM assets a
+  WHERE a.type = 'PHOTO'
+    AND a.is_deleted = false
+    AND NOT EXISTS (
+      SELECT 1
+      FROM face_results f
+      WHERE f.asset_id = a.asset_id
+    )
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+  LIMIT sqlc.arg('limit')
+  OFFSET sqlc.arg('offset')
+)
 SELECT a.*
-FROM assets a
-LEFT JOIN face_results f ON a.asset_id = f.asset_id
-WHERE a.type = 'PHOTO'
-  AND a.is_deleted = false
-  AND f.asset_id IS NULL
-  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
-ORDER BY COALESCE(a.taken_time, a.upload_time) DESC
-LIMIT sqlc.arg('limit')
-OFFSET sqlc.arg('offset');
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.sort_time DESC, p.asset_id DESC;
