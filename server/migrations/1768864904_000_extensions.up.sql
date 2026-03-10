@@ -3,6 +3,8 @@
 --
 -- pgcrypto: provides gen_random_uuid() used as DEFAULT for UUID primary keys.
 -- vector: provides the VECTOR data type and related index operators.
+-- pg_trgm: provides trigram indexes for fast ILIKE filename search.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;

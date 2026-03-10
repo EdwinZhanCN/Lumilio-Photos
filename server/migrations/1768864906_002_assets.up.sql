@@ -103,5 +103,8 @@ CREATE INDEX idx_thumbnails_asset_id ON thumbnails(asset_id);
 CREATE INDEX embeddings_asset_type_idx ON embeddings(asset_id, embedding_type);
 CREATE INDEX embeddings_type_model_idx ON embeddings(embedding_type, embedding_model);
 CREATE INDEX embeddings_primary_idx ON embeddings(embedding_type, is_primary) WHERE is_primary = true;
+CREATE UNIQUE INDEX embeddings_one_primary_per_asset_type_idx
+  ON embeddings(asset_id, embedding_type)
+  WHERE is_primary = true;
 CREATE INDEX embeddings_vector_idx ON embeddings USING hnsw (vector vector_l2_ops)
 WITH (m = 16, ef_construction = 200);
