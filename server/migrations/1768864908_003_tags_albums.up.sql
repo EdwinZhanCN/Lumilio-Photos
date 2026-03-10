@@ -37,3 +37,5 @@ CREATE TABLE album_assets (
 
 -- Indexes
 CREATE INDEX idx_albums_user_id ON albums(user_id);
+CREATE INDEX idx_albums_user_created_at ON albums(user_id, created_at DESC, album_id DESC);
+CREATE INDEX idx_album_assets_album_order ON album_assets(album_id, position ASC, added_time ASC, asset_id ASC);

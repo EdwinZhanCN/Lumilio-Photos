@@ -2,6 +2,8 @@
 -- WARNING: This will permanently delete data
 
 DROP INDEX IF EXISTS idx_albums_user_id;
+DROP INDEX IF EXISTS idx_albums_user_created_at;
+DROP INDEX IF EXISTS idx_album_assets_album_order;
 DROP TABLE IF EXISTS album_assets CASCADE;
 DROP TABLE IF EXISTS albums CASCADE;
 DROP TABLE IF EXISTS asset_tags CASCADE;
