@@ -181,6 +181,10 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 	if a.AssetID.Valid {
 		id = uuid.UUID(a.AssetID.Bytes).String()
 	}
+	var storagePath string
+	if a.StoragePath != nil {
+		storagePath = *a.StoragePath
+	}
 	var uploadTime time.Time
 	if a.UploadTime.Valid {
 		uploadTime = a.UploadTime.Time
@@ -206,7 +210,7 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 		RepositoryID:     repositoryID,
 		Type:             a.Type,
 		OriginalFilename: a.OriginalFilename,
-		StoragePath:      *a.StoragePath,
+		StoragePath:      storagePath,
 		MimeType:         a.MimeType,
 		FileSize:         a.FileSize,
 		Hash:             a.Hash,

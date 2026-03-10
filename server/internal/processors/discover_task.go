@@ -15,7 +15,6 @@ import (
 	"github.com/riverqueue/river"
 
 	"server/internal/db/dbtypes"
-	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/utils/file"
@@ -86,8 +85,7 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 		return fmt.Errorf("calculate hash: %w", err)
 	}
 
-	initialStatus := status.NewProcessingStatus("Asset discovery ingestion started")
-	statusJSON, err := initialStatus.ToJSONB()
+	statusJSON, err := buildTrackedProcessingStatus(validation.AssetType, "Asset discovery ingestion started")
 	if err != nil {
 		return fmt.Errorf("marshal status: %w", err)
 	}

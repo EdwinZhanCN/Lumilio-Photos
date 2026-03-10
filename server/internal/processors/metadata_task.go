@@ -24,25 +24,34 @@ func (ap *AssetProcessor) ProcessMetadataTask(ctx context.Context, args jobs.Met
 		return err
 	}
 
-	fullPath := filepath.Join(args.RepoPath, args.StoragePath)
-	switch args.AssetType {
-	case dbtypes.AssetTypePhoto:
-		return ap.extractPhotoMetadata(ctx, asset, fullPath)
-	case dbtypes.AssetTypeVideo:
-		info, err := ap.getVideoInfo(fullPath)
-		if err != nil {
-			return err
-		}
-		return ap.extractVideoMetadata(ctx, asset, fullPath, info)
-	case dbtypes.AssetTypeAudio:
-		info, err := ap.getAudioInfo(fullPath)
-		if err != nil {
-			return err
-		}
-		return ap.extractAudioMetadata(ctx, asset, fullPath, info)
-	default:
-		return fmt.Errorf("unsupported asset type for metadata: %s", args.AssetType)
-	}
+	return ap.runTrackedAssetTask(
+		ctx,
+		args.AssetID,
+		taskMetadata,
+		"Extracting metadata",
+		"Metadata extracted",
+		func() error {
+			fullPath := filepath.Join(args.RepoPath, args.StoragePath)
+			switch args.AssetType {
+			case dbtypes.AssetTypePhoto:
+				return ap.extractPhotoMetadata(ctx, asset, fullPath)
+			case dbtypes.AssetTypeVideo:
+				info, err := ap.getVideoInfo(fullPath)
+				if err != nil {
+					return err
+				}
+				return ap.extractVideoMetadata(ctx, asset, fullPath, info)
+			case dbtypes.AssetTypeAudio:
+				info, err := ap.getAudioInfo(fullPath)
+				if err != nil {
+					return err
+				}
+				return ap.extractAudioMetadata(ctx, asset, fullPath, info)
+			default:
+				return fmt.Errorf("unsupported asset type for metadata: %s", args.AssetType)
+			}
+		},
+	)
 }
 
 // extractPhotoMetadata extracts EXIF metadata for photos.

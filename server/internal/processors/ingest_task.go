@@ -66,13 +66,6 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 		CreatedAt: task.Timestamp,
 	}
 
-	// Initial status
-	initialStatus := status.NewProcessingStatus("Asset ingestion started")
-	statusJSON, err := initialStatus.ToJSONB()
-	if err != nil {
-		return nil, fmt.Errorf("marshal status: %w", err)
-	}
-
 	// Owner handling (anonymous → nil)
 	var ownerIDPtr *int32
 	if task.UserID != "" && task.UserID != "anonymous" {
@@ -90,6 +83,12 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 				ownerIDPtr = &ownerID
 			}
 		}
+	}
+
+	// Initial status
+	statusJSON, err := buildTrackedProcessingStatus(contentType, "Asset ingestion started")
+	if err != nil {
+		return nil, fmt.Errorf("marshal status: %w", err)
 	}
 
 	// Create asset record with empty storage path

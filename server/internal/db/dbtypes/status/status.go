@@ -20,6 +20,16 @@ const (
 	StateFailed AssetState = "failed"
 )
 
+// TaskState represents the processing state of an individual pipeline task.
+type TaskState string
+
+const (
+	TaskPending    TaskState = "pending"
+	TaskProcessing TaskState = "processing"
+	TaskComplete   TaskState = "complete"
+	TaskFailed     TaskState = "failed"
+)
+
 // ErrorDetail represents a single processing error
 type ErrorDetail struct {
 	Task  string `json:"task"`
@@ -27,12 +37,24 @@ type ErrorDetail struct {
 	Time  string `json:"time,omitempty"`
 }
 
+// TaskStatus represents status for a single queued processing task.
+type TaskStatus struct {
+	State     TaskState `json:"state"`
+	Message   string    `json:"message,omitempty"`
+	UpdatedAt string    `json:"updated_at"`
+}
+
 // AssetStatus represents the complete status information for an asset
 type AssetStatus struct {
-	State     AssetState    `json:"state"`
-	Message   string        `json:"message"`
-	Errors    []ErrorDetail `json:"errors,omitempty"`
-	UpdatedAt string        `json:"updated_at"`
+	State     AssetState            `json:"state"`
+	Message   string                `json:"message"`
+	Errors    []ErrorDetail         `json:"errors,omitempty"`
+	UpdatedAt string                `json:"updated_at"`
+	Tasks     map[string]TaskStatus `json:"tasks,omitempty"`
+}
+
+func nowRFC3339() string {
+	return time.Now().Format(time.RFC3339)
 }
 
 // NewProcessingStatus creates a new processing status
@@ -40,7 +62,7 @@ func NewProcessingStatus(message string) AssetStatus {
 	return AssetStatus{
 		State:     StateProcessing,
 		Message:   message,
-		UpdatedAt: time.Now().Format(time.RFC3339),
+		UpdatedAt: nowRFC3339(),
 	}
 }
 
@@ -49,7 +71,7 @@ func NewCompleteStatus() AssetStatus {
 	return AssetStatus{
 		State:     StateComplete,
 		Message:   "Asset processed successfully",
-		UpdatedAt: time.Now().Format(time.RFC3339),
+		UpdatedAt: nowRFC3339(),
 	}
 }
 
@@ -59,7 +81,7 @@ func NewWarningStatus(message string, errors []ErrorDetail) AssetStatus {
 		State:     StateWarning,
 		Message:   message,
 		Errors:    errors,
-		UpdatedAt: time.Now().Format(time.RFC3339),
+		UpdatedAt: nowRFC3339(),
 	}
 }
 
@@ -69,16 +91,23 @@ func NewFailedStatus(message string, errors []ErrorDetail) AssetStatus {
 		State:     StateFailed,
 		Message:   message,
 		Errors:    errors,
-		UpdatedAt: time.Now().Format(time.RFC3339),
+		UpdatedAt: nowRFC3339(),
 	}
+}
+
+// NewTrackedProcessingStatus initializes a processing status with known pipeline tasks.
+func NewTrackedProcessingStatus(message string, tasks []string) AssetStatus {
+	status := NewProcessingStatus(message)
+	status.EnsureTasks(tasks)
+	return status
 }
 
 // AddError adds an error to the status
 func (s *AssetStatus) AddError(task, errorMsg string) {
-	s.Errors = append(s.Errors, ErrorDetail{
+	s.upsertError(ErrorDetail{
 		Task:  task,
 		Error: errorMsg,
-		Time:  time.Now().Format(time.RFC3339),
+		Time:  nowRFC3339(),
 	})
 }
 
@@ -131,10 +160,10 @@ func (s AssetStatus) GetFailedTasks() []string {
 // GetFailedTasksByCategory returns failed tasks grouped by category
 func (s AssetStatus) GetFailedTasksByCategory() map[string][]string {
 	categories := map[string][]string{
-		"metadata":       {"extract_exif", "extract_metadata"},
-		"thumbnails":     {"generate_thumbnails", "save_thumbnails"},
-		"transcoding":    {"transcode_video", "transcode_audio", "generate_web_version"},
-		"ai_processing":  {"clip_processing"},
+		"metadata":       {"metadata_asset", "extract_exif", "extract_metadata"},
+		"thumbnails":     {"thumbnail_asset", "generate_thumbnails", "save_thumbnails"},
+		"transcoding":    {"transcode_asset", "transcode_video", "transcode_audio", "generate_web_version"},
+		"ai_processing":  {"process_clip", "process_ocr", "process_caption", "process_face", "clip_processing"},
 		"raw_processing": {"raw_processing"},
 	}
 
@@ -184,4 +213,165 @@ func (s AssetStatus) FilterErrorsByTasks(tasks []string) []ErrorDetail {
 		}
 	}
 	return filtered
+}
+
+// EnsureTasks initializes the tracked task map for the provided task names.
+func (s *AssetStatus) EnsureTasks(tasks []string) {
+	if len(tasks) == 0 {
+		return
+	}
+	if s.Tasks == nil {
+		s.Tasks = make(map[string]TaskStatus, len(tasks))
+	}
+	for _, task := range tasks {
+		if task == "" {
+			continue
+		}
+		if _, ok := s.Tasks[task]; ok {
+			continue
+		}
+		s.Tasks[task] = TaskStatus{
+			State:     TaskPending,
+			Message:   "Queued",
+			UpdatedAt: nowRFC3339(),
+		}
+	}
+}
+
+// MarkTaskPending marks a task as queued/pending.
+func (s *AssetStatus) MarkTaskPending(taskName string, message string) {
+	s.markTask(taskName, TaskPending, message)
+}
+
+// MarkTaskProcessing marks a task as currently running.
+func (s *AssetStatus) MarkTaskProcessing(taskName string, message string) {
+	s.markTask(taskName, TaskProcessing, message)
+}
+
+// MarkTaskComplete marks a task as complete and clears any stale error for it.
+func (s *AssetStatus) MarkTaskComplete(taskName string, message string) {
+	s.removeError(taskName)
+	s.markTask(taskName, TaskComplete, message)
+}
+
+// MarkTaskFailed marks a task as failed and records the error detail.
+func (s *AssetStatus) MarkTaskFailed(taskName string, message string, errorMsg string) {
+	s.upsertError(ErrorDetail{
+		Task:  taskName,
+		Error: errorMsg,
+		Time:  nowRFC3339(),
+	})
+	s.markTask(taskName, TaskFailed, message)
+}
+
+// RefreshSummary recomputes top-level state/message from tracked task statuses.
+func (s *AssetStatus) RefreshSummary() {
+	if len(s.Tasks) == 0 {
+		if s.State == "" {
+			s.State = StateProcessing
+		}
+		if s.Message == "" {
+			s.Message = "Asset processing in progress"
+		}
+		s.UpdatedAt = nowRFC3339()
+		return
+	}
+
+	var (
+		total           = len(s.Tasks)
+		pendingCount    int
+		processingCount int
+		completeCount   int
+		failedCount     int
+		processingTask  string
+		processingMsg   string
+	)
+
+	for taskName, taskStatus := range s.Tasks {
+		switch taskStatus.State {
+		case TaskComplete:
+			completeCount++
+		case TaskFailed:
+			failedCount++
+		case TaskProcessing:
+			processingCount++
+			processingTask = taskName
+			processingMsg = taskStatus.Message
+		default:
+			pendingCount++
+		}
+	}
+
+	switch {
+	case processingCount > 0:
+		s.State = StateProcessing
+		if processingCount == 1 && processingMsg != "" {
+			s.Message = processingMsg
+		} else if processingCount == 1 {
+			s.Message = fmt.Sprintf("%s is in progress", processingTask)
+		} else {
+			s.Message = fmt.Sprintf("Processing %d of %d tasks", completeCount+failedCount+processingCount, total)
+		}
+	case pendingCount > 0:
+		s.State = StateProcessing
+		if failedCount > 0 {
+			s.Message = fmt.Sprintf("Processing %d of %d tasks (%d failed)", completeCount+failedCount, total, failedCount)
+		} else {
+			s.Message = fmt.Sprintf("Processing %d of %d tasks", completeCount, total)
+		}
+	case failedCount == total:
+		s.State = StateFailed
+		s.Message = "Asset processing failed"
+	case failedCount > 0:
+		s.State = StateWarning
+		s.Message = fmt.Sprintf("Asset processed with %d failed task(s)", failedCount)
+	default:
+		s.State = StateComplete
+		s.Message = "Asset processed successfully"
+	}
+
+	s.UpdatedAt = nowRFC3339()
+}
+
+func (s *AssetStatus) markTask(taskName string, state TaskState, message string) {
+	if taskName == "" {
+		return
+	}
+	s.EnsureTasks([]string{taskName})
+	taskStatus := s.Tasks[taskName]
+	taskStatus.State = state
+	if message != "" {
+		taskStatus.Message = message
+	}
+	taskStatus.UpdatedAt = nowRFC3339()
+	s.Tasks[taskName] = taskStatus
+	s.RefreshSummary()
+}
+
+func (s *AssetStatus) upsertError(detail ErrorDetail) {
+	for i := range s.Errors {
+		if s.Errors[i].Task == detail.Task {
+			s.Errors[i] = detail
+			return
+		}
+	}
+	s.Errors = append(s.Errors, detail)
+}
+
+func (s *AssetStatus) removeError(taskName string) {
+	if len(s.Errors) == 0 {
+		return
+	}
+
+	filtered := s.Errors[:0]
+	for _, detail := range s.Errors {
+		if detail.Task != taskName {
+			filtered = append(filtered, detail)
+		}
+	}
+	if len(filtered) == 0 {
+		s.Errors = nil
+		return
+	}
+	s.Errors = filtered
 }

@@ -19,22 +19,31 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 		return err
 	}
 
-	fullPath := filepath.Join(args.RepoPath, args.StoragePath)
-	switch args.AssetType {
-	case dbtypes.AssetTypePhoto:
-		return ap.generatePhotoThumbnails(ctx, fullPath, asset.OriginalFilename, repository, asset)
-	case dbtypes.AssetTypeVideo:
-		info, err := ap.getVideoInfo(fullPath)
-		if err != nil {
-			return err
-		}
-		return ap.generateVideoThumbnail(ctx, repository.Path, asset, fullPath, info)
-	case dbtypes.AssetTypeAudio:
-		// Optional waveform thumbnail for audio
-		return ap.generateWaveform(ctx, repository.Path, asset, fullPath)
-	default:
-		return fmt.Errorf("unsupported asset type for thumbnails: %s", args.AssetType)
-	}
+	return ap.runTrackedAssetTask(
+		ctx,
+		args.AssetID,
+		taskThumbnail,
+		"Generating thumbnails",
+		"Thumbnails generated",
+		func() error {
+			fullPath := filepath.Join(args.RepoPath, args.StoragePath)
+			switch args.AssetType {
+			case dbtypes.AssetTypePhoto:
+				return ap.generatePhotoThumbnails(ctx, fullPath, asset.OriginalFilename, repository, asset)
+			case dbtypes.AssetTypeVideo:
+				info, err := ap.getVideoInfo(fullPath)
+				if err != nil {
+					return err
+				}
+				return ap.generateVideoThumbnail(ctx, repository.Path, asset, fullPath, info)
+			case dbtypes.AssetTypeAudio:
+				// Optional waveform thumbnail for audio
+				return ap.generateWaveform(ctx, repository.Path, asset, fullPath)
+			default:
+				return fmt.Errorf("unsupported asset type for thumbnails: %s", args.AssetType)
+			}
+		},
+	)
 }
 
 // generatePhotoThumbnails handles photo thumbnail generation with RAW support.

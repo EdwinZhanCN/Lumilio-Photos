@@ -80,16 +80,12 @@ func (ap *AssetProcessor) RetryAsset(ctx context.Context, assetIDStr string, ret
 		return fmt.Errorf("no failed tasks to retry")
 	}
 
-	// Update status to retrying
-	retryStatus := status.NewProcessingStatus(fmt.Sprintf("Retrying tasks: %v", tasksToRetry))
-	retryStatusJSON, err := retryStatus.ToJSONB()
-	if err != nil {
-		return fmt.Errorf("failed to marshal retry status: %w", err)
-	}
-
-	_, err = ap.queries.UpdateAssetStatus(ctx, repo.UpdateAssetStatusParams{
-		AssetID: asset.AssetID,
-		Status:  retryStatusJSON,
+	err = ap.queries.MutateAssetStatus(ctx, asset.AssetID, func(current status.AssetStatus) (status.AssetStatus, error) {
+		current.EnsureTasks(tasksToRetry)
+		for _, taskName := range tasksToRetry {
+			current.MarkTaskPending(taskName, fmt.Sprintf("Retry queued for %s", taskName))
+		}
+		return current, nil
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update asset status: %w", err)
