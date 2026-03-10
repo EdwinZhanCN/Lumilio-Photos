@@ -166,9 +166,6 @@ function CollectionsContent() {
           albums={albums}
           onAlbumClick={handleAlbumClick}
           loading={showLoading}
-          emptyMessage={t("collections.emptyMessage", {
-            defaultValue: "Create your first album to get started",
-          })}
           selectedIds={selectedAlbumIds.map(String)}
           isSelectionMode={isSelectionMode}
         />

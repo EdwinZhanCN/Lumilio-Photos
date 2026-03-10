@@ -1,5 +1,6 @@
 import ImgStackView from "../ImgStackView/ImgStackView";
-import { CheckCircle2, Circle, Album as AlbumIcon } from "lucide-react";
+import { CheckCircle2, Circle } from "lucide-react";
+import EmptyState from "@/components/EmptyState";
 
 export interface Album {
   id: string;
@@ -16,7 +17,6 @@ interface ImgStackGridProps {
   onAlbumClick?: (album: Album) => void;
   className?: string;
   loading?: boolean;
-  emptyMessage?: string;
   selectedIds?: string[];
   isSelectionMode?: boolean;
 }
@@ -26,7 +26,6 @@ function ImgStackGrid({
   onAlbumClick,
   className = "",
   loading = false,
-  emptyMessage = "No albums found",
   selectedIds = [],
   isSelectionMode = false,
 }: ImgStackGridProps) {
@@ -53,15 +52,7 @@ function ImgStackGrid({
   }
 
   if (albums.length === 0) {
-    return (
-      <div
-        className={`flex flex-col items-center justify-center p-12 text-center min-h-[400px] ${className}`}
-      >
-        <AlbumIcon className="mb-4 size-16 text-base-300" />
-        <h3 className="text-lg font-medium mb-2">No Albums</h3>
-        <p className="text-base-content/60">{emptyMessage}</p>
-      </div>
-    );
+    return <EmptyState className={className} />;
   }
 
   return (

@@ -16,12 +16,12 @@ import {
 } from "@/lib/layout/justifiedLayout";
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
-import { Camera } from "lucide-react";
 import { AssetGalleryProps } from "../gallery.types";
 import {
   DEFAULT_GROUP_KEYS,
   formatAssetGroupLabel,
 } from "@/features/assets/utils/assetGroups";
+import EmptyState from "@/components/EmptyState";
 
 const getThumbnailSize = (width: number) => {
   if (width >= 520) return "large";
@@ -237,16 +237,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   }, [supportsIntersectionObserver]);
 
   if (!isLoading && totalAssetCount === 0) {
-    return (
-      <div
-        className={`w-full p-8 text-center text-base-content/60 ${className}`}
-      >
-        <div className="flex flex-col items-center justify-center gap-3 py-8">
-          <Camera className="size-12 text-base-300" />
-          <span>{t("assets.justifiedGallery.no_assets_found")}</span>
-        </div>
-      </div>
-    );
+    return <EmptyState className={className} />;
   }
 
   return (

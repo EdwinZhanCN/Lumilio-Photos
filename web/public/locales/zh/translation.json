@@ -74,7 +74,6 @@
         }
     },
     "collections": {
-        "emptyMessage": "创建你的第一个相册以开始使用",
         "untitled": "未命名相册",
         "createSuccess": "相册创建成功",
         "deleteError": "相册删除失败",
@@ -262,7 +261,6 @@
             "unknown_type": "未知类型"
         },
         "justifiedGallery": {
-            "no_assets_found": "未找到任何资产",
             "item_count": "{{count}} 项",
             "item_count_plural": "{{count}} 项",
             "loading_more": "正在加载更多"
@@ -761,7 +759,11 @@
         "uploaded": "上传于",
         "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
         "clickToEdit": "点击编辑",
-        "loadMore": "加载更多"
+        "loadMore": "加载更多",
+        "emptyState": {
+            "title": "这里还没有内容",
+            "description": "有内容时会显示在这里。"
+        }
     },
     "monitor": {
         "title": "服务器监控",
