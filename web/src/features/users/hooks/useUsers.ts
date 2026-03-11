@@ -16,6 +16,8 @@ export type UpdateOwnProfilePayload =
   Schemas["dto.UpdateOwnProfileRequestDTO"];
 export type AdminUpdateUserPayload =
   Schemas["dto.AdminUpdateUserRequestDTO"];
+export type ChangePasswordPayload =
+  Schemas["dto.ChangePasswordRequestDTO"];
 
 export function useUsers(limit = 50, offset = 0): UseQueryResult<
   ApiResult<ListUsersResponseDTO>,
@@ -63,6 +65,22 @@ export function useAdminUpdateUser() {
   const queryClient = useQueryClient();
 
   return $api.useMutation("patch", "/api/v1/users/{id}", {
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/users"],
+      });
+    },
+  });
+}
+
+export function useChangeMyPassword() {
+  return $api.useMutation("patch", "/api/v1/users/me/password");
+}
+
+export function useResetUserAccess() {
+  const queryClient = useQueryClient();
+
+  return $api.useMutation("post", "/api/v1/users/{id}/reset-access", {
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["get", "/api/v1/users"],

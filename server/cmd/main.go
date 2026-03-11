@@ -162,9 +162,9 @@ func main() {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool)
-	authService := service.NewAuthService(queries)
+	authService := service.NewAuthService(queries, pgxPool)
 	albumService := service.NewAlbumService(queries)
-	userService := service.NewUserService(queries)
+	userService := service.NewUserService(queries, pgxPool)
 
 	// Initialize Agent Service
 	agentService := core.NewAgentService(queries, settingsService)

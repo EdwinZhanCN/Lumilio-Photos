@@ -116,9 +116,7 @@ function normalizeManifestIo(input: unknown): RuntimeManifestIo | undefined {
       "Manifest io.input.mimeTypes",
     );
 
-    ioInput = {
-      ...(mimeTypes ? { mimeTypes } : {}),
-    };
+    ioInput = mimeTypes ? { mimeTypes } : {};
   }
 
   let ioOutput: RuntimeManifestIoOutput | undefined;

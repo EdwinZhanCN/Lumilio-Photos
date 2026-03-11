@@ -19,6 +19,12 @@ export function authReducer(state: AuthState, action: AuthAction): AuthState {
         isLoading: true,
         error: null,
       };
+    case "AUTH_IDLE":
+      return {
+        ...state,
+        isLoading: false,
+        error: null,
+      };
     case "AUTH_SUCCESS":
       return {
         ...state,

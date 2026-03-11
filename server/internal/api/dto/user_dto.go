@@ -14,10 +14,20 @@ type UpdateOwnProfileRequestDTO struct {
 type AdminUpdateUserRequestDTO struct {
 	Username    *string `json:"username,omitempty" example:"alex"`
 	DisplayName *string `json:"display_name,omitempty" example:"Alex Chen"`
-	Email       *string `json:"email,omitempty" example:"alex@example.com"`
 	AvatarURL   *string `json:"avatar_url,omitempty" example:"https://example.com/avatar.jpg"`
 	Role        *string `json:"role,omitempty" enums:"admin,user" example:"admin"`
 	IsActive    *bool   `json:"is_active,omitempty" example:"true"`
+}
+
+type ChangePasswordRequestDTO struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=6"`
+}
+
+type ResetAccessResponseDTO struct {
+	TemporaryPassword string `json:"temporary_password"`
+	ClearedPasskeys   bool   `json:"cleared_passkeys"`
+	ClearedTOTP       bool   `json:"cleared_totp"`
 }
 
 type ManagedUserDTO struct {
@@ -43,7 +53,6 @@ func ToUserDTO(user service.UserResponse) UserDTO {
 		UserID:      user.UserID,
 		Username:    user.Username,
 		DisplayName: displayName,
-		Email:       user.Email,
 		AvatarURL:   user.AvatarURL,
 		CreatedAt:   user.CreatedAt,
 		UpdatedAt:   user.UpdatedAt,
@@ -73,5 +82,13 @@ func ToListUsersResponseDTO(result service.UserListResult) ListUsersResponseDTO 
 		Total:  int(result.Total),
 		Limit:  result.Limit,
 		Offset: result.Offset,
+	}
+}
+
+func ToResetAccessResponseDTO(result service.ResetAccessResult) ResetAccessResponseDTO {
+	return ResetAccessResponseDTO{
+		TemporaryPassword: result.TemporaryPassword,
+		ClearedPasskeys:   result.ClearedPasskeys,
+		ClearedTOTP:       result.ClearedTOTP,
 	}
 }

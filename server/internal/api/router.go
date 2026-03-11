@@ -49,11 +49,28 @@ type AssetControllerInterface interface {
 
 // AuthControllerInterface defines the interface for authentication controllers
 type AuthControllerInterface interface {
-	Register(c *gin.Context)
+	StartRegistration(c *gin.Context)
+	GetBootstrapStatus(c *gin.Context)
 	Login(c *gin.Context)
+	BeginRegistrationPasskey(c *gin.Context)
+	VerifyRegistrationPasskey(c *gin.Context)
+	BeginRegistrationTOTPSetup(c *gin.Context)
+	CompleteRegistrationTOTP(c *gin.Context)
+	BeginPasskeyLogin(c *gin.Context)
+	VerifyPasskeyLogin(c *gin.Context)
 	RefreshToken(c *gin.Context)
 	Logout(c *gin.Context)
 	Me(c *gin.Context)
+	VerifyMFA(c *gin.Context)
+	GetMFAStatus(c *gin.Context)
+	ListPasskeys(c *gin.Context)
+	BeginPasskeyEnrollment(c *gin.Context)
+	VerifyPasskeyEnrollment(c *gin.Context)
+	DeletePasskey(c *gin.Context)
+	BeginTOTPSetup(c *gin.Context)
+	EnableTOTP(c *gin.Context)
+	DisableTOTP(c *gin.Context)
+	RegenerateRecoveryCodes(c *gin.Context)
 	AuthMiddleware() gin.HandlerFunc
 	OptionalAuthMiddleware() gin.HandlerFunc
 	RequireAdmin() gin.HandlerFunc
@@ -111,8 +128,10 @@ type SettingsControllerInterface interface {
 
 type UserControllerInterface interface {
 	UpdateMyProfile(c *gin.Context)
+	ChangeMyPassword(c *gin.Context)
 	ListUsers(c *gin.Context)
 	UpdateUser(c *gin.Context)
+	ResetUserAccess(c *gin.Context)
 }
 
 func NewRouter(
@@ -160,19 +179,38 @@ func NewRouter(
 		// Authentication routes
 		auth := v1.Group("/auth")
 		{
-			auth.POST("/register", authController.Register)
+			auth.GET("/bootstrap-status", authController.GetBootstrapStatus)
+			auth.POST("/register/start", authController.StartRegistration)
+			auth.POST("/register/totp/setup", authController.BeginRegistrationTOTPSetup)
+			auth.POST("/register/totp/complete", authController.CompleteRegistrationTOTP)
 			auth.POST("/login", authController.Login)
+			auth.POST("/passkeys/register/options", authController.BeginRegistrationPasskey)
+			auth.POST("/passkeys/register/verify", authController.VerifyRegistrationPasskey)
+			auth.POST("/passkeys/login/options", authController.BeginPasskeyLogin)
+			auth.POST("/passkeys/login/verify", authController.VerifyPasskeyLogin)
+			auth.POST("/mfa/verify", authController.VerifyMFA)
 			auth.POST("/refresh", authController.RefreshToken)
 			auth.POST("/logout", authController.Logout)
 			auth.GET("/me", authController.AuthMiddleware(), authController.Me)
+			auth.GET("/mfa", authController.AuthMiddleware(), authController.GetMFAStatus)
+			auth.GET("/mfa/passkeys", authController.AuthMiddleware(), authController.ListPasskeys)
+			auth.POST("/mfa/passkeys/options", authController.AuthMiddleware(), authController.BeginPasskeyEnrollment)
+			auth.POST("/mfa/passkeys/verify", authController.AuthMiddleware(), authController.VerifyPasskeyEnrollment)
+			auth.DELETE("/mfa/passkeys/:id", authController.AuthMiddleware(), authController.DeletePasskey)
+			auth.POST("/mfa/totp/setup", authController.AuthMiddleware(), authController.BeginTOTPSetup)
+			auth.POST("/mfa/totp/enable", authController.AuthMiddleware(), authController.EnableTOTP)
+			auth.POST("/mfa/totp/disable", authController.AuthMiddleware(), authController.DisableTOTP)
+			auth.POST("/mfa/recovery-codes/regenerate", authController.AuthMiddleware(), authController.RegenerateRecoveryCodes)
 		}
 
 		users := v1.Group("/users")
 		users.Use(authController.AuthMiddleware())
 		{
 			users.PATCH("/me/profile", userController.UpdateMyProfile)
+			users.PATCH("/me/password", userController.ChangeMyPassword)
 			users.GET("", authController.RequireAdmin(), userController.ListUsers)
 			users.PATCH("/:id", authController.RequireAdmin(), userController.UpdateUser)
+			users.POST("/:id/reset-access", authController.RequireAdmin(), userController.ResetUserAccess)
 		}
 
 		// Asset routes (new unified API) - with optional authentication

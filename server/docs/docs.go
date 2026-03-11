@@ -41,7 +41,7 @@ const docTemplate = `{
             "data": {
                 "properties": {
                     "data": {
-                        "$ref": "#/components/schemas/dto.UserDTO"
+                        "$ref": "#/components/schemas/dto.ResetAccessResponseDTO"
                     }
                 },
                 "type": "object"
@@ -210,10 +210,6 @@ const docTemplate = `{
                     },
                     "display_name": {
                         "example": "Alex Chen",
-                        "type": "string"
-                    },
-                    "email": {
-                        "example": "alex@example.com",
                         "type": "string"
                     },
                     "is_active": {
@@ -574,11 +570,27 @@ const docTemplate = `{
             },
             "dto.AuthResponseDTO": {
                 "properties": {
+                    "bootstrap_admin": {
+                        "type": "boolean"
+                    },
                     "expiresAt": {
+                        "type": "string"
+                    },
+                    "mfa_methods": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "mfa_token": {
                         "type": "string"
                     },
                     "refreshToken": {
                         "type": "string"
+                    },
+                    "requires_mfa": {
+                        "type": "boolean"
                     },
                     "token": {
                         "type": "string"
@@ -626,6 +638,20 @@ const docTemplate = `{
                     },
                     "task_id": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.BootstrapStatusDTO": {
+                "properties": {
+                    "has_users": {
+                        "type": "boolean"
+                    },
+                    "is_bootstrap_mode": {
+                        "type": "boolean"
+                    },
+                    "next_registration_role": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -705,6 +731,22 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.ChangePasswordRequestDTO": {
+                "properties": {
+                    "current_password": {
+                        "type": "string"
+                    },
+                    "new_password": {
+                        "minLength": 6,
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "current_password",
+                    "new_password"
+                ],
+                "type": "object"
+            },
             "dto.CreateAlbumRequestDTO": {
                 "properties": {
                     "album_name": {
@@ -731,6 +773,32 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "type": "object"
+            },
+            "dto.DisableTOTPRequestDTO": {
+                "properties": {
+                    "current_password": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "current_password"
+                ],
+                "type": "object"
+            },
+            "dto.EnableTOTPRequestDTO": {
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "setup_token": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "setup_token"
+                ],
                 "type": "object"
             },
             "dto.FeaturedAssetsResponseDTO": {
@@ -948,6 +1016,30 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.MFAStatusDTO": {
+                "properties": {
+                    "available_methods": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "passkey_count": {
+                        "type": "integer"
+                    },
+                    "recovery_codes_generated_at": {
+                        "type": "string"
+                    },
+                    "recovery_codes_remaining": {
+                        "type": "integer"
+                    },
+                    "totp_enabled": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
             "dto.MLCapabilitiesDTO": {
                 "properties": {
                     "active_node_count": {
@@ -1037,9 +1129,6 @@ const docTemplate = `{
                     "display_name": {
                         "type": "string"
                     },
-                    "email": {
-                        "type": "string"
-                    },
                     "is_active": {
                         "type": "boolean"
                     },
@@ -1111,6 +1200,75 @@ const docTemplate = `{
                         "type": "integer"
                     }
                 },
+                "type": "object"
+            },
+            "dto.PasskeyCredentialSummaryDTO": {
+                "properties": {
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "last_used_at": {
+                        "type": "string"
+                    },
+                    "passkey_id": {
+                        "type": "integer"
+                    },
+                    "transports": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.PasskeyListResponseDTO": {
+                "properties": {
+                    "credentials": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.PasskeyCredentialSummaryDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.PasskeyOptionsRequestDTO": {
+                "properties": {
+                    "username": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.PasskeyOptionsResponseDTO": {
+                "properties": {
+                    "challenge_token": {
+                        "type": "string"
+                    },
+                    "options": {}
+                },
+                "type": "object"
+            },
+            "dto.PasskeyVerifyRequestDTO": {
+                "properties": {
+                    "challenge_token": {
+                        "type": "string"
+                    },
+                    "credential": {}
+                },
+                "required": [
+                    "challenge_token",
+                    "credential"
+                ],
                 "type": "object"
             },
             "dto.ProgressSummaryDTO": {
@@ -1223,6 +1381,24 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.RecoveryCodesResponseDTO": {
+                "properties": {
+                    "generated_at": {
+                        "type": "string"
+                    },
+                    "recovery_codes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/dto.MFAStatusDTO"
+                    }
+                },
+                "type": "object"
+            },
             "dto.RefreshTokenRequestDTO": {
                 "properties": {
                     "refreshToken": {
@@ -1234,11 +1410,47 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
-            "dto.RegisterRequestDTO": {
+            "dto.RegenerateRecoveryCodesRequestDTO": {
                 "properties": {
-                    "email": {
+                    "current_password": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "current_password"
+                ],
+                "type": "object"
+            },
+            "dto.RegistrationPasskeyVerifyRequestDTO": {
+                "properties": {
+                    "challenge_token": {
                         "type": "string"
                     },
+                    "credential": {},
+                    "registration_session_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "challenge_token",
+                    "credential",
+                    "registration_session_id"
+                ],
+                "type": "object"
+            },
+            "dto.RegistrationSessionRequestDTO": {
+                "properties": {
+                    "registration_session_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "registration_session_id"
+                ],
+                "type": "object"
+            },
+            "dto.RegistrationStartRequestDTO": {
+                "properties": {
                     "password": {
                         "minLength": 6,
                         "type": "string"
@@ -1250,10 +1462,73 @@ const docTemplate = `{
                     }
                 },
                 "required": [
-                    "email",
                     "password",
                     "username"
                 ],
+                "type": "object"
+            },
+            "dto.RegistrationStartResponseDTO": {
+                "properties": {
+                    "bootstrap_admin": {
+                        "type": "boolean"
+                    },
+                    "next_registration_role": {
+                        "type": "string"
+                    },
+                    "registration_session_id": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RegistrationTOTPCompleteRequestDTO": {
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "registration_session_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "registration_session_id"
+                ],
+                "type": "object"
+            },
+            "dto.RegistrationTOTPCompleteResponseDTO": {
+                "properties": {
+                    "auth": {
+                        "$ref": "#/components/schemas/dto.AuthResponseDTO"
+                    },
+                    "generated_at": {
+                        "type": "string"
+                    },
+                    "recovery_codes": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RegistrationTOTPSetupResponseDTO": {
+                "properties": {
+                    "account_name": {
+                        "type": "string"
+                    },
+                    "issuer": {
+                        "type": "string"
+                    },
+                    "otpauth_uri": {
+                        "type": "string"
+                    },
+                    "secret": {
+                        "type": "string"
+                    }
+                },
                 "type": "object"
             },
             "dto.ReprocessAssetRequestDTO": {
@@ -1311,6 +1586,20 @@ const docTemplate = `{
                     },
                     "status": {
                         "example": "queued",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ResetAccessResponseDTO": {
+                "properties": {
+                    "cleared_passkeys": {
+                        "type": "boolean"
+                    },
+                    "cleared_totp": {
+                        "type": "boolean"
+                    },
+                    "temporary_password": {
                         "type": "string"
                     }
                 },
@@ -1466,6 +1755,26 @@ const docTemplate = `{
                     },
                     "updated_by": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.TOTPSetupResponseDTO": {
+                "properties": {
+                    "account_name": {
+                        "type": "string"
+                    },
+                    "issuer": {
+                        "type": "string"
+                    },
+                    "otpauth_uri": {
+                        "type": "string"
+                    },
+                    "secret": {
+                        "type": "string"
+                    },
+                    "setup_token": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -1707,9 +2016,6 @@ const docTemplate = `{
                     "display_name": {
                         "type": "string"
                     },
-                    "email": {
-                        "type": "string"
-                    },
                     "is_active": {
                         "type": "boolean"
                     },
@@ -1744,6 +2050,29 @@ const docTemplate = `{
                         "type": "boolean"
                     }
                 },
+                "type": "object"
+            },
+            "dto.VerifyMFARequestDTO": {
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "method": {
+                        "enum": [
+                            "totp",
+                            "recovery_code"
+                        ],
+                        "type": "string"
+                    },
+                    "mfa_token": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "method",
+                    "mfa_token"
+                ],
                 "type": "object"
             },
             "handler.AgentChatRequest": {
@@ -6087,9 +6416,76 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/auth/bootstrap-status": {
+            "get": {
+                "description": "Return whether Lumilio is still in first-user bootstrap mode and which role the next registration receives.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Bootstrap status retrieved successfully"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get auth bootstrap status",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
         "/api/v1/auth/login": {
             "post": {
-                "description": "Authenticate user with username and password",
+                "description": "Authenticate user with username and password. Returns an MFA challenge instead of session tokens when TOTP is enabled.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -6338,6 +6734,1312 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/auth/mfa": {
+            "get": {
+                "description": "Get the authenticated user's MFA status, including TOTP enablement and remaining recovery codes.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "MFA status retrieved successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get MFA status",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/mfa/passkeys": {
+            "get": {
+                "description": "List the authenticated user's enrolled passkeys.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Passkeys retrieved successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List passkeys",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/mfa/passkeys/options": {
+            "post": {
+                "description": "Create WebAuthn registration options to add a new passkey to the authenticated account.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Passkey enrollment options created successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Begin passkey enrollment",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/mfa/passkeys/verify": {
+            "post": {
+                "description": "Verify a passkey enrollment response and attach the new passkey to the authenticated account.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.PasskeyVerifyRequestDTO",
+                                        "summary": "request",
+                                        "description": "Passkey enrollment verification payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Passkey enrollment verification payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Passkey enrolled successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid or expired challenge"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Verify passkey enrollment",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/mfa/passkeys/{id}": {
+            "delete": {
+                "description": "Delete one enrolled passkey for the authenticated user.",
+                "parameters": [
+                    {
+                        "description": "Passkey ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Passkey deleted successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Passkey not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Delete passkey",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/mfa/recovery-codes/regenerate": {
+            "post": {
+                "description": "Generate a fresh set of recovery codes for the authenticated user.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RegenerateRecoveryCodesRequestDTO",
+                                        "summary": "request",
+                                        "description": "Recovery code regeneration payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Recovery code regeneration payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Recovery codes regenerated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "MFA is not enabled"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized or incorrect password"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Regenerate recovery codes",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/mfa/totp/disable": {
+            "post": {
+                "description": "Disable TOTP MFA and invalidate recovery codes for the authenticated user.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.DisableTOTPRequestDTO",
+                                        "summary": "request",
+                                        "description": "Disable TOTP payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Disable TOTP payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "TOTP disabled successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "MFA is not enabled"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized or incorrect password"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Disable TOTP",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/mfa/totp/enable": {
+            "post": {
+                "description": "Verify a TOTP setup code and enable TOTP MFA for the authenticated user.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.EnableTOTPRequestDTO",
+                                        "summary": "request",
+                                        "description": "TOTP enable payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "TOTP enable payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "TOTP enabled successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid setup token or verification code"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Enable TOTP",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/mfa/totp/setup": {
+            "post": {
+                "description": "Generate a new TOTP secret and setup token for the authenticated user.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "TOTP setup created successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Begin TOTP setup",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/mfa/verify": {
+            "post": {
+                "description": "Verify a pending MFA login challenge with a TOTP code or recovery code.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.VerifyMFARequestDTO",
+                                        "summary": "request",
+                                        "description": "MFA verification payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "MFA verification payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "MFA verification successful"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid or expired MFA challenge"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Verify MFA challenge",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/passkeys/login/options": {
+            "post": {
+                "description": "Create WebAuthn login options for a username-first passkey login flow.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.PasskeyOptionsRequestDTO",
+                                        "summary": "request",
+                                        "description": "Username for passkey login"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Username for passkey login",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Passkey login options created successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid credentials"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Begin passkey login",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/passkeys/login/verify": {
+            "post": {
+                "description": "Verify a passkey login assertion and issue session tokens.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.PasskeyVerifyRequestDTO",
+                                        "summary": "request",
+                                        "description": "Passkey login verification payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Passkey login verification payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Passkey login verified successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid credentials"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Verify passkey login",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/passkeys/register/options": {
+            "post": {
+                "description": "Create WebAuthn registration options for a staged registration session.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RegistrationSessionRequestDTO",
+                                        "summary": "request",
+                                        "description": "Registration session"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Registration session",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Passkey registration options created successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid or expired registration session"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Begin passkey registration",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/passkeys/register/verify": {
+            "post": {
+                "description": "Verify a staged registration passkey response, create the user, and issue session tokens.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RegistrationPasskeyVerifyRequestDTO",
+                                        "summary": "request",
+                                        "description": "Passkey registration verification payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Passkey registration verification payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Passkey registration verified successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid or expired passkey registration challenge"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "User already exists"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Verify passkey registration",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
         "/api/v1/auth/refresh": {
             "post": {
                 "description": "Generate a new access token using a valid refresh token",
@@ -6436,9 +8138,9 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/auth/register": {
+        "/api/v1/auth/register/start": {
             "post": {
-                "description": "Create a new user account with username, email, and password",
+                "description": "Create a staged registration session with username and password before passkey or TOTP enrollment.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -6448,7 +8150,7 @@ const docTemplate = `{
                                         "type": "object"
                                     },
                                     {
-                                        "$ref": "#/components/schemas/dto.RegisterRequestDTO",
+                                        "$ref": "#/components/schemas/dto.RegistrationStartRequestDTO",
                                         "summary": "request",
                                         "description": "Registration data"
                                     }
@@ -6460,7 +8162,7 @@ const docTemplate = `{
                     "required": true
                 },
                 "responses": {
-                    "201": {
+                    "200": {
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6495,7 +8197,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "User registered successfully"
+                        "description": "Registration session created successfully"
                     },
                     "400": {
                         "content": {
@@ -6528,7 +8230,193 @@ const docTemplate = `{
                         "description": "Internal server error"
                     }
                 },
-                "summary": "Register a new user",
+                "summary": "Start user registration",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/register/totp/complete": {
+            "post": {
+                "description": "Verify the staged TOTP code, create the user account, and issue session tokens plus recovery codes.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RegistrationTOTPCompleteRequestDTO",
+                                        "summary": "request",
+                                        "description": "TOTP verification payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "TOTP verification payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "TOTP registration completed successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid or expired registration session"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "User already exists"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Complete staged TOTP registration",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
+        "/api/v1/auth/register/totp/setup": {
+            "post": {
+                "description": "Generate TOTP setup data for a staged registration session.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RegistrationSessionRequestDTO",
+                                        "summary": "request",
+                                        "description": "Registration session"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Registration session",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "TOTP setup created successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid or expired registration session"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Begin staged TOTP setup",
                 "tags": [
                     "auth"
                 ]
@@ -7456,6 +9344,82 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/users/me/password": {
+            "patch": {
+                "description": "Verify the current password, set a new password, and revoke all refresh tokens for the current user.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.ChangePasswordRequestDTO",
+                                        "summary": "request",
+                                        "description": "Password change payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Password change payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Password updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Current password is incorrect"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Change my password",
+                "tags": [
+                    "users"
+                ]
+            }
+        },
         "/api/v1/users/me/profile": {
             "patch": {
                 "description": "Update the current user's profile fields such as display name and avatar URL.",
@@ -7698,6 +9662,129 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Update user",
+                "tags": [
+                    "users"
+                ]
+            }
+        },
+        "/api/v1/users/{id}/reset-access": {
+            "post": {
+                "description": "Generate a temporary password and clear passkeys, TOTP, recovery codes, and refresh tokens for a user.",
+                "parameters": [
+                    {
+                        "description": "User ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "User access reset successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "User not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Reset user access",
                 "tags": [
                     "users"
                 ]

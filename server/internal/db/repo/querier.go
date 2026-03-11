@@ -53,27 +53,37 @@ type Querier interface {
 	CreateOCRResult(ctx context.Context, arg CreateOCRResultParams) (OcrResult, error)
 	CreateOCRTextItem(ctx context.Context, arg CreateOCRTextItemParams) (OcrTextItem, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
+	CreateRegistrationSession(ctx context.Context, arg CreateRegistrationSessionParams) (RegistrationSession, error)
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	CreateSpeciesPrediction(ctx context.Context, arg CreateSpeciesPredictionParams) (SpeciesPrediction, error)
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
 	CreateThumbnail(ctx context.Context, arg CreateThumbnailParams) (Thumbnail, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUserRecoveryCode(ctx context.Context, arg CreateUserRecoveryCodeParams) error
+	CreateUserWebAuthnCredential(ctx context.Context, arg CreateUserWebAuthnCredentialParams) (UserWebauthnCredential, error)
 	DeleteAlbum(ctx context.Context, albumID int32) error
 	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteCaptionByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
+	DeleteExpiredRegistrationSessions(ctx context.Context) error
 	DeleteFaceCluster(ctx context.Context, clusterID int32) error
 	DeleteFaceClusterMember(ctx context.Context, arg DeleteFaceClusterMemberParams) error
 	DeleteFaceItemsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteFaceResultByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteRegistrationSession(ctx context.Context, sessionID pgtype.UUID) error
+	DeleteRegistrationSessionsByUsername(ctx context.Context, username string) error
 	DeleteRepositories(ctx context.Context, dollar_1 []pgtype.UUID) error
 	DeleteRepository(ctx context.Context, repoID pgtype.UUID) error
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteTag(ctx context.Context, tagID int32) error
 	DeleteUser(ctx context.Context, userID int32) error
+	DeleteUserRecoveryCodes(ctx context.Context, userID int32) error
+	DeleteUserTOTPCredential(ctx context.Context, userID int32) error
+	DeleteUserWebAuthnCredential(ctx context.Context, arg DeleteUserWebAuthnCredentialParams) (int64, error)
+	DeleteUserWebAuthnCredentials(ctx context.Context, userID int32) error
 	FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]Asset, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAssetCountScopedParams) (int64, error)
@@ -162,6 +172,7 @@ type Querier interface {
 	GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (Embedding, error)
 	GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams) ([]FaceItem, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
+	GetRegistrationSessionByID(ctx context.Context, sessionID pgtype.UUID) (RegistrationSession, error)
 	GetRepository(ctx context.Context, repoID pgtype.UUID) (Repository, error)
 	// Repository Asset Statistics (kept for repository management)
 	GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error)
@@ -187,9 +198,10 @@ type Querier interface {
 	GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesForAssetParams) ([]SpeciesPrediction, error)
 	GetTopSpeciesLabels(ctx context.Context, limit int32) ([]GetTopSpeciesLabelsRow, error)
 	GetUnclusteredFaces(ctx context.Context, arg GetUnclusteredFacesParams) ([]FaceItem, error)
-	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, userID int32) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMFAStatusRow, error)
+	GetUserTOTPCredential(ctx context.Context, userID int32) (UserMfaTotpCredential, error)
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
 	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
 	ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error)
@@ -199,6 +211,8 @@ type Querier interface {
 	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
+	ListUserWebAuthnCredentialSummaries(ctx context.Context, userID int32) ([]ListUserWebAuthnCredentialSummariesRow, error)
+	ListUserWebAuthnCredentials(ctx context.Context, userID int32) ([]UserWebauthnCredential, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error)
 	MergeFaceClusters(ctx context.Context, arg MergeFaceClustersParams) error
@@ -207,6 +221,7 @@ type Querier interface {
 	RepositoryExists(ctx context.Context, path string) (bool, error)
 	ResetAssetStatusForRetry(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
+	RevokeUserRefreshTokens(ctx context.Context, userID int32) error
 	SearchAllEmbeddingsByType(ctx context.Context, arg SearchAllEmbeddingsByTypeParams) ([]SearchAllEmbeddingsByTypeRow, error)
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	SearchAssetsByCaption(ctx context.Context, arg SearchAssetsByCaptionParams) ([]Asset, error)
@@ -248,17 +263,23 @@ type Querier interface {
 	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)
 	UpdateFaceResultStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateOCRResultStats(ctx context.Context, assetID pgtype.UUID) error
+	UpdateRegistrationSessionTOTPSecret(ctx context.Context, arg UpdateRegistrationSessionTOTPSecretParams) (RegistrationSession, error)
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateUserLastLogin(ctx context.Context, arg UpdateUserLastLoginParams) error
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	UpdateUserTOTPLastUsed(ctx context.Context, userID int32) error
+	UpdateUserWebAuthnCredentialUsage(ctx context.Context, arg UpdateUserWebAuthnCredentialUsageParams) (UserWebauthnCredential, error)
 	UpsertCheckpoint(ctx context.Context, arg UpsertCheckpointParams) error
 	// Unified embeddings table queries
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error)
+	UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTOTPCredentialParams) (UserMfaTotpCredential, error)
+	UseRecoveryCode(ctx context.Context, arg UseRecoveryCodeParams) (int32, error)
 }
 
 var _ Querier = (*Queries)(nil)

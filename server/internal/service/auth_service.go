@@ -17,28 +17,25 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	ErrInvalidToken      = errors.New("invalid token")
-	ErrExpiredToken      = errors.New("token has expired")
-	ErrTokenNotFound     = errors.New("token not found")
-	ErrUserNotFound      = errors.New("user not found")
-	ErrInvalidPassword   = errors.New("invalid password")
-	ErrUserAlreadyExists = errors.New("user already exists")
+	ErrInvalidToken                = errors.New("invalid token")
+	ErrExpiredToken                = errors.New("token has expired")
+	ErrTokenNotFound               = errors.New("token not found")
+	ErrUserNotFound                = errors.New("user not found")
+	ErrInvalidPassword             = errors.New("invalid password")
+	ErrUserAlreadyExists           = errors.New("user already exists")
+	ErrRegistrationSessionNotFound = errors.New("registration session not found")
+	ErrRegistrationSessionExpired  = errors.New("registration session expired")
 )
 
 // Request/Response types
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
-}
-
-type RegisterRequest struct {
-	Username string `json:"username" binding:"required,min=3,max=50"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
 }
 
 type RefreshTokenRequest struct {
@@ -49,7 +46,6 @@ type UserResponse struct {
 	UserID      int        `json:"user_id"`
 	Username    string     `json:"username"`
 	DisplayName string     `json:"display_name"`
-	Email       string     `json:"email"`
 	AvatarURL   *string    `json:"avatar_url,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
@@ -60,18 +56,35 @@ type UserResponse struct {
 }
 
 type AuthResponse struct {
-	User         UserResponse `json:"user"`
-	AccessToken  string       `json:"token"`
-	RefreshToken string       `json:"refreshToken"`
-	ExpiresAt    time.Time    `json:"expiresAt"`
+	User           *UserResponse `json:"user,omitempty"`
+	AccessToken    string        `json:"token,omitempty"`
+	RefreshToken   string        `json:"refreshToken,omitempty"`
+	ExpiresAt      *time.Time    `json:"expiresAt,omitempty"`
+	RequiresMFA    bool          `json:"requires_mfa"`
+	MFAToken       string        `json:"mfa_token,omitempty"`
+	MFAMethods     []string      `json:"mfa_methods,omitempty"`
+	BootstrapAdmin bool          `json:"bootstrap_admin,omitempty"`
+}
+
+type BootstrapStatus struct {
+	HasUsers             bool   `json:"has_users"`
+	IsBootstrapMode      bool   `json:"is_bootstrap_mode"`
+	NextRegistrationRole string `json:"next_registration_role"`
 }
 
 // AuthService handles JWT authentication operations
 type AuthService struct {
-	queries         *repo.Queries
-	jwtSecret       []byte
-	accessTokenTTL  time.Duration
-	refreshTokenTTL time.Duration
+	queries                *repo.Queries
+	db                     *pgxpool.Pool
+	jwtSecret              []byte
+	mfaTokenSecret         []byte
+	passkeyTokenSecret     []byte
+	mfaEncryptKey          []byte
+	accessTokenTTL         time.Duration
+	refreshTokenTTL        time.Duration
+	webauthnRPDisplayName  string
+	webauthnRPID           string
+	webauthnAllowedOrigins []string
 }
 
 // JWTClaims represents the claims in the JWT token
@@ -83,12 +96,15 @@ type JWTClaims struct {
 }
 
 // NewAuthService creates a new authentication service
-func NewAuthService(queries *repo.Queries) *AuthService {
+func NewAuthService(queries *repo.Queries, db *pgxpool.Pool) *AuthService {
 	rootSecret, err := loadOrCreateLumilioSecretKey(strings.TrimSpace(os.Getenv("LUMILIO_SECRET_KEY")))
 	if err != nil {
 		panic(fmt.Sprintf("failed to initialize JWT secret from LUMILIO_SECRET_KEY: %v", err))
 	}
 	jwtSecret := deriveScopedSecret(rootSecret, "jwt.signing.v1")
+	mfaTokenSecret := deriveScopedSecret(rootSecret, "mfa.signing.v1")
+	passkeyTokenSecret := deriveScopedSecret(rootSecret, "passkey.signing.v1")
+	mfaEncryptKey := deriveScopedSecret(rootSecret, "mfa.encryption.v1")
 
 	// Access token TTL (default: 15 minutes)
 	accessTokenTTL := 15 * time.Minute
@@ -107,10 +123,17 @@ func NewAuthService(queries *repo.Queries) *AuthService {
 	}
 
 	return &AuthService{
-		queries:         queries,
-		jwtSecret:       jwtSecret,
-		accessTokenTTL:  accessTokenTTL,
-		refreshTokenTTL: refreshTokenTTL,
+		queries:                queries,
+		db:                     db,
+		jwtSecret:              jwtSecret,
+		mfaTokenSecret:         mfaTokenSecret,
+		passkeyTokenSecret:     passkeyTokenSecret,
+		mfaEncryptKey:          mfaEncryptKey,
+		accessTokenTTL:         accessTokenTTL,
+		refreshTokenTTL:        refreshTokenTTL,
+		webauthnRPDisplayName:  loadWebAuthnRPDisplayName(),
+		webauthnRPID:           loadWebAuthnRPID(),
+		webauthnAllowedOrigins: loadWebAuthnAllowedOrigins(),
 	}
 }
 
@@ -121,57 +144,10 @@ func deriveScopedSecret(rootSecret string, scope string) []byte {
 	return derived
 }
 
-// Register creates a new user account
-func (s *AuthService) Register(req RegisterRequest) (*AuthResponse, error) {
-	// Check if user already exists
-	_, err := s.queries.GetUserByUsername(context.Background(), req.Username)
-	if err == nil {
-		return nil, ErrUserAlreadyExists
-	}
-
-	// Check if email already exists
-	_, err = s.queries.GetUserByEmail(context.Background(), req.Email)
-	if err == nil {
-		return nil, ErrUserAlreadyExists
-	}
-
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, fmt.Errorf("error hashing password: %w", err)
-	}
-
-	// Create new user
-	role := UserRoleUser
-	userCount, err := s.queries.CountUsers(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("error counting users: %w", err)
-	}
-	if userCount == 0 {
-		role = UserRoleAdmin
-	}
-
-	params := repo.CreateUserParams{
-		Username:    req.Username,
-		Email:       req.Email,
-		Password:    string(hashedPassword),
-		DisplayName: req.Username,
-		Role:        string(role),
-	}
-
-	user, err := s.queries.CreateUser(context.Background(), params)
-	if err != nil {
-		return nil, fmt.Errorf("error creating user: %w", err)
-	}
-
-	// Generate tokens
-	return s.generateAuthResponse(user)
-}
-
 // Login authenticates a user and returns tokens
 func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 	// Get user by username
-	user, err := s.queries.GetUserByUsername(context.Background(), req.Username)
+	user, err := s.queries.GetUserByUsername(context.Background(), strings.ToLower(strings.TrimSpace(req.Username)))
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
@@ -186,19 +162,25 @@ func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 		return nil, ErrInvalidPassword
 	}
 
-	// Update last login
-	now := pgtype.Timestamptz{}
-	now.Scan(time.Now())
+	status, err := s.queries.GetUserMFAStatus(context.Background(), user.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("error loading mfa status: %w", err)
+	}
 
-	err = s.queries.UpdateUserLastLogin(context.Background(), repo.UpdateUserLastLoginParams{
-		UserID:    user.UserID,
-		LastLogin: now,
-	})
+	if coerceBool(status.TotpEnabled) {
+		challenge, err := s.issueLoginMFAChallenge(user, status)
+		if err != nil {
+			return nil, fmt.Errorf("error creating mfa challenge: %w", err)
+		}
+		return challenge, nil
+	}
+
+	lastLogin, err := s.updateUserLastLogin(context.Background(), user.UserID)
 	if err != nil {
 		// Log error but don't fail login
 		fmt.Printf("Warning: failed to update last login for user %d: %v\n", user.UserID, err)
 	} else {
-		user.LastLogin = now
+		user.LastLogin = lastLogin
 	}
 
 	// Generate tokens
@@ -300,6 +282,27 @@ func (s *AuthService) GetCurrentUser(userID int) (*UserResponse, error) {
 	return &response, nil
 }
 
+func (s *AuthService) GetBootstrapStatus(ctx context.Context) (BootstrapStatus, error) {
+	userCount, err := s.queries.CountUsers(ctx)
+	if err != nil {
+		return BootstrapStatus{}, fmt.Errorf("count users: %w", err)
+	}
+
+	if userCount == 0 {
+		return BootstrapStatus{
+			HasUsers:             false,
+			IsBootstrapMode:      true,
+			NextRegistrationRole: string(UserRoleAdmin),
+		}, nil
+	}
+
+	return BootstrapStatus{
+		HasUsers:             true,
+		IsBootstrapMode:      false,
+		NextRegistrationRole: string(UserRoleUser),
+	}, nil
+}
+
 // generateAuthResponse creates an authentication response with tokens
 func (s *AuthService) generateAuthResponse(user repo.User) (*AuthResponse, error) {
 	// Generate access token
@@ -315,10 +318,10 @@ func (s *AuthService) generateAuthResponse(user repo.User) (*AuthResponse, error
 	}
 
 	return &AuthResponse{
-		User:         ConvertUserToResponse(user),
+		User:         ptr(ConvertUserToResponse(user)),
 		AccessToken:  accessToken,
 		RefreshToken: refreshTokenString,
-		ExpiresAt:    expiresAt,
+		ExpiresAt:    &expiresAt,
 	}, nil
 }
 
@@ -391,7 +394,6 @@ func ConvertUserToResponse(user repo.User) UserResponse {
 		UserID:      int(user.UserID),
 		Username:    user.Username,
 		DisplayName: displayName,
-		Email:       user.Email,
 		AvatarURL:   cloneOptionalString(user.AvatarUrl),
 		CreatedAt:   user.CreatedAt.Time,
 		UpdatedAt:   user.UpdatedAt.Time,
@@ -400,4 +402,24 @@ func ConvertUserToResponse(user repo.User) UserResponse {
 		Role:        string(role),
 		Permissions: PermissionsForRole(role),
 	}
+}
+
+func (s *AuthService) updateUserLastLogin(ctx context.Context, userID int32) (pgtype.Timestamptz, error) {
+	now := pgtype.Timestamptz{}
+	if err := now.Scan(time.Now()); err != nil {
+		return pgtype.Timestamptz{}, fmt.Errorf("scan current time: %w", err)
+	}
+
+	if err := s.queries.UpdateUserLastLogin(ctx, repo.UpdateUserLastLoginParams{
+		UserID:    userID,
+		LastLogin: now,
+	}); err != nil {
+		return pgtype.Timestamptz{}, err
+	}
+
+	return now, nil
+}
+
+func ptr[T any](value T) *T {
+	return &value
 }

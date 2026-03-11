@@ -12,6 +12,8 @@ import Updates from "@/features/updates/routes/Updates";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
 import { AssetsProvider } from "@/features/assets";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
+import MFAPage from "@/features/auth/routes/MFAPage.tsx";
+import ChangePasswordPage from "@/features/auth/routes/ChangePasswordPage.tsx";
 import RegisterPage from "@/features/auth/routes/RegisterPage.tsx";
 
 export const publicRoutes = [
@@ -22,6 +24,17 @@ export const publicRoutes = [
   {
     path: "/register",
     element: <RegisterPage />,
+  },
+];
+
+export const protectedStandaloneRoutes = [
+  {
+    path: "/mfa",
+    element: <MFAPage />,
+  },
+  {
+    path: "/change-password",
+    element: <ChangePasswordPage />,
   },
 ];
 

@@ -217,6 +217,17 @@ type RefreshToken struct {
 	IsRevoked *bool              `db:"is_revoked" json:"is_revoked"`
 }
 
+type RegistrationSession struct {
+	SessionID            pgtype.UUID        `db:"session_id" json:"session_id"`
+	Username             string             `db:"username" json:"username"`
+	PasswordHash         string             `db:"password_hash" json:"password_hash"`
+	Role                 string             `db:"role" json:"role"`
+	WebauthnUserHandle   []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
+	TotpSecretCiphertext []byte             `db:"totp_secret_ciphertext" json:"totp_secret_ciphertext"`
+	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ExpiresAt            pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+}
+
 type Repository struct {
 	RepoID    pgtype.UUID              `db:"repo_id" json:"repo_id"`
 	Name      string                   `db:"name" json:"name"`
@@ -271,15 +282,49 @@ type Thumbnail struct {
 }
 
 type User struct {
-	UserID      int32              `db:"user_id" json:"user_id"`
-	Username    string             `db:"username" json:"username"`
-	Email       string             `db:"email" json:"email"`
-	Password    string             `db:"password" json:"password"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	IsActive    *bool              `db:"is_active" json:"is_active"`
-	LastLogin   pgtype.Timestamptz `db:"last_login" json:"last_login"`
-	DisplayName string             `db:"display_name" json:"display_name"`
-	AvatarUrl   *string            `db:"avatar_url" json:"avatar_url"`
-	Role        string             `db:"role" json:"role"`
+	UserID             int32              `db:"user_id" json:"user_id"`
+	Username           string             `db:"username" json:"username"`
+	Password           string             `db:"password" json:"password"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	IsActive           *bool              `db:"is_active" json:"is_active"`
+	LastLogin          pgtype.Timestamptz `db:"last_login" json:"last_login"`
+	DisplayName        string             `db:"display_name" json:"display_name"`
+	AvatarUrl          *string            `db:"avatar_url" json:"avatar_url"`
+	Role               string             `db:"role" json:"role"`
+	WebauthnUserHandle []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
+}
+
+type UserMfaRecoveryCode struct {
+	RecoveryCodeID int32              `db:"recovery_code_id" json:"recovery_code_id"`
+	UserID         int32              `db:"user_id" json:"user_id"`
+	CodeHash       string             `db:"code_hash" json:"code_hash"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UsedAt         pgtype.Timestamptz `db:"used_at" json:"used_at"`
+}
+
+type UserMfaTotpCredential struct {
+	UserID           int32              `db:"user_id" json:"user_id"`
+	SecretCiphertext []byte             `db:"secret_ciphertext" json:"secret_ciphertext"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	EnabledAt        pgtype.Timestamptz `db:"enabled_at" json:"enabled_at"`
+	LastUsedAt       pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
+}
+
+type UserWebauthnCredential struct {
+	UserWebauthnCredentialID int32              `db:"user_webauthn_credential_id" json:"user_webauthn_credential_id"`
+	CredentialID             []byte             `db:"credential_id" json:"credential_id"`
+	UserID                   int32              `db:"user_id" json:"user_id"`
+	PublicKey                []byte             `db:"public_key" json:"public_key"`
+	SignCount                int64              `db:"sign_count" json:"sign_count"`
+	Transports               []byte             `db:"transports" json:"transports"`
+	AttestationType          string             `db:"attestation_type" json:"attestation_type"`
+	Aaguid                   []byte             `db:"aaguid" json:"aaguid"`
+	UserPresent              bool               `db:"user_present" json:"user_present"`
+	UserVerified             bool               `db:"user_verified" json:"user_verified"`
+	BackupEligible           bool               `db:"backup_eligible" json:"backup_eligible"`
+	BackupState              bool               `db:"backup_state" json:"backup_state"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	LastUsedAt               pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
 }

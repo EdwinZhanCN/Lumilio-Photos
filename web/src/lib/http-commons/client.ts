@@ -28,7 +28,14 @@ const authMiddleware: Middleware = {
     if (response.status === 401) {
       const url = request.url;
       // Don't attempt refresh for auth endpoints to avoid loops
-      if (url.includes("/auth/refresh") || url.includes("/auth/login")) {
+      if (
+        url.includes("/auth/refresh") ||
+        url.includes("/auth/login") ||
+        url.includes("/auth/register") ||
+        url.includes("/auth/passkeys/login") ||
+        url.includes("/auth/passkeys/register") ||
+        url.includes("/auth/mfa/verify")
+      ) {
         return response;
       }
 

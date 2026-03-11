@@ -205,7 +205,7 @@ const AssetsPageHeader = ({
           count: selection.selectedCount,
         }),
       );
-    } catch (error) {
+    } catch {
       showMessage("error", t("assets.assetsPageHeader.messages.deleteError"));
     } finally {
       setIsDeleteConfirmOpen(false);
@@ -233,7 +233,7 @@ const AssetsPageHeader = ({
         "success",
         t("assets.assetsPageHeader.messages.downloadStart"),
       );
-    } catch (error) {
+    } catch {
       showMessage("error", t("assets.assetsPageHeader.messages.downloadError"));
     }
   };
@@ -251,7 +251,7 @@ const AssetsPageHeader = ({
       if (responseData?.data) {
         setAlbums(responseData.data.albums || []);
       }
-    } catch (error) {
+    } catch {
       showMessage(
         "error",
         t("assets.assetsPageHeader.messages.loadAlbumsError"),
@@ -273,7 +273,7 @@ const AssetsPageHeader = ({
       );
       setIsAlbumModalOpen(false);
       selection.clear();
-    } catch (error) {
+    } catch {
       showMessage(
         "error",
         t("assets.assetsPageHeader.messages.addToAlbumError"),

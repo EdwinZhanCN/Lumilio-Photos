@@ -24,32 +24,36 @@ func NewAuthHandler(authService *service.AuthService) *AuthHandler {
 	}
 }
 
-// Register handles user registration
-// @Summary Register a new user
-// @Description Create a new user account with username, email, and password
+// StartRegistration creates a staged registration session.
+// @Summary Start user registration
+// @Description Create a staged registration session with username and password before passkey or TOTP enrollment.
 // @Tags auth
 // @Accept json
 // @Produce json
-// @Param request body dto.RegisterRequestDTO true "Registration data"
-// @Success 201 {object} api.Result{data=dto.AuthResponseDTO} "User registered successfully"
+// @Param request body dto.RegistrationStartRequestDTO true "Registration data"
+// @Success 200 {object} api.Result{data=dto.RegistrationStartResponseDTO} "Registration session created successfully"
 // @Failure 400 {object} api.Result "Invalid request data"
 // @Failure 409 {object} api.Result "User already exists"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/auth/register [post]
-func (h *AuthHandler) Register(c *gin.Context) {
-	var req dto.RegisterRequestDTO
+// @Router /api/v1/auth/register/start [post]
+func (h *AuthHandler) StartRegistration(c *gin.Context) {
+	var req dto.RegistrationStartRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
 	}
 
-	authResponse, err := h.authService.Register(service.RegisterRequest{
+	response, err := h.authService.StartRegistration(c.Request.Context(), service.RegistrationStartRequest{
 		Username: req.Username,
-		Email:    req.Email,
 		Password: req.Password,
 	})
 	if err != nil {
-		if errors.Is(err, service.ErrUserAlreadyExists) {
+		switch {
+		case errors.Is(err, service.ErrInvalidUsernameFormat),
+			errors.Is(err, service.ErrWeakPassword):
+			api.GinBadRequest(c, err, err.Error())
+			return
+		case errors.Is(err, service.ErrUserAlreadyExists):
 			api.GinError(c, 409, err, http.StatusConflict, "User already exists")
 			return
 		}
@@ -57,12 +61,31 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, authResponse)
+	api.GinSuccess(c, dto.ToRegistrationStartResponseDTO(response))
+}
+
+// GetBootstrapStatus reports whether the system is still waiting for its first account.
+// @Summary Get auth bootstrap status
+// @Description Return whether Lumilio is still in first-user bootstrap mode and which role the next registration receives.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Success 200 {object} api.Result{data=dto.BootstrapStatusDTO} "Bootstrap status retrieved successfully"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/auth/bootstrap-status [get]
+func (h *AuthHandler) GetBootstrapStatus(c *gin.Context) {
+	status, err := h.authService.GetBootstrapStatus(c.Request.Context())
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to load bootstrap status")
+		return
+	}
+
+	api.GinSuccess(c, dto.ToBootstrapStatusDTO(status))
 }
 
 // Login handles user authentication
 // @Summary Login user
-// @Description Authenticate user with username and password
+// @Description Authenticate user with username and password. Returns an MFA challenge instead of session tokens when TOTP is enabled.
 // @Tags auth
 // @Accept json
 // @Produce json
@@ -92,7 +115,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, authResponse)
+	api.GinSuccess(c, dto.ToAuthResponseDTO(authResponse))
 }
 
 // RefreshToken handles JWT token refresh
@@ -126,7 +149,7 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, authResponse)
+	api.GinSuccess(c, dto.ToAuthResponseDTO(authResponse))
 }
 
 // Logout handles user logout
