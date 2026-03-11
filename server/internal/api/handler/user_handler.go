@@ -51,6 +51,10 @@ func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 		AvatarURL:   req.AvatarURL,
 	})
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidDisplayName) {
+			api.GinBadRequest(c, err, err.Error())
+			return
+		}
 		api.GinInternalError(c, err, "Failed to update profile")
 		return
 	}
@@ -155,7 +159,6 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 
 	updated, err := h.userService.AdminUpdateUser(c.Request.Context(), admin.UserID, userID, service.AdminUpdateUserInput{
 		Username:    req.Username,
-		Email:       req.Email,
 		DisplayName: req.DisplayName,
 		AvatarURL:   req.AvatarURL,
 		Role:        role,
@@ -163,6 +166,10 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	})
 	if err != nil {
 		switch {
+		case errors.Is(err, service.ErrInvalidUsernameFormat),
+			errors.Is(err, service.ErrInvalidDisplayName):
+			api.GinBadRequest(c, err, err.Error())
+			return
 		case errors.Is(err, service.ErrUserNotFound):
 			api.GinNotFound(c, err, "User not found")
 		case errors.Is(err, service.ErrUserAlreadyExists):
@@ -178,4 +185,91 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	}
 
 	api.GinSuccess(c, dto.ToUserDTO(updated))
+}
+
+// ChangeMyPassword rotates the authenticated user's password and revokes all refresh tokens.
+// @Summary Change my password
+// @Description Verify the current password, set a new password, and revoke all refresh tokens for the current user.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body dto.ChangePasswordRequestDTO true "Password change payload"
+// @Success 200 {object} api.Result "Password updated successfully"
+// @Failure 400 {object} api.Result "Invalid request data"
+// @Failure 401 {object} api.Result "Current password is incorrect"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/users/me/password [patch]
+func (h *UserHandler) ChangeMyPassword(c *gin.Context) {
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return
+	}
+
+	var req dto.ChangePasswordRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request data")
+		return
+	}
+
+	if err := h.userService.ChangePassword(c.Request.Context(), user.UserID, service.ChangePasswordInput{
+		CurrentPassword: req.CurrentPassword,
+		NewPassword:     req.NewPassword,
+	}); err != nil {
+		switch {
+		case errors.Is(err, service.ErrWeakPassword):
+			api.GinBadRequest(c, err, err.Error())
+			return
+		case errors.Is(err, service.ErrInvalidCurrentSecret):
+			api.GinUnauthorized(c, err, "Current password is incorrect")
+		default:
+			api.GinInternalError(c, err, "Failed to change password")
+		}
+		return
+	}
+
+	api.GinSuccess(c, gin.H{"password_changed": true})
+}
+
+// ResetUserAccess resets password and clears MFA factors for a target user.
+// @Summary Reset user access
+// @Description Generate a temporary password and clear passkeys, TOTP, recovery codes, and refresh tokens for a user.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "User ID"
+// @Success 200 {object} api.Result{data=dto.ResetAccessResponseDTO} "User access reset successfully"
+// @Failure 400 {object} api.Result "Invalid request"
+// @Failure 401 {object} api.Result "Unauthorized"
+// @Failure 403 {object} api.Result "Forbidden"
+// @Failure 404 {object} api.Result "User not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/users/{id}/reset-access [post]
+func (h *UserHandler) ResetUserAccess(c *gin.Context) {
+	admin, ok := requireAdminUser(c)
+	if !ok {
+		return
+	}
+
+	userID, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid user ID")
+		return
+	}
+
+	result, err := h.userService.AdminResetAccess(c.Request.Context(), admin.UserID, userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrUserNotFound):
+			api.GinNotFound(c, err, "User not found")
+		case errors.Is(err, service.ErrInsufficientPermissions):
+			api.GinForbidden(c, err, "Admin access required")
+		default:
+			api.GinInternalError(c, err, "Failed to reset access")
+		}
+		return
+	}
+
+	api.GinSuccess(c, dto.ToResetAccessResponseDTO(result))
 }

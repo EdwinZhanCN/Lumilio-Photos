@@ -83,7 +83,7 @@ const components: CustomComponents = {
   a: Link,
   details: ThinkBlock,
   "lumilio-tool": MarkdownToolBlock,
-  p: ({node, ...props}) => <div {...props} />
+  p: ({ node: _node, ...props }) => <div {...props} />
 };
 
 export const Markdown = ({

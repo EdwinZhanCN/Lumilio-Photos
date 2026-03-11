@@ -1,5 +1,5 @@
 -- name: CreateUser :one
-INSERT INTO users (username, email, password, display_name, role)
+INSERT INTO users (username, password, display_name, role, webauthn_user_handle)
 VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
@@ -18,12 +18,9 @@ SELECT * FROM users WHERE user_id = $1;
 -- name: GetUserByUsername :one
 SELECT * FROM users WHERE username = $1;
 
--- name: GetUserByEmail :one
-SELECT * FROM users WHERE email = $1;
-
 -- name: UpdateUser :one
 UPDATE users
-SET username = $2, email = $3, updated_at = CURRENT_TIMESTAMP, last_login = $4
+SET username = $2, updated_at = CURRENT_TIMESTAMP, last_login = $3
 WHERE user_id = $1
 RETURNING *;
 
@@ -43,14 +40,19 @@ RETURNING *;
 -- name: AdminUpdateUser :one
 UPDATE users
 SET username = $2,
-    email = $3,
-    display_name = $4,
-    avatar_url = $5,
-    role = $6,
-    is_active = $7,
+    display_name = $3,
+    avatar_url = $4,
+    role = $5,
+    is_active = $6,
     updated_at = CURRENT_TIMESTAMP
 WHERE user_id = $1
 RETURNING *;
+
+-- name: UpdateUserPassword :exec
+UPDATE users
+SET password = $2,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1;
 
 -- name: DeleteUser :exec
 DELETE FROM users WHERE user_id = $1;
@@ -92,3 +94,9 @@ WHERE token = $1 AND is_revoked = false;
 
 -- name: RevokeRefreshToken :exec
 UPDATE refresh_tokens SET is_revoked = true WHERE token_id = $1;
+
+-- name: RevokeUserRefreshTokens :exec
+UPDATE refresh_tokens
+SET is_revoked = true
+WHERE user_id = $1
+  AND is_revoked = false;

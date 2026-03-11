@@ -6,17 +6,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
 import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/LumilioAvatar";
 import { useSettingsContext, useWorkingRepository } from "@/features/settings";
-
-function getInitials(name: string) {
-  return (
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "U"
-  );
-}
+import UserAvatar from "@/components/UserAvatar";
 
 function NavBar() {
   const [isLumilioHovered, setIsLumilioHovered] = useState(false);
@@ -116,7 +106,9 @@ function NavBar() {
             className={`swap swap-rotate ${isFollowingSystem ? "cursor-not-allowed opacity-60" : ""}`}
             title={
               isFollowingSystem
-                ? t("settings.appearanceSettings.themes.followSystem.navbarHint")
+                ? t(
+                    "settings.appearanceSettings.themes.followSystem.navbarHint",
+                  )
                 : undefined
             }
           >
@@ -143,21 +135,12 @@ function NavBar() {
                 tabIndex={0}
                 className="btn btn-ghost h-auto min-h-0 rounded-full px-2 py-1"
               >
-                <div className="avatar placeholder">
-                  <div className="bg-primary text-primary-content size-10 rounded-full">
-                    {user.avatar_url ? (
-                      <img
-                        src={user.avatar_url}
-                        alt={displayName}
-                        className="size-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-sm font-semibold">
-                        {getInitials(displayName)}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <UserAvatar
+                  src={user.avatar_url}
+                  name={displayName}
+                  size="size-10"
+                  textSize="text-sm"
+                />
                 <div className="hidden text-left sm:block">
                   <div className="text-sm font-semibold leading-tight">
                     {displayName}
@@ -172,7 +155,14 @@ function NavBar() {
                 className="menu dropdown-content z-20 mt-2 w-64 rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl"
               >
                 <li className="menu-title px-3 py-2">
-                  <span>{user.email}</span>
+                  <span className="font-semibold text-base-content">
+                    {displayName}
+                  </span>
+                  {user.username && (
+                    <span className="text-xs text-base-content/70">
+                      @{user.username}
+                    </span>
+                  )}
                 </li>
                 <li>
                   <Link to="/settings?tab=account">

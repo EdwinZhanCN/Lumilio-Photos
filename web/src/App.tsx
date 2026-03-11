@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import SideBar from "@/components/SideBar";
 import NavBar from "@/components/NavBar";
-import { appRoutes, publicRoutes } from "@/routes/routes";
+import { appRoutes, protectedStandaloneRoutes, publicRoutes } from "@/routes/routes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import GlobalProvider, { useGlobal } from "@/contexts/GlobalContext";
 import "@/styles/App.css";
@@ -91,6 +91,13 @@ function App(): React.ReactNode {
               <Routes>
                 {publicRoutes.map((route) => (
                   <Route key={route.path} path={route.path} element={route.element} />
+                ))}
+                {protectedStandaloneRoutes.map((route) => (
+                  <Route
+                    key={route.path}
+                    path={route.path}
+                    element={<ProtectedRoute>{route.element}</ProtectedRoute>}
+                  />
                 ))}
                 <Route
                   element={
