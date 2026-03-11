@@ -55,8 +55,8 @@ type AssetService interface {
 	UpdateAssetLike(ctx context.Context, id uuid.UUID, liked bool) error
 	UpdateAssetRatingAndLike(ctx context.Context, id uuid.UUID, rating int, liked bool) error
 	UpdateAssetDescription(ctx context.Context, id uuid.UUID, description string) error
-	GetAssetsByRating(ctx context.Context, rating int, limit, offset int) ([]repo.Asset, error)
-	GetLikedAssets(ctx context.Context, limit, offset int) ([]repo.Asset, error)
+	GetAssetsByRating(ctx context.Context, rating int, ownerID *int32, limit, offset int) ([]repo.Asset, error)
+	GetLikedAssets(ctx context.Context, ownerID *int32, limit, offset int) ([]repo.Asset, error)
 
 	AddAssetToAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error
 	RemoveAssetFromAlbum(ctx context.Context, assetID uuid.UUID, albumID int) error
@@ -142,6 +142,7 @@ type SearchAssetsResult struct {
 
 type QueryPhotoMapPointsParams struct {
 	RepositoryID *string
+	OwnerID      *int32
 	Limit        int
 	Offset       int
 }
@@ -913,20 +914,22 @@ func (s *assetService) UpdateAssetDescription(ctx context.Context, id uuid.UUID,
 	return s.queries.UpdateAssetDescription(ctx, params)
 }
 
-func (s *assetService) GetAssetsByRating(ctx context.Context, rating int, limit, offset int) ([]repo.Asset, error) {
+func (s *assetService) GetAssetsByRating(ctx context.Context, rating int, ownerID *int32, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetAssetsByRatingParams{
-		Rating: int32(rating),
-		Limit:  int32(limit),
-		Offset: int32(offset),
+		Rating:  int32(rating),
+		OwnerID: ownerID,
+		Limit:   int32(limit),
+		Offset:  int32(offset),
 	}
 
 	return s.queries.GetAssetsByRating(ctx, params)
 }
 
-func (s *assetService) GetLikedAssets(ctx context.Context, limit, offset int) ([]repo.Asset, error) {
+func (s *assetService) GetLikedAssets(ctx context.Context, ownerID *int32, limit, offset int) ([]repo.Asset, error) {
 	params := repo.GetLikedAssetsParams{
-		Limit:  int32(limit),
-		Offset: int32(offset),
+		OwnerID: ownerID,
+		Limit:   int32(limit),
+		Offset:  int32(offset),
 	}
 
 	return s.queries.GetLikedAssets(ctx, params)
@@ -1563,13 +1566,17 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
 	}
 
-	total, err := s.queries.CountPhotoMapPoints(ctx, repoUUID)
+	total, err := s.queries.CountPhotoMapPoints(ctx, repo.CountPhotoMapPointsParams{
+		RepositoryID: repoUUID,
+		OwnerID:      params.OwnerID,
+	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count photo map points: %w", err)
 	}
 
 	rows, err := s.queries.GetPhotoMapPoints(ctx, repo.GetPhotoMapPointsParams{
 		RepositoryID: repoUUID,
+		OwnerID:      params.OwnerID,
 		Limit:        int32(params.Limit),
 		Offset:       int32(params.Offset),
 	})

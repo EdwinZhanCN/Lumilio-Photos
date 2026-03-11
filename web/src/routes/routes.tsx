@@ -10,15 +10,11 @@ import Collections from "@/features/collections/routes/Collections";
 import AlbumDetails from "@/features/collections/routes/AlbumDetails";
 import Updates from "@/features/updates/routes/Updates";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
-import {AssetsProvider} from "@/features/assets";
+import { AssetsProvider } from "@/features/assets";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
 import RegisterPage from "@/features/auth/routes/RegisterPage.tsx";
 
-export const routes = [
-  {
-    path: "/",
-    element: <Home />,
-  },
+export const publicRoutes = [
   {
     path: "/login",
     element: <LoginPage />,
@@ -26,6 +22,13 @@ export const routes = [
   {
     path: "/register",
     element: <RegisterPage />,
+  },
+];
+
+export const appRoutes = [
+  {
+    path: "/",
+    element: <Home />,
   },
   {
     path: "/updates",
@@ -94,9 +97,9 @@ export const routes = [
   {
     path: "/lumilio",
     element: (
-        <AssetsProvider>
-            <LumilioChatPage />
-        </AssetsProvider>
+      <AssetsProvider>
+        <LumilioChatPage />
+      </AssetsProvider>
     ),
   },
   {

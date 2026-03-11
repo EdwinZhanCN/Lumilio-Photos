@@ -161,6 +161,10 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 		return
 	}
 
+	if _, ok := h.getAuthorizedAlbum(c, int32(albumID), "Authentication required to access this album", "You don't have permission to access this album"); !ok {
+		return
+	}
+
 	repositoryID, ok := parseOptionalRepositoryUUID(c)
 	if !ok {
 		return
@@ -290,17 +294,8 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		return
 	}
 
-	// Get the existing album to verify ownership and get current values
-	existingAlbum, err := h.queries.GetAlbumByID(c.Request.Context(), int32(albumID))
-	if err != nil {
-		api.GinNotFound(c, err, "Album not found")
-		return
-	}
-
-	// Verify ownership (if user context is available)
-	userID, exists := c.Get("user_id")
-	if exists && existingAlbum.UserID != int32(userID.(int)) {
-		api.GinForbidden(c, errors.New("access denied"), "You don't have permission to update this album")
+	existingAlbum, ok := h.getAuthorizedAlbum(c, int32(albumID), "Authentication required to update this album", "You don't have permission to update this album")
+	if !ok {
 		return
 	}
 
@@ -374,17 +369,7 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 		return
 	}
 
-	// Get the existing album to verify ownership
-	existingAlbum, err := h.queries.GetAlbumByID(c.Request.Context(), int32(albumID))
-	if err != nil {
-		api.GinNotFound(c, err, "Album not found")
-		return
-	}
-
-	// Verify ownership (if user context is available)
-	userID, exists := c.Get("user_id")
-	if exists && existingAlbum.UserID != int32(userID.(int)) {
-		api.GinForbidden(c, errors.New("access denied"), "You don't have permission to delete this album")
+	if _, ok := h.getAuthorizedAlbum(c, int32(albumID), "Authentication required to delete this album", "You don't have permission to delete this album"); !ok {
 		return
 	}
 
@@ -425,10 +410,7 @@ func (h *AlbumHandler) GetAlbumAssets(c *gin.Context) {
 		return
 	}
 
-	// Verify album exists
-	_, err = h.queries.GetAlbumByID(c.Request.Context(), int32(albumID))
-	if err != nil {
-		api.GinNotFound(c, err, "Album not found")
+	if _, ok := h.getAuthorizedAlbum(c, int32(albumID), "Authentication required to access this album", "You don't have permission to access this album"); !ok {
 		return
 	}
 
@@ -485,15 +467,27 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 		return
 	}
 
-	// Verify album exists
-	_, err = h.queries.GetAlbumByID(c.Request.Context(), int32(albumID))
+	album, ok := h.getAuthorizedAlbum(c, int32(albumID), "Authentication required to modify this album", "You don't have permission to modify this album")
+	if !ok {
+		return
+	}
+
+	assetPGUUID := pgtype.UUID{Bytes: assetID, Valid: true}
+	asset, err := h.queries.GetAssetByID(c.Request.Context(), assetPGUUID)
 	if err != nil {
-		api.GinNotFound(c, err, "Album not found")
+		api.GinNotFound(c, err, "Asset not found")
+		return
+	}
+	if !ensureOwnerAccess(c, asset.OwnerID, "Authentication required to modify this asset", "You don't have permission to modify this asset") {
+		return
+	}
+	if asset.OwnerID != nil && *asset.OwnerID != album.UserID && !currentUserIsAdmin(c) {
+		api.GinForbidden(c, errors.New("cross-user album access denied"), "Asset and album must belong to the same user")
 		return
 	}
 
 	params := repo.AddAssetToAlbumParams{
-		AssetID:  pgtype.UUID{Bytes: assetID, Valid: true},
+		AssetID:  assetPGUUID,
 		AlbumID:  int32(albumID),
 		Position: req.Position,
 	}
@@ -539,6 +533,10 @@ func (h *AlbumHandler) RemoveAssetFromAlbum(c *gin.Context) {
 	params := repo.RemoveAssetFromAlbumParams{
 		AssetID: pgtype.UUID{Bytes: assetID, Valid: true},
 		AlbumID: int32(albumID),
+	}
+
+	if _, ok := h.getAuthorizedAlbum(c, int32(albumID), "Authentication required to modify this album", "You don't have permission to modify this album"); !ok {
+		return
 	}
 
 	err = h.queries.RemoveAssetFromAlbum(c.Request.Context(), params)
@@ -592,6 +590,10 @@ func (h *AlbumHandler) UpdateAssetPositionInAlbum(c *gin.Context) {
 		Position: req.Position,
 	}
 
+	if _, ok := h.getAuthorizedAlbum(c, int32(albumID), "Authentication required to modify this album", "You don't have permission to modify this album"); !ok {
+		return
+	}
+
 	err = h.queries.UpdateAssetPositionInAlbum(c.Request.Context(), params)
 	if err != nil {
 		log.Printf("Failed to update asset position in album: %v", err)
@@ -622,6 +624,15 @@ func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 		return
 	}
 
+	asset, err := h.queries.GetAssetByID(c.Request.Context(), pgtype.UUID{Bytes: assetID, Valid: true})
+	if err != nil {
+		api.GinNotFound(c, err, "Asset not found")
+		return
+	}
+	if !ensureOwnerAccess(c, asset.OwnerID, "Authentication required to access this asset", "You don't have permission to access this asset") {
+		return
+	}
+
 	albums, err := h.queries.GetAssetAlbums(c.Request.Context(), pgtype.UUID{Bytes: assetID, Valid: true})
 	if err != nil {
 		log.Printf("Failed to retrieve albums for asset %s: %v", assetID, err)
@@ -629,9 +640,17 @@ func (h *AlbumHandler) GetAssetAlbums(c *gin.Context) {
 		return
 	}
 
+	filteredAlbums := albums[:0]
+	currentUser, _ := currentUserFromContext(c)
+	for _, album := range albums {
+		if currentUserIsAdmin(c) || (currentUser != nil && int32(currentUser.UserID) == album.UserID) {
+			filteredAlbums = append(filteredAlbums, album)
+		}
+	}
+
 	api.GinSuccess(c, gin.H{
 		"asset_id": assetID,
-		"albums":   albums,
-		"count":    len(albums),
+		"albums":   filteredAlbums,
+		"count":    len(filteredAlbums),
 	})
 }

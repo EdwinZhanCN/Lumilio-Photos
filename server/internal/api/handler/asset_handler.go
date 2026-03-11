@@ -694,6 +694,10 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 		return
 	}
 
+	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
+		return
+	}
+
 	// Parse include options with defaults
 	includeThumbnails := c.DefaultQuery("include_thumbnails", "true") == "true"
 	includeTags := c.DefaultQuery("include_tags", "true") == "true"
@@ -754,14 +758,8 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 		return
 	}
 
-	asset, err := h.assetService.GetAsset(c.Request.Context(), assetID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Asset not found"})
-			return
-		}
-		log.Printf("Failed to verify asset existence: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to access asset"})
+	asset, ok := h.getAuthorizedAsset(c, assetID, "Authentication required to access this thumbnail", "You don't have permission to access this thumbnail")
+	if !ok {
 		return
 	}
 
@@ -842,15 +840,8 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 		return
 	}
 
-	// Get asset metadata from service
-	asset, err := h.assetService.GetAsset(ctx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			api.GinNotFound(c, err, "Asset not found")
-			return
-		}
-		log.Printf("Failed to retrieve asset metadata: %v", err)
-		api.GinInternalError(c, err, "Failed to retrieve asset")
+	asset, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this file", "You don't have permission to access this file")
+	if !ok {
 		return
 	}
 
@@ -906,14 +897,8 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	}
 
 	// Get asset metadata from service
-	asset, err := h.assetService.GetAsset(ctx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			api.GinNotFound(c, err, "Asset not found")
-			return
-		}
-		log.Printf("Failed to retrieve asset metadata: %v", err)
-		api.GinInternalError(c, err, "Failed to retrieve asset")
+	asset, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this video", "You don't have permission to access this video")
+	if !ok {
 		return
 	}
 
@@ -992,14 +977,8 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	}
 
 	// Get asset metadata from service
-	asset, err := h.assetService.GetAsset(ctx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			api.GinNotFound(c, err, "Asset not found")
-			return
-		}
-		log.Printf("Failed to retrieve asset metadata: %v", err)
-		api.GinInternalError(c, err, "Failed to retrieve asset")
+	asset, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this audio", "You don't have permission to access this audio")
+	if !ok {
 		return
 	}
 
@@ -1076,6 +1055,10 @@ func (h *AssetHandler) UpdateAsset(c *gin.Context) {
 		return
 	}
 
+	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to update this asset", "You don't have permission to update this asset"); !ok {
+		return
+	}
+
 	var updateData dto.UpdateAssetRequestDTO
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		api.GinBadRequest(c, err, "Invalid request body")
@@ -1111,6 +1094,10 @@ func (h *AssetHandler) DeleteAsset(c *gin.Context) {
 		return
 	}
 
+	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to delete this asset", "You don't have permission to delete this asset"); !ok {
+		return
+	}
+
 	err = h.assetService.DeleteAsset(c.Request.Context(), id)
 	if err != nil {
 		log.Printf("Failed to delete asset: %v", err)
@@ -1143,6 +1130,24 @@ func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 	albumID, err := strconv.Atoi(c.Param("albumId"))
 	if err != nil {
 		api.GinBadRequest(c, err, "Invalid album ID")
+		return
+	}
+
+	asset, ok := h.getAuthorizedAsset(c, assetID, "Authentication required to modify this asset", "You don't have permission to modify this asset")
+	if !ok {
+		return
+	}
+
+	album, err := h.queries.GetAlbumByID(c.Request.Context(), int32(albumID))
+	if err != nil {
+		api.GinNotFound(c, err, "Album not found")
+		return
+	}
+	if !ensureOwnerAccess(c, &album.UserID, "Authentication required to modify this album", "You don't have permission to modify this album") {
+		return
+	}
+	if asset.OwnerID != nil && *asset.OwnerID != album.UserID && !currentUserIsAdmin(c) {
+		api.GinForbidden(c, errors.New("cross-user album access denied"), "Asset and album must belong to the same user")
 		return
 	}
 
@@ -1431,6 +1436,7 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 	}
 
 	params := buildQueryAssetsParams(req.Query, req.SearchType, req.GroupBy, req.ViewerTimezone, req.Filter, req.Pagination)
+	params = applyAssetOwnershipScope(c, params)
 
 	assets, total, err := h.assetService.QueryAssets(c.Request.Context(), params)
 	if err != nil {
@@ -1487,6 +1493,7 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 	}
 
 	params := buildQueryAssetsParams(req.Query, "filename", req.GroupBy, req.ViewerTimezone, req.Filter, req.Pagination)
+	params = applyAssetOwnershipScope(c, params)
 
 	result, err := h.assetService.SearchAssets(c.Request.Context(), service.SearchAssetsParams{
 		QueryAssetsParams: params,
@@ -1680,6 +1687,7 @@ func (h *AssetHandler) GetFeaturedAssets(c *gin.Context) {
 		Limit:        candidateLimit,
 		Offset:       0,
 	}
+	params = applyAssetOwnershipScope(c, params)
 
 	assets, _, err := h.assetService.QueryAssets(c.Request.Context(), params)
 	if err != nil {
@@ -1747,11 +1755,11 @@ func (h *AssetHandler) GetPhotoMapPoints(c *gin.Context) {
 		repositoryID = &rawRepoID
 	}
 
-	points, total, err := h.assetService.QueryPhotoMapPoints(c.Request.Context(), service.QueryPhotoMapPointsParams{
+	points, total, err := h.assetService.QueryPhotoMapPoints(c.Request.Context(), applyMapPointOwnershipScope(c, service.QueryPhotoMapPointsParams{
 		RepositoryID: repositoryID,
 		Limit:        limit,
 		Offset:       offset,
-	})
+	}))
 	if err != nil {
 		log.Printf("Failed to query photo map points: %v", err)
 		api.GinInternalError(c, err, "Failed to query photo map points")
@@ -1884,6 +1892,10 @@ func (h *AssetHandler) UpdateAssetRating(c *gin.Context) {
 		return
 	}
 
+	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to update this asset", "You don't have permission to update this asset"); !ok {
+		return
+	}
+
 	err = h.assetService.UpdateAssetRating(c.Request.Context(), id, req.Rating)
 	if err != nil {
 		log.Printf("Failed to update asset rating: %v", err)
@@ -1918,6 +1930,10 @@ func (h *AssetHandler) UpdateAssetLike(c *gin.Context) {
 	var req dto.UpdateLikeRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to update this asset", "You don't have permission to update this asset"); !ok {
 		return
 	}
 
@@ -1963,6 +1979,10 @@ func (h *AssetHandler) UpdateAssetRatingAndLike(c *gin.Context) {
 		return
 	}
 
+	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to update this asset", "You don't have permission to update this asset"); !ok {
+		return
+	}
+
 	err = h.assetService.UpdateAssetRatingAndLike(c.Request.Context(), id, req.Rating, req.Liked)
 	if err != nil {
 		log.Printf("Failed to update asset rating and like status: %v", err)
@@ -1997,6 +2017,10 @@ func (h *AssetHandler) UpdateAssetDescription(c *gin.Context) {
 	var req dto.UpdateDescriptionRequestDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to update this asset", "You don't have permission to update this asset"); !ok {
 		return
 	}
 
@@ -2051,7 +2075,17 @@ func (h *AssetHandler) GetAssetsByRating(c *gin.Context) {
 		}
 	}
 
-	assets, err := h.assetService.GetAssetsByRating(c.Request.Context(), rating, limit, offset)
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return
+	}
+	var ownerID *int32
+	if !service.IsAdminRole(user.Role) {
+		id := int32(user.UserID)
+		ownerID = &id
+	}
+
+	assets, err := h.assetService.GetAssetsByRating(c.Request.Context(), rating, ownerID, limit, offset)
 	if err != nil {
 		log.Printf("Failed to get assets by rating: %v", err)
 		api.GinInternalError(c, err, "Failed to retrieve assets")
@@ -2100,7 +2134,17 @@ func (h *AssetHandler) GetLikedAssets(c *gin.Context) {
 		}
 	}
 
-	assets, err := h.assetService.GetLikedAssets(ctx, limit, offset)
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return
+	}
+	var ownerID *int32
+	if !service.IsAdminRole(user.Role) {
+		id := int32(user.UserID)
+		ownerID = &id
+	}
+
+	assets, err := h.assetService.GetLikedAssets(ctx, ownerID, limit, offset)
 	if err != nil {
 		log.Printf("Failed to get liked assets: %v", err)
 		api.GinInternalError(c, err, "Failed to retrieve liked assets")
@@ -2814,6 +2858,10 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get asset"})
+		return
+	}
+
+	if !ensureOwnerAccess(c, asset.OwnerID, "Authentication required to reprocess this asset", "You don't have permission to reprocess this asset") {
 		return
 	}
 

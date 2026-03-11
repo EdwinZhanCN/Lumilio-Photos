@@ -1,6 +1,14 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth.ts";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+
+type AuthRedirectState = {
+  from?: {
+    pathname?: string;
+    search?: string;
+    hash?: string;
+  };
+};
 
 const RegisterPage: React.FC = () => {
   const [username, setUsername] = useState("");
@@ -9,8 +17,20 @@ const RegisterPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   
-  const { register, isLoading, error: authError } = useAuth();
+  const { register, isAuthenticated, isLoading, error: authError } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
+  const redirectTo = useMemo(() => {
+    const from = (location.state as AuthRedirectState | null)?.from;
+    if (!from?.pathname) return "/";
+    return `${from.pathname}${from.search ?? ""}${from.hash ?? ""}`;
+  }, [location.state]);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      navigate(redirectTo, { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate, redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,8 +43,8 @@ const RegisterPage: React.FC = () => {
 
     try {
       await register(username, email, password);
-      navigate("/");
-    } catch (err) {
+      navigate(redirectTo, { replace: true });
+    } catch {
       // Error is handled by context
     }
   };
@@ -32,7 +52,7 @@ const RegisterPage: React.FC = () => {
   const displayError = localError || authError;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-base-200">
+    <div className="flex min-h-screen w-full items-center justify-center bg-base-200 px-4">
       <div className="card w-full max-w-md bg-base-100 shadow-xl">
         <div className="card-body">
           <h2 className="card-title text-2xl font-bold justify-center mb-4">Create Account</h2>
@@ -117,7 +137,11 @@ const RegisterPage: React.FC = () => {
 
           <div className="text-center mt-4">
             <p>Already have an account?</p>
-            <Link to="/login" className="link link-primary font-semibold">
+            <Link
+              to="/login"
+              state={location.state}
+              className="link link-primary font-semibold"
+            >
               Login here
             </Link>
           </div>

@@ -164,6 +164,7 @@ func main() {
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool)
 	authService := service.NewAuthService(queries)
 	albumService := service.NewAlbumService(queries)
+	userService := service.NewUserService(queries)
 
 	// Initialize Agent Service
 	agentService := core.NewAgentService(queries, settingsService)
@@ -201,6 +202,7 @@ func main() {
 	assetController := handler.NewAssetHandler(assetService, indexingService, queries, repoManager, stagingManager, queueClient)
 	authController := handler.NewAuthHandler(authService)
 	albumController := handler.NewAlbumHandler(&albumService, queries)
+	userController := handler.NewUserHandler(userService)
 	queueController := handler.NewQueueHandler(queueClient, pgxPool)
 	statsController := handler.NewStatsHandler(queries)
 	agentController := handler.NewAgentHandler(agentService)
@@ -224,6 +226,7 @@ func main() {
 		agentController,
 		capabilitiesController,
 		settingsController,
+		userController,
 		handler.RequireLLMAgentEnabled(settingsService),
 	)
 

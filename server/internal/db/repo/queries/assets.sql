@@ -381,6 +381,7 @@ WHERE asset_id = sqlc.arg('asset_id');
 SELECT * FROM assets
 WHERE is_deleted = false
   AND rating = sqlc.arg('rating')::integer
+  AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'))
 ORDER BY upload_time DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
@@ -388,6 +389,7 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 SELECT * FROM assets
 WHERE is_deleted = false
   AND liked = true
+  AND (sqlc.narg('owner_id')::integer IS NULL OR owner_id = sqlc.narg('owner_id'))
 ORDER BY upload_time DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
@@ -752,6 +754,7 @@ FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
   AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
   AND (a.specific_metadata->>'gps_latitude')::double precision BETWEEN -90 AND 90
@@ -766,6 +769,7 @@ FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
   AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
   AND (a.specific_metadata->>'gps_latitude')::double precision BETWEEN -90 AND 90

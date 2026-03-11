@@ -48,6 +48,7 @@ type Asset struct {
 	Duration             *float64                 `db:"duration" json:"duration"`
 	UploadTime           pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
 	TakenTime            pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
+	CaptureOffsetMinutes *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
 	IsDeleted            *bool                    `db:"is_deleted" json:"is_deleted"`
 	DeletedAt            pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
 	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
@@ -56,7 +57,6 @@ type Asset struct {
 	RepositoryID         pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Status               []byte                   `db:"status" json:"status"`
 	UpdatedAt            pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
-	CaptureOffsetMinutes *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
 }
 
 type AssetTag struct {
@@ -271,12 +271,15 @@ type Thumbnail struct {
 }
 
 type User struct {
-	UserID    int32              `db:"user_id" json:"user_id"`
-	Username  string             `db:"username" json:"username"`
-	Email     string             `db:"email" json:"email"`
-	Password  string             `db:"password" json:"password"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	IsActive  *bool              `db:"is_active" json:"is_active"`
-	LastLogin pgtype.Timestamptz `db:"last_login" json:"last_login"`
+	UserID      int32              `db:"user_id" json:"user_id"`
+	Username    string             `db:"username" json:"username"`
+	Email       string             `db:"email" json:"email"`
+	Password    string             `db:"password" json:"password"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	IsActive    *bool              `db:"is_active" json:"is_active"`
+	LastLogin   pgtype.Timestamptz `db:"last_login" json:"last_login"`
+	DisplayName string             `db:"display_name" json:"display_name"`
+	AvatarUrl   *string            `db:"avatar_url" json:"avatar_url"`
+	Role        string             `db:"role" json:"role"`
 }

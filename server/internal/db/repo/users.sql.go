@@ -11,6 +11,81 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const adminUpdateUser = `-- name: AdminUpdateUser :one
+UPDATE users
+SET username = $2,
+    email = $3,
+    display_name = $4,
+    avatar_url = $5,
+    role = $6,
+    is_active = $7,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+RETURNING user_id, username, email, password, created_at, updated_at, is_active, last_login, display_name, avatar_url, role
+`
+
+type AdminUpdateUserParams struct {
+	UserID      int32   `db:"user_id" json:"user_id"`
+	Username    string  `db:"username" json:"username"`
+	Email       string  `db:"email" json:"email"`
+	DisplayName string  `db:"display_name" json:"display_name"`
+	AvatarUrl   *string `db:"avatar_url" json:"avatar_url"`
+	Role        string  `db:"role" json:"role"`
+	IsActive    *bool   `db:"is_active" json:"is_active"`
+}
+
+func (q *Queries) AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, adminUpdateUser,
+		arg.UserID,
+		arg.Username,
+		arg.Email,
+		arg.DisplayName,
+		arg.AvatarUrl,
+		arg.Role,
+		arg.IsActive,
+	)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.Email,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsActive,
+		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Role,
+	)
+	return i, err
+}
+
+const countActiveUsersByRole = `-- name: CountActiveUsersByRole :one
+SELECT COUNT(*)
+FROM users
+WHERE role = $1
+  AND is_active = true
+`
+
+func (q *Queries) CountActiveUsersByRole(ctx context.Context, role string) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveUsersByRole, role)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countUsers = `-- name: CountUsers :one
+SELECT COUNT(*) FROM users
+`
+
+func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countUsers)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createRefreshToken = `-- name: CreateRefreshToken :one
 INSERT INTO refresh_tokens (user_id, token, expires_at)
 VALUES ($1, $2, $3)
@@ -38,19 +113,27 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (username, email, password)
-VALUES ($1, $2, $3)
-RETURNING user_id, username, email, password, created_at, updated_at, is_active, last_login
+INSERT INTO users (username, email, password, display_name, role)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING user_id, username, email, password, created_at, updated_at, is_active, last_login, display_name, avatar_url, role
 `
 
 type CreateUserParams struct {
-	Username string `db:"username" json:"username"`
-	Email    string `db:"email" json:"email"`
-	Password string `db:"password" json:"password"`
+	Username    string `db:"username" json:"username"`
+	Email       string `db:"email" json:"email"`
+	Password    string `db:"password" json:"password"`
+	DisplayName string `db:"display_name" json:"display_name"`
+	Role        string `db:"role" json:"role"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Username, arg.Email, arg.Password)
+	row := q.db.QueryRow(ctx, createUser,
+		arg.Username,
+		arg.Email,
+		arg.Password,
+		arg.DisplayName,
+		arg.Role,
+	)
 	var i User
 	err := row.Scan(
 		&i.UserID,
@@ -61,6 +144,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.IsActive,
 		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Role,
 	)
 	return i, err
 }
@@ -94,7 +180,7 @@ func (q *Queries) GetRefreshTokenByToken(ctx context.Context, token string) (Ref
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT user_id, username, email, password, created_at, updated_at, is_active, last_login FROM users WHERE email = $1
+SELECT user_id, username, email, password, created_at, updated_at, is_active, last_login, display_name, avatar_url, role FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -109,12 +195,15 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.UpdatedAt,
 		&i.IsActive,
 		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Role,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT user_id, username, email, password, created_at, updated_at, is_active, last_login FROM users WHERE user_id = $1
+SELECT user_id, username, email, password, created_at, updated_at, is_active, last_login, display_name, avatar_url, role FROM users WHERE user_id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, userID int32) (User, error) {
@@ -129,12 +218,15 @@ func (q *Queries) GetUserByID(ctx context.Context, userID int32) (User, error) {
 		&i.UpdatedAt,
 		&i.IsActive,
 		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Role,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT user_id, username, email, password, created_at, updated_at, is_active, last_login FROM users WHERE username = $1
+SELECT user_id, username, email, password, created_at, updated_at, is_active, last_login, display_name, avatar_url, role FROM users WHERE username = $1
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -149,12 +241,15 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.UpdatedAt,
 		&i.IsActive,
 		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Role,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT user_id, username, email, password, created_at, updated_at, is_active, last_login FROM users
+SELECT user_id, username, email, password, created_at, updated_at, is_active, last_login, display_name, avatar_url, role FROM users
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -182,6 +277,86 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.UpdatedAt,
 			&i.IsActive,
 			&i.LastLogin,
+			&i.DisplayName,
+			&i.AvatarUrl,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUsersWithStats = `-- name: ListUsersWithStats :many
+SELECT
+  u.user_id, u.username, u.email, u.password, u.created_at, u.updated_at, u.is_active, u.last_login, u.display_name, u.avatar_url, u.role,
+  COALESCE(asset_counts.asset_count, 0)::bigint AS asset_count,
+  COALESCE(album_counts.album_count, 0)::bigint AS album_count
+FROM users u
+LEFT JOIN (
+  SELECT owner_id AS user_id, COUNT(*) AS asset_count
+  FROM assets
+  WHERE owner_id IS NOT NULL
+    AND is_deleted = false
+  GROUP BY owner_id
+) asset_counts ON asset_counts.user_id = u.user_id
+LEFT JOIN (
+  SELECT user_id, COUNT(*) AS album_count
+  FROM albums
+  GROUP BY user_id
+) album_counts ON album_counts.user_id = u.user_id
+ORDER BY u.created_at DESC, u.user_id DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListUsersWithStatsParams struct {
+	Limit  int32 `db:"limit" json:"limit"`
+	Offset int32 `db:"offset" json:"offset"`
+}
+
+type ListUsersWithStatsRow struct {
+	UserID      int32              `db:"user_id" json:"user_id"`
+	Username    string             `db:"username" json:"username"`
+	Email       string             `db:"email" json:"email"`
+	Password    string             `db:"password" json:"password"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	IsActive    *bool              `db:"is_active" json:"is_active"`
+	LastLogin   pgtype.Timestamptz `db:"last_login" json:"last_login"`
+	DisplayName string             `db:"display_name" json:"display_name"`
+	AvatarUrl   *string            `db:"avatar_url" json:"avatar_url"`
+	Role        string             `db:"role" json:"role"`
+	AssetCount  int64              `db:"asset_count" json:"asset_count"`
+	AlbumCount  int64              `db:"album_count" json:"album_count"`
+}
+
+func (q *Queries) ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error) {
+	rows, err := q.db.Query(ctx, listUsersWithStats, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsersWithStatsRow
+	for rows.Next() {
+		var i ListUsersWithStatsRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Username,
+			&i.Email,
+			&i.Password,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsActive,
+			&i.LastLogin,
+			&i.DisplayName,
+			&i.AvatarUrl,
+			&i.Role,
+			&i.AssetCount,
+			&i.AlbumCount,
 		); err != nil {
 			return nil, err
 		}
@@ -206,7 +381,7 @@ const updateUser = `-- name: UpdateUser :one
 UPDATE users
 SET username = $2, email = $3, updated_at = CURRENT_TIMESTAMP, last_login = $4
 WHERE user_id = $1
-RETURNING user_id, username, email, password, created_at, updated_at, is_active, last_login
+RETURNING user_id, username, email, password, created_at, updated_at, is_active, last_login, display_name, avatar_url, role
 `
 
 type UpdateUserParams struct {
@@ -233,6 +408,59 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.IsActive,
 		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Role,
+	)
+	return i, err
+}
+
+const updateUserLastLogin = `-- name: UpdateUserLastLogin :exec
+UPDATE users
+SET last_login = $2, updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateUserLastLoginParams struct {
+	UserID    int32              `db:"user_id" json:"user_id"`
+	LastLogin pgtype.Timestamptz `db:"last_login" json:"last_login"`
+}
+
+func (q *Queries) UpdateUserLastLogin(ctx context.Context, arg UpdateUserLastLoginParams) error {
+	_, err := q.db.Exec(ctx, updateUserLastLogin, arg.UserID, arg.LastLogin)
+	return err
+}
+
+const updateUserProfile = `-- name: UpdateUserProfile :one
+UPDATE users
+SET display_name = $2,
+    avatar_url = $3,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+RETURNING user_id, username, email, password, created_at, updated_at, is_active, last_login, display_name, avatar_url, role
+`
+
+type UpdateUserProfileParams struct {
+	UserID      int32   `db:"user_id" json:"user_id"`
+	DisplayName string  `db:"display_name" json:"display_name"`
+	AvatarUrl   *string `db:"avatar_url" json:"avatar_url"`
+}
+
+func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserProfile, arg.UserID, arg.DisplayName, arg.AvatarUrl)
+	var i User
+	err := row.Scan(
+		&i.UserID,
+		&i.Username,
+		&i.Email,
+		&i.Password,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsActive,
+		&i.LastLogin,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Role,
 	)
 	return i, err
 }

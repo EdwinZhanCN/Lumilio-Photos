@@ -14,10 +14,12 @@ import (
 type Querier interface {
 	AddAssetToAlbum(ctx context.Context, arg AddAssetToAlbumParams) error
 	AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) error
+	AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams) (User, error)
 	BulkToggleAssetLiked(ctx context.Context, assetIds []pgtype.UUID) error
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
 	BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error
+	CountActiveUsersByRole(ctx context.Context, role string) (int64, error)
 	CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error)
 	CountAssetsByRating(ctx context.Context, ownerID *int32) ([]CountAssetsByRatingRow, error)
 	CountAssetsByStatus(ctx context.Context, status []byte) (int64, error)
@@ -37,9 +39,10 @@ type Querier interface {
 	CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	// Count query matching GetPhotoMapPoints.
-	CountPhotoMapPoints(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
+	CountUsers(ctx context.Context) (int64, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
 	CreateCaption(ctx context.Context, arg CreateCaptionParams) (Caption, error)
@@ -197,6 +200,7 @@ type Querier interface {
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error)
 	MergeFaceClusters(ctx context.Context, arg MergeFaceClustersParams) error
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
@@ -249,6 +253,8 @@ type Querier interface {
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
+	UpdateUserLastLogin(ctx context.Context, arg UpdateUserLastLoginParams) error
+	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertCheckpoint(ctx context.Context, arg UpsertCheckpointParams) error
 	// Unified embeddings table queries
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error

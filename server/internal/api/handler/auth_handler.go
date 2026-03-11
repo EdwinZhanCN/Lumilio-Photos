@@ -173,54 +173,25 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // @Failure 500 {object} api.Result "Internal server error"
 // @Router /api/v1/auth/me [get]
 func (h *AuthHandler) Me(c *gin.Context) {
-	// Get user ID from JWT claims (set by auth middleware)
-	userID, exists := c.Get("user_id")
-	if !exists {
-		api.GinUnauthorized(c, errors.New("User ID not found in token"), "Unauthorized")
+	user, ok := requireCurrentUser(c)
+	if !ok {
 		return
 	}
 
-	// Get user information
-	// This would typically come from a user service
-	user := dto.UserDTO{
-		UserID:   userID.(int),
-		Username: c.GetString("username"),
-		// Other fields would be fetched from database
-	}
-
-	api.GinSuccess(c, user)
+	api.GinSuccess(c, dto.ToUserDTO(*user))
 }
 
 // AuthMiddleware validates JWT tokens and sets user context
 func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			api.GinUnauthorized(c, errors.New("Authorization header is required"), "Unauthorized")
-			c.Abort()
-			return
-		}
-
-		// Extract token from "Bearer <token>" format
-		tokenParts := strings.Split(authHeader, " ")
-		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			api.GinUnauthorized(c, errors.New("Invalid authorization header format"), "Unauthorized")
-			c.Abort()
-			return
-		}
-
-		token := tokenParts[1]
-		claims, err := h.authService.ValidateToken(token)
+		user, err := h.authenticateRequest(c)
 		if err != nil {
 			api.GinUnauthorized(c, errors.New("Invalid or expired token"), "Unauthorized")
 			c.Abort()
 			return
 		}
 
-		// Set user information in context
-		c.Set("user_id", claims.UserID)
-		c.Set("username", claims.Username)
-
+		h.setUserContext(c, user)
 		c.Next()
 	}
 }
@@ -234,24 +205,51 @@ func (h *AuthHandler) OptionalAuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Extract token from "Bearer <token>" format
-		tokenParts := strings.Split(authHeader, " ")
-		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			c.Next()
-			return
-		}
-
-		token := tokenParts[1]
-		claims, err := h.authService.ValidateToken(token)
+		user, err := h.authenticateRequest(c)
 		if err != nil {
 			c.Next()
 			return
 		}
 
-		// Set user information in context
-		c.Set("user_id", claims.UserID)
-		c.Set("username", claims.Username)
+		h.setUserContext(c, user)
 
 		c.Next()
 	}
+}
+
+func (h *AuthHandler) RequireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if _, ok := requireAdminUser(c); !ok {
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+func (h *AuthHandler) authenticateRequest(c *gin.Context) (*service.UserResponse, error) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		return nil, errors.New("authorization header is required")
+	}
+
+	tokenParts := strings.Split(authHeader, " ")
+	if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+		return nil, errors.New("invalid authorization header format")
+	}
+
+	claims, err := h.authService.ValidateToken(tokenParts[1])
+	if err != nil {
+		return nil, err
+	}
+
+	return h.authService.GetCurrentUser(claims.UserID)
+}
+
+func (h *AuthHandler) setUserContext(c *gin.Context, user *service.UserResponse) {
+	c.Set("current_user", user)
+	c.Set("user_id", user.UserID)
+	c.Set("username", user.Username)
+	c.Set("user_role", user.Role)
+	c.Set("user_permissions", user.Permissions)
 }
