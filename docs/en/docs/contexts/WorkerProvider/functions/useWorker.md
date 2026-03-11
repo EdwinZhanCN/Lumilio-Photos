@@ -4,7 +4,7 @@
 
 > **useWorker**(): [`AppWorkerClient`](../../../workers/workerClient/classes/AppWorkerClient.md)
 
-Defined in: [contexts/WorkerProvider.tsx:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/c61b22df54ea7cb37ab4a4bd7817fe9e39968a81/web/src/contexts/WorkerProvider.tsx#L13)
+Defined in: [contexts/WorkerProvider.tsx:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/574173b438f2a4193e6274fde31e7df06d283183/web/src/contexts/WorkerProvider.tsx#L13)
 
 Custom hook to safely access the AppWorkerClient instance from the context.
 It ensures that the hook is used within a component wrapped by WorkerProvider.
