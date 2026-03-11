@@ -1,9 +1,6 @@
 package handler
 
 import (
-	"errors"
-	"fmt"
-
 	"server/internal/api"
 	"server/internal/api/dto"
 	"server/internal/service"
@@ -105,25 +102,4 @@ func (h *SettingsHandler) ValidateLLMSettings(c *gin.Context) {
 	}
 
 	api.GinSuccess(c, dto.ValidateLLMSettingsResponseDTO{Valid: true})
-}
-
-func currentUserIDFromContext(c *gin.Context) (*int32, error) {
-	value, exists := c.Get("user_id")
-	if !exists {
-		return nil, errors.New("user id not found in context")
-	}
-
-	switch userID := value.(type) {
-	case int:
-		converted := int32(userID)
-		return &converted, nil
-	case int32:
-		converted := userID
-		return &converted, nil
-	case int64:
-		converted := int32(userID)
-		return &converted, nil
-	default:
-		return nil, fmt.Errorf("unexpected user id type %T", value)
-	}
 }

@@ -15,6 +15,7 @@ import (
 	"server/internal/db/repo"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -45,12 +46,17 @@ type RefreshTokenRequest struct {
 }
 
 type UserResponse struct {
-	UserID    int        `json:"user_id"`
-	Username  string     `json:"username"`
-	Email     string     `json:"email"`
-	CreatedAt time.Time  `json:"created_at"`
-	IsActive  bool       `json:"is_active"`
-	LastLogin *time.Time `json:"last_login,omitempty"`
+	UserID      int        `json:"user_id"`
+	Username    string     `json:"username"`
+	DisplayName string     `json:"display_name"`
+	Email       string     `json:"email"`
+	AvatarURL   *string    `json:"avatar_url,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	IsActive    bool       `json:"is_active"`
+	LastLogin   *time.Time `json:"last_login,omitempty"`
+	Role        string     `json:"role"`
+	Permissions []string   `json:"permissions"`
 }
 
 type AuthResponse struct {
@@ -72,6 +78,7 @@ type AuthService struct {
 type JWTClaims struct {
 	UserID   int    `json:"user_id"`
 	Username string `json:"username"`
+	Role     string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -135,10 +142,21 @@ func (s *AuthService) Register(req RegisterRequest) (*AuthResponse, error) {
 	}
 
 	// Create new user
+	role := UserRoleUser
+	userCount, err := s.queries.CountUsers(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("error counting users: %w", err)
+	}
+	if userCount == 0 {
+		role = UserRoleAdmin
+	}
+
 	params := repo.CreateUserParams{
-		Username: req.Username,
-		Email:    req.Email,
-		Password: string(hashedPassword),
+		Username:    req.Username,
+		Email:       req.Email,
+		Password:    string(hashedPassword),
+		DisplayName: req.Username,
+		Role:        string(role),
 	}
 
 	user, err := s.queries.CreateUser(context.Background(), params)
@@ -172,15 +190,15 @@ func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 	now := pgtype.Timestamptz{}
 	now.Scan(time.Now())
 
-	_, err = s.queries.UpdateUser(context.Background(), repo.UpdateUserParams{
+	err = s.queries.UpdateUserLastLogin(context.Background(), repo.UpdateUserLastLoginParams{
 		UserID:    user.UserID,
-		Username:  user.Username,
-		Email:     user.Email,
 		LastLogin: now,
 	})
 	if err != nil {
 		// Log error but don't fail login
 		fmt.Printf("Warning: failed to update last login for user %d: %v\n", user.UserID, err)
+	} else {
+		user.LastLogin = now
 	}
 
 	// Generate tokens
@@ -265,6 +283,23 @@ func (s *AuthService) RevokeRefreshToken(refreshTokenString string) error {
 	return s.queries.RevokeRefreshToken(context.Background(), refreshToken.TokenID)
 }
 
+func (s *AuthService) GetCurrentUser(userID int) (*UserResponse, error) {
+	user, err := s.queries.GetUserByID(context.Background(), int32(userID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrUserNotFound
+		}
+		return nil, fmt.Errorf("error getting current user: %w", err)
+	}
+
+	if user.IsActive == nil || !*user.IsActive {
+		return nil, ErrUserNotFound
+	}
+
+	response := ConvertUserToResponse(user)
+	return &response, nil
+}
+
 // generateAuthResponse creates an authentication response with tokens
 func (s *AuthService) generateAuthResponse(user repo.User) (*AuthResponse, error) {
 	// Generate access token
@@ -294,6 +329,7 @@ func (s *AuthService) generateAccessToken(user repo.User) (string, time.Time, er
 	claims := &JWTClaims{
 		UserID:   int(user.UserID),
 		Username: user.Username,
+		Role:     string(normalizeUserRole(user.Role)),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -345,12 +381,23 @@ func ConvertUserToResponse(user repo.User) UserResponse {
 		lastLogin = &user.LastLogin.Time
 	}
 
+	role := normalizeUserRole(user.Role)
+	displayName := strings.TrimSpace(user.DisplayName)
+	if displayName == "" {
+		displayName = user.Username
+	}
+
 	return UserResponse{
-		UserID:    int(user.UserID),
-		Username:  user.Username,
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt.Time,
-		IsActive:  user.IsActive != nil && *user.IsActive,
-		LastLogin: lastLogin,
+		UserID:      int(user.UserID),
+		Username:    user.Username,
+		DisplayName: displayName,
+		Email:       user.Email,
+		AvatarURL:   cloneOptionalString(user.AvatarUrl),
+		CreatedAt:   user.CreatedAt.Time,
+		UpdatedAt:   user.UpdatedAt.Time,
+		IsActive:    user.IsActive != nil && *user.IsActive,
+		LastLogin:   lastLogin,
+		Role:        string(role),
+		Permissions: PermissionsForRole(role),
 	}
 }

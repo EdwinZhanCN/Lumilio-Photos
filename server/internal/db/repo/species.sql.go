@@ -224,7 +224,7 @@ WITH page_ids AS MATERIALIZED (
     ORDER BY MAX(sp.score) DESC, a.upload_time DESC, a.asset_id DESC
     LIMIT $3 OFFSET $2
 )
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.capture_offset_minutes
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
 ORDER BY p.best_score DESC, p.upload_time DESC, p.asset_id DESC
@@ -259,6 +259,7 @@ func (q *Queries) SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsByS
 			&i.Duration,
 			&i.UploadTime,
 			&i.TakenTime,
+			&i.CaptureOffsetMinutes,
 			&i.IsDeleted,
 			&i.DeletedAt,
 			&i.SpecificMetadata,
@@ -267,7 +268,6 @@ func (q *Queries) SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsByS
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
-			&i.CaptureOffsetMinutes,
 		); err != nil {
 			return nil, err
 		}

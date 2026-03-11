@@ -4674,6 +4674,307 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List users
+         * @description List users with ownership statistics for administrator management views.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Maximum number of results */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Users retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update user
+         * @description Update user identity, role, status, and avatar fields as an administrator.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description User ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            /** @description User update payload */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.AdminUpdateUserRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description User updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request data */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description User not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description User already exists */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/users/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update my profile
+         * @description Update the current user's profile fields such as display name and avatar URL.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Profile update payload */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdateOwnProfileRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Profile updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request data */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4699,7 +5000,7 @@ export interface components {
             message?: string;
         } & components["schemas"]["data"];
         data: {
-            data?: components["schemas"]["handler.AvailableYearsResponse"];
+            data?: components["schemas"]["dto.UserDTO"];
         };
         /** @enum {string} */
         "dbtypes.AssetType": "PHOTO" | "VIDEO" | "AUDIO";
@@ -4763,6 +5064,23 @@ export interface components {
         };
         "dto.AddAssetToAlbumRequestDTO": {
             position?: number;
+        };
+        "dto.AdminUpdateUserRequestDTO": {
+            /** @example https://example.com/avatar.jpg */
+            avatar_url?: string;
+            /** @example Alex Chen */
+            display_name?: string;
+            /** @example alex@example.com */
+            email?: string;
+            /** @example true */
+            is_active?: boolean;
+            /**
+             * @example admin
+             * @enum {string}
+             */
+            role?: "admin" | "user";
+            /** @example alex */
+            username?: string;
         };
         "dto.AssetDTO": {
             asset_id?: string;
@@ -5055,6 +5373,12 @@ export interface components {
             offset?: number;
             total?: number;
         };
+        "dto.ListUsersResponseDTO": {
+            limit?: number;
+            offset?: number;
+            total?: number;
+            users?: components["schemas"]["dto.ManagedUserDTO"][];
+        };
         "dto.LoginRequestDTO": {
             password: string;
             username: string;
@@ -5086,6 +5410,21 @@ export interface components {
             face_detect_and_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             ocr?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             vlm_generate?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+        };
+        "dto.ManagedUserDTO": {
+            album_count?: number;
+            asset_count?: number;
+            avatar_url?: string;
+            created_at?: string;
+            display_name?: string;
+            email?: string;
+            is_active?: boolean;
+            last_login?: string;
+            permissions?: string[];
+            role?: string;
+            updated_at?: string;
+            user_id?: number;
+            username?: string;
         };
         "dto.MessageResponseDTO": {
             /** @example Operation completed successfully */
@@ -5285,6 +5624,12 @@ export interface components {
             face_enabled?: boolean;
             ocr_enabled?: boolean;
         };
+        "dto.UpdateOwnProfileRequestDTO": {
+            /** @example https://example.com/avatar.jpg */
+            avatar_url?: string;
+            /** @example Alex Chen */
+            display_name?: string;
+        };
         "dto.UpdateRatingAndLikeRequestDTO": {
             /** @example true */
             liked?: boolean;
@@ -5325,10 +5670,15 @@ export interface components {
             task_id?: number;
         };
         "dto.UserDTO": {
+            avatar_url?: string;
             created_at?: string;
+            display_name?: string;
             email?: string;
             is_active?: boolean;
             last_login?: string;
+            permissions?: string[];
+            role?: string;
+            updated_at?: string;
             user_id?: number;
             username?: string;
         };

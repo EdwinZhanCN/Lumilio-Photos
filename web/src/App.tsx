@@ -1,8 +1,8 @@
 import React, { useEffect } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import SideBar from "@/components/SideBar";
 import NavBar from "@/components/NavBar";
-import { routes } from "@/routes/routes";
+import { appRoutes, publicRoutes } from "@/routes/routes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import GlobalProvider, { useGlobal } from "@/contexts/GlobalContext";
 import "@/styles/App.css";
@@ -14,6 +14,38 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { AuthProvider, ProtectedRoute } from "./features/auth";
 
 const queryClient = new QueryClient();
+
+function AppShellLayout(): React.ReactNode {
+  const { t } = useI18n();
+
+  return (
+    <div className="flex h-screen flex-col">
+      <div className="bg-base-100 shadow">
+        <NavBar />
+      </div>
+      <div className="flex flex-1 overflow-hidden">
+        <div className="w-auto bg-base-200 shadow-lg">
+          <SideBar />
+        </div>
+        <div
+          id="app-scroll-container"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-4"
+        >
+          <Outlet />
+        </div>
+      </div>
+      <footer className="bg-base-100 text-base-content text-xs">
+        <div className="container mx-auto py-0.5">
+          <p className="text-center">
+            {t("footer.copyright", {
+              year: new Date().getFullYear(),
+            })}
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}
 
 function HealthPoller(): React.ReactNode {
   const { state } = useSettingsContext();
@@ -50,58 +82,28 @@ function HealthPoller(): React.ReactNode {
 }
 
 function App(): React.ReactNode {
-  const { t } = useI18n();
-
   return (
     <SettingsProvider>
       <GlobalProvider>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <BrowserRouter>
-              <div className="flex flex-col h-screen">
-                <div className="bg-base-100 shadow">
-                  <NavBar />
-                </div>
-                <div className="flex flex-1 overflow-hidden">
-                  <div className="w-auto bg-base-200 shadow-lg">
-                    <SideBar />
-                  </div>
-                  <div
-                    id="app-scroll-container"
-                    className="flex-1 p-4 overflow-y-auto overflow-x-hidden"
-                  >
-                    <Routes>
-                      {routes.map((route) => {
-                        const isPublic =
-                          route.path === "/login" || route.path === "/register";
-
-                        return (
-                          <Route
-                            key={route.path}
-                            path={route.path}
-                            element={
-                              isPublic ? (
-                                route.element
-                              ) : (
-                                <ProtectedRoute>{route.element}</ProtectedRoute>
-                              )
-                            }
-                          />
-                        );
-                      })}
-                    </Routes>
-                  </div>
-                </div>
-                <footer className="bg-base-100 text-base-content text-xs">
-                  <div className="container mx-auto py-0.5">
-                    <p className="text-center">
-                      {t("footer.copyright", {
-                        year: new Date().getFullYear(),
-                      })}
-                    </p>
-                  </div>
-                </footer>
-              </div>
+              <Routes>
+                {publicRoutes.map((route) => (
+                  <Route key={route.path} path={route.path} element={route.element} />
+                ))}
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <AppShellLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  {appRoutes.map((route) => (
+                    <Route key={route.path} path={route.path} element={route.element} />
+                  ))}
+                </Route>
+              </Routes>
             </BrowserRouter>
           </AuthProvider>
           <HealthPoller />

@@ -56,6 +56,7 @@ type AuthControllerInterface interface {
 	Me(c *gin.Context)
 	AuthMiddleware() gin.HandlerFunc
 	OptionalAuthMiddleware() gin.HandlerFunc
+	RequireAdmin() gin.HandlerFunc
 }
 
 // AlbumControllerInterface defines the interface for album controllers
@@ -108,6 +109,12 @@ type SettingsControllerInterface interface {
 	ValidateLLMSettings(c *gin.Context)
 }
 
+type UserControllerInterface interface {
+	UpdateMyProfile(c *gin.Context)
+	ListUsers(c *gin.Context)
+	UpdateUser(c *gin.Context)
+}
+
 func NewRouter(
 	assetController AssetControllerInterface,
 	authController AuthControllerInterface,
@@ -117,6 +124,7 @@ func NewRouter(
 	agentController AgentControllerInterface,
 	capabilitiesController CapabilitiesControllerInterface,
 	settingsController SettingsControllerInterface,
+	userController UserControllerInterface,
 	agentAvailabilityMiddleware gin.HandlerFunc,
 ) *gin.Engine {
 	r := gin.Default()
@@ -142,7 +150,7 @@ func NewRouter(
 		v1.GET("/capabilities", authController.OptionalAuthMiddleware(), capabilitiesController.GetCapabilities)
 
 		settings := v1.Group("/settings")
-		settings.Use(authController.AuthMiddleware())
+		settings.Use(authController.AuthMiddleware(), authController.RequireAdmin())
 		{
 			settings.GET("/system", settingsController.GetSystemSettings)
 			settings.PATCH("/system", settingsController.UpdateSystemSettings)
@@ -159,6 +167,14 @@ func NewRouter(
 			auth.GET("/me", authController.AuthMiddleware(), authController.Me)
 		}
 
+		users := v1.Group("/users")
+		users.Use(authController.AuthMiddleware())
+		{
+			users.PATCH("/me/profile", userController.UpdateMyProfile)
+			users.GET("", authController.RequireAdmin(), userController.ListUsers)
+			users.PATCH("/:id", authController.RequireAdmin(), userController.UpdateUser)
+		}
+
 		// Asset routes (new unified API) - with optional authentication
 		assets := v1.Group("/assets")
 		assets.Use(authController.OptionalAuthMiddleware())
@@ -168,9 +184,9 @@ func NewRouter(
 			assets.GET("/filter-options", assetController.GetFilterOptions)
 			assets.GET("/featured", assetController.GetFeaturedAssets)
 			assets.GET("/map-points", assetController.GetPhotoMapPoints)
-			assets.GET("/indexing/repositories", authController.AuthMiddleware(), assetController.ListIndexingRepositories)
-			assets.GET("/indexing/stats", authController.AuthMiddleware(), assetController.GetIndexingStats)
-			assets.POST("/indexing/rebuild", authController.AuthMiddleware(), assetController.RebuildAssetIndexes)
+			assets.GET("/indexing/repositories", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.ListIndexingRepositories)
+			assets.GET("/indexing/stats", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.GetIndexingStats)
+			assets.POST("/indexing/rebuild", authController.AuthMiddleware(), authController.RequireAdmin(), assetController.RebuildAssetIndexes)
 			assets.POST("/list", assetController.QueryAssets)
 			assets.POST("/search", assetController.SearchAssets)
 			assets.POST("/batch", assetController.BatchUploadAssets)
@@ -217,7 +233,7 @@ func NewRouter(
 
 		// Admin routes for queue monitoring (read-only)
 		admin := v1.Group("/admin")
-		admin.Use(authController.OptionalAuthMiddleware())
+		admin.Use(authController.AuthMiddleware(), authController.RequireAdmin())
 		{
 			river := admin.Group("/river")
 			{

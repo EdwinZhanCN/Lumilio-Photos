@@ -13,11 +13,13 @@ import {
 import { Album, Activity } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useGlobal } from "@/contexts/GlobalContext";
+import { useAuth } from "@/features/auth";
 
 function SideBar() {
   const [messageCount] = useState<number>(0);
   const [isUpdate] = useState<boolean>(false);
   const { online: isOnline } = useGlobal();
+  const { user } = useAuth();
   const location = useLocation();
   const { t } = useI18n();
 
@@ -87,29 +89,31 @@ function SideBar() {
             )}
           </Link>
         </li>
-        <li>
-          <Link to="/server-monitor">
-            {isOnline ? (
-              <div className="flex items-center justify-center gap-2 text-success">
-                <Activity className="size-5" />
-                {t("sidebar.status.online")}
-                <div className="inline-grid *:[grid-area:1/1]">
-                  <div className="status status-success animate-ping"></div>
-                  <div className="status status-success"></div>
+        {user?.role === "admin" && (
+          <li>
+            <Link to="/server-monitor">
+              {isOnline ? (
+                <div className="flex items-center justify-center gap-2 text-success">
+                  <Activity className="size-5" />
+                  {t("sidebar.status.online")}
+                  <div className="inline-grid *:[grid-area:1/1]">
+                    <div className="status status-success animate-ping"></div>
+                    <div className="status status-success"></div>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2 text-error">
-                <Activity className="size-5" />
-                {t("sidebar.status.offline")}
-                <div className="inline-grid *:[grid-area:1/1]">
-                  <div className="status status-error animate-ping"></div>
-                  <div className="status status-error"></div>
+              ) : (
+                <div className="flex items-center justify-center gap-2 text-error">
+                  <Activity className="size-5" />
+                  {t("sidebar.status.offline")}
+                  <div className="inline-grid *:[grid-area:1/1]">
+                    <div className="status status-error animate-ping"></div>
+                    <div className="status status-error"></div>
+                  </div>
                 </div>
-              </div>
-            )}
-          </Link>
-        </li>
+              )}
+            </Link>
+          </li>
+        )}
       </ul>
     </div>
   );

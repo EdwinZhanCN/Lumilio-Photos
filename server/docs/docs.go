@@ -41,7 +41,7 @@ const docTemplate = `{
             "data": {
                 "properties": {
                     "data": {
-                        "$ref": "#/components/schemas/handler.AvailableYearsResponse"
+                        "$ref": "#/components/schemas/dto.UserDTO"
                     }
                 },
                 "type": "object"
@@ -198,6 +198,39 @@ const docTemplate = `{
                 "properties": {
                     "position": {
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.AdminUpdateUserRequestDTO": {
+                "properties": {
+                    "avatar_url": {
+                        "example": "https://example.com/avatar.jpg",
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "example": "Alex Chen",
+                        "type": "string"
+                    },
+                    "email": {
+                        "example": "alex@example.com",
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "role": {
+                        "enum": [
+                            "admin",
+                            "user"
+                        ],
+                        "example": "admin",
+                        "type": "string"
+                    },
+                    "username": {
+                        "example": "alex",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -879,6 +912,27 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.ListUsersResponseDTO": {
+                "properties": {
+                    "limit": {
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "type": "integer"
+                    },
+                    "total": {
+                        "type": "integer"
+                    },
+                    "users": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.ManagedUserDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
             "dto.LoginRequestDTO": {
                 "properties": {
                     "password": {
@@ -962,6 +1016,54 @@ const docTemplate = `{
                     },
                     "vlm_generate": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ManagedUserDTO": {
+                "properties": {
+                    "album_count": {
+                        "type": "integer"
+                    },
+                    "asset_count": {
+                        "type": "integer"
+                    },
+                    "avatar_url": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "last_login": {
+                        "type": "string"
+                    },
+                    "permissions": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "user_id": {
+                        "type": "integer"
+                    },
+                    "username": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -1480,6 +1582,19 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.UpdateOwnProfileRequestDTO": {
+                "properties": {
+                    "avatar_url": {
+                        "example": "https://example.com/avatar.jpg",
+                        "type": "string"
+                    },
+                    "display_name": {
+                        "example": "Alex Chen",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.UpdateRatingAndLikeRequestDTO": {
                 "properties": {
                     "liked": {
@@ -1583,7 +1698,13 @@ const docTemplate = `{
             },
             "dto.UserDTO": {
                 "properties": {
+                    "avatar_url": {
+                        "type": "string"
+                    },
                     "created_at": {
+                        "type": "string"
+                    },
+                    "display_name": {
                         "type": "string"
                     },
                     "email": {
@@ -1593,6 +1714,19 @@ const docTemplate = `{
                         "type": "boolean"
                     },
                     "last_login": {
+                        "type": "string"
+                    },
+                    "permissions": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "updated_at": {
                         "type": "string"
                     },
                     "user_id": {
@@ -7207,6 +7341,365 @@ const docTemplate = `{
                 "summary": "Get time distribution",
                 "tags": [
                     "stats"
+                ]
+            }
+        },
+        "/api/v1/users": {
+            "get": {
+                "description": "List users with ownership statistics for administrator management views.",
+                "parameters": [
+                    {
+                        "description": "Maximum number of results",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 20,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Number of results to skip",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "default": 0,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Users retrieved successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List users",
+                "tags": [
+                    "users"
+                ]
+            }
+        },
+        "/api/v1/users/me/profile": {
+            "patch": {
+                "description": "Update the current user's profile fields such as display name and avatar URL.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.UpdateOwnProfileRequestDTO",
+                                        "summary": "request",
+                                        "description": "Profile update payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Profile update payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Profile updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update my profile",
+                "tags": [
+                    "users"
+                ]
+            }
+        },
+        "/api/v1/users/{id}": {
+            "patch": {
+                "description": "Update user identity, role, status, and avatar fields as an administrator.",
+                "parameters": [
+                    {
+                        "description": "User ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.AdminUpdateUserRequestDTO",
+                                        "summary": "request",
+                                        "description": "User update payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "User update payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "User updated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "User not found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "User already exists"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Update user",
+                "tags": [
+                    "users"
                 ]
             }
         }

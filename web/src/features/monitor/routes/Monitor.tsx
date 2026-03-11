@@ -2,6 +2,7 @@ import { Activity } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
+import { useAuth } from "@/features/auth";
 import {
   CapabilitiesMonitor,
   MLMonitor,
@@ -12,6 +13,7 @@ import {
 
 export default function Monitor() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedView = searchParams.get("tab");
   const view =
@@ -30,6 +32,26 @@ export default function Monitor() {
 
     setSearchParams(params, { replace: true });
   };
+
+  if (user?.role !== "admin") {
+    return (
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="rounded-3xl border border-base-300 bg-base-100 p-8 text-center shadow-sm">
+          <div className="text-lg font-semibold">
+            {t("monitor.adminOnlyTitle", {
+              defaultValue: "Admin access required",
+            })}
+          </div>
+          <p className="mt-2 text-sm opacity-70">
+            {t("monitor.adminOnlyDescription", {
+              defaultValue:
+                "Queue monitoring and runtime diagnostics are only available to administrators.",
+            })}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
