@@ -1,6 +1,5 @@
-import React, { useRef, useEffect, ChangeEvent, useMemo } from "react";
+import React, { useRef, ChangeEvent, useMemo } from "react";
 import FileDropZone from "./FileDropZone";
-import FileUploadProgress from "./FileUploadProgress";
 
 import { useUploadContext } from "@/features/upload";
 import {
@@ -21,6 +20,16 @@ import {
 import { X } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 
+type UploadQueueRow = {
+  key: string;
+  fileName: string;
+  size?: number;
+  status: "pending" | "uploading" | "completed" | "failed";
+  progress: number;
+  error?: string;
+  isChunked: boolean;
+};
+
 function UnifiedUploadSection(): React.JSX.Element {
   const { t } = useI18n(); // Initialize useI18n
   const {
@@ -39,7 +48,6 @@ function UnifiedUploadSection(): React.JSX.Element {
 
   const showMessage = useMessage();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeSessionIds = useMemo(() => {
     const ids = fileProgress
@@ -67,13 +75,100 @@ function UnifiedUploadSection(): React.JSX.Element {
     return `${mb.toFixed(1)} MB`;
   };
 
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+  const getStatusText = (
+    status: "pending" | "uploading" | "completed" | "failed",
+  ) => {
+    switch (status) {
+      case "completed":
+        return t("upload.FileUploadProgress.status_completed");
+      case "uploading":
+        return t("upload.FileUploadProgress.status_uploading");
+      case "failed":
+        return t("upload.FileUploadProgress.status_failed");
+      case "pending":
+      default:
+        return t("upload.FileUploadProgress.status_pending");
+    }
+  };
+
+  const getStatusBadgeClass = (
+    status: "pending" | "uploading" | "completed" | "failed",
+  ) => {
+    switch (status) {
+      case "completed":
+        return "badge-success";
+      case "uploading":
+        return "badge-primary";
+      case "failed":
+        return "badge-error";
+      case "pending":
+      default:
+        return "badge-ghost";
+    }
+  };
+
+  const getProgressClass = (
+    status: "pending" | "uploading" | "completed" | "failed",
+  ) => {
+    switch (status) {
+      case "completed":
+        return "progress-success";
+      case "uploading":
+        return "progress-primary";
+      case "failed":
+        return "progress-error";
+      case "pending":
+      default:
+        return "progress-base-300";
+    }
+  };
+
+  const queueRows = useMemo(() => {
+    const progressBuckets = new Map<string, typeof fileProgress>();
+    fileProgress.forEach((item) => {
+      const bucket = progressBuckets.get(item.fileName);
+      if (bucket) {
+        bucket.push(item);
+      } else {
+        progressBuckets.set(item.fileName, [item]);
       }
-    };
-  }, []);
+    });
+
+    const consumedCount = new Map<string, number>();
+
+    const rows: UploadQueueRow[] = files.map((file, index) => {
+      const consumed = consumedCount.get(file.name) ?? 0;
+      const match = progressBuckets.get(file.name)?.[consumed];
+      consumedCount.set(file.name, consumed + 1);
+
+      return {
+        key: `file-${index}-${file.name}`,
+        fileName: file.name,
+        size: file.size,
+        status: match?.status ?? "pending",
+        progress: match?.progress ?? 0,
+        error: match?.error,
+        isChunked: match?.isChunked ?? false,
+      };
+    });
+
+    progressBuckets.forEach((bucket, fileName) => {
+      const consumed = consumedCount.get(fileName) ?? 0;
+      bucket.slice(consumed).forEach((item, index) => {
+        rows.push({
+          key: `progress-${fileName}-${index}`,
+          fileName: item.fileName,
+          size: undefined,
+          status: item.status,
+          progress: item.progress,
+          error: item.error,
+          isChunked: item.isChunked,
+        });
+      });
+    });
+
+    return rows;
+  }, [files, fileProgress]);
 
   /**
    * Handle file selection and validation.
@@ -259,66 +354,91 @@ function UnifiedUploadSection(): React.JSX.Element {
         </div>
       </div>
 
-      {/* File List - Floating Card Style */}
-      {fileCount > 0 && (
+      {/* Unified Queue Table */}
+      {queueRows.length > 0 && (
         <div className="mt-6">
           <div className="card bg-base-200 shadow-xl">
             <div className="card-body p-4">
-              <h3 className="card-title text-base">
-                {t("upload.UnifiedUploadSection.selected_files_title")}
-                <div className="badge badge-primary badge-sm">{fileCount}</div>
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="card-title text-base">
+                  {t("upload.UnifiedUploadSection.queue_title")}
+                </h3>
+                <div className="badge badge-primary badge-sm">
+                  {queueRows.length}
+                </div>
+              </div>
 
-              {/* Progress bar */}
-              <progress
-                className="progress progress-primary w-full h-1"
-                value={fileCount}
-                max={maxTotalFiles}
-              />
-
-              {/* File list with smooth scrolling */}
-              <div className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                {files.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-base-100 rounded-lg hover:bg-base-300 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      {/* File icon */}
-                      <div className="avatar placeholder">
-                        <div className="bg-neutral text-neutral-content rounded w-10 h-10">
-                          <span className="text-xs">
-                            {file.name
-                              .split(".")
-                              .pop()
-                              ?.toUpperCase()
-                              .slice(0, 3)}
+              <div className="overflow-x-auto max-h-96 custom-scrollbar">
+                <table className="table table-zebra table-sm">
+                  <thead>
+                    <tr>
+                      <th>{t("upload.UnifiedUploadSection.table.file")}</th>
+                      <th>{t("upload.UnifiedUploadSection.table.size")}</th>
+                      <th>{t("upload.UnifiedUploadSection.table.status")}</th>
+                      <th className="w-56">
+                        {t("upload.UnifiedUploadSection.table.progress")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {queueRows.map((row) => (
+                      <tr key={row.key}>
+                        <td>
+                          <div className="max-w-md">
+                            <div
+                              className="font-medium truncate"
+                              title={row.fileName}
+                            >
+                              {row.fileName}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              {row.isChunked && (
+                                <span className="badge badge-xs badge-outline">
+                                  {t("upload.FileUploadProgress.chunked_badge")}
+                                </span>
+                              )}
+                              {row.error && (
+                                <span
+                                  className="text-xs text-error truncate"
+                                  title={row.error}
+                                >
+                                  {row.error}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap">
+                          {typeof row.size === "number"
+                            ? formatBytes(row.size)
+                            : "-"}
+                        </td>
+                        <td>
+                          <span
+                            className={`badge badge-sm ${getStatusBadgeClass(row.status)}`}
+                          >
+                            {getStatusText(row.status)}
                           </span>
-                        </div>
-                      </div>
-
-                      {/* File info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {file.name}
-                        </p>
-                        <p className="text-xs text-base-content/60">
-                          {(file.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            <progress
+                              className={`progress w-full h-2 ${getProgressClass(row.status)}`}
+                              value={row.progress}
+                              max="100"
+                            />
+                            <span className="text-xs font-medium tabular-nums min-w-10 text-right">
+                              {row.progress.toFixed(0)}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Individual File Upload Progress */}
-      {fileProgress.length > 0 && (
-        <div className="mt-6">
-          <FileUploadProgress fileProgress={fileProgress} />
         </div>
       )}
 

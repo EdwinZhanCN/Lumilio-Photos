@@ -2,10 +2,21 @@ import {
   createContext,
   useContext,
   useState,
+  useCallback,
   ReactNode,
   Dispatch,
   SetStateAction,
 } from "react";
+
+export type GlobalMessageType = "success" | "error" | "hint" | "info";
+
+export interface GlobalNotification {
+  id: string;
+  type: GlobalMessageType;
+  message: string;
+  createdAt: number;
+  read: boolean;
+}
 
 // 1. Define the shape of your GlobalContext
 interface GlobalContextType {
@@ -17,6 +28,16 @@ interface GlobalContextType {
   setHint: Dispatch<SetStateAction<string>>;
   info: string;
   setInfo: Dispatch<SetStateAction<string>>;
+  notifications: GlobalNotification[];
+  addNotification: (
+    type: GlobalMessageType,
+    message: string,
+    options?: { duration?: number },
+  ) => string | null;
+  removeNotification: (id: string) => void;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  clearNotifications: () => void;
   online: boolean;
   setOnline: Dispatch<SetStateAction<boolean>>;
 }
@@ -31,6 +52,12 @@ const defaultContext: GlobalContextType = {
   setHint: () => {},
   info: "",
   setInfo: () => {},
+  notifications: [],
+  addNotification: () => null,
+  removeNotification: () => {},
+  markNotificationRead: () => {},
+  markAllNotificationsRead: () => {},
+  clearNotifications: () => {},
   online: false,
   setOnline: () => {},
 };
@@ -49,7 +76,58 @@ export default function GlobalProvider({ children }: GlobalProviderProps) {
   const [success, setSuccess] = useState("");
   const [hint, setHint] = useState("");
   const [info, setInfo] = useState("");
+  const [notifications, setNotifications] = useState<GlobalNotification[]>([]);
   const [online, setOnline] = useState(false);
+
+  const removeNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const addNotification = useCallback(
+    (
+      type: GlobalMessageType,
+      message: string,
+      options?: { duration?: number },
+    ) => {
+      const trimmed = message.trim();
+      if (!trimmed) return null;
+
+      const id =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      setNotifications((prev) => {
+        const next: GlobalNotification = {
+          id,
+          type,
+          message: trimmed,
+          createdAt: Date.now(),
+          read: false,
+        };
+        return [next, ...prev].slice(0, 200);
+      });
+
+      void options;
+
+      return id;
+    },
+    [],
+  );
+
+  const markNotificationRead = useCallback((id: string) => {
+    setNotifications((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, read: true } : item)),
+    );
+  }, []);
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+  }, []);
+
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
 
   return (
     <GlobalContext.Provider
@@ -62,6 +140,12 @@ export default function GlobalProvider({ children }: GlobalProviderProps) {
         setHint,
         info,
         setInfo,
+        notifications,
+        addNotification,
+        removeNotification,
+        markNotificationRead,
+        markAllNotificationsRead,
+        clearNotifications,
         online,
         setOnline,
       }}

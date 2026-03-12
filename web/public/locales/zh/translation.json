@@ -18,6 +18,12 @@
         "theme": {
             "light": "浅色",
             "dark": "深色"
+        },
+        "notifications": {
+            "title": "消息中心",
+            "empty": "暂无消息。",
+            "markAllRead": "全部标记为已读",
+            "clear": "清空消息"
         }
     },
     "search": {
@@ -498,7 +504,14 @@
             "server_in_flight": "进行中的请求",
             "server_active_sessions": "活跃会话",
             "server_completed_files": "已完成文件",
-            "server_failed_sessions": "失败会话"
+            "server_failed_sessions": "失败会话",
+            "queue_title": "上传队列",
+            "table": {
+                "file": "文件",
+                "size": "大小",
+                "status": "状态",
+                "progress": "进度"
+            }
         },
         "FileUploadProgress": {
             "title": "文件上传进度",
