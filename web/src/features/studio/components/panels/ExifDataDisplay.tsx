@@ -10,12 +10,19 @@ type ExifDataDisplayProps = {
 };
 
 // Helper function to format EXIF values for better readability
-const formatExifValue = (key: string, value: any): string => {
-  if (value === null || value === undefined || value === "") return "N/A";
-  if (typeof value === "string" && value.trim() === "") return "N/A";
+const formatExifValue = (
+  key: string,
+  value: any,
+  options: {
+    naText: string;
+    locale: string;
+  },
+): string => {
+  if (value === null || value === undefined || value === "") return options.naText;
+  if (typeof value === "string" && value.trim() === "") return options.naText;
 
   if (key.toLowerCase().includes("date") && !isNaN(new Date(value).getTime())) {
-    return new Date(value).toLocaleString();
+    return new Date(value).toLocaleString(options.locale);
   }
   if (
     key.toLowerCase().includes("exposuretime") &&
@@ -97,7 +104,7 @@ const processExifData = (
 };
 
 export function ExifDataDisplay({ exifData, isLoading }: ExifDataDisplayProps) {
-  const { t } = useI18n();
+  const { t, i18n } = useI18n();
   const entries = processExifData(exifData);
 
   const handleDownload = () => {
@@ -140,8 +147,8 @@ export function ExifDataDisplay({ exifData, isLoading }: ExifDataDisplayProps) {
           className="btn btn-ghost btn-sm"
           onClick={handleDownload}
           disabled={isLoading || !exifData}
-          title="Download JSON"
-          aria-label="Download JSON"
+          title={t("studio.exif.download")}
+          aria-label={t("studio.exif.download")}
         >
           <ArrowDownTrayIcon className="w-5 h-5" />
         </button>
@@ -171,7 +178,10 @@ export function ExifDataDisplay({ exifData, isLoading }: ExifDataDisplayProps) {
                   {key}
                 </div>
                 <div className="text-xs flex-1 break-words font-mono text-right">
-                  {formatExifValue(key, value)}
+                  {formatExifValue(key, value, {
+                    naText: t("common.na"),
+                    locale: i18n.resolvedLanguage || i18n.language,
+                  })}
                 </div>
               </div>
             ))}

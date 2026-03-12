@@ -178,25 +178,19 @@ function UnifiedUploadSection(): React.JSX.Element {
                   <div className="mt-2 space-y-1 text-xs text-base-content/70">
                     <p>
                       <span className="font-medium">
-                        {t("upload.UnifiedUploadSection.server_chunk_size", {
-                          defaultValue: "Server chunk size",
-                        })}
+                        {t("upload.UnifiedUploadSection.server_chunk_size")}
                       </span>{" "}
                       {formatBytes(uploadConfig.chunk_size)}
                     </p>
                     <p>
                       <span className="font-medium">
-                        {t("upload.UnifiedUploadSection.server_concurrency", {
-                          defaultValue: "Server concurrency",
-                        })}
+                        {t("upload.UnifiedUploadSection.server_concurrency")}
                       </span>{" "}
                       {uploadConfig.max_concurrent ?? "-"}
                     </p>
                     <p>
                       <span className="font-medium">
-                        {t("upload.UnifiedUploadSection.server_in_flight", {
-                          defaultValue: "In-flight requests",
-                        })}
+                        {t("upload.UnifiedUploadSection.server_in_flight")}
                       </span>{" "}
                       {uploadConfig.max_in_flight_requests ?? "-"}
                     </p>
@@ -354,9 +348,7 @@ function UnifiedUploadSection(): React.JSX.Element {
           <div className="card-body p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium">
-                {t("upload.UnifiedUploadSection.server_progress_label", {
-                  defaultValue: "Server processing",
-                })}
+                {t("upload.UnifiedUploadSection.server_progress_label")}
               </span>
               {typeof serverSummary?.overall_progress === "number" && (
                 <span className="text-sm font-bold text-primary">
@@ -376,21 +368,15 @@ function UnifiedUploadSection(): React.JSX.Element {
             {serverSummary && (
               <div className="mt-2 flex flex-wrap gap-4 text-xs text-base-content/70">
                 <span>
-                  {t("upload.UnifiedUploadSection.server_active_sessions", {
-                    defaultValue: "Active sessions",
-                  })}
+                  {t("upload.UnifiedUploadSection.server_active_sessions")}
                   : {serverSummary.active_sessions ?? 0}
                 </span>
                 <span>
-                  {t("upload.UnifiedUploadSection.server_completed_files", {
-                    defaultValue: "Completed files",
-                  })}
+                  {t("upload.UnifiedUploadSection.server_completed_files")}
                   : {serverSummary.completed_files ?? 0}
                 </span>
                 <span>
-                  {t("upload.UnifiedUploadSection.server_failed_sessions", {
-                    defaultValue: "Failed sessions",
-                  })}
+                  {t("upload.UnifiedUploadSection.server_failed_sessions")}
                   : {serverSummary.failed_sessions ?? 0}
                 </span>
               </div>

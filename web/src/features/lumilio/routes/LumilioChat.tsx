@@ -6,6 +6,7 @@ import { LumilioChatProvider } from "../LumilioChatProvider";
 import { useLumilioChat } from "../hooks/useLumilioChat";
 import { LumilioInput, LumilioMessages } from "../components/LumilioChat";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
+import { useI18n } from "@/lib/i18n.tsx";
 
 /** Main chat interface component that displays conversation and handles user input.
  *
@@ -14,6 +15,7 @@ import { useCapabilities } from "@/lib/capabilities/useCapabilities";
  * actions for sending messages and resuming conversations after interrupts.
  */
 const ChatInterface: React.FC = () => {
+  const { t } = useI18n();
   const { state, sendMessage, resumeConversation, dispatch } = useLumilioChat();
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const { capabilities } = useCapabilities(5000);
@@ -23,9 +25,9 @@ const ChatInterface: React.FC = () => {
   );
   const agentDisabledReason =
     capabilities && !capabilities.llm.agentEnabled
-      ? "Lumilio Agent is disabled. Enable it in Settings > AI."
+      ? t("lumilio.agent.disabled")
       : capabilities && !capabilities.llm.configured
-        ? "Lumilio Agent is not configured. Complete provider, model and API key in Settings > AI."
+        ? t("lumilio.agent.notConfigured")
         : null;
 
   /** Handles submission of user messages to the agent.
@@ -65,7 +67,7 @@ const ChatInterface: React.FC = () => {
         {state.conversation.length === 0 && !state.isGenerating ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center text-base-content/60">
-              <p>Start a conversation with Lumilio!</p>
+              <p>{t("lumilio.chat.empty")}</p>
             </div>
           </div>
         ) : (
@@ -82,27 +84,29 @@ const ChatInterface: React.FC = () => {
           <div className="px-4 py-3 border-b border-base-300 bg-warning/10 text-sm">
             <span>{agentDisabledReason}</span>{" "}
             <Link className="link link-hover" to="/settings?tab=ai">
-              Open AI settings
+              {t("lumilio.chat.openAiSettings")}
             </Link>
           </div>
         )}
 
         {rootCauseInterrupt?.Info && (
           <div className="p-4 border-b border-base-300 bg-warning/10">
-            <h4 className="font-bold text-warning">Confirmation Required</h4>
+            <h4 className="font-bold text-warning">
+              {t("lumilio.chat.confirmation.title")}
+            </h4>
             <p className="text-sm my-2">{rootCauseInterrupt.Info.message}</p>
             <div className="flex gap-2">
               <button
                 className="btn btn-sm btn-success"
                 onClick={() => handleConfirmation(true)}
               >
-                Confirm
+                {t("lumilio.chat.confirmation.confirm")}
               </button>
               <button
                 className="btn btn-sm btn-error"
                 onClick={() => handleConfirmation(false)}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
             </div>
           </div>

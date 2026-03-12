@@ -2,6 +2,7 @@ import { useRef, useEffect } from "react";
 import { Markdown } from "../LumilioMarkdown/Markdown";
 import { LumilioAvatar } from "../LumilioAvatar/LumilioAvatar";
 import type { ChatMessage } from "@/features/lumilio/lumilio.type.ts";
+import { useI18n } from "@/lib/i18n.tsx";
 
 /** Processes thinking tags in markdown content for display.
  *
@@ -14,6 +15,7 @@ import type { ChatMessage } from "@/features/lumilio/lumilio.type.ts";
  */
 function processThinkTags(
   content: string,
+  thinkingSummary: string,
   isStreaming: boolean = false,
 ): string {
   const openTags = (content.match(/<think>/g) || []).length;
@@ -26,13 +28,13 @@ function processThinkTags(
     processed = processed.replace(/<think>/g, () => {
       openTagsReplaced++;
       return openTagsReplaced === openTags
-        ? "<details open><summary> Thinking...</summary>"
-        : "<details><summary> Thinking...</summary>";
+        ? `<details open><summary> ${thinkingSummary}</summary>`
+        : `<details><summary> ${thinkingSummary}</summary>`;
     });
   } else {
     processed = processed.replace(
       /<think>/g,
-      "<details><summary> Thinking...</summary>",
+      `<details><summary> ${thinkingSummary}</summary>`,
     );
   }
   processed = processed.replace(/<\/think>/g, "</details>");
@@ -57,6 +59,7 @@ export function LumilioMessages({
   conversation,
   isGenerating,
 }: LumilioMessagesProps) {
+  const { t } = useI18n();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,7 +96,11 @@ export function LumilioMessages({
             >
               {message.content && (
                 <Markdown
-                  content={processThinkTags(message.content, isStreamingHere)}
+                  content={processThinkTags(
+                    message.content,
+                    t("lumilio.messages.thinking"),
+                    isStreamingHere,
+                  )}
                   className={`${message.role === "user" ? "" : "mx-6 my-4"}`}
                 />
               )}

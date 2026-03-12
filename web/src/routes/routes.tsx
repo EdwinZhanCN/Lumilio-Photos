@@ -5,10 +5,8 @@ import { WorkerProvider } from "@/contexts/WorkerProvider";
 import Settings from "@/features/settings/routes/Settings";
 import Monitor from "@/features/monitor/routes/Monitor";
 import UploadAssets from "@/features/upload/routes/UploadAssets";
-import { Portfolio } from "@/features/portfolio";
 import Collections from "@/features/collections/routes/Collections";
 import AlbumDetails from "@/features/collections/routes/AlbumDetails";
-import Updates from "@/features/updates/routes/Updates";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
 import { AssetsProvider } from "@/features/assets";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
@@ -43,10 +41,10 @@ export const appRoutes = [
     path: "/",
     element: <Home />,
   },
-  {
-    path: "/updates",
-    element: <Updates />,
-  },
+  // {
+  //   path: "/updates",
+  //   element: <Updates />,
+  // },
   {
     path: "/settings",
     element: <Settings />,
@@ -115,8 +113,8 @@ export const appRoutes = [
       </AssetsProvider>
     ),
   },
-  {
-    path: "/portfolio",
-    element: <Portfolio />,
-  },
+  // {
+  //   path: "/portfolio",
+  //   element: <Portfolio />,
+  // },
 ];

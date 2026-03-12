@@ -82,9 +82,7 @@ function CollectionsContent() {
       await queryClient.invalidateQueries({ queryKey: ["albums"] });
       showMessage(
         "success",
-        t("collections.deleteSuccess", {
-          defaultValue: "Albums deleted successfully",
-        }),
+        t("collections.messages.deleteSuccess"),
       );
       dispatch({ type: "CLEAR_SELECTION" });
       dispatch({ type: "TOGGLE_SELECTION_MODE" });
@@ -93,9 +91,7 @@ function CollectionsContent() {
       console.error("Failed to delete albums:", error);
       showMessage(
         "error",
-        t("collections.deleteError", {
-          defaultValue: "Failed to delete albums",
-        }),
+        t("collections.messages.deleteError"),
       );
     } finally {
       setIsDeleting(false);
@@ -178,8 +174,8 @@ function CollectionsContent() {
               className="btn btn-outline btn-wide"
             >
               {isFetchingNextPage
-                ? t("common.loading", { defaultValue: "Loading..." })
-                : t("common.loadMore", { defaultValue: "Load More" })}
+                ? t("common.loading")
+                : t("common.loadMore")}
             </button>
           </div>
         )}
@@ -193,20 +189,21 @@ function CollectionsContent() {
           <div className="modal-box border-t-4 border-error">
             <div className="flex items-center gap-3 text-error mb-4">
               <AlertTriangle size={24} />
-              <h3 className="font-bold text-lg">Delete Albums</h3>
+              <h3 className="font-bold text-lg">
+                {t("collections.deleteModal.title")}
+              </h3>
             </div>
             <p className="py-4">
-              Are you sure you want to delete{" "}
-              <strong>{selectedAlbumIds.length}</strong> selected albums? This
-              will only delete the collections, your photos will remain safe in
-              your library.
+              {t("collections.deleteModal.description", {
+                count: selectedAlbumIds.length,
+              })}
             </p>
             <div className="modal-action">
               <button
                 className="btn btn-ghost"
                 onClick={() => setIsDeleteConfirmOpen(false)}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 className={`btn btn-error gap-2 ${isDeleting ? "loading" : ""}`}
@@ -214,7 +211,9 @@ function CollectionsContent() {
                 disabled={isDeleting}
               >
                 {!isDeleting && <Trash2 size={18} />}
-                {isDeleting ? "Deleting..." : "Delete Collections"}
+                {isDeleting
+                  ? t("collections.deleteModal.deleting")
+                  : t("collections.deleteModal.confirm")}
               </button>
             </div>
           </div>
@@ -229,10 +228,16 @@ function CollectionsContent() {
 }
 
 function Collections() {
+  const { t } = useI18n();
+
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack code={500} title="Something went wrong" {...props} />
+        <ErrorFallBack
+          code={500}
+          title={t("assets.errorFallback.something_went_wrong")}
+          {...props}
+        />
       )}
     >
       <CollectionsProvider>

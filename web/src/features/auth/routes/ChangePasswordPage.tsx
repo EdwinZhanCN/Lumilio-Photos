@@ -125,7 +125,9 @@ export default function ChangePasswordPage(): React.ReactNode {
               <div className="inline-flex items-center gap-4 text-3xl font-bold tracking-tight text-base-content sm:text-4xl">
                 <img
                   src="/logo.png"
-                  alt={t("app.name") + " Logo"}
+                  alt={t("auth.common.logoAlt", {
+                    appName: t("app.name"),
+                  })}
                   className="size-10 bg-contain object-contain sm:size-12"
                 />
                 <span>{t("app.name")}</span>

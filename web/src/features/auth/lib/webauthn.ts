@@ -1,6 +1,10 @@
 export type PasskeySupport = {
   supported: boolean;
-  reason?: string;
+  reasonKey?:
+    | "auth.passkeySupport.browserOnly"
+    | "auth.passkeySupport.notSupported"
+    | "auth.passkeySupport.secureContextRequired"
+    | "auth.passkeySupport.httpsRequired";
 };
 
 function isLocalHostname(hostname: string) {
@@ -11,21 +15,21 @@ export function getPasskeySupport(): PasskeySupport {
   if (typeof window === "undefined") {
     return {
       supported: false,
-      reason: "Passkeys are only available in a browser context.",
+      reasonKey: "auth.passkeySupport.browserOnly",
     };
   }
 
   if (!("PublicKeyCredential" in window)) {
     return {
       supported: false,
-      reason: "This browser or device does not support passkeys.",
+      reasonKey: "auth.passkeySupport.notSupported",
     };
   }
 
   if (!window.isSecureContext) {
     return {
       supported: false,
-      reason: "Passkeys require a secure browser context.",
+      reasonKey: "auth.passkeySupport.secureContextRequired",
     };
   }
 
@@ -36,7 +40,7 @@ export function getPasskeySupport(): PasskeySupport {
 
   return {
     supported: false,
-    reason: "Passkeys require HTTPS outside localhost development.",
+    reasonKey: "auth.passkeySupport.httpsRequired",
   };
 }
 
@@ -152,7 +156,7 @@ function coerceRequestOptions(payload: unknown): PublicKeyCredentialRequestOptio
 function serializeCredential(credential: Credential | null) {
   const publicKeyCredential = credential as PublicKeyCredential | null;
   if (!publicKeyCredential) {
-    throw new Error("Passkey operation was cancelled.");
+    throw new Error("auth.passkeySupport.operationCancelled");
   }
 
   const response = publicKeyCredential.response;
@@ -192,7 +196,7 @@ function serializeCredential(credential: Credential | null) {
     };
   }
 
-  throw new Error("Unsupported passkey response.");
+  throw new Error("auth.passkeySupport.unsupportedResponse");
 }
 
 export async function createPasskeyCredential(options: unknown) {

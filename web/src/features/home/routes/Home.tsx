@@ -54,10 +54,16 @@ function Home() {
 
   const mapSubtitle =
     isMapLoading && mapLoadedPhotos === 0
-      ? "正在加载地图数据..."
+      ? t("home.map.loading")
       : mapPoints.length > 0
-        ? `定位照片 ${mapPoints.length} 张 / 已加载 ${mapLoadedPhotos}${mapTotalPhotos ? ` / 总计 ${mapTotalPhotos}` : ""}${isMapFetchingNextPage || mapHasNextPage ? "（继续加载中）" : ""}`
-        : "暂无带地理位置的照片";
+        ? t("home.map.loadedStatus", {
+            pointsCount: mapPoints.length,
+            loadedCount: mapLoadedPhotos,
+            totalCount: mapTotalPhotos ?? 0,
+            hasTotal: Boolean(mapTotalPhotos),
+            loadingMore: Boolean(isMapFetchingNextPage || mapHasNextPage),
+          })
+        : t("home.map.empty");
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -80,7 +86,7 @@ function Home() {
             onClick={() => setDisplayMode("gallery")}
           >
             <SparklesIcon className="size-4" />
-            {t("home.tabs.gallery", { defaultValue: "Gallery" })}
+            {t("home.tabs.gallery")}
           </button>
           <button
             type="button"
@@ -92,7 +98,7 @@ function Home() {
             onClick={() => setDisplayMode("stats")}
           >
             <CameraIcon className="size-4" />
-            {t("home.tabs.stats", { defaultValue: "Stats" })}
+            {t("home.tabs.stats")}
           </button>
         </div>
       </PageHeader>
@@ -104,8 +110,12 @@ function Home() {
               <div className="alert alert-warning">
                 <ExclamationTriangleIcon className="size-5" />
                 <span>
-                  featured 接口加载失败：
-                  {error instanceof Error ? error.message : "Unknown error"}
+                  {t("home.errors.featuredLoadFailed", {
+                    message:
+                      error instanceof Error
+                        ? error.message
+                        : t("home.errors.unknown"),
+                  })}
                 </span>
               </div>
             )}

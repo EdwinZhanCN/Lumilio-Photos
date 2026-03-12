@@ -38,15 +38,10 @@ export default function Monitor() {
       <div className="flex h-full items-center justify-center p-6">
         <div className="rounded-3xl border border-base-300 bg-base-100 p-8 text-center shadow-sm">
           <div className="text-lg font-semibold">
-            {t("monitor.adminOnlyTitle", {
-              defaultValue: "Admin access required",
-            })}
+            {t("monitor.adminOnlyTitle")}
           </div>
           <p className="mt-2 text-sm opacity-70">
-            {t("monitor.adminOnlyDescription", {
-              defaultValue:
-                "Queue monitoring and runtime diagnostics are only available to administrators.",
-            })}
+            {t("monitor.adminOnlyDescription")}
           </p>
         </div>
       </div>

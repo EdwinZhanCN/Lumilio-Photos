@@ -3,8 +3,10 @@ import React from "react";
 import { SideChannelEvent } from "@/features/lumilio/schema";
 import { useLumilioChat } from "@/features/lumilio/hooks/useLumilioChat";
 import {AssetGalleryRenderer} from "@/features/lumilio/components/ToolRenderers";
+import { useI18n } from "@/lib/i18n.tsx";
 
 export const MarkdownToolBlock: React.FC<any> = ({ id, ...props }) => {
+  const { t } = useI18n();
   const { state } = useLumilioChat();
 
   // 1. 获取原始 ID (id 或 data-id)
@@ -22,10 +24,10 @@ export const MarkdownToolBlock: React.FC<any> = ({ id, ...props }) => {
   if (!event) {
     // 调试信息：同时显示处理后的 ID 和原始 ID，方便排查
     return (
-      <div className="text-xs text-error p-2 border border-error rounded my-2">
-        Tool event not found. <br />
-        Looked for: <b>{executionId}</b> <br />
-        Received raw id: {rawId}
+        <div className="text-xs text-error p-2 border border-error rounded my-2">
+        {t("lumilio.tools.eventNotFound")} <br />
+        {t("lumilio.tools.lookedFor")}: <b>{executionId}</b> <br />
+        {t("lumilio.tools.receivedRawId")}: {rawId}
       </div>
     );
   }

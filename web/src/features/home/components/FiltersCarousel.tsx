@@ -1,5 +1,6 @@
 import React from "react";
 import { SwatchIcon } from "@heroicons/react/24/outline";
+import { useI18n } from "@/lib/i18n.tsx";
 
 export type FilterItem = {
   id?: string;
@@ -51,10 +52,10 @@ export type FiltersCarouselProps = {
 };
 
 const DEFAULT_FILTERS: FilterItem[] = [
-  { name: "胶片模拟" },
-  { name: "赛博朋克" },
-  { name: "复古褪色" },
-  { name: "黑金夜景" },
+  { name: "Film Emulation" },
+  { name: "Cyberpunk" },
+  { name: "Vintage Fade" },
+  { name: "Noir Nightscape" },
 ];
 
 const FiltersCarousel: React.FC<FiltersCarouselProps> = ({
@@ -62,15 +63,17 @@ const FiltersCarousel: React.FC<FiltersCarouselProps> = ({
   onSelect,
   onPreview,
   showPreviewButton = true,
-  previewLabel = "预览效果",
+  previewLabel,
   className = "",
   itemClassName = "",
   tileClassName = "",
 }) => {
+  const { t } = useI18n();
+  const resolvedPreviewLabel = previewLabel || t("home.filters.previewLabel");
   return (
     <section
       className={`carousel carousel-center gap-4 p-4 bg-base-200 rounded-3xl ${className}`}
-      aria-label="创意滤镜预览墙"
+      aria-label={t("home.filters.sectionAriaLabel")}
     >
       {filters.map((filter, i) => {
         const key = filter.id ?? filter.name ?? `filter-${i}`;
@@ -104,7 +107,7 @@ const FiltersCarousel: React.FC<FiltersCarouselProps> = ({
               className={`group relative w-48 h-64 bg-base-100 rounded-xl shadow-lg hover:shadow-2xl transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary ${tileClassName}`}
               role="button"
               tabIndex={0}
-              aria-label={`滤镜：${filter.name}`}
+              aria-label={t("home.filters.itemAriaLabel", { name: filter.name })}
               onClick={handleSelect}
               onKeyDown={handleKeyDown}
             >
@@ -114,12 +117,12 @@ const FiltersCarousel: React.FC<FiltersCarouselProps> = ({
                   {filter.renderContent(filter, i)}
                 </div>
               ) : filter.imageUrl ? (
-                <img
-                  src={filter.imageUrl}
-                  alt={`${filter.name} 预览`}
-                  className="absolute inset-0 h-full w-full object-cover rounded-xl"
-                  loading="lazy"
-                />
+                  <img
+                    src={filter.imageUrl}
+                    alt={t("home.filters.previewAlt", { name: filter.name })}
+                    className="absolute inset-0 h-full w-full object-cover rounded-xl"
+                    loading="lazy"
+                  />
               ) : (
                 <div className="absolute inset-0 bg-base-200 rounded-xl" />
               )}
@@ -146,9 +149,14 @@ const FiltersCarousel: React.FC<FiltersCarouselProps> = ({
                   type="button"
                   onClick={handlePreview}
                   className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 backdrop-blur-sm flex items-center justify-center rounded-xl"
-                  aria-label={`${filter.name} ${previewLabel}`}
+                  aria-label={t("home.filters.previewButtonAriaLabel", {
+                    name: filter.name,
+                    action: resolvedPreviewLabel,
+                  })}
                 >
-                  <span className="btn btn-xs btn-primary">{previewLabel}</span>
+                  <span className="btn btn-xs btn-primary">
+                    {resolvedPreviewLabel}
+                  </span>
                 </button>
               )}
             </div>

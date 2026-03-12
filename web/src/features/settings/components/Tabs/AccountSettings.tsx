@@ -285,7 +285,14 @@ function PasskeysModal({
 }: {
   passkeys: Schemas["dto.PasskeyCredentialSummaryDTO"][];
   passkeysLoading: boolean;
-  passkeySupport: { supported: boolean; reason?: string };
+  passkeySupport: {
+    supported: boolean;
+    reasonKey?:
+      | "auth.passkeySupport.browserOnly"
+      | "auth.passkeySupport.notSupported"
+      | "auth.passkeySupport.secureContextRequired"
+      | "auth.passkeySupport.httpsRequired";
+  };
   passkeyBusy: boolean;
   deleteIsPending: boolean;
   onAdd: () => void;
@@ -355,7 +362,9 @@ function PasskeysModal({
                         defaultValue:
                           "Add a passkey to sign in with your device's biometrics or security key.",
                       })
-                    : (passkeySupport.reason ?? "")}
+                    : passkeySupport.reasonKey
+                      ? t(passkeySupport.reasonKey)
+                      : ""}
                 </p>
               </div>
             </div>
@@ -850,7 +859,9 @@ export default function AccountSettings() {
                   defaultValue:
                     "Use your device's native passkey flow for sign-in.",
                 })
-              : (passkeySupport.reason ?? "")
+              : passkeySupport.reasonKey
+                ? t(passkeySupport.reasonKey)
+                : ""
           }
           badge={
             passkeys.length > 0

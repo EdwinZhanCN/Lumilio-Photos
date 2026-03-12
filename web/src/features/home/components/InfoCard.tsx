@@ -1,6 +1,7 @@
 import React from "react";
 import { GlobeAltIcon } from "@heroicons/react/24/outline";
 import { ExternalLink } from "lucide-react";
+import { useI18n } from "@/lib/i18n.tsx";
 
 export type InfoLink = {
   label: string;
@@ -90,17 +91,27 @@ const variantClasses: Record<NonNullable<InfoCardProps["variant"]>, string> = {
 };
 
 const InfoCard: React.FC<InfoCardProps> = ({
-  title = "摄影网站资讯",
-  description = "发现500px、Flickr等平台的优秀作品与摄影技巧分享",
+  title,
+  description,
   icon,
-  links = DEFAULT_LINKS,
+  links,
   actions,
   onBrowse,
-  browseLabel = "浏览资讯",
+  browseLabel,
   variant = "primary",
   className = "",
 }) => {
+  const { t } = useI18n();
   const headerId = React.useId();
+  const resolvedTitle = title ?? t("home.info.title");
+  const resolvedDescription = description ?? t("home.info.description");
+  const resolvedLinks =
+    links ??
+    DEFAULT_LINKS.map((link, index) => ({
+      ...link,
+      description: t(`home.info.links.${index}.description`),
+    }));
+  const resolvedBrowseLabel = browseLabel ?? t("home.info.browse");
 
   return (
     <section
@@ -114,17 +125,17 @@ const InfoCard: React.FC<InfoCardProps> = ({
             <span className="text-current">
               {icon ?? <GlobeAltIcon className="size-6" />}
             </span>
-            <span>{title}</span>
+            <span>{resolvedTitle}</span>
           </span>
         </h2>
 
-        {description && (
-          <p className="opacity-90 text-sm md:text-base">{description}</p>
+        {resolvedDescription && (
+          <p className="opacity-90 text-sm md:text-base">{resolvedDescription}</p>
         )}
 
-        {links && links.length > 0 && (
+        {resolvedLinks && resolvedLinks.length > 0 && (
           <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-            {links.map((link, i) => {
+            {resolvedLinks.map((link, i) => {
               const {
                 label,
                 href,
@@ -178,17 +189,17 @@ const InfoCard: React.FC<InfoCardProps> = ({
             actions
           ) : onBrowse ? (
             <button type="button" className="btn btn-secondary" onClick={onBrowse}>
-              {browseLabel}
+              {resolvedBrowseLabel}
             </button>
           ) : (
             // Fallback: If no onBrowse and no custom actions, guide the user
             <a
-              href={links?.[0]?.href ?? "#"}
+              href={resolvedLinks?.[0]?.href ?? "#"}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-secondary"
             >
-              {browseLabel}
+              {resolvedBrowseLabel}
             </a>
           )}
         </div>

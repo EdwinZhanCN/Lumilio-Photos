@@ -1,5 +1,6 @@
 import { Brain } from "lucide-react";
 import React, { useState } from "react";
+import { useI18n } from "@/lib/i18n.tsx";
 
 interface ThinkBlockProps {
   open?: boolean;
@@ -14,6 +15,7 @@ export const ThinkBlock: React.FC<ThinkBlockProps> = ({
   children,
   ...props
 }) => {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(open);
 
   const toggleOpen = () => {
@@ -33,8 +35,8 @@ export const ThinkBlock: React.FC<ThinkBlockProps> = ({
   const summaryText = summaryElement
     ? React.isValidElement(summaryElement) && summaryElement.props
       ? (summaryElement.props as any).children
-      : "Details"
-    : "Think about this...";
+      : t("lumilio.markdown.think.details")
+    : t("lumilio.markdown.think.defaultSummary");
 
   return (
     <div
