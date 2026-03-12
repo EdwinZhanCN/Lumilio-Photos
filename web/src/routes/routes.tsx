@@ -7,6 +7,7 @@ import Monitor from "@/features/monitor/routes/Monitor";
 import UploadAssets from "@/features/upload/routes/UploadAssets";
 import Collections from "@/features/collections/routes/Collections";
 import AlbumDetails from "@/features/collections/routes/AlbumDetails";
+import PersonDetails from "@/features/people/routes/PersonDetails";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
 import { AssetsProvider } from "@/features/assets";
 import LoginPage from "@/features/auth/routes/LoginPage.tsx";
@@ -60,6 +61,14 @@ export const appRoutes = [
   {
     path: "/collections/:albumId/:assetId",
     element: <AlbumDetails />,
+  },
+  {
+    path: "/people/:personId",
+    element: <PersonDetails />,
+  },
+  {
+    path: "/people/:personId/:assetId",
+    element: <PersonDetails />,
   },
   {
     path: "/assets/photos",

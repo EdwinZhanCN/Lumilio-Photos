@@ -126,14 +126,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to Initialize Queue: %v", err)
 	}
+	faceService := service.NewFaceService(queries, repoManager)
 
-	lumenService, embeddingService, err := initMLServices(ctx, queries, workers, zapLogger, settingsService)
+	lumenService, embeddingService, err := initMLServices(ctx, queries, workers, zapLogger, settingsService, faceService)
 	if err != nil {
 		log.Fatalf("Failed to initialize ML services: %v", err)
 	}
 
 	if lumenService != nil {
-		warmupTasks := []string{"clip_image_embed", "ocr", "vlm_generate", "face_detect_and_embed"}
+		warmupTasks := []string{"clip_image_embed", "clip_classify", "clip_scene_classify", "ocr", "vlm_generate", "face_detect_and_embed"}
 		lumenService.WarmupTasks(ctx, warmupTasks)
 		go func() {
 			ticker := time.NewTicker(30 * time.Second)
@@ -202,6 +203,7 @@ func main() {
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, queries, repoManager, stagingManager, queueClient)
 	authController := handler.NewAuthHandler(authService)
 	albumController := handler.NewAlbumHandler(&albumService, queries)
+	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
 	userController := handler.NewUserHandler(userService)
 	queueController := handler.NewQueueHandler(queueClient, pgxPool)
 	statsController := handler.NewStatsHandler(queries)
@@ -221,6 +223,7 @@ func main() {
 		assetController,
 		authController,
 		albumController,
+		peopleController,
 		queueController,
 		statsController,
 		agentController,
@@ -248,6 +251,7 @@ func initMLServices(
 	workers *river.Workers,
 	zapLogger *zap.Logger,
 	settingsService service.SettingsService,
+	faceService service.FaceService,
 ) (service.LumenService, service.EmbeddingService, error) {
 	log.Println("🤖 Initializing ML services...")
 
@@ -268,15 +272,14 @@ func initMLServices(
 	log.Println("✅ Lumen Service Initialized")
 
 	embeddingService := service.NewEmbeddingService(queries)
-	speciesService := service.NewSpeciesService(queries)
+	tagService := service.NewAIGeneratedTagService(queries)
 	captionService := service.NewCaptionService(queries, lumenService)
 	ocrService := service.NewOCRService(queries)
-	faceService := service.NewFaceService(queries)
 
 	river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
 		LumenService:     lumenService,
 		EmbeddingService: embeddingService,
-		SpeciesService:   speciesService,
+		TagService:       tagService,
 		ConfigProvider:   settingsService,
 	})
 	log.Println("✅ CLIP Service and Worker Registered")

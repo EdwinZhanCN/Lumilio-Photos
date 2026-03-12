@@ -25,6 +25,8 @@ export type Capabilities = {
     tasks: {
       clipImageEmbed: MLTaskCapability;
       clipTextEmbed: MLTaskCapability;
+      clipClassify: MLTaskCapability;
+      clipSceneClassify: MLTaskCapability;
       ocr: MLTaskCapability;
       vlmGenerate: MLTaskCapability;
       faceDetectAndEmbed: MLTaskCapability;
@@ -69,6 +71,10 @@ function normalizeCapabilities(
           data.ml?.tasks?.clip_image_embed,
         ),
         clipTextEmbed: normalizeTaskCapability(data.ml?.tasks?.clip_text_embed),
+        clipClassify: normalizeTaskCapability(data.ml?.tasks?.clip_classify),
+        clipSceneClassify: normalizeTaskCapability(
+          data.ml?.tasks?.clip_scene_classify,
+        ),
         ocr: normalizeTaskCapability(data.ml?.tasks?.ocr),
         vlmGenerate: normalizeTaskCapability(data.ml?.tasks?.vlm_generate),
         faceDetectAndEmbed: normalizeTaskCapability(

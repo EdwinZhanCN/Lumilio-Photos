@@ -133,13 +133,13 @@ LIMIT $2;
 -- name: GetSimilarFaces :many
 SELECT
     fi.*,
-    1 - (fi.embedding <=> $1::vector) as similarity
+    CAST(1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) AS double precision) as similarity
 FROM face_items fi
-WHERE fi.id != $2
+WHERE fi.id != sqlc.arg('id')
 AND fi.embedding IS NOT NULL
-AND 1 - (fi.embedding <=> $1::vector) >= $3
+AND 1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) >= sqlc.arg('min_similarity')::float8
 ORDER BY similarity DESC
-LIMIT $4;
+LIMIT sqlc.arg('limit');
 
 -- name: GetFaceStatsByModel :many
 SELECT

@@ -91,6 +91,14 @@ type AlbumControllerInterface interface {
 	GetAssetAlbums(c *gin.Context)
 }
 
+type PeopleControllerInterface interface {
+	ListPeople(c *gin.Context)
+	GetPerson(c *gin.Context)
+	GetPersonCover(c *gin.Context)
+	UpdatePerson(c *gin.Context)
+	ListPersonAssets(c *gin.Context)
+}
+
 // QueueControllerInterface defines the interface for queue monitoring controllers
 type QueueControllerInterface interface {
 	ListJobs(c *gin.Context)
@@ -139,6 +147,7 @@ func NewRouter(
 	assetController AssetControllerInterface,
 	authController AuthControllerInterface,
 	albumController AlbumControllerInterface,
+	peopleController PeopleControllerInterface,
 	queueController QueueControllerInterface,
 	statsController StatsControllerInterface,
 	agentController AgentControllerInterface,
@@ -269,6 +278,16 @@ func NewRouter(
 			albums.POST("/:id/assets/:assetId", albumController.AddAssetToAlbum)
 			albums.DELETE("/:id/assets/:assetId", albumController.RemoveAssetFromAlbum)
 			albums.PUT("/:id/assets/:assetId/position", albumController.UpdateAssetPositionInAlbum)
+		}
+
+		people := v1.Group("/people")
+		people.Use(authController.OptionalAuthMiddleware())
+		{
+			people.GET("", peopleController.ListPeople)
+			people.GET("/:id", peopleController.GetPerson)
+			people.GET("/:id/cover", peopleController.GetPersonCover)
+			people.PATCH("/:id", authController.AuthMiddleware(), peopleController.UpdatePerson)
+			people.POST("/:id/assets/list", peopleController.ListPersonAssets)
 		}
 
 		// Admin routes for queue monitoring (read-only)

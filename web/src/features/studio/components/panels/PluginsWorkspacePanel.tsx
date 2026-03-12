@@ -11,7 +11,6 @@ type PluginsWorkspacePanelProps = {
   pluginRuntimeEnabled: boolean;
   installedPlugins: InstalledPluginRecord[];
   selectedPluginId: string | null;
-  onSelectPlugin: (pluginId: string) => void;
   pluginUiModule: StudioPluginUiModule | null;
   pluginParams: Record<string, unknown>;
   onPluginParamsChange: (next: Record<string, unknown>) => void;
@@ -26,7 +25,6 @@ export function PluginsWorkspacePanel({
   pluginRuntimeEnabled,
   installedPlugins,
   selectedPluginId,
-  onSelectPlugin,
   pluginUiModule,
   pluginParams,
   onPluginParamsChange,
@@ -71,56 +69,35 @@ export function PluginsWorkspacePanel({
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
-          <div className="rounded-lg bg-base-100 p-2 overflow-x-auto">
-            <div className="flex gap-2 min-w-max">
-              {installedPlugins.map((item) => {
-                const isActive = item.pluginId === selectedPluginId;
-                return (
-                  <button
-                    key={`${item.pluginId}@${item.version}`}
-                    type="button"
-                    className={`btn btn-sm ${isActive ? "btn-primary" : "btn-ghost"}`}
-                    onClick={() => onSelectPlugin(item.pluginId)}
-                    disabled={isGenerating}
-                  >
-                    {item.pluginId}@{item.version}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+        <div className="rounded-lg bg-base-100 p-4 space-y-3">
+          {pluginLoading && (
+            <p className="text-sm text-base-content/70">
+              {t("studio.plugins.loading")}
+            </p>
+          )}
 
-          <div className="rounded-lg bg-base-100 p-4 space-y-3">
-            {pluginLoading && (
-              <p className="text-sm text-base-content/70">
-                {t("studio.plugins.loading")}
-              </p>
+          {pluginError && <p className="text-sm text-error">{pluginError}</p>}
+
+          {pluginUiModule && !pluginLoading && (
+            <pluginUiModule.Panel
+              value={pluginParams}
+              onChange={onPluginParamsChange}
+              disabled={isGenerating}
+            />
+          )}
+
+          <button
+            type="button"
+            className="btn btn-primary w-full"
+            onClick={onGeneratePlugin}
+            disabled={isGenerating || !pluginUiModule || !selectedPluginId}
+          >
+            {isGenerating ? (
+              <span className="loading loading-spinner"></span>
+            ) : (
+              t("studio.plugins.apply")
             )}
-
-            {pluginError && <p className="text-sm text-error">{pluginError}</p>}
-
-            {pluginUiModule && !pluginLoading && (
-              <pluginUiModule.Panel
-                value={pluginParams}
-                onChange={onPluginParamsChange}
-                disabled={isGenerating}
-              />
-            )}
-
-            <button
-              type="button"
-              className="btn btn-primary w-full"
-              onClick={onGeneratePlugin}
-              disabled={isGenerating || !pluginUiModule || !selectedPluginId}
-            >
-              {isGenerating ? (
-                <span className="loading loading-spinner"></span>
-              ) : (
-                t("studio.plugins.apply")
-              )}
-            </button>
-          </div>
+          </button>
         </div>
       )}
     </div>

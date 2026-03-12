@@ -5546,6 +5546,439 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List people
+         * @description List recognized people for the current repository scope.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                    /** @description Maximum number of results (max 100) */
+                    limit?: number;
+                    /** @description Number of results to skip */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description People listed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/people/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get person
+         * @description Get a single recognized person by cluster ID.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Person ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Person fetched successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Person not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update person
+         * @description Rename a recognized person. Successful updates mark the person as confirmed.
+         */
+        patch: {
+            parameters: {
+                query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Person ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            /** @description Person update payload */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.UpdatePersonRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Person updated successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Person not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/api/v1/people/{id}/assets/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List person assets
+         * @description List assets scoped to a specific person while reusing the unified asset query filters.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Person ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            /** @description Asset query parameters */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.AssetQueryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Assets listed successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Person not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Semantic search unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/people/{id}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get person cover
+         * @description Serve the representative face crop image for a recognized person.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Person ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Face crop */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/webp": Record<string, never>;
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/webp": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/webp": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Person cover not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/webp": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "image/webp": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/system": {
         parameters: {
             query?: never;
@@ -7085,6 +7518,12 @@ export interface components {
             offset?: number;
             total?: number;
         };
+        "dto.ListPeopleResponseDTO": {
+            limit?: number;
+            offset?: number;
+            people?: components["schemas"]["dto.PersonSummaryDTO"][];
+            total?: number;
+        };
         "dto.ListUsersResponseDTO": {
             limit?: number;
             offset?: number;
@@ -7124,7 +7563,9 @@ export interface components {
             enabled?: boolean;
         };
         "dto.MLTaskSetDTO": {
+            clip_classify?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             clip_image_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+            clip_scene_classify?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             clip_text_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             face_detect_and_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             ocr?: components["schemas"]["dto.MLTaskCapabilityDTO"];
@@ -7184,6 +7625,28 @@ export interface components {
         "dto.PasskeyVerifyRequestDTO": {
             challenge_token: string;
             credential: unknown;
+        };
+        "dto.PersonDetailDTO": {
+            asset_count?: number;
+            cover_face_image_path?: string;
+            created_at?: string;
+            is_confirmed?: boolean;
+            member_count?: number;
+            name?: string;
+            person_id?: number;
+            representative_asset_id?: string;
+            updated_at?: string;
+        };
+        "dto.PersonSummaryDTO": {
+            asset_count?: number;
+            cover_face_image_path?: string;
+            created_at?: string;
+            is_confirmed?: boolean;
+            member_count?: number;
+            name?: string;
+            person_id?: number;
+            representative_asset_id?: string;
+            updated_at?: string;
         };
         "dto.ProgressSummaryDTO": {
             active_sessions?: number;
@@ -7420,6 +7883,9 @@ export interface components {
             avatar_url?: string;
             /** @example Alex Chen */
             display_name?: string;
+        };
+        "dto.UpdatePersonRequestDTO": {
+            name: string;
         };
         "dto.UpdateRatingAndLikeRequestDTO": {
             /** @example true */

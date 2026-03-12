@@ -22,6 +22,7 @@ type DirectoryStructure struct {
 	ThumbnailsDir string // .lumilio/assets/thumbnails
 	VideosDir     string // .lumilio/assets/videos
 	AudiosDir     string // .lumilio/assets/audios
+	FacesDir      string // .lumilio/assets/faces
 	StagingDir    string // .lumilio/staging
 	TempDir       string // .lumilio/temp
 	TrashDir      string // .lumilio/trash
@@ -40,6 +41,7 @@ var DefaultStructure = DirectoryStructure{
 	ThumbnailsDir: ".lumilio/assets/thumbnails",
 	VideosDir:     ".lumilio/assets/videos",
 	AudiosDir:     ".lumilio/assets/audios",
+	FacesDir:      ".lumilio/assets/faces",
 	StagingDir:    ".lumilio/staging",
 	TempDir:       ".lumilio/temp",
 	TrashDir:      ".lumilio/trash",
@@ -59,6 +61,7 @@ var Directories = []string{
 	".lumilio/assets/videos/web",
 	".lumilio/assets/audios",
 	".lumilio/assets/audios/web",
+	".lumilio/assets/faces",
 	".lumilio/staging",          // Upload staging area
 	".lumilio/staging/incoming", // Upload staging area
 	".lumilio/staging/failed",   // Upload staging area
@@ -307,6 +310,7 @@ func (dm *DefaultDirectoryManager) ProtectSystemDirectories(repoPath string) err
 		DefaultStructure.ThumbnailsDir: 0755, // rwxr-xr-x
 		DefaultStructure.VideosDir:     0755, // rwxr-xr-x
 		DefaultStructure.AudiosDir:     0755, // rwxr-xr-x
+		DefaultStructure.FacesDir:      0755, // rwxr-xr-x
 		DefaultStructure.StagingDir:    0700, // rwx------ (app-only)
 		DefaultStructure.TempDir:       0700, // rwx------
 		DefaultStructure.TrashDir:      0755, // rwxr-xr-x

@@ -63,6 +63,7 @@
         "home": "首页",
         "assets": "资产",
         "collections": "合集",
+        "people": "人物",
         "studio": "工作室",
         "portfolio": "作品集",
         "upload": "上传照片",
@@ -81,7 +82,14 @@
         },
         "errors": {
             "featuredLoadFailed": "精选资源加载失败：{{message}}",
+            "peopleLoadFailed": "人物列表加载失败：{{message}}",
             "unknown": "未知错误"
+        },
+        "people": {
+            "eyebrow": "人物",
+            "title": "已识别的人脸",
+            "subtitle": "这里会显示资料库中识别到的人物，未命名人物也会直接出现。",
+            "empty": "还没有识别出人物。等人脸处理完成后，这里会自动出现。"
         },
         "map": {
             "title": "时空轨迹",
@@ -197,6 +205,23 @@
             "itemsCount_other": "{{count}} 项",
             "createdAtLabel": "创建于",
             "loadError": "加载相册失败：{{error}}"
+        }
+    },
+    "people": {
+        "unnamed": "未命名",
+        "confirmed": "已命名",
+        "membersCount_one": "{{count}} 张脸",
+        "membersCount_other": "{{count}} 张脸",
+        "photosCount_one": "{{count}} 张照片",
+        "photosCount_other": "{{count}} 张照片",
+        "details": {
+            "loadError": "加载人物详情失败：{{error}}",
+            "personCode": "人物 {{id}}",
+            "confirmedHint": "这个人物已经确认并命名。",
+            "unconfirmedHint": "这个人物还未命名，确认后可以直接填写名字。",
+            "renamePlaceholder": "为这个人物命名",
+            "save": "保存",
+            "updatedLabel": "更新于"
         }
     },
     "assets": {
@@ -868,6 +893,8 @@
             "taskNames": {
                 "clipImageEmbed": "CLIP 图像嵌入",
                 "clipTextEmbed": "CLIP 文本嵌入",
+                "clipClassify": "CLIP 分类",
+                "clipSceneClassify": "CLIP 场景分类",
                 "ocr": "OCR",
                 "vlmGenerate": "VLM 描述",
                 "faceDetectAndEmbed": "人脸检测与嵌入"

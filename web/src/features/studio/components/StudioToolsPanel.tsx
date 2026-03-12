@@ -1,4 +1,4 @@
-import { PanelType } from "../routes/Studio";
+import type { PanelType } from "../routes/Studio";
 import { ExifDataDisplay } from "./panels/ExifDataDisplay";
 import { DevelopPanel } from "./panels/DevelopPanel";
 import { MarketplacePanel } from "./panels/MarketplacePanel";
@@ -32,7 +32,6 @@ type StudioToolsPanelProps = {
   installedPlugins: InstalledPluginRecord[];
   catalogPlugins: CatalogPluginSummary[];
   selectedPluginId: string | null;
-  onSelectPlugin: (pluginId: string) => void;
   onInstallPlugin: (pluginId: string, version: string) => void;
   onUninstallPlugin: (pluginId: string) => void;
   isPluginInstalled: (pluginId: string, version?: string) => boolean;
@@ -64,7 +63,6 @@ export function StudioToolsPanel({
   installedPlugins,
   catalogPlugins,
   selectedPluginId,
-  onSelectPlugin,
   onInstallPlugin,
   onUninstallPlugin,
   isPluginInstalled,
@@ -121,7 +119,6 @@ export function StudioToolsPanel({
             pluginRuntimeEnabled={pluginRuntimeEnabled}
             installedPlugins={installedPlugins}
             selectedPluginId={selectedPluginId}
-            onSelectPlugin={onSelectPlugin}
             pluginUiModule={pluginUiModule}
             pluginParams={pluginParams}
             onPluginParamsChange={onPluginParamsChange}

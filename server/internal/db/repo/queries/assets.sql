@@ -216,6 +216,11 @@ SET confidence = $3, source = $4;
 DELETE FROM asset_tags
 WHERE asset_id = $1 AND tag_id = $2;
 
+-- name: RemoveAssetTagsBySources :exec
+DELETE FROM asset_tags
+WHERE asset_id = $1
+  AND source = ANY(sqlc.arg('sources')::text[]);
+
 -- name: FilterAssets :many
 SELECT a.* FROM assets a
 LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
@@ -575,6 +580,16 @@ WITH page_ids AS MATERIALIZED (
     AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
     AND (
+      sqlc.narg('person_id')::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = sqlc.narg('person_id')
+          AND fi_person.asset_id = a.asset_id
+      )
+    )
+    AND (
       sqlc.narg('album_id')::integer IS NULL
       OR EXISTS (
         SELECT 1
@@ -628,6 +643,16 @@ WITH candidate_ids AS MATERIALIZED (
     AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
     AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
     AND (
+      sqlc.narg('person_id')::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = sqlc.narg('person_id')
+          AND fi_person.asset_id = a.asset_id
+      )
+    )
+    AND (
       sqlc.narg('album_id')::integer IS NULL
       OR EXISTS (
         SELECT 1
@@ -674,6 +699,16 @@ WHERE a.is_deleted = false
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (
+    sqlc.narg('person_id')::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM face_cluster_members fcm
+      JOIN face_items fi_person ON fi_person.id = fcm.face_id
+      WHERE fcm.cluster_id = sqlc.narg('person_id')
+        AND fi_person.asset_id = a.asset_id
+    )
+  )
+  AND (
     sqlc.narg('album_id')::integer IS NULL
     OR EXISTS (
       SELECT 1
@@ -713,6 +748,16 @@ WHERE a.is_deleted = false
   AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+  AND (
+    sqlc.narg('person_id')::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM face_cluster_members fcm
+      JOIN face_items fi_person ON fi_person.id = fcm.face_id
+      WHERE fcm.cluster_id = sqlc.narg('person_id')
+        AND fi_person.asset_id = a.asset_id
+    )
+  )
   AND (
     sqlc.narg('album_id')::integer IS NULL
     OR EXISTS (

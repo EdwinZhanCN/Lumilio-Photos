@@ -3,11 +3,11 @@ package queue
 import (
 	"context"
 	"fmt"
-	"server/internal/db/dbtypes"
 	"server/internal/queue/jobs"
 	"server/internal/service"
 	"time"
 
+	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
@@ -20,7 +20,7 @@ type ProcessClipWorker struct {
 	river.WorkerDefaults[ProcessClipArgs]
 	EmbeddingService service.EmbeddingService
 	LumenService     service.LumenService
-	SpeciesService   service.SpeciesService
+	TagService       service.AIGeneratedTagService
 	ConfigProvider   MLConfigProvider
 }
 
@@ -46,8 +46,13 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 	if w.LumenService == nil {
 		return river.JobSnooze(30 * time.Second)
 	}
-	if !w.LumenService.IsTaskAvailable("clip_image_embed") || !w.LumenService.IsTaskAvailable("bioclip_classify") {
+	if !w.LumenService.IsTaskAvailable("clip_image_embed") ||
+		!w.LumenService.IsTaskAvailable("clip_classify") ||
+		!w.LumenService.IsTaskAvailable("clip_scene_classify") {
 		return river.JobSnooze(30 * time.Second)
+	}
+	if w.TagService == nil {
+		return fmt.Errorf("ai generated tag service unavailable")
 	}
 
 	embedding, err := w.LumenService.ClipImageEmbed(ctx, args.ImageData)
@@ -61,28 +66,46 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 		return fmt.Errorf("failed to save embedding: %w", err)
 	}
 
-	labels, err := w.LumenService.BioClipClassify(ctx, args.ImageData, 3)
+	clipLabels, err := w.LumenService.ClipClassify(ctx, args.ImageData, 3)
 	if err != nil {
-		return fmt.Errorf("failed to classify image: %w", err)
+		return fmt.Errorf("failed to classify image with CLIP: %w", err)
 	}
 
-	// Save species predictions to ML metadata if available
-	if len(labels) > 0 {
-		predictions := make([]dbtypes.SpeciesPredictionMeta, len(labels))
-		for i, pred := range labels {
-			predictions[i] = dbtypes.SpeciesPredictionMeta{
-				Label: pred.Label,
-				Score: pred.Score,
-			}
-		}
+	sceneLabels, err := w.LumenService.ClipSceneClassify(ctx, args.ImageData, 1)
+	if err != nil {
+		return fmt.Errorf("failed to classify image scene with CLIP: %w", err)
+	}
 
-		// Save species predictions to database
-		err = w.SpeciesService.SaveSpeciesPredictions(ctx, pgUUID, predictions)
+	tags := labelsToAIGeneratedTags(clipLabels, "clip_classify")
+	tags = append(tags, labelsToAIGeneratedTags(sceneLabels, "clip_scene_classify")...)
+
+	if w.LumenService.IsTaskAvailable("bioclip_classify") {
+		bioClipLabels, err := w.LumenService.BioClipClassify(ctx, args.ImageData, 3)
 		if err != nil {
-			// Log error but don't fail the job
-			fmt.Printf("Failed to save species predictions: %v\n", err)
+			return fmt.Errorf("failed to classify image with BioCLIP: %w", err)
 		}
+		tags = append(tags, labelsToAIGeneratedTags(bioClipLabels, "bioclip_classify")...)
+	}
+
+	if err := w.TagService.ReplaceAssetAIGeneratedTags(ctx, pgUUID, tags, []string{
+		"clip_classify",
+		"clip_scene_classify",
+		"bioclip_classify",
+	}); err != nil {
+		return fmt.Errorf("failed to save ai generated tags: %w", err)
 	}
 
 	return nil
+}
+
+func labelsToAIGeneratedTags(labels []types.Label, source string) []service.AIGeneratedTag {
+	tags := make([]service.AIGeneratedTag, 0, len(labels))
+	for _, label := range labels {
+		tags = append(tags, service.AIGeneratedTag{
+			Name:       label.Label,
+			Confidence: label.Score,
+			Source:     source,
+		})
+	}
+	return tags
 }

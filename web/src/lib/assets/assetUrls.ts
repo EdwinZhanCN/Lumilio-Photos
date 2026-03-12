@@ -33,4 +33,15 @@ export const assetUrls = {
   getWebAudioUrl(id: string): string {
     return withMediaToken(`${baseURL}/api/v1/assets/${id}/audio/web`);
   },
+
+  getPersonCoverUrl(id: number | string, repositoryId?: string): string {
+    const search = new URLSearchParams();
+    if (repositoryId) {
+      search.set("repository_id", repositoryId);
+    }
+
+    const suffix = search.toString();
+    const url = `${baseURL}/api/v1/people/${id}/cover${suffix ? `?${suffix}` : ""}`;
+    return withMediaToken(url);
+  },
 };
