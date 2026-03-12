@@ -158,16 +158,11 @@ export function usePhotoStats(
         try {
           if (years.length > 0) {
             const latestYear = years[0];
-            const startDate = new Date(latestYear, 0, 1);
-            const endDate = new Date(latestYear, 11, 31);
-            const daysDiff = Math.ceil(
-              (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-            );
 
             const heatmapResponse = await fetchDailyActivity({
               params: {
                 query: {
-                  days: daysDiff + 365,
+                  year: latestYear,
                   ...repositoryScope,
                 },
               },
@@ -208,16 +203,10 @@ export function usePhotoStats(
       setError(null);
 
       try {
-        const startDate = new Date(year, 0, 1);
-        const endDate = new Date(year, 11, 31);
-        const daysDiff = Math.ceil(
-          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
-        );
-
         const heatmapResponse = await fetchDailyActivity({
           params: {
             query: {
-              days: daysDiff + 365,
+              year,
               ...repositoryScope,
             },
           },

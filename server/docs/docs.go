@@ -1157,6 +1157,17 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.MediaTokenDTO": {
+                "properties": {
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "token": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.MessageResponseDTO": {
                 "properties": {
                     "message": {
@@ -6734,6 +6745,88 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/auth/media-token": {
+            "get": {
+                "description": "Generate a short-lived media token for image/video/audio URL authorization in browser media elements.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Media token issued successfully"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get media access token",
+                "tags": [
+                    "auth"
+                ]
+            }
+        },
         "/api/v1/auth/mfa": {
             "get": {
                 "description": "Get the authenticated user's MFA status, including TOTP enablement and remaining recovery codes.",
@@ -8978,14 +9071,37 @@ const docTemplate = `{
         },
         "/api/v1/stats/daily-activity": {
             "get": {
-                "description": "Get daily shooting activity heatmap data for the past year",
+                "description": "Get daily shooting activity heatmap data for a calendar year or custom date range.",
                 "parameters": [
                     {
-                        "description": "Number of days to look back",
+                        "description": "Calendar year (e.g. 2024)",
+                        "in": "query",
+                        "name": "year",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Start date in YYYY-MM-DD (must be used with end_date)",
+                        "in": "query",
+                        "name": "start_date",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "End date in YYYY-MM-DD, inclusive (must be used with start_date)",
+                        "in": "query",
+                        "name": "end_date",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Deprecated fallback: number of days to look back (used only when year/start_date/end_date are absent)",
                         "in": "query",
                         "name": "days",
                         "schema": {
-                            "default": 365,
                             "type": "integer"
                         }
                     },

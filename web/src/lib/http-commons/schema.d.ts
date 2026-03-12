@@ -3808,6 +3808,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/media-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get media access token
+         * @description Generate a short-lived media token for image/video/audio URL authorization in browser media elements.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Media token issued successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/mfa": {
         parameters: {
             query?: never;
@@ -5874,12 +5953,18 @@ export interface paths {
         };
         /**
          * Get daily activity heatmap
-         * @description Get daily shooting activity heatmap data for the past year
+         * @description Get daily shooting activity heatmap data for a calendar year or custom date range.
          */
         get: {
             parameters: {
                 query?: {
-                    /** @description Number of days to look back */
+                    /** @description Calendar year (e.g. 2024) */
+                    year?: number;
+                    /** @description Start date in YYYY-MM-DD (must be used with end_date) */
+                    start_date?: string;
+                    /** @description End date in YYYY-MM-DD, inclusive (must be used with start_date) */
+                    end_date?: string;
+                    /** @description Deprecated fallback: number of days to look back (used only when year/start_date/end_date are absent) */
                     days?: number;
                     /** @description Optional repository UUID filter */
                     repository_id?: string;
@@ -7058,6 +7143,10 @@ export interface components {
             updated_at?: string;
             user_id?: number;
             username?: string;
+        };
+        "dto.MediaTokenDTO": {
+            expires_at?: string;
+            token?: string;
         };
         "dto.MessageResponseDTO": {
             /** @example Operation completed successfully */
