@@ -49,6 +49,11 @@ type BootstrapStatusDTO struct {
 	NextRegistrationRole string `json:"next_registration_role"`
 }
 
+type MediaTokenDTO struct {
+	Token     string    `json:"token"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
 func ToAuthResponseDTO(response *service.AuthResponse) *AuthResponseDTO {
 	if response == nil {
 		return nil

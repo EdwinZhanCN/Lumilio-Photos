@@ -79,9 +79,11 @@ type AuthService struct {
 	jwtSecret              []byte
 	mfaTokenSecret         []byte
 	passkeyTokenSecret     []byte
+	mediaTokenSecret       []byte
 	mfaEncryptKey          []byte
 	accessTokenTTL         time.Duration
 	refreshTokenTTL        time.Duration
+	mediaTokenTTL          time.Duration
 	webauthnRPDisplayName  string
 	webauthnRPID           string
 	webauthnAllowedOrigins []string
@@ -95,6 +97,16 @@ type JWTClaims struct {
 	jwt.RegisteredClaims
 }
 
+type MediaTokenClaims struct {
+	UserID   int    `json:"user_id"`
+	Username string `json:"username"`
+	Role     string `json:"role"`
+	Scope    string `json:"scope"`
+	jwt.RegisteredClaims
+}
+
+const mediaTokenScope = "media"
+
 // NewAuthService creates a new authentication service
 func NewAuthService(queries *repo.Queries, db *pgxpool.Pool) *AuthService {
 	rootSecret, err := loadOrCreateLumilioSecretKey(strings.TrimSpace(os.Getenv("LUMILIO_SECRET_KEY")))
@@ -104,6 +116,7 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool) *AuthService {
 	jwtSecret := deriveScopedSecret(rootSecret, "jwt.signing.v1")
 	mfaTokenSecret := deriveScopedSecret(rootSecret, "mfa.signing.v1")
 	passkeyTokenSecret := deriveScopedSecret(rootSecret, "passkey.signing.v1")
+	mediaTokenSecret := deriveScopedSecret(rootSecret, "media.url.signing.v1")
 	mfaEncryptKey := deriveScopedSecret(rootSecret, "mfa.encryption.v1")
 
 	// Access token TTL (default: 15 minutes)
@@ -122,15 +135,25 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool) *AuthService {
 		}
 	}
 
+	// Media token TTL (default: 10 minutes)
+	mediaTokenTTL := 10 * time.Minute
+	if ttlStr := os.Getenv("MEDIA_TOKEN_TTL"); ttlStr != "" {
+		if ttl, err := time.ParseDuration(ttlStr); err == nil {
+			mediaTokenTTL = ttl
+		}
+	}
+
 	return &AuthService{
 		queries:                queries,
 		db:                     db,
 		jwtSecret:              jwtSecret,
 		mfaTokenSecret:         mfaTokenSecret,
 		passkeyTokenSecret:     passkeyTokenSecret,
+		mediaTokenSecret:       mediaTokenSecret,
 		mfaEncryptKey:          mfaEncryptKey,
 		accessTokenTTL:         accessTokenTTL,
 		refreshTokenTTL:        refreshTokenTTL,
+		mediaTokenTTL:          mediaTokenTTL,
 		webauthnRPDisplayName:  loadWebAuthnRPDisplayName(),
 		webauthnRPID:           loadWebAuthnRPID(),
 		webauthnAllowedOrigins: loadWebAuthnAllowedOrigins(),
@@ -253,6 +276,56 @@ func (s *AuthService) ValidateToken(tokenString string) (*JWTClaims, error) {
 	}
 
 	return nil, ErrInvalidToken
+}
+
+func (s *AuthService) GenerateMediaToken(userID int, username, role string) (string, time.Time, error) {
+	now := time.Now()
+	expiresAt := now.Add(s.mediaTokenTTL)
+
+	claims := &MediaTokenClaims{
+		UserID:   userID,
+		Username: username,
+		Role:     string(normalizeUserRole(role)),
+		Scope:    mediaTokenScope,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			Issuer:    "lumilio-photos",
+			Subject:   strconv.Itoa(userID),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(s.mediaTokenSecret)
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("sign media token: %w", err)
+	}
+
+	return tokenString, expiresAt, nil
+}
+
+func (s *AuthService) ValidateMediaToken(tokenString string) (*MediaTokenClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &MediaTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return s.mediaTokenSecret, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error parsing media token: %w", err)
+	}
+
+	claims, ok := token.Claims.(*MediaTokenClaims)
+	if !ok || !token.Valid {
+		return nil, ErrInvalidToken
+	}
+
+	if claims.Scope != mediaTokenScope {
+		return nil, ErrInvalidToken
+	}
+
+	return claims, nil
 }
 
 // RevokeRefreshToken revokes a refresh token

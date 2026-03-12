@@ -172,7 +172,7 @@ const LoginPage: React.FC = () => {
         throw new Error(verifyData?.message || t("auth.login.passkeyVerifyError"));
       }
 
-      completeAuth(verifyData.data);
+      await completeAuth(verifyData.data);
       navigate(redirectTo, { replace: true });
     } catch (passkeyAuthError) {
       setPasskeyError(

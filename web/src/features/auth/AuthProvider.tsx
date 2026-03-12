@@ -11,12 +11,13 @@ import {
 } from "./auth.type.ts";
 import { getToken, getRefreshToken, removeToken, saveToken } from "@/lib/http-commons/auth.ts";
 import { $api } from "@/lib/http-commons/queryClient";
+import { ensureMediaToken, getMediaTokenRefreshIntervalMs } from "@/lib/assets/mediaAccess.ts";
 
 interface AuthContextType extends AuthState {
   dispatch: React.Dispatch<AuthAction>;
   login: (username: string, password: string) => Promise<LoginResult>;
   verifyMFA: (mfaToken: string, code: string, method: MFAMethod) => Promise<void>;
-  completeAuth: (response: AuthResponse) => User;
+  completeAuth: (response: AuthResponse) => Promise<User>;
   logout: () => void;
 }
 
@@ -36,13 +37,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return apiError.message || apiError.error || fallback;
   };
 
-  const completeAuth = (response: AuthResponse): User => {
+  const completeAuth = async (response: AuthResponse): Promise<User> => {
     const { token, refreshToken, user } = response;
     if (!token || !user) {
       throw new Error("auth.errors.invalidSessionResponse");
     }
 
     saveToken(token, refreshToken || "");
+    await ensureMediaToken(true);
     dispatch({ type: "AUTH_SUCCESS", payload: user });
     return user;
   };
@@ -67,6 +69,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const response = await currentUserMutation.mutateAsync({});
             const responseData = response as ApiResult<User> | undefined;
             if (responseData?.code === 0 && responseData?.data) {
+              await ensureMediaToken();
               dispatch({ type: "AUTH_SUCCESS", payload: responseData.data });
               isInitialized.current = true;
               return;
@@ -84,7 +87,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             });
             const refreshData = refreshRes as ApiResult<AuthResponse> | undefined;
             if (refreshData?.code === 0 && refreshData?.data) {
-              completeAuth(refreshData.data);
+              await completeAuth(refreshData.data);
               isInitialized.current = true;
               return;
             }
@@ -108,6 +111,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initAuth();
   }, []);
 
+  useEffect(() => {
+    if (!state.isAuthenticated) {
+      return undefined;
+    }
+
+    void ensureMediaToken();
+    const timer = window.setInterval(() => {
+      void ensureMediaToken();
+    }, getMediaTokenRefreshIntervalMs());
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [state.isAuthenticated]);
+
   const login = async (username: string, password: string): Promise<LoginResult> => {
     dispatch({ type: "AUTH_START" });
     try {
@@ -129,7 +147,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           };
         }
         if (user) {
-          completeAuth(responseData.data);
+          await completeAuth(responseData.data);
           return { status: "authenticated" };
         }
       } else {
@@ -158,7 +176,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const responseData = response as ApiResult<AuthResponse> | undefined;
       if (responseData?.code === 0 && responseData?.data) {
         if (responseData.data.user) {
-          completeAuth(responseData.data);
+          await completeAuth(responseData.data);
           return;
         }
       }
