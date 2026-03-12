@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"server/internal/api"
 	"server/internal/db/repo"
 	"strconv"
@@ -87,6 +88,10 @@ type HeatmapResponse struct {
 type AvailableYearsResponse struct {
 	Years []int `json:"years"`
 }
+
+const (
+	heatmapDateLayout = "2006-01-02"
+)
 
 // GetFocalLengthDistribution godoc
 // @Summary Get focal length distribution
@@ -292,21 +297,22 @@ func (h *StatsHandler) getMonthlyDistribution(c *gin.Context, repositoryID pgtyp
 
 // GetDailyActivityHeatmap godoc
 // @Summary Get daily activity heatmap
-// @Description Get daily shooting activity heatmap data for the past year
+// @Description Get daily shooting activity heatmap data for a calendar year or custom date range.
 // @Tags stats
 // @Produce json
-// @Param days query int false "Number of days to look back" default(365)
+// @Param year query int false "Calendar year (e.g. 2024)"
+// @Param start_date query string false "Start date in YYYY-MM-DD (must be used with end_date)"
+// @Param end_date query string false "End date in YYYY-MM-DD, inclusive (must be used with start_date)"
+// @Param days query int false "Deprecated fallback: number of days to look back (used only when year/start_date/end_date are absent)"
 // @Param repository_id query string false "Optional repository UUID filter"
 // @Success 200 {object} api.Result{data=HeatmapResponse}
 // @Failure 400 {object} api.Result
 // @Failure 500 {object} api.Result
 // @Router /api/v1/stats/daily-activity [get]
 func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
-	// Parse days parameter
-	daysStr := c.DefaultQuery("days", "365")
-	days, err := strconv.Atoi(daysStr)
-	if err != nil || days <= 0 || days > 730 {
-		api.GinBadRequest(c, err, "Invalid days parameter. Must be between 1 and 730")
+	startDate, endDate, err := resolveHeatmapRange(c, time.Now())
+	if err != nil {
+		api.GinBadRequest(c, err, err.Error())
 		return
 	}
 
@@ -314,10 +320,6 @@ func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
 	if !ok {
 		return
 	}
-
-	// Calculate date range
-	endDate := time.Now()
-	startDate := endDate.AddDate(0, 0, -days)
 
 	// Convert to pgtype.Timestamptz
 	params := repo.GetDailyActivityHeatmapParams{
@@ -353,6 +355,65 @@ func (h *StatsHandler) GetDailyActivityHeatmap(c *gin.Context) {
 	}
 
 	api.GinSuccess(c, response)
+}
+
+func resolveHeatmapRange(c *gin.Context, now time.Time) (time.Time, time.Time, error) {
+	location := now.Location()
+	yearRaw := strings.TrimSpace(c.Query("year"))
+	startDateRaw := strings.TrimSpace(c.Query("start_date"))
+	endDateRaw := strings.TrimSpace(c.Query("end_date"))
+	daysRaw := strings.TrimSpace(c.Query("days"))
+
+	// Highest-priority mode: calendar year.
+	if yearRaw != "" {
+		if startDateRaw != "" || endDateRaw != "" {
+			return time.Time{}, time.Time{}, errors.New("year cannot be combined with start_date/end_date")
+		}
+		year, err := strconv.Atoi(yearRaw)
+		if err != nil || year < 1900 || year > 2200 {
+			return time.Time{}, time.Time{}, errors.New("invalid year parameter. Must be between 1900 and 2200")
+		}
+		start := time.Date(year, time.January, 1, 0, 0, 0, 0, location)
+		end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, location).Add(-time.Nanosecond)
+		return start, end, nil
+	}
+
+	// Second mode: explicit date range.
+	if startDateRaw != "" || endDateRaw != "" {
+		if startDateRaw == "" || endDateRaw == "" {
+			return time.Time{}, time.Time{}, errors.New("start_date and end_date must be provided together")
+		}
+		start, err := time.ParseInLocation(heatmapDateLayout, startDateRaw, location)
+		if err != nil {
+			return time.Time{}, time.Time{}, errors.New("invalid start_date format. Expected YYYY-MM-DD")
+		}
+		end, err := time.ParseInLocation(heatmapDateLayout, endDateRaw, location)
+		if err != nil {
+			return time.Time{}, time.Time{}, errors.New("invalid end_date format. Expected YYYY-MM-DD")
+		}
+		if end.Before(start) {
+			return time.Time{}, time.Time{}, errors.New("end_date must be on or after start_date")
+		}
+		endInclusive := end.AddDate(0, 0, 1).Add(-time.Nanosecond)
+		return start, endInclusive, nil
+	}
+
+	// Backward-compatible fallback for old callers.
+	if daysRaw != "" {
+		days, err := strconv.Atoi(daysRaw)
+		if err != nil || days <= 0 || days > 36500 {
+			return time.Time{}, time.Time{}, errors.New("invalid days parameter. Must be between 1 and 36500")
+		}
+		end := now
+		start := end.AddDate(0, 0, -days)
+		return start, end, nil
+	}
+
+	// Default mode: current calendar year.
+	year := now.Year()
+	start := time.Date(year, time.January, 1, 0, 0, 0, 0, location)
+	end := time.Date(year+1, time.January, 1, 0, 0, 0, 0, location).Add(-time.Nanosecond)
+	return start, end, nil
 }
 
 // GetAvailableYears godoc

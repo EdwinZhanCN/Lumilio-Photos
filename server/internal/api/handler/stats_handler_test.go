@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"server/internal/api"
 	"server/internal/db/repo"
@@ -108,6 +109,47 @@ func TestStatsHandlerGetDailyActivityHeatmap_RejectsInvalidRepositoryID(t *testi
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/stats/daily-activity?repository_id=bad-id", nil)
+
+	handler.GetDailyActivityHeatmap(ctx)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+}
+
+func TestStatsHandlerGetDailyActivityHeatmap_UsesYearRange(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &StatsHandler{
+		queries: stubStatsQuerier{
+			getDailyActivityHeatmapFn: func(arg repo.GetDailyActivityHeatmapParams) ([]repo.GetDailyActivityHeatmapRow, error) {
+				require.Equal(t, 2024, arg.StartTime.Time.Year())
+				require.Equal(t, time.January, arg.StartTime.Time.Month())
+				require.Equal(t, 1, arg.StartTime.Time.Day())
+
+				require.Equal(t, 2024, arg.EndTime.Time.Year())
+				require.Equal(t, time.December, arg.EndTime.Time.Month())
+				require.Equal(t, 31, arg.EndTime.Time.Day())
+				return []repo.GetDailyActivityHeatmapRow{}, nil
+			},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/stats/daily-activity?year=2024", nil)
+
+	handler.GetDailyActivityHeatmap(ctx)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+}
+
+func TestStatsHandlerGetDailyActivityHeatmap_RejectsIncompleteDateRange(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &StatsHandler{queries: stubStatsQuerier{}}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/v1/stats/daily-activity?start_date=2024-01-01", nil)
 
 	handler.GetDailyActivityHeatmap(ctx)
 

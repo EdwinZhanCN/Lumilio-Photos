@@ -55,7 +55,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme}
       className="toaster group"
-      closeButton
+      closeButton={false}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
@@ -92,8 +92,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
           description: "text-xs text-base-content/70",
           actionButton: "btn btn-xs btn-primary",
           cancelButton: "btn btn-xs btn-ghost",
-          closeButton:
-            "border border-base-300 bg-base-100 text-base-content hover:bg-base-200",
         },
       }}
       {...props}
