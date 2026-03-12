@@ -18,6 +18,12 @@
         "theme": {
             "light": "Light",
             "dark": "Dark"
+        },
+        "notifications": {
+            "title": "Message Center",
+            "empty": "No messages yet.",
+            "markAllRead": "Mark all as read",
+            "clear": "Clear all messages"
         }
     },
     "search": {
@@ -499,7 +505,14 @@
             "server_in_flight": "In-flight requests",
             "server_active_sessions": "Active sessions",
             "server_completed_files": "Completed files",
-            "server_failed_sessions": "Failed sessions"
+            "server_failed_sessions": "Failed sessions",
+            "queue_title": "Upload Queue",
+            "table": {
+                "file": "File",
+                "size": "Size",
+                "status": "Status",
+                "progress": "Progress"
+            }
         },
         "FileUploadProgress": {
             "title": "File Upload Progress",

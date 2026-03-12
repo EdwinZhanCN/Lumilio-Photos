@@ -7,6 +7,7 @@ import { useAuth } from "@/features/auth";
 import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/LumilioAvatar";
 import { useSettingsContext, useWorkingRepository } from "@/features/settings";
 import UserAvatar from "@/components/UserAvatar";
+import MessageCenter from "@/components/MessageCenter";
 
 function NavBar() {
   const [isLumilioHovered, setIsLumilioHovered] = useState(false);
@@ -102,6 +103,7 @@ function NavBar() {
 
       <div className="flex flex-1 justify-end">
         <div className="flex items-center gap-3">
+          <MessageCenter />
           <label
             className={`swap swap-rotate ${isFollowingSystem ? "cursor-not-allowed opacity-60" : ""}`}
             title={

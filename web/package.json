@@ -52,6 +52,7 @@
         "remark-gfm": "^4.0.1",
         "remark-math": "^6.0.0",
         "sass": "^1.89.2",
+        "sonner": "^2.0.7",
         "supercluster": "^8.0.1",
         "swiper": "^12.1.0",
         "tailwindcss": "^4.0.8",
