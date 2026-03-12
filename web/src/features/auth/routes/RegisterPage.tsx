@@ -117,6 +117,9 @@ const RegisterPage: React.FC = () => {
   const bootstrapStatus = bootstrapQuery.data?.data;
   const isBootstrapMode = bootstrapStatus?.is_bootstrap_mode ?? false;
   const passkeySupport = useMemo(() => getPasskeySupport(), []);
+  const passkeySupportReason = passkeySupport.reasonKey
+    ? t(passkeySupport.reasonKey)
+    : null;
   const confirmPasswordMessage = t("auth.register.confirmPasswordHint", {
     defaultValue: "Passwords must match exactly.",
   });
@@ -190,7 +193,7 @@ const RegisterPage: React.FC = () => {
     const payload =
       setupResponse as ApiResult<RegistrationTOTPSetupResponse> | undefined;
     if (!payload?.data) {
-      throw new Error(payload?.message || "Failed to start TOTP setup.");
+      throw new Error(payload?.message || t("auth.register.totpSetupStartError"));
     }
 
     setTotpSetup(payload.data);
@@ -222,7 +225,7 @@ const RegisterPage: React.FC = () => {
       const payload =
         response as ApiResult<RegistrationStartResponse> | undefined;
       if (!payload?.data) {
-        throw new Error(payload?.message || "Failed to start registration.");
+        throw new Error(payload?.message || t("auth.register.startError"));
       }
 
       const nextFlow = {
@@ -238,13 +241,12 @@ const RegisterPage: React.FC = () => {
       }
 
       setCapabilityMessage(
-        passkeySupport.reason ||
-          "Passkeys are unavailable here, so Lumilio will use an authenticator app instead.",
+        passkeySupportReason || t("auth.register.passkeyUnavailableUseTotp"),
       );
       await startTotpSetup(nextFlow.sessionId);
     } catch (registrationError) {
       setFlowError(
-        getApiMessage(registrationError, "Failed to start registration."),
+        getApiMessage(registrationError, t("auth.register.startError")),
       );
     }
   };
@@ -263,7 +265,7 @@ const RegisterPage: React.FC = () => {
         optionsResponse as ApiResult<PasskeyOptionsResponse> | undefined;
       if (!optionsData?.data) {
         throw new Error(
-          optionsData?.message || "Failed to start passkey registration.",
+          optionsData?.message || t("auth.register.passkeyStartError"),
         );
       }
 
@@ -277,14 +279,14 @@ const RegisterPage: React.FC = () => {
       });
       const verifyData = verifyResponse as ApiResult<AuthResponse> | undefined;
       if (!verifyData?.data) {
-        throw new Error(verifyData?.message || "Passkey registration failed.");
+        throw new Error(verifyData?.message || t("auth.register.passkeyVerifyError"));
       }
 
       completeAuth(verifyData.data);
       navigate(redirectTo, { replace: true });
     } catch (passkeyError) {
       setFlowError(
-        getApiMessage(passkeyError, "Passkey registration failed."),
+        getApiMessage(passkeyError, t("auth.register.passkeyVerifyError")),
       );
     }
   };
@@ -296,7 +298,7 @@ const RegisterPage: React.FC = () => {
     try {
       await startTotpSetup(flow.sessionId);
     } catch (totpError) {
-      setFlowError(getApiMessage(totpError, "Failed to start TOTP setup."));
+      setFlowError(getApiMessage(totpError, t("auth.register.totpSetupStartError")));
     }
   };
 
@@ -318,14 +320,14 @@ const RegisterPage: React.FC = () => {
       const payload =
         response as ApiResult<RegistrationTOTPCompleteResponse> | undefined;
       if (!payload?.data?.auth) {
-        throw new Error(payload?.message || "Failed to complete TOTP setup.");
+        throw new Error(payload?.message || t("auth.register.totpSetupCompleteError"));
       }
 
       completeAuth(payload.data.auth);
       setRecoveryCodes(payload.data.recovery_codes ?? []);
       setStep("recovery");
     } catch (totpError) {
-      setFlowError(getApiMessage(totpError, "Failed to complete TOTP setup."));
+      setFlowError(getApiMessage(totpError, t("auth.register.totpSetupCompleteError")));
     }
   };
 
@@ -347,7 +349,9 @@ const RegisterPage: React.FC = () => {
               <div className="inline-flex items-center gap-4 text-3xl font-bold tracking-tight text-base-content sm:text-4xl">
                 <img
                   src="/logo.png"
-                  alt={t("app.name") + " Logo"}
+                  alt={t("auth.common.logoAlt", {
+                    appName: t("app.name"),
+                  })}
                   className="size-10 bg-contain object-contain sm:size-12"
                 />
                 <span>{t("app.name")}</span>
@@ -408,7 +412,7 @@ const RegisterPage: React.FC = () => {
             {displayError && (
               <div className="alert alert-error py-3 text-sm">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{displayError}</span>
+                <span>{t(displayError, { defaultValue: displayError })}</span>
               </div>
             )}
 
@@ -438,7 +442,7 @@ const RegisterPage: React.FC = () => {
                     <User className="h-4 w-4 shrink-0 text-base-content/70" />
                     <input
                       type="text"
-                      placeholder="username"
+                      placeholder={t("auth.register.usernamePlaceholder")}
                       className="grow"
                       value={username}
                       onChange={(event) =>
@@ -542,7 +546,7 @@ const RegisterPage: React.FC = () => {
               <div className="space-y-4">
                 {capabilityMessage && (
                   <div className="rounded-xl border border-base-300 bg-base-200/60 p-4 text-sm text-base-content/80">
-                    {capabilityMessage}
+                    {t(capabilityMessage, { defaultValue: capabilityMessage })}
                   </div>
                 )}
 
@@ -614,7 +618,7 @@ const RegisterPage: React.FC = () => {
                       {qrCodeDataURL ? (
                         <img
                           src={qrCodeDataURL}
-                          alt="TOTP QR code"
+                          alt={t("auth.register.totpQrAlt")}
                           className="size-full rounded-xl bg-white object-contain"
                         />
                       ) : (
@@ -626,7 +630,7 @@ const RegisterPage: React.FC = () => {
                   <div className="space-y-4">
                     {capabilityMessage && (
                       <div className="rounded-xl border border-base-300 bg-base-200/60 p-4 text-sm text-base-content/80">
-                        {capabilityMessage}
+                        {t(capabilityMessage, { defaultValue: capabilityMessage })}
                       </div>
                     )}
 

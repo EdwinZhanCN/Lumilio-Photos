@@ -30,7 +30,6 @@ import {
   useBulkAssetOperations,
 } from "@/features/assets/hooks/useSelection";
 import { GroupByType } from "@/features/assets/types/assets.type";
-import { selectTabTitle } from "@/features/assets/slices/ui.slice";
 import {
   useCallback,
   useMemo,
@@ -110,8 +109,16 @@ const AssetsPageHeader = ({
     [inboundDTO],
   );
 
-  // Get tab-specific configuration
-  const tabTitle = selectTabTitle(currentTab);
+  const tabTitle = useMemo(() => {
+    switch (currentTab) {
+      case "videos":
+        return t("assets.videos.title");
+      case "audios":
+        return t("assets.audios.title");
+      default:
+        return t("assets.photos.title");
+    }
+  }, [currentTab, t]);
 
   // Get appropriate icon for current tab
   const TabIcon = useMemo(() => {

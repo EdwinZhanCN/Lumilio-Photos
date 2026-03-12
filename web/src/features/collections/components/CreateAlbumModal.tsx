@@ -23,6 +23,7 @@ import { flattenAssetGroups } from "@/features/assets/utils/assetGroups";
 const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
   onSelect,
 }) => {
+  const { t } = useI18n();
   const groupBy = useGroupBy();
   const { setGroupBy, setSearchQuery } = useUIActions();
   const { resetFilters } = useFilterActions();
@@ -82,7 +83,7 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
       <AssetsPageHeader
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
-        title="Select Cover Photo"
+        title={t("collections.createModal.coverPicker.title")}
         icon={<ImageIcon className="w-6 h-6 text-primary" />}
       />
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
@@ -185,12 +186,12 @@ const CreateAlbumModal: React.FC = () => {
                 <div className="form-control w-full">
                   <label className="label">
                     <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">
-                      Album Name
+                      {t("collections.createModal.fields.name.label")}
                     </span>
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Summer Vacation 2024"
+                    placeholder={t("collections.createModal.fields.name.placeholder")}
                     className="input input-bordered w-full focus:input-primary bg-base-100"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -201,12 +202,14 @@ const CreateAlbumModal: React.FC = () => {
                 <div className="form-control w-full">
                   <label className="label">
                     <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">
-                      Description
+                      {t("collections.createModal.fields.description.label")}
                     </span>
                   </label>
                   <textarea
                     className="textarea textarea-bordered h-40 focus:textarea-primary resize-none bg-base-100"
-                    placeholder="Tell a story about this collection..."
+                    placeholder={t(
+                      "collections.createModal.fields.description.placeholder",
+                    )}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                   ></textarea>
@@ -217,7 +220,7 @@ const CreateAlbumModal: React.FC = () => {
               <div className="flex flex-col">
                 <label className="label">
                   <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">
-                    Album Cover
+                    {t("collections.createModal.fields.cover.label")}
                   </span>
                 </label>
 
@@ -235,11 +238,11 @@ const CreateAlbumModal: React.FC = () => {
                           "medium",
                         )}
                         className="w-full h-full object-cover"
-                        alt="Selected cover"
+                        alt={t("collections.createModal.fields.cover.selectedAlt")}
                       />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
                         <span className="text-white text-sm font-bold bg-primary px-4 py-2 rounded-full shadow-lg">
-                          Change Cover
+                          {t("collections.createModal.fields.cover.change")}
                         </span>
                       </div>
                     </>
@@ -250,10 +253,10 @@ const CreateAlbumModal: React.FC = () => {
                       </div>
                       <div className="text-center">
                         <span className="block text-sm font-bold text-base-content/70">
-                          Choose a cover photo
+                          {t("collections.createModal.fields.cover.choose")}
                         </span>
                         <span className="text-xs text-base-content/40 mt-1 block">
-                          Required for new albums
+                          {t("collections.createModal.fields.cover.requiredHint")}
                         </span>
                       </div>
                     </>
@@ -268,14 +271,16 @@ const CreateAlbumModal: React.FC = () => {
                 className="btn btn-ghost px-8"
                 onClick={handleClose}
               >
-                Cancel
+                {t("common.cancel")}
               </button>
               <button
                 type="submit"
                 className={`btn btn-primary px-12 shadow-lg shadow-primary/20 ${isSubmitting ? "loading" : ""}`}
                 disabled={isSubmitting || !name.trim() || !selectedCoverId}
               >
-                {isSubmitting ? "Creating..." : "Create Album"}
+                {isSubmitting
+                  ? t("collections.createModal.actions.creating")
+                  : t("collections.createModal.actions.create")}
               </button>
             </div>
           </form>

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { $api } from "@/lib/http-commons/queryClient";
+import { useI18n } from "@/lib/i18n.tsx";
 import type {
   ApiResult,
   JobDTO,
@@ -22,47 +23,57 @@ import type {
 } from "../monitor.type";
 
 // Format timestamp to relative time
-function formatRelativeTime(timestamp: string): string {
+function formatRelativeTime(
+  timestamp: string,
+  t: (key: string, options?: Record<string, unknown>) => string,
+  language?: string,
+): string {
   const date = new Date(timestamp);
   const now = new Date();
   const secondsAgo = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (secondsAgo < 60) return `${secondsAgo}s ago`;
-  if (secondsAgo < 3600) return `${Math.floor(secondsAgo / 60)}m ago`;
-  if (secondsAgo < 86400) return `${Math.floor(secondsAgo / 3600)}h ago`;
-  if (secondsAgo < 604800) return `${Math.floor(secondsAgo / 86400)}d ago`;
-  return date.toLocaleDateString();
+  if (secondsAgo < 60) return t("monitor.jobs.timeAgoSeconds", { count: secondsAgo });
+  if (secondsAgo < 3600)
+    return t("monitor.jobs.timeAgoMinutes", { count: Math.floor(secondsAgo / 60) });
+  if (secondsAgo < 86400)
+    return t("monitor.jobs.timeAgoHours", { count: Math.floor(secondsAgo / 3600) });
+  if (secondsAgo < 604800)
+    return t("monitor.jobs.timeAgoDays", { count: Math.floor(secondsAgo / 86400) });
+  return date.toLocaleDateString(language);
 }
 
 // Get the most relevant timestamp based on job state
-function getRelevantTimestamp(job: JobDTO): { label: string; time: string } {
+function getRelevantTimestamp(
+  job: JobDTO,
+  t: (key: string) => string,
+): { label: string; time: string } {
   switch (job.state) {
     case "running":
       return {
-        label: "Started",
+        label: t("monitor.jobs.labels.started"),
         time: job.attempted_at || job.created_at || new Date().toISOString(),
       };
     case "completed":
     case "cancelled":
     case "discarded":
       return {
-        label: "Finished",
+        label: t("monitor.jobs.labels.finished"),
         time: job.finalized_at || job.created_at || new Date().toISOString(),
       };
     case "retryable":
       return {
-        label: "Failed",
+        label: t("monitor.jobs.labels.failed"),
         time: job.attempted_at || job.created_at || new Date().toISOString(),
       };
     case "scheduled":
       return {
-        label: "Scheduled",
+        label: t("monitor.jobs.labels.scheduled"),
         time: job.scheduled_at || new Date().toISOString(),
       };
     case "available":
     default:
       return {
-        label: "Created",
+        label: t("monitor.jobs.labels.created"),
         time: job.created_at || new Date().toISOString(),
       };
   }
@@ -83,6 +94,7 @@ function getJobDuration(job: JobDTO): string | null {
 }
 
 export function TaskMonitor() {
+  const { t, i18n } = useI18n();
   const [jobs, setJobs] = useState<JobDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,7 +160,7 @@ export function TaskMonitor() {
         }
       } catch (err) {
         if (mounted) {
-          setError("Failed to fetch jobs");
+          setError(t("monitor.jobs.fetchError"));
           console.error("Job list error:", err);
         }
       } finally {
@@ -284,7 +296,7 @@ export function TaskMonitor() {
     return (
       <div className="bg-base-100 rounded-lg shadow-sm p-6 text-center">
         <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-        <p className="mt-3 text-sm opacity-60">Loading jobs...</p>
+        <p className="mt-3 text-sm opacity-60">{t("monitor.jobs.loading")}</p>
       </div>
     );
   }
@@ -306,39 +318,39 @@ export function TaskMonitor() {
         <div className="flex flex-wrap gap-2 items-center">
           <div className="flex items-center gap-2">
             <label className="text-xs opacity-60 uppercase tracking-wide font-semibold">
-              Time:
+              {t("monitor.jobs.filters.time")}
             </label>
             <div className="btn-group">
               <button
                 className={`btn btn-xs ${timeRange === "1h" ? "btn-active" : ""}`}
                 onClick={() => handleTimeRangeChange("1h")}
               >
-                &lt; 1h
+                {t("monitor.jobs.filters.timeRanges.1h")}
               </button>
               <button
                 className={`btn btn-xs ${timeRange === "24h" ? "btn-active" : ""}`}
                 onClick={() => handleTimeRangeChange("24h")}
               >
-                &lt; 1d
+                {t("monitor.jobs.filters.timeRanges.24h")}
               </button>
               <button
                 className={`btn btn-xs ${timeRange === "30d" ? "btn-active" : ""}`}
                 onClick={() => handleTimeRangeChange("30d")}
               >
-                &lt; 30d
+                {t("monitor.jobs.filters.timeRanges.30d")}
               </button>
               <button
                 className={`btn btn-xs ${timeRange === "all" ? "btn-active" : ""}`}
                 onClick={() => handleTimeRangeChange("all")}
               >
-                All
+                {t("monitor.jobs.filters.timeRanges.all")}
               </button>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <label className="text-xs opacity-60 uppercase tracking-wide font-semibold">
-              State:
+              {t("monitor.jobs.filters.state")}
             </label>
             <select
               className="select select-xs select-bordered"
@@ -353,20 +365,20 @@ export function TaskMonitor() {
                 setTotalPages(null);
               }}
             >
-              <option value="all">All</option>
-              <option value="running">Running</option>
-              <option value="available">Available</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="retryable">Retryable</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="discarded">Discarded</option>
+              <option value="all">{t("monitor.jobs.filters.states.all")}</option>
+              <option value="running">{t("monitor.jobs.filters.states.running")}</option>
+              <option value="available">{t("monitor.jobs.filters.states.available")}</option>
+              <option value="scheduled">{t("monitor.jobs.filters.states.scheduled")}</option>
+              <option value="retryable">{t("monitor.jobs.filters.states.retryable")}</option>
+              <option value="completed">{t("monitor.jobs.filters.states.completed")}</option>
+              <option value="cancelled">{t("monitor.jobs.filters.states.cancelled")}</option>
+              <option value="discarded">{t("monitor.jobs.filters.states.discarded")}</option>
             </select>
           </div>
 
           <div className="flex items-center gap-2">
             <label className="text-xs opacity-60 uppercase tracking-wide font-semibold">
-              Queue:
+              {t("monitor.jobs.filters.queue")}
             </label>
             <select
               className="select select-xs select-bordered"
@@ -381,7 +393,7 @@ export function TaskMonitor() {
                 setTotalPages(null);
               }}
             >
-              <option value="all">All</option>
+              <option value="all">{t("monitor.jobs.filters.allQueues")}</option>
               {queues.map((q) => (
                 <option key={q} value={q}>
                   {q}
@@ -436,9 +448,9 @@ export function TaskMonitor() {
 
           <div className="text-xs opacity-60">
             {totalCount !== null ? (
-              <span>{totalCount} total jobs</span>
+              <span>{t("monitor.jobs.pagination.totalJobs", { count: totalCount })}</span>
             ) : nextCursor ? (
-              <span>More results available</span>
+              <span>{t("monitor.jobs.pagination.moreResults")}</span>
             ) : null}
           </div>
         </div>
@@ -449,7 +461,7 @@ export function TaskMonitor() {
         {jobs.length === 0 ? (
           <div className="p-8 text-center opacity-60">
             <Clock className="w-12 h-12 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No jobs found with current filters</p>
+            <p className="text-sm">{t("monitor.jobs.empty")}</p>
           </div>
         ) : (
           <ul
@@ -463,8 +475,12 @@ export function TaskMonitor() {
               const duration = getJobDuration(job);
               const hasErrors = job.errors && job.errors.length > 0;
               const badgeClass = getStateBadgeClass((job.state || 'available') as JobState);
-              const timestamp = getRelevantTimestamp(job);
-              const relativeTime = formatRelativeTime(timestamp.time);
+              const timestamp = getRelevantTimestamp(job, t);
+              const relativeTime = formatRelativeTime(
+                timestamp.time,
+                t,
+                i18n.resolvedLanguage || i18n.language,
+              );
 
               return (
                 <li
@@ -481,7 +497,7 @@ export function TaskMonitor() {
                   >
                     {getStateIcon((job.state || 'available') as JobState)}
                     <span className="hidden sm:inline sm:ml-1">
-                      {job.state}
+                      {t(`monitor.jobs.filters.states.${job.state || "available"}`)}
                     </span>
                   </div>
 
@@ -526,7 +542,10 @@ export function TaskMonitor() {
                         <>
                           <span>•</span>
                           <span>
-                            {job.attempt ?? 0}/{job.max_attempts ?? 0} attempts
+                            {t("monitor.jobs.attempts", {
+                              current: job.attempt ?? 0,
+                              max: job.max_attempts ?? 0,
+                            })}
                           </span>
                         </>
                       )}

@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { CameraIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { GitHubStyleHeatmap } from "@/components/Heatmap";
 import { usePhotoStats } from "../hooks/usePhotoStats";
+import { useI18n } from "@/lib/i18n.tsx";
 
 export type StatsCardsProps = {
   className?: string;
@@ -12,6 +13,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
   className = "",
   repositoryId,
 }) => {
+  const { t } = useI18n();
   const {
     focalLengthData,
     cameraLensData,
@@ -65,10 +67,10 @@ const StatsCards: React.FC<StatsCardsProps> = ({
     if (!cameraLensData || total === 0) return [];
 
     return (cameraLensData.data ?? []).map((item) => ({
-      combo: `${item.camera_model ?? "Unknown"} + ${item.lens_model ?? "Unknown"}`,
+      combo: `${item.camera_model ?? t("home.stats.unknown")} + ${item.lens_model ?? t("home.stats.unknown")}`,
       rate: Math.round(((item.count ?? 0) / total) * 100),
     }));
-  }, [cameraLensData]);
+  }, [cameraLensData, t]);
 
   // Calculate multiple time-of-day percentages (golden / blue / sunrise / sunset)
   const { goldenPercent, bluePercent, sunrisePercent, sunsetPercent } =
@@ -158,7 +160,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
         <div className="col-span-full card bg-base-100 shadow-sm">
           <div className="card-body">
             <div className="alert alert-error">
-              <span>加载统计数据失败: {error}</span>
+              <span>{t("home.stats.error", { error: String(error) })}</span>
             </div>
           </div>
         </div>
@@ -175,7 +177,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
         <div className="card-body">
           <div className="flex items-center gap-2 text-primary">
             <CameraIcon className="size-5" />
-            <h3 className="font-bold">常用焦段分布</h3>
+            <h3 className="font-bold">{t("home.stats.focalLength.title")}</h3>
           </div>
           {focalStats.length > 0 ? (
             <div className="text-sm space-y-3 mt-2">
@@ -195,7 +197,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             </div>
           ) : (
             <div className="flex items-center justify-center h-32 text-base-content/50">
-              <p className="text-sm">暂无焦距数据</p>
+              <p className="text-sm">{t("home.stats.focalLength.empty")}</p>
             </div>
           )}
         </div>
@@ -206,7 +208,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
         <div className="card-body">
           <div className="flex items-center gap-2 text-primary">
             <ClockIcon className="size-5" />
-            <h3 className="font-bold">拍摄时段分布</h3>
+            <h3 className="font-bold">{t("home.stats.timeDistribution.title")}</h3>
           </div>
           <div className="grid grid-cols-2 gap-4 items-center justify-center mt-2">
             <div className="flex flex-col items-center gap-1">
@@ -220,7 +222,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               >
                 {goldenPercent}%
               </div>
-              <p className="text-xs text-primary">黄金</p>
+              <p className="text-xs text-primary">
+                {t("home.stats.timeDistribution.golden")}
+              </p>
             </div>
 
             <div className="flex flex-col items-center gap-1">
@@ -234,7 +238,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               >
                 {bluePercent}%
               </div>
-              <p className="text-xs text-info">蓝调</p>
+              <p className="text-xs text-info">
+                {t("home.stats.timeDistribution.blue")}
+              </p>
             </div>
 
             <div className="flex flex-col items-center gap-1">
@@ -248,7 +254,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               >
                 {sunrisePercent}%
               </div>
-              <p className="text-xs text-warning">日出</p>
+              <p className="text-xs text-warning">
+                {t("home.stats.timeDistribution.sunrise")}
+              </p>
             </div>
 
             <div className="flex flex-col items-center gap-1">
@@ -262,7 +270,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               >
                 {sunsetPercent}%
               </div>
-              <p className="text-xs text-secondary">日落</p>
+              <p className="text-xs text-secondary">
+                {t("home.stats.timeDistribution.sunset")}
+              </p>
             </div>
           </div>
         </div>
@@ -273,7 +283,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
         <div className="card-body">
           <div className="flex items-center gap-2 text-primary">
             <CameraIcon className="size-5" />
-            <h3 className="font-bold">常用相机镜头组合</h3>
+            <h3 className="font-bold">{t("home.stats.cameraLens.title")}</h3>
           </div>
           {combos.length > 0 ? (
             <div className="text-sm space-y-2 mt-2">
@@ -297,7 +307,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             </div>
           ) : (
             <div className="flex items-center justify-center h-32 text-base-content/50">
-              <p className="text-sm">暂无相机镜头数据</p>
+              <p className="text-sm">{t("home.stats.cameraLens.empty")}</p>
             </div>
           )}
         </div>
@@ -309,7 +319,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 text-primary">
               <ClockIcon className="size-5" />
-              <h3 className="font-bold">拍摄活跃热力图</h3>
+              <h3 className="font-bold">{t("home.stats.heatmap.title")}</h3>
             </div>
             {availableYears.length > 0 && (
               <div className="flex items-center gap-2">
@@ -351,7 +361,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             </div>
           ) : (
             <div className="flex items-center justify-center h-32 text-base-content/50">
-              <p className="text-sm">暂无活跃度数据</p>
+              <p className="text-sm">{t("home.stats.heatmap.empty")}</p>
             </div>
           )}
         </div>

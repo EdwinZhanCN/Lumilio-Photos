@@ -1,8 +1,10 @@
 import { Clock, Zap, Loader2, AlertCircle } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { ApiResult, QueueStatsDTO, QueueStatsResponse } from "../monitor.type";
+import { useI18n } from "@/lib/i18n.tsx";
 
 export function QueueList() {
+  const { t } = useI18n();
   const queuesQuery = $api.useQuery(
     "get",
     "/api/v1/admin/river/queues",
@@ -17,13 +19,13 @@ export function QueueList() {
   const response = queuesQuery.data as ApiResult<QueueStatsResponse> | undefined;
   const queues: QueueStatsDTO[] = response?.data?.queues ?? [];
   const loading = queuesQuery.isLoading;
-  const error = queuesQuery.isError ? "Failed to fetch queues" : null;
+  const error = queuesQuery.isError ? t("monitor.queues.fetchError") : null;
 
   if (loading) {
     return (
-      <div className="bg-base-100 rounded-lg shadow-sm p-6 text-center">
+        <div className="bg-base-100 rounded-lg shadow-sm p-6 text-center">
         <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-        <p className="mt-3 text-sm opacity-60">Loading queues...</p>
+        <p className="mt-3 text-sm opacity-60">{t("monitor.queues.loading")}</p>
       </div>
     );
   }
@@ -33,7 +35,7 @@ export function QueueList() {
       <div className="bg-base-100 rounded-lg shadow-sm p-6 text-center">
         <AlertCircle className="w-8 h-8 mx-auto text-warning" />
         <div className="text-warning mt-2 text-sm">
-          {error || "No active queues found"}
+          {error || t("monitor.queues.empty")}
         </div>
       </div>
     );
@@ -45,7 +47,7 @@ export function QueueList() {
       <div className="sticky top-0 z-10 bg-base-100 p-3 border-b border-base-300">
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold opacity-60">
-            {queues.length} Active Queue{queues.length !== 1 ? "s" : ""}
+            {t("monitor.queues.activeCount", { count: queues.length })}
           </span>
         </div>
       </div>
@@ -62,11 +64,15 @@ export function QueueList() {
 
             let timeAgo = "";
             if (secondsAgo < 60) {
-              timeAgo = `${secondsAgo}s ago`;
+              timeAgo = t("monitor.queues.timeAgoSeconds", { count: secondsAgo });
             } else if (secondsAgo < 3600) {
-              timeAgo = `${Math.floor(secondsAgo / 60)}m ago`;
+              timeAgo = t("monitor.queues.timeAgoMinutes", {
+                count: Math.floor(secondsAgo / 60),
+              });
             } else {
-              timeAgo = `${Math.floor(secondsAgo / 3600)}h ago`;
+              timeAgo = t("monitor.queues.timeAgoHours", {
+                count: Math.floor(secondsAgo / 3600),
+              });
             }
 
             // Determine if queue is stale (no update in 5+ minutes)
@@ -102,11 +108,11 @@ export function QueueList() {
                 {/* Status Badge */}
                 {isStale ? (
                   <div className="badge badge-ghost badge-xs gap-1 flex-shrink-0">
-                    Idle
+                    {t("monitor.queues.idle")}
                   </div>
                 ) : (
                   <div className="badge badge-success badge-xs gap-1 flex-shrink-0 animate-pulse">
-                    Active
+                    {t("monitor.queues.active")}
                   </div>
                 )}
               </li>

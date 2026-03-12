@@ -4,6 +4,7 @@ import {
   MentionType,
   MentionTypeOption,
 } from "../RichInput/types";
+import { useI18n } from "@/lib/i18n.tsx";
 
 interface LumilioInputProps {
   isGenerating: boolean;
@@ -22,9 +23,10 @@ export function LumilioInput({
   disabled = false,
   disabledHint,
 }: LumilioInputProps) {
+  const { t } = useI18n();
   // Mention feature remains a placeholder for now
   const mentionTypes: MentionTypeOption[] = [
-    { type: "placeholder", label: "Placeholder" },
+    { type: "placeholder", label: t("lumilio.input.placeholderType") },
   ];
 
   const getEntitiesByType = (type: MentionType) => {
@@ -32,7 +34,7 @@ export function LumilioInput({
       placeholder: [
         {
           id: "placeholder-123",
-          label: "Placeholder Label",
+          label: t("lumilio.input.placeholderLabel"),
           type: "placeholder",
         },
       ],
@@ -46,8 +48,8 @@ export function LumilioInput({
         <RichInput
           placeholder={
             disabled
-              ? "Lumilio Agent is unavailable."
-              : "Ask Lumilio Agent... (Type @ or /)"
+              ? t("lumilio.input.unavailable")
+              : t("lumilio.input.prompt")
           }
           onSubmit={onSubmit}
           mentionTypes={mentionTypes}
@@ -60,8 +62,8 @@ export function LumilioInput({
         {/* Status info */}
         <div className="text-xs text-base-content/60 mt-2">
           {disabled
-            ? (disabledHint ?? "Lumilio Agent is unavailable.")
-            : isGenerating && "Generating response..."}
+            ? (disabledHint ?? t("lumilio.input.unavailable"))
+            : isGenerating && t("lumilio.input.generating")}
         </div>
       </div>
     </RichInputProvider>

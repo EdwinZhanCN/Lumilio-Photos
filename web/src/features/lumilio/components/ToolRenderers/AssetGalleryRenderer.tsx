@@ -16,6 +16,7 @@ import {
   findAssetIndex,
   flattenAssetGroups,
 } from "@/features/assets/utils/assetGroups";
+import { useI18n } from "@/lib/i18n.tsx";
 
 interface AssetGalleryRendererProps {
   event: SideChannelEvent;
@@ -24,6 +25,7 @@ interface AssetGalleryRendererProps {
 export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
   event,
 }) => {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const resetFilters = useAssetsStore((s) => s.resetFilters);
   const batchUpdateFilters = useAssetsStore((s) => s.batchUpdateFilters);
@@ -66,22 +68,25 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
         onClick={() => setIsModalOpen(true)}
       >
         <GalleryThumbnails className="h-4 w-4 mr-2" />
-        View Results
+        {t("lumilio.tools.viewResults")}
       </button>
 
       {isModalOpen && (
         <dialog className="modal modal-open">
           <div className="modal-box w-11/12 max-w-7xl h-[90vh] p-5 overflow-hidden flex flex-col bg-base-100 shadow-2xl">
             {/* Header */}
-            <PageHeader title={`${event.tool.name} Results`} icon={<Hammer className="w-6 h-6 text-primary" />}>
+            <PageHeader
+              title={t("lumilio.tools.resultsTitle", { toolName: event.tool.name })}
+              icon={<Hammer className="w-6 h-6 text-primary" />}
+            >
               <div className="flex items-center gap-4">
                 <button
                   className="btn btn-sm btn-soft btn-info"
                   onClick={handleOpenMainView}
-                  title="Open in main gallery view"
+                  title={t("lumilio.tools.openMainGallery")}
                 >
                   <ExternalLink className="w-4 h-4 mr-1" />
-                  Open Full View
+                  {t("lumilio.tools.openFullView")}
                 </button>
                 <button className="btn btn-sm btn-soft btn-info" onClick={() => setIsModalOpen(false)}>
                   <X className="w-5 h-5" />
@@ -98,7 +103,7 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
             </div>
           </div>
           <form method="dialog" className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
-            <button>close</button>
+            <button>{t("common.close")}</button>
           </form>
         </dialog>
       )}
@@ -107,6 +112,7 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
 };
 
 const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
+  const { t } = useI18n();
   const [carouselAssetId, setCarouselAssetId] = useState<string | undefined>();
 
   const viewDefinition = useMemo<AssetViewDefinition>(() => ({
@@ -158,7 +164,7 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
     <div className="min-h-full p-4">
       {error && (
         <div className="alert alert-error mb-4">
-          <span>Error: {error}</span>
+          <span>{t("lumilio.tools.error", { error: String(error) })}</span>
         </div>
       )}
 

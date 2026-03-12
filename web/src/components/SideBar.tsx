@@ -4,10 +4,8 @@ import {
   AdjustmentsHorizontalIcon,
   ArrowUpTrayIcon,
   HomeIcon,
-  InformationCircleIcon,
   PhotoIcon,
   PaintBrushIcon,
-  BookOpenIcon,
 } from "@heroicons/react/24/outline/index.js";
 
 import { Album, Activity } from "lucide-react";
@@ -17,7 +15,6 @@ import { useAuth } from "@/features/auth";
 
 function SideBar() {
   const [messageCount] = useState<number>(0);
-  const [isUpdate] = useState<boolean>(false);
   const { online: isOnline } = useGlobal();
   const { user } = useAuth();
   const location = useLocation();
@@ -57,12 +54,12 @@ function SideBar() {
             {t("sidebar.studio")}
           </Link>
         </li>
-        <li>
+        {/* <li>
           <Link to={"/portfolio"}>
             <BookOpenIcon className="size-5" />
             {t("sidebar.portfolio")}
           </Link>
-        </li>
+        </li> */}
         <li>
           <div className="bg-linear-50 from-ctp-maroon-300 text-ctp-base">
             <ArrowUpTrayIcon className="size-5" />
@@ -75,7 +72,7 @@ function SideBar() {
             {t("sidebar.settings")}
           </Link>
         </li>
-        <li>
+        {/* <li>
           <Link
             to="/updates"
             className={location.pathname === "/updates" ? "active" : ""}
@@ -88,7 +85,7 @@ function SideBar() {
               </span>
             )}
           </Link>
-        </li>
+        </li> */}
         {user?.role === "admin" && (
           <li>
             <Link to="/server-monitor">

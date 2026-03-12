@@ -1,4 +1,5 @@
 import React from "react";
+import { useI18n } from "@/lib/i18n.tsx";
 
 export type AICategory = {
   id?: string;
@@ -37,10 +38,10 @@ export type AICategoryCarouselProps = {
 };
 
 const DEFAULT_CATEGORIES: AICategory[] = [
-  { name: "旅行记忆" },
-  { name: "家庭时光" },
-  { name: "自然景观" },
-  { name: "美食记录" },
+  { name: "Travel Memories" },
+  { name: "Family Moments" },
+  { name: "Nature Scenes" },
+  { name: "Food Stories" },
 ];
 
 const AICategoryCarousel: React.FC<AICategoryCarouselProps> = ({
@@ -51,10 +52,11 @@ const AICategoryCarousel: React.FC<AICategoryCarouselProps> = ({
   itemClassName = "",
   cardClassName = "",
 }) => {
+  const { t } = useI18n();
   return (
     <section
       className={`carousel carousel-center gap-4 p-4 bg-base-200 rounded-3xl ${className}`}
-      aria-label="AI 分类展示"
+      aria-label={t("home.aiCategories.sectionAriaLabel")}
     >
       {categories.map((cat, i) => {
         const key = cat.id ?? cat.name ?? `cat-${i}`;
@@ -69,7 +71,10 @@ const AICategoryCarousel: React.FC<AICategoryCarouselProps> = ({
               className={`card w-64 bg-base-100 shadow-xl hover:shadow-2xl transition-shadow cursor-pointer ${cardClassName}`}
               role="button"
               tabIndex={0}
-              aria-label={`分类：${cat.name}，共 ${count} 个相关项目`}
+              aria-label={t("home.aiCategories.itemAriaLabel", {
+                name: cat.name,
+                count,
+              })}
               onClick={handleSelect}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -92,7 +97,9 @@ const AICategoryCarousel: React.FC<AICategoryCarouselProps> = ({
               </figure>
               <div className="card-body">
                 <h3 className="card-title">{cat.name}</h3>
-                <p className="text-sm opacity-70">AI识别到{count}个相关项目</p>
+                <p className="text-sm opacity-70">
+                  {t("home.aiCategories.itemCount", { count })}
+                </p>
                 {cat.subtitle && (
                   <p className="text-xs text-base-content/60">{cat.subtitle}</p>
                 )}

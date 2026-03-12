@@ -1,5 +1,6 @@
 import { GalleryVerticalEnd } from "lucide-react";
 import { useState } from "react";
+import { useI18n } from "@/lib/i18n.tsx";
 
 interface ImgStackViewProps {
   coverImages?: string[];
@@ -8,6 +9,7 @@ interface ImgStackViewProps {
 }
 
 function ImgStackView({ coverImages, albumName, isSelected = false }: ImgStackViewProps) {
+  const { t } = useI18n();
   const hasCover = coverImages && coverImages.length > 0;
   const [imageError, setImageError] = useState(false);
 
@@ -39,7 +41,11 @@ function ImgStackView({ coverImages, albumName, isSelected = false }: ImgStackVi
         {hasCover && !imageError ? (
           <img
             src={coverImages[0]}
-            alt={albumName ? `Cover image for ${albumName} album` : "Album cover image"}
+            alt={
+              albumName
+                ? t("collections.coverAltWithName", { albumName })
+                : t("collections.coverAlt")
+            }
             className={`size-full object-cover transition-all duration-300 ${isSelected ? 'brightness-90 scale-105' : ''}`}
             loading="lazy"
             onError={() => setImageError(true)}

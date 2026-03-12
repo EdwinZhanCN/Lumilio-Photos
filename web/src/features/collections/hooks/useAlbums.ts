@@ -21,9 +21,7 @@ export const mapAlbumToUI = (
 
   return {
     id: String(album.album_id),
-    name:
-      album.album_name?.trim() ||
-      t("collections.untitled", { defaultValue: "Untitled Album" }),
+    name: album.album_name?.trim() || t("collections.untitled"),
     description: album.description ?? "",
     imageCount: album.asset_count ?? 0,
     coverImages: coverAssetId

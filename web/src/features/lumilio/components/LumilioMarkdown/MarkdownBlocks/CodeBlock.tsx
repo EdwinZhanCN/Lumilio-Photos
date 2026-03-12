@@ -5,6 +5,7 @@ import {
   oneLight,
 } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import { isDarkDaisyUITheme } from "@/lib/theme/daisyuiThemes";
+import { useI18n } from "@/lib/i18n.tsx";
 
 interface CodeBlockProps {
   inline?: boolean;
@@ -19,6 +20,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
   children,
   ...props
 }) => {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const match = /language-(\w+)/.exec(className || "");
@@ -76,13 +78,15 @@ export const CodeBlock: React.FC<CodeBlockProps> = ({
     <div className="relative group my-4">
       <div className="flex items-center justify-between bg-base-300 px-4 py-2 rounded-t-lg">
         <span className="text-sm text-base-content/70 font-medium">
-          {language || "text"}
+          {language || t("lumilio.markdown.code.languageFallback")}
         </span>
         <button
           onClick={handleCopy}
           className="text-base-content/60 hover:text-base-content transition-colors duration-200 text-sm"
         >
-          {copied ? "✓ Copied" : "Copy"}
+          {copied
+            ? t("lumilio.markdown.code.copied")
+            : t("lumilio.markdown.code.copy")}
         </button>
       </div>
       <SyntaxHighlighter

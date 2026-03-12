@@ -1,6 +1,7 @@
 import ImgStackView from "../ImgStackView/ImgStackView";
 import { CheckCircle2, Circle } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
+import { useI18n } from "@/lib/i18n.tsx";
 
 export interface Album {
   id: string;
@@ -29,6 +30,8 @@ function ImgStackGrid({
   selectedIds = [],
   isSelectionMode = false,
 }: ImgStackGridProps) {
+  const { t } = useI18n();
+
   if (loading) {
     return (
       <div
@@ -100,7 +103,7 @@ function ImgStackGrid({
                 {album.name}
               </h3>
               <p className="text-xs text-base-content/50 font-medium">
-                {album.imageCount} {album.imageCount === 1 ? "item" : "items"}
+                {t("collections.itemsCount", { count: album.imageCount })}
               </p>
             </div>
           </div>

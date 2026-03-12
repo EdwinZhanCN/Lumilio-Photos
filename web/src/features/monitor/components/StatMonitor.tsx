@@ -1,8 +1,10 @@
 import { Activity, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { ApiResult, JobStatsResponse } from "../monitor.type";
+import { useI18n } from "@/lib/i18n.tsx";
 
 export function StatMonitor() {
+  const { t } = useI18n();
   const statsQuery = $api.useQuery(
     "get",
     "/api/v1/admin/river/stats",
@@ -17,13 +19,13 @@ export function StatMonitor() {
   const response = statsQuery.data as ApiResult<JobStatsResponse> | undefined;
   const stats = response?.data ?? null;
   const loading = statsQuery.isLoading;
-  const error = statsQuery.isError ? "Failed to fetch queue stats" : null;
+  const error = statsQuery.isError ? t("monitor.stats.fetchError") : null;
 
   if (loading) {
     return (
       <div className="stats stats-vertical lg:stats-horizontal shadow-sm w-full">
         <div className="stat">
-          <div className="stat-title">Loading...</div>
+          <div className="stat-title">{t("common.loading")}</div>
           <div className="stat-value">
             <span className="loading loading-spinner loading-md"></span>
           </div>
@@ -36,9 +38,9 @@ export function StatMonitor() {
     return (
       <div className="stats stats-vertical lg:stats-horizontal shadow-sm w-full">
         <div className="stat">
-          <div className="stat-title">Error</div>
+          <div className="stat-title">{t("common.error")}</div>
           <div className="stat-value text-error text-lg">
-            {error || "No data"}
+            {error || t("monitor.stats.noData")}
           </div>
         </div>
       </div>
@@ -60,22 +62,26 @@ export function StatMonitor() {
         <div className="stat-figure text-primary">
           <Activity className="w-8 h-8" />
         </div>
-        <div className="stat-title">Active Jobs</div>
+        <div className="stat-title">{t("monitor.stats.activeJobs")}</div>
         <div className="stat-value text-primary">{activeJobs}</div>
         <div className="stat-desc">
           {(stats.running ?? 0) > 0 && (
             <span className="inline-flex items-center gap-1 text-info">
               <Loader2 className="w-3 h-3 animate-spin" />
-              {stats.running} running
+              {t("monitor.stats.runningCount", { count: stats.running })}
             </span>
           )}
           {(stats.running ?? 0) === 0 && (stats.available ?? 0) > 0 && (
-            <span className="text-neutral">{stats.available} available</span>
+            <span className="text-neutral">
+              {t("monitor.stats.availableCount", { count: stats.available })}
+            </span>
           )}
           {(stats.running ?? 0) === 0 &&
             (stats.available ?? 0) === 0 &&
             (stats.scheduled ?? 0) > 0 && (
-              <span className="text-neutral">{stats.scheduled} scheduled</span>
+              <span className="text-neutral">
+                {t("monitor.stats.scheduledCount", { count: stats.scheduled })}
+              </span>
             )}
         </div>
       </div>
@@ -85,13 +91,13 @@ export function StatMonitor() {
         <div className="stat-figure text-success">
           <CheckCircle2 className="w-8 h-8" />
         </div>
-        <div className="stat-title">Completed</div>
+        <div className="stat-title">{t("monitor.stats.completed")}</div>
         <div className="stat-value text-success">{stats.completed ?? 0}</div>
         <div className="stat-desc">
           {totalProcessed > 0 ? (
-            <span>{successRate}% success rate</span>
+            <span>{t("monitor.stats.successRate", { rate: successRate })}</span>
           ) : (
-            <span>No jobs processed yet</span>
+            <span>{t("monitor.stats.noProcessedJobs")}</span>
           )}
         </div>
       </div>
@@ -101,26 +107,34 @@ export function StatMonitor() {
         <div className="stat-figure text-warning">
           <AlertTriangle className="w-8 h-8" />
         </div>
-        <div className="stat-title">Issues</div>
+        <div className="stat-title">{t("monitor.stats.issues")}</div>
         <div className="stat-value text-warning">{issueJobs}</div>
         <div className="stat-desc">
           {(stats.retryable ?? 0) > 0 && (
-            <span className="text-warning">{stats.retryable} retryable</span>
+            <span className="text-warning">
+              {t("monitor.stats.retryableCount", { count: stats.retryable })}
+            </span>
           )}
           {(stats.retryable ?? 0) > 0 &&
             ((stats.cancelled ?? 0) > 0 || (stats.discarded ?? 0) > 0) && (
               <span className="mx-1">·</span>
             )}
           {(stats.cancelled ?? 0) > 0 && (
-            <span className="text-error">{stats.cancelled} cancelled</span>
+            <span className="text-error">
+              {t("monitor.stats.cancelledCount", { count: stats.cancelled })}
+            </span>
           )}
           {(stats.cancelled ?? 0) > 0 && (stats.discarded ?? 0) > 0 && (
             <span className="mx-1">·</span>
           )}
           {(stats.discarded ?? 0) > 0 && (
-            <span className="text-error">{stats.discarded} discarded</span>
+            <span className="text-error">
+              {t("monitor.stats.discardedCount", { count: stats.discarded })}
+            </span>
           )}
-          {issueJobs === 0 && <span className="text-success">All healthy</span>}
+          {issueJobs === 0 && (
+            <span className="text-success">{t("monitor.stats.allHealthy")}</span>
+          )}
         </div>
       </div>
     </div>

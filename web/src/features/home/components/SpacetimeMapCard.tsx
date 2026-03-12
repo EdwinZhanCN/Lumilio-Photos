@@ -2,6 +2,7 @@ import React from "react";
 import { MapIcon } from "@heroicons/react/24/outline";
 import PhotoMapView from "@/components/PhotoMapView";
 import type { components } from "@/lib/http-commons/schema.d.ts";
+import { useI18n } from "@/lib/i18n.tsx";
 
 type Schemas = components["schemas"];
 type MapPhotoPoint = Schemas["dto.AssetMapPointDTO"];
@@ -53,7 +54,7 @@ export interface SpacetimeMapCardProps {
  * Renders a card with a header and a Leaflet map for displaying photo locations.
  */
 const SpacetimeMapCard: React.FC<SpacetimeMapCardProps> = ({
-  title = "时空轨迹",
+  title,
   subtitle,
   icon,
   headerRight,
@@ -63,6 +64,9 @@ const SpacetimeMapCard: React.FC<SpacetimeMapCardProps> = ({
   aspect = "aspect-[16/9]",
   style,
 }) => {
+  const { t } = useI18n();
+  const resolvedTitle = title ?? t("home.map.title");
+
   return (
     <section
       className={`card bg-base-100 shadow-xl overflow-hidden ${className}`}
@@ -75,7 +79,7 @@ const SpacetimeMapCard: React.FC<SpacetimeMapCardProps> = ({
               {icon ?? <MapIcon className="size-6" />}
             </div>
             <div>
-              <h2 className="text-xl font-bold">{title}</h2>
+              <h2 className="text-xl font-bold">{resolvedTitle}</h2>
               {subtitle && (
                 <p className="text-sm text-base-content/70">{subtitle}</p>
               )}

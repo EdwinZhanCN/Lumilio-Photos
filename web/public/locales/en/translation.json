@@ -3,7 +3,6 @@
         "name": "Lumilio",
         "tagline": "Photos"
     },
-
     "navbar": {
         "agent": {
             "label": "Lumilio Agent",
@@ -22,8 +21,8 @@
         }
     },
     "search": {
-        "open": "Search Open",
-        "close": "Search Close",
+        "open": "Open search",
+        "close": "Close search",
         "placeholder": "Search",
         "placeholderai": "Search photos, scenes, and text...",
         "topResults": "Top Results",
@@ -32,8 +31,9 @@
         "error": "Search is temporarily unavailable. Try again in a moment.",
         "option": {
             "semantic": "AI Search",
-            "filename": "Filname Search"
-        }
+            "filename": "Filename search"
+        },
+        "loading": "Searching..."
     },
     "sidebar": {
         "home": "Home",
@@ -72,15 +72,126 @@
         "tabs": {
             "gallery": "Gallery",
             "stats": "Stats"
+        },
+        "errors": {
+            "featuredLoadFailed": "Failed to load featured assets: {{message}}",
+            "unknown": "Unknown error"
+        },
+        "map": {
+            "title": "Spacetime Trail",
+            "loading": "Loading map data...",
+            "loadedStatus": "Located {{pointsCount}} photos / Loaded {{loadedCount}}{{hasTotal, select, true { / Total {{totalCount}}} other {}}}{{loadingMore, select, true { (loading more)} other {}}}",
+            "empty": "No photos with location data yet."
+        },
+        "info": {
+            "title": "Photography Resources",
+            "description": "Discover excellent works and photography insights from platforms like 500px and Flickr.",
+            "browse": "Browse Resources",
+            "links": {
+                "0": {
+                    "description": "A high-quality photography sharing community"
+                },
+                "1": {
+                    "description": "A long-standing photo platform"
+                },
+                "2": {
+                    "description": "A free high-quality image community"
+                },
+                "3": {
+                    "description": "Photography news and techniques"
+                }
+            }
+        },
+        "stats": {
+            "unknown": "Unknown",
+            "error": "Failed to load statistics: {{error}}",
+            "focalLength": {
+                "title": "Popular Focal Lengths",
+                "empty": "No focal length data available"
+            },
+            "timeDistribution": {
+                "title": "Shooting Time Distribution",
+                "golden": "Golden Hour",
+                "blue": "Blue Hour",
+                "sunrise": "Sunrise",
+                "sunset": "Sunset"
+            },
+            "cameraLens": {
+                "title": "Popular Camera and Lens Combinations",
+                "empty": "No camera and lens data available"
+            },
+            "heatmap": {
+                "title": "Shooting Activity Heatmap",
+                "empty": "No activity data available"
+            }
+        },
+        "filters": {
+            "previewLabel": "Preview",
+            "sectionAriaLabel": "Creative filter preview wall",
+            "itemAriaLabel": "Filter: {{name}}",
+            "previewAlt": "{{name}} preview",
+            "previewButtonAriaLabel": "{{name}} {{action}}"
+        },
+        "aiCategories": {
+            "sectionAriaLabel": "AI category showcase",
+            "itemAriaLabel": "Category: {{name}}, {{count}} related items",
+            "itemCount": "AI detected {{count}} related items"
         }
     },
     "collections": {
         "untitled": "Untitled Album",
         "createSuccess": "Album created successfully",
-        "deleteSuccess": "Album deleted successfully",
-        "deleteError": "Failed to delete albums",
         "newAlbum": "New Album",
-        "updateSuccess": "Album updated successfully"
+        "updateSuccess": "Album updated successfully",
+        "itemsCount_one": "{{count}} item",
+        "itemsCount_other": "{{count}} items",
+        "coverAlt": "Album cover image",
+        "coverAltWithName": "Cover image for album {{albumName}}",
+        "messages": {
+            "deleteSuccess": "Albums deleted successfully",
+            "deleteError": "Failed to delete albums"
+        },
+        "deleteModal": {
+            "title": "Delete albums",
+            "description_one": "Are you sure you want to delete {{count}} selected album? This only removes the collection. Your photos remain in your library.",
+            "description_other": "Are you sure you want to delete {{count}} selected albums? This only removes the collections. Your photos remain in your library.",
+            "deleting": "Deleting...",
+            "confirm": "Delete collections"
+        },
+        "createModal": {
+            "fields": {
+                "name": {
+                    "label": "Album name",
+                    "placeholder": "e.g. Summer Vacation 2024"
+                },
+                "description": {
+                    "label": "Description",
+                    "placeholder": "Describe this collection..."
+                },
+                "cover": {
+                    "label": "Album cover",
+                    "selectedAlt": "Selected cover image",
+                    "change": "Change cover",
+                    "choose": "Choose a cover photo",
+                    "requiredHint": "Required for new albums"
+                }
+            },
+            "actions": {
+                "creating": "Creating...",
+                "create": "Create album"
+            },
+            "coverPicker": {
+                "title": "Select cover photo"
+            }
+        },
+        "albumDetails": {
+            "fallbackName": "Album",
+            "albumCode": "ALBUM #{{id}}",
+            "itemsCount_one": "{{count}} item",
+            "itemsCount_other": "{{count}} items",
+            "createdAtLabel": "Created",
+            "loadError": "Failed to load album: {{error}}"
+        }
     },
     "assets": {
         "errorFallback": {
@@ -88,7 +199,7 @@
         },
         "photos": {
             "title": "Photos",
-            "end_of_results": "End of results.",
+            "end_of_results": "No more results.",
             "locating_asset": "Locating asset...",
             "loading_more_data": "Loading more data to find the asset...",
             "asset_not_available": "Asset may not be available in the current view.",
@@ -128,21 +239,21 @@
         },
         "videos": {
             "title": "Videos",
-            "end_of_results": "End of results.",
+            "end_of_results": "No more results.",
             "locating_asset": "Locating asset...",
             "loading_more_data": "Loading more data to find the asset...",
             "asset_not_available": "Asset may not be available in the current view.",
             "loading_assets": "Loading assets..."
         },
         "audios": {
-            "title": "Audios",
-            "end_of_results": "End of results.",
+            "title": "Audio",
+            "end_of_results": "No more results.",
             "locating_asset": "Locating asset...",
             "loading_more_data": "Loading more data to find the asset...",
             "asset_not_available": "Asset may not be available in the current view.",
             "loading_assets": "Loading assets..."
         },
-        "empty": "No assets yet",
+        "empty": "No assets available yet.",
         "basicInfo": {
             "title": "Basic Info",
             "location": "Location",
@@ -155,7 +266,7 @@
             "descriptionUpdated": "Description updated successfully",
             "descriptionUpdateError": "Failed to update description",
             "viewExif": "View EXIF",
-            "loadingFile": "Loading File...",
+            "loadingFile": "Loading file...",
             "extracting": "Extracting...",
             "latitude": "Lat",
             "longitude": "Lng",
@@ -258,14 +369,14 @@
             "recording_location": "Recording Location"
         },
         "fullScreenBasicInfo": {
-            "unknown_asset_type": "UNKNOWN",
+            "unknown_asset_type": "Unknown",
             "unknown_file": "Unknown file",
             "unknown_type": "Unknown type"
         },
         "justifiedGallery": {
             "item_count": "{{count}} item",
             "item_count_plural": "{{count}} items",
-            "loading_more": "Loading more"
+            "loading_more": "Loading more..."
         },
         "mediaViewer": {
             "video_title": "Video",
@@ -304,7 +415,9 @@
             },
             "selectionMode": {
                 "exit": "Exit Selection Mode",
-                "enter": "Enter Selection Mode"
+                "enter": "Enter Selection Mode",
+                "label": "Selection",
+                "selectedCount": "{{count}} selected"
             },
             "actions": {
                 "title": "Actions",
@@ -332,6 +445,13 @@
                 "noAlbumsFound": "No albums found",
                 "createNewAlbum": "Create New Album"
             }
+        },
+        "groups": {
+            "today": "Today",
+            "yesterday": "Yesterday",
+            "thisWeek": "This Week",
+            "thisMonth": "This Month",
+            "allResults": "All Results"
         }
     },
     "upload": {
@@ -724,6 +844,51 @@
             "modelListDescription": "Check config from WebLLM (Do not edit this unless you know what is it)",
             "save": "Save",
             "unsavedChanges": "You have unsaved changes"
+        },
+        "account": {
+            "mfa": {
+                "setupError": "Failed to start authenticator setup.",
+                "enabled": "Two-factor authentication has been enabled.",
+                "enableError": "Failed to enable two-factor authentication.",
+                "disabled": "Two-factor authentication has been disabled.",
+                "disableError": "Failed to disable two-factor authentication.",
+                "regenerated": "Recovery codes have been regenerated successfully.",
+                "regenerateError": "Failed to regenerate recovery codes.",
+                "qrError": "Failed to generate the authenticator QR code.",
+                "bootstrapOnboardingTitle": "First administrator account",
+                "bootstrapOnboarding": "This is the first Lumilio administrator account. Complete authenticator setup now to secure administrator sign-in from the first session.",
+                "enabledBadge": "Enabled",
+                "disabledBadge": "Disabled",
+                "remainingCodes": "{{count}} recovery codes remaining",
+                "beginSetup": "Set up authenticator",
+                "regenerateButton": "Regenerate recovery codes",
+                "disableButton": "Disable two-factor authentication",
+                "stepOne": "Step 1",
+                "setupTitle": "Scan the QR code in your authenticator app",
+                "setupDescription": "Use Duo, 1Password, Google Authenticator, or another TOTP-compatible app. If scanning is unavailable, copy the setup details manually.",
+                "qrAlt": "Authenticator setup QR code",
+                "qrCaption": "If scanning is unavailable, you can still use the manual setup key.",
+                "issuer": "Issuer",
+                "account": "Account",
+                "setupKey": "Manual setup key",
+                "setupKeyHint": "Enter this key manually in your authenticator app if you cannot scan the QR code.",
+                "advanced": "Advanced setup URI",
+                "stepTwoLabel": "Step 2",
+                "stepTwo": "Verify with a 6-digit code",
+                "verificationCode": "Verification code",
+                "totpValidation": "Enter the 6-digit code from your authenticator app.",
+                "enableButton": "Enable two-factor authentication",
+                "enabling": "Enabling…",
+                "disableWarning": "Disabling two-factor authentication will reduce account security. Please confirm with your current password.",
+                "currentPassword": "Current password",
+                "currentPasswordHint": "Enter your current password to confirm this security change.",
+                "confirmDisable": "Confirm disable",
+                "regenerateTitle": "Regenerate recovery codes",
+                "regenerateHint": "Regenerating recovery codes will invalidate all existing codes immediately.",
+                "confirmRegenerate": "Confirm regeneration",
+                "recoveryCodesTitle": "Recovery codes",
+                "recoveryCodesHint": "Store these one-time codes securely. Each code can be used only once."
+            }
         }
     },
     "map": {
@@ -753,7 +918,9 @@
         "emptyState": {
             "title": "Nothing here yet",
             "description": "Items will appear here when available."
-        }
+        },
+        "copy": "Copy",
+        "or": "OR"
     },
     "monitor": {
         "title": "Server Monitor",
@@ -788,11 +955,84 @@
         "status": {
             "online": "Online",
             "offline": "Offline"
+        },
+        "adminOnlyTitle": "Admin access required",
+        "adminOnlyDescription": "Queue monitoring and runtime diagnostics are only available to administrators.",
+        "stats": {
+            "fetchError": "Failed to fetch queue stats",
+            "noData": "No data",
+            "activeJobs": "Active jobs",
+            "runningCount": "{{count}} running",
+            "availableCount": "{{count}} available",
+            "scheduledCount": "{{count}} scheduled",
+            "completed": "Completed",
+            "successRate": "{{rate}}% success rate",
+            "noProcessedJobs": "No jobs processed yet",
+            "issues": "Issues",
+            "retryableCount": "{{count}} retryable",
+            "cancelledCount": "{{count}} cancelled",
+            "discardedCount": "{{count}} discarded",
+            "allHealthy": "All healthy"
+        },
+        "queues": {
+            "fetchError": "Failed to fetch queues",
+            "loading": "Loading queues...",
+            "empty": "No active queues found",
+            "activeCount_one": "{{count}} active queue",
+            "activeCount_other": "{{count}} active queues",
+            "timeAgoSeconds": "{{count}}s ago",
+            "timeAgoMinutes": "{{count}}m ago",
+            "timeAgoHours": "{{count}}h ago",
+            "idle": "Idle",
+            "active": "Active"
+        },
+        "jobs": {
+            "fetchError": "Failed to fetch jobs",
+            "loading": "Loading jobs...",
+            "empty": "No jobs found with current filters",
+            "attempts": "{{current}}/{{max}} attempts",
+            "timeAgoSeconds": "{{count}}s ago",
+            "timeAgoMinutes": "{{count}}m ago",
+            "timeAgoHours": "{{count}}h ago",
+            "timeAgoDays": "{{count}}d ago",
+            "labels": {
+                "started": "Started",
+                "finished": "Finished",
+                "failed": "Failed",
+                "scheduled": "Scheduled",
+                "created": "Created"
+            },
+            "filters": {
+                "time": "Time",
+                "state": "State",
+                "queue": "Queue",
+                "allQueues": "All",
+                "timeRanges": {
+                    "1h": "< 1h",
+                    "24h": "< 1d",
+                    "30d": "< 30d",
+                    "all": "All"
+                },
+                "states": {
+                    "all": "All",
+                    "running": "Running",
+                    "available": "Available",
+                    "scheduled": "Scheduled",
+                    "retryable": "Retryable",
+                    "completed": "Completed",
+                    "cancelled": "Cancelled",
+                    "discarded": "Discarded"
+                }
+            },
+            "pagination": {
+                "totalJobs": "{{count}} total jobs",
+                "moreResults": "More results available"
+            }
         }
     },
     "rating": {
         "unrated": "Unrated",
-        "none": "None",
+        "none": "No rating",
         "stars": "{{count}} star",
         "stars_plural": "{{count}} stars",
         "like": "Like",
@@ -807,16 +1047,196 @@
         "updateError": "Failed to update items"
     },
     "delete": {
-        "confirmTitle": "Delete Photo",
+        "confirmTitle": "Delete asset",
         "confirmMessage": "Are you sure you want to delete \"{{filename}}\"?",
         "thisAsset": "this photo",
         "softDeleteNote": "This will mark the photo as deleted. The file will not be permanently removed.",
-        "confirm": "Delete Photo",
+        "confirm": "Delete asset",
         "deleting": "Deleting...",
-        "success": "Photo deleted successfully",
-        "error": "Failed to delete photo"
+        "success": "Asset deleted successfully",
+        "error": "Failed to delete asset"
     },
     "lumen": {
         "title": "Lumen"
+    },
+    "auth": {
+        "common": {
+            "logoAlt": "{{appName}} logo"
+        },
+        "errors": {
+            "invalidSessionResponse": "Authentication response did not include a valid session.",
+            "sessionExpired": "Your session has expired. Please sign in again.",
+            "authenticationFailed": "Authentication failed. Please sign in again.",
+            "loginFailed": "Sign-in failed. Please try again.",
+            "invalidCredentials": "The username or password is incorrect.",
+            "verificationFailed": "Verification failed. Please try again."
+        },
+        "passkeySupport": {
+            "browserOnly": "Passkeys are available only in a browser environment.",
+            "notSupported": "This browser or device does not support passkeys.",
+            "secureContextRequired": "Passkeys require a secure browser context.",
+            "httpsRequired": "Passkeys require HTTPS outside localhost development.",
+            "operationCancelled": "Passkey operation was canceled.",
+            "unsupportedResponse": "Unsupported passkey response was returned by this device."
+        },
+        "login": {
+            "usernamePlaceholder": "Enter username",
+            "authenticatorCodePlaceholder": "Enter 6-digit code",
+            "recoveryCodePlaceholder": "Enter recovery code",
+            "passkeyStartError": "Unable to start passkey sign-in for this account.",
+            "passkeyVerifyError": "Passkey verification failed.",
+            "passkeyUnavailable": "Passkey sign-in is unavailable for this account on this device.",
+            "verifyTitle": "Two-factor verification",
+            "passwordTitle": "Enter your password",
+            "bootstrapTitle": "Set up your administrator account",
+            "usernameTitle": "Continue with your username",
+            "verifySubtitle": "Complete sign-in with your authenticator app or a recovery code.",
+            "passwordSubtitle": "Use your password if you prefer not to use a passkey on this device.",
+            "bootstrapSubtitle": "No users exist yet. Create the first account to claim administrator access.",
+            "usernameSubtitle": "Passkey is the primary sign-in method. Password remains available as fallback.",
+            "bootstrapPromptTitle": "Initial setup required",
+            "bootstrapPromptBody": "The first registration becomes administrator and will guide you through passkey or authenticator setup.",
+            "createAdmin": "Create the first administrator account",
+            "verifyPrompt": "Continuing as {{name}}",
+            "recoveryHint": "Enter one of your one-time recovery codes.",
+            "totpHint": "Enter the 6-digit code from your authenticator app.",
+            "recoveryCode": "Recovery code",
+            "authenticatorCode": "Authenticator code",
+            "recoveryValidation": "Enter an 8-character recovery code.",
+            "totpValidation": "Enter a 6-digit authenticator code.",
+            "back": "Back",
+            "verifying": "Verifying…",
+            "verifyButton": "Verify and continue",
+            "useRecoveryCode": "Use a recovery code instead",
+            "useAuthenticatorCode": "Use an authenticator code instead",
+            "username": "Username",
+            "usernameHint": "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
+            "password": "Password",
+            "loading": "Signing in…",
+            "submit": "Continue with password",
+            "passkeyLoading": "Opening passkey…",
+            "passkeySubmit": "Continue with passkey",
+            "usePasswordInstead": "Use password instead",
+            "needAccount": "Need an account?",
+            "register": "Create one now"
+        },
+        "register": {
+            "usernamePlaceholder": "Enter username",
+            "totpQrAlt": "TOTP setup QR code",
+            "startError": "Failed to start account registration.",
+            "passkeyStartError": "Failed to start passkey registration.",
+            "passkeyVerifyError": "Passkey registration failed.",
+            "totpSetupStartError": "Failed to start authenticator setup.",
+            "totpSetupCompleteError": "Failed to complete authenticator setup.",
+            "passkeyUnavailableUseTotp": "Passkeys are unavailable in the current environment. Please continue with an authenticator app.",
+            "title": "Create an account",
+            "bootstrapTitle": "Create the first administrator account",
+            "securityChoiceTitle": "Choose your sign-in method",
+            "totpTitle": "Set up authenticator app",
+            "recoveryTitle": "Save your recovery codes",
+            "subtitle": "Create your username and password first, then secure your account.",
+            "bootstrapSubtitle": "Create your username first, then complete passkey or authenticator setup to finish administrator onboarding.",
+            "securityChoiceSubtitle": "Passkey is recommended when the current device and origin support it.",
+            "totpSubtitle": "Scan the QR code with Duo, 1Password, or any authenticator app, then verify once.",
+            "recoverySubtitle": "These one-time codes are the only fallback if you lose access to your authenticator.",
+            "bootstrapPromptTitle": "You are registering the initial administrator user",
+            "bootstrapPromptBody": "Lumilio will create the first administrator account and require passkey or authenticator enrollment before setup is complete.",
+            "username": "Username",
+            "usernameHint": "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
+            "password": "Password",
+            "passwordHint": "10-72 characters with at least one uppercase letter, one lowercase letter, and one number.",
+            "confirmPassword": "Confirm password",
+            "confirmPasswordHint": "Passwords must match exactly.",
+            "loading": "Preparing account…",
+            "submitBootstrap": "Continue as administrator",
+            "submit": "Continue",
+            "passkeyCardTitle": "Create passkey",
+            "passkeyCardBody": "Use this device's native passkey flow for the fastest and strongest sign-in.",
+            "passkeyAction": "Create passkey",
+            "totpCardTitle": "Use authenticator app instead",
+            "totpCardBody": "Choose TOTP if you prefer Duo, 1Password, Google Authenticator, or another app.",
+            "totpAction": "Use authenticator app",
+            "manualKey": "Setup key",
+            "verifyCode": "Verification code",
+            "verifyAndFinish": "Verify and finish setup",
+            "recoveryReadyTitle": "Account secured successfully",
+            "recoveryReadyBody": "Store these recovery codes in a safe place before continuing.",
+            "finish": "Continue to Lumilio",
+            "haveAccount": "Already have an account?",
+            "login": "Sign in"
+        },
+        "mfa": {
+            "pageTitle": "Manage authenticator setup",
+            "pageSubtitle": "Manage verification, recovery codes, and security settings for your account in one place.",
+            "bootstrapTitle": "Protect the first administrator account",
+            "bootstrapSubtitle": "Complete authenticator setup now so the first Lumilio administrator account is protected before you continue.",
+            "doneHere": "Finished here?",
+            "continueToApp": "Continue to application",
+            "backToSettings": "Back to settings"
+        },
+        "changePassword": {
+            "pageTitle": "Change your password",
+            "pageSubtitle": "After changing your password, you will be signed out and need to sign in again with your new password.",
+            "currentPassword": "Current password",
+            "currentPasswordHint": "Enter your current password to verify your identity.",
+            "newPasswordDivider": "NEW PASSWORD",
+            "newPassword": "New password",
+            "passwordHint": "10-72 characters with at least one uppercase letter, one lowercase letter, and one number.",
+            "confirmPassword": "Confirm new password",
+            "mismatch": "Passwords must match exactly.",
+            "loading": "Updating password…",
+            "submit": "Update password",
+            "error": "Failed to change password.",
+            "changed": "Changed your mind?",
+            "backToSettings": "Back to settings"
+        }
+    },
+    "lumilio": {
+        "agent": {
+            "disabled": "Lumilio Agent is disabled. Enable it in Settings > AI.",
+            "notConfigured": "Lumilio Agent is not configured. Complete provider, model, and API key in Settings > AI."
+        },
+        "chat": {
+            "empty": "Start a conversation with Lumilio!",
+            "openAiSettings": "Open AI settings",
+            "confirmation": {
+                "title": "Confirmation required",
+                "confirm": "Confirm"
+            }
+        },
+        "input": {
+            "placeholderType": "Placeholder",
+            "placeholderLabel": "Placeholder label",
+            "unavailable": "Lumilio Agent is unavailable.",
+            "prompt": "Ask Lumilio Agent... (Type @ or /)",
+            "generating": "Generating response..."
+        },
+        "messages": {
+            "thinking": "Thinking..."
+        },
+        "status": {
+            "loading": "Loading {{status}}"
+        },
+        "tools": {
+            "viewResults": "View results",
+            "resultsTitle": "{{toolName}} results",
+            "openMainGallery": "Open in main gallery view",
+            "openFullView": "Open full view",
+            "error": "Error: {{error}}",
+            "eventNotFound": "Tool event not found.",
+            "lookedFor": "Looked for",
+            "receivedRawId": "Received raw ID"
+        },
+        "markdown": {
+            "code": {
+                "languageFallback": "text",
+                "copy": "Copy",
+                "copied": "Copied"
+            },
+            "think": {
+                "details": "Details",
+                "defaultSummary": "Think about this..."
+            }
+        }
     }
 }

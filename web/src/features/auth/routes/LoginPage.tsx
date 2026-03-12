@@ -107,6 +107,9 @@ const LoginPage: React.FC = () => {
   const passkeyBusy =
     passkeyOptionsMutation.isPending || passkeyVerifyMutation.isPending;
   const displayError = passkeyError ?? error;
+  const passkeySupportReason = passkeySupport.reasonKey
+    ? t(passkeySupport.reasonKey)
+    : null;
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -152,7 +155,7 @@ const LoginPage: React.FC = () => {
       if (!optionsData?.data) {
         throw new Error(
           optionsData?.message ||
-            "Passkey sign-in could not be started for this account.",
+            t("auth.login.passkeyStartError"),
         );
       }
 
@@ -166,7 +169,7 @@ const LoginPage: React.FC = () => {
       const verifyData =
         verifyResponse as ApiResult<AuthResponse> | undefined;
       if (!verifyData?.data) {
-        throw new Error(verifyData?.message || "Passkey verification failed.");
+        throw new Error(verifyData?.message || t("auth.login.passkeyVerifyError"));
       }
 
       completeAuth(verifyData.data);
@@ -175,7 +178,7 @@ const LoginPage: React.FC = () => {
       setPasskeyError(
         getApiMessage(
           passkeyAuthError,
-          "Passkey sign-in is unavailable for this account on this device.",
+          t("auth.login.passkeyUnavailable"),
         ),
       );
     }
@@ -222,7 +225,9 @@ const LoginPage: React.FC = () => {
               <div className="inline-flex items-center gap-4 text-3xl font-bold tracking-tight text-base-content sm:text-4xl">
                 <img
                   src="/logo.png"
-                  alt={t("app.name") + " Logo"}
+                  alt={t("auth.common.logoAlt", {
+                    appName: t("app.name"),
+                  })}
                   className="size-10 bg-contain object-contain sm:size-12"
                 />
                 <span>{t("app.name")}</span>
@@ -274,7 +279,7 @@ const LoginPage: React.FC = () => {
             {displayError && (
               <div className="alert alert-error py-3 text-sm">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{displayError}</span>
+                <span>{t(displayError, { defaultValue: displayError })}</span>
               </div>
             )}
 
@@ -349,7 +354,9 @@ const LoginPage: React.FC = () => {
                       autoFocus
                       className="grow"
                       placeholder={
-                        mfaMethod === "recovery_code" ? "ABCD-EFGH" : "123456"
+                        mfaMethod === "recovery_code"
+                          ? t("auth.login.recoveryCodePlaceholder")
+                          : t("auth.login.authenticatorCodePlaceholder")
                       }
                       value={mfaCode}
                       onChange={(event) => setMfaCode(event.target.value)}
@@ -443,7 +450,7 @@ const LoginPage: React.FC = () => {
                     <User className="h-4 w-4 shrink-0 text-base-content/70" />
                     <input
                       type="text"
-                      placeholder="username"
+                      placeholder={t("auth.login.usernamePlaceholder")}
                       className="grow"
                       value={username}
                       onChange={(event) =>
@@ -487,9 +494,9 @@ const LoginPage: React.FC = () => {
                   </fieldset>
                 )}
 
-                {!showPasswordStep && passkeySupport.reason && (
+                {!showPasswordStep && passkeySupportReason && (
                   <div className="rounded-xl border border-base-300 bg-base-200/60 p-4 text-sm text-base-content/80">
-                    {passkeySupport.reason}
+                    {passkeySupportReason}
                   </div>
                 )}
 

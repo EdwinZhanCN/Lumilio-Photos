@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const completeAuth = (response: AuthResponse): User => {
     const { token, refreshToken, user } = response;
     if (!token || !user) {
-      throw new Error("Authentication response did not include a session.");
+      throw new Error("auth.errors.invalidSessionResponse");
     }
 
     saveToken(token, refreshToken || "");
@@ -95,11 +95,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // 3. Everything failed
         removeToken();
-        dispatch({ type: "AUTH_FAILURE", payload: "Session expired" });
+        dispatch({ type: "AUTH_FAILURE", payload: "auth.errors.sessionExpired" });
       } catch (error) {
         console.error("Auth initialization failed:", error);
         removeToken();
-        dispatch({ type: "AUTH_FAILURE", payload: "Authentication failed" });
+        dispatch({ type: "AUTH_FAILURE", payload: "auth.errors.authenticationFailed" });
       } finally {
         isInitialized.current = true;
       }
@@ -135,15 +135,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         dispatch({
           type: "AUTH_FAILURE",
-          payload: responseData?.message || "Login failed",
+          payload: responseData?.message || "auth.errors.loginFailed",
         });
       }
 
-      throw new Error(responseData?.message || "Login failed");
+      throw new Error(responseData?.message || "auth.errors.loginFailed");
     } catch (error: any) {
       dispatch({
         type: "AUTH_FAILURE",
-        payload: getApiMessage(error, "Invalid credentials"),
+        payload: getApiMessage(error, "auth.errors.invalidCredentials"),
       });
       throw error;
     }
@@ -163,13 +163,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
 
-      const message = responseData?.message || "Verification failed";
+      const message = responseData?.message || "auth.errors.verificationFailed";
       dispatch({ type: "AUTH_FAILURE", payload: message });
       throw new Error(message);
     } catch (error: any) {
       dispatch({
         type: "AUTH_FAILURE",
-        payload: getApiMessage(error, "Verification failed"),
+        payload: getApiMessage(error, "auth.errors.verificationFailed"),
       });
       throw error;
     }

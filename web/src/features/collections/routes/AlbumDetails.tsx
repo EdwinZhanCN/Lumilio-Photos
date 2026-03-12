@@ -21,8 +21,10 @@ import {
   findAssetIndex,
   flattenAssetGroups,
 } from "@/features/assets/utils/assetGroups";
+import { useI18n } from "@/lib/i18n.tsx";
 
 const AlbumAssetsContent = () => {
+  const { t, i18n } = useI18n();
   const { albumId, assetId } = useParams<{
     albumId: string;
     assetId: string;
@@ -127,7 +129,11 @@ const AlbumAssetsContent = () => {
   }, []);
 
   if (error)
-    return <div className="p-8 text-error">Error loading album: {error}</div>;
+    return (
+      <div className="p-8 text-error">
+        {t("collections.albumDetails.loadError", { error: String(error) })}
+      </div>
+    );
 
   // Initial loading state: loading assets and we have none yet
   const isInitialLoading = isLoading && assets.length === 0;
@@ -138,7 +144,7 @@ const AlbumAssetsContent = () => {
         <AssetsPageHeader
           groupBy={groupBy}
           onGroupByChange={setGroupBy}
-          title={album?.album_name || "Album"}
+          title={album?.album_name || t("collections.albumDetails.fallbackName")}
           icon={<FolderIcon className="w-6 h-6 text-primary" />}
         />
 
@@ -154,10 +160,10 @@ const AlbumAssetsContent = () => {
             ) : (
               <>
                 <h1 className="text-4xl font-black tracking-tight text-primary">
-                  {album?.album_name || "Untitled Album"}
+                  {album?.album_name || t("collections.untitled")}
                 </h1>
                 <span className="badge badge-ghost font-mono text-xs opacity-50">
-                  ALBUM #{albumId}
+                  {t("collections.albumDetails.albumCode", { id: albumId })}
                 </span>
               </>
             )}
@@ -187,7 +193,11 @@ const AlbumAssetsContent = () => {
               {isAlbumLoading && !album ? (
                 <div className="h-3 w-16 bg-base-300 animate-pulse rounded"></div>
               ) : (
-                <span>{album?.asset_count || 0} items</span>
+                <span>
+                  {t("collections.albumDetails.itemsCount", {
+                    count: album?.asset_count || 0,
+                  })}
+                </span>
               )}
             </div>
             <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
@@ -196,9 +206,11 @@ const AlbumAssetsContent = () => {
                 <div className="h-3 w-24 bg-base-300 animate-pulse rounded"></div>
               ) : (
                 <span>
-                  Created{" "}
+                  {t("collections.albumDetails.createdAtLabel")}{" "}
                   {album?.created_at
-                    ? new Date(album.created_at).toLocaleDateString()
+                    ? new Date(album.created_at).toLocaleDateString(
+                        i18n.resolvedLanguage || i18n.language,
+                      )
                     : ""}
                 </span>
               )}
@@ -249,9 +261,11 @@ const AlbumAssetsContent = () => {
             <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center">
               <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
                 <div className="loading loading-spinner loading-lg mb-4"></div>
-                <p className="text-lg font-medium mb-2">Locating asset...</p>
+                <p className="text-lg font-medium mb-2">
+                  {t("assets.photos.locating_asset")}
+                </p>
                 <p className="text-sm text-gray-300">
-                  Loading more data to find the asset...
+                  {t("assets.photos.loading_more_data")}
                 </p>
               </div>
             </div>

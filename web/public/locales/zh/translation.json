@@ -21,8 +21,8 @@
         }
     },
     "search": {
-        "open": "搜索开启",
-        "close": "搜索关闭",
+        "open": "打开搜索",
+        "close": "关闭搜索",
         "placeholder": "搜索",
         "placeholderai": "搜索照片、场景和文字...",
         "topResults": "最佳结果",
@@ -32,7 +32,8 @@
         "option": {
             "semantic": "智能搜索",
             "filename": "文件名搜索"
-        }
+        },
+        "loading": "搜索中..."
     },
     "sidebar": {
         "home": "首页",
@@ -71,15 +72,126 @@
         "tabs": {
             "gallery": "画廊",
             "stats": "数据统计"
+        },
+        "errors": {
+            "featuredLoadFailed": "精选资源加载失败：{{message}}",
+            "unknown": "未知错误"
+        },
+        "map": {
+            "title": "时空轨迹",
+            "loading": "正在加载地图数据...",
+            "loadedStatus": "定位照片 {{pointsCount}} 张 / 已加载 {{loadedCount}}{{hasTotal, select, true { / 总计 {{totalCount}}} other {}}}{{loadingMore, select, true {（继续加载中）} other {}}}",
+            "empty": "暂无带地理位置的照片。"
+        },
+        "info": {
+            "title": "摄影网站资讯",
+            "description": "发现 500px、Flickr 等平台的优秀作品与摄影技巧分享。",
+            "browse": "浏览资讯",
+            "links": {
+                "0": {
+                    "description": "高质量摄影作品分享社区"
+                },
+                "1": {
+                    "description": "历史悠久的摄影作品平台"
+                },
+                "2": {
+                    "description": "免费高质量图片社区"
+                },
+                "3": {
+                    "description": "摄影新闻与技巧"
+                }
+            }
+        },
+        "stats": {
+            "unknown": "未知",
+            "error": "加载统计数据失败：{{error}}",
+            "focalLength": {
+                "title": "常用焦段分布",
+                "empty": "暂无焦距数据"
+            },
+            "timeDistribution": {
+                "title": "拍摄时段分布",
+                "golden": "黄金",
+                "blue": "蓝调",
+                "sunrise": "日出",
+                "sunset": "日落"
+            },
+            "cameraLens": {
+                "title": "常用相机镜头组合",
+                "empty": "暂无相机镜头数据"
+            },
+            "heatmap": {
+                "title": "拍摄活跃热力图",
+                "empty": "暂无活跃度数据"
+            }
+        },
+        "filters": {
+            "previewLabel": "预览效果",
+            "sectionAriaLabel": "创意滤镜预览墙",
+            "itemAriaLabel": "滤镜：{{name}}",
+            "previewAlt": "{{name}} 预览",
+            "previewButtonAriaLabel": "{{name}} {{action}}"
+        },
+        "aiCategories": {
+            "sectionAriaLabel": "AI 分类展示",
+            "itemAriaLabel": "分类：{{name}}，共 {{count}} 个相关项目",
+            "itemCount": "AI 识别到 {{count}} 个相关项目"
         }
     },
     "collections": {
         "untitled": "未命名相册",
         "createSuccess": "相册创建成功",
-        "deleteError": "相册删除失败",
-        "deleteSuccess": "相册删除成功",
         "updateSuccess": "相册更新成功",
-        "newAlbum": "新建相册"
+        "newAlbum": "新建相册",
+        "itemsCount_one": "{{count}} 项",
+        "itemsCount_other": "{{count}} 项",
+        "coverAlt": "相册封面图",
+        "coverAltWithName": "相册 {{albumName}} 的封面图",
+        "messages": {
+            "deleteSuccess": "相册删除成功",
+            "deleteError": "删除相册失败"
+        },
+        "deleteModal": {
+            "title": "删除相册",
+            "description_one": "确定要删除已选中的 {{count}} 个相册吗？此操作仅删除合集，不会删除资料库中的照片。",
+            "description_other": "确定要删除已选中的 {{count}} 个相册吗？此操作仅删除合集，不会删除资料库中的照片。",
+            "deleting": "删除中...",
+            "confirm": "删除合集"
+        },
+        "createModal": {
+            "fields": {
+                "name": {
+                    "label": "相册名称",
+                    "placeholder": "例如：2024 夏日旅行"
+                },
+                "description": {
+                    "label": "描述",
+                    "placeholder": "为这个合集添加描述..."
+                },
+                "cover": {
+                    "label": "相册封面",
+                    "selectedAlt": "已选封面图",
+                    "change": "更换封面",
+                    "choose": "选择封面照片",
+                    "requiredHint": "新建相册时必须选择"
+                }
+            },
+            "actions": {
+                "creating": "创建中...",
+                "create": "创建相册"
+            },
+            "coverPicker": {
+                "title": "选择封面照片"
+            }
+        },
+        "albumDetails": {
+            "fallbackName": "相册",
+            "albumCode": "相册 #{{id}}",
+            "itemsCount_one": "{{count}} 项",
+            "itemsCount_other": "{{count}} 项",
+            "createdAtLabel": "创建于",
+            "loadError": "加载相册失败：{{error}}"
+        }
     },
     "assets": {
         "errorFallback": {
@@ -140,7 +252,7 @@
             "asset_not_available": "资产可能在当前视图中不可用。",
             "loading_assets": "正在加载资产..."
         },
-        "empty": "暂无资产",
+        "empty": "暂无可用资产。",
         "basicInfo": {
             "title": "基本信息",
             "location": "位置",
@@ -153,7 +265,7 @@
             "descriptionUpdated": "描述更新成功",
             "descriptionUpdateError": "更新描述失败",
             "viewExif": "查看 EXIF",
-            "loadingFile": "加载文件中...",
+            "loadingFile": "正在加载文件...",
             "extracting": "提取中...",
             "latitude": "纬度",
             "longitude": "经度",
@@ -263,7 +375,7 @@
         "justifiedGallery": {
             "item_count": "{{count}} 项",
             "item_count_plural": "{{count}} 项",
-            "loading_more": "正在加载更多"
+            "loading_more": "正在加载更多..."
         },
         "mediaViewer": {
             "video_title": "视频",
@@ -302,7 +414,9 @@
             },
             "selectionMode": {
                 "exit": "退出选择模式",
-                "enter": "进入选择模式"
+                "enter": "进入选择模式",
+                "label": "选择模式",
+                "selectedCount": "已选择 {{count}} 项"
             },
             "actions": {
                 "title": "操作",
@@ -330,6 +444,13 @@
                 "noAlbumsFound": "未找到相册",
                 "createNewAlbum": "创建新相册"
             }
+        },
+        "groups": {
+            "today": "今天",
+            "yesterday": "昨天",
+            "thisWeek": "本周",
+            "thisMonth": "本月",
+            "allResults": "全部结果"
         }
     },
     "upload": {
@@ -462,6 +583,28 @@
             },
             "apply": "应用边框",
             "cancel": "取消生成"
+        },
+        "marketplace": {
+            "title": "插件市场",
+            "runtimeDisabled": "工作室插件运行时已禁用。启用 VITE_STUDIO_PLUGIN_RUNTIME_ENABLED 以浏览插件。",
+            "searchPlaceholder": "按名称、ID 或描述搜索插件",
+            "installedOnly": "仅显示已安装",
+            "summary": "显示 {{visible}} / {{total}} 个插件（已安装 {{installed}} 个）",
+            "catalogLoading": "正在加载插件目录...",
+            "empty": "当前筛选条件下没有匹配的插件。",
+            "install": "安装",
+            "uninstall": "移除",
+            "statusInstalled": "已安装",
+            "statusNotInstalled": "未安装"
+        },
+        "plugins": {
+            "title": "插件工作区",
+            "runtimeDisabled": "工作室插件运行时已禁用。启用 VITE_STUDIO_PLUGIN_RUNTIME_ENABLED 以运行插件。",
+            "emptyInstalled": "暂无已安装插件。",
+            "openMarketplace": "打开插件市场",
+            "loading": "正在加载插件界面...",
+            "apply": "应用插件",
+            "cancel": "取消插件运行"
         }
     },
     "settings": {
@@ -734,6 +877,51 @@
             "modelListDescription": "请查看 WebLLM 的配置（除非您知道这是什么，否则请勿编辑）",
             "save": "保存",
             "unsavedChanges": "您有未保存的更改"
+        },
+        "account": {
+            "mfa": {
+                "setupError": "启动身份验证器设置失败。",
+                "enabled": "双重验证已启用。",
+                "enableError": "启用双重验证失败。",
+                "disabled": "双重验证已禁用。",
+                "disableError": "禁用双重验证失败。",
+                "regenerated": "恢复码已重新生成。",
+                "regenerateError": "重新生成恢复码失败。",
+                "qrError": "生成身份验证器二维码失败。",
+                "bootstrapOnboardingTitle": "首个管理员账户",
+                "bootstrapOnboarding": "这是 Lumilio 的首个管理员账户。请立即完成身份验证器设置，以确保管理员登录从首次会话起即受到保护。",
+                "enabledBadge": "已启用",
+                "disabledBadge": "未启用",
+                "remainingCodes": "剩余 {{count}} 个恢复码",
+                "beginSetup": "设置身份验证器",
+                "regenerateButton": "重新生成恢复码",
+                "disableButton": "禁用双重验证",
+                "stepOne": "步骤 1",
+                "setupTitle": "在身份验证器应用中扫描二维码",
+                "setupDescription": "请使用 Duo、1Password、Google Authenticator 或其他兼容 TOTP 的应用。如无法扫码，可手动复制设置信息。",
+                "qrAlt": "身份验证器设置二维码",
+                "qrCaption": "如无法扫码，仍可使用手动设置密钥。",
+                "issuer": "签发方",
+                "account": "账户",
+                "setupKey": "手动设置密钥",
+                "setupKeyHint": "若无法扫描二维码，请在身份验证器应用中手动输入此密钥。",
+                "advanced": "高级设置 URI",
+                "stepTwoLabel": "步骤 2",
+                "stepTwo": "使用 6 位验证码完成验证",
+                "verificationCode": "验证码",
+                "totpValidation": "请输入身份验证器应用中的 6 位验证码。",
+                "enableButton": "启用双重验证",
+                "enabling": "启用中…",
+                "disableWarning": "禁用双重验证会降低账户安全性。请使用当前密码确认操作。",
+                "currentPassword": "当前密码",
+                "currentPasswordHint": "请输入当前密码以确认此安全变更。",
+                "confirmDisable": "确认禁用",
+                "regenerateTitle": "重新生成恢复码",
+                "regenerateHint": "重新生成后，现有恢复码将立即失效。",
+                "confirmRegenerate": "确认重新生成",
+                "recoveryCodesTitle": "恢复码",
+                "recoveryCodesHint": "请妥善保管这些一次性恢复码。每个恢复码仅可使用一次。"
+            }
         }
     },
     "map": {
@@ -763,7 +951,9 @@
         "emptyState": {
             "title": "这里还没有内容",
             "description": "有内容时会显示在这里。"
-        }
+        },
+        "copy": "复制",
+        "or": "或"
     },
     "monitor": {
         "title": "服务器监控",
@@ -798,11 +988,84 @@
         "status": {
             "online": "在线",
             "offline": "离线"
+        },
+        "adminOnlyTitle": "需要管理员权限",
+        "adminOnlyDescription": "队列监控与运行时诊断仅对管理员开放。",
+        "stats": {
+            "fetchError": "获取队列统计失败",
+            "noData": "暂无数据",
+            "activeJobs": "活跃任务",
+            "runningCount": "{{count}} 运行中",
+            "availableCount": "{{count}} 可执行",
+            "scheduledCount": "{{count}} 已调度",
+            "completed": "已完成",
+            "successRate": "成功率 {{rate}}%",
+            "noProcessedJobs": "暂无已处理任务",
+            "issues": "异常",
+            "retryableCount": "{{count}} 可重试",
+            "cancelledCount": "{{count}} 已取消",
+            "discardedCount": "{{count}} 已丢弃",
+            "allHealthy": "状态正常"
+        },
+        "queues": {
+            "fetchError": "获取队列失败",
+            "loading": "正在加载队列...",
+            "empty": "暂无活跃队列",
+            "activeCount_one": "{{count}} 个活跃队列",
+            "activeCount_other": "{{count}} 个活跃队列",
+            "timeAgoSeconds": "{{count}} 秒前",
+            "timeAgoMinutes": "{{count}} 分钟前",
+            "timeAgoHours": "{{count}} 小时前",
+            "idle": "空闲",
+            "active": "活跃"
+        },
+        "jobs": {
+            "fetchError": "获取任务失败",
+            "loading": "正在加载任务...",
+            "empty": "当前筛选条件下没有任务",
+            "attempts": "尝试 {{current}}/{{max}} 次",
+            "timeAgoSeconds": "{{count}} 秒前",
+            "timeAgoMinutes": "{{count}} 分钟前",
+            "timeAgoHours": "{{count}} 小时前",
+            "timeAgoDays": "{{count}} 天前",
+            "labels": {
+                "started": "开始于",
+                "finished": "结束于",
+                "failed": "失败于",
+                "scheduled": "计划于",
+                "created": "创建于"
+            },
+            "filters": {
+                "time": "时间",
+                "state": "状态",
+                "queue": "队列",
+                "allQueues": "全部",
+                "timeRanges": {
+                    "1h": "< 1小时",
+                    "24h": "< 1天",
+                    "30d": "< 30天",
+                    "all": "全部"
+                },
+                "states": {
+                    "all": "全部",
+                    "running": "运行中",
+                    "available": "可执行",
+                    "scheduled": "已调度",
+                    "retryable": "可重试",
+                    "completed": "已完成",
+                    "cancelled": "已取消",
+                    "discarded": "已丢弃"
+                }
+            },
+            "pagination": {
+                "totalJobs": "共 {{count}} 个任务",
+                "moreResults": "还有更多结果"
+            }
         }
     },
     "rating": {
         "unrated": "未评分",
-        "none": "无",
+        "none": "无评分",
         "stars": "{{count}} 星",
         "stars_plural": "{{count}} 星",
         "like": "喜欢",
@@ -817,16 +1080,196 @@
         "updateError": "更新失败"
     },
     "delete": {
-        "confirmTitle": "删除照片",
+        "confirmTitle": "删除资产",
         "confirmMessage": "确定要删除 \"{{filename}}\" 吗？",
         "thisAsset": "这张照片",
         "softDeleteNote": "这将标记照片为已删除。文件不会被永久删除。",
-        "confirm": "删除照片",
+        "confirm": "删除资产",
         "deleting": "删除中...",
-        "success": "照片删除成功",
-        "error": "删除照片失败"
+        "success": "资产删除成功",
+        "error": "删除资产失败"
     },
     "lumen": {
         "title": "Lumen"
+    },
+    "auth": {
+        "common": {
+            "logoAlt": "{{appName}} 标志"
+        },
+        "errors": {
+            "invalidSessionResponse": "认证响应中未包含有效会话信息。",
+            "sessionExpired": "您的会话已过期，请重新登录。",
+            "authenticationFailed": "认证失败，请重新登录。",
+            "loginFailed": "登录失败，请稍后重试。",
+            "invalidCredentials": "用户名或密码不正确。",
+            "verificationFailed": "验证失败，请重试。"
+        },
+        "passkeySupport": {
+            "browserOnly": "Passkey 仅可在浏览器环境中使用。",
+            "notSupported": "当前浏览器或设备不支持 Passkey。",
+            "secureContextRequired": "Passkey 需要在安全浏览器上下文中使用。",
+            "httpsRequired": "在 localhost 之外使用 Passkey 需要 HTTPS。",
+            "operationCancelled": "Passkey 操作已取消。",
+            "unsupportedResponse": "设备返回了不受支持的 Passkey 响应。"
+        },
+        "login": {
+            "usernamePlaceholder": "请输入用户名",
+            "authenticatorCodePlaceholder": "请输入 6 位验证码",
+            "recoveryCodePlaceholder": "请输入恢复码",
+            "passkeyStartError": "无法为该账户启动 Passkey 登录。",
+            "passkeyVerifyError": "Passkey 验证失败。",
+            "passkeyUnavailable": "当前设备上该账户暂不可使用 Passkey 登录。",
+            "verifyTitle": "双重验证",
+            "passwordTitle": "请输入密码",
+            "bootstrapTitle": "设置管理员账户",
+            "usernameTitle": "使用用户名继续",
+            "verifySubtitle": "请使用身份验证器应用或恢复码完成登录验证。",
+            "passwordSubtitle": "若当前设备不便使用 Passkey，可改用密码登录。",
+            "bootstrapSubtitle": "系统尚无用户。请创建首个账户以获得管理员权限。",
+            "usernameSubtitle": "Passkey 为首选登录方式，密码仍可作为备用方案。",
+            "bootstrapPromptTitle": "需要完成首次初始化",
+            "bootstrapPromptBody": "首个注册账户将成为管理员，并引导您完成 Passkey 或身份验证器设置。",
+            "createAdmin": "创建首个管理员账户",
+            "verifyPrompt": "当前登录账户：{{name}}",
+            "recoveryHint": "请输入一次性恢复码中的任意一组。",
+            "totpHint": "请输入身份验证器应用中的 6 位验证码。",
+            "recoveryCode": "恢复码",
+            "authenticatorCode": "身份验证器验证码",
+            "recoveryValidation": "请输入 8 位恢复码。",
+            "totpValidation": "请输入 6 位身份验证器验证码。",
+            "back": "返回",
+            "verifying": "验证中…",
+            "verifyButton": "验证并继续",
+            "useRecoveryCode": "改用恢复码",
+            "useAuthenticatorCode": "改用身份验证器验证码",
+            "username": "用户名",
+            "usernameHint": "长度 3-32 位，需以字母开头。仅支持小写字母、数字、点号、下划线和连字符。",
+            "password": "密码",
+            "loading": "登录中…",
+            "submit": "使用密码继续",
+            "passkeyLoading": "正在唤起 Passkey…",
+            "passkeySubmit": "使用 Passkey 继续",
+            "usePasswordInstead": "改用密码",
+            "needAccount": "还没有账户？",
+            "register": "立即注册"
+        },
+        "register": {
+            "usernamePlaceholder": "请输入用户名",
+            "totpQrAlt": "TOTP 设置二维码",
+            "startError": "启动账户注册失败。",
+            "passkeyStartError": "启动 Passkey 注册失败。",
+            "passkeyVerifyError": "Passkey 注册失败。",
+            "totpSetupStartError": "启动身份验证器设置失败。",
+            "totpSetupCompleteError": "完成身份验证器设置失败。",
+            "passkeyUnavailableUseTotp": "当前环境暂不支持 Passkey，请使用身份验证器应用继续。",
+            "title": "创建账户",
+            "bootstrapTitle": "创建首个管理员账户",
+            "securityChoiceTitle": "选择登录方式",
+            "totpTitle": "设置身份验证器应用",
+            "recoveryTitle": "保存恢复码",
+            "subtitle": "请先创建用户名和密码，然后完成账户安全设置。",
+            "bootstrapSubtitle": "请先创建用户名，然后完成 Passkey 或身份验证器设置，以完成管理员初始化。",
+            "securityChoiceSubtitle": "当设备与来源环境支持时，建议优先使用 Passkey。",
+            "totpSubtitle": "请使用 Duo、1Password 或其他身份验证器应用扫描二维码，并完成一次验证码校验。",
+            "recoverySubtitle": "若您失去身份验证器访问权限，这些一次性恢复码是唯一备用方式。",
+            "bootstrapPromptTitle": "您正在注册首个管理员用户",
+            "bootstrapPromptBody": "Lumilio 将创建首个管理员账户，并要求在完成初始化前启用 Passkey 或身份验证器。",
+            "username": "用户名",
+            "usernameHint": "长度 3-32 位，需以字母开头。仅支持小写字母、数字、点号、下划线和连字符。",
+            "password": "密码",
+            "passwordHint": "长度 10-72 位，且至少包含 1 个大写字母、1 个小写字母和 1 个数字。",
+            "confirmPassword": "确认密码",
+            "confirmPasswordHint": "两次输入的密码必须完全一致。",
+            "loading": "正在准备账户…",
+            "submitBootstrap": "以管理员身份继续",
+            "submit": "继续",
+            "passkeyCardTitle": "创建 Passkey",
+            "passkeyCardBody": "使用当前设备的原生 Passkey 流程，可获得更高效且更安全的登录体验。",
+            "passkeyAction": "创建 Passkey",
+            "totpCardTitle": "改用身份验证器应用",
+            "totpCardBody": "若您更偏好 Duo、1Password、Google Authenticator 或其他应用，请选择 TOTP。",
+            "totpAction": "使用身份验证器应用",
+            "manualKey": "设置密钥",
+            "verifyCode": "验证码",
+            "verifyAndFinish": "验证并完成设置",
+            "recoveryReadyTitle": "账户安全设置已完成",
+            "recoveryReadyBody": "继续前，请先将这些恢复码妥善保存。",
+            "finish": "继续使用 Lumilio",
+            "haveAccount": "已有账户？",
+            "login": "立即登录"
+        },
+        "mfa": {
+            "pageTitle": "管理身份验证器设置",
+            "pageSubtitle": "在同一页面集中管理验证、恢复码及账户安全设置。",
+            "bootstrapTitle": "保护首个管理员账户",
+            "bootstrapSubtitle": "请立即完成身份验证器设置，确保首个 Lumilio 管理员账户在继续前已受到保护。",
+            "doneHere": "已完成当前操作？",
+            "continueToApp": "继续使用应用",
+            "backToSettings": "返回设置"
+        },
+        "changePassword": {
+            "pageTitle": "修改密码",
+            "pageSubtitle": "修改密码后，您将被安全登出，并需使用新密码重新登录。",
+            "currentPassword": "当前密码",
+            "currentPasswordHint": "请输入当前密码以验证您的身份。",
+            "newPasswordDivider": "新密码",
+            "newPassword": "新密码",
+            "passwordHint": "长度 10-72 位，且至少包含 1 个大写字母、1 个小写字母和 1 个数字。",
+            "confirmPassword": "确认新密码",
+            "mismatch": "两次输入的密码必须完全一致。",
+            "loading": "正在更新密码…",
+            "submit": "更新密码",
+            "error": "修改密码失败。",
+            "changed": "是否取消本次操作？",
+            "backToSettings": "返回设置"
+        }
+    },
+    "lumilio": {
+        "agent": {
+            "disabled": "Lumilio Agent 已禁用。请在 设置 > AI 中启用。",
+            "notConfigured": "Lumilio Agent 尚未配置。请在 设置 > AI 中完成 provider、model 与 API key。"
+        },
+        "chat": {
+            "empty": "开始与 Lumilio 对话吧！",
+            "openAiSettings": "打开 AI 设置",
+            "confirmation": {
+                "title": "需要确认",
+                "confirm": "确认"
+            }
+        },
+        "input": {
+            "placeholderType": "占位",
+            "placeholderLabel": "占位标签",
+            "unavailable": "Lumilio Agent 当前不可用。",
+            "prompt": "向 Lumilio Agent 提问...（输入 @ 或 /）",
+            "generating": "正在生成回复..."
+        },
+        "messages": {
+            "thinking": "思考中..."
+        },
+        "status": {
+            "loading": "加载中 {{status}}"
+        },
+        "tools": {
+            "viewResults": "查看结果",
+            "resultsTitle": "{{toolName}} 结果",
+            "openMainGallery": "在主图库视图中打开",
+            "openFullView": "打开完整视图",
+            "error": "错误：{{error}}",
+            "eventNotFound": "未找到工具事件。",
+            "lookedFor": "查找 ID",
+            "receivedRawId": "接收到的原始 ID"
+        },
+        "markdown": {
+            "code": {
+                "languageFallback": "文本",
+                "copy": "复制",
+                "copied": "已复制"
+            },
+            "think": {
+                "details": "详情",
+                "defaultSummary": "思考过程..."
+            }
+        }
     }
 }
