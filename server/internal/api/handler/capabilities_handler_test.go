@@ -44,7 +44,7 @@ func (s stubLumenService) IsTaskAvailable(taskName string) bool {
 	return s.isTaskAvailableFn(taskName)
 }
 
-func TestCapabilitiesHandlerGetCapabilities_IncludesClipTextEmbed(t *testing.T) {
+func TestCapabilitiesHandlerGetCapabilities_IncludesClipCapabilities(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	handler := NewCapabilitiesHandler(
@@ -76,7 +76,10 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesClipTextEmbed(t *testing.T) 
 				return []*client.NodeInfo{}, nil
 			},
 			isTaskAvailableFn: func(taskName string) bool {
-				return taskName == "clip_image_embed" || taskName == "clip_text_embed"
+				return taskName == "clip_image_embed" ||
+					taskName == "clip_text_embed" ||
+					taskName == "clip_classify" ||
+					taskName == "clip_scene_classify"
 			},
 		},
 	)
@@ -99,4 +102,8 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesClipTextEmbed(t *testing.T) 
 	require.True(t, response.Data.ML.Tasks.ClipImageEmbed.Available)
 	require.True(t, response.Data.ML.Tasks.ClipTextEmbed.Enabled)
 	require.True(t, response.Data.ML.Tasks.ClipTextEmbed.Available)
+	require.True(t, response.Data.ML.Tasks.ClipClassify.Enabled)
+	require.True(t, response.Data.ML.Tasks.ClipClassify.Available)
+	require.True(t, response.Data.ML.Tasks.ClipSceneClassify.Enabled)
+	require.True(t, response.Data.ML.Tasks.ClipSceneClassify.Available)
 }

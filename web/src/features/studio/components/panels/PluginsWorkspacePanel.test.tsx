@@ -48,9 +48,7 @@ const createUiModule = (): StudioPluginUiModule => ({
 });
 
 describe("PluginsWorkspacePanel", () => {
-  it("switches active plugin through tabs", () => {
-    const onSelectPlugin = vi.fn();
-
+  it("renders the active plugin panel without in-panel navigation buttons", () => {
     render(
       <PluginsWorkspacePanel
         isGenerating={false}
@@ -58,7 +56,6 @@ describe("PluginsWorkspacePanel", () => {
         pluginRuntimeEnabled={true}
         installedPlugins={installedPlugins}
         selectedPluginId="com.lumilio.border"
-        onSelectPlugin={onSelectPlugin}
         pluginUiModule={createUiModule()}
         pluginParams={{ strength: 0.7 }}
         onPluginParamsChange={vi.fn()}
@@ -68,10 +65,10 @@ describe("PluginsWorkspacePanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "com.lumilio.hello@0.1.0" }));
-
-    expect(onSelectPlugin).toHaveBeenCalledWith("com.lumilio.hello");
     expect(screen.getByTestId("plugin-panel")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /com\.lumilio\.hello/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("toggles apply button by readiness and runs plugin", () => {
@@ -81,7 +78,6 @@ describe("PluginsWorkspacePanel", () => {
       onGeneratePlugin,
       pluginRuntimeEnabled: true,
       installedPlugins,
-      onSelectPlugin: vi.fn(),
       onPluginParamsChange: vi.fn(),
       pluginLoading: false,
       pluginError: null,
@@ -127,7 +123,6 @@ describe("PluginsWorkspacePanel", () => {
         pluginRuntimeEnabled={true}
         installedPlugins={[]}
         selectedPluginId={null}
-        onSelectPlugin={vi.fn()}
         pluginUiModule={null}
         pluginParams={{}}
         onPluginParamsChange={vi.fn()}

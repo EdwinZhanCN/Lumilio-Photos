@@ -23,6 +23,7 @@ export function StudioHeader({
   onFileChange,
 }: StudioHeaderProps) {
   const { t } = useI18n();
+
   return (
     <PageHeader
       title={t("studio.title")}
@@ -35,16 +36,18 @@ export function StudioHeader({
         accept="image/jpeg, image/png, image/tiff, image/heic, image/heif, image/webp"
         className="hidden"
       />
-      <button onClick={onOpenFile} className="ml-5 btn btn-sm btn-primary">
-        <ArrowUpTrayIcon className="w-4 h-4 mr-1" />
-        {t("studio.imgOpen")}
-      </button>
-      {hasExportImage && onExportImage && (
-        <button onClick={onExportImage} className="btn btn-sm btn-outline ml-2">
-          <ArrowDownTrayIcon className="w-4 h-4 mr-1" />
-          {t("common.save")}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <button onClick={onOpenFile} className="btn btn-sm btn-primary">
+          <ArrowUpTrayIcon className="w-4 h-4 mr-1" />
+          {t("studio.imgOpen")}
         </button>
-      )}
+        {hasExportImage && onExportImage && (
+          <button onClick={onExportImage} className="btn btn-sm btn-outline">
+            <ArrowDownTrayIcon className="w-4 h-4 mr-1" />
+            {t("common.save")}
+          </button>
+        )}
+      </div>
     </PageHeader>
   );
 }

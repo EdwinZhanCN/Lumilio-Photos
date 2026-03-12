@@ -106,7 +106,7 @@ type FaceCluster struct {
 	ClusterID int32 `db:"cluster_id" json:"cluster_id"`
 	// User-assigned name for the person in this cluster
 	ClusterName          *string `db:"cluster_name" json:"cluster_name"`
-	RepresentativeFaceID int32   `db:"representative_face_id" json:"representative_face_id"`
+	RepresentativeFaceID *int32  `db:"representative_face_id" json:"representative_face_id"`
 	// Overall confidence score for this cluster
 	ConfidenceScore *float32 `db:"confidence_score" json:"confidence_score"`
 	// Number of faces currently in this cluster

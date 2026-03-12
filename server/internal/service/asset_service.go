@@ -96,6 +96,7 @@ type QueryAssetsParams struct {
 	SearchType     string // "filename" (default) | "semantic"
 	ViewerTimeZone string
 	RepositoryID   *string
+	PersonID       *int32
 	AssetType      *string  // Single type filter
 	AssetTypes     []string // Multiple types filter
 	OwnerID        *int32
@@ -1331,6 +1332,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		AssetType:    params.AssetType,
 		AssetTypes:   params.AssetTypes,
 		RepositoryID: repoUUID,
+		PersonID:     params.PersonID,
 		OwnerID:      params.OwnerID,
 		AlbumID:      params.AlbumID,
 		Query:        queryPtr,
@@ -1351,6 +1353,7 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		AssetType:    params.AssetType,
 		AssetTypes:   params.AssetTypes,
 		RepositoryID: repoUUID,
+		PersonID:     params.PersonID,
 		OwnerID:      params.OwnerID,
 		AlbumID:      params.AlbumID,
 		Query:        queryPtr,
@@ -1429,6 +1432,7 @@ func (s *assetService) queryAssetsVectorTopResults(ctx context.Context, params Q
 		AssetType:     params.AssetType,
 		AssetTypes:    params.AssetTypes,
 		RepositoryID:  repoUUID,
+		PersonID:      params.PersonID,
 		OwnerID:       params.OwnerID,
 		AlbumID:       params.AlbumID,
 		IsRaw:         params.IsRaw,
@@ -1511,6 +1515,7 @@ func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssets
 		AssetType:     params.AssetType,
 		AssetTypes:    params.AssetTypes,
 		RepositoryID:  repoUUID,
+		PersonID:      params.PersonID,
 		OwnerID:       params.OwnerID,
 		AlbumID:       params.AlbumID,
 		IsRaw:         params.IsRaw,
@@ -1533,6 +1538,7 @@ func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssets
 		AssetType:     params.AssetType,
 		AssetTypes:    params.AssetTypes,
 		RepositoryID:  repoUUID,
+		PersonID:      params.PersonID,
 		OwnerID:       params.OwnerID,
 		AlbumID:       params.AlbumID,
 		IsRaw:         params.IsRaw,

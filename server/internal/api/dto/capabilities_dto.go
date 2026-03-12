@@ -18,6 +18,8 @@ type MLCapabilitiesDTO struct {
 type MLTaskSetDTO struct {
 	ClipImageEmbed     MLTaskCapabilityDTO `json:"clip_image_embed"`
 	ClipTextEmbed      MLTaskCapabilityDTO `json:"clip_text_embed"`
+	ClipClassify       MLTaskCapabilityDTO `json:"clip_classify"`
+	ClipSceneClassify  MLTaskCapabilityDTO `json:"clip_scene_classify"`
 	OCR                MLTaskCapabilityDTO `json:"ocr"`
 	VLMGenerate        MLTaskCapabilityDTO `json:"vlm_generate"`
 	FaceDetectAndEmbed MLTaskCapabilityDTO `json:"face_detect_and_embed"`

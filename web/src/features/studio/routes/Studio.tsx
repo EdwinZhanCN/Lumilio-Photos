@@ -37,7 +37,6 @@ export function Studio() {
 
   // UI State
   const [activePanel, setActivePanel] = useState<PanelType>("exif");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Processed EXIF data for display
@@ -403,8 +402,11 @@ export function Studio() {
         <StudioSidebar
           activePanel={activePanel}
           setActivePanel={setActivePanel}
-          isCollapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          pluginRuntimeEnabled={pluginRuntimeEnabled}
+          installedPlugins={installed}
+          selectedPluginId={selectedPluginId}
+          onSelectPlugin={handleSelectPlugin}
+          isPluginNavDisabled={isGeneratingPlugin}
         />
 
         <StudioViewport
@@ -428,7 +430,6 @@ export function Studio() {
           installedPlugins={installed}
           catalogPlugins={pluginCatalog}
           selectedPluginId={selectedPluginId}
-          onSelectPlugin={handleSelectPlugin}
           onInstallPlugin={handleInstallPlugin}
           onUninstallPlugin={handleUninstallPlugin}
           isPluginInstalled={isInstalled}

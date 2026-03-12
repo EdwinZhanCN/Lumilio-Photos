@@ -20,7 +20,7 @@ RETURNING cluster_id, cluster_name, representative_face_id, confidence_score, me
 
 type CreateFaceClusterParams struct {
 	ClusterName          *string  `db:"cluster_name" json:"cluster_name"`
-	RepresentativeFaceID int32    `db:"representative_face_id" json:"representative_face_id"`
+	RepresentativeFaceID *int32   `db:"representative_face_id" json:"representative_face_id"`
 	ConfidenceScore      *float32 `db:"confidence_score" json:"confidence_score"`
 	IsConfirmed          *bool    `db:"is_confirmed" json:"is_confirmed"`
 }
@@ -407,7 +407,7 @@ SELECT cluster_id, cluster_name, representative_face_id, confidence_score, membe
 WHERE representative_face_id = $1
 `
 
-func (q *Queries) GetFaceClusterByRepresentative(ctx context.Context, representativeFaceID int32) (FaceCluster, error) {
+func (q *Queries) GetFaceClusterByRepresentative(ctx context.Context, representativeFaceID *int32) (FaceCluster, error) {
 	row := q.db.QueryRow(ctx, getFaceClusterByRepresentative, representativeFaceID)
 	var i FaceCluster
 	err := row.Scan(
@@ -940,20 +940,20 @@ func (q *Queries) GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams
 const getSimilarFaces = `-- name: GetSimilarFaces :many
 SELECT
     fi.id, fi.asset_id, fi.face_id, fi.bounding_box, fi.confidence, fi.age_group, fi.gender, fi.ethnicity, fi.expression, fi.face_size, fi.face_image_path, fi.embedding, fi.embedding_model, fi.is_primary, fi.quality_score, fi.blur_score, fi.pose_angles, fi.created_at,
-    1 - (fi.embedding <=> $1::vector) as similarity
+    CAST(1 - (fi.embedding <=> $1::vector) AS double precision) as similarity
 FROM face_items fi
 WHERE fi.id != $2
 AND fi.embedding IS NOT NULL
-AND 1 - (fi.embedding <=> $1::vector) >= $3
+AND 1 - (fi.embedding <=> $1::vector) >= $3::float8
 ORDER BY similarity DESC
 LIMIT $4
 `
 
 type GetSimilarFacesParams struct {
-	Column1   *pgvector.Vector `db:"column_1" json:"column_1"`
-	ID        int32            `db:"id" json:"id"`
-	Embedding *pgvector.Vector `db:"embedding" json:"embedding"`
-	Limit     int32            `db:"limit" json:"limit"`
+	EmbeddingQuery *pgvector.Vector `db:"embedding_query" json:"embedding_query"`
+	ID             int32            `db:"id" json:"id"`
+	MinSimilarity  float64          `db:"min_similarity" json:"min_similarity"`
+	Limit          int32            `db:"limit" json:"limit"`
 }
 
 type GetSimilarFacesRow struct {
@@ -975,14 +975,14 @@ type GetSimilarFacesRow struct {
 	BlurScore      *float32           `db:"blur_score" json:"blur_score"`
 	PoseAngles     []byte             `db:"pose_angles" json:"pose_angles"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	Similarity     int32              `db:"similarity" json:"similarity"`
+	Similarity     float64            `db:"similarity" json:"similarity"`
 }
 
 func (q *Queries) GetSimilarFaces(ctx context.Context, arg GetSimilarFacesParams) ([]GetSimilarFacesRow, error) {
 	rows, err := q.db.Query(ctx, getSimilarFaces,
-		arg.Column1,
+		arg.EmbeddingQuery,
 		arg.ID,
-		arg.Embedding,
+		arg.MinSimilarity,
 		arg.Limit,
 	)
 	if err != nil {

@@ -214,28 +214,38 @@ WHERE a.is_deleted = false
     $6::integer IS NULL
     OR EXISTS (
       SELECT 1
-      FROM album_assets aa
-      WHERE aa.asset_id = a.asset_id
-        AND aa.album_id = $6
+      FROM face_cluster_members fcm
+      JOIN face_items fi_person ON fi_person.id = fcm.face_id
+      WHERE fcm.cluster_id = $6
+        AND fi_person.asset_id = a.asset_id
     )
   )
-  AND ($7::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $7)
-  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $8)
-  AND ($9::boolean IS NULL OR
+  AND (
+    $7::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa
+      WHERE aa.asset_id = a.asset_id
+        AND aa.album_id = $7
+    )
+  )
+  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $8)
+  AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $9)
+  AND ($10::boolean IS NULL OR
     CASE
-      WHEN $9 = true THEN a.specific_metadata->>'is_raw' = 'true'
+      WHEN $10 = true THEN a.specific_metadata->>'is_raw' = 'true'
       ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
     END
   )
-  AND ($10::integer IS NULL OR
+  AND ($11::integer IS NULL OR
     CASE
-      WHEN $10 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $10
+      WHEN $11 = 0 THEN a.rating IS NULL
+      ELSE a.rating = $11
     END
   )
-  AND ($11::boolean IS NULL OR a.liked = $11)
-  AND ($12::text IS NULL OR a.specific_metadata->>'camera_model' = $12)
-  AND ($13::text IS NULL OR a.specific_metadata->>'lens_model' = $13)
+  AND ($12::boolean IS NULL OR a.liked = $12)
+  AND ($13::text IS NULL OR a.specific_metadata->>'camera_model' = $13)
+  AND ($14::text IS NULL OR a.specific_metadata->>'lens_model' = $14)
 `
 
 type CountAssetsUnifiedParams struct {
@@ -244,6 +254,7 @@ type CountAssetsUnifiedParams struct {
 	AssetTypes   []string           `db:"asset_types" json:"asset_types"`
 	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
 	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	PersonID     *int32             `db:"person_id" json:"person_id"`
 	AlbumID      *int32             `db:"album_id" json:"album_id"`
 	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
 	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
@@ -263,6 +274,7 @@ func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnified
 		arg.AssetTypes,
 		arg.OwnerID,
 		arg.RepositoryID,
+		arg.PersonID,
 		arg.AlbumID,
 		arg.DateFrom,
 		arg.DateTo,
@@ -292,29 +304,39 @@ WHERE a.is_deleted = false
     $6::integer IS NULL
     OR EXISTS (
       SELECT 1
-      FROM album_assets aa
-      WHERE aa.asset_id = a.asset_id
-        AND aa.album_id = $6
+      FROM face_cluster_members fcm
+      JOIN face_items fi_person ON fi_person.id = fcm.face_id
+      WHERE fcm.cluster_id = $6
+        AND fi_person.asset_id = a.asset_id
     )
   )
-  AND ($7::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $7)
-  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $8)
-  AND ($9::boolean IS NULL OR
+  AND (
+    $7::integer IS NULL
+    OR EXISTS (
+      SELECT 1
+      FROM album_assets aa
+      WHERE aa.asset_id = a.asset_id
+        AND aa.album_id = $7
+    )
+  )
+  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $8)
+  AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $9)
+  AND ($10::boolean IS NULL OR
     CASE
-      WHEN $9 = true THEN a.specific_metadata->>'is_raw' = 'true'
+      WHEN $10 = true THEN a.specific_metadata->>'is_raw' = 'true'
       ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
     END
   )
-  AND ($10::integer IS NULL OR
+  AND ($11::integer IS NULL OR
     CASE
-      WHEN $10 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $10
+      WHEN $11 = 0 THEN a.rating IS NULL
+      ELSE a.rating = $11
     END
   )
-  AND ($11::boolean IS NULL OR a.liked = $11)
-  AND ($12::text IS NULL OR a.specific_metadata->>'camera_model' = $12)
-  AND ($13::text IS NULL OR a.specific_metadata->>'lens_model' = $13)
-  AND (e.embedding <-> $14::vector) <= $15::float8
+  AND ($12::boolean IS NULL OR a.liked = $12)
+  AND ($13::text IS NULL OR a.specific_metadata->>'camera_model' = $13)
+  AND ($14::text IS NULL OR a.specific_metadata->>'lens_model' = $14)
+  AND (e.embedding <-> $15::vector) <= $16::float8
 `
 
 type CountAssetsVectorUnifiedParams struct {
@@ -323,6 +345,7 @@ type CountAssetsVectorUnifiedParams struct {
 	AssetTypes    []string           `db:"asset_types" json:"asset_types"`
 	OwnerID       *int32             `db:"owner_id" json:"owner_id"`
 	RepositoryID  pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	PersonID      *int32             `db:"person_id" json:"person_id"`
 	AlbumID       *int32             `db:"album_id" json:"album_id"`
 	DateFrom      pgtype.Timestamptz `db:"date_from" json:"date_from"`
 	DateTo        pgtype.Timestamptz `db:"date_to" json:"date_to"`
@@ -344,6 +367,7 @@ func (q *Queries) CountAssetsVectorUnified(ctx context.Context, arg CountAssetsV
 		arg.AssetTypes,
 		arg.OwnerID,
 		arg.RepositoryID,
+		arg.PersonID,
 		arg.AlbumID,
 		arg.DateFrom,
 		arg.DateTo,
@@ -1618,33 +1642,43 @@ WITH page_ids AS MATERIALIZED (
       $7::integer IS NULL
       OR EXISTS (
         SELECT 1
-        FROM album_assets aa
-        WHERE aa.asset_id = a.asset_id
-          AND aa.album_id = $7
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = $7
+          AND fi_person.asset_id = a.asset_id
       )
     )
-    AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $8)
-    AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $9)
-    AND ($10::boolean IS NULL OR
+    AND (
+      $8::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = $8
+      )
+    )
+    AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $9)
+    AND ($10::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $10)
+    AND ($11::boolean IS NULL OR
       CASE
-        WHEN $10 = true THEN a.specific_metadata->>'is_raw' = 'true'
+        WHEN $11 = true THEN a.specific_metadata->>'is_raw' = 'true'
         ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
       END
     )
-    AND ($11::integer IS NULL OR
+    AND ($12::integer IS NULL OR
       CASE
-        WHEN $11 = 0 THEN a.rating IS NULL
-        ELSE a.rating = $11
+        WHEN $12 = 0 THEN a.rating IS NULL
+        ELSE a.rating = $12
       END
     )
-    AND ($12::boolean IS NULL OR a.liked = $12)
-    AND ($13::text IS NULL OR a.specific_metadata->>'camera_model' = $13)
-    AND ($14::text IS NULL OR a.specific_metadata->>'lens_model' = $14)
+    AND ($13::boolean IS NULL OR a.liked = $13)
+    AND ($14::text IS NULL OR a.specific_metadata->>'camera_model' = $14)
+    AND ($15::text IS NULL OR a.specific_metadata->>'lens_model' = $15)
   ORDER BY
     CASE WHEN $1::text = 'type' THEN a.mime_type END ASC,
     COALESCE(a.taken_time, a.upload_time) DESC,
     a.asset_id DESC
-  LIMIT $16 OFFSET $15
+  LIMIT $17 OFFSET $16
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
 FROM page_ids p
@@ -1659,6 +1693,7 @@ type GetAssetsUnifiedParams struct {
 	AssetTypes   []string           `db:"asset_types" json:"asset_types"`
 	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
 	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	PersonID     *int32             `db:"person_id" json:"person_id"`
 	AlbumID      *int32             `db:"album_id" json:"album_id"`
 	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
 	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
@@ -1685,6 +1720,7 @@ func (q *Queries) GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedPara
 		arg.AssetTypes,
 		arg.OwnerID,
 		arg.RepositoryID,
+		arg.PersonID,
 		arg.AlbumID,
 		arg.DateFrom,
 		arg.DateTo,
@@ -2371,6 +2407,22 @@ func (q *Queries) RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromA
 	return err
 }
 
+const removeAssetTagsBySources = `-- name: RemoveAssetTagsBySources :exec
+DELETE FROM asset_tags
+WHERE asset_id = $1
+  AND source = ANY($2::text[])
+`
+
+type RemoveAssetTagsBySourcesParams struct {
+	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
+	Sources []string    `db:"sources" json:"sources"`
+}
+
+func (q *Queries) RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error {
+	_, err := q.db.Exec(ctx, removeAssetTagsBySources, arg.AssetID, arg.Sources)
+	return err
+}
+
 const removeTagFromAsset = `-- name: RemoveTagFromAsset :exec
 DELETE FROM asset_tags
 WHERE asset_id = $1 AND tag_id = $2
@@ -2782,31 +2834,41 @@ WITH candidate_ids AS MATERIALIZED (
       $7::integer IS NULL
       OR EXISTS (
         SELECT 1
-        FROM album_assets aa
-        WHERE aa.asset_id = a.asset_id
-          AND aa.album_id = $7
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = $7
+          AND fi_person.asset_id = a.asset_id
       )
     )
-    AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $8)
-    AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $9)
-    AND ($10::boolean IS NULL OR
+    AND (
+      $8::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = $8
+      )
+    )
+    AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $9)
+    AND ($10::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $10)
+    AND ($11::boolean IS NULL OR
       CASE
-        WHEN $10 = true THEN a.specific_metadata->>'is_raw' = 'true'
+        WHEN $11 = true THEN a.specific_metadata->>'is_raw' = 'true'
         ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
       END
     )
-    AND ($11::integer IS NULL OR
+    AND ($12::integer IS NULL OR
       CASE
-        WHEN $11 = 0 THEN a.rating IS NULL
-        ELSE a.rating = $11
+        WHEN $12 = 0 THEN a.rating IS NULL
+        ELSE a.rating = $12
       END
     )
-    AND ($12::boolean IS NULL OR a.liked = $12)
-    AND ($13::text IS NULL OR a.specific_metadata->>'camera_model' = $13)
-    AND ($14::text IS NULL OR a.specific_metadata->>'lens_model' = $14)
-    AND (e.vector <-> $1::vector) <= $15::float8
+    AND ($13::boolean IS NULL OR a.liked = $13)
+    AND ($14::text IS NULL OR a.specific_metadata->>'camera_model' = $14)
+    AND ($15::text IS NULL OR a.specific_metadata->>'lens_model' = $15)
+    AND (e.vector <-> $1::vector) <= $16::float8
   ORDER BY (e.vector <-> $1::vector), a.asset_id DESC
-  LIMIT $17 OFFSET $16
+  LIMIT $18 OFFSET $17
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, c.distance
 FROM candidate_ids c
@@ -2821,6 +2883,7 @@ type SearchAssetsVectorUnifiedParams struct {
 	AssetTypes    []string           `db:"asset_types" json:"asset_types"`
 	OwnerID       *int32             `db:"owner_id" json:"owner_id"`
 	RepositoryID  pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	PersonID      *int32             `db:"person_id" json:"person_id"`
 	AlbumID       *int32             `db:"album_id" json:"album_id"`
 	DateFrom      pgtype.Timestamptz `db:"date_from" json:"date_from"`
 	DateTo        pgtype.Timestamptz `db:"date_to" json:"date_to"`
@@ -2870,6 +2933,7 @@ func (q *Queries) SearchAssetsVectorUnified(ctx context.Context, arg SearchAsset
 		arg.AssetTypes,
 		arg.OwnerID,
 		arg.RepositoryID,
+		arg.PersonID,
 		arg.AlbumID,
 		arg.DateFrom,
 		arg.DateTo,

@@ -11,12 +11,13 @@ func (s stubTaskAvailabilityChecker) IsTaskAvailable(taskName string) bool {
 func TestIsIndexingTaskRuntimeAvailable(t *testing.T) {
 	t.Run("clip requires both runtime tasks", func(t *testing.T) {
 		checker := stubTaskAvailabilityChecker{
-			"clip_image_embed": true,
-			"bioclip_classify": false,
+			"clip_image_embed":    true,
+			"clip_classify":       true,
+			"clip_scene_classify": false,
 		}
 
 		if IsIndexingTaskRuntimeAvailable(checker, AssetIndexingTaskClip) {
-			t.Fatal("expected clip task to be unavailable when BioCLIP runtime is missing")
+			t.Fatal("expected clip task to be unavailable when scene classification runtime is missing")
 		}
 	})
 
@@ -43,7 +44,8 @@ func TestIsIndexingTaskRuntimeAvailable(t *testing.T) {
 func TestFilterRuntimeAvailableIndexingTasks(t *testing.T) {
 	checker := stubTaskAvailabilityChecker{
 		"clip_image_embed":      true,
-		"bioclip_classify":      true,
+		"clip_classify":         true,
+		"clip_scene_classify":   true,
 		"face_detect_and_embed": false,
 		"ocr":                   true,
 	}

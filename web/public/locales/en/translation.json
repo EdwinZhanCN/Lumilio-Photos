@@ -63,6 +63,7 @@
         "home": "Home",
         "assets": "Assets",
         "collections": "Collections",
+        "people": "People",
         "studio": "Studio",
         "portfolio": "Portfolio",
         "upload": "Upload Photos",
@@ -81,7 +82,14 @@
         },
         "errors": {
             "featuredLoadFailed": "Failed to load featured assets: {{message}}",
+            "peopleLoadFailed": "Failed to load people: {{message}}",
             "unknown": "Unknown error"
+        },
+        "people": {
+            "eyebrow": "People",
+            "title": "Recognized Faces",
+            "subtitle": "Named or unnamed people detected from your library.",
+            "empty": "No recognized faces yet. New people will appear here after face processing finishes."
         },
         "map": {
             "title": "Spacetime Trail",
@@ -197,6 +205,23 @@
             "itemsCount_other": "{{count}} items",
             "createdAtLabel": "Created",
             "loadError": "Failed to load album: {{error}}"
+        }
+    },
+    "people": {
+        "unnamed": "Unnamed",
+        "confirmed": "Named",
+        "membersCount_one": "{{count}} face",
+        "membersCount_other": "{{count}} faces",
+        "photosCount_one": "{{count}} photo",
+        "photosCount_other": "{{count}} photos",
+        "details": {
+            "loadError": "Failed to load person details: {{error}}",
+            "personCode": "PERSON {{id}}",
+            "confirmedHint": "This person has been named and confirmed.",
+            "unconfirmedHint": "This person is still unnamed. Give them a name when you are confident.",
+            "renamePlaceholder": "Name this person",
+            "save": "Save",
+            "updatedLabel": "Updated"
         }
     },
     "assets": {
@@ -835,6 +860,8 @@
             "taskNames": {
                 "clipImageEmbed": "CLIP image embed",
                 "clipTextEmbed": "CLIP text embed",
+                "clipClassify": "CLIP classify",
+                "clipSceneClassify": "CLIP scene classify",
                 "ocr": "OCR",
                 "vlmGenerate": "VLM caption",
                 "faceDetectAndEmbed": "Face detect & embed"

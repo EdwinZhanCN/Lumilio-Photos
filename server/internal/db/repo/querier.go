@@ -33,6 +33,7 @@ type Querier interface {
 	CountAssetsVectorUnified(ctx context.Context, arg CountAssetsVectorUnifiedParams) (int64, error)
 	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
+	CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error)
 	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountPhotoAssetsWithCaptions(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountPhotoAssetsWithEmbeddingType(ctx context.Context, arg CountPhotoAssetsWithEmbeddingTypeParams) (int64, error)
@@ -144,7 +145,7 @@ type Querier interface {
 	GetEmbeddingModels(ctx context.Context, embeddingType string) ([]GetEmbeddingModelsRow, error)
 	GetFaceClusterByFaceID(ctx context.Context, faceID int32) (FaceCluster, error)
 	GetFaceClusterByID(ctx context.Context, clusterID int32) (FaceCluster, error)
-	GetFaceClusterByRepresentative(ctx context.Context, representativeFaceID int32) (FaceCluster, error)
+	GetFaceClusterByRepresentative(ctx context.Context, representativeFaceID *int32) (FaceCluster, error)
 	GetFaceClusterMembers(ctx context.Context, clusterID int32) ([]GetFaceClusterMembersRow, error)
 	GetFaceDemographics(ctx context.Context, confidence float32) ([]GetFaceDemographicsRow, error)
 	GetFaceEmbeddingsForClustering(ctx context.Context, arg GetFaceEmbeddingsForClusteringParams) ([]GetFaceEmbeddingsForClusteringRow, error)
@@ -167,6 +168,7 @@ type Querier interface {
 	GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetOCRTextItemStatsByAssetRow, error)
 	GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) ([]OcrTextItem, error)
 	GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOCRTextItemsByAssetWithLimitParams) ([]OcrTextItem, error)
+	GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScopedParams) (GetPersonByIDScopedRow, error)
 	// Lightweight photo locations for map clustering/rendering.
 	GetPhotoMapPoints(ctx context.Context, arg GetPhotoMapPointsParams) ([]GetPhotoMapPointsRow, error)
 	GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (Embedding, error)
@@ -204,6 +206,7 @@ type Querier interface {
 	GetUserTOTPCredential(ctx context.Context, userID int32) (UserMfaTotpCredential, error)
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
 	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
+	ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error)
 	ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error)
 	ListPhotoAssetsMissingCaptions(ctx context.Context, arg ListPhotoAssetsMissingCaptionsParams) ([]Asset, error)
 	ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg ListPhotoAssetsMissingEmbeddingTypeParams) ([]Asset, error)
@@ -217,7 +220,9 @@ type Querier interface {
 	ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error)
 	MergeFaceClusters(ctx context.Context, arg MergeFaceClustersParams) error
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
+	RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
+	RenameFaceCluster(ctx context.Context, arg RenameFaceClusterParams) (FaceCluster, error)
 	RepositoryExists(ctx context.Context, path string) (bool, error)
 	ResetAssetStatusForRetry(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
@@ -260,6 +265,7 @@ type Querier interface {
 	UpdateCaptionStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateDiscoveredAssetByID(ctx context.Context, arg UpdateDiscoveredAssetByIDParams) (Asset, error)
 	UpdateFaceCluster(ctx context.Context, arg UpdateFaceClusterParams) (FaceCluster, error)
+	UpdateFaceClusterRepresentative(ctx context.Context, arg UpdateFaceClusterRepresentativeParams) (FaceCluster, error)
 	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)
 	UpdateFaceResultStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateOCRResultStats(ctx context.Context, assetID pgtype.UUID) error
