@@ -40,6 +40,7 @@ import (
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
 	assetService    service.AssetService
+	authService     *service.AuthService
 	indexingService service.AssetIndexingService
 	queries         *repo.Queries
 	repoManager     storage.RepositoryManager
@@ -54,6 +55,7 @@ type AssetHandler struct {
 // NewAssetHandler creates a new AssetHandler instance
 func NewAssetHandler(
 	assetService service.AssetService,
+	authService *service.AuthService,
 	indexingService service.AssetIndexingService,
 	queries *repo.Queries,
 	repoManager storage.RepositoryManager,
@@ -68,6 +70,7 @@ func NewAssetHandler(
 
 	handler := &AssetHandler{
 		assetService:    assetService,
+		authService:     authService,
 		indexingService: indexingService,
 		queries:         queries,
 		repoManager:     repoManager,
@@ -758,7 +761,7 @@ func (h *AssetHandler) GetAssetThumbnail(c *gin.Context) {
 		return
 	}
 
-	asset, ok := h.getAuthorizedAsset(c, assetID, "Authentication required to access this thumbnail", "You don't have permission to access this thumbnail")
+	asset, ok := h.getAuthorizedAssetForMedia(c, assetID, "Authentication required to access this thumbnail", "You don't have permission to access this thumbnail")
 	if !ok {
 		return
 	}
@@ -840,7 +843,7 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 		return
 	}
 
-	asset, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this file", "You don't have permission to access this file")
+	asset, ok := h.getAuthorizedAssetForMedia(c, id, "Authentication required to access this file", "You don't have permission to access this file")
 	if !ok {
 		return
 	}
@@ -897,7 +900,7 @@ func (h *AssetHandler) GetWebVideo(c *gin.Context) {
 	}
 
 	// Get asset metadata from service
-	asset, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this video", "You don't have permission to access this video")
+	asset, ok := h.getAuthorizedAssetForMedia(c, id, "Authentication required to access this video", "You don't have permission to access this video")
 	if !ok {
 		return
 	}
@@ -977,7 +980,7 @@ func (h *AssetHandler) GetWebAudio(c *gin.Context) {
 	}
 
 	// Get asset metadata from service
-	asset, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this audio", "You don't have permission to access this audio")
+	asset, ok := h.getAuthorizedAssetForMedia(c, id, "Authentication required to access this audio", "You don't have permission to access this audio")
 	if !ok {
 		return
 	}

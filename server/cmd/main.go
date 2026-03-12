@@ -199,7 +199,7 @@ func main() {
 	defer repoMonitor.Stop()
 
 	// Initialize controllers with new storage system
-	assetController := handler.NewAssetHandler(assetService, indexingService, queries, repoManager, stagingManager, queueClient)
+	assetController := handler.NewAssetHandler(assetService, authService, indexingService, queries, repoManager, stagingManager, queueClient)
 	authController := handler.NewAuthHandler(authService)
 	albumController := handler.NewAlbumHandler(&albumService, queries)
 	userController := handler.NewUserHandler(userService)

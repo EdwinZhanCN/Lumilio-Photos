@@ -204,6 +204,35 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	api.GinSuccess(c, dto.ToUserDTO(*user))
 }
 
+// GetMediaToken issues a short-lived token that can be attached to media URLs.
+// @Summary Get media access token
+// @Description Generate a short-lived media token for image/video/audio URL authorization in browser media elements.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} api.Result{data=dto.MediaTokenDTO} "Media token issued successfully"
+// @Failure 401 {object} api.Result "Unauthorized"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/auth/media-token [get]
+func (h *AuthHandler) GetMediaToken(c *gin.Context) {
+	user, ok := requireCurrentUser(c)
+	if !ok {
+		return
+	}
+
+	token, expiresAt, err := h.authService.GenerateMediaToken(user.UserID, user.Username, user.Role)
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to generate media token")
+		return
+	}
+
+	api.GinSuccess(c, dto.MediaTokenDTO{
+		Token:     token,
+		ExpiresAt: expiresAt,
+	})
+}
+
 // AuthMiddleware validates JWT tokens and sets user context
 func (h *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {

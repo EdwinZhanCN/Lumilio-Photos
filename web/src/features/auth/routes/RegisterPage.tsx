@@ -282,7 +282,7 @@ const RegisterPage: React.FC = () => {
         throw new Error(verifyData?.message || t("auth.register.passkeyVerifyError"));
       }
 
-      completeAuth(verifyData.data);
+      await completeAuth(verifyData.data);
       navigate(redirectTo, { replace: true });
     } catch (passkeyError) {
       setFlowError(
@@ -323,7 +323,7 @@ const RegisterPage: React.FC = () => {
         throw new Error(payload?.message || t("auth.register.totpSetupCompleteError"));
       }
 
-      completeAuth(payload.data.auth);
+      await completeAuth(payload.data.auth);
       setRecoveryCodes(payload.data.recovery_codes ?? []);
       setStep("recovery");
     } catch (totpError) {
