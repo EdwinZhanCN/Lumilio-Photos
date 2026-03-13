@@ -99,6 +99,19 @@ type Embedding struct {
 	IsPrimary           *bool              `db:"is_primary" json:"is_primary"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	SpaceID             int64              `db:"space_id" json:"space_id"`
+}
+
+type EmbeddingSpace struct {
+	ID              int64              `db:"id" json:"id"`
+	EmbeddingType   string             `db:"embedding_type" json:"embedding_type"`
+	ModelID         string             `db:"model_id" json:"model_id"`
+	Dimensions      int32              `db:"dimensions" json:"dimensions"`
+	DistanceMetric  string             `db:"distance_metric" json:"distance_metric"`
+	SearchEnabled   bool               `db:"search_enabled" json:"search_enabled"`
+	IsDefaultSearch bool               `db:"is_default_search" json:"is_default_search"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 // Face recognition clusters table, grouping similar faces together

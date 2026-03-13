@@ -28,9 +28,6 @@ type Querier interface {
 	// Count query matching GetAssetsUnified WHERE clause
 	// Returns total count of assets matching the filters (for pagination)
 	CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error)
-	// Count query matching SearchAssetsVectorUnified WHERE clause
-	// Returns total count of assets matching semantic search (for pagination)
-	CountAssetsVectorUnified(ctx context.Context, arg CountAssetsVectorUnifiedParams) (int64, error)
 	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error)
@@ -138,11 +135,13 @@ type Querier interface {
 	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
 	// 获取每日拍摄活跃度热力图数据
 	GetDailyActivityHeatmap(ctx context.Context, arg GetDailyActivityHeatmapParams) ([]GetDailyActivityHeatmapRow, error)
+	GetDefaultEmbeddingSpaceByType(ctx context.Context, embeddingType string) (EmbeddingSpace, error)
 	GetDistinctCameraMakes(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
-	GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (Embedding, error)
-	GetEmbeddingByType(ctx context.Context, arg GetEmbeddingByTypeParams) (Embedding, error)
+	GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (GetEmbeddingRow, error)
+	GetEmbeddingByType(ctx context.Context, arg GetEmbeddingByTypeParams) (GetEmbeddingByTypeRow, error)
 	GetEmbeddingModels(ctx context.Context, embeddingType string) ([]GetEmbeddingModelsRow, error)
+	GetEmbeddingSpaceByAttributes(ctx context.Context, arg GetEmbeddingSpaceByAttributesParams) (EmbeddingSpace, error)
 	GetFaceClusterByFaceID(ctx context.Context, faceID int32) (FaceCluster, error)
 	GetFaceClusterByID(ctx context.Context, clusterID int32) (FaceCluster, error)
 	GetFaceClusterByRepresentative(ctx context.Context, representativeFaceID *int32) (FaceCluster, error)
@@ -171,7 +170,7 @@ type Querier interface {
 	GetPersonByIDScoped(ctx context.Context, arg GetPersonByIDScopedParams) (GetPersonByIDScopedRow, error)
 	// Lightweight photo locations for map clustering/rendering.
 	GetPhotoMapPoints(ctx context.Context, arg GetPhotoMapPointsParams) ([]GetPhotoMapPointsRow, error)
-	GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (Embedding, error)
+	GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (GetPrimaryEmbeddingRow, error)
 	GetPrimaryFaces(ctx context.Context, arg GetPrimaryFacesParams) ([]FaceItem, error)
 	GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error)
 	GetRegistrationSessionByID(ctx context.Context, sessionID pgtype.UUID) (RegistrationSession, error)
@@ -219,6 +218,7 @@ type Querier interface {
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error)
 	MergeFaceClusters(ctx context.Context, arg MergeFaceClustersParams) error
+	PromoteEmbeddingSpaceAsDefaultIfNone(ctx context.Context, arg PromoteEmbeddingSpaceAsDefaultIfNoneParams) (EmbeddingSpace, error)
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
@@ -227,7 +227,6 @@ type Querier interface {
 	ResetAssetStatusForRetry(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
 	RevokeUserRefreshTokens(ctx context.Context, userID int32) error
-	SearchAllEmbeddingsByType(ctx context.Context, arg SearchAllEmbeddingsByTypeParams) ([]SearchAllEmbeddingsByTypeRow, error)
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
 	SearchAssetsByCaption(ctx context.Context, arg SearchAssetsByCaptionParams) ([]Asset, error)
 	SearchAssetsByCaptionSummary(ctx context.Context, arg SearchAssetsByCaptionSummaryParams) ([]Asset, error)
@@ -239,11 +238,6 @@ type Querier interface {
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
 	SearchAssetsFilename(ctx context.Context, arg SearchAssetsFilenameParams) ([]Asset, error)
 	SearchAssetsVector(ctx context.Context, arg SearchAssetsVectorParams) ([]SearchAssetsVectorRow, error)
-	// Handles: semantic vector search with all filtering
-	// Same WHERE clause as GetAssetsUnified for consistency
-	SearchAssetsVectorUnified(ctx context.Context, arg SearchAssetsVectorUnifiedParams) ([]SearchAssetsVectorUnifiedRow, error)
-	SearchEmbeddingsByModel(ctx context.Context, arg SearchEmbeddingsByModelParams) ([]SearchEmbeddingsByModelRow, error)
-	SearchEmbeddingsByType(ctx context.Context, arg SearchEmbeddingsByTypeParams) ([]SearchEmbeddingsByTypeRow, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
 	SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error)
@@ -283,6 +277,8 @@ type Querier interface {
 	UpsertCheckpoint(ctx context.Context, arg UpsertCheckpointParams) error
 	// Unified embeddings table queries
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
+	// Embedding spaces
+	UpsertEmbeddingSpace(ctx context.Context, arg UpsertEmbeddingSpaceParams) (EmbeddingSpace, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error)
 	UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTOTPCredentialParams) (UserMfaTotpCredential, error)
 	UseRecoveryCode(ctx context.Context, arg UseRecoveryCodeParams) (int32, error)

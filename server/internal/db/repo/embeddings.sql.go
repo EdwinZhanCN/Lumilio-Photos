@@ -52,7 +52,7 @@ func (q *Queries) DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams
 }
 
 const getAllEmbeddingsForAsset = `-- name: GetAllEmbeddingsForAsset :many
-SELECT id, asset_id, embedding_type, embedding_model, embedding_dimensions, is_primary, created_at, updated_at
+SELECT id, asset_id, embedding_type, embedding_model, embedding_dimensions, space_id, is_primary, created_at, updated_at
 FROM embeddings
 WHERE asset_id = $1
 ORDER BY embedding_type, is_primary DESC, created_at DESC
@@ -64,6 +64,7 @@ type GetAllEmbeddingsForAssetRow struct {
 	EmbeddingType       string             `db:"embedding_type" json:"embedding_type"`
 	EmbeddingModel      string             `db:"embedding_model" json:"embedding_model"`
 	EmbeddingDimensions int32              `db:"embedding_dimensions" json:"embedding_dimensions"`
+	SpaceID             int64              `db:"space_id" json:"space_id"`
 	IsPrimary           *bool              `db:"is_primary" json:"is_primary"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
@@ -84,6 +85,7 @@ func (q *Queries) GetAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.U
 			&i.EmbeddingType,
 			&i.EmbeddingModel,
 			&i.EmbeddingDimensions,
+			&i.SpaceID,
 			&i.IsPrimary,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -98,8 +100,33 @@ func (q *Queries) GetAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.U
 	return items, nil
 }
 
+const getDefaultEmbeddingSpaceByType = `-- name: GetDefaultEmbeddingSpaceByType :one
+SELECT id, embedding_type, model_id, dimensions, distance_metric, search_enabled, is_default_search, created_at, updated_at
+FROM embedding_spaces
+WHERE embedding_type = $1
+  AND is_default_search = true
+LIMIT 1
+`
+
+func (q *Queries) GetDefaultEmbeddingSpaceByType(ctx context.Context, embeddingType string) (EmbeddingSpace, error) {
+	row := q.db.QueryRow(ctx, getDefaultEmbeddingSpaceByType, embeddingType)
+	var i EmbeddingSpace
+	err := row.Scan(
+		&i.ID,
+		&i.EmbeddingType,
+		&i.ModelID,
+		&i.Dimensions,
+		&i.DistanceMetric,
+		&i.SearchEnabled,
+		&i.IsDefaultSearch,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getEmbedding = `-- name: GetEmbedding :one
-SELECT id, asset_id, embedding_type, embedding_model, embedding_dimensions, vector, is_primary, created_at, updated_at
+SELECT id, asset_id, embedding_type, embedding_model, embedding_dimensions, space_id, vector, is_primary, created_at, updated_at
 FROM embeddings
 WHERE asset_id = $1 AND embedding_type = $2 AND embedding_model = $3
 `
@@ -110,15 +137,29 @@ type GetEmbeddingParams struct {
 	EmbeddingModel string      `db:"embedding_model" json:"embedding_model"`
 }
 
-func (q *Queries) GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (Embedding, error) {
+type GetEmbeddingRow struct {
+	ID                  int32              `db:"id" json:"id"`
+	AssetID             pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	EmbeddingType       string             `db:"embedding_type" json:"embedding_type"`
+	EmbeddingModel      string             `db:"embedding_model" json:"embedding_model"`
+	EmbeddingDimensions int32              `db:"embedding_dimensions" json:"embedding_dimensions"`
+	SpaceID             int64              `db:"space_id" json:"space_id"`
+	Vector              *pgvector.Vector   `db:"vector" json:"vector"`
+	IsPrimary           *bool              `db:"is_primary" json:"is_primary"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (GetEmbeddingRow, error) {
 	row := q.db.QueryRow(ctx, getEmbedding, arg.AssetID, arg.EmbeddingType, arg.EmbeddingModel)
-	var i Embedding
+	var i GetEmbeddingRow
 	err := row.Scan(
 		&i.ID,
 		&i.AssetID,
 		&i.EmbeddingType,
 		&i.EmbeddingModel,
 		&i.EmbeddingDimensions,
+		&i.SpaceID,
 		&i.Vector,
 		&i.IsPrimary,
 		&i.CreatedAt,
@@ -128,7 +169,7 @@ func (q *Queries) GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (Emb
 }
 
 const getEmbeddingByType = `-- name: GetEmbeddingByType :one
-SELECT id, asset_id, embedding_type, embedding_model, embedding_dimensions, vector, is_primary, created_at, updated_at
+SELECT id, asset_id, embedding_type, embedding_model, embedding_dimensions, space_id, vector, is_primary, created_at, updated_at
 FROM embeddings
 WHERE asset_id = $1 AND embedding_type = $2
 ORDER BY is_primary DESC, created_at DESC
@@ -140,15 +181,29 @@ type GetEmbeddingByTypeParams struct {
 	EmbeddingType string      `db:"embedding_type" json:"embedding_type"`
 }
 
-func (q *Queries) GetEmbeddingByType(ctx context.Context, arg GetEmbeddingByTypeParams) (Embedding, error) {
+type GetEmbeddingByTypeRow struct {
+	ID                  int32              `db:"id" json:"id"`
+	AssetID             pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	EmbeddingType       string             `db:"embedding_type" json:"embedding_type"`
+	EmbeddingModel      string             `db:"embedding_model" json:"embedding_model"`
+	EmbeddingDimensions int32              `db:"embedding_dimensions" json:"embedding_dimensions"`
+	SpaceID             int64              `db:"space_id" json:"space_id"`
+	Vector              *pgvector.Vector   `db:"vector" json:"vector"`
+	IsPrimary           *bool              `db:"is_primary" json:"is_primary"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetEmbeddingByType(ctx context.Context, arg GetEmbeddingByTypeParams) (GetEmbeddingByTypeRow, error) {
 	row := q.db.QueryRow(ctx, getEmbeddingByType, arg.AssetID, arg.EmbeddingType)
-	var i Embedding
+	var i GetEmbeddingByTypeRow
 	err := row.Scan(
 		&i.ID,
 		&i.AssetID,
 		&i.EmbeddingType,
 		&i.EmbeddingModel,
 		&i.EmbeddingDimensions,
+		&i.SpaceID,
 		&i.Vector,
 		&i.IsPrimary,
 		&i.CreatedAt,
@@ -190,8 +245,46 @@ func (q *Queries) GetEmbeddingModels(ctx context.Context, embeddingType string) 
 	return items, nil
 }
 
+const getEmbeddingSpaceByAttributes = `-- name: GetEmbeddingSpaceByAttributes :one
+SELECT id, embedding_type, model_id, dimensions, distance_metric, search_enabled, is_default_search, created_at, updated_at
+FROM embedding_spaces
+WHERE embedding_type = $1
+  AND model_id = $2
+  AND dimensions = $3
+  AND distance_metric = $4
+`
+
+type GetEmbeddingSpaceByAttributesParams struct {
+	EmbeddingType  string `db:"embedding_type" json:"embedding_type"`
+	ModelID        string `db:"model_id" json:"model_id"`
+	Dimensions     int32  `db:"dimensions" json:"dimensions"`
+	DistanceMetric string `db:"distance_metric" json:"distance_metric"`
+}
+
+func (q *Queries) GetEmbeddingSpaceByAttributes(ctx context.Context, arg GetEmbeddingSpaceByAttributesParams) (EmbeddingSpace, error) {
+	row := q.db.QueryRow(ctx, getEmbeddingSpaceByAttributes,
+		arg.EmbeddingType,
+		arg.ModelID,
+		arg.Dimensions,
+		arg.DistanceMetric,
+	)
+	var i EmbeddingSpace
+	err := row.Scan(
+		&i.ID,
+		&i.EmbeddingType,
+		&i.ModelID,
+		&i.Dimensions,
+		&i.DistanceMetric,
+		&i.SearchEnabled,
+		&i.IsDefaultSearch,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getPrimaryEmbedding = `-- name: GetPrimaryEmbedding :one
-SELECT id, asset_id, embedding_type, embedding_model, embedding_dimensions, vector, is_primary, created_at, updated_at
+SELECT id, asset_id, embedding_type, embedding_model, embedding_dimensions, space_id, vector, is_primary, created_at, updated_at
 FROM embeddings
 WHERE asset_id = $1 AND embedding_type = $2 AND is_primary = true
 `
@@ -201,15 +294,29 @@ type GetPrimaryEmbeddingParams struct {
 	EmbeddingType string      `db:"embedding_type" json:"embedding_type"`
 }
 
-func (q *Queries) GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (Embedding, error) {
+type GetPrimaryEmbeddingRow struct {
+	ID                  int32              `db:"id" json:"id"`
+	AssetID             pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	EmbeddingType       string             `db:"embedding_type" json:"embedding_type"`
+	EmbeddingModel      string             `db:"embedding_model" json:"embedding_model"`
+	EmbeddingDimensions int32              `db:"embedding_dimensions" json:"embedding_dimensions"`
+	SpaceID             int64              `db:"space_id" json:"space_id"`
+	Vector              *pgvector.Vector   `db:"vector" json:"vector"`
+	IsPrimary           *bool              `db:"is_primary" json:"is_primary"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddingParams) (GetPrimaryEmbeddingRow, error) {
 	row := q.db.QueryRow(ctx, getPrimaryEmbedding, arg.AssetID, arg.EmbeddingType)
-	var i Embedding
+	var i GetPrimaryEmbeddingRow
 	err := row.Scan(
 		&i.ID,
 		&i.AssetID,
 		&i.EmbeddingType,
 		&i.EmbeddingModel,
 		&i.EmbeddingDimensions,
+		&i.SpaceID,
 		&i.Vector,
 		&i.IsPrimary,
 		&i.CreatedAt,
@@ -219,7 +326,7 @@ func (q *Queries) GetPrimaryEmbedding(ctx context.Context, arg GetPrimaryEmbeddi
 }
 
 const listAssetEmbeddings = `-- name: ListAssetEmbeddings :many
-SELECT asset_id, embedding_type, embedding_model, embedding_dimensions, is_primary, created_at
+SELECT asset_id, embedding_type, embedding_model, embedding_dimensions, space_id, is_primary, created_at
 FROM embeddings
 WHERE asset_id IN (SELECT unnest($1::uuid[]))
 ORDER BY asset_id, embedding_type, is_primary DESC
@@ -230,6 +337,7 @@ type ListAssetEmbeddingsRow struct {
 	EmbeddingType       string             `db:"embedding_type" json:"embedding_type"`
 	EmbeddingModel      string             `db:"embedding_model" json:"embedding_model"`
 	EmbeddingDimensions int32              `db:"embedding_dimensions" json:"embedding_dimensions"`
+	SpaceID             int64              `db:"space_id" json:"space_id"`
 	IsPrimary           *bool              `db:"is_primary" json:"is_primary"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
@@ -248,6 +356,7 @@ func (q *Queries) ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUI
 			&i.EmbeddingType,
 			&i.EmbeddingModel,
 			&i.EmbeddingDimensions,
+			&i.SpaceID,
 			&i.IsPrimary,
 			&i.CreatedAt,
 		); err != nil {
@@ -261,158 +370,42 @@ func (q *Queries) ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUI
 	return items, nil
 }
 
-const searchAllEmbeddingsByType = `-- name: SearchAllEmbeddingsByType :many
-SELECT a.asset_id, e.embedding_type, e.embedding_model, e.embedding_dimensions, (e.vector <-> $1::vector) AS distance
-FROM embeddings e
-JOIN assets a ON e.asset_id = a.asset_id
-WHERE e.embedding_type = $2
-  AND a.is_deleted = false
-ORDER BY (e.vector <-> $1::vector)
-LIMIT $3
+const promoteEmbeddingSpaceAsDefaultIfNone = `-- name: PromoteEmbeddingSpaceAsDefaultIfNone :one
+UPDATE embedding_spaces AS es
+SET search_enabled = true,
+    is_default_search = true,
+    updated_at = NOW()
+WHERE es.id = $1
+  AND es.embedding_type = $2
+  AND NOT EXISTS (
+    SELECT 1
+    FROM embedding_spaces existing
+    WHERE existing.embedding_type = $2
+      AND existing.is_default_search = true
+  )
+RETURNING es.id, es.embedding_type, es.model_id, es.dimensions, es.distance_metric, es.search_enabled, es.is_default_search, es.created_at, es.updated_at
 `
 
-type SearchAllEmbeddingsByTypeParams struct {
-	Column1       *pgvector.Vector `db:"column_1" json:"column_1"`
-	EmbeddingType string           `db:"embedding_type" json:"embedding_type"`
-	Limit         int32            `db:"limit" json:"limit"`
+type PromoteEmbeddingSpaceAsDefaultIfNoneParams struct {
+	ID            int64  `db:"id" json:"id"`
+	EmbeddingType string `db:"embedding_type" json:"embedding_type"`
 }
 
-type SearchAllEmbeddingsByTypeRow struct {
-	AssetID             pgtype.UUID `db:"asset_id" json:"asset_id"`
-	EmbeddingType       string      `db:"embedding_type" json:"embedding_type"`
-	EmbeddingModel      string      `db:"embedding_model" json:"embedding_model"`
-	EmbeddingDimensions int32       `db:"embedding_dimensions" json:"embedding_dimensions"`
-	Distance            interface{} `db:"distance" json:"distance"`
-}
-
-func (q *Queries) SearchAllEmbeddingsByType(ctx context.Context, arg SearchAllEmbeddingsByTypeParams) ([]SearchAllEmbeddingsByTypeRow, error) {
-	rows, err := q.db.Query(ctx, searchAllEmbeddingsByType, arg.Column1, arg.EmbeddingType, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []SearchAllEmbeddingsByTypeRow
-	for rows.Next() {
-		var i SearchAllEmbeddingsByTypeRow
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.EmbeddingType,
-			&i.EmbeddingModel,
-			&i.EmbeddingDimensions,
-			&i.Distance,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const searchEmbeddingsByModel = `-- name: SearchEmbeddingsByModel :many
-SELECT a.asset_id, e.embedding_type, e.embedding_model, (e.vector <-> $1::vector) AS distance
-FROM embeddings e
-JOIN assets a ON e.asset_id = a.asset_id
-WHERE e.embedding_type = $2
-  AND e.embedding_model = $3
-  AND a.is_deleted = false
-ORDER BY (e.vector <-> $1::vector)
-LIMIT $4
-`
-
-type SearchEmbeddingsByModelParams struct {
-	Column1        *pgvector.Vector `db:"column_1" json:"column_1"`
-	EmbeddingType  string           `db:"embedding_type" json:"embedding_type"`
-	EmbeddingModel string           `db:"embedding_model" json:"embedding_model"`
-	Limit          int32            `db:"limit" json:"limit"`
-}
-
-type SearchEmbeddingsByModelRow struct {
-	AssetID        pgtype.UUID `db:"asset_id" json:"asset_id"`
-	EmbeddingType  string      `db:"embedding_type" json:"embedding_type"`
-	EmbeddingModel string      `db:"embedding_model" json:"embedding_model"`
-	Distance       interface{} `db:"distance" json:"distance"`
-}
-
-func (q *Queries) SearchEmbeddingsByModel(ctx context.Context, arg SearchEmbeddingsByModelParams) ([]SearchEmbeddingsByModelRow, error) {
-	rows, err := q.db.Query(ctx, searchEmbeddingsByModel,
-		arg.Column1,
-		arg.EmbeddingType,
-		arg.EmbeddingModel,
-		arg.Limit,
+func (q *Queries) PromoteEmbeddingSpaceAsDefaultIfNone(ctx context.Context, arg PromoteEmbeddingSpaceAsDefaultIfNoneParams) (EmbeddingSpace, error) {
+	row := q.db.QueryRow(ctx, promoteEmbeddingSpaceAsDefaultIfNone, arg.ID, arg.EmbeddingType)
+	var i EmbeddingSpace
+	err := row.Scan(
+		&i.ID,
+		&i.EmbeddingType,
+		&i.ModelID,
+		&i.Dimensions,
+		&i.DistanceMetric,
+		&i.SearchEnabled,
+		&i.IsDefaultSearch,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []SearchEmbeddingsByModelRow
-	for rows.Next() {
-		var i SearchEmbeddingsByModelRow
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.EmbeddingType,
-			&i.EmbeddingModel,
-			&i.Distance,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const searchEmbeddingsByType = `-- name: SearchEmbeddingsByType :many
-SELECT a.asset_id, e.embedding_type, e.embedding_model, (e.vector <-> $1::vector) AS distance
-FROM embeddings e
-JOIN assets a ON e.asset_id = a.asset_id
-WHERE e.embedding_type = $2
-  AND e.is_primary = true
-  AND a.is_deleted = false
-ORDER BY (e.vector <-> $1::vector)
-LIMIT $3
-`
-
-type SearchEmbeddingsByTypeParams struct {
-	Column1       *pgvector.Vector `db:"column_1" json:"column_1"`
-	EmbeddingType string           `db:"embedding_type" json:"embedding_type"`
-	Limit         int32            `db:"limit" json:"limit"`
-}
-
-type SearchEmbeddingsByTypeRow struct {
-	AssetID        pgtype.UUID `db:"asset_id" json:"asset_id"`
-	EmbeddingType  string      `db:"embedding_type" json:"embedding_type"`
-	EmbeddingModel string      `db:"embedding_model" json:"embedding_model"`
-	Distance       interface{} `db:"distance" json:"distance"`
-}
-
-func (q *Queries) SearchEmbeddingsByType(ctx context.Context, arg SearchEmbeddingsByTypeParams) ([]SearchEmbeddingsByTypeRow, error) {
-	rows, err := q.db.Query(ctx, searchEmbeddingsByType, arg.Column1, arg.EmbeddingType, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []SearchEmbeddingsByTypeRow
-	for rows.Next() {
-		var i SearchEmbeddingsByTypeRow
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.EmbeddingType,
-			&i.EmbeddingModel,
-			&i.Distance,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+	return i, err
 }
 
 const setPrimaryEmbedding = `-- name: SetPrimaryEmbedding :exec
@@ -453,10 +446,11 @@ func (q *Queries) SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimar
 }
 
 const upsertEmbedding = `-- name: UpsertEmbedding :exec
-INSERT INTO embeddings (asset_id, embedding_type, embedding_model, embedding_dimensions, vector, is_primary)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO embeddings (asset_id, embedding_type, embedding_model, embedding_dimensions, space_id, vector, is_primary)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (asset_id, embedding_type, embedding_model)
 DO UPDATE SET
+    space_id = EXCLUDED.space_id,
     vector = EXCLUDED.vector,
     embedding_dimensions = EXCLUDED.embedding_dimensions,
     is_primary = EXCLUDED.is_primary,
@@ -468,6 +462,7 @@ type UpsertEmbeddingParams struct {
 	EmbeddingType       string           `db:"embedding_type" json:"embedding_type"`
 	EmbeddingModel      string           `db:"embedding_model" json:"embedding_model"`
 	EmbeddingDimensions int32            `db:"embedding_dimensions" json:"embedding_dimensions"`
+	SpaceID             int64            `db:"space_id" json:"space_id"`
 	Vector              *pgvector.Vector `db:"vector" json:"vector"`
 	IsPrimary           *bool            `db:"is_primary" json:"is_primary"`
 }
@@ -479,8 +474,47 @@ func (q *Queries) UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams
 		arg.EmbeddingType,
 		arg.EmbeddingModel,
 		arg.EmbeddingDimensions,
+		arg.SpaceID,
 		arg.Vector,
 		arg.IsPrimary,
 	)
 	return err
+}
+
+const upsertEmbeddingSpace = `-- name: UpsertEmbeddingSpace :one
+INSERT INTO embedding_spaces (embedding_type, model_id, dimensions, distance_metric)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (embedding_type, model_id, dimensions, distance_metric)
+DO UPDATE SET updated_at = NOW()
+RETURNING id, embedding_type, model_id, dimensions, distance_metric, search_enabled, is_default_search, created_at, updated_at
+`
+
+type UpsertEmbeddingSpaceParams struct {
+	EmbeddingType  string `db:"embedding_type" json:"embedding_type"`
+	ModelID        string `db:"model_id" json:"model_id"`
+	Dimensions     int32  `db:"dimensions" json:"dimensions"`
+	DistanceMetric string `db:"distance_metric" json:"distance_metric"`
+}
+
+// Embedding spaces
+func (q *Queries) UpsertEmbeddingSpace(ctx context.Context, arg UpsertEmbeddingSpaceParams) (EmbeddingSpace, error) {
+	row := q.db.QueryRow(ctx, upsertEmbeddingSpace,
+		arg.EmbeddingType,
+		arg.ModelID,
+		arg.Dimensions,
+		arg.DistanceMetric,
+	)
+	var i EmbeddingSpace
+	err := row.Scan(
+		&i.ID,
+		&i.EmbeddingType,
+		&i.ModelID,
+		&i.Dimensions,
+		&i.DistanceMetric,
+		&i.SearchEnabled,
+		&i.IsDefaultSearch,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

@@ -16,8 +16,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pgvector/pgvector-go"
 )
 
@@ -159,6 +162,7 @@ type PhotoMapPoint struct {
 
 type assetService struct {
 	queries                      *repo.Queries
+	pool                         *pgxpool.Pool
 	lumen                        LumenService
 	repoManager                  *storage.RepositoryManager
 	embeddingService             EmbeddingService
@@ -166,9 +170,10 @@ type assetService struct {
 	searchAssetsClipTopResultsFn func(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta)
 }
 
-func NewAssetService(q *repo.Queries, l LumenService, r *storage.RepositoryManager, e EmbeddingService) (AssetService, error) {
+func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, r *storage.RepositoryManager, e EmbeddingService) (AssetService, error) {
 	return &assetService{
 		queries:          q,
+		pool:             pool,
 		lumen:            l,
 		repoManager:      r,
 		embeddingService: e,
@@ -1160,32 +1165,6 @@ func classifySearchEnhancementError(err error, ctx context.Context) string {
 	}
 }
 
-func mapVectorSearchRowToAsset(r repo.SearchAssetsVectorUnifiedRow) repo.Asset {
-	return repo.Asset{
-		AssetID:          r.AssetID,
-		OwnerID:          r.OwnerID,
-		Type:             r.Type,
-		OriginalFilename: r.OriginalFilename,
-		StoragePath:      r.StoragePath,
-		MimeType:         r.MimeType,
-		FileSize:         r.FileSize,
-		Hash:             r.Hash,
-		Width:            r.Width,
-		Height:           r.Height,
-		Duration:         r.Duration,
-		TakenTime:        r.TakenTime,
-		UploadTime:       r.UploadTime,
-		UpdatedAt:        r.UpdatedAt,
-		IsDeleted:        r.IsDeleted,
-		DeletedAt:        r.DeletedAt,
-		SpecificMetadata: r.SpecificMetadata,
-		Rating:           r.Rating,
-		Liked:            r.Liked,
-		RepositoryID:     r.RepositoryID,
-		Status:           r.Status,
-	}
-}
-
 func (s *assetService) runQueryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
 	if s.queryAssetsUnifiedFn != nil {
 		return s.queryAssetsUnifiedFn(ctx, params)
@@ -1376,190 +1355,246 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 }
 
 func (s *assetService) queryAssetsVectorTopResults(ctx context.Context, params QueryAssetsParams, limit int) ([]repo.Asset, error) {
-	if s.lumen == nil {
-		return nil, fmt.Errorf("%w: lumen service not available", ErrSemanticSearchUnavailable)
-	}
-	if !s.lumen.IsTaskAvailable("clip_text_embed") {
-		return nil, fmt.Errorf("%w: clip_text_embed task not available", ErrSemanticSearchUnavailable)
-	}
-
-	embeddingResult, err := s.lumen.ClipTextEmbedFast(ctx, []byte(params.Query))
+	embeddingResult, err := s.resolveClipQueryEmbedding(ctx, params.Query, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get query embedding: %w", err)
+		return nil, err
 	}
 
-	queryVector := make([]float32, len(embeddingResult.Vector))
-	for i, v := range embeddingResult.Vector {
-		queryVector[i] = float32(v)
-	}
-
-	pgVector := pgvector.NewVector(queryVector)
-
-	var repoUUID pgtype.UUID
-	if params.RepositoryID != nil && *params.RepositoryID != "" {
-		parsedUUID, err := uuid.Parse(*params.RepositoryID)
-		if err != nil {
-			return nil, fmt.Errorf("invalid repository ID: %w", err)
-		}
-		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
-	}
-
-	maxDistance := 0.5
-	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			maxDistance = f
-		}
-	}
-
-	var ratingPtr *int32
-	if params.Rating != nil {
-		r := int32(*params.Rating)
-		ratingPtr = &r
-	}
-
-	var fromTime, toTime pgtype.Timestamptz
-	if params.DateFrom != nil {
-		fromTime = pgtype.Timestamptz{Time: *params.DateFrom, Valid: true}
-	}
-	if params.DateTo != nil {
-		toTime = pgtype.Timestamptz{Time: *params.DateTo, Valid: true}
-	}
-
-	results, err := s.queries.SearchAssetsVectorUnified(ctx, repo.SearchAssetsVectorUnifiedParams{
-		Embedding:     &pgVector,
-		EmbeddingType: string(EmbeddingTypeCLIP),
-		MaxDistance:   &maxDistance,
-		AssetType:     params.AssetType,
-		AssetTypes:    params.AssetTypes,
-		RepositoryID:  repoUUID,
-		PersonID:      params.PersonID,
-		OwnerID:       params.OwnerID,
-		AlbumID:       params.AlbumID,
-		IsRaw:         params.IsRaw,
-		Rating:        ratingPtr,
-		Liked:         params.Liked,
-		CameraModel:   params.CameraModel,
-		LensModel:     params.LensModel,
-		DateFrom:      fromTime,
-		DateTo:        toTime,
-		Limit:         int32(limit),
-		Offset:        0,
-	})
+	assets, _, err := s.searchAssetsInResolvedSpace(ctx, params, embeddingResult.ModelID, embeddingResult.Vector, limit, 0, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to search assets: %w", err)
-	}
-
-	assets := make([]repo.Asset, len(results))
-	for i, r := range results {
-		assets[i] = mapVectorSearchRowToAsset(r)
+		return nil, err
 	}
 
 	return assets, nil
 }
 
 func (s *assetService) queryAssetsVector(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
+	embeddingResult, err := s.resolveClipQueryEmbedding(ctx, params.Query, false)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return s.searchAssetsInResolvedSpace(ctx, params, embeddingResult.ModelID, embeddingResult.Vector, params.Limit, params.Offset, true)
+}
+
+func (s *assetService) resolveClipQueryEmbedding(ctx context.Context, query string, fast bool) (*types.EmbeddingV1, error) {
 	if s.lumen == nil {
-		return nil, 0, fmt.Errorf("%w: lumen service not available", ErrSemanticSearchUnavailable)
+		return nil, fmt.Errorf("%w: lumen service not available", ErrSemanticSearchUnavailable)
+	}
+	if s.embeddingService == nil {
+		return nil, fmt.Errorf("%w: embedding service not available", ErrSemanticSearchUnavailable)
 	}
 	if !s.lumen.IsTaskAvailable("clip_text_embed") {
-		return nil, 0, fmt.Errorf("%w: clip_text_embed task not available", ErrSemanticSearchUnavailable)
+		return nil, fmt.Errorf("%w: clip_text_embed task not available", ErrSemanticSearchUnavailable)
 	}
 
-	embeddingResult, err := s.lumen.ClipTextEmbed(ctx, []byte(params.Query))
+	var (
+		embeddingResult *types.EmbeddingV1
+		err             error
+	)
+	if fast {
+		embeddingResult, err = s.lumen.ClipTextEmbedFast(ctx, []byte(query))
+	} else {
+		embeddingResult, err = s.lumen.ClipTextEmbed(ctx, []byte(query))
+	}
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get query embedding: %w", err)
+		return nil, fmt.Errorf("failed to get query embedding: %w", err)
+	}
+	if len(embeddingResult.Vector) == 0 {
+		return nil, fmt.Errorf("%w: clip_text_embed returned empty embedding", ErrSemanticSearchUnavailable)
+	}
+	return embeddingResult, nil
+}
+
+func (s *assetService) searchAssetsInResolvedSpace(ctx context.Context, params QueryAssetsParams, model string, vector []float32, limit, offset int, includeCount bool) ([]repo.Asset, int64, error) {
+	space, err := s.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeCLIP, model, len(vector))
+	if err != nil {
+		return nil, 0, err
 	}
 
-	queryVector := make([]float32, len(embeddingResult.Vector))
-	for i, v := range embeddingResult.Vector {
-		queryVector[i] = float32(v)
+	queryVector := pgvector.NewVector(vector)
+	assets, err := s.searchAssetsBySemanticSpace(ctx, params, space, &queryVector, limit, offset)
+	if err != nil {
+		return nil, 0, err
 	}
 
-	pgVector := pgvector.NewVector(queryVector)
+	if !includeCount {
+		return assets, 0, nil
+	}
 
-	var repoUUID pgtype.UUID
+	total, err := s.countAssetsBySemanticSpace(ctx, params, space, &queryVector)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return assets, total, nil
+}
+
+type semanticSQLBuilder struct {
+	args []any
+}
+
+func (b *semanticSQLBuilder) addArg(value any) string {
+	b.args = append(b.args, value)
+	return fmt.Sprintf("$%d", len(b.args))
+}
+
+func (s *assetService) searchAssetsBySemanticSpace(ctx context.Context, params QueryAssetsParams, space repo.EmbeddingSpace, vector *pgvector.Vector, limit, offset int) ([]repo.Asset, error) {
+	builder := &semanticSQLBuilder{}
+	baseSQL, distanceExpr, err := s.buildSemanticSearchBaseSQL(builder, params, space, vector)
+	if err != nil {
+		return nil, err
+	}
+
+	limitPlaceholder := builder.addArg(limit)
+	offsetPlaceholder := builder.addArg(offset)
+	query := fmt.Sprintf(`
+WITH candidate_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    %s AS distance
+  %s
+  ORDER BY %s, a.asset_id DESC
+  LIMIT %s OFFSET %s
+)
+SELECT a.*
+FROM candidate_ids c
+JOIN assets a ON a.asset_id = c.asset_id
+ORDER BY c.distance, c.asset_id DESC
+`, distanceExpr, baseSQL, distanceExpr, limitPlaceholder, offsetPlaceholder)
+
+	rows, err := s.pool.Query(ctx, query, builder.args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search assets: %w", err)
+	}
+	defer rows.Close()
+
+	assets, err := pgx.CollectRows(rows, pgx.RowToStructByName[repo.Asset])
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode semantic search rows: %w", err)
+	}
+
+	return assets, nil
+}
+
+func (s *assetService) countAssetsBySemanticSpace(ctx context.Context, params QueryAssetsParams, space repo.EmbeddingSpace, vector *pgvector.Vector) (int64, error) {
+	builder := &semanticSQLBuilder{}
+	baseSQL, _, err := s.buildSemanticSearchBaseSQL(builder, params, space, vector)
+	if err != nil {
+		return 0, err
+	}
+
+	query := "SELECT COUNT(*) " + baseSQL
+	var count int64
+	if err := s.pool.QueryRow(ctx, query, builder.args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("failed to count assets: %w", err)
+	}
+
+	return count, nil
+}
+
+func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, params QueryAssetsParams, space repo.EmbeddingSpace, vector *pgvector.Vector) (string, string, error) {
+	if vector == nil {
+		return "", "", fmt.Errorf("semantic query vector is nil")
+	}
+	if space.ID <= 0 || space.Dimensions <= 0 {
+		return "", "", fmt.Errorf("invalid semantic search space")
+	}
+
+	embeddingPlaceholder := builder.addArg(vector)
+	spacePlaceholder := builder.addArg(space.ID)
+	maxDistance := semanticMaxDistance()
+	maxDistancePlaceholder := builder.addArg(maxDistance)
+
+	distanceExpr := fmt.Sprintf("(e.vector::vector(%d) <-> %s::vector(%d))", space.Dimensions, embeddingPlaceholder, space.Dimensions)
+	conditions := []string{
+		"a.is_deleted = false",
+		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
+		"e.is_primary = true",
+		fmt.Sprintf("%s <= %s::float8", distanceExpr, maxDistancePlaceholder),
+	}
+
+	if params.AssetType != nil {
+		conditions = append(conditions, fmt.Sprintf("a.type = %s", builder.addArg(*params.AssetType)))
+	}
+	if len(params.AssetTypes) > 0 {
+		conditions = append(conditions, fmt.Sprintf("a.type = ANY(%s::text[])", builder.addArg(params.AssetTypes)))
+	}
+	if params.OwnerID != nil {
+		conditions = append(conditions, fmt.Sprintf("a.owner_id = %s", builder.addArg(*params.OwnerID)))
+	}
 	if params.RepositoryID != nil && *params.RepositoryID != "" {
-		parsedUUID, err := uuid.Parse(*params.RepositoryID)
+		repositoryID, err := uuid.Parse(*params.RepositoryID)
 		if err != nil {
-			return nil, 0, fmt.Errorf("invalid repository ID: %w", err)
+			return "", "", fmt.Errorf("invalid repository ID: %w", err)
 		}
-		repoUUID = pgtype.UUID{Bytes: parsedUUID, Valid: true}
+		conditions = append(conditions, fmt.Sprintf("a.repository_id = %s", builder.addArg(repositoryID)))
+	}
+	if params.PersonID != nil {
+		personPlaceholder := builder.addArg(*params.PersonID)
+		conditions = append(conditions, fmt.Sprintf(`EXISTS (
+			SELECT 1
+			FROM face_cluster_members fcm
+			JOIN face_items fi_person ON fi_person.id = fcm.face_id
+			WHERE fcm.cluster_id = %s
+			  AND fi_person.asset_id = a.asset_id
+		)`, personPlaceholder))
+	}
+	if params.AlbumID != nil {
+		albumPlaceholder := builder.addArg(*params.AlbumID)
+		conditions = append(conditions, fmt.Sprintf(`EXISTS (
+			SELECT 1
+			FROM album_assets aa
+			WHERE aa.asset_id = a.asset_id
+			  AND aa.album_id = %s
+		)`, albumPlaceholder))
+	}
+	if params.DateFrom != nil {
+		conditions = append(conditions, fmt.Sprintf("COALESCE(a.taken_time, a.upload_time) >= %s", builder.addArg(*params.DateFrom)))
+	}
+	if params.DateTo != nil {
+		conditions = append(conditions, fmt.Sprintf("COALESCE(a.taken_time, a.upload_time) <= %s", builder.addArg(*params.DateTo)))
+	}
+	if params.IsRaw != nil {
+		if *params.IsRaw {
+			conditions = append(conditions, "a.specific_metadata->>'is_raw' = 'true'")
+		} else {
+			conditions = append(conditions, "(a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL)")
+		}
+	}
+	if params.Rating != nil {
+		if *params.Rating == 0 {
+			conditions = append(conditions, "a.rating IS NULL")
+		} else {
+			conditions = append(conditions, fmt.Sprintf("a.rating = %s", builder.addArg(*params.Rating)))
+		}
+	}
+	if params.Liked != nil {
+		conditions = append(conditions, fmt.Sprintf("a.liked = %s", builder.addArg(*params.Liked)))
+	}
+	if params.CameraModel != nil {
+		conditions = append(conditions, fmt.Sprintf("a.specific_metadata->>'camera_model' = %s", builder.addArg(*params.CameraModel)))
+	}
+	if params.LensModel != nil {
+		conditions = append(conditions, fmt.Sprintf("a.specific_metadata->>'lens_model' = %s", builder.addArg(*params.LensModel)))
 	}
 
+	baseSQL := fmt.Sprintf(`
+FROM embeddings e
+JOIN assets a ON a.asset_id = e.asset_id
+WHERE %s`, strings.Join(conditions, "\n  AND "))
+
+	return baseSQL, distanceExpr, nil
+}
+
+func semanticMaxDistance() float64 {
 	maxDistance := 0.5
 	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
 			maxDistance = f
 		}
 	}
-
-	var ratingPtr *int32
-	if params.Rating != nil {
-		r := int32(*params.Rating)
-		ratingPtr = &r
-	}
-
-	var fromTime, toTime pgtype.Timestamptz
-	if params.DateFrom != nil {
-		fromTime = pgtype.Timestamptz{Time: *params.DateFrom, Valid: true}
-	}
-	if params.DateTo != nil {
-		toTime = pgtype.Timestamptz{Time: *params.DateTo, Valid: true}
-	}
-
-	// Get total count
-	countResult, err := s.queries.CountAssetsVectorUnified(ctx, repo.CountAssetsVectorUnifiedParams{
-		Embedding:     &pgVector,
-		EmbeddingType: string(EmbeddingTypeCLIP),
-		MaxDistance:   &maxDistance,
-		AssetType:     params.AssetType,
-		AssetTypes:    params.AssetTypes,
-		RepositoryID:  repoUUID,
-		PersonID:      params.PersonID,
-		OwnerID:       params.OwnerID,
-		AlbumID:       params.AlbumID,
-		IsRaw:         params.IsRaw,
-		Rating:        ratingPtr,
-		Liked:         params.Liked,
-		CameraModel:   params.CameraModel,
-		LensModel:     params.LensModel,
-		DateFrom:      fromTime,
-		DateTo:        toTime,
-	})
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to count assets: %w", err)
-	}
-
-	// Get assets
-	results, err := s.queries.SearchAssetsVectorUnified(ctx, repo.SearchAssetsVectorUnifiedParams{
-		Embedding:     &pgVector,
-		EmbeddingType: string(EmbeddingTypeCLIP),
-		MaxDistance:   &maxDistance,
-		AssetType:     params.AssetType,
-		AssetTypes:    params.AssetTypes,
-		RepositoryID:  repoUUID,
-		PersonID:      params.PersonID,
-		OwnerID:       params.OwnerID,
-		AlbumID:       params.AlbumID,
-		IsRaw:         params.IsRaw,
-		Rating:        ratingPtr,
-		Liked:         params.Liked,
-		CameraModel:   params.CameraModel,
-		LensModel:     params.LensModel,
-		DateFrom:      fromTime,
-		DateTo:        toTime,
-		Limit:         int32(params.Limit),
-		Offset:        int32(params.Offset),
-	})
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to search assets: %w", err)
-	}
-
-	assets := make([]repo.Asset, len(results))
-	for i, r := range results {
-		assets[i] = mapVectorSearchRowToAsset(r)
-	}
-	return assets, countResult, nil
+	return maxDistance
 }
 
 func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhotoMapPointsParams) ([]PhotoMapPoint, int64, error) {

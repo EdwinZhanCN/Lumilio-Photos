@@ -26,6 +26,7 @@ import (
 	"server/internal/storage/repocfg"
 
 	lumenconfig "github.com/edwinzhancn/lumen-sdk/pkg/config"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -128,7 +129,7 @@ func main() {
 	}
 	faceService := service.NewFaceService(queries, repoManager)
 
-	lumenService, embeddingService, err := initMLServices(ctx, queries, workers, zapLogger, settingsService, faceService)
+	lumenService, embeddingService, err := initMLServices(ctx, pgxPool, queries, workers, zapLogger, settingsService, faceService)
 	if err != nil {
 		log.Fatalf("Failed to initialize ML services: %v", err)
 	}
@@ -158,7 +159,7 @@ func main() {
 		}
 	}()
 
-	assetService, err := service.NewAssetService(queries, lumenService, &repoManager, embeddingService)
+	assetService, err := service.NewAssetService(queries, pgxPool, lumenService, &repoManager, embeddingService)
 	if err != nil {
 		log.Fatalf("Failed to initialize asset service: %v", err)
 	}
@@ -247,6 +248,7 @@ func main() {
 
 func initMLServices(
 	ctx context.Context,
+	pgxPool *pgxpool.Pool,
 	queries *repo.Queries,
 	workers *river.Workers,
 	zapLogger *zap.Logger,
@@ -271,7 +273,7 @@ func initMLServices(
 	}
 	log.Println("✅ Lumen Service Initialized")
 
-	embeddingService := service.NewEmbeddingService(queries)
+	embeddingService := service.NewEmbeddingService(queries, pgxPool)
 	tagService := service.NewAIGeneratedTagService(queries)
 	captionService := service.NewCaptionService(queries, lumenService)
 	ocrService := service.NewOCRService(queries)
