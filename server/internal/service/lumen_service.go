@@ -101,7 +101,7 @@ func (s *lumenService) clipTextEmbedWithRetry(ctx context.Context, text []byte, 
 		return nil, fmt.Errorf("failed to parse embedding response: %w", err)
 	}
 
-	s.logger.Info("Generated CLIP embedding",
+	s.logger.Debug("Generated CLIP embedding",
 		zap.String("model", embedResp.ModelID),
 		zap.Int("dimensions", len(embedResp.Vector)))
 
@@ -130,7 +130,7 @@ func (s *lumenService) ClipImageEmbed(ctx context.Context, imageData []byte) (*t
 		return nil, fmt.Errorf("failed to parse embedding response: %w", err)
 	}
 
-	s.logger.Info("Generated CLIP image embedding",
+	s.logger.Debug("Generated CLIP image embedding",
 		zap.String("model", embedResp.ModelID),
 		zap.Int("dimensions", len(embedResp.Vector)))
 
@@ -171,7 +171,7 @@ func (s *lumenService) classifyImage(ctx context.Context, imageData []byte, task
 	}
 
 	topLabels := classifyResp.TopK(topK)
-	s.logger.Info("Generated image classification",
+	s.logger.Debug("Generated image classification",
 		zap.String("task", taskName),
 		zap.String("model", classifyResp.ModelID),
 		zap.Int("top_labels", len(topLabels)))
@@ -205,7 +205,7 @@ func (s *lumenService) FaceDetectEmbed(ctx context.Context, imageData []byte) (*
 		return nil, fmt.Errorf("failed to parse face response: %w", err)
 	}
 
-	s.logger.Info("Face detection completed",
+	s.logger.Debug("Face detection completed",
 		zap.String("model", faceResp.ModelID),
 		zap.Int("face_count", faceResp.Count),
 		zap.Int("detected_faces", len(faceResp.Faces)))
@@ -233,7 +233,7 @@ func (s *lumenService) OCR(ctx context.Context, imageData []byte) (*types.OCRV1,
 		return nil, fmt.Errorf("failed to parse OCR response: %w", err)
 	}
 
-	s.logger.Info("Generated OCR results",
+	s.logger.Debug("Generated OCR results",
 		zap.String("model", ocrResp.ModelID),
 		zap.Int("items", len(ocrResp.Items)))
 
@@ -267,7 +267,7 @@ func (s *lumenService) VLMCaptionWithPrompt(ctx context.Context, imageData []byt
 		return "", fmt.Errorf("failed to parse caption response: %w", err)
 	}
 
-	s.logger.Info("Generated VLM caption",
+	s.logger.Debug("Generated VLM caption",
 		zap.String("model", captionResp.ModelID),
 		zap.Int("tokens", captionResp.GeneratedTokens),
 		zap.String("finished_reason", captionResp.FinishReason))
@@ -299,7 +299,7 @@ func (s *lumenService) VLMCaptionWithMetadata(ctx context.Context, imageData []b
 		return nil, fmt.Errorf("failed to parse caption response: %w", err)
 	}
 
-	s.logger.Info("Generated VLM caption",
+	s.logger.Debug("Generated VLM caption",
 		zap.String("model", captionResp.ModelID),
 		zap.Int("tokens", captionResp.GeneratedTokens),
 		zap.String("finished_reason", captionResp.FinishReason))

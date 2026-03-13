@@ -3,7 +3,6 @@ package processors
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
+	"go.uber.org/zap"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/dbtypes/status"
@@ -114,16 +114,37 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 	if err != nil {
 		failureDetail := fmt.Sprintf("commit staging to inbox failed: %v", err)
 		if moveErr := ap.stagingManager.MoveStagingToFailed(stagingFile); moveErr != nil {
-			log.Printf("Failed to move staging file %s to failed dir: %v", stagingFile.Path, moveErr)
+			ap.logger.Warn("failed to move staging file to failed dir",
+				zap.String("operation", "asset.ingest"),
+				zap.String("staging_path", stagingFile.Path),
+				zap.Error(moveErr),
+			)
+			ap.repoAudit(repository.Path).Error("asset.ingest.move_failed", moveErr,
+				zap.String("asset_id", asset.AssetID.String()),
+				zap.String("staging_path", stagingFile.Path),
+			)
 			if removeErr := os.Remove(stagingFile.Path); removeErr != nil && !os.IsNotExist(removeErr) {
-				log.Printf("Failed to remove staging file %s after move failure: %v", stagingFile.Path, removeErr)
+				ap.logger.Warn("failed to remove staging file after move failure",
+					zap.String("operation", "asset.ingest"),
+					zap.String("staging_path", stagingFile.Path),
+					zap.Error(removeErr),
+				)
 			}
 			failureDetail = fmt.Sprintf("%s; move to failed dir failed: %v", failureDetail, moveErr)
 		}
 
 		if markErr := ap.markAssetFailed(ctx, asset.AssetID, "commit_staging", failureDetail); markErr != nil {
-			log.Printf("Failed to mark asset %s as failed after staging commit error: %v", asset.AssetID.String(), markErr)
+			ap.logger.Warn("failed to mark asset as failed after staging commit error",
+				zap.String("operation", "asset.ingest"),
+				zap.String("asset_id", asset.AssetID.String()),
+				zap.Error(markErr),
+			)
 		}
+		ap.repoAudit(repository.Path).Error("asset.ingest.commit_staging", err,
+			zap.String("asset_id", asset.AssetID.String()),
+			zap.String("storage_path", storageRelPath),
+			zap.String("original_filename", task.FileName),
+		)
 		return asset, nil
 	}
 
@@ -199,6 +220,13 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 	default:
 		return nil, fmt.Errorf("unsupported asset type: %s", assetType)
 	}
+
+	ap.repoAudit(repository.Path).Operation("asset.ingest",
+		zap.String("repository_id", uuid.UUID(repository.RepoID.Bytes).String()),
+		zap.String("asset_id", asset.AssetID.String()),
+		zap.String("storage_path", storageRelPath),
+		zap.String("asset_type", string(assetType)),
+	)
 
 	return asset, nil
 }

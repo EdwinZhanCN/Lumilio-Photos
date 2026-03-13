@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 type fakePrimaryStorageRepositoryManager struct {
@@ -88,7 +89,7 @@ func TestInitPrimaryStorage_InitializesPrimaryUnderStorageRoot(t *testing.T) {
 		getByPathRepos: map[string]*repo.Repository{},
 	}
 
-	err := initPrimaryStorage(manager)
+	err := initPrimaryStorage(manager, zap.NewNop())
 	require.NoError(t, err)
 
 	require.Empty(t, manager.addCalls)
@@ -111,7 +112,7 @@ func TestInitPrimaryStorage_RejectsLegacyRootRepository(t *testing.T) {
 		},
 	}
 
-	err := initPrimaryStorage(manager)
+	err := initPrimaryStorage(manager, zap.NewNop())
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "legacy repository detected")
 	require.Empty(t, manager.addCalls)
@@ -133,7 +134,7 @@ func TestInitPrimaryStorage_RegistersExistingPrimaryRepository(t *testing.T) {
 		addRepo:        fakeRepo(primaryPath),
 	}
 
-	err := initPrimaryStorage(manager)
+	err := initPrimaryStorage(manager, zap.NewNop())
 	require.NoError(t, err)
 
 	require.Len(t, manager.getCalls, 1)

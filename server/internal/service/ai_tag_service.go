@@ -30,10 +30,11 @@ func NewAIGeneratedTagService(queries *repo.Queries) AIGeneratedTagService {
 }
 
 func (s *aiGeneratedTagService) ReplaceAssetAIGeneratedTags(ctx context.Context, assetID pgtype.UUID, tags []AIGeneratedTag, sources []string) error {
-	if len(sources) > 0 {
+	normalizedSources := normalizeAssetTagSources(sources)
+	if len(normalizedSources) > 0 {
 		if err := s.queries.RemoveAssetTagsBySources(ctx, repo.RemoveAssetTagsBySourcesParams{
 			AssetID: assetID,
-			Sources: sources,
+			Sources: normalizedSources,
 		}); err != nil {
 			return fmt.Errorf("remove existing ai tags: %w", err)
 		}
@@ -55,7 +56,7 @@ func (s *aiGeneratedTagService) ReplaceAssetAIGeneratedTags(ctx context.Context,
 			AssetID:    assetID,
 			TagID:      dbTag.TagID,
 			Confidence: confidenceNumeric,
-			Source:     tag.Source,
+			Source:     normalizeAssetTagSource(tag.Source),
 		}); err != nil {
 			return fmt.Errorf("attach tag %q to asset: %w", tag.Name, err)
 		}
@@ -112,4 +113,32 @@ func dedupeAIGeneratedTags(tags []AIGeneratedTag) []AIGeneratedTag {
 	}
 
 	return deduped
+}
+
+func normalizeAssetTagSources(sources []string) []string {
+	normalized := make([]string, 0, len(sources))
+	seen := make(map[string]struct{}, len(sources))
+	for _, source := range sources {
+		value := normalizeAssetTagSource(source)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		normalized = append(normalized, value)
+	}
+	return normalized
+}
+
+func normalizeAssetTagSource(source string) string {
+	switch strings.TrimSpace(source) {
+	case "":
+		return ""
+	case "system", "user", "ai":
+		return strings.TrimSpace(source)
+	default:
+		return "ai"
+	}
 }

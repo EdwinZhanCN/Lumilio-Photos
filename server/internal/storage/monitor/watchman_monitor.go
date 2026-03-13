@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -24,6 +23,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
+	"go.uber.org/zap"
 )
 
 const (
@@ -51,6 +51,7 @@ type WatchmanMonitor struct {
 	queue      *river.Client[pgx.Tx]
 	cfg        config.WatchmanConfig
 	extensions []string
+	logger     *zap.Logger
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
@@ -62,7 +63,11 @@ func NewWatchmanMonitor(
 	queries *repo.Queries,
 	queue *river.Client[pgx.Tx],
 	cfg config.WatchmanConfig,
+	logger *zap.Logger,
 ) *WatchmanMonitor {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	rawExt := file.GetSupportedExtensions()
 	suffixes := make([]string, 0, len(rawExt))
 	seen := make(map[string]struct{}, len(rawExt))
@@ -84,6 +89,7 @@ func NewWatchmanMonitor(
 		queue:      queue,
 		cfg:        cfg,
 		extensions: suffixes,
+		logger:     logger.With(zap.String("component", "watchman")),
 	}
 }
 
@@ -93,7 +99,7 @@ func (m *WatchmanMonitor) Start(ctx context.Context) error {
 		return nil
 	}
 	if !m.cfg.Enabled {
-		log.Println("ℹ️  Watchman monitor disabled (WATCHMAN_ENABLED=false)")
+		m.logger.Info("watchman monitor disabled", zap.String("operation", "watchman.start"))
 		return nil
 	}
 	if strings.TrimSpace(m.cfg.SocketPath) == "" {
@@ -117,7 +123,7 @@ func (m *WatchmanMonitor) Start(ctx context.Context) error {
 		return fmt.Errorf("list active repositories: %w", err)
 	}
 	if len(repos) == 0 {
-		log.Println("ℹ️  Watchman monitor: no active repositories found")
+		m.logger.Info("watchman monitor found no active repositories", zap.String("operation", "watchman.start"))
 		return nil
 	}
 
@@ -131,7 +137,11 @@ func (m *WatchmanMonitor) Start(ctx context.Context) error {
 			continue
 		}
 		if !isWatchableRepositoryRoot(repoItem.Path) {
-			log.Printf("⚠️  Watchman monitor: skip non-watchable repository path=%s repo_id=%s", repoItem.Path, uuid.UUID(repoItem.RepoID.Bytes).String())
+			m.logger.Warn("watchman monitor skipped non-watchable repository",
+				zap.String("operation", "watchman.start"),
+				zap.String("repository_path", repoItem.Path),
+				zap.String("repository_id", uuid.UUID(repoItem.RepoID.Bytes).String()),
+			)
 			continue
 		}
 		m.wg.Add(1)
@@ -177,7 +187,11 @@ func (m *WatchmanMonitor) runRepositoryLoop(ctx context.Context, repository repo
 		}
 
 		if err := m.watchRepositorySession(ctx, repository); err != nil {
-			log.Printf("⚠️  Watchman monitor (%s): %v", repoID, err)
+			m.logger.Warn("watchman repository session failed",
+				zap.String("operation", "watchman.session"),
+				zap.String("repository_id", repoID),
+				zap.Error(err),
+			)
 
 			timer := time.NewTimer(backoff)
 			select {
@@ -235,7 +249,12 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 		if queryErr != nil && clockToken != "" {
 			// Clock tokens can become invalid after watchman restarts/rebuilds.
 			// Fallback to a full scan instead of stalling the monitor loop forever.
-			log.Printf("⚠️  Watchman initial query with saved clock failed for repo=%s clock=%s: %v; retrying full scan", repository.Name, clockToken, queryErr)
+			m.logger.Warn("watchman initial query with saved clock failed; retrying full scan",
+				zap.String("operation", "watchman.initial_query"),
+				zap.String("repository_name", repository.Name),
+				zap.String("clock", clockToken),
+				zap.Error(queryErr),
+			)
 			clockToken = ""
 			_ = m.clearClock(repository.Path)
 			delete(queryOpts, "since")
@@ -250,7 +269,11 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 			_ = m.saveClock(repository.Path, result.Clock)
 		}
 		if err := m.enqueueReadyFiles(ctx, repository, result.Files); err != nil {
-			log.Printf("⚠️  Watchman initial enqueue (%s): %v", repository.Name, err)
+			m.logger.Warn("watchman initial enqueue failed",
+				zap.String("operation", "watchman.initial_enqueue"),
+				zap.String("repository_name", repository.Name),
+				zap.Error(err),
+			)
 		}
 	}
 
@@ -275,7 +298,12 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 	subClock, err := client.Subscribe(ctx, wp.Watch, subscriptionName, subscribeOpts)
 	if err != nil {
 		if clockToken != "" {
-			log.Printf("⚠️  Watchman subscribe with saved clock failed for repo=%s clock=%s: %v; retrying with fresh clock", repository.Name, clockToken, err)
+			m.logger.Warn("watchman subscribe with saved clock failed; retrying with fresh clock",
+				zap.String("operation", "watchman.subscribe"),
+				zap.String("repository_name", repository.Name),
+				zap.String("clock", clockToken),
+				zap.Error(err),
+			)
 			freshClock, clockErr := client.Clock(ctx, wp.Watch)
 			if clockErr != nil {
 				return fmt.Errorf("subscribe failed and fresh clock failed: %w / %v", err, clockErr)
@@ -291,7 +319,14 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 		_ = m.saveClock(repository.Path, subClock)
 	}
 	settle := time.Duration(maxInt(m.cfg.SettleSeconds, 1)) * time.Second
-	log.Printf("✅ Watchman monitor subscribed repo=%s repo_id=%s watch=%s relative_root=%s clock=%s", repository.Name, repoID, wp.Watch, relativeRoot, subClock)
+	m.logger.Info("watchman monitor subscribed",
+		zap.String("operation", "watchman.subscribe"),
+		zap.String("repository_name", repository.Name),
+		zap.String("repository_id", repoID),
+		zap.String("watch", wp.Watch),
+		zap.String("relative_root", relativeRoot),
+		zap.String("clock", subClock),
+	)
 	pending := make(map[string]*pendingEntry)
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -325,7 +360,11 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 	if m.cfg.PollFallbackSeconds > 0 {
 		snapshot, err = snapshotRepositoryFiles(repository.Path)
 		if err != nil {
-			log.Printf("⚠️  Watchman poll fallback snapshot init failed (%s): %v", repository.Name, err)
+			m.logger.Warn("watchman poll fallback snapshot init failed",
+				zap.String("operation", "watchman.poll"),
+				zap.String("repository_name", repository.Name),
+				zap.Error(err),
+			)
 		}
 		pollTicker = time.NewTicker(time.Duration(m.cfg.PollFallbackSeconds) * time.Second)
 		pollCh = pollTicker.C
@@ -343,7 +382,11 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 		case <-pollCh:
 			current, scanErr := snapshotRepositoryFiles(repository.Path)
 			if scanErr != nil {
-				log.Printf("⚠️  Watchman poll fallback snapshot failed (%s): %v", repository.Name, scanErr)
+				m.logger.Warn("watchman poll fallback snapshot failed",
+					zap.String("operation", "watchman.poll"),
+					zap.String("repository_name", repository.Name),
+					zap.Error(scanErr),
+				)
 				continue
 			}
 			if snapshot == nil {
@@ -355,7 +398,11 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 			if len(changes) == 0 {
 				continue
 			}
-			log.Printf("ℹ️  Watchman poll fallback detected %d change(s) repo=%s", len(changes), repository.Name)
+			m.logger.Info("watchman poll fallback detected changes",
+				zap.String("operation", "watchman.poll"),
+				zap.String("repository_name", repository.Name),
+				zap.Int("change_count", len(changes)),
+			)
 			m.handleFileEvents(ctx, repository, pending, settle, changes)
 		case msg := <-msgCh:
 			subName, _ := msg["subscription"].(string)
@@ -365,7 +412,11 @@ func (m *WatchmanMonitor) watchRepositorySession(ctx context.Context, repository
 
 			result, err := watchman.ParseQueryResult(msg)
 			if err != nil {
-				log.Printf("⚠️  Watchman parse payload (%s): %v", repository.Name, err)
+				m.logger.Warn("watchman parse payload failed",
+					zap.String("operation", "watchman.payload"),
+					zap.String("repository_name", repository.Name),
+					zap.Error(err),
+				)
 				continue
 			}
 			if result.Clock != "" {
@@ -401,7 +452,12 @@ func (m *WatchmanMonitor) handleFileEvents(
 		if !f.Exists {
 			delete(pending, cleaned)
 			if err := m.enqueueDiscover(ctx, repoID, cleaned, filepath.Base(cleaned), nil, jobs.DiscoverOperationDelete); err != nil {
-				log.Printf("⚠️  Watchman delete enqueue (%s:%s): %v", repository.Name, cleaned, err)
+				m.logger.Warn("watchman delete enqueue failed",
+					zap.String("operation", "watchman.enqueue_delete"),
+					zap.String("repository_name", repository.Name),
+					zap.String("storage_path", cleaned),
+					zap.Error(err),
+				)
 			}
 			continue
 		}
@@ -440,7 +496,12 @@ func (m *WatchmanMonitor) enqueueReadyFiles(ctx context.Context, repository repo
 		}
 		if !f.Exists {
 			if err := m.enqueueDiscover(ctx, repoID, cleaned, filepath.Base(cleaned), nil, jobs.DiscoverOperationDelete); err != nil {
-				log.Printf("⚠️  Watchman initial delete enqueue (%s:%s): %v", repository.Name, cleaned, err)
+				m.logger.Warn("watchman initial delete enqueue failed",
+					zap.String("operation", "watchman.initial_delete_enqueue"),
+					zap.String("repository_name", repository.Name),
+					zap.String("storage_path", cleaned),
+					zap.Error(err),
+				)
 			}
 			continue
 		}
@@ -455,7 +516,12 @@ func (m *WatchmanMonitor) enqueueReadyFiles(ctx context.Context, repository repo
 		}
 
 		if err := m.enqueueDiscover(ctx, repoID, storagePath, filepath.Base(cleaned), info, jobs.DiscoverOperationUpsert); err != nil {
-			log.Printf("⚠️  Watchman initial enqueue (%s:%s): %v", repository.Name, storagePath, err)
+			m.logger.Warn("watchman initial enqueue failed",
+				zap.String("operation", "watchman.initial_enqueue"),
+				zap.String("repository_name", repository.Name),
+				zap.String("storage_path", storagePath),
+				zap.Error(err),
+			)
 		}
 	}
 	return nil
@@ -482,7 +548,12 @@ func (m *WatchmanMonitor) flushPending(
 		if err != nil {
 			if os.IsNotExist(err) {
 				if enqueueErr := m.enqueueDiscover(ctx, repoID, entry.StoragePath, entry.Filename, nil, jobs.DiscoverOperationDelete); enqueueErr != nil {
-					log.Printf("⚠️  Watchman delete enqueue (%s:%s): %v", repository.Name, entry.StoragePath, enqueueErr)
+					m.logger.Warn("watchman delete enqueue failed",
+						zap.String("operation", "watchman.enqueue_delete"),
+						zap.String("repository_name", repository.Name),
+						zap.String("storage_path", entry.StoragePath),
+						zap.Error(enqueueErr),
+					)
 				}
 			}
 			delete(pending, key)
@@ -505,7 +576,12 @@ func (m *WatchmanMonitor) flushPending(
 		if err := m.enqueueDiscover(ctx, repoID, entry.StoragePath, entry.Filename, info, jobs.DiscoverOperationUpsert); err != nil {
 			entry.Attempts++
 			if entry.Attempts >= 3 {
-				log.Printf("⚠️  Watchman enqueue failed after retries (%s:%s): %v", repository.Name, entry.StoragePath, err)
+				m.logger.Warn("watchman enqueue failed after retries",
+					zap.String("operation", "watchman.enqueue"),
+					zap.String("repository_name", repository.Name),
+					zap.String("storage_path", entry.StoragePath),
+					zap.Error(err),
+				)
 				delete(pending, key)
 				continue
 			}

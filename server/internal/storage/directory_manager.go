@@ -168,16 +168,16 @@ func (dm *DefaultDirectoryManager) CreateStructure(repoPath string) error {
 		}
 	}
 
-	// Create initial log files
-	logFiles := map[string]string{
-		".lumilio/logs/app.log":        "# Lumilio application logs\n",
-		".lumilio/logs/error.log":      "# Lumilio error logs\n",
-		".lumilio/logs/operations.log": "# Lumilio operations logs\n",
+	// Create empty log files so JSON loggers can append valid lines immediately.
+	logFiles := []string{
+		".lumilio/logs/app.log",
+		".lumilio/logs/error.log",
+		".lumilio/logs/operations.log",
 	}
 
-	for logFile, content := range logFiles {
+	for _, logFile := range logFiles {
 		logPath := filepath.Join(cleanPath, logFile)
-		if err := os.WriteFile(logPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(logPath, nil, 0644); err != nil {
 			return fmt.Errorf("failed to create log file %s: %w", logFile, err)
 		}
 	}
@@ -272,17 +272,17 @@ func (dm *DefaultDirectoryManager) RepairStructure(repoPath string) error {
 		}
 	}
 
-	// Recreate missing log files
-	logFiles := map[string]string{
-		".lumilio/logs/app.log":        "# Lumilio application logs\n",
-		".lumilio/logs/error.log":      "# Lumilio error logs\n",
-		".lumilio/logs/operations.log": "# Lumilio operations logs\n",
+	// Recreate missing log files as empty JSONL targets.
+	logFiles := []string{
+		".lumilio/logs/app.log",
+		".lumilio/logs/error.log",
+		".lumilio/logs/operations.log",
 	}
 
-	for logFile, content := range logFiles {
+	for _, logFile := range logFiles {
 		logPath := filepath.Join(cleanPath, logFile)
 		if _, err := os.Stat(logPath); os.IsNotExist(err) {
-			if err := os.WriteFile(logPath, []byte(content), 0644); err != nil {
+			if err := os.WriteFile(logPath, nil, 0644); err != nil {
 				return fmt.Errorf("failed to recreate log file %s: %w", logFile, err)
 			}
 		}

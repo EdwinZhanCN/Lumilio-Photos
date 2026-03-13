@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"log/slog"
 	"runtime"
 
 	"github.com/jackc/pgx/v5"
@@ -9,7 +10,7 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 )
 
-func New(dbpool *pgxpool.Pool, workers *river.Workers) (*river.Client[pgx.Tx], error) {
+func New(dbpool *pgxpool.Pool, workers *river.Workers, logger *slog.Logger) (*river.Client[pgx.Tx], error) {
 	queues := map[string]river.QueueConfig{
 		"ingest_asset":    {MaxWorkers: 50},
 		"discover_asset":  {MaxWorkers: 20},
@@ -28,6 +29,7 @@ func New(dbpool *pgxpool.Pool, workers *river.Workers) (*river.Client[pgx.Tx], e
 		Schema:  "public",
 		Queues:  queues,
 		Workers: workers,
+		Logger:  logger,
 	})
 	return client, err
 }
