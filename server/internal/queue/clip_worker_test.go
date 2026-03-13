@@ -97,6 +97,10 @@ func (s *clipWorkerEmbeddingStub) SaveEmbedding(_ context.Context, _ pgtype.UUID
 	return nil
 }
 
+func (s *clipWorkerEmbeddingStub) ResolveDefaultSearchSpace(context.Context, service.EmbeddingType, string, int) (repo.EmbeddingSpace, error) {
+	panic("not implemented")
+}
+
 func (s *clipWorkerEmbeddingStub) GetEmbedding(context.Context, pgtype.UUID, service.EmbeddingType, string) (repo.Embedding, error) {
 	panic("not implemented")
 }
