@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,6 +14,7 @@ import (
 
 	"server/config"
 	"server/internal/db/repo"
+	"server/internal/logging"
 	"server/internal/queue/jobs"
 	"server/internal/utils/imaging"
 	"server/internal/utils/raw"
@@ -24,6 +24,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
+	"go.uber.org/zap"
 )
 
 type AssetIndexingTask string
@@ -81,6 +82,8 @@ type assetIndexingService struct {
 	runtimeChecker  TaskAvailabilityChecker
 	queueClient     *river.Client[pgx.Tx]
 	dbpool          *pgxpool.Pool
+	logger          *zap.Logger
+	auditProvider   logging.RepositoryAuditProvider
 }
 
 type reindexCandidate struct {
@@ -94,13 +97,23 @@ func NewAssetIndexingService(
 	runtimeChecker TaskAvailabilityChecker,
 	queueClient *river.Client[pgx.Tx],
 	dbpool *pgxpool.Pool,
+	logger *zap.Logger,
+	auditProvider logging.RepositoryAuditProvider,
 ) AssetIndexingService {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	if auditProvider == nil {
+		auditProvider = logging.NewRepositoryAuditProvider(logger)
+	}
 	return &assetIndexingService{
 		queries:         queries,
 		settingsService: settingsService,
 		runtimeChecker:  runtimeChecker,
 		queueClient:     queueClient,
 		dbpool:          dbpool,
+		logger:          logger.With(zap.String("component", "indexing")),
+		auditProvider:   auditProvider,
 	}
 }
 
@@ -250,17 +263,27 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 
 	enabledTasks := filterEnabledIndexingTasks(requestedTasks, effectiveConfig)
 	if len(enabledTasks) == 0 {
-		log.Printf("reindex: no enabled tasks for request %v", requestedTasks)
+		s.logger.Info("reindex skipped: no enabled tasks",
+			zap.String("operation", "reindex.process"),
+			zap.Any("requested_tasks", requestedTasks),
+		)
 		return nil
 	}
 
 	runtimeAvailableTasks := FilterRuntimeAvailableIndexingTasks(enabledTasks, s.runtimeChecker)
 	if len(runtimeAvailableTasks) == 0 {
-		log.Printf("reindex: no runtime-available tasks for request %v", requestedTasks)
+		s.logger.Info("reindex skipped: no runtime-available tasks",
+			zap.String("operation", "reindex.process"),
+			zap.Any("requested_tasks", requestedTasks),
+		)
 		return nil
 	}
 	if len(runtimeAvailableTasks) != len(enabledTasks) {
-		log.Printf("reindex: skipping runtime-unavailable tasks (enabled=%v available=%v)", enabledTasks, runtimeAvailableTasks)
+		s.logger.Info("reindex skipping runtime-unavailable tasks",
+			zap.String("operation", "reindex.process"),
+			zap.Any("enabled_tasks", enabledTasks),
+			zap.Any("available_tasks", runtimeAvailableTasks),
+		)
 	}
 	enabledTasks = runtimeAvailableTasks
 
@@ -274,6 +297,12 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		return err
 	}
 	if len(candidates) == 0 {
+		s.audit(input.RepositoryID, "").Operation("asset.reindex",
+			zap.Any("tasks", enabledTasks),
+			zap.Int("limit", input.Limit),
+			zap.Bool("missing_only", input.MissingOnly),
+			zap.String("result", "no_candidates"),
+		)
 		return nil
 	}
 
@@ -285,7 +314,14 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		queued, enqueueErr := s.enqueueAssetIndexingTasks(ctx, candidate, repositoryCache)
 		if enqueueErr != nil {
 			failedAssets++
-			log.Printf("reindex: failed to queue asset %s: %v", candidate.asset.AssetID.String(), enqueueErr)
+			s.logger.Warn("reindex failed to queue asset",
+				zap.String("operation", "reindex.process"),
+				zap.String("asset_id", candidate.asset.AssetID.String()),
+				zap.Error(enqueueErr),
+			)
+			s.audit(input.RepositoryID, "").Error("asset.reindex", enqueueErr,
+				zap.String("asset_id", candidate.asset.AssetID.String()),
+			)
 			continue
 		}
 		queuedJobs += queued
@@ -295,7 +331,18 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		return fmt.Errorf("failed to queue %d assets for reindex", failedAssets)
 	}
 
-	log.Printf("reindex: queued %d jobs across %d assets (failed assets: %d)", queuedJobs, len(candidates), failedAssets)
+	s.logger.Info("reindex queued jobs",
+		zap.String("operation", "reindex.process"),
+		zap.Int("queued_jobs", queuedJobs),
+		zap.Int("candidate_assets", len(candidates)),
+		zap.Int("failed_assets", failedAssets),
+	)
+	s.audit(input.RepositoryID, "").Operation("asset.reindex",
+		zap.Int("queued_jobs", queuedJobs),
+		zap.Int("candidate_assets", len(candidates)),
+		zap.Int("failed_assets", failedAssets),
+		zap.Any("tasks", enabledTasks),
+	)
 	return nil
 }
 
@@ -616,10 +663,35 @@ WHERE queue = $1
 
 	var count int64
 	if err := s.dbpool.QueryRow(ctx, query, queueName).Scan(&count); err != nil {
-		log.Printf("indexing stats: count queue %s failed: %v", queueName, err)
+		s.logger.Warn("indexing stats queue count failed",
+			zap.String("operation", "indexing.stats"),
+			zap.String("queue", queueName),
+			zap.Error(err),
+		)
 		return 0
 	}
 	return count
+}
+
+func (s *assetIndexingService) audit(repositoryID *string, repoPath string) logging.RepositoryAuditLogger {
+	if s.auditProvider == nil {
+		return logging.NewRepositoryAuditProvider(s.logger).ForPath(repoPath)
+	}
+	if strings.TrimSpace(repoPath) != "" {
+		return s.auditProvider.ForPath(repoPath)
+	}
+	if repositoryID == nil || strings.TrimSpace(*repositoryID) == "" || s.queries == nil {
+		return s.auditProvider.ForPath(repoPath)
+	}
+	repositoryUUID, err := parseRepositoryUUID(repositoryID)
+	if err != nil {
+		return s.auditProvider.ForPath(repoPath)
+	}
+	repository, err := s.queries.GetRepository(context.Background(), repositoryUUID)
+	if err != nil {
+		return s.auditProvider.ForPath(repoPath)
+	}
+	return s.auditProvider.ForPath(repository.Path)
 }
 
 func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg config.MLConfig) []AssetIndexingTask {

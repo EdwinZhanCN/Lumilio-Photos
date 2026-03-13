@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
+	"go.uber.org/zap"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -42,6 +43,13 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 		})
 		if err != nil {
 			return fmt.Errorf("soft delete discovered asset (%s): %w", storagePath, err)
+		}
+		repository, repoErr := ap.queries.GetRepository(ctx, repoID)
+		if repoErr == nil {
+			ap.repoAudit(repository.Path).Operation("asset.discover.delete",
+				zap.String("repository_id", args.RepositoryID),
+				zap.String("storage_path", storagePath),
+			)
 		}
 		return nil
 	}
@@ -231,6 +239,13 @@ func (ap *AssetProcessor) enqueueDiscoveredDownstream(
 	default:
 		return fmt.Errorf("unsupported asset type: %s", assetType)
 	}
+
+	ap.repoAudit(repository.Path).Operation("asset.discover.upsert",
+		zap.String("repository_id", uuid.UUID(repository.RepoID.Bytes).String()),
+		zap.String("asset_id", asset.AssetID.String()),
+		zap.String("storage_path", storagePath),
+		zap.String("asset_type", string(assetType)),
+	)
 
 	return nil
 }

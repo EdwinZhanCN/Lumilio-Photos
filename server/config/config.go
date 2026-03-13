@@ -143,15 +143,7 @@ func LoadEnvironment() {
 	}
 
 	// Try to load .env file but continue if it's not found
-	if err := godotenv.Load(envFile); err != nil {
-		log.Printf("Running without %s file, using environment variables", envFile)
-	} else {
-		log.Printf("Environment variables loaded from %s file", envFile)
-	}
-
-	if isDev {
-		log.Println("Running in DEVELOPMENT mode")
-	}
+	_ = godotenv.Load(envFile)
 }
 
 // LoadDBConfig loads database settings from environment variables

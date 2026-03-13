@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +17,7 @@ import (
 	"server/internal/api/handler"
 	"server/internal/db"
 	"server/internal/db/repo"
+	"server/internal/logging"
 	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/service"
@@ -26,6 +26,8 @@ import (
 	"server/internal/storage/repocfg"
 
 	lumenconfig "github.com/edwinzhancn/lumen-sdk/pkg/config"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	swaggerFiles "github.com/swaggo/files"
@@ -42,9 +44,6 @@ type primaryStorageRepositoryManager interface {
 }
 
 func init() {
-	log.SetOutput(os.Stdout)
-
-	// Load environment variables using unified config function
 	config.LoadEnvironment()
 }
 
@@ -70,22 +69,47 @@ func main() {
 	// Load configurations
 	dbConfig := config.LoadDBConfig()
 	appConfig := config.LoadAppConfig()
+	logRuntime, err := logging.NewLogger(logging.LoadConfig(appConfig.ServerConfig.LogLevel))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer logRuntime.Sync()
+	restoreStdLog := logging.RedirectStandardLog(logRuntime.Named("stdlib"))
+	defer restoreStdLog()
 
-	log.Println("🚀 Starting Lumilio Photos API...")
-	log.Printf("📊 Database configuration: %s:%s/%s", dbConfig.Host, dbConfig.Port, dbConfig.DBName)
+	appLogger := logRuntime.Named("app")
+	lumenLogger := logRuntime.Named("lumen")
+	repositoryLogger := logRuntime.Named("repository")
+	processorLogger := logRuntime.Named("processor")
+	indexingLogger := logRuntime.Named("indexing")
+	watchmanLogger := logRuntime.Named("watchman")
+	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"))
+
+	appLogger.Info("starting Lumilio Photos API",
+		zap.String("operation", "server.start"),
+		zap.String("db_host", dbConfig.Host),
+		zap.String("db_port", dbConfig.Port),
+		zap.String("db_name", dbConfig.DBName),
+	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Run database migrations
 	if err := db.AutoMigrate(ctx, dbConfig); err != nil {
-		log.Printf("Warning: Failed to run migrations automatically: %v", err)
-		log.Println("Please run migrations manually using: migrate -path server/migrations -database \"$DATABASE_URL\" up")
+		appLogger.Warn("failed to run migrations automatically",
+			zap.String("operation", "database.migrate"),
+			zap.Error(err),
+		)
+		appLogger.Warn("please run migrations manually using migrate -path server/migrations -database \"$DATABASE_URL\" up",
+			zap.String("operation", "database.migrate"),
+		)
 	}
 
 	// Connect to the database
 	database, err := db.New(dbConfig)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		appLogger.Fatal("failed to connect to database", zap.String("operation", "database.connect"), zap.Error(err))
 	}
 	defer database.Close()
 	pgxPool := database.Pool
@@ -93,45 +117,42 @@ func main() {
 
 	settingsService := service.NewSettingsService(queries)
 	if err := settingsService.EnsureInitialized(ctx); err != nil {
-		log.Fatalf("Failed to initialize system settings: %v", err)
+		appLogger.Fatal("failed to initialize system settings", zap.String("operation", "settings.init"), zap.Error(err))
 	}
 
 	currentMLConfig, err := settingsService.GetMLConfig(ctx)
 	if err != nil {
-		log.Fatalf("Failed to load ML settings: %v", err)
+		appLogger.Fatal("failed to load ML settings", zap.String("operation", "settings.ml"), zap.Error(err))
 	}
 	if currentMLConfig.IsAutoEnabled() {
-		log.Println("🤖 ML_AUTO is enabled: discovery mode will accept all discovered ML tasks")
+		appLogger.Info("ML auto mode enabled; discovery mode will accept all discovered ML tasks",
+			zap.String("operation", "settings.ml"),
+		)
 	}
 
 	// Initialize new repository-based storage system
-	repoManager, err := storage.NewRepositoryManager(queries)
+	repoManager, err := storage.NewRepositoryManager(queries, repositoryLogger, repoAuditProvider)
 	if err != nil {
-		log.Fatalf("Failed to initialize repository manager: %v", err)
+		appLogger.Fatal("failed to initialize repository manager", zap.String("operation", "repository.init"), zap.Error(err))
 	}
 	stagingManager := storage.NewStagingManager()
-	log.Println("✅ Repository Storage System Initialized")
+	appLogger.Info("repository storage system initialized", zap.String("operation", "repository.init"))
 	// Initialize primary storage repository
-	log.Println("📁 Initializing primary storage repository...")
-	if err := initPrimaryStorage(repoManager); err != nil {
-		log.Fatalf("Failed to initialize primary storage: %v", err)
-	}
-
-	zapLogger, err := zap.NewProduction()
-	if err != nil {
-		log.Fatalf("Failed to initialize zap logger: %v", err)
+	appLogger.Info("initializing primary storage repository", zap.String("operation", "repository.primary"))
+	if err := initPrimaryStorage(repoManager, repositoryLogger); err != nil {
+		appLogger.Fatal("failed to initialize primary storage", zap.String("operation", "repository.primary"), zap.Error(err))
 	}
 
 	workers := river.NewWorkers()
-	queueClient, err := queue.New(pgxPool, workers)
+	queueClient, err := queue.New(pgxPool, workers, logRuntime.RiverLogger())
 	if err != nil {
-		log.Fatalf("Failed to Initialize Queue: %v", err)
+		appLogger.Fatal("failed to initialize queue", zap.String("operation", "queue.init"), zap.Error(err))
 	}
 	faceService := service.NewFaceService(queries, repoManager)
 
-	lumenService, embeddingService, err := initMLServices(ctx, pgxPool, queries, workers, zapLogger, settingsService, faceService)
+	lumenService, embeddingService, err := initMLServices(ctx, pgxPool, queries, workers, appLogger, lumenLogger, settingsService, faceService)
 	if err != nil {
-		log.Fatalf("Failed to initialize ML services: %v", err)
+		appLogger.Fatal("failed to initialize ML services", zap.String("operation", "ml.init"), zap.Error(err))
 	}
 
 	if lumenService != nil {
@@ -154,30 +175,30 @@ func main() {
 	defer func() {
 		if lumenService != nil {
 			if err := lumenService.Close(); err != nil {
-				log.Printf("⚠️  Failed to close lumen service: %v", err)
+				lumenLogger.Warn("failed to close lumen service", zap.String("operation", "lumen.close"), zap.Error(err))
 			}
 		}
 	}()
 
 	assetService, err := service.NewAssetService(queries, pgxPool, lumenService, &repoManager, embeddingService)
 	if err != nil {
-		log.Fatalf("Failed to initialize asset service: %v", err)
+		appLogger.Fatal("failed to initialize asset service", zap.String("operation", "asset.init"), zap.Error(err))
 	}
-	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool)
+	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool, indexingLogger, repoAuditProvider)
 	authService := service.NewAuthService(queries, pgxPool)
 	albumService := service.NewAlbumService(queries)
 	userService := service.NewUserService(queries, pgxPool)
 
 	// Initialize Agent Service
 	agentService := core.NewAgentService(queries, settingsService)
-	log.Println("✅ Agent Service Initialized")
+	appLogger.Info("agent service initialized", zap.String("operation", "agent.init"))
 
 	// Register agent tools
 	tools.RegisterFilterAsset()
 	tools.RegisterBulkLikeTool()
-	log.Println("✅ Agent Tools Registered")
+	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
-	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
+	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService, processorLogger, repoAuditProvider)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})
 	river.AddWorker[queue.MetadataArgs](workers, &queue.MetadataWorker{Process: assetProcessor.ProcessMetadataTask})
@@ -188,15 +209,15 @@ func main() {
 
 	go func() {
 		if err := queueClient.Start(context.Background()); err != nil {
-			panic(err)
+			appLogger.Fatal("queue client stopped unexpectedly", zap.String("operation", "queue.start"), zap.Error(err))
 		}
 	}()
 
-	log.Println("✅ Queues initialized successfully")
+	appLogger.Info("queues initialized successfully", zap.String("operation", "queue.init"))
 
-	repoMonitor := monitor.NewWatchmanMonitor(queries, queueClient, appConfig.WatchmanConfig)
+	repoMonitor := monitor.NewWatchmanMonitor(queries, queueClient, appConfig.WatchmanConfig, watchmanLogger)
 	if err := repoMonitor.Start(ctx); err != nil {
-		log.Fatalf("Failed to start watchman monitor: %v", err)
+		appLogger.Fatal("failed to start watchman monitor", zap.String("operation", "watchman.start"), zap.Error(err))
 	}
 	defer repoMonitor.Stop()
 
@@ -237,12 +258,15 @@ func main() {
 	// Add Swagger documentation endpoint
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	log.Printf("🌐 Server starting on port %s...", appConfig.ServerConfig.Port)
-	log.Printf("📖 API Documentation: http://localhost:%s/swagger/index.html", appConfig.ServerConfig.Port)
-	log.Printf("🔗 Health Check: http://localhost:%s/api/v1/health", appConfig.ServerConfig.Port)
+	appLogger.Info("server starting",
+		zap.String("operation", "server.listen"),
+		zap.String("port", appConfig.ServerConfig.Port),
+		zap.String("swagger_url", fmt.Sprintf("http://localhost:%s/swagger/index.html", appConfig.ServerConfig.Port)),
+		zap.String("health_url", fmt.Sprintf("http://localhost:%s/api/v1/health", appConfig.ServerConfig.Port)),
+	)
 
 	if err := http.ListenAndServe(":"+appConfig.ServerConfig.Port, router); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+		appLogger.Fatal("failed to start server", zap.String("operation", "server.listen"), zap.Error(err))
 	}
 }
 
@@ -251,18 +275,19 @@ func initMLServices(
 	pgxPool *pgxpool.Pool,
 	queries *repo.Queries,
 	workers *river.Workers,
-	zapLogger *zap.Logger,
+	appLogger *zap.Logger,
+	lumenLogger *zap.Logger,
 	settingsService service.SettingsService,
 	faceService service.FaceService,
 ) (service.LumenService, service.EmbeddingService, error) {
-	log.Println("🤖 Initializing ML services...")
+	appLogger.Info("initializing ML services", zap.String("operation", "ml.init"))
 
 	lumenCfg, err := lumenconfig.LoadConfig("")
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to load lumen sdk config: %w", err)
 	}
 
-	lumenService, err := service.NewLumenService(lumenCfg, zapLogger)
+	lumenService, err := service.NewLumenService(lumenCfg, lumenLogger)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -271,7 +296,7 @@ func initMLServices(
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Println("✅ Lumen Service Initialized")
+	appLogger.Info("lumen service initialized", zap.String("operation", "ml.init"))
 
 	embeddingService := service.NewEmbeddingService(queries, pgxPool)
 	tagService := service.NewAIGeneratedTagService(queries)
@@ -284,34 +309,37 @@ func initMLServices(
 		TagService:       tagService,
 		ConfigProvider:   settingsService,
 	})
-	log.Println("✅ CLIP Service and Worker Registered")
+	appLogger.Info("CLIP service and worker registered", zap.String("operation", "ml.init"))
 
 	river.AddWorker[queue.ProcessCaptionArgs](workers, &queue.ProcessCaptionWorker{
 		CaptionService: captionService,
 		LumenService:   lumenService,
 		ConfigProvider: settingsService,
 	})
-	log.Println("✅ Caption Service and Worker Registered")
+	appLogger.Info("caption service and worker registered", zap.String("operation", "ml.init"))
 
 	river.AddWorker[queue.ProcessOcrArgs](workers, &queue.ProcessOcrWorker{
 		OCRService:     ocrService,
 		LumenService:   lumenService,
 		ConfigProvider: settingsService,
 	})
-	log.Println("✅ OCR Service and Worker Registered")
+	appLogger.Info("OCR service and worker registered", zap.String("operation", "ml.init"))
 
 	river.AddWorker[queue.ProcessFaceArgs](workers, &queue.ProcessFaceWorker{
 		FaceService:    faceService,
 		LumenService:   lumenService,
 		ConfigProvider: settingsService,
 	})
-	log.Println("✅ Face Service and Worker Registered")
+	appLogger.Info("face service and worker registered", zap.String("operation", "ml.init"))
 
-	log.Println("✅ ML Services Initialization Complete")
+	appLogger.Info("ML services initialization complete", zap.String("operation", "ml.init"))
 	return lumenService, embeddingService, nil
 }
 
-func initPrimaryStorage(repoManager primaryStorageRepositoryManager) error {
+func initPrimaryStorage(repoManager primaryStorageRepositoryManager, logger *zap.Logger) error {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	// Load environment variables
 	storagePath := os.Getenv("STORAGE_PATH")
 	storageRootPath, primaryRepoPath, err := resolvePrimaryStoragePaths(storagePath)
@@ -345,8 +373,11 @@ func initPrimaryStorage(repoManager primaryStorageRepositoryManager) error {
 	if repocfg.IsRepositoryRoot(primaryRepoPath) {
 		// If it's already registered in DB, we're done
 		if existing, err := repoManager.GetRepositoryByPath(primaryRepoPath); err == nil {
-			log.Printf("✅ Primary storage already initialized at: %s", primaryRepoPath)
-			log.Printf("   Repository ID: %s", existing.RepoID)
+			logger.Info("primary storage already initialized",
+				zap.String("operation", "repository.primary"),
+				zap.String("repository_path", primaryRepoPath),
+				zap.String("repository_id", repoUUIDString(existing.RepoID)),
+			)
 			return nil
 		}
 
@@ -356,8 +387,11 @@ func initPrimaryStorage(repoManager primaryStorageRepositoryManager) error {
 			return fmt.Errorf("failed to register existing primary storage repository: %w", err)
 		}
 
-		log.Printf("✅ Primary storage registered at: %s", primaryRepoPath)
-		log.Printf("   Repository ID: %s", existingRepo.RepoID)
+		logger.Info("primary storage registered",
+			zap.String("operation", "repository.primary"),
+			zap.String("repository_path", primaryRepoPath),
+			zap.String("repository_id", repoUUIDString(existingRepo.RepoID)),
+		)
 		return nil
 	}
 
@@ -374,11 +408,14 @@ func initPrimaryStorage(repoManager primaryStorageRepositoryManager) error {
 		return fmt.Errorf("failed to initialize primary storage repository: %w", err)
 	}
 
-	log.Printf("✅ Primary storage initialized at: %s", primaryRepoPath)
-	log.Printf("   Repository ID: %s", repo.RepoID)
-	log.Printf("   Storage Strategy: %s", storageStrategy)
-	log.Printf("   Duplicate Handling: %s", duplicateHandling)
-	log.Printf("   Preserve Filename: %v", preserve)
+	logger.Info("primary storage initialized",
+		zap.String("operation", "repository.primary"),
+		zap.String("repository_path", primaryRepoPath),
+		zap.String("repository_id", repoUUIDString(repo.RepoID)),
+		zap.String("storage_strategy", storageStrategy),
+		zap.String("duplicate_handling", duplicateHandling),
+		zap.Bool("preserve_filename", preserve),
+	)
 
 	return nil
 }
@@ -396,4 +433,11 @@ func resolvePrimaryStoragePaths(storagePath string) (string, string, error) {
 
 	primaryRepoPath := filepath.Join(storageRootPath, primaryRepositoryFolderName)
 	return storageRootPath, primaryRepoPath, nil
+}
+
+func repoUUIDString(id pgtype.UUID) string {
+	if !id.Valid {
+		return ""
+	}
+	return uuid.UUID(id.Bytes).String()
 }

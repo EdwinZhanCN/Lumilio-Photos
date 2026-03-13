@@ -9,10 +9,12 @@ import (
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/logging"
 	"server/internal/storage/repocfg"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"go.uber.org/zap"
 )
 
 // ValidationResult represents the result of repository validation
@@ -72,14 +74,29 @@ type DefaultRepositoryManager struct {
 	queries        *repo.Queries
 	dirManager     DirectoryManager
 	stagingManager StagingManager
+	logger         *zap.Logger
+	auditProvider  logging.RepositoryAuditProvider
 }
 
 // NewRepositoryManager creates a new repository manager instance
-func NewRepositoryManager(queries *repo.Queries) (RepositoryManager, error) {
+func NewRepositoryManager(
+	queries *repo.Queries,
+	logger *zap.Logger,
+	auditProvider logging.RepositoryAuditProvider,
+) (RepositoryManager, error) {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	if auditProvider == nil {
+		auditProvider = logging.NewRepositoryAuditProvider(logger)
+	}
+
 	rm := &DefaultRepositoryManager{
 		queries:        queries,
 		dirManager:     NewDirectoryManager(),
 		stagingManager: NewStagingManager(),
+		logger:         logger.With(zap.String("component", "repository")),
+		auditProvider:  auditProvider,
 	}
 
 	return rm, nil
@@ -90,15 +107,19 @@ func (rm *DefaultRepositoryManager) AddRepository(path string) (*repo.Repository
 	// Clean and validate path
 	cleanPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
+		rm.logger.Warn("repository add failed: invalid path", zap.String("operation", "repository.add"), zap.String("path", path), zap.Error(err))
 		return nil, fmt.Errorf("invalid path: %w", err)
 	}
 
 	// Validate that this is a valid repository
 	result, err := rm.ValidateRepository(cleanPath)
 	if err != nil {
+		rm.repoAudit(cleanPath).Error("repository.add", err, zap.String("repository_path", cleanPath))
 		return nil, fmt.Errorf("failed to validate repository: %w", err)
 	}
 	if !result.Valid {
+		validationErr := fmt.Errorf("invalid repository")
+		rm.repoAudit(cleanPath).Error("repository.add", validationErr, zap.Strings("errors", result.Errors))
 		return nil, fmt.Errorf("invalid repository at %s: %v", cleanPath, result.Errors)
 	}
 
@@ -136,8 +157,19 @@ func (rm *DefaultRepositoryManager) AddRepository(path string) (*repo.Repository
 		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	})
 	if err != nil {
+		rm.repoAudit(cleanPath).Error("repository.add", err, zap.String("repository_id", config.ID))
 		return nil, fmt.Errorf("failed to create database record: %w", err)
 	}
+
+	rm.repoAudit(cleanPath).Operation("repository.add",
+		zap.String("repository_id", config.ID),
+		zap.String("repository_name", config.Name),
+	)
+	rm.logger.Info("repository registered",
+		zap.String("operation", "repository.add"),
+		zap.String("repository_id", config.ID),
+		zap.String("repository_path", cleanPath),
+	)
 
 	return &dbRepo, nil
 }
@@ -154,6 +186,7 @@ func (rm *DefaultRepositoryManager) ValidateRepository(path string) (*Validation
 	if err != nil {
 		result.Valid = false
 		result.Errors = append(result.Errors, fmt.Sprintf("Invalid path: %v", err))
+		rm.logger.Warn("repository validation failed: invalid path", zap.String("operation", "repository.validate"), zap.String("path", path), zap.Error(err))
 		return result, nil
 	}
 
@@ -236,6 +269,17 @@ func (rm *DefaultRepositoryManager) ValidateRepository(path string) (*Validation
 		result.Warnings = append(result.Warnings, fmt.Sprintf("Permission issues: %v", err))
 	}
 
+	fields := []zap.Field{
+		zap.String("repository_path", cleanPath),
+		zap.Bool("valid", result.Valid),
+		zap.Strings("warnings", result.Warnings),
+	}
+	if len(result.Errors) > 0 {
+		rm.repoAudit(cleanPath).Error("repository.validate", fmt.Errorf("repository validation failed"), append(fields, zap.Strings("errors", result.Errors))...)
+	} else {
+		rm.repoAudit(cleanPath).Operation("repository.validate", fields...)
+	}
+
 	return result, nil
 }
 
@@ -305,6 +349,7 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 	// Clean and validate path
 	cleanPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
+		rm.logger.Warn("repository init failed: invalid path", zap.String("operation", "repository.initialize"), zap.String("path", path), zap.Error(err))
 		return nil, fmt.Errorf("invalid path: %w", err)
 	}
 
@@ -329,6 +374,7 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 
 	// Create directory structure using directory manager
 	if err := rm.dirManager.CreateStructure(cleanPath); err != nil {
+		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_name", config.Name))
 		return nil, fmt.Errorf("failed to create repository structure: %w", err)
 	}
 
@@ -336,6 +382,7 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 	if err := config.SaveConfigToFile(cleanPath); err != nil {
 		// Clean up on failure
 		os.RemoveAll(cleanPath)
+		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_name", config.Name))
 		return nil, fmt.Errorf("failed to save configuration: %w", err)
 	}
 
@@ -343,6 +390,7 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 	if err != nil {
 		// Clean up on failure
 		os.RemoveAll(cleanPath)
+		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_name", config.Name))
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
 
@@ -359,8 +407,19 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 	if err != nil {
 		// Clean up on failure
 		os.RemoveAll(cleanPath)
+		rm.repoAudit(cleanPath).Error("repository.initialize", err, zap.String("repository_id", config.ID), zap.String("repository_name", config.Name))
 		return nil, fmt.Errorf("failed to create database record: %w", err)
 	}
+
+	rm.repoAudit(cleanPath).Operation("repository.initialize",
+		zap.String("repository_id", config.ID),
+		zap.String("repository_name", config.Name),
+	)
+	rm.logger.Info("repository initialized",
+		zap.String("operation", "repository.initialize"),
+		zap.String("repository_id", config.ID),
+		zap.String("repository_path", cleanPath),
+	)
 
 	return &dbRepo, nil
 }
@@ -410,13 +469,25 @@ func (rm *DefaultRepositoryManager) ListRepositories() ([]*repo.Repository, erro
 func (rm *DefaultRepositoryManager) RemoveRepository(id string) error {
 	repoUUID, err := uuid.Parse(id)
 	if err != nil {
+		rm.logger.Warn("repository remove failed: invalid id", zap.String("operation", "repository.remove"), zap.String("repository_id", id), zap.Error(err))
 		return fmt.Errorf("invalid repository ID: %w", err)
+	}
+
+	var repoPath string
+	if rm.queries != nil {
+		existing, getErr := rm.queries.GetRepository(context.Background(), pgtype.UUID{Bytes: repoUUID, Valid: true})
+		if getErr == nil {
+			repoPath = existing.Path
+		}
 	}
 
 	err = rm.queries.DeleteRepository(context.Background(), pgtype.UUID{Bytes: repoUUID, Valid: true})
 	if err != nil {
+		rm.repoAudit(repoPath).Error("repository.remove", err, zap.String("repository_id", id))
 		return fmt.Errorf("failed to remove repository: %w", err)
 	}
+
+	rm.repoAudit(repoPath).Operation("repository.remove", zap.String("repository_id", id))
 
 	return nil
 }
@@ -447,6 +518,7 @@ func (rm *DefaultRepositoryManager) RemoveRepositories(ids []string) error {
 func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.RepositoryConfig) (*repo.Repository, error) {
 	repoUUID, err := uuid.Parse(id)
 	if err != nil {
+		rm.logger.Warn("repository update failed: invalid id", zap.String("operation", "repository.update"), zap.String("repository_id", id), zap.Error(err))
 		return nil, fmt.Errorf("invalid repository ID: %w", err)
 	}
 
@@ -465,15 +537,29 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.R
 		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
 	})
 	if err != nil {
+		rm.repoAudit("").Error("repository.update", err, zap.String("repository_id", id))
 		return nil, fmt.Errorf("failed to update repository: %w", err)
 	}
 
 	// Update configuration file
 	if err := config.SaveConfigToFile(dbRepo.Path); err != nil {
+		rm.repoAudit(dbRepo.Path).Error("repository.update", err, zap.String("repository_id", id))
 		return nil, fmt.Errorf("failed to update configuration file: %w", err)
 	}
 
+	rm.repoAudit(dbRepo.Path).Operation("repository.update",
+		zap.String("repository_id", id),
+		zap.String("repository_name", config.Name),
+	)
+
 	return &dbRepo, nil
+}
+
+func (rm *DefaultRepositoryManager) repoAudit(repoPath string) logging.RepositoryAuditLogger {
+	if rm.auditProvider == nil {
+		return logging.NewRepositoryAuditProvider(rm.logger).ForPath(repoPath)
+	}
+	return rm.auditProvider.ForPath(repoPath)
 }
 
 // GetRepositoryAssetStats returns comprehensive statistics about assets in a repository
