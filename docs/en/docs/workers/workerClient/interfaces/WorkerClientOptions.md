@@ -2,12 +2,12 @@
 
 # Interface: WorkerClientOptions
 
-Defined in: [workers/workerClient.ts:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6861c5c2f94488377f5171e2b8df86020faf272b/web/src/workers/workerClient.ts#L26)
+Defined in: [workers/workerClient.ts:26](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/779f6d7ca1e766a6d7988f3adbd292f42ecd8ee4/web/src/workers/workerClient.ts#L26)
 
 ## Properties
 
 ### preload?
 
-> `optional` **preload**: [`WorkerType`](../type-aliases/WorkerType.md)[]
+> `optional` **preload?**: [`WorkerType`](../type-aliases/WorkerType.md)[]
 
-Defined in: [workers/workerClient.ts:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6861c5c2f94488377f5171e2b8df86020faf272b/web/src/workers/workerClient.ts#L27)
+Defined in: [workers/workerClient.ts:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/779f6d7ca1e766a6d7988f3adbd292f42ecd8ee4/web/src/workers/workerClient.ts#L27)
