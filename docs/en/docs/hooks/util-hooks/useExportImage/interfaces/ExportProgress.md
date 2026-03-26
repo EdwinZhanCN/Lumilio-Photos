@@ -2,23 +2,23 @@
 
 # Interface: ExportProgress
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6861c5c2f94488377f5171e2b8df86020faf272b/web/src/hooks/util-hooks/useExportImage.tsx#L20)
+Defined in: [hooks/util-hooks/useExportImage.tsx:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/779f6d7ca1e766a6d7988f3adbd292f42ecd8ee4/web/src/hooks/util-hooks/useExportImage.tsx#L20)
 
 ## Properties
 
 ### currentFile?
 
-> `optional` **currentFile**: `string`
+> `optional` **currentFile?**: `string`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6861c5c2f94488377f5171e2b8df86020faf272b/web/src/hooks/util-hooks/useExportImage.tsx#L23)
+Defined in: [hooks/util-hooks/useExportImage.tsx:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/779f6d7ca1e766a6d7988f3adbd292f42ecd8ee4/web/src/hooks/util-hooks/useExportImage.tsx#L23)
 
 ***
 
 ### error?
 
-> `optional` **error**: `string`
+> `optional` **error?**: `string`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:24](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6861c5c2f94488377f5171e2b8df86020faf272b/web/src/hooks/util-hooks/useExportImage.tsx#L24)
+Defined in: [hooks/util-hooks/useExportImage.tsx:24](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/779f6d7ca1e766a6d7988f3adbd292f42ecd8ee4/web/src/hooks/util-hooks/useExportImage.tsx#L24)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:24](https://github.com/EdwinZha
 
 > **processed**: `number`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6861c5c2f94488377f5171e2b8df86020faf272b/web/src/hooks/util-hooks/useExportImage.tsx#L21)
+Defined in: [hooks/util-hooks/useExportImage.tsx:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/779f6d7ca1e766a6d7988f3adbd292f42ecd8ee4/web/src/hooks/util-hooks/useExportImage.tsx#L21)
 
 ***
 
@@ -34,4 +34,4 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:21](https://github.com/EdwinZha
 
 > **total**: `number`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6861c5c2f94488377f5171e2b8df86020faf272b/web/src/hooks/util-hooks/useExportImage.tsx#L22)
+Defined in: [hooks/util-hooks/useExportImage.tsx:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/779f6d7ca1e766a6d7988f3adbd292f42ecd8ee4/web/src/hooks/util-hooks/useExportImage.tsx#L22)
