@@ -205,7 +205,7 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset, 
 			Width:     1920,
 			Height:    1920,
 			Quality:   90,
-			Type:      bimg.JPEG,
+			Type:      bimg.WEBP,
 			NoProfile: true,
 		})
 		if err != nil {
@@ -238,8 +238,8 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset, 
 		captionData, err := imaging.ProcessImageStream(imageInput, bimg.Options{
 			Width:     1024,
 			Height:    1024,
-			Quality:   85,
-			Type:      bimg.JPEG,
+			Quality:   90,
+			Type:      bimg.WEBP,
 			NoProfile: true,
 		})
 		if err != nil {
@@ -273,7 +273,7 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset, 
 			Width:     1920,
 			Height:    1920,
 			Quality:   90,
-			Type:      bimg.JPEG,
+			Type:      bimg.WEBP,
 			NoProfile: true,
 		})
 		if err != nil {

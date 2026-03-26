@@ -52,8 +52,12 @@ func RegisterFilterAsset() {
 			// Store the filter DTO in ReferenceManager
 			refID := ""
 			if deps.ReferenceManager != nil {
-				// We store the DTO itself, not the assets
-				refID = deps.ReferenceManager.StoreWithID(ctx, filterDTO, "Asset Filter Configuration")
+				// We store the DTO itself, not the assets.
+				refID = deps.ReferenceManager.Store(ctx, filterDTO, core.ReferenceDescriptor{
+					SourceTool:  "filter_assets",
+					Kind:        "asset_filter",
+					Description: "Asset Filter Configuration",
+				})
 			}
 
 			// Send the filter configuration to the frontend via side channel

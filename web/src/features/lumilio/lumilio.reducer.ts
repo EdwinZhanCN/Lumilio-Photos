@@ -24,7 +24,7 @@ export const initialState: LumilioChatState = {
 /** Reducer for managing the Lumilio chat state.
  *
  * Handles all state transitions for the chat feature, including connection status,
- * message management, streaming content processing, UI events, interrupts,
+ * message management, streaming content processing, side-channel events, interrupts,
  * and tool management.
  *
  * @param state - The current Lumilio chat state.
@@ -76,13 +76,13 @@ export const lumilioReducer = (
         id: crypto.randomUUID(),
         role: "user",
         content: action.payload.content,
-        uiEvents: [],
+        sideEvents: [],
       };
       const assistantPlaceholder: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
         content: "",
-        uiEvents: [],
+        sideEvents: [],
       };
       return {
         ...state,
@@ -96,12 +96,12 @@ export const lumilioReducer = (
 
     case "PROCESS_STREAM_CHUNK": {
       const { reasoning, output } = action.payload;
-      
+
       if (import.meta.env.DEV) {
-        console.log("[DEBUG] PROCESS_STREAM_CHUNK", { 
-          reasoning: Boolean(reasoning), 
-          output: Boolean(output), 
-          currentBlock: state.streamingBlock 
+        console.log("[DEBUG] PROCESS_STREAM_CHUNK", {
+          reasoning: Boolean(reasoning),
+          output: Boolean(output),
+          currentBlock: state.streamingBlock,
         });
       }
 
@@ -110,7 +110,10 @@ export const lumilioReducer = (
 
       if (!lastMsg || lastMsg.role !== "assistant") {
         if (import.meta.env.DEV) {
-          console.warn("[DEBUG] PROCESS_STREAM_CHUNK ignored: Last message is not assistant", lastMsg);
+          console.warn(
+            "[DEBUG] PROCESS_STREAM_CHUNK ignored: Last message is not assistant",
+            lastMsg,
+          );
         }
         return state;
       }
@@ -175,35 +178,35 @@ export const lumilioReducer = (
       };
     }
 
-    case "RECEIVE_UI_EVENT": {
+    case "RECEIVE_SIDE_EVENT": {
       if (import.meta.env.DEV) {
         console.log(
-          "[DEBUG] Reducer RECEIVE_UI_EVENT. Current conversation length:",
+          "[DEBUG] Reducer RECEIVE_SIDE_EVENT. Current conversation length:",
           state.conversation.length,
         );
-        console.log("[DEBUG] New uiEvent payload:", action.payload);
+        console.log("[DEBUG] New sideEvent payload:", action.payload);
       }
 
       const lastAsstMsgIndex = state.conversation.length - 1;
       const lastAsstMsg = state.conversation[lastAsstMsgIndex];
 
       if (lastAsstMsg?.role === "assistant") {
-        const newUiEvent = action.payload;
-        const existingEventIndex = lastAsstMsg.uiEvents.findIndex(
-          (event) => event.tool.executionId === newUiEvent.tool.executionId,
+        const newSideEvent = action.payload;
+        const existingEventIndex = lastAsstMsg.sideEvents.findIndex(
+          (event) => event.tool.executionId === newSideEvent.tool.executionId,
         );
 
-        let newUiEvents;
+        let newSideEvents;
         let newContent = lastAsstMsg.content;
         let newStreamingBlock = state.streamingBlock;
 
         if (existingEventIndex !== -1) {
-          newUiEvents = [...lastAsstMsg.uiEvents];
-          newUiEvents[existingEventIndex] = newUiEvent;
+          newSideEvents = [...lastAsstMsg.sideEvents];
+          newSideEvents[existingEventIndex] = newSideEvent;
         } else {
-          newUiEvents = [...lastAsstMsg.uiEvents, newUiEvent];
+          newSideEvents = [...lastAsstMsg.sideEvents, newSideEvent];
 
-          // If we are currently in a reasoning block, close it before adding the tool
+          // If we are currently in a reasoning block, close it before inserting the side-channel tool block.
           if (state.streamingBlock === "reasoning") {
             newContent += "</think>";
             newStreamingBlock = null; // Reset block state so next reasoning chunk re-opens it
@@ -212,14 +215,14 @@ export const lumilioReducer = (
             }
           }
 
-          const toolTag = `\n\n<lumilio-tool id="${newUiEvent.tool.executionId}"></lumilio-tool>\n\n`;
+          const toolTag = `\n\n<lumilio-tool id="${newSideEvent.tool.executionId}"></lumilio-tool>\n\n`;
           newContent += toolTag;
         }
 
         const newConversation = [...state.conversation];
         newConversation[lastAsstMsgIndex] = {
           ...lastAsstMsg,
-          uiEvents: newUiEvents,
+          sideEvents: newSideEvents,
           content: newContent,
         };
         return {
