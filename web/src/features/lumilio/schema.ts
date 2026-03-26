@@ -1,6 +1,7 @@
 /** Represents a side-channel event for tool execution status updates.
- * These events provide real-time feedback about tool execution progress,
- * including status changes, errors, and output data.
+ * These events provide real-time feedback about tool execution progress
+ * and other structured side effects, including status changes, errors,
+ * payloads, and optional rendering hints.
  */
 export interface SideChannelEvent {
   type: string;
@@ -28,14 +29,14 @@ export interface AgentMessageEvent {
 
 /** Represents a Server-Sent Event (SSE) wrapper.
  * Generic type T determines the payload type for different event types.
- * Events include session info, messages, UI events, actions, completion,
+ * Events include session info, messages, side-channel events, actions, completion,
  * errors, and heartbeat signals.
  */
 export interface SseEvent<T> {
   type:
     | "session_info"
     | "message"
-    | "ui_event"
+    | "side_event"
     | "action"
     | "done"
     | "error"

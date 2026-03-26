@@ -21,10 +21,10 @@ type LLMConfigProvider interface {
 
 type AgentService interface {
 	// AskAgent 执行 Agent 查询或开启新会话
-	AskAgent(ctx context.Context, threadID, query string, toolNames []string, uiChannel ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
+	AskAgent(ctx context.Context, threadID, query string, toolNames []string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent]
 
 	// ResumeAgent 恢复中断的会话
-	ResumeAgent(ctx context.Context, threadID string, params *adk.ResumeParams, uiChannel ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error)
+	ResumeAgent(ctx context.Context, threadID string, params *adk.ResumeParams, sideChannels ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error)
 
 	// GetAvailableTools 列出所有可用工具
 	GetAvailableTools() []*schema.ToolInfo
@@ -135,10 +135,10 @@ func (s *agentService) AskLLM(ctx context.Context, query string) (resp string, e
 	return response.Content, nil
 }
 
-func (s *agentService) AskAgent(ctx context.Context, threadID, query string, toolNames []string, uiChannel ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
+func (s *agentService) AskAgent(ctx context.Context, threadID, query string, toolNames []string, sideChannels ...chan<- *SideChannelEvent) *adk.AsyncIterator[*adk.AgentEvent] {
 	var sideChannel chan<- *SideChannelEvent
-	if len(uiChannel) > 0 && uiChannel[0] != nil {
-		sideChannel = uiChannel[0]
+	if len(sideChannels) > 0 && sideChannels[0] != nil {
+		sideChannel = sideChannels[0]
 	}
 
 	agent, err := s.buildAgent(ctx, toolNames, sideChannel)
@@ -160,10 +160,10 @@ func (s *agentService) AskAgent(ctx context.Context, threadID, query string, too
 	return runner.Query(ctx, query, adk.WithCheckPointID(threadID))
 }
 
-func (s *agentService) ResumeAgent(ctx context.Context, threadID string, params *adk.ResumeParams, uiChannel ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error) {
+func (s *agentService) ResumeAgent(ctx context.Context, threadID string, params *adk.ResumeParams, sideChannels ...chan<- *SideChannelEvent) (*adk.AsyncIterator[*adk.AgentEvent], error) {
 	var sideChannel chan<- *SideChannelEvent
-	if len(uiChannel) > 0 && uiChannel[0] != nil {
-		sideChannel = uiChannel[0]
+	if len(sideChannels) > 0 && sideChannels[0] != nil {
+		sideChannel = sideChannels[0]
 	}
 
 	// 1. 重建 Agent (配置必须与 AskAgent 完全一致！)

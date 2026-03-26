@@ -165,7 +165,11 @@ func RegisterBulkLikeTool() {
 			// Store result for reference
 			refID := ""
 			if deps.ReferenceManager != nil {
-				refID = deps.ReferenceManager.StoreWithID(ctx, resultSummary, resultSummary.Description)
+				refID = deps.ReferenceManager.Store(ctx, resultSummary, core.ReferenceDescriptor{
+					SourceTool:  "bulk_like_assets",
+					Kind:        "bulk_like_update",
+					Description: resultSummary.Description,
+				})
 				resultSummary.RefID = refID
 			}
 

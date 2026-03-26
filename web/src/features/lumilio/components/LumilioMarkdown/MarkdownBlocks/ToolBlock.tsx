@@ -2,7 +2,7 @@ import { BadgeCheck, Ghost, Hammer, X } from "lucide-react";
 import React from "react";
 import { SideChannelEvent } from "@/features/lumilio/schema";
 import { useLumilioChat } from "@/features/lumilio/hooks/useLumilioChat";
-import {AssetGalleryRenderer} from "@/features/lumilio/components/ToolRenderers";
+import { AssetGalleryRenderer } from "@/features/lumilio/components/ToolRenderers";
 import { useI18n } from "@/lib/i18n.tsx";
 
 export const MarkdownToolBlock: React.FC<any> = ({ id, ...props }) => {
@@ -13,18 +13,20 @@ export const MarkdownToolBlock: React.FC<any> = ({ id, ...props }) => {
   const rawId = id || props["data-id"];
 
   // 2. 核心修复：移除自动添加的 "user-content-" 前缀
-  const executionId = rawId ? String(rawId).replace(/^user-content-/, "") : null;
+  const executionId = rawId
+    ? String(rawId).replace(/^user-content-/, "")
+    : null;
 
   if (!executionId) return null;
 
   const event = state.conversation
-    .flatMap((msg) => msg.uiEvents)
+    .flatMap((msg) => msg.sideEvents)
     .find((e) => e.tool.executionId === executionId);
 
   if (!event) {
     // 调试信息：同时显示处理后的 ID 和原始 ID，方便排查
     return (
-        <div className="text-xs text-error p-2 border border-error rounded my-2">
+      <div className="text-xs text-error p-2 border border-error rounded my-2">
         {t("lumilio.tools.eventNotFound")} <br />
         {t("lumilio.tools.lookedFor")}: <b>{executionId}</b> <br />
         {t("lumilio.tools.receivedRawId")}: {rawId}
@@ -39,10 +41,10 @@ export const MarkdownToolBlock: React.FC<any> = ({ id, ...props }) => {
           <LumilioTool event={event} />
           <AssetGalleryRenderer event={event} />
         </div>
-      )
+      );
     default:
       return <LumilioTool event={event} />;
-  };
+  }
 };
 
 const StatusIcon: React.FC<{
@@ -64,8 +66,8 @@ const StatusIcon: React.FC<{
 };
 
 export const LumilioTool: React.FC<{ event: SideChannelEvent }> = ({
-                                                                     event,
-                                                                   }) => {
+  event,
+}) => {
   const { tool, execution } = event;
 
   const statusColors: Record<string, string> = {

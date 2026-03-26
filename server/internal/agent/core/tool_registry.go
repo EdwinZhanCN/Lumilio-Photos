@@ -11,8 +11,8 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// SideChannelEvent represents an event sent through the side channel to frontend
-// This provides real-time execution status and data without passing through LLM
+// SideChannelEvent represents an event sent to the frontend through the side channel.
+// It carries structured execution state and side-effect data without passing through the LLM.
 type SideChannelEvent struct {
 	// Event type identifier
 	Type string `json:"type"`
@@ -26,7 +26,7 @@ type SideChannelEvent struct {
 	// Execution status and lifecycle
 	Execution ExecutionInfo `json:"execution"`
 
-	// Data payload for frontend rendering
+	// Structured data payload for frontend consumption. Rendering is only one possible use.
 	Data *DataPayload `json:"data,omitempty"`
 
 	// Extra type-specific information
@@ -70,7 +70,7 @@ type ErrorInfo struct {
 	Details interface{} `json:"details,omitempty"` // Additional error context
 }
 
-// DataPayload contains data for frontend rendering
+// DataPayload contains structured data for frontend consumption, with optional rendering hints.
 type DataPayload struct {
 	RefID       string           `json:"refId"`                  // Reference ID for this data
 	PayloadType string           `json:"payload_type,omitempty"` // DTO type name (e.g., "AssetDTO[]")
@@ -78,7 +78,7 @@ type DataPayload struct {
 	Rendering   *RenderingConfig `json:"rendering,omitempty"`    // Rendering configuration
 }
 
-// RenderingConfig defines how data should be displayed
+// RenderingConfig defines optional frontend rendering hints for the payload.
 type RenderingConfig struct {
 	Component ComponentType `json:"component"` // Component type
 	Config    interface{}   `json:"config,omitempty"`
@@ -122,7 +122,7 @@ type FilterInterruptState struct {
 // ToolDependencies Defines the dependencies like database queries that tool execution needs
 type ToolDependencies struct {
 	Queries          *repo.Queries
-	SideChannel      chan<- *SideChannelEvent // SideChannel sends DTO data to frontend, bypassing LLM
+	SideChannel      chan<- *SideChannelEvent // SideChannel sends structured side-channel data to the frontend, bypassing the LLM
 	ReferenceManager *ReferenceManager        // ReferenceManager stores and manages tool outputs across session
 }
 

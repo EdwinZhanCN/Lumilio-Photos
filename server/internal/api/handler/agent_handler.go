@@ -74,17 +74,17 @@ func (h *AgentHandler) Chat(c *gin.Context) {
 		threadID = uuid.NewString()
 	}
 
-	// 创建 UI 侧信道
-	uiChannel := make(chan *core.SideChannelEvent, 100)
+	// 创建工具侧信道
+	sideChannel := make(chan *core.SideChannelEvent, 100)
 
 	// 获取 Agent 迭代器
-	iter := h.agentService.AskAgent(c.Request.Context(), threadID, req.Query, req.ToolNames, uiChannel)
+	iter := h.agentService.AskAgent(c.Request.Context(), threadID, req.Query, req.ToolNames, sideChannel)
 
 	// 发送会话信息事件
 	h.sendSSE(c, flusher, "session_info", map[string]string{"thread_id": threadID})
 
 	// 开始流式传输事件
-	h.streamAgentEvents(c, flusher, iter, uiChannel)
+	h.streamAgentEvents(c, flusher, iter, sideChannel)
 }
 
 // ResumeChat handles resuming an interrupted agent execution
@@ -111,21 +111,21 @@ func (h *AgentHandler) ResumeChat(c *gin.Context) {
 		return
 	}
 
-	uiChannel := make(chan *core.SideChannelEvent, 100)
+	sideChannel := make(chan *core.SideChannelEvent, 100)
 
 	// 构建 Resume 参数
 	params := &adk.ResumeParams{
 		Targets: req.Targets,
 	}
 
-	iter, err := h.agentService.ResumeAgent(c.Request.Context(), req.ThreadID, params, uiChannel)
+	iter, err := h.agentService.ResumeAgent(c.Request.Context(), req.ThreadID, params, sideChannel)
 	if err != nil {
 		h.sendSSE(c, flusher, "error", map[string]interface{}{"error": err.Error()})
 		return
 	}
 
 	h.sendSSE(c, flusher, "session_info", map[string]string{"thread_id": req.ThreadID})
-	h.streamAgentEvents(c, flusher, iter, uiChannel)
+	h.streamAgentEvents(c, flusher, iter, sideChannel)
 }
 
 // prepareSSE sets the necessary headers for Server-Sent Events.
@@ -143,25 +143,25 @@ func (h *AgentHandler) prepareSSE(c *gin.Context) (http.Flusher, error) {
 	return flusher, nil
 }
 
-// streamAgentEvents handles the main loop for streaming agent and UI events via SSE.
-func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, iter *adk.AsyncIterator[*adk.AgentEvent], uiChannel chan *core.SideChannelEvent) {
+// streamAgentEvents handles the main loop for streaming agent and side-channel events via SSE.
+func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, iter *adk.AsyncIterator[*adk.AgentEvent], sideChannel chan *core.SideChannelEvent) {
 	done := make(chan struct{})
 	defer close(done)
 
-	// Goroutine to handle UI events from tools
+	// Goroutine to handle side-channel events from tools.
 	go func() {
-		defer close(uiChannel)
+		defer close(sideChannel)
 		for {
 			select {
 			case <-done:
 				return
 			case <-c.Request.Context().Done():
 				return
-			case event, ok := <-uiChannel:
+			case event, ok := <-sideChannel:
 				if !ok {
 					return
 				}
-				h.sendSSE(c, flusher, "ui_event", event)
+				h.sendSSE(c, flusher, "side_event", event)
 			}
 		}
 	}()

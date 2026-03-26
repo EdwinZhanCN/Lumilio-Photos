@@ -177,9 +177,9 @@ export const LumilioChatProvider = ({ children }: { children: ReactNode }) => {
           handleAgentMessageEvent(event.data as AgentMessageEvent);
           break;
         }
-        case "ui_event":
+        case "side_event":
           dispatch({
-            type: "RECEIVE_UI_EVENT",
+            type: "RECEIVE_SIDE_EVENT",
             payload: event.data as SideChannelEvent,
           });
           break;

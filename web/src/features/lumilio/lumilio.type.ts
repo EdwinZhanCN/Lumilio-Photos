@@ -11,8 +11,8 @@ export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  // UI events are attached to the assistant message they belong to.
-  uiEvents: SideChannelEvent[];
+  // Side-channel events are attached to the assistant message they belong to.
+  sideEvents: SideChannelEvent[];
 };
 
 /**
@@ -65,7 +65,7 @@ export type LumilioChatAction =
   | { type: "FINISH_STREAM" }
 
   // Side-channel and interrupt handling
-  | { type: "RECEIVE_UI_EVENT"; payload: SideChannelEvent }
+  | { type: "RECEIVE_SIDE_EVENT"; payload: SideChannelEvent }
   | { type: "RECEIVE_INTERRUPT"; payload: InterruptInfo }
   | { type: "CLEAR_INTERRUPT" }
 

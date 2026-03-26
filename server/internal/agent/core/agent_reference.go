@@ -5,18 +5,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/google/uuid"
 	"github.com/jinzhu/copier"
 )
 
 // ReferenceMeta 存储引用的元数据信息
 type ReferenceMeta struct {
 	ID          string
+	SourceTool  string
+	Kind        string
 	TypeName    string
 	Description string
 	CreatedAt   time.Time
+}
+
+// ReferenceDescriptor describes the semantic metadata attached to a stored reference.
+type ReferenceDescriptor struct {
+	SourceTool  string
+	Kind        string
+	Description string
 }
 
 // ReferenceManager 统一的存储容器，支持类型转换
@@ -59,9 +71,23 @@ func (rm *ReferenceManager) RegisterConverter(converter TypeConverter) {
 	}
 }
 
-// StoreWithID 存储数据，自动生成引用 ID，并将其存入 Eino session
-func (rm *ReferenceManager) StoreWithID(ctx context.Context, data interface{}, description string) string {
-	id := fmt.Sprintf("ref_%x", time.Now().UnixNano())
+// Store stores data with semantic metadata, generates a reference ID, and saves both into the Eino session.
+func (rm *ReferenceManager) Store(ctx context.Context, data interface{}, descriptor ReferenceDescriptor) string {
+	typeName := referenceTypeString(data)
+	sourceTool := sanitizeReferenceToken(descriptor.SourceTool)
+	if sourceTool == "" {
+		sourceTool = "generic"
+	}
+
+	kind := sanitizeReferenceToken(descriptor.Kind)
+	if kind == "" {
+		kind = sanitizeReferenceToken(defaultReferenceKind(data))
+	}
+	if kind == "" {
+		kind = "value"
+	}
+
+	id := newReferenceID(sourceTool, kind)
 
 	// 为了避免和其他 Session 变量冲突，加个前缀
 	sessionKey := "ref_val:" + id
@@ -74,13 +100,22 @@ func (rm *ReferenceManager) StoreWithID(ctx context.Context, data interface{}, d
 	// 存储元数据（可选，用于调试或 LLM 上下文）
 	meta := &ReferenceMeta{
 		ID:          id,
-		TypeName:    reflect.TypeOf(data).String(),
-		Description: description,
+		SourceTool:  sourceTool,
+		Kind:        kind,
+		TypeName:    typeName,
+		Description: descriptor.Description,
 		CreatedAt:   time.Now(),
 	}
 	adk.AddSessionValue(ctx, metaKey, meta)
 
 	return id
+}
+
+// StoreWithID stores data using a backward-compatible description-only API.
+func (rm *ReferenceManager) StoreWithID(ctx context.Context, data interface{}, description string) string {
+	return rm.Store(ctx, data, ReferenceDescriptor{
+		Description: description,
+	})
 }
 
 // Get 尝试从 Eino session 获取原始数据
@@ -149,10 +184,109 @@ func (rm *ReferenceManager) GetMeta(ctx context.Context, id string) (*ReferenceM
 	return meta, nil
 }
 
+func newReferenceID(sourceTool, kind string) string {
+	suffix := strings.ReplaceAll(uuid.NewString(), "-", "")
+	return fmt.Sprintf("ref.%s.%s.%s", sourceTool, kind, suffix)
+}
+
+func referenceTypeString(data interface{}) string {
+	t := reflect.TypeOf(data)
+	if t == nil {
+		return "value"
+	}
+	return t.String()
+}
+
+func defaultReferenceKind(data interface{}) string {
+	t := reflect.TypeOf(data)
+	if t == nil {
+		return "value"
+	}
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	switch t.Kind() {
+	case reflect.Slice, reflect.Array:
+		elem := t.Elem()
+		for elem.Kind() == reflect.Ptr {
+			elem = elem.Elem()
+		}
+		if elem.Name() != "" {
+			return toSnakeCase(elem.Name()) + "_list"
+		}
+	case reflect.Map:
+		return "map_value"
+	}
+
+	if t.Name() != "" {
+		return toSnakeCase(t.Name())
+	}
+	return sanitizeReferenceToken(t.String())
+}
+
+func sanitizeReferenceToken(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		return ""
+	}
+
+	var b strings.Builder
+	lastUnderscore := false
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			lastUnderscore = false
+		case r == '_':
+			if !lastUnderscore && b.Len() > 0 {
+				b.WriteRune('_')
+				lastUnderscore = true
+			}
+		default:
+			if !lastUnderscore && b.Len() > 0 {
+				b.WriteRune('_')
+				lastUnderscore = true
+			}
+		}
+	}
+
+	return strings.Trim(b.String(), "_")
+}
+
+func toSnakeCase(value string) string {
+	if value == "" {
+		return ""
+	}
+
+	var b strings.Builder
+	runes := []rune(value)
+	for i, r := range runes {
+		if unicode.IsUpper(r) {
+			if i > 0 {
+				prev := runes[i-1]
+				var next rune
+				hasNext := i+1 < len(runes)
+				if hasNext {
+					next = runes[i+1]
+				}
+				if unicode.IsLower(prev) || unicode.IsDigit(prev) || (hasNext && unicode.IsLower(next)) {
+					b.WriteRune('_')
+				}
+			}
+			b.WriteRune(unicode.ToLower(r))
+			continue
+		}
+		b.WriteRune(unicode.ToLower(r))
+	}
+
+	return b.String()
+}
+
 // Reference 是一个泛型容器，解决了 JSON string -> Go Struct 的桥接问题
 //
 // 问题描述：
-// - LLM 只能输出字符串引用 ID（如 "ref_123456"）
+// - LLM 只能输出字符串引用 ID（如 "ref.filter_assets.asset_filter.1234abcd"）
 // - Go 结构体字段需要特定类型（如 []repo.Asset）
 // - 标准 JSON 反序列化会失败：json: cannot unmarshal string into Go value of type []repo.Asset
 //
@@ -161,7 +295,7 @@ func (rm *ReferenceManager) GetMeta(ctx context.Context, id string) (*ReferenceM
 // - Reference[T].Data 存储转换后的 T 类型数据
 // - 中间件会在工具执行前自动填充 Data 字段
 type Reference[T any] struct {
-	// ID 存储 JSON 解析得到的引用 ID（如 "ref_123456"）
+	// ID 存储 JSON 解析得到的引用 ID（如 "ref.filter_assets.asset_filter.1234abcd"）
 	ID string `json:"id"`
 
 	// Data 存储通过 ReferenceManager 转换后的实际数据
@@ -170,8 +304,8 @@ type Reference[T any] struct {
 }
 
 // UnmarshalJSON 实现了自定义反序列化，接受两种格式的 JSON 输入：
-// 1. 字符串格式："ref_123456" - LLM 直接输出的引用 ID
-// 2. 对象格式：{"id": "ref_123456"} - 标准的 JSON 对象
+// 1. 字符串格式："ref.filter_assets.asset_filter.1234abcd" - LLM 直接输出的引用 ID
+// 2. 对象格式：{"id": "ref.filter_assets.asset_filter.1234abcd"} - 标准的 JSON 对象
 func (r *Reference[T]) UnmarshalJSON(data []byte) error {
 	var id string
 

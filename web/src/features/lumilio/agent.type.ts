@@ -14,7 +14,7 @@ export type AgentEventType =
   | "session_info"
   | "message"
   | "action"
-  | "ui_event"
+  | "side_event"
   | "done"
   | "error"
   | "heartbeat";
