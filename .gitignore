@@ -93,3 +93,6 @@ pml/data/bioclip/txt_emb_species.json
 /data
 server/main
 /ml/lumen-clip/data
+
+# Agent
+.codex/
