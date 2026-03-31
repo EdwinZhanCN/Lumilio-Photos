@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumilio.dev/schemas/agent/dataset_manifest.schema.json",
+  "title": "Agent Episodic Memory Dataset Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dataset_version",
+    "schema_version",
+    "created_at",
+    "generator",
+    "split_seed",
+    "counts"
+  ],
+  "properties": {
+    "dataset_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "temperature": { "type": "number" },
+        "top_p": { "type": "number" },
+        "seed": { "type": "integer" }
+      }
+    },
+    "split_seed": {
+      "type": "integer"
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["episodes", "queries", "train", "val", "test"],
+      "properties": {
+        "episodes": { "type": "integer", "minimum": 0 },
+        "queries": { "type": "integer", "minimum": 0 },
+        "train": { "type": "integer", "minimum": 0 },
+        "val": { "type": "integer", "minimum": 0 },
+        "test": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "source_bundle": {
+      "type": "string"
+    },
+    "git_commit": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+[project]
+name = "agent-memory-research"
+version = "0.1.0"
+description = "Python research harness for agent episodic memory data generation, validation, and evaluation."
+readme = "README.md"
+authors = [{ name = "EdwinZhan", email = "ed_zhan@outlook.com" }]
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.27.0", "jsonschema>=4.23.0", "tenacity>=9.0.0", "typer>=0.12.3"]
+
+[project.scripts]
+agent-memory-research = "agent_memory_research.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.8.0,<0.9"]
+build-backend = "uv_build"

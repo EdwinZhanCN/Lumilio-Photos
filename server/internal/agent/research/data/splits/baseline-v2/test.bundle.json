@@ -1,0 +1,1596 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive photos rated 1-star from Tokyo business trip",
+      "intent": "bulk_archive",
+      "summary": "Archived 15 low-rated Tokyo photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "work_archive",
+      "route": "rating_based_action",
+      "tags": [
+        "business",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "1",
+          "role": "criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_month"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 15 assets from Tokyo with 1-star rating",
+          "input": {
+            "location": "Tokyo",
+            "rating": 1,
+            "time_window": "last_month"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 15 assets",
+          "input": {
+            "asset_count": 15
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos from Tokyo trip with ratings below 2 stars",
+      "intent": "bulk_archive",
+      "summary": "Archived 18 low-rated photos from Tokyo collection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "cleanup",
+      "tags": [
+        "travel",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "destination"
+        }
+      ],
+      "metadata": {
+        "rating": "<2 stars",
+        "time_window": "2024-03-15 to 2024-03-22"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 18 photos from Tokyo with rating < 2 stars",
+          "input": {
+            "location": "Tokyo",
+            "max_rating": 1.9,
+            "date_range": "2024-03-15 to 2024-03-22"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Successfully archived 18 low-rated photos",
+          "input": {
+            "asset_ids": [
+              "tok_001",
+              "tok_002",
+              "tok_003",
+              "tok_004",
+              "tok_005",
+              "tok_006",
+              "tok_007",
+              "tok_008",
+              "tok_009",
+              "tok_010",
+              "tok_011",
+              "tok_012",
+              "tok_013",
+              "tok_014",
+              "tok_015",
+              "tok_016",
+              "tok_017",
+              "tok_018"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive photos from Tokyo trip with rating 2 or lower",
+      "intent": "bulk_archive",
+      "summary": "Successfully archived 15 low-rated Tokyo photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "cleanup",
+      "tags": [
+        "archive",
+        "travel"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "2",
+          "role": "threshold"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_month"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 15 assets from Tokyo with rating <= 2",
+          "input": {
+            "location": "Tokyo",
+            "max_rating": 2
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 15 assets",
+          "input": {
+            "asset_count": 15
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos from Tokyo trip with rating below 3 stars",
+      "intent": "bulk_archive",
+      "summary": "Archived 18 low-rated photos from Tokyo trip",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "cleanup",
+      "tags": [
+        "archive",
+        "travel"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "trip_destination"
+        },
+        {
+          "type": "rating",
+          "name": "low_rated",
+          "role": "archive_criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-11-05 to 2023-11-12"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 65 assets from Tokyo trip, 18 with rating < 3",
+          "input": {
+            "location": "Tokyo",
+            "max_rating": 2
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 18 assets to cold storage",
+          "input": {
+            "asset_ids": [
+              "tok_001",
+              "tok_002",
+              "tok_003"
+            ],
+            "archive": true
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "system_note",
+          "text": "User has limited storage and wants to keep only high-quality photos",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos from Tokyo trip with rating below 2",
+      "intent": "bulk_archive",
+      "summary": "Archived 8 low-rated Tokyo photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "bulk_operations",
+      "tags": [
+        "archive",
+        "low_rating",
+        "trip"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "<2",
+          "role": "filter"
+        }
+      ],
+      "metadata": {
+        "priority": "low"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 8 assets from Tokyo with rating < 2",
+          "input": {
+            "location": "Tokyo",
+            "max_rating": 1
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 8 assets successfully",
+          "input": {
+            "asset_count": 8
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all 1-star photos from the Johnson Wedding",
+      "intent": "bulk_archive",
+      "summary": "Archived low-quality wedding photos after filter error recovery",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "quality_cleanup",
+      "tags": [
+        "wedding",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "1",
+          "role": "criteria"
+        },
+        {
+          "type": "failure_mode",
+          "name": "filter_error",
+          "role": "obstacle"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-10-21"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "error",
+          "output_summary": "Filter failed due to corrupted metadata",
+          "error": {
+            "code": "FILTER_ERROR",
+            "message": "Unable to parse rating metadata for some assets"
+          },
+          "input": {
+            "album": "Johnson Wedding",
+            "rating": 1
+          }
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 7 assets with 1-star rating after retry",
+          "fix_summary": "Used alternative metadata field for rating",
+          "input": {
+            "album": "Johnson Wedding",
+            "rating_field": "user_rating",
+            "rating": 1
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 7 low-rated assets",
+          "input": {
+            "asset_count": 7,
+            "reason": "low_quality"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos with 1-star rating from my Tokyo trip",
+      "intent": "bulk_archive",
+      "summary": "Archived 18 low-rated photos from Tokyo",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v1",
+      "workspace": "personal_library",
+      "route": "bulk_operations",
+      "tags": [
+        "cleanup",
+        "travel"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "source"
+        },
+        {
+          "type": "rating",
+          "name": "1_star",
+          "role": "filter"
+        }
+      ],
+      "metadata": {
+        "priority": "low"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 18 assets with 1-star rating from Tokyo",
+          "input": {
+            "location": "Tokyo",
+            "rating": "1_star"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 18 assets",
+          "input": {
+            "asset_count": 18
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos rated 1 or 2 from the Tokyo trip",
+      "intent": "bulk_archive",
+      "summary": "Failed to archive due to permission error, then recovered",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo"
+        },
+        {
+          "type": "rating",
+          "name": "1-2"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 27 assets with rating 1-2 from Tokyo"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "error",
+          "output_summary": "Permission denied for bulk archive",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to archive assets"
+          },
+          "fix_summary": "Retried with corrected permissions"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 27 low-rated assets"
+        }
+      ]
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive photos from Hawaii vacation with rating 2 or lower",
+      "intent": "bulk_archive",
+      "summary": "Successfully archived low-rated vacation photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "bulk_operations",
+      "tags": [
+        "vacation",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "2",
+          "role": "threshold"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_year"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 15 assets from Hawaii with rating <= 2",
+          "input": {
+            "location": "Hawaii",
+            "max_rating": 2
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 15 low-rated assets",
+          "input": {
+            "asset_count": 15
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos from Paris trip with rating below 3",
+      "intent": "bulk_archive",
+      "summary": "Archived 18 low-rated Paris photos to free up space",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v2",
+      "workspace": "personal_library",
+      "route": "/assets/archive",
+      "tags": [
+        "travel",
+        "cleanup",
+        "storage"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "primary"
+        },
+        {
+          "type": "rating",
+          "name": "low",
+          "role": "filter"
+        },
+        {
+          "type": "time_window",
+          "name": "2023_fall",
+          "role": "constraint"
+        }
+      ],
+      "metadata": {
+        "source": "storage_alert",
+        "priority": "low"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 18 assets from Paris with rating < 3",
+          "input": {
+            "location": "Paris",
+            "rating_max": 2,
+            "date_range": "2023-09-01 to 2023-11-30"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 18 assets to cold storage",
+          "input": {
+            "asset_ids": [
+              "par_001",
+              "par_002",
+              "par_003"
+            ],
+            "reason": "low_rating"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "system_policy",
+          "text": "Auto-archive assets with rating < 3 after 6 months",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos with 1-star ratings from my phone camera",
+      "intent": "bulk_archive",
+      "summary": "Failed to archive due to permission error, then recovered",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "mobile_backup",
+      "route": "bulk_operations",
+      "tags": [
+        "cleanup",
+        "recovery"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "iPhone 14 Pro",
+          "role": "source_device"
+        },
+        {
+          "type": "rating",
+          "name": "1 star",
+          "role": "selection_criteria"
+        },
+        {
+          "type": "failure_mode",
+          "name": "permission_denied",
+          "role": "error_type"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-01-01 to 2023-12-31"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 18 low-rated phone photos",
+          "input": {
+            "camera_model": "iPhone 14 Pro",
+            "max_rating": 1
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "error",
+          "output_summary": "Permission denied for archive operation",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to archive assets"
+          },
+          "input": {
+            "asset_ids": [
+              "low_1",
+              "low_2",
+              "..."
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 18 assets after permission fix",
+          "fix_summary": "Retried with elevated permissions",
+          "input": {
+            "asset_ids": [
+              "low_1",
+              "low_2",
+              "..."
+            ]
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos with rating 1 from Tokyo trip",
+      "intent": "bulk_archive",
+      "summary": "Successfully archived low-rated Tokyo photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo"
+        },
+        {
+          "type": "rating",
+          "name": "1"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 8 assets from Tokyo with rating 1"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 8 low-rated assets"
+        }
+      ]
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos from Tokyo with rating below 2",
+      "intent": "bulk_archive",
+      "summary": "Failed to archive due to permission error, then recovered and archived 15 assets",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 15 assets from Tokyo with rating < 2"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "error",
+          "output_summary": "Permission denied for bulk archive operation",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to archive assets"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 15 assets after permission fix",
+          "fix_summary": "Retried with elevated permissions"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo"
+        },
+        {
+          "type": "rating",
+          "name": "<2"
+        },
+        {
+          "type": "failure_mode",
+          "name": "permission_error"
+        }
+      ]
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos with rating 1 from the Tokyo trip",
+      "intent": "bulk_archive",
+      "summary": "Successfully archived low-rated Tokyo photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "travel_archive",
+      "route": "bulk_operations",
+      "tags": [
+        "travel",
+        "archive"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "1",
+          "role": "filter"
+        }
+      ],
+      "metadata": {
+        "priority": "medium"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 15 photos from Tokyo with rating 1",
+          "input": {
+            "location": "Tokyo",
+            "rating": 1
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 15 photos",
+          "input": {
+            "asset_count": 15
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for photos taken with Canon EOS R5",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for 28 Canon EOS R5 photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_inspection",
+      "tags": [
+        "technical",
+        "analysis"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R5",
+          "role": "subject"
+        }
+      ],
+      "metadata": {},
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 28 assets from Canon EOS R5",
+          "input": {
+            "camera_model": "Canon EOS R5"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report with aperture, shutter speed, ISO",
+          "input": {
+            "asset_count": 28
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for all photos taken with my Canon EOS R5",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for 156 Canon EOS R5 photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_analysis",
+      "tags": [
+        "camera",
+        "technical"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R5",
+          "role": "camera"
+        }
+      ],
+      "metadata": {
+        "camera_model": "Canon EOS R5"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 156 photos taken with Canon EOS R5",
+          "input": {
+            "camera_model": "Canon EOS R5"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated detailed metadata report including aperture, shutter speed, ISO, and lens info",
+          "input": {
+            "asset_ids": [
+              "can_001",
+              "can_002",
+              "can_003",
+              "can_004",
+              "can_005"
+            ]
+          },
+          "payload": {
+            "sample_size": 5,
+            "report_type": "camera_settings"
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera metadata for photos taken with Canon EOS R5",
+      "intent": "inspect_metadata",
+      "summary": "Successfully inspected metadata for 8 Canon photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "inspection",
+      "tags": [
+        "metadata",
+        "camera"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R5",
+          "role": "subject"
+        }
+      ],
+      "metadata": {},
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 8 assets shot with Canon EOS R5",
+          "input": {
+            "camera_model": "Canon EOS R5"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 8 assets",
+          "input": {
+            "asset_count": 8
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for all photos taken with Sony A7III in Banff",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for 42 Sony A7III photos from Banff",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_analysis",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Banff",
+          "role": "shoot_location"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "target_camera"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-07-20 to 2023-07-25"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 42 assets from Banff taken with Sony A7III",
+          "input": {
+            "location": "Banff",
+            "camera_model": "Sony A7III"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Report includes ISO, aperture, shutter speed for 42 assets",
+          "input": {
+            "asset_ids": [
+              "ban_001",
+              "ban_002",
+              "ban_003"
+            ]
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User is analyzing shooting patterns for future trips",
+          "weight": 0.6
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera metadata for all photos taken with Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for 56 Sony A7III photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "equipment_review",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata",
+        "inspection"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "priority": "medium"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 56 assets taken with Sony A7III",
+          "input": {
+            "camera_model": "Sony A7III"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report covering 56 assets",
+          "input": {
+            "asset_count": 56
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for all Sony A7IV photos from Tokyo",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for Tokyo Sony photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "metadata_analysis",
+      "tags": [
+        "camera",
+        "analysis"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV",
+          "role": "tool"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-11-05 to 2023-11-12"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 32 assets from Tokyo taken with Sony A7IV",
+          "input": {
+            "location": "Tokyo",
+            "camera_model": "Sony A7IV",
+            "date_range": "2023-11-05 to 2023-11-12"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report showing aperture, shutter speed, ISO settings",
+          "input": {
+            "asset_count": 32
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for all photos taken with my Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for 120 Sony A7III photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v1",
+      "workspace": "personal_library",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "camera"
+        }
+      ],
+      "metadata": {
+        "priority": "medium"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 120 assets from Sony A7III camera",
+          "input": {
+            "camera_model": "Sony A7III"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 120 assets",
+          "input": {
+            "asset_count": 120
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for photos taken with Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Successfully inspected metadata for Sony A7III photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 156 assets taken with Sony A7III"
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 156 assets"
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for photos taken with Canon EOS R5",
+      "intent": "inspect_metadata",
+      "summary": "Successfully inspected camera metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R5",
+          "role": "subject"
+        }
+      ],
+      "metadata": {},
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 63 assets taken with Canon EOS R5",
+          "input": {
+            "camera_model": "Canon EOS R5"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 63 assets",
+          "input": {
+            "asset_count": 63
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for all photos taken with Nikon Z6",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for 127 Nikon Z6 photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v2",
+      "workspace": "photography_projects",
+      "route": "/metadata/inspect",
+      "tags": [
+        "camera",
+        "technical",
+        "analysis"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Nikon Z6",
+          "role": "primary"
+        },
+        {
+          "type": "failure_mode",
+          "name": "none",
+          "role": "constraint"
+        }
+      ],
+      "metadata": {
+        "source": "user_request",
+        "priority": "low"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 127 assets captured with Nikon Z6",
+          "input": {
+            "camera_model": "Nikon Z6"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Report shows aperture, shutter speed, ISO for 127 assets",
+          "input": {
+            "asset_ids": [
+              "nik_001",
+              "nik_002",
+              "nik_003"
+            ],
+            "fields": [
+              "aperture",
+              "shutter",
+              "iso"
+            ]
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "Interested in technical camera data for learning",
+          "weight": 0.5
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for all photos taken with my Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for camera photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "source_device"
+        },
+        {
+          "type": "time_window",
+          "name": "last 6 months",
+          "role": "time_range"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-06-01 to 2023-12-01"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 127 assets from Sony A7III",
+          "input": {
+            "camera_model": "Sony A7III",
+            "date_range": "2023-06-01 to 2023-12-01"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 127 assets",
+          "input": {
+            "asset_ids": [
+              "sony_1",
+              "sony_2",
+              "..."
+            ]
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera metadata for photos taken with Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for Sony A7III photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 156 assets captured with Sony A7III"
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 156 Sony A7III assets"
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for my Sony A7III photos from last week",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for 32 Sony A7III photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 32 assets from Sony A7III in last 7 days"
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report showing aperture, shutter speed, ISO settings"
+        }
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        },
+        {
+          "type": "time_window",
+          "name": "last_7_days"
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for photos taken with Sony A7III in the Alps",
+      "intent": "inspect_metadata",
+      "summary": "Successfully inspected camera metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "photography_library",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Alps",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "filter"
+        }
+      ],
+      "metadata": {
+        "priority": "low"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 32 photos from Alps taken with Sony A7III",
+          "input": {
+            "location": "Alps",
+            "camera_model": "Sony A7III"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 32 photos",
+          "input": {
+            "asset_count": 32
+          }
+        }
+      ],
+      "context": []
+    }
+  ],
+  "queries": [
+    {
+      "query": "What camera settings did I use with my Canon EOS R5?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Canon EOS R5",
+      "status": "succeeded",
+      "tags": [
+        "technical",
+        "analysis"
+      ],
+      "notes": "Paraphrase of checking camera metadata"
+    },
+    {
+      "query": "Tell me about the camera settings analysis I ran for my Canon photos",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Canon EOS R5",
+      "status": "succeeded",
+      "tags": [
+        "camera",
+        "technical"
+      ]
+    },
+    {
+      "query": "What occurred when archiving poorly rated Tokyo photos?",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "entity": "Tokyo",
+      "status": "succeeded",
+      "tags": [
+        "archive",
+        "travel"
+      ],
+      "notes": "Paraphrase of bulk archive goal"
+    },
+    {
+      "query": "Tell me about archiving low-quality Tokyo photos",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "entity": "Tokyo",
+      "status": "succeeded",
+      "tags": [
+        "archive",
+        "travel"
+      ],
+      "notes": "Paraphrases bulk archiving based on rating"
+    },
+    {
+      "query": "Check what camera settings were used for all Sony A7III shots",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Sony A7III",
+      "status": "succeeded",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "notes": "Paraphrase of metadata inspection goal"
+    },
+    {
+      "query": "Show me what I did with low-rated wedding photos",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "entity": "Johnson Wedding",
+      "status": "recovered",
+      "tags": [
+        "wedding",
+        "cleanup"
+      ],
+      "notes": "Looking for archive actions on specific event"
+    },
+    {
+      "query": "Tell me about archiving low-quality Tokyo photos",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "entity": "Tokyo",
+      "status": "recovered"
+    },
+    {
+      "query": "What was the outcome of archiving poor Hawaii vacation photos?",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "entity": "Hawaii",
+      "status": "succeeded",
+      "tags": [
+        "vacation",
+        "cleanup"
+      ],
+      "notes": "Paraphrase of bulk archive goal"
+    },
+    {
+      "query": "Show me what happened when checking camera settings for Nikon photos",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Nikon Z6",
+      "status": "succeeded",
+      "tags": [
+        "metadata",
+        "camera"
+      ],
+      "notes": "Technical metadata inspection query"
+    },
+    {
+      "query": "What camera settings did I use for my Sony photos recently?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Sony A7III",
+      "status": "succeeded",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "notes": "Paraphrase of metadata inspection goal"
+    },
+    {
+      "query": "What camera details did I check for my Sony photos?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Sony A7III",
+      "status": "succeeded"
+    },
+    {
+      "query": "Tell me about archiving low-quality Tokyo photos",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "entity": "Tokyo",
+      "status": "recovered"
+    },
+    {
+      "query": "Show me the camera details for my Alps photos taken with the Sony.",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Alps",
+      "status": "succeeded",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "notes": "Paraphrase for metadata inspection"
+    }
+  ]
+}

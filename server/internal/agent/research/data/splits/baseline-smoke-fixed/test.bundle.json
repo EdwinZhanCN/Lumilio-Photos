@@ -1,0 +1,189 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for photos taken with Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Recovered from missing metadata and generated camera report",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata",
+        "technical"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "failure_mode": "missing_metadata"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "error",
+          "output_summary": "Failed to retrieve metadata for some Sony A7III photos",
+          "error": {
+            "code": "METADATA_MISSING",
+            "message": "EXIF data incomplete for selected assets"
+          },
+          "fix_summary": "Used fallback metadata extraction method"
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 32 Sony A7III photos",
+          "input": {
+            "camera_model": "Sony A7III",
+            "method": "fallback"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Show me the camera settings used in my Sony A7III photos",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for all photos taken with my Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for 25 Sony A7III photos, recovered from initial grouping error",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        },
+        {
+          "type": "failure_mode",
+          "name": "grouping_error"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "error",
+          "output_summary": "Failed to group assets by date due to missing metadata",
+          "error": {
+            "code": "GROUP_ERROR_002",
+            "message": "Cannot group by date: date metadata missing for some assets"
+          }
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 25 assets from Sony A7III camera",
+          "fix_summary": "Used direct camera filter instead of grouping",
+          "input": {
+            "camera_model": "Sony A7III"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 25 assets including EXIF data and timestamps"
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for all photos taken with Sony A7III camera",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for Sony A7III photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 62 assets taken with Sony A7III"
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report showing exposure, ISO, and lens details"
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for all photos taken with my Nikon Z7",
+      "intent": "inspect_metadata",
+      "summary": "Successfully inspected metadata for 67 Nikon Z7 photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_analysis",
+      "tags": [
+        "camera",
+        "metadata",
+        "technical"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Nikon Z7",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "time_window": "all_time"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 67 assets taken with Nikon Z7",
+          "input": {
+            "camera_model": "Nikon Z7"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 67 assets",
+          "input": {
+            "asset_count": 67
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User is learning photography and wants to review camera settings",
+          "weight": 0.7
+        }
+      ]
+    }
+  ],
+  "queries": []
+}

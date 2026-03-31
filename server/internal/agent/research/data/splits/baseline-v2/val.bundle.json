@@ -1,0 +1,691 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group New York City photos by time of day for review",
+      "intent": "group_assets",
+      "summary": "Grouped 60 NYC photos into morning, afternoon, evening groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "asset_organization",
+      "tags": [
+        "city",
+        "organization"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York City",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_year"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 60 assets from New York City",
+          "input": {
+            "location": "New York City",
+            "time_window": "last_year"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 3 groups: morning (20), afternoon (25), evening (15)",
+          "input": {
+            "group_by": "time_of_day"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group photos from Hawaii vacation by location for easier review",
+      "intent": "group_assets",
+      "summary": "Grouped 87 Hawaii photos into 5 location-based categories",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "organization",
+      "tags": [
+        "travel",
+        "organization"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "destination"
+        }
+      ],
+      "metadata": {
+        "time_window": "2024-02-01 to 2024-02-14"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 87 photos from Hawaii vacation in February",
+          "input": {
+            "location": "Hawaii",
+            "date_range": "2024-02-01 to 2024-02-14"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 5 groups: Waikiki Beach (23), Diamond Head (18), North Shore (22), Honolulu (15), Maui (9)",
+          "input": {
+            "group_by": "location",
+            "asset_ids": [
+              "haw_001",
+              "haw_002",
+              "haw_003",
+              "haw_004",
+              "haw_005"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group photos from Hawaii by date for review",
+      "intent": "group_assets",
+      "summary": "Successfully grouped 30 Hawaii photos into 3 date groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "organization",
+      "tags": [
+        "grouping",
+        "vacation"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_year"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 30 assets from Hawaii in last year",
+          "input": {
+            "location": "Hawaii",
+            "time_range": "last_year"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped into 3 date-based groups",
+          "input": {
+            "group_by": "date"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group photos from Iceland by time of day for review",
+      "intent": "group_assets",
+      "summary": "Grouped 85 Iceland photos into morning, afternoon, evening categories",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "organization",
+      "tags": [
+        "grouping",
+        "travel"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Iceland",
+          "role": "trip_destination"
+        },
+        {
+          "type": "time_window",
+          "name": "morning",
+          "role": "grouping_criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-10-01 to 2023-10-10"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 85 assets from Iceland trip in October 2023",
+          "input": {
+            "location": "Iceland",
+            "date_range": "2023-10-01 to 2023-10-10"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 3 groups: morning (28), afternoon (35), evening (22)",
+          "input": {
+            "group_by": "time_of_day",
+            "asset_ids": [
+              "ice_001",
+              "ice_002",
+              "ice_003"
+            ]
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User wants to review photos by lighting conditions",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group photos from Hawaii vacation by date for review",
+      "intent": "group_assets",
+      "summary": "Grouped 94 Hawaii photos into 7 date-based groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "vacation_review",
+      "route": "asset_grouping",
+      "tags": [
+        "grouping",
+        "vacation",
+        "review"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "subject"
+        },
+        {
+          "type": "time_window",
+          "name": "by_date",
+          "role": "grouping"
+        }
+      ],
+      "metadata": {
+        "priority": "medium"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 94 assets from Hawaii vacation",
+          "input": {
+            "location": "Hawaii"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 7 groups based on capture dates",
+          "input": {
+            "group_by": "date",
+            "asset_count": 94
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group New York photos by time of day for editing",
+      "intent": "group_assets",
+      "summary": "Successfully grouped NYC photos into morning, afternoon, evening",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "organizational",
+      "tags": [
+        "city",
+        "organization"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York",
+          "role": "subject"
+        },
+        {
+          "type": "time_window",
+          "name": "morning",
+          "role": "group_criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-08-20 to 2023-08-25"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 56 assets from New York in August 2023",
+          "input": {
+            "location": "New York",
+            "date_range": "2023-08-20 to 2023-08-25"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped into 3 time-based categories: morning (18), afternoon (22), evening (16)",
+          "input": {
+            "group_by": "time_of_day",
+            "asset_count": 56
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group photos from my Hawaii vacation by date for easier review",
+      "intent": "group_assets",
+      "summary": "Grouped 85 Hawaii photos into 7 date-based groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v1",
+      "workspace": "personal_library",
+      "route": "asset_grouping",
+      "tags": [
+        "travel",
+        "organization"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "source"
+        },
+        {
+          "type": "time_window",
+          "name": "by_date",
+          "role": "grouping"
+        }
+      ],
+      "metadata": {
+        "priority": "medium"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 85 assets from Hawaii",
+          "input": {
+            "location": "Hawaii"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 7 groups based on date",
+          "input": {
+            "group_by": "date",
+            "asset_count": 85
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group photos from Hawaii by date for review",
+      "intent": "group_assets",
+      "summary": "Successfully grouped Hawaii photos by date",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 89 assets from Hawaii in last 60 days"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 89 assets into 7 date-based groups"
+        }
+      ]
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group New York photos by date for review",
+      "intent": "group_assets",
+      "summary": "Successfully grouped photos by date",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "asset_organization",
+      "tags": [
+        "grouping",
+        "review"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_week"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 52 assets from New York in last week",
+          "input": {
+            "location": "New York",
+            "time_range": "last_week"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 52 assets into 7 date-based groups",
+          "input": {
+            "group_by": "date"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group New York street photography by time of day",
+      "intent": "group_assets",
+      "summary": "Grouped 89 photos into morning, afternoon, evening categories",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v2",
+      "workspace": "street_photography",
+      "route": "/assets/group",
+      "tags": [
+        "urban",
+        "time_based",
+        "organization"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York",
+          "role": "primary"
+        },
+        {
+          "type": "time_window",
+          "name": "day_parts",
+          "role": "grouping"
+        }
+      ],
+      "metadata": {
+        "source": "user_request",
+        "priority": "medium"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 89 assets from New York street photography",
+          "input": {
+            "location": "New York",
+            "genre": "street"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 3 groups: morning (32), afternoon (41), evening (16)",
+          "input": {
+            "group_by": "time_of_day",
+            "bins": [
+              "morning",
+              "afternoon",
+              "evening"
+            ]
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "project_note",
+          "text": "Planning to create time-based series for exhibition",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group my Tokyo photos by date for easier review",
+      "intent": "group_assets",
+      "summary": "Successfully grouped Tokyo photos into date-based groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "asset_grouping",
+      "tags": [
+        "travel",
+        "organization"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "destination"
+        },
+        {
+          "type": "time_window",
+          "name": "2023-11-05 to 2023-11-12",
+          "role": "trip_duration"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-11-05 to 2023-11-12"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 89 assets from Tokyo trip",
+          "input": {
+            "location": "Tokyo",
+            "date_range": "2023-11-05 to 2023-11-12"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 8 date-based groups",
+          "input": {
+            "group_by": "date",
+            "asset_ids": [
+              "tokyo_1",
+              "tokyo_2",
+              "..."
+            ]
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group photos from Bali by date for review",
+      "intent": "group_assets",
+      "summary": "Grouped Bali photos by date successfully",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Bali"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 89 assets from Bali in last 60 days"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 89 assets into 7 date-based groups"
+        }
+      ]
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group my Barcelona photos by date for easier review",
+      "intent": "group_assets",
+      "summary": "Successfully grouped 56 Barcelona photos into 4 date-based groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 56 assets from Barcelona"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 4 groups by date: May 10 (15), May 11 (18), May 12 (13), May 13 (10)"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Barcelona"
+        }
+      ]
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group photos from New York by date for review",
+      "intent": "group_assets",
+      "summary": "Successfully grouped New York photos by date",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "city_collection",
+      "route": "asset_grouping",
+      "tags": [
+        "city",
+        "organization"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York",
+          "role": "subject"
+        },
+        {
+          "type": "time_window",
+          "name": "by_date",
+          "role": "grouping"
+        }
+      ],
+      "metadata": {
+        "priority": "medium"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 50 photos from New York",
+          "input": {
+            "location": "New York"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 50 photos into 5 date-based groups",
+          "input": {
+            "group_by": "date"
+          }
+        }
+      ],
+      "context": []
+    }
+  ],
+  "queries": [
+    {
+      "query": "Tell me about organizing my New York photos",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "entity": "New York",
+      "status": "succeeded",
+      "tags": [
+        "city",
+        "organization"
+      ],
+      "notes": "Asking about grouping/organization activity"
+    }
+  ]
+}

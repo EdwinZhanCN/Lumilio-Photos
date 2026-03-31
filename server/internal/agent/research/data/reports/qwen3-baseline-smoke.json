@@ -1,0 +1,172 @@
+{
+  "schema_version": "agent-memory/retrieval-benchmark-report/v1",
+  "created_at": "2026-03-26T23:12:17.241635+00:00",
+  "input_bundle": "data/splits/baseline-smoke/test.bundle.json",
+  "collection": "agent_episodic_memory",
+  "embedder": {
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "model": "qwen3-embedding:0.6b",
+    "dimensions": 1024
+  },
+  "limit": 10,
+  "ks": [
+    1,
+    5,
+    10
+  ],
+  "query_count": 8,
+  "filters_enabled": true,
+  "metrics": {
+    "recall": {
+      "recall@1": 0.375,
+      "recall@5": 0.375,
+      "recall@10": 0.375
+    },
+    "mrr": {
+      "mrr@10": 0.375
+    }
+  },
+  "latency_ms": {
+    "embed": {
+      "p50": 64.135,
+      "p95": 122.88,
+      "mean": 71.53
+    },
+    "search": {
+      "p50": 3.248,
+      "p95": 13.539,
+      "mean": 4.443
+    },
+    "end_to_end": {
+      "p50": 67.641,
+      "p95": 136.42,
+      "mean": 75.974
+    }
+  },
+  "per_query": [
+    {
+      "query": "How did you organize my vacation pictures from Hawaii?",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "rank": null,
+      "embed_ms": 122.88,
+      "search_ms": 13.539,
+      "end_to_end_ms": 136.42,
+      "results": []
+    },
+    {
+      "query": "What happened when you tried to clean up the Johnson Wedding duplicates?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "rank": null,
+      "embed_ms": 63.066,
+      "search_ms": 2.627,
+      "end_to_end_ms": 65.694,
+      "results": []
+    },
+    {
+      "query": "What did I do with my Paris vacation photos?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "rank": 1,
+      "embed_ms": 68.139,
+      "search_ms": 2.977,
+      "end_to_end_ms": 71.117,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.5074114,
+          "episode_id": "afe45d44-59b7-4484-830d-a5fc5e3d2156",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created Paris Trip album and added filtered photos"
+        }
+      ]
+    },
+    {
+      "query": "How did I handle duplicates from the wedding shoot?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "rank": 1,
+      "embed_ms": 61.333,
+      "search_ms": 3.221,
+      "end_to_end_ms": 64.555,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.6639384,
+          "episode_id": "c0ea640b-7ea8-44ba-8b1c-b83abff51637",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Identified 8 duplicate groups in wedding photos, recovered from initial filter error"
+        },
+        {
+          "rank": 2,
+          "score": 0.6548047,
+          "episode_id": "3d38b399-fe66-45fe-8a15-4e012bc7fafb",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Found duplicates but failed to archive due to permission error, then recovered by selecting specific duplicates"
+        }
+      ]
+    },
+    {
+      "query": "How did you organize my vacation pictures from Hawaii?",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "rank": null,
+      "embed_ms": 66.006,
+      "search_ms": 3.296,
+      "end_to_end_ms": 69.304,
+      "results": []
+    },
+    {
+      "query": "Show me what you did with the duplicate wedding photos",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "rank": 1,
+      "embed_ms": 64.135,
+      "search_ms": 3.504,
+      "end_to_end_ms": 67.641,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7416371,
+          "episode_id": "c0ea640b-7ea8-44ba-8b1c-b83abff51637",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Identified 8 duplicate groups in wedding photos, recovered from initial filter error"
+        },
+        {
+          "rank": 2,
+          "score": 0.74020076,
+          "episode_id": "3d38b399-fe66-45fe-8a15-4e012bc7fafb",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Found duplicates but failed to archive due to permission error, then recovered by selecting specific duplicates"
+        }
+      ]
+    },
+    {
+      "query": "How did I organize my vacation pictures from Paris?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "rank": null,
+      "embed_ms": 63.244,
+      "search_ms": 3.248,
+      "end_to_end_ms": 66.494,
+      "results": []
+    },
+    {
+      "query": "What happened when I tried to clean up duplicates from the Yosemite shoot?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "rank": null,
+      "embed_ms": 63.437,
+      "search_ms": 3.132,
+      "end_to_end_ms": 66.57,
+      "results": []
+    }
+  ]
+}

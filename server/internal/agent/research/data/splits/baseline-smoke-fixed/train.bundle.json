@@ -1,0 +1,888 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "scenario": "curate_trip_album",
+      "goal": "Create an album for photos from a recent trip to Paris",
+      "intent": "curate_album",
+      "summary": "Successfully created Paris Trip album and added filtered photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "album_creation",
+      "tags": [
+        "trip",
+        "album",
+        "photos"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Paris Trip",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_month"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 45 photos from Paris in last month",
+          "input": {
+            "location": "Paris",
+            "time_window": "last_month"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris Trip'",
+          "input": {
+            "album_name": "Paris Trip"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 45 photos to Paris Trip album",
+          "input": {
+            "album_name": "Paris Trip",
+            "asset_count": 45
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "I want to organize my Paris photos from last month into an album",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "curate_trip_album",
+      "goal": "Create an album for my recent trip to Paris",
+      "intent": "curate_album",
+      "summary": "Successfully created 'Paris 2024' album and added 15 selected photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "album",
+          "name": "Paris 2024"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 15 assets from Paris trip in last 30 days",
+          "input": {
+            "location": "Paris",
+            "time_window": "last_30_days"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris 2024' with ID album_paris_001"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 15 assets to album 'Paris 2024'"
+        }
+      ]
+    },
+    {
+      "scenario": "curate_trip_album",
+      "goal": "Create an album for photos from my trip to Paris",
+      "intent": "curate_album",
+      "summary": "Successfully created Paris Trip album and added filtered photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "album",
+          "name": "Paris Trip"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 45 assets from Paris in last 30 days",
+          "input": {
+            "location": "Paris",
+            "time_window": "last_30_days"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris Trip' with ID album_paris_001"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 45 assets to album 'Paris Trip'"
+        }
+      ]
+    },
+    {
+      "scenario": "curate_trip_album",
+      "goal": "Create an album for my recent trip to Paris",
+      "intent": "curate_album",
+      "summary": "Successfully created 'Paris 2024' album and added 35 photos from the trip",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "album_creation",
+      "tags": [
+        "travel",
+        "album",
+        "photos"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Paris 2024",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_week"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 35 assets from Paris trip in last week",
+          "input": {
+            "location": "Paris",
+            "time_window": "last_week"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris 2024'",
+          "input": {
+            "album_name": "Paris 2024",
+            "description": "Photos from Paris trip"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 35 assets to album 'Paris 2024'",
+          "input": {
+            "album_name": "Paris 2024",
+            "asset_count": 35
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User prefers to organize travel photos by location and date",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "bulk_like_highlights",
+      "goal": "Mark all high-quality photos from Yosemite trip as liked",
+      "intent": "bulk_like",
+      "summary": "Successfully liked 28 high-quality Yosemite photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "bulk_operations",
+      "tags": [
+        "nature",
+        "liked",
+        "quality"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "rating": "high",
+        "liked_state": "true"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 28 high-quality photos from Yosemite",
+          "input": {
+            "location": "Yosemite",
+            "rating": "high"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Marked 28 photos as liked",
+          "input": {
+            "asset_count": 28,
+            "liked_state": true
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "I want to mark all my best Yosemite photos as favorites",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "bulk_like_highlights",
+      "goal": "Mark all my favorite photos from Yosemite as liked",
+      "intent": "bulk_like",
+      "summary": "Successfully liked 12 high-rated photos from Yosemite trip",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "rating",
+          "name": "high"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 12 assets from Yosemite with rating >= 4",
+          "input": {
+            "location": "Yosemite",
+            "min_rating": 4
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Marked 12 assets as liked"
+        }
+      ]
+    },
+    {
+      "scenario": "bulk_like_highlights",
+      "goal": "Mark all 5-star rated photos from Yosemite as liked",
+      "intent": "bulk_like",
+      "summary": "Successfully liked all high-rated Yosemite photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "rating",
+          "name": "5_star"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 28 assets from Yosemite with 5-star rating"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Marked 28 assets as liked"
+        }
+      ]
+    },
+    {
+      "scenario": "bulk_like_highlights",
+      "goal": "Mark all my favorite photos from the Johnson Wedding as liked",
+      "intent": "bulk_like",
+      "summary": "Successfully liked 42 wedding photos with rating 4+",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "event_coverage",
+      "route": "bulk_operations",
+      "tags": [
+        "wedding",
+        "favorites",
+        "rating"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "4+",
+          "role": "criteria"
+        }
+      ],
+      "metadata": {
+        "liked_state": "true"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 42 assets from Johnson Wedding with rating >= 4",
+          "input": {
+            "album": "Johnson Wedding",
+            "min_rating": 4
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Marked 42 assets as liked",
+          "input": {
+            "asset_count": 42,
+            "liked": true
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User wants to highlight best wedding photos for sharing",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "scenario": "summarize_selected_assets",
+      "goal": "Get a summary of all my liked photos from Hawaii",
+      "intent": "summarize_selection",
+      "summary": "Created summary of 18 liked Hawaii photos with breakdown by date",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 18 liked assets from Hawaii",
+          "input": {
+            "location": "Hawaii",
+            "liked": true
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 18 assets, 5 from last month, 13 from last year, average rating 4.2"
+        }
+      ]
+    },
+    {
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from a wedding shoot",
+      "intent": "cleanup_duplicates",
+      "summary": "Recovered from initial error and successfully identified duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "duplicate_cleanup",
+      "tags": [
+        "wedding",
+        "duplicates",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "failure_mode": "network_timeout"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Failed to analyze duplicates due to network timeout",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection to duplicate detection service timed out"
+          },
+          "fix_summary": "Retried with smaller batch size"
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate pairs in Johnson Wedding photos",
+          "input": {
+            "album_name": "Johnson Wedding",
+            "batch_size": 50
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Clean up duplicate photos from the Johnson Wedding shoot",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from the Johnson Wedding shoot",
+      "intent": "cleanup_duplicates",
+      "summary": "Identified 8 duplicate groups in wedding photos, recovered from initial filter error",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "failure_mode",
+          "name": "filter_error"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "error",
+          "output_summary": "Failed to filter assets due to invalid time parameter",
+          "error": {
+            "code": "FILTER_ERROR_001",
+            "message": "Invalid time window parameter provided"
+          }
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 45 assets from Johnson Wedding album",
+          "fix_summary": "Used album-based filtering instead of time window",
+          "input": {
+            "album": "Johnson Wedding"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 8 duplicate groups containing 24 total assets"
+        }
+      ]
+    },
+    {
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from the Johnson Wedding shoot",
+      "intent": "cleanup_duplicates",
+      "summary": "Found duplicates but failed to archive due to permission error, then recovered by selecting specific duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "failure_mode",
+          "name": "permission_error"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate groups in Johnson Wedding album"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "error",
+          "output_summary": "Failed to archive 12 assets due to permission error",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to archive assets"
+          }
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 6 specific duplicate assets for manual review",
+          "fix_summary": "Selected specific duplicates instead of bulk operation"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Successfully archived 6 duplicate assets"
+        }
+      ]
+    },
+    {
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from the Yosemite shoot",
+      "intent": "cleanup_duplicates",
+      "summary": "Recovered from initial error and identified 12 duplicate assets in Yosemite shoot",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "duplicate_cleanup",
+      "tags": [
+        "duplicates",
+        "landscape",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7R IV",
+          "role": "tool"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_month"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 85 assets from Yosemite in last month",
+          "input": {
+            "location": "Yosemite",
+            "time_window": "last_month"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Failed to analyze duplicates due to metadata inconsistency",
+          "error": {
+            "code": "METADATA_PARSE_ERROR",
+            "message": "Could not parse EXIF data from 3 assets"
+          },
+          "fix_summary": "Retried with different similarity threshold"
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate assets with 95% similarity",
+          "input": {
+            "similarity_threshold": 0.95
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "system_note",
+          "text": "Yosemite shoot involved multiple takes of same scenes",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group photos from Hawaii vacation by location for review",
+      "intent": "group_assets",
+      "summary": "Successfully grouped Hawaii photos into 4 location-based groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "asset_grouping",
+      "tags": [
+        "vacation",
+        "grouping",
+        "organization"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_year"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 87 photos from Hawaii in last year",
+          "input": {
+            "location": "Hawaii",
+            "time_window": "last_year"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 87 photos into 4 location groups",
+          "input": {
+            "group_by": "location",
+            "asset_count": 87
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Organize my Hawaii photos by where they were taken",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group photos from Hawaii trip by date for easier review",
+      "intent": "group_assets",
+      "summary": "Successfully grouped Hawaii photos by date",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 87 assets from Hawaii in last 90 days"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped assets into 7 date-based groups"
+        }
+      ]
+    },
+    {
+      "scenario": "group_assets_for_review",
+      "goal": "Group my New York photos by time of day for easier review",
+      "intent": "group_assets",
+      "summary": "Successfully grouped 124 New York photos into morning, afternoon, and evening groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "organization",
+      "tags": [
+        "grouping",
+        "city",
+        "time_based"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "time_window": "last_month"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 124 assets from New York in last month",
+          "input": {
+            "location": "New York",
+            "time_window": "last_month"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 3 groups: morning (42), afternoon (51), evening (31)",
+          "input": {
+            "group_by": "time_of_day"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User likes to review photos by lighting conditions",
+          "weight": 0.8
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query": "How did you organize my vacation pictures from Hawaii?",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "entity": "Hawaii",
+      "status": "succeeded",
+      "tags": [
+        "vacation",
+        "organization"
+      ],
+      "notes": "User asking about previous grouping operation"
+    },
+    {
+      "query": "What happened when you tried to clean up the Johnson Wedding duplicates?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": "Johnson Wedding",
+      "status": "recovered",
+      "tags": [
+        "wedding",
+        "duplicates"
+      ],
+      "notes": "User inquiring about recovery from network error"
+    },
+    {
+      "query": "What did I do with my Paris vacation photos?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "entity": "Paris",
+      "status": "succeeded"
+    },
+    {
+      "query": "How did I handle duplicates from the wedding shoot?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": "Johnson Wedding",
+      "status": "recovered"
+    },
+    {
+      "query": "How did you organize my vacation pictures from Hawaii?",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "entity": "Hawaii",
+      "status": "succeeded"
+    },
+    {
+      "query": "Show me what you did with the duplicate wedding photos",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": "Johnson Wedding",
+      "status": "recovered"
+    },
+    {
+      "query": "How did I organize my vacation pictures from Paris?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "entity": "Paris",
+      "status": "succeeded",
+      "tags": [
+        "travel",
+        "album"
+      ],
+      "notes": "Looking for album creation workflow"
+    },
+    {
+      "query": "What happened when I tried to clean up duplicates from the Yosemite shoot?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": "Yosemite",
+      "status": "recovered",
+      "tags": [
+        "duplicates",
+        "recovery"
+      ],
+      "notes": "Interested in error recovery process"
+    }
+  ]
+}

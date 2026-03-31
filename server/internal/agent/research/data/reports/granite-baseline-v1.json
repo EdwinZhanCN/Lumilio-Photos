@@ -1,0 +1,135 @@
+{
+  "schema_version": "agent-memory/retrieval-benchmark-report/v1",
+  "created_at": "2026-03-27T00:07:46.105418+00:00",
+  "input_bundle": "data/splits/baseline-v1/test.bundle.json",
+  "collection": "agent_episodic_memory_granite_768",
+  "embedder": {
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "model": "granite-embedding:278m",
+    "dimensions": 768
+  },
+  "limit": 10,
+  "ks": [
+    1,
+    5,
+    10
+  ],
+  "query_count": 2,
+  "filters_enabled": true,
+  "metrics": {
+    "recall": {
+      "recall@1": 1.0,
+      "recall@5": 1.0,
+      "recall@10": 1.0
+    },
+    "mrr": {
+      "mrr@10": 1.0
+    }
+  },
+  "latency_ms": {
+    "embed": {
+      "p50": 85.249,
+      "p95": 117.872,
+      "mean": 101.561
+    },
+    "search": {
+      "p50": 3.577,
+      "p95": 23.041,
+      "mean": 13.309
+    },
+    "end_to_end": {
+      "p50": 88.828,
+      "p95": 140.914,
+      "mean": 114.871
+    }
+  },
+  "per_query": [
+    {
+      "query": "Show me what camera settings I used most often with my Sony during that shoot",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "rank": 1,
+      "embed_ms": 117.872,
+      "search_ms": 23.041,
+      "end_to_end_ms": 140.914,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7095427,
+          "episode_id": "26291a88-15a2-4ba2-b268-818a6cb79440",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for Sony A7III photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.70911825,
+          "episode_id": "639fe131-e459-413f-822e-670833a44436",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 62 Sony A7III photos"
+        },
+        {
+          "rank": 3,
+          "score": 0.68033236,
+          "episode_id": "a1e6d0f7-41c6-41bf-8389-733a547253af",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected metadata for Sony camera photos"
+        },
+        {
+          "rank": 4,
+          "score": 0.6682979,
+          "episode_id": "9f731e91-8f51-4e8d-b058-9e98941b5f4a",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Sony A7III photos"
+        }
+      ]
+    },
+    {
+      "query": "Show me camera details for everything I shot with my Sony A7III",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "rank": 1,
+      "embed_ms": 85.249,
+      "search_ms": 3.577,
+      "end_to_end_ms": 88.828,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.810868,
+          "episode_id": "639fe131-e459-413f-822e-670833a44436",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 62 Sony A7III photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.791629,
+          "episode_id": "26291a88-15a2-4ba2-b268-818a6cb79440",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for Sony A7III photos"
+        },
+        {
+          "rank": 3,
+          "score": 0.78227276,
+          "episode_id": "9f731e91-8f51-4e8d-b058-9e98941b5f4a",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Sony A7III photos"
+        },
+        {
+          "rank": 4,
+          "score": 0.78206295,
+          "episode_id": "a1e6d0f7-41c6-41bf-8389-733a547253af",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected metadata for Sony camera photos"
+        }
+      ]
+    }
+  ]
+}

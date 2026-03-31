@@ -1,0 +1,656 @@
+{
+  "schema_version": "agent-memory/retrieval-benchmark-report/v1",
+  "created_at": "2026-03-31T02:09:03.554275+00:00",
+  "input_bundle": "data/splits/baseline-v2/test.bundle.json",
+  "collection": "agent_episodic_memory_granite_v2_768",
+  "embedder": {
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "model": "granite-embedding:278m",
+    "dimensions": 768
+  },
+  "limit": 10,
+  "ks": [
+    1,
+    5,
+    10
+  ],
+  "query_count": 13,
+  "filters_enabled": true,
+  "metrics": {
+    "recall": {
+      "recall@1": 1.0,
+      "recall@5": 1.0,
+      "recall@10": 1.0
+    },
+    "mrr": {
+      "mrr@10": 1.0
+    }
+  },
+  "latency_ms": {
+    "embed": {
+      "p50": 85.261,
+      "p95": 87.955,
+      "mean": 87.956
+    },
+    "search": {
+      "p50": 6.145,
+      "p95": 12.609,
+      "mean": 9.731
+    },
+    "end_to_end": {
+      "p50": 92.467,
+      "p95": 97.873,
+      "mean": 97.689
+    }
+  },
+  "per_query": [
+    {
+      "query": "What camera settings did I use with my Canon EOS R5?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "rank": 1,
+      "embed_ms": 129.696,
+      "search_ms": 47.771,
+      "end_to_end_ms": 177.468,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.81566554,
+          "episode_id": "cebed85c-b9f4-450e-b46a-b1fada847d69",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 156 Canon EOS R5 photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.81515425,
+          "episode_id": "e0cf6072-6e7c-4d06-a0b4-ff153edc37d4",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 28 Canon EOS R5 photos"
+        },
+        {
+          "rank": 3,
+          "score": 0.76618147,
+          "episode_id": "ee73bff9-d57a-439e-8940-52a1d447bece",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected metadata for 8 Canon photos"
+        },
+        {
+          "rank": 4,
+          "score": 0.75582725,
+          "episode_id": "8614738a-51a6-4b58-941e-1273611dc44f",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected camera metadata"
+        }
+      ]
+    },
+    {
+      "query": "Tell me about the camera settings analysis I ran for my Canon photos",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "rank": 1,
+      "embed_ms": 86.248,
+      "search_ms": 7.206,
+      "end_to_end_ms": 93.458,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.74873495,
+          "episode_id": "cebed85c-b9f4-450e-b46a-b1fada847d69",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 156 Canon EOS R5 photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.7471126,
+          "episode_id": "e0cf6072-6e7c-4d06-a0b4-ff153edc37d4",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 28 Canon EOS R5 photos"
+        },
+        {
+          "rank": 3,
+          "score": 0.70676816,
+          "episode_id": "ee73bff9-d57a-439e-8940-52a1d447bece",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected metadata for 8 Canon photos"
+        },
+        {
+          "rank": 4,
+          "score": 0.68482196,
+          "episode_id": "8614738a-51a6-4b58-941e-1273611dc44f",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected camera metadata"
+        }
+      ]
+    },
+    {
+      "query": "What occurred when archiving poorly rated Tokyo photos?",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "rank": 1,
+      "embed_ms": 86.061,
+      "search_ms": 9.496,
+      "end_to_end_ms": 95.559,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8707474,
+          "episode_id": "4bb7c0df-724c-47b1-b8fd-88d042357f0d",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated Tokyo photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.8677933,
+          "episode_id": "e82b0072-c565-466a-aad6-928e9245c752",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 18 low-rated photos from Tokyo trip"
+        },
+        {
+          "rank": 3,
+          "score": 0.86632663,
+          "episode_id": "c3df589b-f888-48a3-9af9-834d648db5b0",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 8 low-rated Tokyo photos"
+        },
+        {
+          "rank": 4,
+          "score": 0.8627622,
+          "episode_id": "82d14d80-1a7d-4073-805f-03bb808bd762",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 18 low-rated photos from Tokyo collection"
+        },
+        {
+          "rank": 5,
+          "score": 0.8625978,
+          "episode_id": "341509eb-0f6e-4077-8440-ad0197612b50",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 15 low-rated Tokyo photos"
+        },
+        {
+          "rank": 6,
+          "score": 0.86000174,
+          "episode_id": "e677575c-952a-4f8e-826d-c48be595482e",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 18 low-rated photos from Tokyo"
+        },
+        {
+          "rank": 7,
+          "score": 0.8589945,
+          "episode_id": "2d91b7ed-ff6a-4ea9-aa82-e025d780dfce",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated Tokyo photos"
+        },
+        {
+          "rank": 8,
+          "score": 0.8574365,
+          "episode_id": "c3c723d1-45ec-4db4-8864-fe9d828b84a0",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived 15 low-rated Tokyo photos"
+        },
+        {
+          "rank": 9,
+          "score": 0.7229613,
+          "episode_id": "97a3f848-cf62-47b2-aabe-d28e3cdd2fe0",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for Tokyo Sony photos"
+        }
+      ]
+    },
+    {
+      "query": "Tell me about archiving low-quality Tokyo photos",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "rank": 1,
+      "embed_ms": 85.261,
+      "search_ms": 12.609,
+      "end_to_end_ms": 97.873,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8662735,
+          "episode_id": "e82b0072-c565-466a-aad6-928e9245c752",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 18 low-rated photos from Tokyo trip"
+        },
+        {
+          "rank": 2,
+          "score": 0.86516535,
+          "episode_id": "c3df589b-f888-48a3-9af9-834d648db5b0",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 8 low-rated Tokyo photos"
+        },
+        {
+          "rank": 3,
+          "score": 0.86316663,
+          "episode_id": "82d14d80-1a7d-4073-805f-03bb808bd762",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 18 low-rated photos from Tokyo collection"
+        },
+        {
+          "rank": 4,
+          "score": 0.8589131,
+          "episode_id": "4bb7c0df-724c-47b1-b8fd-88d042357f0d",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated Tokyo photos"
+        },
+        {
+          "rank": 5,
+          "score": 0.85832727,
+          "episode_id": "341509eb-0f6e-4077-8440-ad0197612b50",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 15 low-rated Tokyo photos"
+        },
+        {
+          "rank": 6,
+          "score": 0.8577534,
+          "episode_id": "c3c723d1-45ec-4db4-8864-fe9d828b84a0",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived 15 low-rated Tokyo photos"
+        },
+        {
+          "rank": 7,
+          "score": 0.85232157,
+          "episode_id": "e677575c-952a-4f8e-826d-c48be595482e",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 18 low-rated photos from Tokyo"
+        },
+        {
+          "rank": 8,
+          "score": 0.84723496,
+          "episode_id": "2d91b7ed-ff6a-4ea9-aa82-e025d780dfce",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated Tokyo photos"
+        },
+        {
+          "rank": 9,
+          "score": 0.7106487,
+          "episode_id": "97a3f848-cf62-47b2-aabe-d28e3cdd2fe0",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for Tokyo Sony photos"
+        }
+      ]
+    },
+    {
+      "query": "Check what camera settings were used for all Sony A7III shots",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "rank": 1,
+      "embed_ms": 83.453,
+      "search_ms": 9.012,
+      "end_to_end_ms": 92.467,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.90071833,
+          "episode_id": "560239c0-48aa-41a6-915e-bdd7cf662e14",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 120 Sony A7III photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.89611995,
+          "episode_id": "36e12cb4-6af3-4bee-a39f-852a5f65a98c",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected metadata for Sony A7III photos"
+        },
+        {
+          "rank": 3,
+          "score": 0.8844442,
+          "episode_id": "4779d7fe-2f72-45a1-a80c-43e096d3fc3f",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 32 Sony A7III photos"
+        },
+        {
+          "rank": 4,
+          "score": 0.86633104,
+          "episode_id": "2fefc2a1-1bd8-4ba1-8ed2-80936587b1de",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 42 Sony A7III photos from Banff"
+        },
+        {
+          "rank": 5,
+          "score": 0.85675,
+          "episode_id": "86c9d3c6-010d-4004-af82-2d88edd44e3c",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 56 Sony A7III photos"
+        },
+        {
+          "rank": 6,
+          "score": 0.8500835,
+          "episode_id": "62a23641-130c-418d-b898-2ebe73acbad7",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for Sony A7III photos"
+        },
+        {
+          "rank": 7,
+          "score": 0.822312,
+          "episode_id": "7e3fd81c-7ea9-4c7a-b8c7-6f7fdc381c85",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for camera photos"
+        },
+        {
+          "rank": 8,
+          "score": 0.80362225,
+          "episode_id": "e8c7fcdc-c146-4baf-8236-365d5ef4da11",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected camera metadata"
+        }
+      ]
+    },
+    {
+      "query": "Show me what I did with low-rated wedding photos",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "rank": 1,
+      "embed_ms": 81.206,
+      "search_ms": 6.468,
+      "end_to_end_ms": 87.676,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7349364,
+          "episode_id": "8c6877b6-c078-4f52-86c5-a2dff6101226",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived low-quality wedding photos after filter error recovery"
+        }
+      ]
+    },
+    {
+      "query": "Tell me about archiving low-quality Tokyo photos",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "rank": 1,
+      "embed_ms": 81.955,
+      "search_ms": 3.638,
+      "end_to_end_ms": 85.596,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8475272,
+          "episode_id": "6e5bf1d6-9016-4635-a1f4-578d157a5a48",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Failed to archive due to permission error, then recovered and archived 15 assets"
+        },
+        {
+          "rank": 2,
+          "score": 0.8341864,
+          "episode_id": "9746aaf8-7531-4ff4-8265-30f22cfb838a",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Failed to archive due to permission error, then recovered"
+        }
+      ]
+    },
+    {
+      "query": "What was the outcome of archiving poor Hawaii vacation photos?",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "rank": 1,
+      "embed_ms": 81.085,
+      "search_ms": 6.144,
+      "end_to_end_ms": 87.23,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8543875,
+          "episode_id": "bbf553ec-6b18-41b8-934b-bc16a59513ec",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated vacation photos"
+        }
+      ]
+    },
+    {
+      "query": "Show me what happened when checking camera settings for Nikon photos",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "rank": 1,
+      "embed_ms": 86.195,
+      "search_ms": 4.526,
+      "end_to_end_ms": 90.724,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7976333,
+          "episode_id": "e1252113-83e0-4acf-b0a8-fc61edb5d9c8",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 127 Nikon Z6 photos"
+        }
+      ]
+    },
+    {
+      "query": "What camera settings did I use for my Sony photos recently?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "rank": 1,
+      "embed_ms": 87.955,
+      "search_ms": 6.145,
+      "end_to_end_ms": 94.103,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7878083,
+          "episode_id": "4779d7fe-2f72-45a1-a80c-43e096d3fc3f",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 32 Sony A7III photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.7474299,
+          "episode_id": "36e12cb4-6af3-4bee-a39f-852a5f65a98c",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected metadata for Sony A7III photos"
+        },
+        {
+          "rank": 3,
+          "score": 0.74279445,
+          "episode_id": "560239c0-48aa-41a6-915e-bdd7cf662e14",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 120 Sony A7III photos"
+        },
+        {
+          "rank": 4,
+          "score": 0.7276379,
+          "episode_id": "2fefc2a1-1bd8-4ba1-8ed2-80936587b1de",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 42 Sony A7III photos from Banff"
+        },
+        {
+          "rank": 5,
+          "score": 0.69303155,
+          "episode_id": "62a23641-130c-418d-b898-2ebe73acbad7",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for Sony A7III photos"
+        },
+        {
+          "rank": 6,
+          "score": 0.683982,
+          "episode_id": "86c9d3c6-010d-4004-af82-2d88edd44e3c",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 56 Sony A7III photos"
+        },
+        {
+          "rank": 7,
+          "score": 0.6769184,
+          "episode_id": "7e3fd81c-7ea9-4c7a-b8c7-6f7fdc381c85",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for camera photos"
+        },
+        {
+          "rank": 8,
+          "score": 0.65456223,
+          "episode_id": "e8c7fcdc-c146-4baf-8236-365d5ef4da11",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected camera metadata"
+        }
+      ]
+    },
+    {
+      "query": "What camera details did I check for my Sony photos?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "rank": 1,
+      "embed_ms": 83.591,
+      "search_ms": 4.85,
+      "end_to_end_ms": 88.444,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.79749787,
+          "episode_id": "4779d7fe-2f72-45a1-a80c-43e096d3fc3f",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 32 Sony A7III photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.7973821,
+          "episode_id": "36e12cb4-6af3-4bee-a39f-852a5f65a98c",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected metadata for Sony A7III photos"
+        },
+        {
+          "rank": 3,
+          "score": 0.7938608,
+          "episode_id": "560239c0-48aa-41a6-915e-bdd7cf662e14",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 120 Sony A7III photos"
+        },
+        {
+          "rank": 4,
+          "score": 0.779009,
+          "episode_id": "62a23641-130c-418d-b898-2ebe73acbad7",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for Sony A7III photos"
+        },
+        {
+          "rank": 5,
+          "score": 0.7749205,
+          "episode_id": "86c9d3c6-010d-4004-af82-2d88edd44e3c",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 56 Sony A7III photos"
+        },
+        {
+          "rank": 6,
+          "score": 0.76988363,
+          "episode_id": "7e3fd81c-7ea9-4c7a-b8c7-6f7fdc381c85",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for camera photos"
+        },
+        {
+          "rank": 7,
+          "score": 0.7673397,
+          "episode_id": "2fefc2a1-1bd8-4ba1-8ed2-80936587b1de",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Generated metadata report for 42 Sony A7III photos from Banff"
+        },
+        {
+          "rank": 8,
+          "score": 0.73441947,
+          "episode_id": "e8c7fcdc-c146-4baf-8236-365d5ef4da11",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected camera metadata"
+        }
+      ]
+    },
+    {
+      "query": "Tell me about archiving low-quality Tokyo photos",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "rank": 1,
+      "embed_ms": 87.604,
+      "search_ms": 5.15,
+      "end_to_end_ms": 92.757,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8475272,
+          "episode_id": "6e5bf1d6-9016-4635-a1f4-578d157a5a48",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Failed to archive due to permission error, then recovered and archived 15 assets"
+        },
+        {
+          "rank": 2,
+          "score": 0.8341864,
+          "episode_id": "9746aaf8-7531-4ff4-8265-30f22cfb838a",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Failed to archive due to permission error, then recovered"
+        }
+      ]
+    },
+    {
+      "query": "Show me the camera details for my Alps photos taken with the Sony.",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "rank": 1,
+      "embed_ms": 83.114,
+      "search_ms": 3.483,
+      "end_to_end_ms": 86.599,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.782583,
+          "episode_id": "e8c7fcdc-c146-4baf-8236-365d5ef4da11",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected camera metadata"
+        }
+      ]
+    }
+  ]
+}

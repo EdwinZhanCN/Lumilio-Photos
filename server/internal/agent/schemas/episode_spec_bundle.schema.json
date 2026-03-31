@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumilio.dev/schemas/agent/episode_spec_bundle.schema.json",
+  "title": "Agent Episodic Memory Spec Bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "episodes"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "agent-memory/episode-spec-bundle/v1"
+    },
+    "episodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/episodeSpec"
+      }
+    },
+    "queries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/querySpec"
+      }
+    }
+  },
+  "$defs": {
+    "episodeStatus": {
+      "type": "string",
+      "enum": ["succeeded", "failed", "recovered", "aborted"]
+    },
+    "writeTrigger": {
+      "type": "string",
+      "enum": ["goal_resolved", "error_captured", "error_recovered", "manual_bookmark"]
+    },
+    "executionStatus": {
+      "type": "string",
+      "enum": ["pending", "running", "success", "error", "cancelled"]
+    },
+    "entityRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "name"],
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "role": { "type": "string" }
+      }
+    },
+    "contextBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "text"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string", "minLength": 1 },
+        "text": { "type": "string", "minLength": 1 },
+        "weight": { "type": "number" }
+      }
+    },
+    "errorInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "details": {}
+      }
+    },
+    "stepSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool_name", "output_kind"],
+      "properties": {
+        "tool_name": { "type": "string", "minLength": 1 },
+        "output_kind": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/$defs/executionStatus" },
+        "output_summary": { "type": "string" },
+        "fix_summary": { "type": "string" },
+        "error": { "$ref": "#/$defs/errorInfo" },
+        "input": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "episodeSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "goal", "intent", "steps"],
+      "properties": {
+        "scenario": { "type": "string", "minLength": 1 },
+        "goal": { "type": "string", "minLength": 1 },
+        "intent": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string" },
+        "status": { "$ref": "#/$defs/episodeStatus" },
+        "write_trigger": { "$ref": "#/$defs/writeTrigger" },
+        "agent_name": { "type": "string" },
+        "workspace": { "type": "string" },
+        "route": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "entities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/entityRef" }
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/stepSpec" }
+        },
+        "context": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/contextBlock" }
+        }
+      }
+    },
+    "querySpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query"],
+      "properties": {
+        "query": { "type": "string", "minLength": 1 },
+        "target_scenario": { "type": "string" },
+        "target_intent": { "type": "string" },
+        "entity": { "type": "string" },
+        "status": { "$ref": "#/$defs/episodeStatus" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,2599 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "scenario": "User wants to organize vacation photos from Paris into a themed album",
+      "goal": "Create an album for Paris vacation photos and add relevant assets",
+      "intent": "Organize travel memories by location",
+      "summary": "Successfully created 'Paris 2023' album and added 15 photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media-organizer",
+      "workspace": "personal-library",
+      "route": "album-creation",
+      "tags": [
+        "vacation",
+        "organization",
+        "album"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Paris 2023",
+          "role": "output"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "tool"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-06-01 to 2023-06-10"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 25 assets with location Paris from June 2023",
+          "input": {
+            "location": "Paris",
+            "date_range": "2023-06-01 to 2023-06-10"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_created",
+          "status": "success",
+          "output_summary": "Created album 'Paris 2023'",
+          "input": {
+            "album_name": "Paris 2023",
+            "description": "Vacation photos from Paris"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "assets_added",
+          "status": "success",
+          "output_summary": "Added 15 selected photos to album",
+          "input": {
+            "album_name": "Paris 2023",
+            "asset_count": 15
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User prefers thematic organization by trip",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "User needs to find and remove duplicate photos from a wedding shoot",
+      "goal": "Identify duplicate assets and archive the extras",
+      "intent": "Clean up storage by removing duplicates",
+      "summary": "Recovered from initial filter error to archive 8 duplicate photos",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media-cleaner",
+      "workspace": "professional-portfolio",
+      "route": "duplicate-management",
+      "tags": [
+        "wedding",
+        "cleanup",
+        "duplicates"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Chapel Gardens",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R5",
+          "role": "tool"
+        },
+        {
+          "type": "failure_mode",
+          "name": "filter_criteria_too_broad",
+          "role": "error"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-09-15",
+        "rating": "4+ stars"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "error",
+          "output_summary": "Filter returned too many assets (150+) due to broad criteria",
+          "fix_summary": "Refined filter to specific date and rating",
+          "error": {
+            "code": "FILTER_OVERLOAD",
+            "message": "Too many assets match the criteria"
+          },
+          "input": {
+            "location": "Chapel Gardens"
+          }
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 45 assets from wedding day with 4+ star rating",
+          "input": {
+            "location": "Chapel Gardens",
+            "date": "2023-09-15",
+            "min_rating": 4
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicates_found",
+          "status": "success",
+          "output_summary": "Identified 12 duplicate groups among the filtered assets",
+          "input": {
+            "similarity_threshold": 0.95
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "assets_archived",
+          "status": "success",
+          "output_summary": "Archived 8 duplicate photos, keeping the best version of each",
+          "input": {
+            "asset_count": 8,
+            "reason": "duplicate_cleanup"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "project_constraint",
+          "text": "Wedding client requires minimal duplicates in final delivery",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "scenario": "User wants to quickly like all photos from a recent hiking trip to Yosemite",
+      "goal": "Mark all Yosemite hiking photos as liked for easy retrieval",
+      "intent": "Flag favorite outdoor shots",
+      "summary": "Successfully liked 32 photos from Yosemite hike",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media-curator",
+      "workspace": "personal-library",
+      "route": "bulk-actions",
+      "tags": [
+        "hiking",
+        "favorites",
+        "bulk-action"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite National Park",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "iPhone 14 Pro",
+          "role": "tool"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-10-05 to 2023-10-07"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 32 assets from Yosemite in October 2023",
+          "input": {
+            "location": "Yosemite National Park",
+            "date_range": "2023-10-05 to 2023-10-07"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "assets_liked",
+          "status": "success",
+          "output_summary": "Marked all 32 photos as liked",
+          "input": {
+            "asset_count": 32
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_habit",
+          "text": "User likes to mark all photos from memorable trips as favorites",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "scenario": "User needs to group family photos by event for year-end review",
+      "goal": "Create groups of assets based on family events and summarize each",
+      "intent": "Organize family memories by occasion",
+      "summary": "Recovered from metadata inspection error to group and summarize 5 family events",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "family-organizer",
+      "workspace": "shared-family",
+      "route": "grouping-summary",
+      "tags": [
+        "family",
+        "events",
+        "summary"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Events 2023",
+          "role": "output"
+        },
+        {
+          "type": "failure_mode",
+          "name": "metadata_corruption",
+          "role": "error"
+        },
+        {
+          "type": "camera_model",
+          "name": "Nikon Z6",
+          "role": "tool"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-01-01 to 2023-12-31"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 120 family photos from 2023",
+          "input": {
+            "tags": [
+              "family"
+            ],
+            "date_range": "2023-01-01 to 2023-12-31"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_report",
+          "status": "error",
+          "output_summary": "Failed to read metadata for 15 assets due to corruption",
+          "fix_summary": "Skipped corrupted files and proceeded with remaining assets",
+          "error": {
+            "code": "METADATA_CORRUPT",
+            "message": "Cannot read EXIF data from some files"
+          },
+          "input": {
+            "asset_count": 120
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "groups_created",
+          "status": "success",
+          "output_summary": "Grouped 105 assets into 5 event-based groups",
+          "input": {
+            "group_by": "event",
+            "group_count": 5
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "summary_report",
+          "status": "success",
+          "output_summary": "Generated summaries for 5 family events including birthdays and holidays",
+          "input": {
+            "group_count": 5
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "family_policy",
+          "text": "Family wants organized photos for annual slideshow",
+          "weight": 0.85
+        }
+      ]
+    },
+    {
+      "scenario": "User wants to archive all low-rated photos from a studio shoot to free up space",
+      "goal": "Filter low-rated assets and move them to archive",
+      "intent": "Clean up low-quality photos from professional work",
+      "summary": "Successfully archived 18 photos with 1-2 star ratings",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "studio-manager",
+      "workspace": "professional-portfolio",
+      "route": "rating-based-cleanup",
+      "tags": [
+        "studio",
+        "cleanup",
+        "archive"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Studio Alpha",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "1-2 stars",
+          "role": "criteria"
+        },
+        {
+          "type": "camera_model",
+          "name": "Fujifilm X-T4",
+          "role": "tool"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-11-20",
+        "liked_state": "not_liked"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 45 assets from Studio Alpha shoot on Nov 20",
+          "input": {
+            "location": "Studio Alpha",
+            "date": "2023-11-20"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_report",
+          "status": "success",
+          "output_summary": "Identified 18 assets with 1-2 star ratings and not liked",
+          "input": {
+            "rating_range": "1-2",
+            "liked_state": false
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "assets_archived",
+          "status": "success",
+          "output_summary": "Archived 18 low-rated photos",
+          "input": {
+            "asset_count": 18,
+            "reason": "low_rating_cleanup"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "studio_policy",
+          "text": "Studio keeps only 3+ star rated shots in active library",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "scenario": "User needs to create an album for beach vacation photos and add selected assets",
+      "goal": "Make a beach vacation album with filtered photos from multiple locations",
+      "intent": "Compile coastal memories into one collection",
+      "summary": "Successfully created 'Beach Escapes 2023' album with 22 photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "vacation-organizer",
+      "workspace": "personal-library",
+      "route": "album-creation",
+      "tags": [
+        "beach",
+        "vacation",
+        "album"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui",
+          "role": "subject"
+        },
+        {
+          "type": "location",
+          "name": "Cancun",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Beach Escapes 2023",
+          "role": "output"
+        },
+        {
+          "type": "camera_model",
+          "name": "GoPro Hero11",
+          "role": "tool"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-07-01 to 2023-08-31"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 35 beach photos from Maui and Cancun in summer 2023",
+          "input": {
+            "locations": [
+              "Maui",
+              "Cancun"
+            ],
+            "date_range": "2023-07-01 to 2023-08-31"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_created",
+          "status": "success",
+          "output_summary": "Created album 'Beach Escapes 2023'",
+          "input": {
+            "album_name": "Beach Escapes 2023",
+            "description": "Summer beach vacations"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "assets_added",
+          "status": "success",
+          "output_summary": "Added 22 selected photos to album",
+          "input": {
+            "album_name": "Beach Escapes 2023",
+            "asset_count": 22
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User likes to combine photos from different beach trips into one album",
+          "weight": 0.75
+        }
+      ]
+    },
+    {
+      "scenario": "Organize vacation photos from Paris",
+      "goal": "Group all photos taken in Paris during the last trip",
+      "intent": "Create a collection of Paris vacation memories",
+      "summary": "Successfully grouped 45 Paris photos by location and created an album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_organizer",
+      "workspace": "personal_library",
+      "route": "location_based_grouping",
+      "tags": [
+        "vacation",
+        "paris",
+        "grouping"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "target"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R5",
+          "role": "source"
+        },
+        {
+          "type": "album",
+          "name": "Paris Vacation 2023",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-06-10 to 2023-06-17"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Filtered 45 assets with location Paris",
+          "input": {
+            "location": "Paris",
+            "date_range": "2023-06-10 to 2023-06-17"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "grouped_assets",
+          "status": "success",
+          "output_summary": "Grouped 45 assets by date and time",
+          "input": {
+            "assets": "filtered_set",
+            "group_by": "date"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_created",
+          "status": "success",
+          "output_summary": "Created album 'Paris Vacation 2023'",
+          "input": {
+            "name": "Paris Vacation 2023",
+            "description": "Photos from Paris trip"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "assets_added",
+          "status": "success",
+          "output_summary": "Added 45 assets to album",
+          "input": {
+            "album": "Paris Vacation 2023",
+            "assets": "grouped_assets"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "I want to see all my Paris photos from last June in one place",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "Clean up duplicate photos from a wedding shoot",
+      "goal": "Identify and remove duplicate images from a wedding album",
+      "intent": "Reduce storage clutter by eliminating redundant files",
+      "summary": "Found and archived 12 duplicate assets after initial grouping failure",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_cleaner",
+      "workspace": "professional_portfolio",
+      "route": "duplicate_management",
+      "tags": [
+        "wedding",
+        "duplicates",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding",
+          "role": "source"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "primary"
+        },
+        {
+          "type": "failure_mode",
+          "name": "grouping_error",
+          "role": "error"
+        }
+      ],
+      "metadata": {
+        "rating": "4+",
+        "liked_state": "mixed"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "grouped_assets",
+          "status": "error",
+          "output_summary": "Failed to group due to metadata inconsistencies",
+          "fix_summary": "Used inspect tool to check metadata before retrying",
+          "error": {
+            "code": "METADATA_MISMATCH",
+            "message": "Inconsistent EXIF data in wedding photos"
+          },
+          "input": {
+            "assets": "Johnson Wedding album",
+            "group_by": "similarity"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 85 assets, found 12 with duplicate timestamps",
+          "input": {
+            "assets": "Johnson Wedding album",
+            "fields": [
+              "timestamp",
+              "camera_model"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_set",
+          "status": "success",
+          "output_summary": "Identified 12 duplicate assets based on visual similarity",
+          "input": {
+            "assets": "metadata_report subset",
+            "threshold": 0.95
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "archived_assets",
+          "status": "success",
+          "output_summary": "Archived 12 duplicate assets successfully",
+          "input": {
+            "assets": "duplicate_set",
+            "reason": "duplicate_cleanup"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "system_alert",
+          "text": "Storage usage at 85% in professional portfolio",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "Mark favorite photos from a hiking trip in Yosemite",
+      "goal": "Like all high-quality photos from Yosemite National Park",
+      "intent": "Quickly flag the best shots for easy access",
+      "summary": "Successfully liked 28 assets after filtering by location and rating",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_curator",
+      "workspace": "outdoor_collection",
+      "route": "bulk_liking",
+      "tags": [
+        "hiking",
+        "yosemite",
+        "favorites"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite National Park",
+          "role": "target"
+        },
+        {
+          "type": "rating",
+          "name": "5",
+          "role": "criteria"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-08-15 to 2023-08-20",
+        "camera_model": "Nikon Z6"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Filtered 65 assets from Yosemite with rating 4+",
+          "input": {
+            "location": "Yosemite National Park",
+            "min_rating": 4
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "liked_assets",
+          "status": "success",
+          "output_summary": "Liked 28 assets from the filtered set",
+          "input": {
+            "assets": "filtered_set",
+            "action": "like"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Show me the best photos from my Yosemite hike last August",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "Create a summary of family reunion photos",
+      "goal": "Generate a concise summary of assets from a family reunion event",
+      "intent": "Provide a quick overview without browsing all photos",
+      "summary": "Successfully summarized 120 assets into key categories",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_summarizer",
+      "workspace": "family_archive",
+      "route": "selection_summary",
+      "tags": [
+        "family",
+        "reunion",
+        "summary"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023",
+          "role": "source"
+        },
+        {
+          "type": "time_window",
+          "name": "2023-07-04",
+          "role": "event_date"
+        }
+      ],
+      "metadata": {
+        "camera_model": "iPhone 14 Pro",
+        "rating": "3+"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "summary_report",
+          "status": "success",
+          "output_summary": "Summarized 120 assets: 45 group photos, 30 candid shots, 25 food photos, 20 venue shots",
+          "input": {
+            "assets": "Family Reunion 2023 album",
+            "categories": [
+              "people",
+              "activities",
+              "food",
+              "location"
+            ]
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Give me a quick breakdown of what's in our family reunion photos",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "Archive old low-rated photos from a studio shoot",
+      "goal": "Move low-quality studio photos to archive to free up space",
+      "intent": "Clean up workspace by removing subpar assets",
+      "summary": "Recovered from initial filter error and archived 18 assets",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_cleaner",
+      "workspace": "studio_workspace",
+      "route": "bulk_archiving",
+      "tags": [
+        "studio",
+        "cleanup",
+        "low_rating"
+      ],
+      "entities": [
+        {
+          "type": "rating",
+          "name": "1-2",
+          "role": "criteria"
+        },
+        {
+          "type": "failure_mode",
+          "name": "filter_error",
+          "role": "error"
+        },
+        {
+          "type": "camera_model",
+          "name": "Fujifilm X-T4",
+          "role": "source"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-01-01 to 2023-03-31",
+        "liked_state": "not_liked"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "error",
+          "output_summary": "Failed to filter due to rating system mismatch",
+          "fix_summary": "Adjusted rating parameters and retried",
+          "error": {
+            "code": "RATING_SYSTEM_ERROR",
+            "message": "Rating scale 1-5 expected, found 1-10 system"
+          },
+          "input": {
+            "max_rating": 2,
+            "date_range": "2023-01-01 to 2023-03-31"
+          }
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Filtered 18 assets with rating 1-2 (converted scale)",
+          "input": {
+            "max_rating": 4,
+            "date_range": "2023-01-01 to 2023-03-31"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "archived_assets",
+          "status": "success",
+          "output_summary": "Archived 18 low-rated studio photos",
+          "input": {
+            "assets": "filtered_set",
+            "reason": "low_quality_cleanup"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "system_alert",
+          "text": "Studio workspace approaching storage limit",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "scenario": "Organize beach vacation photos into themed albums",
+      "goal": "Create separate albums for different beach activities",
+      "intent": "Categorize vacation memories for better navigation",
+      "summary": "Successfully created 3 themed albums from beach photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_organizer",
+      "workspace": "vacation_library",
+      "route": "album_creation",
+      "tags": [
+        "beach",
+        "vacation",
+        "themed_albums"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui",
+          "role": "target"
+        },
+        {
+          "type": "album",
+          "name": "Maui Sunsets",
+          "role": "output"
+        },
+        {
+          "type": "album",
+          "name": "Maui Snorkeling",
+          "role": "output"
+        },
+        {
+          "type": "album",
+          "name": "Maui Family Time",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-05-05 to 2023-05-12",
+        "camera_model": "GoPro Hero11"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Filtered 150 assets from Maui vacation",
+          "input": {
+            "location": "Maui",
+            "date_range": "2023-05-05 to 2023-05-12"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "grouped_assets",
+          "status": "success",
+          "output_summary": "Grouped into 3 categories: sunsets, snorkeling, family",
+          "input": {
+            "assets": "filtered_set",
+            "group_by": "content_type"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_created",
+          "status": "success",
+          "output_summary": "Created album 'Maui Sunsets'",
+          "input": {
+            "name": "Maui Sunsets",
+            "description": "Evening beach photos"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_created",
+          "status": "success",
+          "output_summary": "Created album 'Maui Snorkeling'",
+          "input": {
+            "name": "Maui Snorkeling",
+            "description": "Underwater and marine life photos"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_created",
+          "status": "success",
+          "output_summary": "Created album 'Maui Family Time'",
+          "input": {
+            "name": "Maui Family Time",
+            "description": "Family activities and group photos"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "assets_added",
+          "status": "success",
+          "output_summary": "Added appropriate assets to each themed album",
+          "input": {
+            "albums": [
+              "Maui Sunsets",
+              "Maui Snorkeling",
+              "Maui Family Time"
+            ],
+            "assets": "grouped_assets"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "I want my Maui photos organized by what we did each day",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "Organize vacation photos from Paris",
+      "goal": "Create an album for Paris trip photos and add relevant assets",
+      "intent": "Group travel memories by location",
+      "summary": "Successfully created 'Paris 2023' album and added 15 photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_organizer",
+      "workspace": "personal_library",
+      "route": "album_creation",
+      "tags": [
+        "vacation",
+        "paris",
+        "album"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Paris 2023",
+          "role": "output"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "tool"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-06-10 to 2023-06-17"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 25 assets with location Paris",
+          "input": {
+            "location": "Paris",
+            "date_range": "2023-06-10 to 2023-06-17"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_created",
+          "status": "success",
+          "output_summary": "Created album 'Paris 2023'",
+          "input": {
+            "album_name": "Paris 2023",
+            "description": "Vacation photos from Paris"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "assets_added",
+          "status": "success",
+          "output_summary": "Added 15 selected photos to album",
+          "input": {
+            "album_name": "Paris 2023",
+            "asset_count": 15
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User prefers organizing photos by trip location",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "Clean up duplicate photos from wedding shoot",
+      "goal": "Identify and archive duplicate images to free up space",
+      "intent": "Remove redundant media files",
+      "summary": "Recovered from initial filter error and archived 8 duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_cleaner",
+      "workspace": "professional_portfolio",
+      "route": "duplicate_management",
+      "tags": [
+        "wedding",
+        "duplicates",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding",
+          "role": "source"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R5",
+          "role": "tool"
+        },
+        {
+          "type": "failure_mode",
+          "name": "filter_criteria_too_broad",
+          "role": "error"
+        }
+      ],
+      "metadata": {
+        "rating": "4+ stars",
+        "time_window": "2023-09-15"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "error",
+          "output_summary": "Filter returned too many assets (500+)",
+          "fix_summary": "Refined date range to specific wedding day",
+          "error": {
+            "code": "FILTER_OVERLOAD",
+            "message": "Too many assets match criteria"
+          },
+          "input": {
+            "album": "Johnson Wedding",
+            "rating": "4+ stars"
+          }
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 120 assets from wedding day",
+          "input": {
+            "album": "Johnson Wedding",
+            "date": "2023-09-15"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicates_found",
+          "status": "success",
+          "output_summary": "Identified 12 duplicate groups",
+          "input": {
+            "similarity_threshold": 0.95
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "assets_archived",
+          "status": "success",
+          "output_summary": "Archived 8 duplicate assets",
+          "input": {
+            "archive_reason": "duplicates",
+            "count": 8
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "system_constraint",
+          "text": "Storage space is limited on device",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "scenario": "Mark favorite photos from mountain hiking trip",
+      "goal": "Like all high-quality photos from Colorado hiking",
+      "intent": "Highlight best outdoor shots",
+      "summary": "Successfully liked 22 photos with high ratings",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_curator",
+      "workspace": "outdoor_collection",
+      "route": "quality_selection",
+      "tags": [
+        "hiking",
+        "colorado",
+        "favorites"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Colorado Rockies",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "5 stars",
+          "role": "criteria"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-07-20 to 2023-07-25"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 45 assets from Colorado hiking trip",
+          "input": {
+            "location": "Colorado Rockies",
+            "date_range": "2023-07-20 to 2023-07-25"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_summary",
+          "status": "success",
+          "output_summary": "22 assets have 5-star ratings",
+          "input": {
+            "rating_filter": "5"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "assets_liked",
+          "status": "success",
+          "output_summary": "Liked 22 high-quality photos",
+          "input": {
+            "count": 22,
+            "reason": "high_rating"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_habit",
+          "text": "User regularly marks favorites after trips",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "scenario": "Group family reunion photos by camera type",
+      "goal": "Organize reunion photos into groups based on camera model",
+      "intent": "Categorize mixed-source media",
+      "summary": "Recovered from metadata inspection failure and created 3 groups",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_organizer",
+      "workspace": "family_archive",
+      "route": "categorization",
+      "tags": [
+        "family",
+        "reunion",
+        "camera_types"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023",
+          "role": "source"
+        },
+        {
+          "type": "camera_model",
+          "name": "iPhone 14 Pro",
+          "role": "group1"
+        },
+        {
+          "type": "camera_model",
+          "name": "Nikon Z6",
+          "role": "group2"
+        },
+        {
+          "type": "failure_mode",
+          "name": "metadata_unavailable",
+          "role": "error"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-08-12"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_summary",
+          "status": "error",
+          "output_summary": "Failed to read camera metadata for some assets",
+          "fix_summary": "Used fallback grouping by file characteristics",
+          "error": {
+            "code": "METADATA_CORRUPT",
+            "message": "Camera EXIF data missing or corrupted"
+          },
+          "input": {
+            "album": "Family Reunion 2023"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "groups_created",
+          "status": "success",
+          "output_summary": "Created 3 groups based on file characteristics",
+          "input": {
+            "group_by": "file_type_size",
+            "album": "Family Reunion 2023"
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "85 assets grouped into iPhone, Nikon, and other categories",
+          "input": {
+            "group_count": 3
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "project_context",
+          "text": "Multiple family members contributed photos",
+          "weight": 0.6
+        }
+      ]
+    },
+    {
+      "scenario": "Archive old low-rated beach photos",
+      "goal": "Move poor quality beach photos to archive",
+      "intent": "Clear low-value media from active library",
+      "summary": "Successfully archived 34 low-rated beach photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_cleaner",
+      "workspace": "vacation_library",
+      "route": "quality_filtering",
+      "tags": [
+        "beach",
+        "archive",
+        "low_quality"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Miami Beach",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "1-2 stars",
+          "role": "criteria"
+        },
+        {
+          "type": "liked_state",
+          "name": "not_liked",
+          "role": "filter"
+        }
+      ],
+      "metadata": {
+        "time_window": "2020-2022"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 150 beach photos from 2020-2022",
+          "input": {
+            "location": "Miami Beach",
+            "date_range": "2020-01-01 to 2022-12-31"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_summary",
+          "status": "success",
+          "output_summary": "34 assets have 1-2 star ratings and are not liked",
+          "input": {
+            "rating_max": 2,
+            "liked": false
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "assets_archived",
+          "status": "success",
+          "output_summary": "Archived 34 low-quality beach photos",
+          "input": {
+            "archive_reason": "low_quality",
+            "count": 34
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "storage_policy",
+          "text": "Archive photos older than 2 years with low ratings",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "Create highlight album from concert photos",
+      "goal": "Make a best-of album from multiple concert events",
+      "intent": "Compile premium event media",
+      "summary": "Successfully created 'Concert Highlights' with 40 top photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_curator",
+      "workspace": "event_collection",
+      "route": "album_curation",
+      "tags": [
+        "concert",
+        "highlights",
+        "curation"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Concert Highlights 2023",
+          "role": "output"
+        },
+        {
+          "type": "rating",
+          "name": "4+ stars",
+          "role": "criteria"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked",
+          "role": "filter"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-01-01 to 2023-10-31"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "filtered_set",
+          "status": "success",
+          "output_summary": "Found 200 concert photos from 2023",
+          "input": {
+            "tags": [
+              "concert"
+            ],
+            "date_range": "2023-01-01 to 2023-10-31"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_summary",
+          "status": "success",
+          "output_summary": "85 assets have 4+ stars or are liked",
+          "input": {
+            "rating_min": 4,
+            "liked": true
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_created",
+          "status": "success",
+          "output_summary": "Created album 'Concert Highlights 2023'",
+          "input": {
+            "album_name": "Concert Highlights 2023",
+            "description": "Best concert photos from 2023"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "assets_added",
+          "status": "success",
+          "output_summary": "Added 40 selected photos to album",
+          "input": {
+            "album_name": "Concert Highlights 2023",
+            "asset_count": 40
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "User wants to share best concert photos with friends",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "scenario": "Organize vacation photos from Paris into albums by location",
+      "goal": "Create albums for photos taken at different Paris landmarks and add relevant assets",
+      "intent": "Group vacation photos by location for easier browsing",
+      "summary": "Successfully created Eiffel Tower and Louvre albums and added matching photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media-organizer",
+      "workspace": "personal-library",
+      "route": "album-creation",
+      "tags": [
+        "vacation",
+        "paris",
+        "organization"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "primary"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R5",
+          "role": "tool"
+        },
+        {
+          "type": "album",
+          "name": "Eiffel Tower Views",
+          "role": "output"
+        },
+        {
+          "type": "album",
+          "name": "Louvre Museum",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-06-10 to 2023-06-15"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_list",
+          "status": "success",
+          "output_summary": "Found 45 photos taken in Paris between June 10-15, 2023",
+          "input": {
+            "location": "Paris",
+            "date_range": "2023-06-10 to 2023-06-15"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album",
+          "status": "success",
+          "output_summary": "Created album 'Eiffel Tower Views'",
+          "input": {
+            "album_name": "Eiffel Tower Views",
+            "description": "Photos from Eiffel Tower visit"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "confirmation",
+          "status": "success",
+          "output_summary": "Added 18 photos to 'Eiffel Tower Views' album",
+          "input": {
+            "album_name": "Eiffel Tower Views",
+            "asset_count": 18
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album",
+          "status": "success",
+          "output_summary": "Created album 'Louvre Museum'",
+          "input": {
+            "album_name": "Louvre Museum",
+            "description": "Photos from Louvre Museum visit"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "confirmation",
+          "status": "success",
+          "output_summary": "Added 12 photos to 'Louvre Museum' album",
+          "input": {
+            "album_name": "Louvre Museum",
+            "asset_count": 12
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User prefers organizing photos by location rather than date",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "Find and remove duplicate photos from a wedding shoot",
+      "goal": "Identify duplicate assets from a wedding photography session and archive the extras",
+      "intent": "Clean up storage by removing redundant wedding photos",
+      "summary": "Found 8 duplicate pairs and archived the lower-quality versions",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media-cleaner",
+      "workspace": "professional-portfolio",
+      "route": "duplicate-management",
+      "tags": [
+        "wedding",
+        "cleanup",
+        "storage"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "St. Mary's Church",
+          "role": "primary"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "tool"
+        },
+        {
+          "type": "rating",
+          "name": "4-star",
+          "role": "criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-09-22"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_list",
+          "status": "success",
+          "output_summary": "Identified 8 pairs of duplicate photos from wedding shoot",
+          "input": {
+            "similarity_threshold": 0.95
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_report",
+          "status": "success",
+          "output_summary": "Compared metadata to determine which duplicates to keep",
+          "input": {
+            "metadata_fields": [
+              "resolution",
+              "exposure",
+              "sharpness"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "confirmation",
+          "status": "success",
+          "output_summary": "Archived 8 lower-quality duplicate photos",
+          "input": {
+            "asset_count": 8,
+            "reason": "duplicate_with_lower_quality"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "constraint",
+          "text": "Client requested only the best version of each shot be kept",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "scenario": "Mark favorite photos from a hiking trip for quick access",
+      "goal": "Like the best photos from a mountain hiking trip to create a favorites collection",
+      "intent": "Curate a selection of top hiking photos for easy sharing",
+      "summary": "Successfully liked 25 photos from the hiking trip based on composition and clarity",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media-curator",
+      "workspace": "personal-library",
+      "route": "selection-management",
+      "tags": [
+        "hiking",
+        "favorites",
+        "curation"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Rocky Mountains",
+          "role": "primary"
+        },
+        {
+          "type": "camera_model",
+          "name": "Fujifilm X-T4",
+          "role": "tool"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-08-05 to 2023-08-07"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_list",
+          "status": "success",
+          "output_summary": "Found 120 photos from Rocky Mountains hiking trip",
+          "input": {
+            "location": "Rocky Mountains",
+            "date_range": "2023-08-05 to 2023-08-07"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_report",
+          "status": "success",
+          "output_summary": "Analyzed photo quality metrics to identify best shots",
+          "input": {
+            "metadata_fields": [
+              "sharpness",
+              "exposure",
+              "composition_score"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "confirmation",
+          "status": "success",
+          "output_summary": "Liked 25 photos with highest quality scores",
+          "input": {
+            "asset_count": 25,
+            "criteria": "quality_score > 85"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User wants to create a 'best of' collection for social media sharing",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "scenario": "Group family reunion photos by camera model for editing consistency",
+      "goal": "Organize family reunion photos into groups based on which camera was used",
+      "intent": "Prepare photos for batch editing by grouping similar camera outputs",
+      "summary": "Failed to group photos due to missing camera metadata, then recovered by extracting EXIF data",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media-organizer",
+      "workspace": "family-archive",
+      "route": "asset-grouping",
+      "tags": [
+        "family",
+        "reunion",
+        "organization"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Grandma's House",
+          "role": "primary"
+        },
+        {
+          "type": "camera_model",
+          "name": "iPhone 14 Pro",
+          "role": "tool"
+        },
+        {
+          "type": "camera_model",
+          "name": "Nikon D850",
+          "role": "tool"
+        },
+        {
+          "type": "failure_mode",
+          "name": "missing_metadata",
+          "role": "error"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-07-04"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "grouped_assets",
+          "status": "error",
+          "output_summary": "Failed to group by camera model - metadata incomplete",
+          "error": {
+            "code": "METADATA_INCOMPLETE",
+            "message": "Camera model information missing from 30% of assets"
+          },
+          "input": {
+            "group_by": "camera_model"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_report",
+          "status": "success",
+          "output_summary": "Extracted camera model from EXIF data for all assets",
+          "fix_summary": "Used EXIF extraction to recover missing camera information",
+          "input": {
+            "metadata_fields": [
+              "exif_camera_model",
+              "exif_make"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "grouped_assets",
+          "status": "success",
+          "output_summary": "Successfully grouped 85 photos by camera model (iPhone 14 Pro: 45, Nikon D850: 40)",
+          "input": {
+            "group_by": "camera_model"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "constraint",
+          "text": "Multiple family members contributed photos from different devices",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "Archive old low-rated photos to free up cloud storage",
+      "goal": "Identify and archive photos with low ratings to optimize storage space",
+      "intent": "Clean up storage by removing poorly rated photos",
+      "summary": "Successfully archived 150 photos with 1-2 star ratings",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media-cleaner",
+      "workspace": "cloud-storage",
+      "route": "storage-optimization",
+      "tags": [
+        "storage",
+        "cleanup",
+        "rating"
+      ],
+      "entities": [
+        {
+          "type": "rating",
+          "name": "1-star",
+          "role": "criteria"
+        },
+        {
+          "type": "rating",
+          "name": "2-star",
+          "role": "criteria"
+        },
+        {
+          "type": "liked_state",
+          "name": "not_liked",
+          "role": "criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2020-01-01 to 2022-12-31"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_list",
+          "status": "success",
+          "output_summary": "Found 500 photos from 2020-2022 with ratings 1-2 stars",
+          "input": {
+            "date_range": "2020-01-01 to 2022-12-31",
+            "max_rating": 2
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "summary",
+          "status": "success",
+          "output_summary": "Selection includes 150 photos suitable for archiving based on low ratings",
+          "input": {
+            "criteria": "rating <= 2 AND liked = false"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "confirmation",
+          "status": "success",
+          "output_summary": "Archived 150 low-rated photos to free up 4.2GB of storage",
+          "input": {
+            "asset_count": 150,
+            "reason": "low_rating_storage_optimization"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "constraint",
+          "text": "Cloud storage is at 95% capacity, need to free up space",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "scenario": "Create a summary of beach vacation photos for a photo book",
+      "goal": "Generate a curated summary of the best beach vacation photos",
+      "intent": "Prepare a selection of photos for creating a vacation photo book",
+      "summary": "Failed to summarize due to network error, then recovered by using cached metadata",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media-curator",
+      "workspace": "personal-library",
+      "route": "selection-summary",
+      "tags": [
+        "beach",
+        "vacation",
+        "summary"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui Beach",
+          "role": "primary"
+        },
+        {
+          "type": "camera_model",
+          "name": "GoPro Hero 11",
+          "role": "tool"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_timeout",
+          "role": "error"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-05-20 to 2023-05-27"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_list",
+          "status": "success",
+          "output_summary": "Found 200 photos from Maui beach vacation",
+          "input": {
+            "location": "Maui Beach",
+            "date_range": "2023-05-20 to 2023-05-27"
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "summary",
+          "status": "error",
+          "output_summary": "Failed to generate summary - network timeout",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection to photo analysis service timed out"
+          },
+          "input": {
+            "selection_criteria": "best_photos"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_report",
+          "status": "success",
+          "output_summary": "Used cached metadata to analyze photo quality",
+          "fix_summary": "Fell back to cached metadata when network service was unavailable",
+          "input": {
+            "metadata_fields": [
+              "cached_quality_score",
+              "cached_composition"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "summary",
+          "status": "success",
+          "output_summary": "Generated summary of 35 best beach photos using cached metadata",
+          "input": {
+            "selection_criteria": "cached_quality_score > 80"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User wants to create a photo book with 30-40 best photos",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "User wants to organize photos from a recent trip to Paris",
+      "goal": "Find and group all photos taken in Paris with Canon EOS R5",
+      "intent": "Create a curated album of high-quality Paris photos",
+      "summary": "Successfully created 'Paris 2023' album with 45 Canon photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media-organizer",
+      "workspace": "personal-library",
+      "route": "filter-group-create",
+      "tags": [
+        "travel",
+        "organization",
+        "album"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "filter_criteria"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R5",
+          "role": "filter_criteria"
+        },
+        {
+          "type": "album",
+          "name": "Paris 2023",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-10-01 to 2023-10-07"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_list",
+          "status": "success",
+          "output_summary": "Found 78 assets matching location:Paris",
+          "input": {
+            "location": "Paris",
+            "time_range": "2023-10-01 to 2023-10-07"
+          }
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_list",
+          "status": "success",
+          "output_summary": "Filtered to 45 assets with camera:Canon EOS R5",
+          "input": {
+            "camera_model": "Canon EOS R5",
+            "previous_results": true
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album",
+          "status": "success",
+          "output_summary": "Created album 'Paris 2023'",
+          "input": {
+            "album_name": "Paris 2023"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "operation_result",
+          "status": "success",
+          "output_summary": "Added 45 assets to album",
+          "input": {
+            "album_name": "Paris 2023",
+            "asset_count": 45
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User prefers high-quality camera photos for albums",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "User needs to clean up duplicate photos from a family reunion",
+      "goal": "Identify and archive duplicate photos from the reunion weekend",
+      "intent": "Free up storage by removing redundant images",
+      "summary": "Recovered from initial error and archived 12 duplicate photos",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media-cleaner",
+      "workspace": "family-library",
+      "route": "find-archive",
+      "tags": [
+        "cleanup",
+        "duplicates",
+        "storage"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Family Reunion Venue",
+          "role": "context"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_timeout",
+          "role": "error_cause"
+        },
+        {
+          "type": "rating",
+          "name": "low_quality",
+          "role": "archive_criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-08-15 to 2023-08-17"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_groups",
+          "status": "error",
+          "output_summary": "Failed to complete duplicate detection",
+          "fix_summary": "Retried with smaller batch size",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection timed out during processing"
+          },
+          "input": {
+            "time_range": "2023-08-15 to 2023-08-17"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_groups",
+          "status": "success",
+          "output_summary": "Found 6 duplicate groups containing 18 assets total",
+          "input": {
+            "time_range": "2023-08-15 to 2023-08-17",
+            "batch_size": 50
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_summary",
+          "status": "success",
+          "output_summary": "Identified 12 low-rated duplicates suitable for archiving",
+          "input": {
+            "rating_threshold": 3,
+            "duplicate_groups": true
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "operation_result",
+          "status": "success",
+          "output_summary": "Archived 12 duplicate photos",
+          "input": {
+            "asset_count": 12,
+            "reason": "duplicate_low_quality"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "system_constraint",
+          "text": "Network connectivity is unstable in this workspace",
+          "weight": 0.6
+        }
+      ]
+    },
+    {
+      "scenario": "User wants to mark favorite photos from a hiking trip in Colorado",
+      "goal": "Like all photos with rating 4+ from Colorado mountains",
+      "intent": "Quickly flag high-quality hiking photos for sharing",
+      "summary": "Successfully liked 32 high-rated Colorado photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media-curator",
+      "workspace": "adventure-library",
+      "route": "filter-like",
+      "tags": [
+        "curation",
+        "favorites",
+        "outdoors"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Colorado Mountains",
+          "role": "filter_criteria"
+        },
+        {
+          "type": "rating",
+          "name": "4_stars",
+          "role": "filter_criteria"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked",
+          "role": "output_state"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-07-10 to 2023-07-15"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_list",
+          "status": "success",
+          "output_summary": "Found 87 assets from Colorado mountains",
+          "input": {
+            "location": "Colorado Mountains",
+            "time_range": "2023-07-10 to 2023-07-15"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_summary",
+          "status": "success",
+          "output_summary": "32 assets have rating 4 or higher",
+          "input": {
+            "rating_threshold": 4,
+            "previous_results": true
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "operation_result",
+          "status": "success",
+          "output_summary": "Liked 32 high-rated photos",
+          "input": {
+            "asset_count": 32
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_habit",
+          "text": "User typically likes photos with ratings 4+ for easy sharing",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "scenario": "User needs to organize beach vacation photos by camera type",
+      "goal": "Group photos from Hawaii by Sony A7III vs iPhone 14 Pro",
+      "intent": "Compare photo quality from different devices",
+      "summary": "Successfully created two groups for camera comparison",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media-analyst",
+      "workspace": "vacation-library",
+      "route": "filter-group",
+      "tags": [
+        "comparison",
+        "organization",
+        "vacation"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "filter_criteria"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "group_criteria"
+        },
+        {
+          "type": "camera_model",
+          "name": "iPhone 14 Pro",
+          "role": "group_criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-06-01 to 2023-06-10"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_list",
+          "status": "success",
+          "output_summary": "Found 156 assets from Hawaii vacation",
+          "input": {
+            "location": "Hawaii",
+            "time_range": "2023-06-01 to 2023-06-10"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped into 94 Sony photos and 62 iPhone photos",
+          "input": {
+            "group_by": "camera_model",
+            "cameras": [
+              "Sony A7III",
+              "iPhone 14 Pro"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "summary_report",
+          "status": "success",
+          "output_summary": "Sony group has higher average resolution, iPhone group has more portrait shots",
+          "input": {
+            "groups": [
+              "Sony A7III",
+              "iPhone 14 Pro"
+            ]
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "analysis_goal",
+          "text": "User wants to compare professional vs mobile camera results",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "scenario": "User wants to archive old low-rated photos from home renovation",
+      "goal": "Find and archive photos with rating 2 or lower from renovation project",
+      "intent": "Clear clutter from unsuccessful photo attempts",
+      "summary": "Recovered from metadata error and archived 28 low-rated photos",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media-cleaner",
+      "workspace": "project-library",
+      "route": "filter-archive",
+      "tags": [
+        "cleanup",
+        "low_quality",
+        "project"
+      ],
+      "entities": [
+        {
+          "type": "failure_mode",
+          "name": "corrupted_metadata",
+          "role": "error_cause"
+        },
+        {
+          "type": "rating",
+          "name": "2_stars",
+          "role": "archive_threshold"
+        },
+        {
+          "type": "liked_state",
+          "name": "not_liked",
+          "role": "additional_criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2022-11-01 to 2023-01-31"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_list",
+          "status": "success",
+          "output_summary": "Found 210 assets from renovation period",
+          "input": {
+            "time_range": "2022-11-01 to 2023-01-31",
+            "tags": [
+              "renovation"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_summary",
+          "status": "error",
+          "output_summary": "Failed to read ratings for 15 assets",
+          "fix_summary": "Skipped corrupted assets and continued with rest",
+          "error": {
+            "code": "METADATA_CORRUPTED",
+            "message": "Cannot parse rating data for some assets"
+          },
+          "input": {
+            "rating_threshold": 2,
+            "previous_results": true
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_summary",
+          "status": "success",
+          "output_summary": "28 assets have rating ≤2 and are not liked",
+          "input": {
+            "rating_threshold": 2,
+            "exclude_liked": true,
+            "skip_corrupted": true
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "operation_result",
+          "status": "success",
+          "output_summary": "Archived 28 low-rated renovation photos",
+          "input": {
+            "asset_count": 28,
+            "reason": "low_quality_unliked"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "data_quality",
+          "text": "Some older assets have corrupted metadata from migration",
+          "weight": 0.5
+        }
+      ]
+    },
+    {
+      "scenario": "User needs to create a highlights album from a wedding",
+      "goal": "Select and album the best 50 photos from a wedding ceremony",
+      "intent": "Create a curated wedding highlights collection",
+      "summary": "Successfully created 'Wedding Highlights' album with top-rated photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media-curator",
+      "workspace": "event-library",
+      "route": "filter-create-add",
+      "tags": [
+        "wedding",
+        "highlights",
+        "album"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Wedding Highlights",
+          "role": "output"
+        },
+        {
+          "type": "rating",
+          "name": "5_stars",
+          "role": "selection_criteria"
+        },
+        {
+          "type": "location",
+          "name": "Wedding Venue",
+          "role": "filter_criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-09-23"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_list",
+          "status": "success",
+          "output_summary": "Found 320 assets from wedding day",
+          "input": {
+            "location": "Wedding Venue",
+            "date": "2023-09-23"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "metadata_summary",
+          "status": "success",
+          "output_summary": "68 assets have 5-star rating",
+          "input": {
+            "rating_threshold": 5,
+            "previous_results": true
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album",
+          "status": "success",
+          "output_summary": "Created album 'Wedding Highlights'",
+          "input": {
+            "album_name": "Wedding Highlights"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "operation_result",
+          "status": "success",
+          "output_summary": "Added top 50 rated photos to album",
+          "input": {
+            "album_name": "Wedding Highlights",
+            "asset_count": 50,
+            "selection_criteria": "top_rated"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "event_importance",
+          "text": "Wedding photos are high priority for careful curation",
+          "weight": 0.9
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query": "How can I put my travel pictures from France into a collection?",
+      "target_scenario": "User wants to organize vacation photos from Paris into a themed album",
+      "target_intent": "Organize travel memories by location",
+      "entity": "Paris",
+      "status": "succeeded",
+      "tags": [
+        "vacation",
+        "organization"
+      ],
+      "notes": "Paraphrase of creating album for location-based photos"
+    },
+    {
+      "query": "What's the best way to get rid of extra copies from the wedding shoot?",
+      "target_scenario": "User needs to find and remove duplicate photos from a wedding shoot",
+      "target_intent": "Clean up storage by removing duplicates",
+      "entity": "Chapel Gardens",
+      "status": "recovered",
+      "tags": [
+        "wedding",
+        "duplicates"
+      ],
+      "notes": "Paraphrase of finding and archiving duplicate assets"
+    },
+    {
+      "query": "How can I put together all the pictures from my trip to France?",
+      "target_scenario": "Organize vacation photos from Paris",
+      "target_intent": "Create a collection of Paris vacation memories",
+      "entity": "location",
+      "status": "succeeded",
+      "tags": [
+        "vacation",
+        "organization"
+      ],
+      "notes": "Paraphrase of grouping Paris photos goal"
+    },
+    {
+      "query": "What's the best way to get rid of extra copies from the wedding shoot?",
+      "target_scenario": "Clean up duplicate photos from a wedding shoot",
+      "target_intent": "Reduce storage clutter by eliminating redundant files",
+      "entity": "album",
+      "status": "recovered",
+      "tags": [
+        "duplicates",
+        "cleanup"
+      ],
+      "notes": "Paraphrase of duplicate removal goal"
+    },
+    {
+      "query": "How can I put together my travel pictures from France into one collection?",
+      "target_scenario": "Organize vacation photos from Paris",
+      "target_intent": "Group travel memories by location",
+      "entity": "Paris",
+      "status": "succeeded",
+      "tags": [
+        "vacation",
+        "album"
+      ],
+      "notes": "Paraphrase of creating album for Paris photos"
+    },
+    {
+      "query": "What's the process for getting rid of extra copies from the wedding shoot?",
+      "target_scenario": "Clean up duplicate photos from wedding shoot",
+      "target_intent": "Remove redundant media files",
+      "entity": "Johnson Wedding",
+      "status": "recovered",
+      "tags": [
+        "wedding",
+        "duplicates"
+      ],
+      "notes": "Paraphrase of identifying and archiving duplicate images"
+    },
+    {
+      "query": "How can I organize my travel pictures from different places into separate collections?",
+      "target_scenario": "Organize vacation photos from Paris into albums by location",
+      "target_intent": "Group vacation photos by location for easier browsing",
+      "entity": "location",
+      "status": "succeeded",
+      "tags": [
+        "organization",
+        "albums",
+        "travel"
+      ],
+      "notes": "Paraphrase of album creation by location goal"
+    },
+    {
+      "query": "What's the best way to get rid of extra copies of similar pictures to save space?",
+      "target_scenario": "Find and remove duplicate photos from a wedding shoot",
+      "target_intent": "Clean up storage by removing redundant wedding photos",
+      "entity": "duplicate",
+      "status": "succeeded",
+      "tags": [
+        "cleanup",
+        "duplicates",
+        "storage"
+      ],
+      "notes": "Paraphrase of duplicate removal goal"
+    },
+    {
+      "query": "How can I put together my best vacation pictures into a collection?",
+      "target_scenario": "User wants to organize photos from a recent trip to Paris",
+      "target_intent": "Create a curated album of high-quality Paris photos",
+      "entity": "album",
+      "status": "succeeded",
+      "tags": [
+        "travel",
+        "album",
+        "organization"
+      ],
+      "notes": "Paraphrase of creating curated albums from trip photos"
+    },
+    {
+      "query": "What's the best way to get rid of extra copies of similar images?",
+      "target_scenario": "User needs to clean up duplicate photos from a family reunion",
+      "target_intent": "Free up storage by removing redundant images",
+      "entity": "failure_mode",
+      "status": "recovered",
+      "tags": [
+        "duplicates",
+        "cleanup",
+        "storage"
+      ],
+      "notes": "Paraphrase of identifying and archiving duplicate assets"
+    }
+  ]
+}

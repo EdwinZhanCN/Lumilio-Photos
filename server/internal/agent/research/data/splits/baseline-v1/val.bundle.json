@@ -1,0 +1,281 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos with 1-star rating from last year",
+      "intent": "bulk_archive",
+      "summary": "Successfully archived low-rated photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "bulk_operations",
+      "tags": [
+        "cleanup",
+        "rating"
+      ],
+      "entities": [],
+      "metadata": {
+        "rating": "1",
+        "time_window": "last_year"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 67 assets with 1-star rating from last year",
+          "input": {
+            "rating": 1,
+            "time_window": "last_year"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 67 assets",
+          "input": {
+            "asset_count": 67
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Archive all my 1-star photos from last year to free up space",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos with 1-star rating from last month",
+      "intent": "bulk_archive",
+      "summary": "Successfully archived 7 low-rated photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "cleanup",
+      "tags": [
+        "rating",
+        "cleanup",
+        "success"
+      ],
+      "entities": [],
+      "metadata": {
+        "rating": "1",
+        "time_window": "last 30 days"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 7 assets with 1-star rating from last month",
+          "input": {
+            "rating": 1,
+            "date_range": "last 30 days"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 7 low-rated assets",
+          "input": {
+            "asset_count": 7,
+            "reason": "low_rating"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User wants to automatically archive photos rated 1 star",
+          "weight": 0.9
+        }
+      ]
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos from Tokyo with 1-star rating",
+      "intent": "bulk_archive",
+      "summary": "Archived low-quality Tokyo photos to free up space",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "bulk_operations",
+      "tags": [
+        "city",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "destination"
+        },
+        {
+          "type": "rating",
+          "name": "1",
+          "role": "target_rating"
+        }
+      ],
+      "metadata": {
+        "time_window": "2024-03-20 to 2024-03-25"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 15 assets from Tokyo with 1-star rating",
+          "input": {
+            "location": "Tokyo",
+            "rating": 1
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 15 low-rated Tokyo photos"
+        }
+      ],
+      "context": [
+        {
+          "kind": "system_note",
+          "text": "User is running low on storage space",
+          "weight": 0.6
+        }
+      ]
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive photos with rating below 2 from Hawaii vacation",
+      "intent": "bulk_archive",
+      "summary": "Recovered from network error and archived low-rated Hawaii photos",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 7 assets from Hawaii with rating < 2",
+          "input": {
+            "location": "Hawaii",
+            "rating": 2,
+            "rating_operator": "lt"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "error",
+          "output_summary": "Network timeout during archive operation",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection to storage service timed out"
+          },
+          "input": {
+            "asset_ids": [
+              "asset_x",
+              "asset_y",
+              "asset_z"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 7 low-rated assets on retry",
+          "fix_summary": "Retried after network reconnection",
+          "input": {
+            "asset_ids": [
+              "asset_x",
+              "asset_y",
+              "asset_z"
+            ]
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii"
+        }
+      ]
+    },
+    {
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all photos rated 1-star from the Tokyo trip",
+      "intent": "bulk_archive",
+      "summary": "Archived 15 low-rated Tokyo photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "cleanup_workflow",
+      "tags": [
+        "archive",
+        "low_quality",
+        "travel"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "trip_location"
+        }
+      ],
+      "metadata": {
+        "rating": "1",
+        "time_window": "last_month"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 15 assets with 1-star rating from Tokyo last month",
+          "input": {
+            "location": "Tokyo",
+            "rating": 1,
+            "time_window": "last_month"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 15 assets",
+          "input": {
+            "asset_count": 15
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "storage_policy",
+          "text": "User archives low-rated photos to save storage space",
+          "weight": 0.8
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query": "Tell me about archiving poor photos from Hawaii - did we have any issues?",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "entity": "Hawaii",
+      "status": "recovered"
+    }
+  ]
+}

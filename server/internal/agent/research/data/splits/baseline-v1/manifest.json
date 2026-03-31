@@ -1,0 +1,19 @@
+{
+  "dataset_version": "v1",
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "created_at": "2026-03-27T00:01:40.160978+00:00",
+  "generator": {
+    "provider": "deepseek",
+    "model": "unknown",
+    "seed": 42
+  },
+  "split_seed": 42,
+  "counts": {
+    "episodes": 35,
+    "queries": 18,
+    "train": 25,
+    "val": 5,
+    "test": 5
+  },
+  "source_bundle": "data/raw/baseline-v1.bundle.json"
+}

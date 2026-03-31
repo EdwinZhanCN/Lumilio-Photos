@@ -1,0 +1,82 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "queries": [
+    {
+      "query": "How did you organize my vacation pictures from Hawaii?",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "entity": "Hawaii",
+      "status": "succeeded",
+      "tags": [
+        "vacation",
+        "organization"
+      ],
+      "notes": "User asking about previous grouping operation"
+    },
+    {
+      "query": "What happened when you tried to clean up the Johnson Wedding duplicates?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": "Johnson Wedding",
+      "status": "recovered",
+      "tags": [
+        "wedding",
+        "duplicates"
+      ],
+      "notes": "User inquiring about recovery from network error"
+    },
+    {
+      "query": "What did I do with my Paris vacation photos?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "entity": "Paris",
+      "status": "succeeded"
+    },
+    {
+      "query": "How did I handle duplicates from the wedding shoot?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": "Johnson Wedding",
+      "status": "recovered"
+    },
+    {
+      "query": "How did you organize my vacation pictures from Hawaii?",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "entity": "Hawaii",
+      "status": "succeeded"
+    },
+    {
+      "query": "Show me what you did with the duplicate wedding photos",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": "Johnson Wedding",
+      "status": "recovered"
+    },
+    {
+      "query": "How did I organize my vacation pictures from Paris?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "entity": "Paris",
+      "status": "succeeded",
+      "tags": [
+        "travel",
+        "album"
+      ],
+      "notes": "Looking for album creation workflow"
+    },
+    {
+      "query": "What happened when I tried to clean up duplicates from the Yosemite shoot?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": "Yosemite",
+      "status": "recovered",
+      "tags": [
+        "duplicates",
+        "recovery"
+      ],
+      "notes": "Interested in error recovery process"
+    }
+  ],
+  "episodes": []
+}

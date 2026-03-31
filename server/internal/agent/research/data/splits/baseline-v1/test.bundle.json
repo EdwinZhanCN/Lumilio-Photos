@@ -1,0 +1,280 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera metadata for photos taken with Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Successfully inspected metadata for Sony camera photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "camera_model": "Sony A7III"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 156 assets taken with Sony A7III",
+          "input": {
+            "camera_model": "Sony A7III"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 156 Sony A7III assets",
+          "input": {
+            "asset_count": 156
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Show me the camera settings for all photos taken with my Sony A7III",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for photos taken with Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for Sony A7III photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata",
+        "analysis"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "camera_model": "Sony A7III"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 42 assets taken with Sony A7III",
+          "input": {
+            "camera_model": "Sony A7III"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated report showing aperture, shutter speed, and ISO settings",
+          "input": {
+            "metadata_fields": [
+              "aperture",
+              "shutter_speed",
+              "iso"
+            ]
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "analysis_purpose",
+          "text": "Checking for consistent camera settings across shoot",
+          "weight": 0.7
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for photos taken with Sony A7IV",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for Sony A7IV photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "technical"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV",
+          "role": "target_camera"
+        }
+      ],
+      "metadata": {
+        "time_window": "2024-07-01 to 2024-07-31"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 89 assets captured with Sony A7IV",
+          "input": {
+            "camera_model": "Sony A7IV"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated detailed metadata report for 89 Sony A7IV photos"
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_preference",
+          "text": "User is learning photography and wants to analyze camera settings",
+          "weight": 0.8
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera metadata for photos taken with Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Inspected metadata for Sony A7III photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 32 assets with camera model Sony A7III",
+          "input": {
+            "camera_model": "Sony A7III"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report for 32 Sony A7III assets",
+          "input": {
+            "asset_ids": [
+              "sony_1",
+              "sony_2",
+              "sony_3"
+            ]
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        }
+      ]
+    },
+    {
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for all photos taken with Sony A7III",
+      "intent": "inspect_metadata",
+      "summary": "Generated metadata report for 62 Sony A7III photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "metadata_analysis",
+      "tags": [
+        "camera",
+        "metadata",
+        "technical"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "camera_used"
+        }
+      ],
+      "metadata": {
+        "camera_model": "Sony A7III"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 62 assets taken with Sony A7III",
+          "input": {
+            "camera_model": "Sony A7III"
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Generated metadata report showing aperture, shutter speed, ISO settings",
+          "input": {
+            "asset_count": 62
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "photographer_need",
+          "text": "Photographer wants to review camera settings for consistency",
+          "weight": 0.9
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query": "Show me what camera settings I used most often with my Sony during that shoot",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Sony A7III",
+      "status": "succeeded",
+      "tags": [
+        "technical",
+        "analysis"
+      ],
+      "notes": "Paraphrase of metadata inspection goal"
+    },
+    {
+      "query": "Show me camera details for everything I shot with my Sony A7III",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Sony A7III",
+      "status": "succeeded",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "notes": "Paraphrase of metadata inspection goal"
+    }
+  ]
+}
