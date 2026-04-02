@@ -1,0 +1,890 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "episode_id": "ep_group_assets_for_review_family_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group family reunion photos by person for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 60 family reunion photos into 8 person groups",
+          "input": {
+            "location": "Family Reunion",
+            "group_by": "person",
+            "time_window": "2023-12-25 to 2023-12-26"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Family Reunion"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_events_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group event photos by date for quarterly review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 150 event photos into 12 date groups",
+          "input": {
+            "group_by": "date",
+            "time_window": "2024-Q1"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "time_window",
+          "name": "2024-Q1"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_family_001_018",
+      "scenario": "group_assets_for_review",
+      "goal": "Group family reunion photos by camera model for review",
+      "intent": "group_assets",
+      "summary": "Grouped family photos by Sony A7III and iPhone 14",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "family_archive",
+      "route": "asset_grouping",
+      "tags": [
+        "family",
+        "grouping",
+        "review"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III",
+          "role": "group_criteria"
+        },
+        {
+          "type": "camera_model",
+          "name": "iPhone 14",
+          "role": "group_criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-05-20_2023-05-20"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 150 photos into Sony A7III (85) and iPhone 14 (65) groups",
+          "input": {
+            "album": "Family Reunion 2023",
+            "group_by": "camera_model"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_wildlife_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group wildlife photos by species for review",
+      "intent": "group_assets",
+      "summary": "Grouped wildlife photos into lion, elephant, and zebra groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "wildlife_photography",
+      "route": "asset_grouping",
+      "tags": [
+        "wildlife",
+        "grouping",
+        "species"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "African Wildlife 2023",
+          "role": "subject"
+        },
+        {
+          "type": "entity",
+          "name": "lion",
+          "role": "group_criteria"
+        },
+        {
+          "type": "entity",
+          "name": "elephant",
+          "role": "group_criteria"
+        },
+        {
+          "type": "entity",
+          "name": "zebra",
+          "role": "group_criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-08-05_2023-08-15"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 200 photos into lion (80), elephant (70), zebra (50)",
+          "input": {
+            "album": "African Wildlife 2023",
+            "group_by": "subject"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_beach_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group beach vacation photos by date for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 5 groups by date for Maui beach photos",
+          "input": {
+            "location": "Maui",
+            "group_by": "date"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_wildlife_001_036",
+      "scenario": "group_assets_for_review",
+      "goal": "Group wildlife photos by camera model",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 3 groups by camera model for Serengeti photos",
+          "input": {
+            "location": "Serengeti",
+            "group_by": "camera_model"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Serengeti"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_sony_a7iv_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group Sony A7IV photos by date for review",
+      "intent": "group_assets",
+      "summary": "Grouped Sony A7IV photos into date-based groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "asset_grouping",
+      "tags": [
+        "grouping",
+        "camera",
+        "Sony"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-10-01_2023-10-31"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 5 date-based groups",
+          "input": {
+            "camera_model": "Sony A7IV",
+            "group_by": "date"
+          },
+          "payload": {
+            "groups_created": 5
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_fujifilm_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group Fujifilm X-T5 street photos by location",
+      "intent": "group_assets",
+      "summary": "Grouped Fujifilm photos by neighborhood",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "asset_grouping",
+      "tags": [
+        "grouping",
+        "camera",
+        "street"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Fujifilm X-T5",
+          "role": "subject"
+        },
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "context"
+        }
+      ],
+      "metadata": {
+        "time_window": "2024-07-01_2024-07-07"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 8 location-based groups",
+          "input": {
+            "camera_model": "Fujifilm X-T5",
+            "group_by": "location"
+          },
+          "payload": {
+            "groups_created": 8
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_family_001_054",
+      "scenario": "group_assets_for_review",
+      "goal": "Group family reunion photos by person for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 145 family reunion photos into 8 groups by detected person",
+          "input": {
+            "album": "Family Reunion 2023",
+            "group_by": "person"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_event_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group conference event photos by session for team review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 189 conference photos into 12 groups by session name",
+          "input": {
+            "album": "Tech Conference 2024",
+            "group_by": "session"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Tech Conference 2024"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_sports_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group basketball game photos by quarter for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 120 assets into 4 quarters based on timestamp",
+          "input": {
+            "album": "Basketball Finals",
+            "group_by": "time_quarter"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Basketball Finals"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_concert_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group concert photos by performer for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 150 concert assets into 3 performer groups",
+          "input": {
+            "album": "Summer Concert",
+            "group_by": "performer"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Summer Concert"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_sports_006",
+      "scenario": "group_assets_for_review",
+      "goal": "Group sports event photos by camera model for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        },
+        {
+          "type": "camera_model",
+          "name": "Nikon Z6"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 89 sports photos by camera model"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_wildlife_012",
+      "scenario": "group_assets_for_review",
+      "goal": "Group wildlife photos by location for editing",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Serengeti"
+        },
+        {
+          "type": "location",
+          "name": "Amazon"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 124 wildlife photos by location"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_safari_006",
+      "scenario": "group_assets_for_review",
+      "goal": "Group safari photos by date for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 156 safari photos into 5 date-based groups"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Serengeti"
+        },
+        {
+          "type": "time_window",
+          "name": "by_date"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_graduation_012",
+      "scenario": "group_assets_for_review",
+      "goal": "Group graduation photos by event segment",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 104 graduation photos into 3 event segments"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Graduation 2023"
+        },
+        {
+          "type": "time_window",
+          "name": "by_event"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_family_006",
+      "scenario": "group_assets_for_review",
+      "goal": "Group family reunion photos by date for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 150 family reunion assets into 3 date-based groups"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023"
+        },
+        {
+          "type": "time_window",
+          "name": "by_date"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_concert_012",
+      "scenario": "group_assets_for_review",
+      "goal": "Group concert photos by performer for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 120 concert assets into 4 performer-based groups"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Summer Concert Series"
+        },
+        {
+          "type": "time_window",
+          "name": "by_performer"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_family_001_114",
+      "scenario": "group_assets_for_review",
+      "goal": "Group family reunion photos by time windows",
+      "intent": "group_assets",
+      "summary": "Grouped family photos into morning and afternoon sets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2024"
+        },
+        {
+          "type": "time_window",
+          "name": "morning_afternoon"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 2 groups: morning (42 photos) and afternoon (38 photos)"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_vacation_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group vacation photos by location for review",
+      "intent": "group_assets",
+      "summary": "Failed to group due to missing location data, then recovered",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "entities": [
+        {
+          "type": "album",
+          "name": "European Vacation"
+        },
+        {
+          "type": "failure_mode",
+          "name": "missing_metadata"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "error",
+          "output_summary": "Failed to group by location",
+          "error": {
+            "code": "METADATA_MISSING",
+            "message": "Location metadata not available for grouping"
+          },
+          "fix_summary": "Used date-based grouping instead"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 5 groups by date ranges"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_portraits_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group portrait photos by lighting condition for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 60 portrait assets into 3 lighting categories: natural, studio, mixed"
+        }
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_sony_a7iv_001_138",
+      "scenario": "group_assets_for_review",
+      "goal": "Group Sony A7IV photos by date for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV"
+        },
+        {
+          "type": "time_window",
+          "name": "last_week"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 67 Sony A7IV photos into 5 date-based groups"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_nikon_z9_001",
+      "scenario": "group_assets_for_review",
+      "goal": "Group Nikon Z9 wildlife photos by location",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Nikon Z9"
+        },
+        {
+          "type": "time_window",
+          "name": "last_month"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 94 Nikon Z9 photos into 3 location-based groups"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_family_006_150",
+      "scenario": "group_assets_for_review",
+      "goal": "Group family reunion photos by date for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 60 family reunion photos into 3 date-based groups"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023"
+        },
+        {
+          "type": "time_window",
+          "name": "by_date"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_concert_012_156",
+      "scenario": "group_assets_for_review",
+      "goal": "Group concert photos by performer for review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 50 concert photos into 4 performer-based groups"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Summer Concert Series"
+        },
+        {
+          "type": "time_window",
+          "name": "by_performer"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_family_001_162",
+      "scenario": "group_assets_for_review",
+      "goal": "Group family reunion photos by camera model for review",
+      "intent": "group_assets",
+      "summary": "Grouped family photos by camera model",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 150 family reunion photos into 3 camera model groups"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_wildlife_001_168",
+      "scenario": "group_assets_for_review",
+      "goal": "Group wildlife photos by location for review",
+      "intent": "group_assets",
+      "summary": "Grouped wildlife photos by location",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 120 wildlife photos into 4 location groups"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Wildlife Photography"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_family_001_174",
+      "scenario": "group_assets_for_review",
+      "goal": "Group family reunion photos by camera model for review",
+      "intent": "group_assets",
+      "summary": "Grouped family photos by Sony A7III and iPhone 15",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 2 groups: Sony A7III (65 photos), iPhone 15 (48 photos)",
+          "input": {
+            "group_by": "camera_model",
+            "album": "Family Reunion 2023"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        },
+        {
+          "type": "camera_model",
+          "name": "iPhone 15"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_group_assets_for_review_vacation_001_180",
+      "scenario": "group_assets_for_review",
+      "goal": "Group Hawaii vacation photos by date for review",
+      "intent": "group_assets",
+      "summary": "Grouped Hawaii photos into 5 date groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Created 5 groups by date for Hawaii vacation photos",
+          "input": {
+            "group_by": "date",
+            "album": "Hawaii Vacation"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Hawaii Vacation"
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query": "Show me how you organized the family reunion pictures by date",
+      "target_episode_ids": [
+        "ep_ep_group_assets_for_review_family_001_018"
+      ],
+      "entity": "Family Reunion 2023",
+      "status": "succeeded",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets"
+    },
+    {
+      "query": "Show me how you organized the family reunion photos by date for review.",
+      "target_episode_ids": [
+        "ep_ep_group_assets_for_review_family_001_018"
+      ],
+      "entity": "Family Reunion 2023",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets"
+    }
+  ]
+}

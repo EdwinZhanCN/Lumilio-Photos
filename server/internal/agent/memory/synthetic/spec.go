@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"server/internal/agent/core"
 	"server/internal/agent/memory"
@@ -23,6 +25,8 @@ type SpecBundle struct {
 const SpecSchemaVersion = "agent-memory/episode-spec-bundle/v1"
 
 type EpisodeSpec struct {
+	EpisodeID    string                `json:"episode_id"`
+	ClusterID    string                `json:"cluster_id"`
 	Scenario     string                `json:"scenario"`
 	Goal         string                `json:"goal"`
 	Intent       string                `json:"intent"`
@@ -51,26 +55,32 @@ type EpisodeStepSpec struct {
 }
 
 type QuerySpec struct {
-	Query          string               `json:"query"`
-	TargetScenario string               `json:"target_scenario,omitempty"`
-	TargetIntent   string               `json:"target_intent,omitempty"`
-	Entity         string               `json:"entity,omitempty"`
-	Status         memory.EpisodeStatus `json:"status,omitempty"`
-	Tags           []string             `json:"tags,omitempty"`
-	Notes          string               `json:"notes,omitempty"`
+	Query            string               `json:"query"`
+	TargetScenario   string               `json:"target_scenario,omitempty"`
+	TargetIntent     string               `json:"target_intent,omitempty"`
+	TargetEpisodeIDs []string             `json:"target_episode_ids"`
+	Entity           string               `json:"entity,omitempty"`
+	Status           memory.EpisodeStatus `json:"status,omitempty"`
+	Tags             []string             `json:"tags,omitempty"`
+	Notes            string               `json:"notes,omitempty"`
 }
 
 func (bundle SpecBundle) Validate() error {
 	if strings.TrimSpace(bundle.SchemaVersion) == "" {
 		return fmt.Errorf("schema_version is required")
 	}
+	episodeIDs := make(map[string]struct{}, len(bundle.Episodes))
 	for index, episode := range bundle.Episodes {
 		if err := episode.Validate(); err != nil {
 			return fmt.Errorf("episodes[%d]: %w", index, err)
 		}
+		if _, exists := episodeIDs[episode.EpisodeID]; exists {
+			return fmt.Errorf("episodes[%d]: duplicate episode_id %q", index, episode.EpisodeID)
+		}
+		episodeIDs[episode.EpisodeID] = struct{}{}
 	}
 	for index, query := range bundle.Queries {
-		if err := query.Validate(); err != nil {
+		if err := query.Validate(episodeIDs); err != nil {
 			return fmt.Errorf("queries[%d]: %w", index, err)
 		}
 	}
@@ -87,6 +97,7 @@ func LoadSpecBundle(path string) (SpecBundle, error) {
 	if err := json.Unmarshal(raw, &bundle); err != nil {
 		return SpecBundle{}, err
 	}
+	normalizeSpecBundle(&bundle)
 	if err := bundle.Validate(); err != nil {
 		return SpecBundle{}, err
 	}
@@ -94,6 +105,12 @@ func LoadSpecBundle(path string) (SpecBundle, error) {
 }
 
 func (spec EpisodeSpec) Validate() error {
+	if strings.TrimSpace(spec.EpisodeID) == "" {
+		return fmt.Errorf("episode_id is required")
+	}
+	if strings.TrimSpace(spec.ClusterID) == "" {
+		return fmt.Errorf("cluster_id is required")
+	}
 	if strings.TrimSpace(spec.Scenario) == "" {
 		return fmt.Errorf("scenario is required")
 	}
@@ -114,11 +131,233 @@ func (spec EpisodeSpec) Validate() error {
 	return nil
 }
 
-func (spec QuerySpec) Validate() error {
+func (spec QuerySpec) Validate(episodeIDs map[string]struct{}) error {
 	if strings.TrimSpace(spec.Query) == "" {
 		return fmt.Errorf("query is required")
 	}
+	if len(spec.TargetEpisodeIDs) == 0 {
+		return fmt.Errorf("target_episode_ids is required")
+	}
+	for index, targetEpisodeID := range spec.TargetEpisodeIDs {
+		trimmed := strings.TrimSpace(targetEpisodeID)
+		if trimmed == "" {
+			return fmt.Errorf("target_episode_ids[%d] is required", index)
+		}
+		if _, exists := episodeIDs[trimmed]; !exists {
+			return fmt.Errorf("target_episode_ids[%d]=%q does not match any episode_id", index, trimmed)
+		}
+	}
 	return nil
+}
+
+func normalizeSpecBundle(bundle *SpecBundle) {
+	ensureEpisodeIDs(bundle)
+	ensureClusterIDs(bundle)
+	ensureQueryTargetEpisodeIDs(bundle)
+}
+
+func ensureEpisodeIDs(bundle *SpecBundle) {
+	usedIDs := make(map[string]struct{}, len(bundle.Episodes))
+	for index := range bundle.Episodes {
+		episodeID := strings.TrimSpace(bundle.Episodes[index].EpisodeID)
+		if episodeID == "" {
+			episodeID = makeEpisodeID(bundle.Episodes[index].Scenario, index+1, usedIDs)
+			bundle.Episodes[index].EpisodeID = episodeID
+		}
+		if _, exists := usedIDs[episodeID]; exists {
+			episodeID = makeEpisodeID(episodeID, index+1, usedIDs)
+			bundle.Episodes[index].EpisodeID = episodeID
+		}
+		usedIDs[episodeID] = struct{}{}
+	}
+}
+
+func ensureClusterIDs(bundle *SpecBundle) {
+	for index := range bundle.Episodes {
+		clusterID := strings.TrimSpace(bundle.Episodes[index].ClusterID)
+		if clusterID != "" {
+			bundle.Episodes[index].ClusterID = clusterID
+			continue
+		}
+		bundle.Episodes[index].ClusterID = deriveClusterID(bundle.Episodes[index], index+1)
+	}
+}
+
+func ensureQueryTargetEpisodeIDs(bundle *SpecBundle) {
+	episodeByID := make(map[string]EpisodeSpec, len(bundle.Episodes))
+	for _, episode := range bundle.Episodes {
+		episodeByID[episode.EpisodeID] = episode
+	}
+
+	for index := range bundle.Queries {
+		query := &bundle.Queries[index]
+		if len(query.TargetEpisodeIDs) == 0 {
+			query.TargetEpisodeIDs = resolveQueryTargetEpisodeIDs(*query, bundle.Episodes)
+		}
+		if len(query.TargetEpisodeIDs) == 0 {
+			continue
+		}
+		targetEpisode, exists := episodeByID[query.TargetEpisodeIDs[0]]
+		if !exists {
+			continue
+		}
+		if strings.TrimSpace(query.TargetScenario) == "" {
+			query.TargetScenario = targetEpisode.Scenario
+		}
+		if strings.TrimSpace(query.TargetIntent) == "" {
+			query.TargetIntent = targetEpisode.Intent
+		}
+	}
+}
+
+func resolveQueryTargetEpisodeIDs(query QuerySpec, episodes []EpisodeSpec) []string {
+	type candidate struct {
+		score     int
+		episodeID string
+	}
+
+	queryTags := make(map[string]struct{}, len(query.Tags))
+	for _, tag := range query.Tags {
+		tag = strings.TrimSpace(tag)
+		if tag != "" {
+			queryTags[tag] = struct{}{}
+		}
+	}
+
+	candidates := make([]candidate, 0, len(episodes))
+	for _, episode := range episodes {
+		if strings.TrimSpace(query.TargetScenario) != "" && episode.Scenario != query.TargetScenario {
+			continue
+		}
+		if strings.TrimSpace(query.TargetIntent) != "" && episode.Intent != query.TargetIntent {
+			continue
+		}
+
+		score := 0
+		if query.Status != "" && episode.Status == query.Status {
+			score += 3
+		}
+		if query.Entity != "" && episodeMatchesEntity(episode, query.Entity) {
+			score += 5
+		}
+		for _, tag := range episode.Tags {
+			if _, exists := queryTags[strings.TrimSpace(tag)]; exists {
+				score++
+			}
+		}
+		candidates = append(candidates, candidate{
+			score:     score,
+			episodeID: episode.EpisodeID,
+		})
+	}
+
+	if len(candidates) == 0 {
+		return nil
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].score != candidates[j].score {
+			return candidates[i].score > candidates[j].score
+		}
+		return candidates[i].episodeID < candidates[j].episodeID
+	})
+	return []string{candidates[0].episodeID}
+}
+
+func deriveClusterID(spec EpisodeSpec, index int) string {
+	scenarioSlug := slugifyToken(spec.Scenario)
+	episodeID := strings.TrimPrefix(strings.TrimSpace(spec.EpisodeID), "ep_")
+	if scenarioSlug != "" && episodeID != "" {
+		marker := scenarioSlug + "_c"
+		if start := strings.Index(episodeID, marker); start >= 0 {
+			clusterID := consumeClusterSlug(episodeID[start:])
+			if clusterID != "" {
+				return clusterID
+			}
+		}
+	}
+	if scenarioSlug == "" {
+		scenarioSlug = "episode"
+	}
+	return fmt.Sprintf("%s_singleton_%03d", scenarioSlug, index)
+}
+
+func consumeClusterSlug(value string) string {
+	parts := strings.Split(value, "_")
+	if len(parts) == 0 {
+		return ""
+	}
+	clusterParts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		clusterParts = append(clusterParts, part)
+		if isClusterCounterToken(part) {
+			return strings.Join(clusterParts, "_")
+		}
+	}
+	return ""
+}
+
+func isClusterCounterToken(value string) bool {
+	if len(value) < 2 || value[0] != 'c' {
+		return false
+	}
+	for _, r := range value[1:] {
+		if !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func episodeMatchesEntity(episode EpisodeSpec, entity string) bool {
+	for _, ref := range episode.Entities {
+		if strings.TrimSpace(ref.Name) == entity {
+			return true
+		}
+	}
+	for _, value := range episode.Metadata {
+		if strings.TrimSpace(value) == entity {
+			return true
+		}
+	}
+	return strings.Contains(episode.Goal, entity) || strings.Contains(episode.Summary, entity)
+}
+
+func makeEpisodeID(seed string, index int, usedIDs map[string]struct{}) string {
+	base := slugifyToken(seed)
+	if base == "" {
+		base = "episode"
+	}
+	candidate := fmt.Sprintf("ep_%s_%03d", base, index)
+	suffix := index
+	for {
+		if _, exists := usedIDs[candidate]; !exists {
+			return candidate
+		}
+		suffix++
+		candidate = fmt.Sprintf("ep_%s_%03d", base, suffix)
+	}
+}
+
+func slugifyToken(value string) string {
+	var builder strings.Builder
+	previousWasSep := false
+	for _, r := range strings.ToLower(value) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			builder.WriteRune(r)
+			previousWasSep = false
+			continue
+		}
+		if previousWasSep {
+			continue
+		}
+		builder.WriteRune('_')
+		previousWasSep = true
+	}
+	return strings.Trim(builder.String(), "_")
 }
 
 func (step EpisodeStepSpec) Validate() error {
@@ -156,6 +395,8 @@ func ExampleSpecBundle() SpecBundle {
 		SchemaVersion: SpecSchemaVersion,
 		Episodes: []EpisodeSpec{
 			{
+				EpisodeID:    "ep_curate_trip_album_tokyo_001",
+				ClusterID:    "curate_trip_album_c01",
 				Scenario:     "curate_trip_album",
 				Goal:         "find Tokyo trip photos from spring 2024, group them by date, and build an album",
 				Intent:       "curate_album",
@@ -179,6 +420,8 @@ func ExampleSpecBundle() SpecBundle {
 				},
 			},
 			{
+				EpisodeID:    "ep_cleanup_duplicates_yosemite_001",
+				ClusterID:    "duplicate_cleanup_recovery_c01",
 				Scenario:     "duplicate_cleanup_recovery",
 				Goal:         "remove duplicate burst shots while keeping the best photo in each duplicate group",
 				Intent:       "cleanup_duplicates",
@@ -203,18 +446,20 @@ func ExampleSpecBundle() SpecBundle {
 		},
 		Queries: []QuerySpec{
 			{
-				Query:          "How did I organize my Tokyo spring trip photos into an album last time?",
-				TargetScenario: "curate_trip_album",
-				TargetIntent:   "curate_album",
-				Entity:         "Tokyo",
-				Tags:           []string{"travel", "album"},
+				Query:            "How did I organize my Tokyo spring trip photos into an album last time?",
+				TargetScenario:   "curate_trip_album",
+				TargetIntent:     "curate_album",
+				TargetEpisodeIDs: []string{"ep_curate_trip_album_tokyo_001"},
+				Entity:           "Tokyo",
+				Tags:             []string{"travel", "album"},
 			},
 			{
-				Query:          "What fix worked for duplicate burst shots that were falsely grouped together?",
-				TargetScenario: "duplicate_cleanup_recovery",
-				TargetIntent:   "cleanup_duplicates",
-				Status:         memory.EpisodeStatusRecovered,
-				Tags:           []string{"duplicates", "recovered"},
+				Query:            "What fix worked for duplicate burst shots that were falsely grouped together?",
+				TargetScenario:   "duplicate_cleanup_recovery",
+				TargetIntent:     "cleanup_duplicates",
+				TargetEpisodeIDs: []string{"ep_cleanup_duplicates_yosemite_001"},
+				Status:           memory.EpisodeStatusRecovered,
+				Tags:             []string{"duplicates", "recovered"},
 			},
 		},
 	}
@@ -235,6 +480,12 @@ func compileEpisodeSpec(rng *rand.Rand, spec EpisodeSpec, threadID, userID strin
 	toolNames := make([]string, 0, len(spec.Steps))
 	cursor := startedAt
 	metadataPayload := metadataToAnyMap(spec.Metadata)
+	if strings.TrimSpace(spec.ClusterID) != "" {
+		if metadataPayload == nil {
+			metadataPayload = make(map[string]any, 1)
+		}
+		metadataPayload["cluster_id"] = spec.ClusterID
+	}
 
 	for index, step := range spec.Steps {
 		stepStatus := step.Status
@@ -319,7 +570,7 @@ func compileEpisodeSpec(rng *rand.Rand, spec EpisodeSpec, threadID, userID strin
 	}
 
 	episode := memory.Episode{
-		ID:            uuid.NewString(),
+		ID:            spec.EpisodeID,
 		ThreadID:      threadID,
 		UserID:        userID,
 		AgentName:     firstNonEmpty(spec.AgentName, "Mock Media Memory Agent"),
@@ -339,6 +590,12 @@ func compileEpisodeSpec(rng *rand.Rand, spec EpisodeSpec, threadID, userID strin
 		ToolTrace:     steps,
 		ContextBlocks: contextBlocks,
 		Metadata:      cloneStringMap(spec.Metadata),
+	}
+	if strings.TrimSpace(spec.ClusterID) != "" {
+		if episode.Metadata == nil {
+			episode.Metadata = make(map[string]string, 1)
+		}
+		episode.Metadata["cluster_id"] = spec.ClusterID
 	}
 	episode.RetrievalText = episode.BuildRetrievalText()
 	return episode

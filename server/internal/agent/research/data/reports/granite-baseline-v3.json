@@ -1,0 +1,1783 @@
+{
+  "schema_version": "agent-memory/retrieval-benchmark-report/v1",
+  "created_at": "2026-03-31T04:47:20.967582+00:00",
+  "input_bundle": "data/splits/baseline-v3/test.bundle.json",
+  "collection": "agent_episodic_memory_granite_v3_768",
+  "embedder": {
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "model": "granite-embedding:278m",
+    "dimensions": 768
+  },
+  "limit": 10,
+  "ks": [
+    1,
+    5,
+    10
+  ],
+  "query_count": 28,
+  "filters_enabled": true,
+  "metrics": {
+    "recall": {
+      "recall@1": 0.214286,
+      "recall@5": 0.821429,
+      "recall@10": 0.928571
+    },
+    "mrr": {
+      "mrr@10": 0.47381
+    }
+  },
+  "latency_ms": {
+    "embed": {
+      "p50": 86.722,
+      "p95": 96.617,
+      "mean": 87.566
+    },
+    "search": {
+      "p50": 5.037,
+      "p95": 10.629,
+      "mean": 7.537
+    },
+    "end_to_end": {
+      "p50": 91.831,
+      "p95": 101.814,
+      "mean": 95.105
+    }
+  },
+  "per_query": [
+    {
+      "query": "What happened when checking camera details for the Yosemite photos?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 3,
+      "embed_ms": 125.623,
+      "search_ms": 68.346,
+      "end_to_end_ms": 193.971,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.82603973,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.8207923,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.8190971,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.7929224,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.7923725,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.7923725,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.7923725,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "What was done with low-rated wedding photos?",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_wedding_001"
+      ],
+      "rank": 1,
+      "embed_ms": 86.84,
+      "search_ms": 6.648,
+      "end_to_end_ms": 93.491,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7954627,
+          "episode_id": "ep_archive_low_rated_assets_wedding_001",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archive low-rated photos from Johnson Wedding. Tool flow: mock_filter_assets -> mock_bulk_archive_assets."
+        },
+        {
+          "rank": 2,
+          "score": 0.78887093,
+          "episode_id": "ep_ep_archive_low_rated_assets_wedding_001_125",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archive poorly rated photos from Johnson Wedding. Tool flow: mock_bulk_archive_assets."
+        }
+      ]
+    },
+    {
+      "query": "Show me when I examined camera details for my mountain photos",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_sony_a7iv_001_021"
+      ],
+      "rank": 1,
+      "embed_ms": 87.991,
+      "search_ms": 4.162,
+      "end_to_end_ms": 92.155,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7563346,
+          "episode_id": "ep_ep_inspect_camera_metadata_sony_a7iv_001_021",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected Sony A7IV metadata for Rocky Mountains photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.74830467,
+          "episode_id": "ep_ep_inspect_camera_metadata_sony_a7iv_001_116",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected Sony A7IV metadata from mountain trip"
+        },
+        {
+          "rank": 3,
+          "score": 0.6599035,
+          "episode_id": "ep_archive_low_rated_assets_rockies_005",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archive photos rated below 3 stars from Rockies trip. Tool flow: mock_filter_assets -> mock_bulk_archive_assets."
+        }
+      ]
+    },
+    {
+      "query": "What happened when checking camera details for Paris photos?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_025"
+      ],
+      "rank": 6,
+      "embed_ms": 87.526,
+      "search_ms": 10.629,
+      "end_to_end_ms": 98.158,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.83440226,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_037",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 2,
+          "score": 0.8288163,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_145",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 3,
+          "score": 0.8288163,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_097",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 4,
+          "score": 0.82376057,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_109",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 5,
+          "score": 0.81771743,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_169",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 6,
+          "score": 0.8169142,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_025",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.804936,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_133",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 8,
+          "score": 0.804936,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_121",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "Tell me about inspecting camera metadata for different models",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 2,
+      "embed_ms": 85.966,
+      "search_ms": 7.721,
+      "end_to_end_ms": 93.69,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7581991,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_025",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.74983585,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.7495296,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 4,
+          "score": 0.7495296,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.7495296,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.74920326,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.7460879,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 8,
+          "score": 0.7451654,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_121",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 9,
+          "score": 0.7451654,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_133",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 10,
+          "score": 0.74262476,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_109",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Paris"
+        }
+      ]
+    },
+    {
+      "query": "What happened when checking camera details for the Yosemite photos?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 3,
+      "embed_ms": 92.209,
+      "search_ms": 6.068,
+      "end_to_end_ms": 98.28,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.82603973,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.8207923,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.8190971,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.7929224,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.7923725,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.7923725,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.7923725,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "What camera settings were used for the Yosemite photos taken with my Canon?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 2,
+      "embed_ms": 84.111,
+      "search_ms": 4.862,
+      "end_to_end_ms": 88.975,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8144826,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.7775233,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.7756678,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.7416662,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.7395667,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.7395667,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.7395667,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "What happened when checking camera details for New York photos?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_inspect_camera_metadata_nikon_z9_001"
+      ],
+      "rank": 1,
+      "embed_ms": 87.512,
+      "search_ms": 4.318,
+      "end_to_end_ms": 91.832,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8255025,
+          "episode_id": "ep_inspect_camera_metadata_nikon_z9_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check Nikon Z9 metadata for New York photos. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.7994363,
+          "episode_id": "ep_inspect_camera_metadata_sony_a7iv_011",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspect Sony A7IV metadata for New York photos. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "What happened when checking camera details from the Yosemite trip?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 3,
+      "embed_ms": 90.254,
+      "search_ms": 7.177,
+      "end_to_end_ms": 97.434,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8294922,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.81659144,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.8138851,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.7944287,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.79388875,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.79388875,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.79388875,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "What camera settings were used for my Paris photos?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_025"
+      ],
+      "rank": 6,
+      "embed_ms": 88.914,
+      "search_ms": 5.234,
+      "end_to_end_ms": 94.15,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8090509,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_097",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.8090509,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_145",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 3,
+          "score": 0.8065424,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_037",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 4,
+          "score": 0.76193154,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_109",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 5,
+          "score": 0.7544968,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_169",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 6,
+          "score": 0.7521223,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_025",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.7385685,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_133",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 8,
+          "score": 0.7385685,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_121",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "What did we find when checking the camera details for our Paris photos?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_025"
+      ],
+      "rank": 5,
+      "embed_ms": 80.977,
+      "search_ms": 5.46,
+      "end_to_end_ms": 86.44,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8257747,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_037",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 2,
+          "score": 0.8224106,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_097",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 3,
+          "score": 0.8224106,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_145",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 4,
+          "score": 0.81471556,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_109",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 5,
+          "score": 0.81119806,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_025",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.80925393,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_169",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 7,
+          "score": 0.8006579,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_133",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 8,
+          "score": 0.8006579,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_121",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "What happened when I tried to check camera settings for my safari photos?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_nikon_z9_001_129"
+      ],
+      "rank": 1,
+      "embed_ms": 87.23,
+      "search_ms": 4.598,
+      "end_to_end_ms": 91.831,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.79122734,
+          "episode_id": "ep_ep_inspect_camera_metadata_nikon_z9_001_129",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Nikon Z9 wildlife photos from safari. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.72789866,
+          "episode_id": "ep_archive_low_rated_assets_safari_001",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Archived 40 low-rated Safari photos"
+        }
+      ]
+    },
+    {
+      "query": "What happened when checking camera details from the Paris trip?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_025"
+      ],
+      "rank": 5,
+      "embed_ms": 88.303,
+      "search_ms": 4.463,
+      "end_to_end_ms": 92.768,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.82870805,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_145",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.82870805,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_097",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 3,
+          "score": 0.8273127,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_037",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 4,
+          "score": 0.81677943,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_109",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 5,
+          "score": 0.81563985,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_025",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.8090135,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_169",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 7,
+          "score": 0.80018985,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_133",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 8,
+          "score": 0.80018985,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_121",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "What camera settings were used for photos taken in Paris with the Canon R5?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_025"
+      ],
+      "rank": 6,
+      "embed_ms": 84.782,
+      "search_ms": 5.494,
+      "end_to_end_ms": 90.279,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8836539,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_037",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 2,
+          "score": 0.87812215,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_145",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 3,
+          "score": 0.87812215,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_097",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 4,
+          "score": 0.8414091,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_109",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 5,
+          "score": 0.8345515,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_169",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        },
+        {
+          "rank": 6,
+          "score": 0.82761985,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_025",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.81502616,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_133",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 8,
+          "score": 0.81502616,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_121",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "Show me instances where I inspected camera metadata from different locations",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 1,
+      "embed_ms": 83.312,
+      "search_ms": 5.145,
+      "end_to_end_ms": 88.46,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7032671,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 2,
+          "score": 0.70153594,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 3,
+          "score": 0.70153594,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 4,
+          "score": 0.70153594,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.70111865,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.7001083,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 7,
+          "score": 0.69942856,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "How did I handle checking camera details for my safari shots?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_nikon_z9_001_179"
+      ],
+      "rank": 1,
+      "embed_ms": 85.346,
+      "search_ms": 4.341,
+      "end_to_end_ms": 89.689,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.77493674,
+          "episode_id": "ep_ep_inspect_camera_metadata_nikon_z9_001_179",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Nikon Z9 safari photos"
+        }
+      ]
+    },
+    {
+      "query": "What camera settings were used for the Yosemite photos from October?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 2,
+      "embed_ms": 95.186,
+      "search_ms": 5.037,
+      "end_to_end_ms": 100.226,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7836542,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.74870646,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.74837655,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.7142406,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.71302605,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.71302605,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.71302605,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "Show me the EXIF data analysis for Canon R5 shots",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": null,
+      "embed_ms": 89.522,
+      "search_ms": 4.553,
+      "end_to_end_ms": 94.077,
+      "results": []
+    },
+    {
+      "query": "How many photos did I take in Yosemite with specific aperture settings?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 3,
+      "embed_ms": 80.741,
+      "search_ms": 5.203,
+      "end_to_end_ms": 85.947,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7543174,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.7210083,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.71996874,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.6939973,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.6929213,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.6929213,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.6929213,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "Review the metadata inspection results from my fall trip",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": null,
+      "embed_ms": 85.965,
+      "search_ms": 4.044,
+      "end_to_end_ms": 90.012,
+      "results": []
+    },
+    {
+      "query": "What camera settings were used for the Yosemite photos from the Canon R5?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 2,
+      "embed_ms": 83.796,
+      "search_ms": 5.009,
+      "end_to_end_ms": 88.807,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8698351,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.83912563,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.8361702,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.8028492,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.7990354,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.7990354,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.7990354,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "Show me the metadata inspection results for the Canon R5 assets",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 5,
+      "embed_ms": 83.365,
+      "search_ms": 4.579,
+      "end_to_end_ms": 87.946,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.86415863,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.86391234,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 3,
+          "score": 0.86391234,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 4,
+          "score": 0.86391234,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.8566854,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 6,
+          "score": 0.85377043,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 7,
+          "score": 0.8513905,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_121",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 8,
+          "score": 0.8513905,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_133",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 9,
+          "score": 0.8458606,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_025",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera metadata for Canon R5 photos from Paris trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 10,
+          "score": 0.8456806,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_169",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected metadata for Canon R5 photos from Paris"
+        }
+      ]
+    },
+    {
+      "query": "How many photos from Yosemite were analyzed for their EXIF data?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 2,
+      "embed_ms": 80.601,
+      "search_ms": 4.114,
+      "end_to_end_ms": 84.718,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.74633014,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 2,
+          "score": 0.7430883,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.7271073,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 4,
+          "score": 0.7271073,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.7271073,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.7265853,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.7232001,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "Retrieve the aperture and ISO details from the Yosemite photo inspection",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 3,
+      "embed_ms": 86.722,
+      "search_ms": 4.821,
+      "end_to_end_ms": 91.545,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7309612,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.730053,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.7268925,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.71131635,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.71131635,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.71131635,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.71087533,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "What camera settings were used for the Yosemite photos taken with my Canon R5?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 2,
+      "embed_ms": 78.854,
+      "search_ms": 4.22,
+      "end_to_end_ms": 83.076,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8693497,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.83548194,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.83266556,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.79879236,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.79494226,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.79494226,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.79494226,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "Show me the EXIF data from the Canon R5 shoot in Yosemite National Park",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 2,
+      "embed_ms": 78.299,
+      "search_ms": 4.178,
+      "end_to_end_ms": 82.479,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.82857907,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 2,
+          "score": 0.82708323,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.8100153,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 4,
+          "score": 0.8072417,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.80544233,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.80544233,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.80544233,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "Which photos from Yosemite were captured with the Canon R5 and what were their settings?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 2,
+      "embed_ms": 85.294,
+      "search_ms": 5.405,
+      "end_to_end_ms": 90.701,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8673939,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 2,
+          "score": 0.85486734,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.8534142,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.823102,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.81997037,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.81997037,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.81997037,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    },
+    {
+      "query": "Review the metadata for my Canon R5 images from the Yosemite trip last fall",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "rank": 2,
+      "embed_ms": 96.617,
+      "search_ms": 5.195,
+      "end_to_end_ms": 101.814,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.92957443,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 2,
+          "score": 0.9293456,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Inspected camera metadata for Canon R5 photos from Yosemite"
+        },
+        {
+          "rank": 3,
+          "score": 0.9218106,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 4,
+          "score": 0.92102534,
+          "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 5,
+          "score": 0.92102534,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 6,
+          "score": 0.92102534,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check metadata for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        },
+        {
+          "rank": 7,
+          "score": 0.89956194,
+          "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Check camera settings for Canon R5 photos from Yosemite trip. Tool flow: mock_inspect_asset_metadata."
+        }
+      ]
+    }
+  ]
+}

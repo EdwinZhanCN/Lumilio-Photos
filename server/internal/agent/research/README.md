@@ -45,7 +45,11 @@ Research data flows through one shared contract:
 
 Important normalization and evaluation rules in the current harness:
 
+- Every episode is expected to have a stable `episode_id`.
+- Every query is expected to carry `target_episode_ids` for instance-level evaluation.
+- Each generation batch is now driven by a programmatic generation matrix before calling DeepSeek.
 - DeepSeek output is normalized before schema validation. Numeric metadata values are coerced to strings.
+- Missing `episode_id` or `target_episode_ids` can be backfilled locally for compatibility, but new datasets should emit them explicitly.
 - Missing query coverage for any `scenario + intent` group is backfilled automatically with synthetic queries.
 - Benchmark filtering uses exact constraints for `entity` and `status`, but does not hard-filter on `tags`.
 - Different embedding models or dimensions should use different Qdrant collections.
@@ -109,6 +113,7 @@ curl http://localhost:6333/collections
 ```bash
 cd /Users/zhanzihao/Lumilio-Photos/server/internal/agent/research
 uv run agent-memory-research print-schema-path
+uv run agent-memory-research print-generation-plan --episode-count 12 --query-count 4 --seed 42
 uv run agent-memory-research validate-bundle data/raw/example.bundle.json
 uv run agent-memory-research generate-spec-bundle data/raw/spec.bundle.json
 uv run agent-memory-research make-splits data/raw/spec.bundle.json data/splits/spec
@@ -140,6 +145,7 @@ uv run agent-memory-research generate-spec-bundle data/raw/baseline-v1.bundle.js
 
 What this does:
 
+- builds a deterministic batch-level generation matrix first
 - generates media-management episodes and retrieval queries in batches
 - validates every batch against schema
 - backfills missing `scenario + intent` query coverage if needed
@@ -247,6 +253,12 @@ Reason:
 - test split is still very small
 - test coverage currently lands on one task family
 - this confirms the pipeline works, but it does not yet separate model quality reliably
+
+Historical note:
+
+- `baseline-v1` and `baseline-v2` were originally scored with family-level matching
+- the harness now supports instance-level matching via `target_episode_ids`
+- future baselines should be regenerated and rescored under the new instance-level rule
 
 ## Recommended Next Experiment
 

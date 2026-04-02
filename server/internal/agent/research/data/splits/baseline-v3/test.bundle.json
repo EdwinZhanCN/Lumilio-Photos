@@ -1,0 +1,1853 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "episode_id": "ep_archive_low_rated_assets_wedding_001",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive low-rated photos from Johnson Wedding",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 28 assets with rating < 3 from Johnson Wedding",
+          "input": {
+            "album": "Johnson Wedding",
+            "rating": "<3",
+            "time_window": "2023-09-15 to 2023-09-15"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 28 low-rated assets",
+          "input": {
+            "archive_state": "true"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "rating",
+          "name": "<3"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_beach_001",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive low-rated photos from beach vacation",
+      "intent": "bulk_archive",
+      "summary": "Archived 18 low-rated beach photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "bulk_operations",
+      "tags": [
+        "beach",
+        "low_rating",
+        "archive"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maldives",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "1_star",
+          "role": "criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-07-15_2023-07-22"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 18 photos with 1-star rating from Maldives",
+          "input": {
+            "location": "Maldives",
+            "rating": 1,
+            "date_range": "2023-07-15 to 2023-07-22"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 18 low-rated photos",
+          "input": {
+            "asset_count": 18
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_sony_a7_001",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive Sony A7 photos rated 1-star or lower",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 15 assets with rating ≤1 from Sony A7",
+          "input": {
+            "camera_model": "Sony A7",
+            "max_rating": 1
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 15 low-rated assets",
+          "input": {
+            "asset_count": 15
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7"
+        },
+        {
+          "type": "rating",
+          "name": "1"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_safari_001",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive low-rated photos from Safari trip",
+      "intent": "bulk_archive",
+      "summary": "Archived 40 low-rated Safari photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "bulk_operations",
+      "tags": [
+        "archive",
+        "safari",
+        "low_rating"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Safari",
+          "role": "context"
+        },
+        {
+          "type": "rating",
+          "name": "low",
+          "role": "criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-09-01_2023-09-10"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 40 low-rated assets",
+          "input": {
+            "location": "Safari",
+            "max_rating": 2
+          },
+          "payload": {
+            "assets_selected": 40
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 40 assets",
+          "input": {
+            "asset_ids": [
+              "low_rated_set"
+            ]
+          },
+          "payload": {
+            "assets_archived": 40
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_nyc_001",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive photos with rating 1 or 2 from New York City trip",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 67 assets with rating 1 or 2 from NYC",
+          "input": {
+            "location": "New York City",
+            "rating_range": [
+              1,
+              2
+            ],
+            "archive_state": "unarchived"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 67 low-rated assets from NYC",
+          "input": {
+            "asset_ids": [
+              "asset_nyc_001",
+              "asset_nyc_002",
+              "asset_nyc_003"
+            ]
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York City"
+        },
+        {
+          "type": "rating",
+          "name": "1-2"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_archive_low_rated_assets_nyc_001_065",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all 1-star photos from NYC trip",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 15 assets from NYC with rating 1",
+          "input": {
+            "location": "NYC",
+            "rating": 1,
+            "time_window": "2023-11-05 to 2023-11-12"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "NYC"
+        },
+        {
+          "type": "rating",
+          "name": "1"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_2023_005",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all 1-star photos from 2023",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "time_window",
+          "name": "2023"
+        },
+        {
+          "type": "rating",
+          "name": "1"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 156 assets with 1-star rating from 2023"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 156 assets"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_rockies_005",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive photos rated below 3 stars from Rockies trip",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 22 assets with rating <3 from Rockies trip"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 22 low-rated assets"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Rocky Mountains"
+        },
+        {
+          "type": "rating",
+          "name": "below_3"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_old_005",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive photos with rating 1 from 2020-2021",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 210 assets with rating 1 from 2020-2021 time window"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 198 low-rated assets"
+        }
+      ],
+      "entities": [
+        {
+          "type": "rating",
+          "name": "1"
+        },
+        {
+          "type": "time_window",
+          "name": "2020-2021"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_archive_low_rated_assets_nyc_001_113",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive photos from NYC with rating below 3",
+      "intent": "bulk_archive",
+      "summary": "Archived low-rated NYC photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York City"
+        },
+        {
+          "type": "rating",
+          "name": "below_3"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 18 photos from NYC with rating < 3"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived all 18 low-rated photos"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_archive_low_rated_assets_wedding_001_125",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive poorly rated photos from Johnson Wedding",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 18 assets with rating < 3 from Johnson Wedding"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "rating",
+          "name": "low"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_portraits_001",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive low-rated portrait studio shots",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 22 portrait assets with rating 1-2 from studio session"
+        }
+      ],
+      "entities": [
+        {
+          "type": "rating",
+          "name": "very_low"
+        },
+        {
+          "type": "time_window",
+          "name": "last_week"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_archive_low_rated_assets_nyc_001_137",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive photos rated below 3 stars from NYC trip",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "NYC"
+        },
+        {
+          "type": "rating",
+          "name": "below_3_stars"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 23 assets rated below 3 stars from NYC"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 23 low-rated NYC assets"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_family_reunion_001",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive blurry photos from Family Reunion",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2024"
+        },
+        {
+          "type": "rating",
+          "name": "blurry"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 17 blurry photos from Family Reunion"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 17 blurry Family Reunion photos"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_nyc_005",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive photos rated 1 or 2 from New York City trip",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 18 assets with rating 1 or 2 from NYC"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 18 low-rated assets from New York City"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York City"
+        },
+        {
+          "type": "rating",
+          "name": "1-2"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_archive_low_rated_assets_nyc_001_161",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive low-rated photos from NYC business trip",
+      "intent": "bulk_archive",
+      "summary": "Archived 28 low-rated NYC photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 40 NYC photos with rating <= 2"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 28 low-rated NYC photos"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "NYC"
+        },
+        {
+          "type": "rating",
+          "name": "2"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_archive_low_rated_assets_nyc_001_173",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive low-rated photos from NYC trip",
+      "intent": "bulk_archive",
+      "summary": "Archived 42 low-rated NYC photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 42 photos with rating 1-2 from NYC",
+          "input": {
+            "location": "New York City",
+            "rating": "1-2"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 42 photos successfully",
+          "input": {
+            "assets": "low_rated_nyc"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York City"
+        },
+        {
+          "type": "rating",
+          "name": "1-2"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_canon_r5_001",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Canon R5 photos from Yosemite trip",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 45 assets from Canon R5 in Yosemite",
+          "input": {
+            "camera_model": "Canon R5",
+            "location": "Yosemite",
+            "time_window": "2023-10-15 to 2023-10-20"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_sony_a7iv_001",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect Sony A7IV metadata for Tokyo photos",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 38 assets from Sony A7IV in Tokyo",
+          "input": {
+            "camera_model": "Sony A7IV",
+            "location": "Tokyo",
+            "time_window": "2024-04-05 to 2024-04-12"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_013",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Canon R5 photos from Yosemite trip",
+      "intent": "inspect_metadata",
+      "summary": "Inspected camera metadata for Canon R5 photos from Yosemite",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata",
+        "Yosemite"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5",
+          "role": "tool"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-06-15_2023-06-20"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 45 Canon R5 photos with detailed EXIF data",
+          "input": {
+            "camera_model": "Canon R5",
+            "location": "Yosemite",
+            "date_range": "2023-06-15 to 2023-06-20"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_sony_a7iv_001_021",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect metadata for Sony A7IV photos from mountain hike",
+      "intent": "inspect_metadata",
+      "summary": "Inspected Sony A7IV metadata for Rocky Mountains photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata",
+        "mountains"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Rocky Mountains",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV",
+          "role": "tool"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-10-05_2023-10-08"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 60 Sony A7IV photos with GPS and exposure data",
+          "input": {
+            "camera_model": "Sony A7IV",
+            "location": "Rocky Mountains",
+            "date_range": "2023-10-05 to 2023-10-08"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_025",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera metadata for Canon R5 photos from Paris trip",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 45 assets with Canon R5 metadata in Paris location",
+          "input": {
+            "camera_model": "Canon R5",
+            "location": "Paris"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_nikon_z9_001",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check Nikon Z9 metadata for New York photos",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 67 assets with Nikon Z9 metadata in New York",
+          "input": {
+            "camera_model": "Nikon Z9",
+            "location": "New York"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "New York"
+        },
+        {
+          "type": "camera_model",
+          "name": "Nikon Z9"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_037",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for Canon R5 photos from Paris trip",
+      "intent": "inspect_metadata",
+      "summary": "Inspected metadata for Canon R5 photos from Paris",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata",
+        "Paris"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Canon R5",
+          "role": "subject"
+        },
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "context"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-06-15_2023-06-20"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 45 photos with detailed EXIF data",
+          "input": {
+            "camera_model": "Canon R5",
+            "location": "Paris"
+          },
+          "payload": {
+            "assets_count": 45
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_nikon_z9_001_045",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect metadata for Nikon Z9 sports photos",
+      "intent": "inspect_metadata",
+      "summary": "Inspected Nikon Z9 metadata from sports event",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "event_library",
+      "route": "metadata_inspection",
+      "tags": [
+        "camera",
+        "metadata",
+        "sports"
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Nikon Z9",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Marathon Event",
+          "role": "context"
+        }
+      ],
+      "metadata": {
+        "time_window": "2024-04-10"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 60 photos with shutter speed and ISO data",
+          "input": {
+            "camera_model": "Nikon Z9",
+            "album": "Marathon Event"
+          },
+          "payload": {
+            "assets_count": 60
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_049",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Canon R5 photos from Yosemite trip",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 45 assets with Canon R5 metadata from Yosemite, including aperture, shutter speed, ISO",
+          "input": {
+            "camera_model": "Canon R5",
+            "location": "Yosemite",
+            "time_window": "2023-10-15 to 2023-10-20"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_nikon_z9_001_056",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect Nikon Z9 metadata for Tokyo night photos",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 28 assets with Nikon Z9 metadata from Tokyo night shots, ISO range 800-6400",
+          "input": {
+            "camera_model": "Nikon Z9",
+            "location": "Tokyo",
+            "time_window": "2024-03-10 to 2024-03-15",
+            "time_of_day": "night"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo"
+        },
+        {
+          "type": "camera_model",
+          "name": "Nikon Z9"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_061",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for Canon R5 photos from Yosemite trip",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 45 assets from Canon R5 in Yosemite, found aperture, shutter speed, ISO data",
+          "input": {
+            "camera_model": "Canon R5",
+            "location": "Yosemite",
+            "time_window": "2023-10-15 to 2023-10-20"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_sony_a7iv_001_068",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect Sony A7IV metadata from Tokyo photos",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 92 assets from Sony A7IV in Tokyo, found lens and exposure data",
+          "input": {
+            "camera_model": "Sony A7IV",
+            "location": "Tokyo",
+            "time_window": "2023-12-01 to 2023-12-10"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_073",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Canon R5 photos from Yosemite trip",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        },
+        {
+          "type": "location",
+          "name": "Yosemite"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 45 assets with Canon R5 metadata from Yosemite"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_sony_a7iv_011",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect Sony A7IV metadata for New York photos",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV"
+        },
+        {
+          "type": "location",
+          "name": "New York"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 38 assets with Sony A7IV metadata from New York"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_085",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Canon R5 photos from Yosemite trip",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 45 assets from Canon R5 shot in Yosemite between 2023-10-01 and 2023-10-05"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_sony_a7iv_008",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect Sony A7IV metadata from Tokyo photos",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 67 assets from Sony A7IV shot in Tokyo between 2023-11-10 and 2023-11-15"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_097",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for Canon R5 photos from Paris trip",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 45 assets from Canon R5 in Paris, found aperture, shutter speed, ISO data"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_sony_a7iv_008_104",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect Sony A7IV metadata for Tokyo night photos",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 38 Sony A7IV assets from Tokyo, found exposure and lens data"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_109",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Canon R5 photos from Paris trip",
+      "intent": "inspect_metadata",
+      "summary": "Inspected camera metadata for Canon R5 photos from Paris",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 45 photos with Canon R5 metadata from Paris trip"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_sony_a7iv_001_116",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check Sony A7IV metadata for mountain photos",
+      "intent": "inspect_metadata",
+      "summary": "Inspected Sony A7IV metadata from mountain trip",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Rocky Mountains"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 52 photos with Sony A7IV metadata from mountains"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_121",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Canon R5 photos from Paris trip",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 45 assets from Canon R5 in Paris with aperture, shutter speed, ISO details"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_nikon_z9_001_129",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Nikon Z9 wildlife photos from safari",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 68 Nikon Z9 safari photos with lens, focal length, exposure data"
+        }
+      ],
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Nikon Z9"
+        },
+        {
+          "type": "location",
+          "name": "Safari"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_133",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Canon R5 photos from Paris trip",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 45 assets from Canon R5 in Paris, found aperture/shutter data"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_145",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for Canon R5 photos from Paris trip",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 45 assets from Canon R5 in Paris, found aperture, shutter speed, ISO data"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_sony_a7_011",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check Sony A7III settings for Tokyo street photography",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 35 assets from Sony A7III in Tokyo, found lens, focal length, exposure data"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_157",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Canon R5 photos from Yosemite trip",
+      "intent": "inspect_metadata",
+      "summary": "Inspected camera metadata for Canon R5 photos from Yosemite",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 45 Canon R5 photos with EXIF data from Yosemite",
+          "input": {
+            "camera_model": "Canon R5",
+            "location": "Yosemite",
+            "time_window": "2023-06-15 to 2023-06-20"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_sony_a7iv_001_167",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check Sony A7IV metadata for London photos",
+      "intent": "inspect_metadata",
+      "summary": "Inspected Sony A7IV metadata from London trip",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 38 Sony A7IV photos with metadata from London"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "London"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7IV"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_canon_r5_001_169",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check metadata for Canon R5 photos from Paris trip",
+      "intent": "inspect_metadata",
+      "summary": "Inspected metadata for Canon R5 photos from Paris",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 45 photos with Canon R5 metadata from Paris",
+          "input": {
+            "camera_model": "Canon R5",
+            "location": "Paris"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon R5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_inspect_camera_metadata_nikon_z9_001_179",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check Nikon Z9 wildlife photos metadata",
+      "intent": "inspect_metadata",
+      "summary": "Inspected metadata for Nikon Z9 safari photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found 68 photos with Nikon Z9 metadata from safari",
+          "input": {
+            "camera_model": "Nikon Z9",
+            "location": "Serengeti"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Serengeti"
+        },
+        {
+          "type": "camera_model",
+          "name": "Nikon Z9"
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query": "What happened when checking camera details for the Yosemite photos?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What was done with low-rated wedding photos?",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "status": "succeeded",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive"
+    },
+    {
+      "query": "Show me when I examined camera details for my mountain photos",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_sony_a7iv_001_021"
+      ],
+      "entity": "Rocky Mountains",
+      "status": "succeeded",
+      "tags": [
+        "camera",
+        "metadata"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What happened when checking camera details for Paris photos?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_025"
+      ],
+      "entity": "Paris",
+      "status": "succeeded",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "Tell me about inspecting camera metadata for different models",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Canon R5",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What happened when checking camera details for the Yosemite photos?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What camera settings were used for the Yosemite photos taken with my Canon?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What happened when checking camera details for New York photos?",
+      "target_episode_ids": [
+        "ep_inspect_camera_metadata_nikon_z9_001"
+      ],
+      "entity": "New York",
+      "status": "succeeded",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What happened when checking camera details from the Yosemite trip?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What camera settings were used for my Paris photos?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_025"
+      ],
+      "entity": "Paris",
+      "status": "succeeded",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What did we find when checking the camera details for our Paris photos?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_025"
+      ],
+      "entity": "Paris",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What happened when I tried to check camera settings for my safari photos?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_nikon_z9_001_129"
+      ],
+      "entity": "Safari",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What happened when checking camera details from the Paris trip?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_025"
+      ],
+      "entity": "Paris",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What camera settings were used for photos taken in Paris with the Canon R5?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_025"
+      ],
+      "entity": "Paris",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "Show me instances where I inspected camera metadata from different locations",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "How did I handle checking camera details for my safari shots?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_nikon_z9_001_179"
+      ],
+      "entity": "Serengeti",
+      "status": "succeeded",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What camera settings were used for the Yosemite photos from October?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "tags": [
+        "metadata_query",
+        "camera_settings"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "Show me the EXIF data analysis for Canon R5 shots",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Canon EOS R5",
+      "status": "succeeded",
+      "tags": [
+        "technical_analysis",
+        "camera_gear"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "How many photos did I take in Yosemite with specific aperture settings?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "tags": [
+        "photo_count",
+        "settings_query"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "Review the metadata inspection results from my fall trip",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "October 2023",
+      "status": "succeeded",
+      "tags": [
+        "trip_review",
+        "metadata_summary"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What camera settings were used for the Yosemite photos from the Canon R5?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "tags": [
+        "metadata",
+        "camera_settings"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "Show me the metadata inspection results for the Canon R5 assets",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Canon R5",
+      "status": "succeeded",
+      "tags": [
+        "inspection",
+        "camera"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "How many photos from Yosemite were analyzed for their EXIF data?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "tags": [
+        "count",
+        "analysis"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "Retrieve the aperture and ISO details from the Yosemite photo inspection",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "tags": [
+        "technical",
+        "settings"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "What camera settings were used for the Yosemite photos taken with my Canon R5?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "tags": [
+        "metadata",
+        "camera",
+        "review"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "Show me the EXIF data from the Canon R5 shoot in Yosemite National Park",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "tags": [
+        "technical",
+        "analysis"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "Which photos from Yosemite were captured with the Canon R5 and what were their settings?",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "tags": [
+        "photo_analysis",
+        "equipment"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    },
+    {
+      "query": "Review the metadata for my Canon R5 images from the Yosemite trip last fall",
+      "target_episode_ids": [
+        "ep_ep_inspect_camera_metadata_canon_r5_001_013"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "tags": [
+        "quality_check",
+        "archive"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata"
+    }
+  ]
+}

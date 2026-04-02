@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type QdrantConfig struct {
@@ -82,7 +84,7 @@ func (s *QdrantStore) UpsertEpisodes(ctx context.Context, episodes []Episode, ve
 	points := make([]map[string]any, 0, len(episodes))
 	for i, episode := range episodes {
 		points = append(points, map[string]any{
-			"id":      episode.ID,
+			"id":      qdrantPointID(episode.ID),
 			"vector":  vectors[i],
 			"payload": payloadFromEpisode(episode),
 		})
@@ -93,6 +95,13 @@ func (s *QdrantStore) UpsertEpisodes(ctx context.Context, episodes []Episode, ve
 	}
 
 	return s.doJSON(ctx, http.MethodPut, "/collections/"+s.config.Collection+"/points?wait=true", body, nil, http.StatusOK)
+}
+
+func qdrantPointID(episodeID string) string {
+	if parsed, err := uuid.Parse(strings.TrimSpace(episodeID)); err == nil {
+		return parsed.String()
+	}
+	return uuid.NewSHA1(uuid.NameSpaceURL, []byte("agent-episode:"+episodeID)).String()
 }
 
 func (s *QdrantStore) SearchEpisodes(ctx context.Context, request SearchRequest, queryVector []float32) ([]SearchHit, error) {

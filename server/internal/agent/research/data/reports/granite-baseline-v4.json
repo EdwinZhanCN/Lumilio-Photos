@@ -1,0 +1,1635 @@
+{
+  "schema_version": "agent-memory/retrieval-benchmark-report/v1",
+  "created_at": "2026-04-02T00:00:16.407014+00:00",
+  "input_bundle": "data/splits/baseline-v4/test.bundle.json",
+  "collection": "agent_episodic_memory_granite_v4_768",
+  "embedder": {
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "model": "granite-embedding:278m",
+    "dimensions": 768
+  },
+  "limit": 10,
+  "ks": [
+    1,
+    5,
+    10
+  ],
+  "query_count": 27,
+  "filters_enabled": true,
+  "metrics": {
+    "recall": {
+      "recall@1": 0.592593,
+      "recall@5": 0.962963,
+      "recall@10": 0.962963
+    },
+    "mrr": {
+      "mrr@10": 0.771605
+    }
+  },
+  "latency_ms": {
+    "embed": {
+      "p50": 86.966,
+      "p95": 96.439,
+      "mean": 92.708
+    },
+    "search": {
+      "p50": 4.867,
+      "p95": 17.62,
+      "mean": 8.026
+    },
+    "end_to_end": {
+      "p50": 91.855,
+      "p95": 113.131,
+      "mean": 100.736
+    }
+  },
+  "per_query": [
+    {
+      "query": "How did we handle duplicate removal for the Yosemite photos taken with Sony A7C II?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82"
+      ],
+      "rank": 1,
+      "embed_ms": 238.605,
+      "search_ms": 62.206,
+      "end_to_end_ms": 300.813,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.9209539,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Found duplicates but some were false positives; inspected metadata to verify and archived only true duplicates"
+        },
+        {
+          "rank": 2,
+          "score": 0.90374386,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_rating_threshold_sony_a7c_ii_false_positive_duplicate_yosemite_1_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from rating filter issue, archived duplicates while preserving rated shots"
+        },
+        {
+          "rank": 3,
+          "score": 0.8907258,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from false positive detection by inspecting metadata"
+        },
+        {
+          "rank": 4,
+          "score": 0.7899238,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_camera_model_fujifilm_x_t5_false_positive_duplicate_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from false positives by comparing EXIF data"
+        }
+      ]
+    },
+    {
+      "query": "What was the process for archiving poorly rated images from the Tokyo Collection?",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_archive_low_rated_assets_c01_anchor_tokyo_collection_tokyo_2_spring_2023"
+      ],
+      "rank": 1,
+      "embed_ms": 85.826,
+      "search_ms": 6.028,
+      "end_to_end_ms": 91.855,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8593087,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_anchor_tokyo_collection_tokyo_2_spring_2023",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated photos from Tokyo spring 2023 album"
+        },
+        {
+          "rank": 2,
+          "score": 0.8453417,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_near_time_window_tokyo_collection_tokyo_2_autumn_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated photos from Tokyo autumn 2024 album"
+        },
+        {
+          "rank": 3,
+          "score": 0.8214091,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_near_location_tokyo_collection_paris_2_spring_2023",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated Paris photos from Tokyo Collection album"
+        }
+      ]
+    },
+    {
+      "query": "What was included in my beach sunset collection from last summer?",
+      "target_scenario": "summarize_selected_assets",
+      "target_intent": "summarize_selection",
+      "target_episode_ids": [
+        "ep_summarize_selected_assets_summarize_selected_assets_c01_anchor_beach_sunset_summer_2023"
+      ],
+      "rank": 2,
+      "embed_ms": 90.882,
+      "search_ms": 6.394,
+      "end_to_end_ms": 97.277,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.84230626,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_anchor_beach_sunset_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 20 sunset beach photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.8407913,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_anchor_beach_sunset_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 35 sunset photos from Beach summer 2023"
+        },
+        {
+          "rank": 3,
+          "score": 0.83968,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_near_rating_threshold_beach_1_sunset_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 28 rated sunset photos from Beach summer 2023"
+        },
+        {
+          "rank": 4,
+          "score": 0.7860233,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_near_selection_theme_beach_family_highlights_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 42 family photos from Beach summer 2023"
+        },
+        {
+          "rank": 5,
+          "score": 0.7705534,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_near_selection_theme_beach_street_moments_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Successfully summarized street moments from Beach summer 2023"
+        }
+      ]
+    },
+    {
+      "query": "Show me how I grouped concert stage shots for review",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "target_episode_ids": [
+        "ep_group_assets_for_review_group_assets_for_review_c02_anchor_date_concert_stage"
+      ],
+      "rank": 1,
+      "embed_ms": 82.835,
+      "search_ms": 6.489,
+      "end_to_end_ms": 89.326,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.84230363,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_anchor_date_concert_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Grouped 63 concert stage photos into 5 date-based groups"
+        },
+        {
+          "rank": 2,
+          "score": 0.82306004,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_anchor_date_concert_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped concert assets by date with stage tag focus"
+        },
+        {
+          "rank": 3,
+          "score": 0.8220524,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_near_camera_model_sony_a7iii_date_concert_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped concert stage photos by date using Sony A7III camera filter"
+        },
+        {
+          "rank": 4,
+          "score": 0.79909873,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_near_tag_focus_date_concert_portrait",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped concert assets by date with portrait tag focus"
+        },
+        {
+          "rank": 5,
+          "score": 0.7967752,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_near_time_window_date_concert_stage_autumn_2024",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped autumn 2024 concert stage photos by date"
+        },
+        {
+          "rank": 6,
+          "score": 0.7834188,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_near_time_window_date_concert_stage_autumn_2024",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped autumn 2024 concert assets by date with stage tag focus"
+        }
+      ]
+    },
+    {
+      "query": "What happened when I tried to clean up duplicate portrait session photos?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c03_near_rating_threshold_canon_eos_r5_near_duplicate_burst_portrait_session_3_0_76"
+      ],
+      "rank": 1,
+      "embed_ms": 94.3,
+      "search_ms": 4.138,
+      "end_to_end_ms": 98.438,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7819166,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c03_near_rating_threshold_canon_eos_r5_near_duplicate_burst_portrait_session_3_0_76",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully cleaned duplicates while preserving high-rated shots"
+        },
+        {
+          "rank": 2,
+          "score": 0.64959645,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_anchor_rating_portrait_session_portrait",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped 85 assets into 5 rating-based groups"
+        },
+        {
+          "rank": 3,
+          "score": 0.6463942,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_near_tag_focus_rating_portrait_session_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped 42 assets into 5 rating-based groups"
+        }
+      ]
+    },
+    {
+      "query": "How were high-rated Yosemite photos marked as favorites?",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_bulk_like_highlights_c03_anchor_yosemite_picks_false_yosemite_4"
+      ],
+      "rank": 2,
+      "embed_ms": 84.613,
+      "search_ms": 17.62,
+      "end_to_end_ms": 102.234,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8454361,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 34 unliked Yosemite photos rated 4+"
+        },
+        {
+          "rank": 2,
+          "score": 0.8194201,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 32 Yosemite photos with rating >= 4"
+        },
+        {
+          "rank": 3,
+          "score": 0.8178053,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_time_window_yosemite_picks_false_yosemite_4_winter_2022",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 18 Yosemite photos from winter 2022 with rating >= 4"
+        },
+        {
+          "rank": 4,
+          "score": 0.7954254,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_camera_model_yosemite_picks_nikon_z7_ii_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 15 Nikon Z7 II photos from Yosemite with rating >= 4"
+        },
+        {
+          "rank": 5,
+          "score": 0.78129065,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_rating_threshold_yosemite_3_landscape_favorites_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 55 Yosemite landscape favorites with rating ≥3"
+        },
+        {
+          "rank": 6,
+          "score": 0.76158583,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_landscape_favorites_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 40 Yosemite landscape favorites"
+        },
+        {
+          "rank": 7,
+          "score": 0.7552912,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_time_window_yosemite_landscape_favorites_summer_2025",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 38 Yosemite landscape favorites from summer 2025"
+        },
+        {
+          "rank": 8,
+          "score": 0.7002401,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_camera_model_sony_a7iii_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved camera settings for 8 Yosemite photos shot with Sony"
+        },
+        {
+          "rank": 9,
+          "score": 0.69306344,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_time_window_sony_a7c_ii_false_positive_duplicate_yosemite_0_82_spring_2023",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully removed duplicates from spring 2023 Yosemite photos"
+        },
+        {
+          "rank": 10,
+          "score": 0.6900946,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 15 Yosemite photos"
+        }
+      ]
+    },
+    {
+      "query": "How did I create the Tokyo Street Album with Fujifilm X-T5 photos from autumn 2024?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "target_episode_ids": [
+        "ep_curate_trip_album_curate_trip_album_c07_anchor_tokyo_street_album_fujifilm_x_t5_tokyo_autumn_2024"
+      ],
+      "rank": 1,
+      "embed_ms": 84.977,
+      "search_ms": 4.267,
+      "end_to_end_ms": 89.246,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.9608164,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c07_anchor_tokyo_street_album_fujifilm_x_t5_tokyo_autumn_2024",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created Tokyo Street Album with 52 assets"
+        },
+        {
+          "rank": 2,
+          "score": 0.9209957,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c07_near_time_window_tokyo_street_album_fujifilm_x_t5_tokyo_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created Tokyo Street Album with 41 assets from spring 2023"
+        }
+      ]
+    },
+    {
+      "query": "What was the process for archiving low-rated photos from the family holiday?",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_archive_low_rated_assets_c04_anchor_holiday_cull_family_holiday_2_autumn_2023"
+      ],
+      "rank": 1,
+      "embed_ms": 82.359,
+      "search_ms": 4.856,
+      "end_to_end_ms": 87.217,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.83776563,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_anchor_holiday_cull_family_holiday_2_autumn_2023",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully filtered and archived 67 low-rated assets to Holiday Cull album"
+        },
+        {
+          "rank": 2,
+          "score": 0.8344856,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_near_rating_threshold_holiday_cull_family_holiday_5_autumn_2023",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully filtered and archived 142 low-rated assets to Holiday Cull album"
+        },
+        {
+          "rank": 3,
+          "score": 0.7980322,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_near_camera_model_holiday_cull_fujifilm_x_t5_family_holiday_2_autumn_2023",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully filtered and archived 23 low-rated Fujifilm X-T5 assets"
+        },
+        {
+          "rank": 4,
+          "score": 0.74885035,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_location_canon_eos_r5_family_holiday_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved camera settings for 10 Family Holiday photos"
+        }
+      ]
+    },
+    {
+      "query": "How did we organize those beautiful blue hour shots from Hawaii?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "target_episode_ids": [
+        "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022"
+      ],
+      "rank": 2,
+      "embed_ms": 85.901,
+      "search_ms": 4.411,
+      "end_to_end_ms": 90.313,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.84628195,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created album with filtered blue hour photos grouped by date"
+        },
+        {
+          "rank": 2,
+          "score": 0.8009876,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created Hawaii Blue Hour album with 15 Nikon Z7 II assets"
+        },
+        {
+          "rank": 3,
+          "score": 0.6915196,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_album_name_wedding_favorites_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created Wedding Favorites album with 22 Nikon Z7 II assets"
+        },
+        {
+          "rank": 4,
+          "score": 0.6788734,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_near_location_canon_eos_r5_hawaii_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 22 Canon EOS R5 assets from Hawaii"
+        }
+      ]
+    },
+    {
+      "query": "How did I organize portrait photos by rating for review?",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "target_episode_ids": [
+        "ep_group_assets_for_review_group_assets_for_review_c08_anchor_rating_portrait_session_portrait"
+      ],
+      "rank": 1,
+      "embed_ms": 87.619,
+      "search_ms": 3.954,
+      "end_to_end_ms": 91.574,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.7786974,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_anchor_rating_portrait_session_portrait",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped 85 assets into 5 rating-based groups"
+        },
+        {
+          "rank": 2,
+          "score": 0.7749399,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_near_tag_focus_rating_portrait_session_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped 42 assets into 5 rating-based groups"
+        },
+        {
+          "rank": 3,
+          "score": 0.6902273,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c03_near_rating_threshold_canon_eos_r5_near_duplicate_burst_portrait_session_3_0_76",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully cleaned duplicates while preserving high-rated shots"
+        }
+      ]
+    },
+    {
+      "query": "What happened when I tried to remove duplicate Sony A7C II photos from Yosemite?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82"
+      ],
+      "rank": 2,
+      "embed_ms": 87.233,
+      "search_ms": 4.552,
+      "end_to_end_ms": 91.786,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.9114492,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Found duplicates but some were false positives; inspected metadata to verify and archived only true duplicates"
+        },
+        {
+          "rank": 2,
+          "score": 0.88719475,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from false positive detection by inspecting metadata"
+        },
+        {
+          "rank": 3,
+          "score": 0.8816871,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_rating_threshold_sony_a7c_ii_false_positive_duplicate_yosemite_1_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from rating filter issue, archived duplicates while preserving rated shots"
+        },
+        {
+          "rank": 4,
+          "score": 0.7948489,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_camera_model_fujifilm_x_t5_false_positive_duplicate_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from false positives by comparing EXIF data"
+        }
+      ]
+    },
+    {
+      "query": "What camera settings were used for the Yosemite spring 2024 photos taken with the Canon R5?",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_bulk_like_highlights_c03_anchor_yosemite_picks_false_yosemite_4"
+      ],
+      "rank": null,
+      "embed_ms": 84.488,
+      "search_ms": 5.631,
+      "end_to_end_ms": 90.12,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8923288,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 15 Yosemite photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.8901731,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 25 Canon EOS R5 assets"
+        },
+        {
+          "rank": 3,
+          "score": 0.85760885,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_near_time_window_canon_eos_r5_yosemite_spring_2023",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 18 Canon EOS R5 assets from previous year"
+        },
+        {
+          "rank": 4,
+          "score": 0.80113673,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_camera_model_sony_a7iii_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved camera settings for 8 Yosemite photos shot with Sony"
+        },
+        {
+          "rank": 5,
+          "score": 0.71919405,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_time_window_sony_a7c_ii_false_positive_duplicate_yosemite_0_82_spring_2023",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully removed duplicates from spring 2023 Yosemite photos"
+        },
+        {
+          "rank": 6,
+          "score": 0.6974963,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_time_window_yosemite_picks_false_yosemite_4_winter_2022",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 18 Yosemite photos from winter 2022 with rating >= 4"
+        },
+        {
+          "rank": 7,
+          "score": 0.6874214,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_time_window_yosemite_landscape_favorites_summer_2025",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 38 Yosemite landscape favorites from summer 2025"
+        },
+        {
+          "rank": 8,
+          "score": 0.6818067,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_rating_threshold_yosemite_3_landscape_favorites_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 55 Yosemite landscape favorites with rating ≥3"
+        },
+        {
+          "rank": 9,
+          "score": 0.66878754,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 34 unliked Yosemite photos rated 4+"
+        },
+        {
+          "rank": 10,
+          "score": 0.6671892,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_landscape_favorites_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 40 Yosemite landscape favorites"
+        }
+      ]
+    },
+    {
+      "query": "Give me a summary of the beach sunset photos from summer 2023",
+      "target_scenario": "summarize_selected_assets",
+      "target_intent": "summarize_selection",
+      "target_episode_ids": [
+        "ep_summarize_selected_assets_summarize_selected_assets_c01_anchor_beach_sunset_summer_2023"
+      ],
+      "rank": 1,
+      "embed_ms": 88.402,
+      "search_ms": 4.527,
+      "end_to_end_ms": 92.93,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.93896747,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_anchor_beach_sunset_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 35 sunset photos from Beach summer 2023"
+        },
+        {
+          "rank": 2,
+          "score": 0.9367446,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_near_rating_threshold_beach_1_sunset_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 28 rated sunset photos from Beach summer 2023"
+        },
+        {
+          "rank": 3,
+          "score": 0.9085352,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_anchor_beach_sunset_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 20 sunset beach photos"
+        },
+        {
+          "rank": 4,
+          "score": 0.8783134,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_near_selection_theme_beach_family_highlights_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 42 family photos from Beach summer 2023"
+        },
+        {
+          "rank": 5,
+          "score": 0.8266652,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_near_selection_theme_beach_street_moments_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Successfully summarized street moments from Beach summer 2023"
+        }
+      ]
+    },
+    {
+      "query": "What was our approach to grouping concert photos by date?",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "target_episode_ids": [
+        "ep_group_assets_for_review_group_assets_for_review_c02_anchor_date_concert_stage"
+      ],
+      "rank": 3,
+      "embed_ms": 88.185,
+      "search_ms": 4.737,
+      "end_to_end_ms": 92.923,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8259158,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_near_camera_model_sony_a7iii_date_concert_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped concert stage photos by date using Sony A7III camera filter"
+        },
+        {
+          "rank": 2,
+          "score": 0.8244423,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_near_tag_focus_date_concert_portrait",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped concert assets by date with portrait tag focus"
+        },
+        {
+          "rank": 3,
+          "score": 0.8210163,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_anchor_date_concert_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Grouped 63 concert stage photos into 5 date-based groups"
+        },
+        {
+          "rank": 4,
+          "score": 0.8092352,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_near_time_window_date_concert_stage_autumn_2024",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped autumn 2024 concert stage photos by date"
+        },
+        {
+          "rank": 5,
+          "score": 0.8082775,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_anchor_date_concert_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped concert assets by date with stage tag focus"
+        },
+        {
+          "rank": 6,
+          "score": 0.7807095,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_near_time_window_date_concert_stage_autumn_2024",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped autumn 2024 concert assets by date with stage tag focus"
+        }
+      ]
+    },
+    {
+      "query": "How did we mark favorite photos from Yosemite that were rated 4 stars or higher?",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_bulk_like_highlights_c03_anchor_yosemite_picks_false_yosemite_4"
+      ],
+      "rank": 2,
+      "embed_ms": 85.735,
+      "search_ms": 6.216,
+      "end_to_end_ms": 91.952,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8550024,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 34 unliked Yosemite photos rated 4+"
+        },
+        {
+          "rank": 2,
+          "score": 0.8527266,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 32 Yosemite photos with rating >= 4"
+        },
+        {
+          "rank": 3,
+          "score": 0.8433254,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_time_window_yosemite_picks_false_yosemite_4_winter_2022",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 18 Yosemite photos from winter 2022 with rating >= 4"
+        },
+        {
+          "rank": 4,
+          "score": 0.8196881,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_camera_model_yosemite_picks_nikon_z7_ii_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 15 Nikon Z7 II photos from Yosemite with rating >= 4"
+        },
+        {
+          "rank": 5,
+          "score": 0.80234563,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_rating_threshold_yosemite_3_landscape_favorites_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 55 Yosemite landscape favorites with rating ≥3"
+        },
+        {
+          "rank": 6,
+          "score": 0.7782062,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_landscape_favorites_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 40 Yosemite landscape favorites"
+        },
+        {
+          "rank": 7,
+          "score": 0.76860505,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_time_window_yosemite_landscape_favorites_summer_2025",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 38 Yosemite landscape favorites from summer 2025"
+        },
+        {
+          "rank": 8,
+          "score": 0.72980946,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_camera_model_sony_a7iii_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved camera settings for 8 Yosemite photos shot with Sony"
+        },
+        {
+          "rank": 9,
+          "score": 0.72007084,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 15 Yosemite photos"
+        },
+        {
+          "rank": 10,
+          "score": 0.71017385,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_time_window_sony_a7c_ii_false_positive_duplicate_yosemite_0_82_spring_2023",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully removed duplicates from spring 2023 Yosemite photos"
+        }
+      ]
+    },
+    {
+      "query": "How did we handle archiving poorly rated family holiday photos?",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_archive_low_rated_assets_c04_anchor_holiday_cull_family_holiday_2_autumn_2023"
+      ],
+      "rank": 1,
+      "embed_ms": 85.295,
+      "search_ms": 3.835,
+      "end_to_end_ms": 89.131,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8276458,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_anchor_holiday_cull_family_holiday_2_autumn_2023",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully filtered and archived 67 low-rated assets to Holiday Cull album"
+        },
+        {
+          "rank": 2,
+          "score": 0.8272723,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_near_rating_threshold_holiday_cull_family_holiday_5_autumn_2023",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully filtered and archived 142 low-rated assets to Holiday Cull album"
+        },
+        {
+          "rank": 3,
+          "score": 0.78201455,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_near_camera_model_holiday_cull_fujifilm_x_t5_family_holiday_2_autumn_2023",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully filtered and archived 23 low-rated Fujifilm X-T5 assets"
+        },
+        {
+          "rank": 4,
+          "score": 0.7228255,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_location_canon_eos_r5_family_holiday_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved camera settings for 10 Family Holiday photos"
+        }
+      ]
+    },
+    {
+      "query": "Can you show me what was in my Yosemite landscape favorites selection from autumn 2023?",
+      "target_scenario": "summarize_selected_assets",
+      "target_intent": "summarize_selection",
+      "target_episode_ids": [
+        "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_landscape_favorites_autumn_2023"
+      ],
+      "rank": 1,
+      "embed_ms": 87.721,
+      "search_ms": 4.947,
+      "end_to_end_ms": 92.669,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.9261503,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_landscape_favorites_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 40 Yosemite landscape favorites"
+        },
+        {
+          "rank": 2,
+          "score": 0.92243105,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_rating_threshold_yosemite_3_landscape_favorites_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 55 Yosemite landscape favorites with rating ≥3"
+        },
+        {
+          "rank": 3,
+          "score": 0.8933106,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_time_window_yosemite_landscape_favorites_summer_2025",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 38 Yosemite landscape favorites from summer 2025"
+        },
+        {
+          "rank": 4,
+          "score": 0.8303615,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_time_window_yosemite_picks_false_yosemite_4_winter_2022",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 18 Yosemite photos from winter 2022 with rating >= 4"
+        },
+        {
+          "rank": 5,
+          "score": 0.8117642,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 34 unliked Yosemite photos rated 4+"
+        },
+        {
+          "rank": 6,
+          "score": 0.7518586,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 32 Yosemite photos with rating >= 4"
+        },
+        {
+          "rank": 7,
+          "score": 0.7314427,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_camera_model_yosemite_picks_nikon_z7_ii_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 15 Nikon Z7 II photos from Yosemite with rating >= 4"
+        },
+        {
+          "rank": 8,
+          "score": 0.7195219,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_camera_model_sony_a7iii_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved camera settings for 8 Yosemite photos shot with Sony"
+        },
+        {
+          "rank": 9,
+          "score": 0.7186799,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_time_window_sony_a7c_ii_false_positive_duplicate_yosemite_0_82_spring_2023",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully removed duplicates from spring 2023 Yosemite photos"
+        },
+        {
+          "rank": 10,
+          "score": 0.71090627,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 15 Yosemite photos"
+        }
+      ]
+    },
+    {
+      "query": "How did we handle duplicate photos from the Yosemite shoot with Sony camera?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_time_window_sony_a7c_ii_false_positive_duplicate_yosemite_0_82_spring_2023"
+      ],
+      "rank": 1,
+      "embed_ms": 83.513,
+      "search_ms": 5.324,
+      "end_to_end_ms": 88.838,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8512121,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_time_window_sony_a7c_ii_false_positive_duplicate_yosemite_0_82_spring_2023",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully removed duplicates from spring 2023 Yosemite photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.82262146,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_failure_mode_sony_a7c_ii_near_duplicate_burst_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully archived 18 near-duplicate burst shots"
+        },
+        {
+          "rank": 3,
+          "score": 0.7860742,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_camera_model_sony_a7iii_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved camera settings for 8 Yosemite photos shot with Sony"
+        },
+        {
+          "rank": 4,
+          "score": 0.7441078,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 34 unliked Yosemite photos rated 4+"
+        },
+        {
+          "rank": 5,
+          "score": 0.737846,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_camera_model_yosemite_picks_nikon_z7_ii_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 15 Nikon Z7 II photos from Yosemite with rating >= 4"
+        },
+        {
+          "rank": 6,
+          "score": 0.7368767,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 15 Yosemite photos"
+        },
+        {
+          "rank": 7,
+          "score": 0.7341496,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_time_window_yosemite_picks_false_yosemite_4_winter_2022",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 18 Yosemite photos from winter 2022 with rating >= 4"
+        },
+        {
+          "rank": 8,
+          "score": 0.7235252,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 32 Yosemite photos with rating >= 4"
+        },
+        {
+          "rank": 9,
+          "score": 0.7059991,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 25 Canon EOS R5 assets"
+        },
+        {
+          "rank": 10,
+          "score": 0.70179546,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_near_time_window_canon_eos_r5_yosemite_spring_2023",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 18 Canon EOS R5 assets from previous year"
+        }
+      ]
+    },
+    {
+      "query": "What was the process for creating the Hawaii Blue Hour album?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "target_episode_ids": [
+        "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022"
+      ],
+      "rank": 2,
+      "embed_ms": 81.569,
+      "search_ms": 4.293,
+      "end_to_end_ms": 85.863,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.87194294,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created album with filtered blue hour photos grouped by date"
+        },
+        {
+          "rank": 2,
+          "score": 0.8280142,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created Hawaii Blue Hour album with 15 Nikon Z7 II assets"
+        }
+      ]
+    },
+    {
+      "query": "What did we do to remove poorly rated Tokyo photos from spring 2023?",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_archive_low_rated_assets_c01_anchor_tokyo_collection_tokyo_2_spring_2023"
+      ],
+      "rank": 1,
+      "embed_ms": 87.933,
+      "search_ms": 4.867,
+      "end_to_end_ms": 92.801,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8435689,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_anchor_tokyo_collection_tokyo_2_spring_2023",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated photos from Tokyo spring 2023 album"
+        },
+        {
+          "rank": 2,
+          "score": 0.8173293,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_near_time_window_tokyo_collection_tokyo_2_autumn_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated photos from Tokyo autumn 2024 album"
+        },
+        {
+          "rank": 3,
+          "score": 0.75231874,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c07_near_time_window_tokyo_street_album_fujifilm_x_t5_tokyo_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created Tokyo Street Album with 41 assets from spring 2023"
+        },
+        {
+          "rank": 4,
+          "score": 0.73557675,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c07_anchor_tokyo_street_album_fujifilm_x_t5_tokyo_autumn_2024",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created Tokyo Street Album with 52 assets"
+        }
+      ]
+    },
+    {
+      "query": "What was our approach to marking favorite Johnson Wedding photos as liked?",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_bulk_like_highlights_c05_anchor_wedding_highlights_false_johnson_wedding_4"
+      ],
+      "rank": 1,
+      "embed_ms": 86.966,
+      "search_ms": 4.548,
+      "end_to_end_ms": 91.515,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.82758915,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c05_anchor_wedding_highlights_false_johnson_wedding_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 25 high-quality wedding photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.825305,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c05_near_time_window_wedding_highlights_false_johnson_wedding_4_spring_2023",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 18 high-quality wedding photos from spring 2023"
+        },
+        {
+          "rank": 3,
+          "score": 0.77041274,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_anchor_wedding_cleanup_johnson_wedding_2_summer_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully filtered and archived low-rated wedding photos"
+        },
+        {
+          "rank": 4,
+          "score": 0.767123,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_near_location_johnson_wedding_sunset_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Successfully summarized sunset photos from Johnson Wedding summer 2023"
+        },
+        {
+          "rank": 5,
+          "score": 0.7368418,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_rating_threshold_wedding_cleanup_johnson_wedding_3_summer_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived assets with stricter rating threshold"
+        }
+      ]
+    },
+    {
+      "query": "How did we create the Hawaii Blue Hour album from winter 2022 photos?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "target_episode_ids": [
+        "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022"
+      ],
+      "rank": 2,
+      "embed_ms": 86.754,
+      "search_ms": 4.187,
+      "end_to_end_ms": 90.943,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.914216,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created album with filtered blue hour photos grouped by date"
+        },
+        {
+          "rank": 2,
+          "score": 0.9056991,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Successfully created Hawaii Blue Hour album with 15 Nikon Z7 II assets"
+        }
+      ]
+    },
+    {
+      "query": "How did we handle false positive duplicate detection in Yosemite shoots?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82"
+      ],
+      "rank": 1,
+      "embed_ms": 88.166,
+      "search_ms": 5.709,
+      "end_to_end_ms": 93.877,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.82677364,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Found duplicates but some were false positives; inspected metadata to verify and archived only true duplicates"
+        },
+        {
+          "rank": 2,
+          "score": 0.8180912,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from false positive detection by inspecting metadata"
+        },
+        {
+          "rank": 3,
+          "score": 0.81685,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_camera_model_fujifilm_x_t5_false_positive_duplicate_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from false positives by comparing EXIF data"
+        },
+        {
+          "rank": 4,
+          "score": 0.7654802,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_rating_threshold_sony_a7c_ii_false_positive_duplicate_yosemite_1_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from rating filter issue, archived duplicates while preserving rated shots"
+        }
+      ]
+    },
+    {
+      "query": "How did I handle removing duplicate photos from Yosemite shot with my Sony camera?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_failure_mode_sony_a7c_ii_near_duplicate_burst_yosemite_0_82"
+      ],
+      "rank": 2,
+      "embed_ms": 85.301,
+      "search_ms": 5.557,
+      "end_to_end_ms": 90.859,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.835022,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_time_window_sony_a7c_ii_false_positive_duplicate_yosemite_0_82_spring_2023",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully removed duplicates from spring 2023 Yosemite photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.81530297,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_failure_mode_sony_a7c_ii_near_duplicate_burst_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully archived 18 near-duplicate burst shots"
+        },
+        {
+          "rank": 3,
+          "score": 0.7513528,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_camera_model_sony_a7iii_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved camera settings for 8 Yosemite photos shot with Sony"
+        },
+        {
+          "rank": 4,
+          "score": 0.727721,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 34 unliked Yosemite photos rated 4+"
+        },
+        {
+          "rank": 5,
+          "score": 0.7210156,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_camera_model_yosemite_picks_nikon_z7_ii_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 15 Nikon Z7 II photos from Yosemite with rating >= 4"
+        },
+        {
+          "rank": 6,
+          "score": 0.71064365,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 32 Yosemite photos with rating >= 4"
+        },
+        {
+          "rank": 7,
+          "score": 0.70828384,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_time_window_yosemite_picks_false_yosemite_4_winter_2022",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 18 Yosemite photos from winter 2022 with rating >= 4"
+        },
+        {
+          "rank": 8,
+          "score": 0.6995317,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 15 Yosemite photos"
+        },
+        {
+          "rank": 9,
+          "score": 0.6704285,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 25 Canon EOS R5 assets"
+        },
+        {
+          "rank": 10,
+          "score": 0.6658259,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_near_time_window_canon_eos_r5_yosemite_spring_2023",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 18 Canon EOS R5 assets from previous year"
+        }
+      ]
+    },
+    {
+      "query": "Can you show me the camera details I checked for my Canon shots in Yosemite?",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_inspect_camera_metadata_inspect_camera_metadata_c09_anchor_canon_eos_r5_yosemite_spring_2024"
+      ],
+      "rank": 2,
+      "embed_ms": 96.439,
+      "search_ms": 16.691,
+      "end_to_end_ms": 113.131,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8099337,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 15 Yosemite photos"
+        },
+        {
+          "rank": 2,
+          "score": 0.7976357,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_anchor_canon_eos_r5_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 25 Canon EOS R5 assets"
+        },
+        {
+          "rank": 3,
+          "score": 0.7946659,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_near_time_window_canon_eos_r5_yosemite_spring_2023",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved detailed camera settings for 18 Canon EOS R5 assets from previous year"
+        },
+        {
+          "rank": 4,
+          "score": 0.7926693,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_camera_model_sony_a7iii_yosemite_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Retrieved camera settings for 8 Yosemite photos shot with Sony"
+        },
+        {
+          "rank": 5,
+          "score": 0.7202753,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_time_window_sony_a7c_ii_false_positive_duplicate_yosemite_0_82_spring_2023",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully removed duplicates from spring 2023 Yosemite photos"
+        },
+        {
+          "rank": 6,
+          "score": 0.712748,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_failure_mode_sony_a7c_ii_near_duplicate_burst_yosemite_0_82",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully archived 18 near-duplicate burst shots"
+        },
+        {
+          "rank": 7,
+          "score": 0.7092854,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 34 unliked Yosemite photos rated 4+"
+        },
+        {
+          "rank": 8,
+          "score": 0.69809043,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_time_window_yosemite_picks_false_yosemite_4_winter_2022",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 18 Yosemite photos from winter 2022 with rating >= 4"
+        },
+        {
+          "rank": 9,
+          "score": 0.6922236,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_camera_model_yosemite_picks_nikon_z7_ii_false_yosemite_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Successfully liked 15 Nikon Z7 II photos from Yosemite with rating >= 4"
+        },
+        {
+          "rank": 10,
+          "score": 0.67768705,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_rating_threshold_yosemite_3_landscape_favorites_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Created summary of 55 Yosemite landscape favorites with rating ≥3"
+        }
+      ]
+    },
+    {
+      "query": "How did I summarize my beach sunset collection?",
+      "target_scenario": "summarize_selected_assets",
+      "target_intent": "summarize_selection",
+      "target_episode_ids": [
+        "ep_summarize_selected_assets_summarize_selected_assets_c01_anchor_beach_sunset_summer_2023"
+      ],
+      "rank": 1,
+      "embed_ms": 90.142,
+      "search_ms": 4.54,
+      "end_to_end_ms": 94.683,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8410393,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_anchor_beach_sunset_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 35 sunset photos from Beach summer 2023"
+        },
+        {
+          "rank": 2,
+          "score": 0.84037435,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_anchor_beach_sunset_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 20 sunset beach photos"
+        },
+        {
+          "rank": 3,
+          "score": 0.8376627,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_near_rating_threshold_beach_1_sunset_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 28 rated sunset photos from Beach summer 2023"
+        },
+        {
+          "rank": 4,
+          "score": 0.78779304,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_near_selection_theme_beach_family_highlights_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Generated summary of 42 family photos from Beach summer 2023"
+        },
+        {
+          "rank": 5,
+          "score": 0.7664596,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_near_selection_theme_beach_street_moments_summer_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Successfully summarized street moments from Beach summer 2023"
+        }
+      ]
+    },
+    {
+      "query": "How did you organize the concert photos for my review last time?",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "target_episode_ids": [
+        "ep_group_assets_for_review_group_assets_for_review_c02_anchor_date_concert_stage"
+      ],
+      "rank": 1,
+      "embed_ms": 91.368,
+      "search_ms": 6.175,
+      "end_to_end_ms": 97.544,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.80941355,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_anchor_date_concert_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Grouped 63 concert stage photos into 5 date-based groups"
+        },
+        {
+          "rank": 2,
+          "score": 0.80721354,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_near_tag_focus_date_concert_portrait",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped concert assets by date with portrait tag focus"
+        },
+        {
+          "rank": 3,
+          "score": 0.7999822,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_near_camera_model_sony_a7iii_date_concert_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped concert stage photos by date using Sony A7III camera filter"
+        },
+        {
+          "rank": 4,
+          "score": 0.7901149,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_anchor_date_concert_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped concert assets by date with stage tag focus"
+        },
+        {
+          "rank": 5,
+          "score": 0.77609694,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_near_time_window_date_concert_stage_autumn_2024",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped autumn 2024 concert stage photos by date"
+        },
+        {
+          "rank": 6,
+          "score": 0.76172125,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_near_time_window_date_concert_stage_autumn_2024",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped autumn 2024 concert assets by date with stage tag focus"
+        }
+      ]
+    }
+  ]
+}

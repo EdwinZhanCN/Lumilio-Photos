@@ -8,49 +8,13 @@ from typing import Any
 
 import httpx
 
-MEDIA_TOOLS = [
-    "mock_filter_assets",
-    "mock_group_assets",
-    "mock_inspect_asset_metadata",
-    "mock_find_duplicate_assets",
-    "mock_bulk_like_assets",
-    "mock_bulk_archive_assets",
-    "mock_create_album",
-    "mock_add_assets_to_album",
-    "mock_summarize_selection",
-]
-
-ALLOWED_OUTPUT_KINDS = {
-    "mock_filter_assets": "asset_selection",
-    "mock_group_assets": "asset_groups",
-    "mock_inspect_asset_metadata": "asset_metadata_report",
-    "mock_find_duplicate_assets": "duplicate_report",
-    "mock_bulk_like_assets": "bulk_like_update",
-    "mock_bulk_archive_assets": "bulk_archive_update",
-    "mock_create_album": "album_record",
-    "mock_add_assets_to_album": "album_membership_update",
-    "mock_summarize_selection": "selection_summary",
-}
-
-INTENT_VOCAB = [
-    "curate_album",
-    "cleanup_duplicates",
-    "bulk_like",
-    "bulk_archive",
-    "inspect_metadata",
-    "group_assets",
-    "summarize_selection",
-]
-
-SCENARIO_VOCAB = [
-    "curate_trip_album",
-    "cleanup_duplicate_shoot",
-    "bulk_like_highlights",
-    "archive_low_rated_assets",
-    "inspect_camera_metadata",
-    "group_assets_for_review",
-    "summarize_selected_assets",
-]
+from .generation_matrix import (
+    ALLOWED_OUTPUT_KINDS,
+    INTENT_VOCAB,
+    MEDIA_TOOLS,
+    SCENARIO_VOCAB,
+    format_plan_for_prompt,
+)
 
 
 class DeepSeekClient:
@@ -77,6 +41,7 @@ class DeepSeekClient:
         query_count: int,
         seed: int,
         schema_text: str,
+        generation_plan: dict[str, Any],
         temperature: float,
         timeout_seconds: float = 120.0,
         max_tokens: int = 7000,
@@ -94,6 +59,11 @@ class DeepSeekClient:
             f"Allowed tool_name -> output_kind mapping: {json.dumps(ALLOWED_OUTPUT_KINDS, ensure_ascii=False)}.\n"
             f"Allowed intent values: {', '.join(INTENT_VOCAB)}.\n"
             f"Allowed scenario values: {', '.join(SCENARIO_VOCAB)}.\n"
+            "Every episode must contain a unique symbolic episode_id such as "
+            "'ep_inspect_camera_metadata_canon_r5_001'.\n"
+            "Every episode must include cluster_id. Episodes in the same minimal-difference cluster must reuse the same cluster_id.\n"
+            "Every query must include target_episode_ids and point to one or a very small number "
+            "of exact episode_id values from the generated episode set.\n"
             f"Vary entities such as location, camera_model, album, failure_mode, rating, liked state, and time windows.\n"
             f"Include both successful and recovered episodes, but no aborted episodes.\n"
             "Use compact symbolic labels for scenario and intent. Do not write them as long natural-language sentences.\n"
@@ -101,8 +71,11 @@ class DeepSeekClient:
             "Do not invent output_kind labels outside the allowed mapping.\n"
             "Avoid repetitive traces such as calling mock_create_album multiple times in a row unless the goal explicitly compares albums.\n"
             "Ensure the query set covers every scenario+intent group present in the episode set at least once.\n"
+            "Queries should target specific prior episodes, not just the broad task family.\n"
+            "Follow the supplied generation plan exactly. Do not invent extra clusters or replace the provided episode_id values.\n"
             f"Queries must paraphrase the task goals instead of copying them verbatim.\n"
             f"Use this JSON schema as the contract:\n{schema_text}\n"
+            f"Use this generation plan as the required batch matrix:\n{format_plan_for_prompt(generation_plan)}\n"
             f"Use seed hint {seed} for deterministic variety."
         )
 

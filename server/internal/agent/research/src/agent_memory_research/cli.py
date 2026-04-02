@@ -12,6 +12,7 @@ import typer
 
 from .bundle_lint import lint_bundle
 from .deepseek_client import DeepSeekClient
+from .generation_matrix import build_generation_plan, slice_generation_plan
 from .ollama_embedder import OllamaEmbedder
 from .qdrant_client import QdrantClient
 from .schema_utils import (
@@ -28,6 +29,20 @@ app = typer.Typer(help="Research CLI for agent episodic memory datasets.")
 @app.command("print-schema-path")
 def print_schema_path(schema_name: str = "episode_spec_bundle.schema.json") -> None:
     typer.echo(str(AGENT_ROOT / "schemas" / schema_name))
+
+
+@app.command("print-generation-plan")
+def print_generation_plan(
+    episode_count: int = 12,
+    query_count: int = 4,
+    seed: int = 42,
+) -> None:
+    plan = build_generation_plan(
+        episode_count=episode_count,
+        query_count=query_count,
+        seed=seed,
+    )
+    typer.echo(json.dumps(plan, ensure_ascii=False, indent=2))
 
 
 @app.command("validate-bundle")
@@ -104,7 +119,9 @@ def generate_spec_bundle(
         max_tokens=max_tokens,
         log=log,
     )
+    bundle = normalize_bundle_for_schema(bundle, force_retarget_queries=True)
     backfill_missing_query_coverage(bundle, desired_query_count=query_count, log=log)
+    bundle = normalize_bundle_for_schema(bundle, force_retarget_queries=True)
     log("validating generated bundle against episode_spec_bundle.schema.json")
     validate_with_schema(bundle, "episode_spec_bundle.schema.json")
     lint_issues = lint_bundle(bundle)
@@ -132,41 +149,44 @@ def make_splits(
         )
 
     bundle = load_json(input_path)
+    bundle = normalize_bundle_for_schema(bundle)
     validate_with_schema(bundle, "episode_spec_bundle.schema.json")
 
     episodes = list(bundle.get("episodes", []))
     queries = list(bundle.get("queries", []))
-    episode_groups = group_episodes_by_target(episodes)
+    episode_groups = group_episodes_by_scenario_cluster(episodes)
 
     train: list[dict[str, Any]] = []
     val: list[dict[str, Any]] = []
     test: list[dict[str, Any]] = []
-    group_to_split: dict[tuple[str, str], str] = {}
-
-    ordered_groups = sorted(
-        episode_groups.items(),
-        key=lambda item: hashlib.sha256(
-            f"{item[0][0]}|{item[0][1]}|{split_seed}".encode("utf-8")
+    ordered_scenarios = sorted(
+        episode_groups,
+        key=lambda scenario: hashlib.sha256(
+            f"{scenario}|{split_seed}".encode("utf-8")
         ).hexdigest(),
     )
-    train_group_count, val_group_count, test_group_count = compute_group_split_counts(
-        len(ordered_groups), train_ratio, val_ratio
-    )
+    for scenario in ordered_scenarios:
+        cluster_groups = episode_groups[scenario]
+        ordered_clusters = sorted(
+            cluster_groups.items(),
+            key=lambda item: hashlib.sha256(
+                f"{scenario}|{item[0]}|{split_seed}".encode("utf-8")
+            ).hexdigest(),
+        )
+        train_group_count, val_group_count, test_group_count = (
+            compute_group_split_counts(len(ordered_clusters), train_ratio, val_ratio)
+        )
+        for index, (_, cluster_episodes) in enumerate(ordered_clusters):
+            if index < train_group_count:
+                train.extend(cluster_episodes)
+            elif index < train_group_count + val_group_count:
+                val.extend(cluster_episodes)
+            else:
+                test.extend(cluster_episodes)
 
-    for index, (group_key, group_episodes) in enumerate(ordered_groups):
-        if index < train_group_count:
-            split_name = "train"
-            train.extend(group_episodes)
-        elif index < train_group_count + val_group_count:
-            split_name = "val"
-            val.extend(group_episodes)
-        else:
-            split_name = "test"
-            test.extend(group_episodes)
-        group_to_split[group_key] = split_name
-
+    episode_id_to_split = build_episode_id_to_split(train, val, test)
     train_queries, val_queries, test_queries = split_queries_by_target(
-        queries, group_to_split
+        queries, episode_id_to_split
     )
     ensure_queries_match_split(train, train_queries, "train")
     ensure_queries_match_split(val, val_queries, "val")
@@ -285,6 +305,7 @@ def benchmark_retrieval(
                 "query": query_spec["query"],
                 "target_scenario": query_spec.get("target_scenario", ""),
                 "target_intent": query_spec.get("target_intent", ""),
+                "target_episode_ids": list(query_spec.get("target_episode_ids", [])),
                 "rank": rank,
                 "embed_ms": round(embed_ms, 3),
                 "search_ms": round(search_ms, 3),
@@ -362,6 +383,22 @@ def group_episodes_by_target(
     return groups
 
 
+def group_episodes_by_scenario_cluster(
+    episodes: list[dict[str, Any]],
+) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    groups: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for index, episode in enumerate(episodes, start=1):
+        scenario = str(episode.get("scenario", "")).strip()
+        cluster_id = str(episode.get("cluster_id", "")).strip()
+        if not scenario:
+            scenario = "unknown"
+        if not cluster_id:
+            cluster_id = derive_cluster_id(episode, index)
+            episode["cluster_id"] = cluster_id
+        groups.setdefault(scenario, {}).setdefault(cluster_id, []).append(episode)
+    return groups
+
+
 def compute_group_split_counts(
     total_groups: int, train_ratio: float, val_ratio: float
 ) -> tuple[int, int, int]:
@@ -395,18 +432,19 @@ def compute_group_split_counts(
 
 def split_queries_by_target(
     queries: list[dict[str, Any]],
-    group_to_split: dict[tuple[str, str], str],
+    episode_id_to_split: dict[str, str],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     train_queries: list[dict[str, Any]] = []
     val_queries: list[dict[str, Any]] = []
     test_queries: list[dict[str, Any]] = []
 
     for query in queries:
-        group_key = (
-            str(query.get("target_scenario", "")).strip(),
-            str(query.get("target_intent", "")).strip(),
-        )
-        split_name = group_to_split.get(group_key)
+        split_name = resolve_query_split_name(query, episode_id_to_split)
+        if split_name is None:
+            raise typer.BadParameter(
+                f"query with target_episode_ids={query.get('target_episode_ids', [])!r} "
+                "does not map to any split"
+            )
         if split_name == "train":
             train_queries.append(query)
         elif split_name == "val":
@@ -420,21 +458,30 @@ def split_queries_by_target(
 def ensure_queries_match_split(
     episodes: list[dict[str, Any]], queries: list[dict[str, Any]], split_name: str
 ) -> None:
-    available_targets = {
-        (
-            str(episode.get("scenario", "")).strip(),
-            str(episode.get("intent", "")).strip(),
-        )
+    available_episode_ids = {
+        str(episode.get("episode_id", "")).strip()
         for episode in episodes
+        if str(episode.get("episode_id", "")).strip()
     }
     for query in queries:
-        query_target = (
-            str(query.get("target_scenario", "")).strip(),
-            str(query.get("target_intent", "")).strip(),
-        )
-        if query_target not in available_targets:
+        target_episode_ids = [
+            str(value).strip()
+            for value in query.get("target_episode_ids", [])
+            if str(value).strip()
+        ]
+        if not target_episode_ids:
             raise typer.BadParameter(
-                f"{split_name} split contains query target {query_target!r} without a matching episode"
+                f"{split_name} split contains a query without target_episode_ids"
+            )
+        missing_episode_ids = [
+            episode_id
+            for episode_id in target_episode_ids
+            if episode_id not in available_episode_ids
+        ]
+        if missing_episode_ids:
+            raise typer.BadParameter(
+                f"{split_name} split contains query target episode IDs {missing_episode_ids!r} "
+                f"without matching episodes"
             )
 
 
@@ -457,6 +504,11 @@ def generate_spec_bundle_in_batches(
     remaining_queries = query_count
     batch_index = 0
     schema_text = json.dumps(schema, ensure_ascii=False, indent=2)
+    global_plan = build_generation_plan(
+        episode_count=episode_count,
+        query_count=query_count,
+        seed=seed,
+    )
     merged_bundle: dict[str, Any] = {
         "schema_version": "agent-memory/episode-spec-bundle/v1",
         "episodes": [],
@@ -474,16 +526,29 @@ def generate_spec_bundle_in_batches(
             f"starting batch {batch_index}: episodes={target_episode_count}, "
             f"queries={target_query_count}"
         )
-        batch_bundle = client.generate_spec_bundle(
-            model=model,
+        generation_plan = slice_generation_plan(
+            global_plan,
+            episode_offset=len(merged_bundle["episodes"]),
             episode_count=current_episode_count,
+            query_offset=len(merged_bundle["queries"]),
             query_count=current_query_count,
-            seed=seed + batch_index - 1,
+        )
+        log(
+            "batch generation matrix: "
+            + json.dumps(generation_plan["coverage_summary"], ensure_ascii=False),
+            color=typer.colors.BLUE,
+        )
+        batch_bundle = generate_bundle_from_plan(
+            client=client,
+            generation_plan=generation_plan,
             schema_text=schema_text,
+            model=model,
+            seed=seed + batch_index - 1,
             temperature=temperature,
             timeout_seconds=timeout_seconds,
             max_tokens=max_tokens,
-            progress=log,
+            log=log,
+            batch_label=f"batch {batch_index}",
         )
         batch_bundle = normalize_bundle_for_schema(batch_bundle)
         validate_with_schema(batch_bundle, "episode_spec_bundle.schema.json")
@@ -503,6 +568,155 @@ def generate_spec_bundle_in_batches(
         )
 
     return merged_bundle
+
+
+def generate_bundle_from_plan(
+    *,
+    client: DeepSeekClient,
+    generation_plan: dict[str, Any],
+    schema_text: str,
+    model: str,
+    seed: int,
+    temperature: float,
+    timeout_seconds: float,
+    max_tokens: int,
+    log,
+    batch_label: str,
+) -> dict[str, Any]:
+    episode_blueprints = list(generation_plan.get("episode_blueprints", []))
+    query_blueprints = list(generation_plan.get("query_blueprints", []))
+    episode_count = len(episode_blueprints)
+    query_count = len(query_blueprints)
+
+    try:
+        return client.generate_spec_bundle(
+            model=model,
+            episode_count=episode_count,
+            query_count=query_count,
+            seed=seed,
+            schema_text=schema_text,
+            generation_plan=generation_plan,
+            temperature=temperature,
+            timeout_seconds=timeout_seconds,
+            max_tokens=max_tokens,
+            progress=log,
+        )
+    except Exception as exc:
+        if episode_count <= 1:
+            raise
+
+        left_plan, right_plan = split_generation_plan_for_retry(generation_plan)
+        if not left_plan or not right_plan:
+            raise
+
+        log(
+            f"{batch_label} failed with {type(exc).__name__}: {exc}. "
+            "Retrying with two smaller sub-batches.",
+            color=typer.colors.YELLOW,
+        )
+
+        left_bundle = generate_bundle_from_plan(
+            client=client,
+            generation_plan=left_plan,
+            schema_text=schema_text,
+            model=model,
+            seed=seed,
+            temperature=temperature,
+            timeout_seconds=timeout_seconds,
+            max_tokens=max_tokens,
+            log=log,
+            batch_label=f"{batch_label}.a",
+        )
+        right_bundle = generate_bundle_from_plan(
+            client=client,
+            generation_plan=right_plan,
+            schema_text=schema_text,
+            model=model,
+            seed=seed + 1000,
+            temperature=temperature,
+            timeout_seconds=timeout_seconds,
+            max_tokens=max_tokens,
+            log=log,
+            batch_label=f"{batch_label}.b",
+        )
+        return {
+            "schema_version": generation_plan.get(
+                "schema_version", "agent-memory/episode-spec-bundle/v1"
+            ),
+            "episodes": list(left_bundle.get("episodes", []))
+            + list(right_bundle.get("episodes", [])),
+            "queries": list(left_bundle.get("queries", []))
+            + list(right_bundle.get("queries", [])),
+        }
+
+
+def split_generation_plan_for_retry(
+    generation_plan: dict[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    episode_blueprints = list(generation_plan.get("episode_blueprints", []))
+    query_blueprints = list(generation_plan.get("query_blueprints", []))
+    if len(episode_blueprints) <= 1:
+        return None, None
+
+    midpoint = max(1, len(episode_blueprints) // 2)
+    left_episodes = episode_blueprints[:midpoint]
+    right_episodes = episode_blueprints[midpoint:]
+    if not left_episodes or not right_episodes:
+        return None, None
+
+    left_episode_ids = {
+        str(episode.get("episode_id", "")).strip()
+        for episode in left_episodes
+        if str(episode.get("episode_id", "")).strip()
+    }
+    left_queries: list[dict[str, Any]] = []
+    right_queries: list[dict[str, Any]] = []
+    for query in query_blueprints:
+        target_episode_ids = {
+            str(value).strip()
+            for value in query.get("target_episode_ids", [])
+            if str(value).strip()
+        }
+        if target_episode_ids and target_episode_ids <= left_episode_ids:
+            left_queries.append(query)
+        else:
+            right_queries.append(query)
+
+    left_plan = {
+        "seed": generation_plan.get("seed"),
+        "episode_count": len(left_episodes),
+        "query_count": len(left_queries),
+        "episode_blueprints": left_episodes,
+        "query_blueprints": left_queries,
+        "coverage_summary": generation_plan_summary(left_episodes, left_queries),
+    }
+    right_plan = {
+        "seed": generation_plan.get("seed"),
+        "episode_count": len(right_episodes),
+        "query_count": len(right_queries),
+        "episode_blueprints": right_episodes,
+        "query_blueprints": right_queries,
+        "coverage_summary": generation_plan_summary(right_episodes, right_queries),
+    }
+    return left_plan, right_plan
+
+
+def generation_plan_summary(
+    episode_blueprints: list[dict[str, Any]],
+    query_blueprints: list[dict[str, Any]],
+) -> dict[str, Any]:
+    episode_groups: dict[str, int] = {}
+    query_groups: dict[str, int] = {}
+    for episode in episode_blueprints:
+        key = f"{episode.get('scenario', '')}/{episode.get('intent', '')}"
+        episode_groups[key] = episode_groups.get(key, 0) + 1
+    for query in query_blueprints:
+        key = f"{query.get('target_scenario', '')}/{query.get('target_intent', '')}"
+        query_groups[key] = query_groups.get(key, 0) + 1
+    return {
+        "episode_groups": episode_groups,
+        "query_groups": query_groups,
+    }
 
 
 def backfill_missing_query_coverage(
@@ -562,6 +776,45 @@ def find_missing_query_targets(
     return sorted(episode_targets - query_targets)
 
 
+def build_episode_id_to_split(
+    train: list[dict[str, Any]],
+    val: list[dict[str, Any]],
+    test: list[dict[str, Any]],
+) -> dict[str, str]:
+    episode_id_to_split: dict[str, str] = {}
+    for split_name, episodes in (("train", train), ("val", val), ("test", test)):
+        for episode in episodes:
+            episode_id = str(episode.get("episode_id", "")).strip()
+            if episode_id:
+                episode_id_to_split[episode_id] = split_name
+    return episode_id_to_split
+
+
+def resolve_query_split_name(
+    query: dict[str, Any], episode_id_to_split: dict[str, str]
+) -> str | None:
+    target_episode_ids = [
+        str(value).strip()
+        for value in query.get("target_episode_ids", [])
+        if str(value).strip()
+    ]
+    if not target_episode_ids:
+        return None
+
+    split_names = {
+        episode_id_to_split.get(target_episode_id, "")
+        for target_episode_id in target_episode_ids
+        if episode_id_to_split.get(target_episode_id, "")
+    }
+    if not split_names:
+        return None
+    if len(split_names) > 1:
+        raise typer.BadParameter(
+            f"query targets multiple splits via target_episode_ids={target_episode_ids!r}"
+        )
+    return next(iter(split_names))
+
+
 def synthesize_query_from_episode(episode: dict[str, Any]) -> dict[str, Any]:
     goal = str(episode.get("goal", "")).strip()
     summary = str(episode.get("summary", "")).strip()
@@ -584,6 +837,7 @@ def synthesize_query_from_episode(episode: dict[str, Any]) -> dict[str, Any]:
         "query": query_text,
         "target_scenario": scenario,
         "target_intent": intent,
+        "target_episode_ids": [str(episode.get("episode_id", "")).strip()],
         "entity": entity,
         "status": status,
         "tags": tags[:4],
@@ -655,7 +909,180 @@ def trim_queries_to_target_count(
         )
 
 
-def normalize_bundle_for_schema(payload: dict[str, Any]) -> dict[str, Any]:
+def ensure_episode_ids(payload: dict[str, Any]) -> None:
+    episodes = payload.get("episodes", [])
+    if not isinstance(episodes, list):
+        return
+
+    used_ids: set[str] = set()
+    for index, episode in enumerate(episodes, start=1):
+        if not isinstance(episode, dict):
+            continue
+        episode_id = str(episode.get("episode_id", "")).strip()
+        if not episode_id:
+            episode_id = make_episode_id(
+                str(episode.get("scenario", "")).strip(), index, used_ids
+            )
+            episode["episode_id"] = episode_id
+        if episode_id in used_ids:
+            episode_id = make_episode_id(episode_id, index, used_ids)
+            episode["episode_id"] = episode_id
+        used_ids.add(episode_id)
+
+
+def ensure_cluster_ids(payload: dict[str, Any]) -> None:
+    episodes = payload.get("episodes", [])
+    if not isinstance(episodes, list):
+        return
+
+    for index, episode in enumerate(episodes, start=1):
+        if not isinstance(episode, dict):
+            continue
+        cluster_id = str(episode.get("cluster_id", "")).strip()
+        if cluster_id:
+            episode["cluster_id"] = cluster_id
+            continue
+        episode["cluster_id"] = derive_cluster_id(episode, index)
+
+
+def ensure_query_target_episode_ids(
+    payload: dict[str, Any], *, force: bool = False
+) -> None:
+    episodes = payload.get("episodes", [])
+    queries = payload.get("queries", [])
+    if not isinstance(episodes, list) or not isinstance(queries, list):
+        return
+    episode_by_id = {
+        str(episode.get("episode_id", "")).strip(): episode
+        for episode in episodes
+        if isinstance(episode, dict) and str(episode.get("episode_id", "")).strip()
+    }
+
+    for query in queries:
+        if not isinstance(query, dict):
+            continue
+        target_episode_ids = [
+            str(value).strip()
+            for value in query.get("target_episode_ids", [])
+            if str(value).strip()
+        ]
+        if target_episode_ids and not force:
+            query["target_episode_ids"] = target_episode_ids
+        else:
+            resolved_target_episode_ids = resolve_query_target_episode_ids(
+                query, episodes
+            )
+            if resolved_target_episode_ids:
+                query["target_episode_ids"] = resolved_target_episode_ids
+                target_episode_ids = resolved_target_episode_ids
+
+        if not target_episode_ids:
+            continue
+
+        target_episode = episode_by_id.get(target_episode_ids[0])
+        if target_episode is None:
+            continue
+        if not str(query.get("target_scenario", "")).strip():
+            query["target_scenario"] = str(target_episode.get("scenario", "")).strip()
+        if not str(query.get("target_intent", "")).strip():
+            query["target_intent"] = str(target_episode.get("intent", "")).strip()
+
+
+def resolve_query_target_episode_ids(
+    query: dict[str, Any], episodes: list[dict[str, Any]]
+) -> list[str]:
+    target_scenario = str(query.get("target_scenario", "")).strip()
+    target_intent = str(query.get("target_intent", "")).strip()
+    entity = str(query.get("entity", "")).strip()
+    status = str(query.get("status", "")).strip()
+    query_tags = {str(tag).strip() for tag in query.get("tags", []) if str(tag).strip()}
+
+    candidates: list[tuple[int, str]] = []
+    for episode in episodes:
+        if not isinstance(episode, dict):
+            continue
+        episode_id = str(episode.get("episode_id", "")).strip()
+        if not episode_id:
+            continue
+        if (
+            target_scenario
+            and str(episode.get("scenario", "")).strip() != target_scenario
+        ):
+            continue
+        if target_intent and str(episode.get("intent", "")).strip() != target_intent:
+            continue
+
+        score = 0
+        if status and str(episode.get("status", "")).strip() == status:
+            score += 3
+        if entity and episode_matches_entity(episode, entity):
+            score += 5
+
+        episode_tags = {
+            str(tag).strip() for tag in episode.get("tags", []) if str(tag).strip()
+        }
+        score += len(query_tags & episode_tags)
+        candidates.append((score, episode_id))
+
+    if not candidates:
+        return []
+
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    return [candidates[0][1]]
+
+
+def episode_matches_entity(episode: dict[str, Any], entity: str) -> bool:
+    for ref in episode.get("entities", []):
+        if not isinstance(ref, dict):
+            continue
+        if str(ref.get("name", "")).strip() == entity:
+            return True
+
+    metadata = episode.get("metadata", {})
+    if isinstance(metadata, dict):
+        for value in metadata.values():
+            if str(value).strip() == entity:
+                return True
+
+    searchable_fields = (
+        str(episode.get("goal", "")).strip(),
+        str(episode.get("summary", "")).strip(),
+    )
+    return any(entity in value for value in searchable_fields if value)
+
+
+def make_episode_id(seed: str, index: int, used_ids: set[str]) -> str:
+    base = slugify_token(seed) or "episode"
+    candidate = f"ep_{base}_{index:03d}"
+    suffix = index
+    while candidate in used_ids:
+        suffix += 1
+        candidate = f"ep_{base}_{suffix:03d}"
+    return candidate
+
+
+def slugify_token(value: str) -> str:
+    chars = []
+    previous_was_sep = False
+    for char in value.lower():
+        if char.isalnum():
+            chars.append(char)
+            previous_was_sep = False
+            continue
+        if previous_was_sep:
+            continue
+        chars.append("_")
+        previous_was_sep = True
+    return "".join(chars).strip("_")
+
+
+def normalize_bundle_for_schema(
+    payload: dict[str, Any], *, force_retarget_queries: bool = False
+) -> dict[str, Any]:
+    ensure_episode_ids(payload)
+    ensure_cluster_ids(payload)
+    ensure_query_target_episode_ids(payload, force=force_retarget_queries)
+
     episodes = payload.get("episodes", [])
     if not isinstance(episodes, list):
         return payload
@@ -671,6 +1098,39 @@ def normalize_bundle_for_schema(payload: dict[str, Any]) -> dict[str, Any]:
         }
 
     return payload
+
+
+def derive_cluster_id(episode: dict[str, Any], index: int) -> str:
+    scenario_slug = slugify_token(str(episode.get("scenario", "")).strip())
+    episode_id = str(episode.get("episode_id", "")).strip()
+    if episode_id.startswith("ep_"):
+        episode_id = episode_id[3:]
+
+    if scenario_slug and episode_id:
+        marker = f"{scenario_slug}_c"
+        start = episode_id.find(marker)
+        if start >= 0:
+            cluster_id = consume_cluster_slug(episode_id[start:])
+            if cluster_id:
+                return cluster_id
+
+    if scenario_slug:
+        return f"{scenario_slug}_singleton_{index:03d}"
+    return f"episode_singleton_{index:03d}"
+
+
+def consume_cluster_slug(value: str) -> str:
+    parts = [part.strip() for part in value.split("_") if part.strip()]
+    cluster_parts: list[str] = []
+    for part in parts:
+        cluster_parts.append(part)
+        if is_cluster_counter_token(part):
+            return "_".join(cluster_parts)
+    return ""
+
+
+def is_cluster_counter_token(value: str) -> bool:
+    return len(value) >= 2 and value[0] == "c" and value[1:].isdigit()
 
 
 def stringify_metadata_value(value: Any) -> str:
@@ -717,18 +1177,19 @@ def percentile(sorted_values: list[float], ratio: float) -> float:
 
 
 def match_rank(results: list[dict[str, Any]], query_spec: dict[str, Any]) -> int | None:
-    target_scenario = str(query_spec.get("target_scenario", "")).strip()
-    target_intent = str(query_spec.get("target_intent", "")).strip()
+    target_episode_ids = {
+        str(value).strip()
+        for value in query_spec.get("target_episode_ids", [])
+        if str(value).strip()
+    }
+    if not target_episode_ids:
+        return None
 
     for index, point in enumerate(results, start=1):
         episode = extract_episode(point)
-        if target_scenario and episode.get("scenario") != target_scenario:
-            continue
-        if target_intent and episode.get("intent") != target_intent:
-            continue
-        if not target_scenario and not target_intent:
-            continue
-        return index
+        episode_id = str(episode.get("id", "")).strip()
+        if episode_id in target_episode_ids:
+            return index
     return None
 
 

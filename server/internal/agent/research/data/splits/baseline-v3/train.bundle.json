@@ -1,0 +1,4541 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "episode_id": "ep_curate_trip_album_paris_001",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Paris vacation photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 120 assets from Paris trip",
+          "input": {
+            "location": "Paris",
+            "time_window": "2024-03-10 to 2024-03-17"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris Spring 2024'",
+          "input": {
+            "album_name": "Paris Spring 2024"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 85 selected assets to album",
+          "input": {
+            "album": "Paris Spring 2024"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "album",
+          "name": "Paris Spring 2024"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_alaska_001",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Alaska cruise photos",
+      "intent": "curate_album",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 95 assets from Alaska cruise",
+          "input": {
+            "location": "Alaska",
+            "time_window": "2023-07-20 to 2023-07-27"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "error",
+          "output_summary": "Failed to create album due to duplicate name",
+          "error": {
+            "code": "DUPLICATE_ALBUM",
+            "message": "Album 'Alaska Cruise' already exists"
+          },
+          "input": {
+            "album_name": "Alaska Cruise"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Alaska Cruise 2023'",
+          "fix_summary": "Used unique album name",
+          "input": {
+            "album_name": "Alaska Cruise 2023"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 95 selected assets to album",
+          "input": {
+            "album": "Alaska Cruise 2023"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Alaska"
+        },
+        {
+          "type": "album",
+          "name": "Alaska Cruise 2023"
+        },
+        {
+          "type": "failure_mode",
+          "name": "duplicate_album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_paris_001_014",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Paris vacation photos",
+      "intent": "curate_album",
+      "summary": "Created Paris album and added selected photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "album_creation",
+      "tags": [
+        "album",
+        "vacation",
+        "Paris"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Paris Vacation 2023",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-04-10_2023-04-17"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 120 photos from Paris trip",
+          "input": {
+            "location": "Paris",
+            "date_range": "2023-04-10 to 2023-04-17"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris Vacation 2023'",
+          "input": {
+            "album_name": "Paris Vacation 2023",
+            "description": "Photos from Paris trip"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 85 photos to album",
+          "input": {
+            "album_name": "Paris Vacation 2023",
+            "asset_count": 85
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_curate_trip_album_japan_001",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Japan trip photos",
+      "intent": "curate_album",
+      "summary": "Created Japan album but failed to add assets due to network error, then recovered",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "album_creation",
+      "tags": [
+        "album",
+        "Japan",
+        "recovery"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Japan Adventure 2023",
+          "role": "output"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_error",
+          "role": "error"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-11-01_2023-11-10"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 95 photos from Japan trip",
+          "input": {
+            "location": "Tokyo",
+            "date_range": "2023-11-01 to 2023-11-10"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Japan Adventure 2023'",
+          "input": {
+            "album_name": "Japan Adventure 2023",
+            "description": "Photos from Japan trip"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "error",
+          "output_summary": "Failed to add photos due to network error",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection timeout while adding assets"
+          },
+          "input": {
+            "album_name": "Japan Adventure 2023",
+            "asset_count": 95
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Successfully added 95 photos after network recovery",
+          "fix_summary": "Retried after network restored",
+          "input": {
+            "album_name": "Japan Adventure 2023",
+            "asset_count": 95
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_curate_trip_album_yosemite_001",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Yosemite hiking photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Yosemite Hikes' with ID ALB-001",
+          "input": {
+            "album_name": "Yosemite Hikes",
+            "location": "Yosemite"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 32 assets to album 'Yosemite Hikes'",
+          "input": {
+            "album_id": "ALB-001",
+            "asset_count": 32
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "album",
+          "name": "Yosemite Hikes"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_kyoto_001",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Kyoto temple photos",
+      "intent": "curate_album",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "error",
+          "output_summary": "Album name 'Kyoto Temples' already exists",
+          "error": {
+            "code": "DUPLICATE_ALBUM",
+            "message": "Album with this name already exists"
+          },
+          "input": {
+            "album_name": "Kyoto Temples",
+            "location": "Kyoto"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Kyoto Temples 2024' with ID ALB-002",
+          "fix_summary": "Used modified album name",
+          "input": {
+            "album_name": "Kyoto Temples 2024",
+            "location": "Kyoto"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Kyoto"
+        },
+        {
+          "type": "album",
+          "name": "Kyoto Temples 2024"
+        },
+        {
+          "type": "failure_mode",
+          "name": "duplicate_album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_paris_001_038",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Paris vacation photos",
+      "intent": "curate_album",
+      "summary": "Created Paris album and added selected photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "album_creation",
+      "tags": [
+        "album",
+        "vacation",
+        "Paris"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Paris Vacation",
+          "role": "output"
+        },
+        {
+          "type": "location",
+          "name": "Paris",
+          "role": "context"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-06-15_2023-06-20"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris Vacation'",
+          "input": {
+            "album_name": "Paris Vacation"
+          },
+          "payload": {
+            "album_id": "alb_paris_001"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 32 photos to album",
+          "input": {
+            "album_id": "alb_paris_001"
+          },
+          "payload": {
+            "assets_added": 32
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_kyoto_001_044",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Kyoto cherry blossom photos",
+      "intent": "curate_album",
+      "summary": "Created Kyoto album but failed to add assets initially",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "album_creation",
+      "tags": [
+        "album",
+        "Kyoto",
+        "cherry_blossom"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Kyoto Blossoms",
+          "role": "output"
+        },
+        {
+          "type": "location",
+          "name": "Kyoto",
+          "role": "context"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_timeout",
+          "role": "error"
+        }
+      ],
+      "metadata": {
+        "time_window": "2024-03-20_2024-03-25"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Kyoto Blossoms'",
+          "input": {
+            "album_name": "Kyoto Blossoms"
+          },
+          "payload": {
+            "album_id": "alb_kyoto_001"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "error",
+          "output_summary": "Failed due to network timeout",
+          "fix_summary": "Retried after network restored",
+          "error": {
+            "code": "NETWORK_ERROR",
+            "message": "Connection timeout while adding assets"
+          },
+          "input": {
+            "album_id": "alb_kyoto_001"
+          },
+          "payload": {}
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 28 photos to album",
+          "input": {
+            "album_id": "alb_kyoto_001"
+          },
+          "payload": {
+            "assets_added": 28
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_paris_001_050",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Paris vacation photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris 2024' with ID alb_paris_2024",
+          "input": {
+            "album_name": "Paris 2024",
+            "description": "Photos from spring trip to Paris"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 78 assets to album 'Paris 2024'",
+          "input": {
+            "album_id": "alb_paris_2024",
+            "asset_count": 78
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "album",
+          "name": "Paris 2024"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_rome_001",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Rome historical sites photos",
+      "intent": "curate_album",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Rome History' with ID alb_rome_history",
+          "input": {
+            "album_name": "Rome History",
+            "description": "Photos of historical sites in Rome"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "error",
+          "output_summary": "Failed to add assets: album not found",
+          "error": {
+            "code": "ALBUM_NOT_FOUND",
+            "message": "Album ID alb_rome_history does not exist"
+          },
+          "input": {
+            "album_id": "alb_rome_history",
+            "asset_count": 52
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Re-created album 'Rome History' with new ID alb_rome_history_v2",
+          "fix_summary": "Recreated album after deletion issue",
+          "input": {
+            "album_name": "Rome History",
+            "description": "Photos of historical sites in Rome"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 52 assets to album 'Rome History'",
+          "input": {
+            "album_id": "alb_rome_history_v2",
+            "asset_count": 52
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Rome"
+        },
+        {
+          "type": "album",
+          "name": "Rome History"
+        },
+        {
+          "type": "failure_mode",
+          "name": "album_not_found"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_paris_001_062",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Paris vacation photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris 2023' with 60 assets",
+          "input": {
+            "album_name": "Paris 2023",
+            "location": "Paris"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "album",
+          "name": "Paris 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_alaska_001_069",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Alaska wildlife photos",
+      "intent": "curate_album",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "error",
+          "output_summary": "Failed to create album due to duplicate name",
+          "error": {
+            "code": "DUPLICATE_ALBUM",
+            "message": "Album 'Alaska Wildlife' already exists"
+          },
+          "input": {
+            "album_name": "Alaska Wildlife",
+            "location": "Alaska"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Alaska Wildlife 2023' with 75 assets",
+          "fix_summary": "Used modified album name to avoid conflict",
+          "input": {
+            "album_name": "Alaska Wildlife 2023",
+            "location": "Alaska"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Alaska"
+        },
+        {
+          "type": "album",
+          "name": "Alaska Wildlife 2023"
+        },
+        {
+          "type": "failure_mode",
+          "name": "duplicate_album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_paris_002",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Paris vacation photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Paris Vacation"
+        },
+        {
+          "type": "location",
+          "name": "Paris"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris Vacation'"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 32 assets to album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_japan_008",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Japan cherry blossom photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Japan Cherry Blossoms"
+        },
+        {
+          "type": "location",
+          "name": "Japan"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Japan Cherry Blossoms'"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 67 assets to album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_paris_002_086",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Paris vacation photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris 2023'"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 78 assets to album 'Paris 2023'"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "album",
+          "name": "Paris 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_alps_009",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Swiss Alps hiking photos",
+      "intent": "curate_album",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "error",
+          "output_summary": "Failed to create album due to duplicate name",
+          "error": {
+            "code": "DUPLICATE_ALBUM",
+            "message": "Album 'Swiss Alps' already exists"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Swiss Alps Hiking 2023'",
+          "fix_summary": "Used unique album name"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 92 assets to album 'Swiss Alps Hiking 2023'"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Swiss Alps"
+        },
+        {
+          "type": "album",
+          "name": "Swiss Alps Hiking 2023"
+        },
+        {
+          "type": "failure_mode",
+          "name": "duplicate_album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_yosemite_002",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Yosemite hiking photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 120 assets from Yosemite location"
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Yosemite Hikes'"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 85 selected assets to album"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "album",
+          "name": "Yosemite Hikes"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_alaska_009",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Alaska wildlife photos",
+      "intent": "curate_album",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 95 assets from Alaska location"
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "error",
+          "output_summary": "Failed to create album due to duplicate name conflict",
+          "error": {
+            "code": "DUPLICATE_ALBUM",
+            "message": "Album 'Alaska Wildlife' already exists"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Alaska Wildlife 2024'",
+          "fix_summary": "Used modified album name to avoid conflict"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 95 selected assets to album"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Alaska"
+        },
+        {
+          "type": "album",
+          "name": "Alaska Wildlife 2024"
+        },
+        {
+          "type": "failure_mode",
+          "name": "duplicate_album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_yosemite_001_110",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Yosemite hiking photos",
+      "intent": "curate_album",
+      "summary": "Created Yosemite album and added selected photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "album",
+          "name": "Yosemite Hiking 2024"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 78 photos from Yosemite trip"
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Yosemite Hiking 2024'"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 32 selected photos to album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_japan_001_117",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Japan cherry blossom photos",
+      "intent": "curate_album",
+      "summary": "Created Japan album with cherry blossom photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Kyoto"
+        },
+        {
+          "type": "album",
+          "name": "Japan Cherry Blossoms"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 94 photos from Japan trip"
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Japan Cherry Blossoms'"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 48 selected photos to album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_paris_001_122",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Paris vacation photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris 2023' with 120 assets"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "album",
+          "name": "Paris 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_japan_001_128",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Japan cherry blossom photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Japan Spring 2023' with 95 cherry blossom photos"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 95 assets to 'Japan Spring 2023' album"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Japan"
+        },
+        {
+          "type": "album",
+          "name": "Japan Spring 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_paris_001_134",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Paris vacation photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "album",
+          "name": "Paris Vacation 2024"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris Vacation 2024'"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 32 assets to album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_japan_001_140",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Japan cherry blossom photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Japan"
+        },
+        {
+          "type": "album",
+          "name": "Japan Cherry Blossoms 2024"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Japan Cherry Blossoms 2024'"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 56 assets to album"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_yosemite_002_146",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Yosemite hiking photos",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Yosemite Hikes' with 30 assets"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 30 assets to album 'Yosemite Hikes'"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "album",
+          "name": "Yosemite Hikes"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_alaska_008",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Alaska wildlife photography",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Alaska Wildlife' with 40 assets"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 40 assets to album 'Alaska Wildlife'"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Alaska"
+        },
+        {
+          "type": "album",
+          "name": "Alaska Wildlife"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_paris_001_158",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Paris vacation photos",
+      "intent": "curate_album",
+      "summary": "Created Paris album and added selected photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris 2023' with ID alb_paris_001"
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 120 photos from Paris trip"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 85 selected photos to Paris album"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "album",
+          "name": "Paris 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_tokyo_001",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Tokyo business trip photos",
+      "intent": "curate_album",
+      "summary": "Created Tokyo album with selected photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Tokyo Business Trip' with ID alb_tokyo_001"
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 90 photos from Tokyo trip"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 60 selected photos to Tokyo album"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo"
+        },
+        {
+          "type": "album",
+          "name": "Tokyo Business Trip"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_yosemite_001_170",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Yosemite hiking photos",
+      "intent": "curate_album",
+      "summary": "Created Yosemite album with selected photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 120 photos from Yosemite trip",
+          "input": {
+            "location": "Yosemite",
+            "time_window": "2023-08-15 to 2023-08-20"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Yosemite Hiking 2023'",
+          "input": {
+            "album_name": "Yosemite Hiking 2023"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 85 photos to album",
+          "input": {
+            "album": "Yosemite Hiking 2023"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "album",
+          "name": "Yosemite Hiking 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_curate_trip_album_japan_001_176",
+      "scenario": "curate_trip_album",
+      "goal": "Create album for Japan cherry blossom photos",
+      "intent": "curate_album",
+      "summary": "Created Japan album with filtered photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 95 cherry blossom photos from Japan",
+          "input": {
+            "location": "Kyoto",
+            "time_window": "2024-04-01 to 2024-04-07"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Japan Cherry Blossoms 2024'",
+          "input": {
+            "album_name": "Japan Cherry Blossoms 2024"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 72 photos to album",
+          "input": {
+            "album": "Japan Cherry Blossoms 2024"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Kyoto"
+        },
+        {
+          "type": "album",
+          "name": "Japan Cherry Blossoms 2024"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_sunset_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all sunset photos from Hawaii trip",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 35 sunset photos from Hawaii",
+          "input": {
+            "location": "Hawaii",
+            "tags": [
+              "sunset"
+            ],
+            "time_window": "2024-01-20 to 2024-01-27"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 35 sunset assets",
+          "input": {
+            "liked_state": "true"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii"
+        },
+        {
+          "type": "liked_state",
+          "name": "true"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_portrait_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all portrait photos from studio session",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 25 portrait photos from studio",
+          "input": {
+            "location": "Studio Session",
+            "tags": [
+              "portrait"
+            ],
+            "time_window": "2024-02-15 to 2024-02-15"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 25 portrait assets",
+          "input": {
+            "liked_state": "true"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Studio Session"
+        },
+        {
+          "type": "liked_state",
+          "name": "true"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_safari_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all highlight photos from African Safari trip",
+      "intent": "bulk_like",
+      "summary": "Liked 35 highlight photos from Safari",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "bulk_operations",
+      "tags": [
+        "safari",
+        "highlights",
+        "liked"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Serengeti",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "5_star",
+          "role": "criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-08-01_2023-08-10"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 35 photos with 5-star rating from Safari",
+          "input": {
+            "location": "Serengeti",
+            "rating": 5,
+            "date_range": "2023-08-01 to 2023-08-10"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 35 highlight photos",
+          "input": {
+            "asset_count": 35,
+            "liked_state": true
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_ep_bulk_like_highlights_sunset_001_023",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like sunset photos from coastal trip",
+      "intent": "bulk_like",
+      "summary": "Liked 25 sunset photos from California coast",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "bulk_operations",
+      "tags": [
+        "sunset",
+        "coast",
+        "liked"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "California Coast",
+          "role": "subject"
+        },
+        {
+          "type": "rating",
+          "name": "4_star",
+          "role": "criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-09-20_2023-09-25"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 25 sunset photos with 4-star rating",
+          "input": {
+            "location": "California Coast",
+            "rating": 4,
+            "keyword": "sunset",
+            "date_range": "2023-09-20 to 2023-09-25"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 25 sunset photos",
+          "input": {
+            "asset_count": 25,
+            "liked_state": true
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_paris_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Mark all 5-star Paris photos as liked",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 28 assets with 5-star rating in Paris",
+          "input": {
+            "location": "Paris",
+            "rating": 5
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Marked 28 assets as liked",
+          "input": {
+            "asset_count": 28,
+            "liked_state": true
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "rating",
+          "name": "5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_yosemite_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Mark 4-star Yosemite photos as liked",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 19 assets with 4-star rating in Yosemite",
+          "input": {
+            "location": "Yosemite",
+            "rating": 4
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Marked 19 assets as liked",
+          "input": {
+            "asset_count": 19,
+            "liked_state": true
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "rating",
+          "name": "4"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_johnson_wedding_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all highlight photos from Johnson Wedding",
+      "intent": "bulk_like",
+      "summary": "Liked 25 highlight photos from wedding",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "event_library",
+      "route": "bulk_operations",
+      "tags": [
+        "wedding",
+        "highlights",
+        "liked"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding",
+          "role": "context"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-08-05"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 25 photos",
+          "input": {
+            "album": "Johnson Wedding",
+            "rating": "high"
+          },
+          "payload": {
+            "assets_liked": 25
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_family_reunion_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like best photos from Family Reunion",
+      "intent": "bulk_like",
+      "summary": "Liked 35 photos from family reunion",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "family_library",
+      "route": "bulk_operations",
+      "tags": [
+        "family",
+        "reunion",
+        "liked"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2024",
+          "role": "context"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked",
+          "role": "output"
+        }
+      ],
+      "metadata": {
+        "time_window": "2024-05-20"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 35 photos",
+          "input": {
+            "album": "Family Reunion 2024",
+            "rating": "high"
+          },
+          "payload": {
+            "assets_liked": 35
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_beach_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all 5-star rated photos from Maui beach trip",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 23 assets with rating 5 from Maui location",
+          "input": {
+            "location": "Maui",
+            "rating": 5,
+            "liked_state": "unliked"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 23 assets from Maui with 5-star rating",
+          "input": {
+            "asset_ids": [
+              "asset_maui_001",
+              "asset_maui_002",
+              "asset_maui_003"
+            ]
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui"
+        },
+        {
+          "type": "rating",
+          "name": "5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_bulk_like_highlights_portrait_001_058",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all portrait photos with rating 4+ from studio session",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 41 portrait assets with rating >=4 from studio session",
+          "input": {
+            "album": "Studio Portraits Q1",
+            "rating": 4,
+            "genre": "portrait",
+            "liked_state": "unliked"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 41 portrait assets from studio session",
+          "input": {
+            "asset_ids": [
+              "asset_portrait_001",
+              "asset_portrait_002",
+              "asset_portrait_003"
+            ]
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Studio Portraits Q1"
+        },
+        {
+          "type": "rating",
+          "name": "4+"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_bulk_like_highlights_beach_001_064",
+      "scenario": "bulk_like_highlights",
+      "goal": "Mark all 5-star beach photos as liked",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 28 assets from Maui beach with rating 5",
+          "input": {
+            "location": "Maui",
+            "rating": 5,
+            "liked_state": "unliked"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui"
+        },
+        {
+          "type": "rating",
+          "name": "5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_bulk_like_highlights_sunset_001_071",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all sunset photos rated 4 or 5",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 42 sunset assets with rating >=4",
+          "input": {
+            "subject": "sunset",
+            "min_rating": 4,
+            "liked_state": "unliked"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "rating",
+          "name": "4-5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_italy_004",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all 5-star photos from Italy trip",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Italy"
+        },
+        {
+          "type": "rating",
+          "name": "5"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 28 assets with 5-star rating from Italy"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 28 assets"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_family_010",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all family reunion photos rated 4+ stars",
+      "intent": "bulk_like",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2024"
+        },
+        {
+          "type": "rating",
+          "name": "4"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 53 assets with 4+ star rating from family reunion"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "error",
+          "output_summary": "Failed to like assets due to permission error",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to modify likes"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 53 assets after permission fix",
+          "fix_summary": "Retried after permission adjustment"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_wedding_004",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all highlight photos from Johnson Wedding",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 35 highlight photos from Johnson Wedding"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 35 assets from Johnson Wedding"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_concert_011",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like best photos from summer concert",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 28 highlight photos from summer concert"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 28 concert highlight assets"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Summer Concert"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_bulk_like_highlights_wedding_004_100",
+      "scenario": "bulk_like_highlights",
+      "goal": "Mark favorite photos from Johnson Wedding as liked",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 65 wedding photos with rating >= 4"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 52 selected assets from Johnson Wedding"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "rating",
+          "name": "4+"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_sports_011",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like best photos from basketball tournament",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 80 sports photos with action shots"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 68 selected basketball tournament assets"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Basketball Tournament"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_wedding_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all highlight photos from Johnson Wedding",
+      "intent": "bulk_like",
+      "summary": "Liked 25 highlight photos from wedding",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 25 highlight photos from wedding album"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked all 25 selected photos"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_concert_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like best photos from summer concert",
+      "intent": "bulk_like",
+      "summary": "Liked 18 concert highlight photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Summer Concert"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 18 highlight photos from concert"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked all 18 selected photos"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_bulk_like_highlights_sunset_001_124",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all sunset photos from Hawaii trip",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 25 sunset photos from Hawaii collection"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_mountain_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all mountain landscape photos from Rockies trip",
+      "intent": "bulk_like",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "error",
+          "output_summary": "Failed to like assets due to permission error",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to modify like status"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 32 mountain photos after permission fix",
+          "fix_summary": "Retried after updating permissions"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Rockies"
+        },
+        {
+          "type": "failure_mode",
+          "name": "permission_error"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_bulk_like_highlights_johnson_wedding_001_136",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all highlight photos from Johnson Wedding",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 85 highlight photos from Johnson Wedding"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 85 assets from Johnson Wedding"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_santorini_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like sunset photos from Santorini trip",
+      "intent": "bulk_like",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Santorini"
+        },
+        {
+          "type": "failure_mode",
+          "name": "permission_denied"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 31 sunset photos from Santorini"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "error",
+          "output_summary": "Permission denied for bulk like operation",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "User lacks permission to modify like status"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 31 Santorini sunset photos after permission fix",
+          "fix_summary": "Retried after permission granted"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_beach_004",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all 5-star rated photos from Maui beach vacation",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 25 assets with rating 5 from Maui location"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 25 assets from Maui beach vacation"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui"
+        },
+        {
+          "type": "rating",
+          "name": "5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_sunset_010",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all sunset photos from Santorini",
+      "intent": "bulk_like",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "error",
+          "output_summary": "Failed to filter sunset photos due to invalid tag",
+          "error": {
+            "code": "INVALID_TAG",
+            "message": "Tag 'sunset' not found in metadata"
+          }
+        },
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 22 assets with time window 6-8 PM from Santorini",
+          "fix_summary": "Used time-based filtering instead of tag"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 22 sunset-time assets from Santorini"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Santorini"
+        },
+        {
+          "type": "time_window",
+          "name": "6-8 PM"
+        },
+        {
+          "type": "failure_mode",
+          "name": "invalid_tag"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_bulk_like_highlights_beach_001_160",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all high-quality beach photos from Maui",
+      "intent": "bulk_like",
+      "summary": "Liked 35 beach photos from Maui trip",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 50 beach photos from Maui with rating >= 4"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 35 selected beach photos"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui"
+        },
+        {
+          "type": "rating",
+          "name": "4"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_bulk_like_highlights_sunset_001_166",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like sunset photos from Santorini",
+      "intent": "bulk_like",
+      "summary": "Liked 25 sunset photos but some failed due to network error",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 40 sunset photos from Santorini"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "error",
+          "output_summary": "Network error during liking operation",
+          "error": {
+            "code": "NETWORK_ERROR",
+            "message": "Connection lost during bulk like operation"
+          },
+          "fix_summary": "Retried after network reconnection"
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Successfully liked 25 sunset photos"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Santorini"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_error"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_bulk_like_highlights_wedding_001_172",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all highlight photos from Johnson Wedding",
+      "intent": "bulk_like",
+      "summary": "Liked 35 highlight photos from wedding",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 35 highlight photos from Johnson Wedding",
+          "input": {
+            "album": "Johnson Wedding",
+            "rating": "4+"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 35 photos successfully",
+          "input": {
+            "assets": "wedding_highlights"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "rating",
+          "name": "4+"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_sports_001",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like best action shots from basketball game",
+      "intent": "bulk_like",
+      "summary": "Failed to like photos due to network error, then recovered",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 22 action shots from Lakers game",
+          "input": {
+            "album": "Lakers Game",
+            "liked_state": "unliked"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "error",
+          "output_summary": "Network error during like operation",
+          "fix_summary": "Retried after network restored",
+          "error": {
+            "code": "NETWORK_ERROR",
+            "message": "Connection lost during bulk operation"
+          },
+          "input": {
+            "assets": "game_highlights"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 22 photos successfully on retry",
+          "input": {
+            "assets": "game_highlights"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Lakers Game"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_error"
+        },
+        {
+          "type": "liked_state",
+          "name": "unliked"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_nature_001",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected nature photos from Yellowstone",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 42 nature photos from Yellowstone",
+          "input": {
+            "location": "Yellowstone",
+            "tags": [
+              "nature",
+              "wildlife"
+            ],
+            "time_window": "2023-08-10 to 2023-08-15"
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 42 assets, mostly landscapes and wildlife",
+          "input": {}
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yellowstone"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_concert_001",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected concert photos",
+      "intent": "summarize_selection",
+      "summary": "Summarized 50 selected concert photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "event_coverage",
+      "route": "selection_summary",
+      "tags": [
+        "concert",
+        "summary",
+        "selection"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Summer Festival 2023",
+          "role": "subject"
+        },
+        {
+          "type": "liked_state",
+          "name": "liked",
+          "role": "criteria"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-06-30_2023-06-30"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 50 liked photos from concert",
+          "input": {
+            "album": "Summer Festival 2023",
+            "liked": true
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 50 photos, mostly stage shots and crowd scenes",
+          "input": {
+            "asset_count": 50
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_family_001",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected family reunion photos",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 42 family reunion photos from July 2023",
+          "input": {
+            "album": "Family Reunion 2023",
+            "time_window": "2023-07"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_beach_001",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected beach vacation photos",
+      "intent": "summarize_selection",
+      "summary": "Generated summary for 50 beach photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "selection_summary",
+      "tags": [
+        "summary",
+        "beach",
+        "vacation"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maldives",
+          "role": "context"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-11-05_2023-11-15"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary covers 50 photos with beach themes",
+          "input": {
+            "location": "Maldives"
+          },
+          "payload": {
+            "assets_summarized": 50
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_hiking_001",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected hiking photos from Colorado",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 34 hiking photos from Colorado, average rating 4.2, taken with Sony A7III",
+          "input": {
+            "location": "Colorado",
+            "activity": "hiking",
+            "camera_model": "Sony A7III"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Colorado"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_summarize_selected_assets_family_001_067",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected family reunion photos",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized 85 selected assets from Smith Family Reunion",
+          "input": {
+            "album": "Smith Family Reunion",
+            "selection_criteria": "manual_selection"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Smith Family Reunion"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_beach_007",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected beach vacation photos",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maldives"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 42 beach photos from Maldives, average rating 4.2"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_family_007",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected family reunion photos",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized 48 selected family reunion photos"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_holiday_007",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected holiday photos from Christmas album",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized 75 selected holiday assets: 45 indoor, 30 outdoor scenes"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Christmas 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_sports_001",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected sports event photos",
+      "intent": "summarize_selection",
+      "summary": "Generated summary of sports event photo selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Basketball Tournament"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 65 action shots, 12 team photos, 8 trophy ceremony"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_summarize_selected_assets_family_001_127",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected family reunion photos",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized 85 family reunion photos: 45 people shots, 25 group photos, 15 detail shots"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Family Reunion 2023"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_hawaii_001",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected Hawaii beach photos",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized 42 Hawaii beach photos: 15 sunrise, 27 sunset shots"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_sports_007",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected basketball game photos",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized 15 selected basketball game photos: 8 action shots, 7 crowd scenes"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Basketball Finals"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_summarize_selected_assets_hiking_001_163",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected hiking photos from Colorado",
+      "intent": "summarize_selection",
+      "summary": "Created summary of Colorado hiking photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 65 hiking photos from Colorado"
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 65 photos, 45 liked, average rating 4.2"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Colorado"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_summarize_selected_assets_concert_001_175",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected concert photos",
+      "intent": "summarize_selection",
+      "summary": "Created summary of 28 concert photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 28 photos from Taylor Swift concert, average rating 4.5",
+          "input": {
+            "selection": "concert_highlights"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Taylor Swift Concert"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_beach_001",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and clean duplicate photos from beach shoot",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Failed to find duplicates due to network timeout",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection timeout during duplicate detection"
+          },
+          "input": {
+            "location": "Maui Beach",
+            "time_window": "2024-02-05 to 2024-02-05"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate sets from Maui Beach",
+          "fix_summary": "Retried after network reconnection",
+          "input": {
+            "location": "Maui Beach",
+            "time_window": "2024-02-05 to 2024-02-05"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui Beach"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_timeout"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_conference_001",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Clean duplicate photos from tech conference",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 8 duplicate sets from Tech Conference 2024",
+          "input": {
+            "location": "Tech Conference 2024",
+            "time_window": "2024-03-22 to 2024-03-24"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tech Conference 2024"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_wedding_001",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from Johnson Wedding shoot",
+      "intent": "cleanup_duplicates",
+      "summary": "Identified duplicate wedding photos but failed to archive due to permission error",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "duplicate_cleanup",
+      "tags": [
+        "wedding",
+        "duplicates",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding",
+          "role": "subject"
+        },
+        {
+          "type": "failure_mode",
+          "name": "permission_error",
+          "role": "error"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-09-05_2023-09-05"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 23 duplicate photos in Johnson Wedding set",
+          "input": {
+            "album": "Johnson Wedding",
+            "similarity_threshold": 0.95
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "error",
+          "output_summary": "Failed to archive duplicates due to permission error",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to archive assets"
+          },
+          "input": {
+            "asset_ids": [
+              "dup_001",
+              "dup_002",
+              "dup_003"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Successfully archived 23 duplicate photos after permission fix",
+          "fix_summary": "Retried with corrected permissions",
+          "input": {
+            "asset_ids": [
+              "dup_001",
+              "dup_002",
+              "dup_003",
+              "dup_004",
+              "dup_005"
+            ]
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_portrait_001",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Clean duplicate photos from portrait session",
+      "intent": "cleanup_duplicates",
+      "summary": "Found and archived duplicate portrait photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "professional_portfolio",
+      "route": "duplicate_cleanup",
+      "tags": [
+        "portrait",
+        "duplicates",
+        "cleanup"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Fall Portraits 2023",
+          "role": "subject"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-10-15_2023-10-15"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate photos in portrait session",
+          "input": {
+            "album": "Fall Portraits 2023",
+            "similarity_threshold": 0.9
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 12 duplicate photos",
+          "input": {
+            "asset_count": 12
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_wedding_001_027",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from Johnson Wedding shoot",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Failed to process due to corrupted metadata",
+          "error": {
+            "code": "METADATA_CORRUPTED",
+            "message": "Asset metadata contains invalid timestamps"
+          },
+          "input": {
+            "album": "Johnson Wedding"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate groups after metadata repair",
+          "fix_summary": "Used fallback timestamp matching",
+          "input": {
+            "album": "Johnson Wedding",
+            "time_window": "2023-06-15"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "failure_mode",
+          "name": "corrupted_metadata"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_portrait_001_035",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find duplicates in portrait studio session",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 8 duplicate groups in portrait session",
+          "input": {
+            "album": "Portrait Studio",
+            "time_window": "2023-11-20"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Portrait Studio"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_yosemite_001",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from Yosemite shoot",
+      "intent": "cleanup_duplicates",
+      "summary": "Identified duplicates in Yosemite photos but failed to archive",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "duplicate_cleanup",
+      "tags": [
+        "duplicates",
+        "nature",
+        "Yosemite"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite",
+          "role": "context"
+        },
+        {
+          "type": "failure_mode",
+          "name": "permission_error",
+          "role": "error"
+        }
+      ],
+      "metadata": {
+        "time_window": "2023-07-10_2023-07-12"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 18 duplicate sets",
+          "input": {
+            "location": "Yosemite"
+          },
+          "payload": {
+            "duplicate_sets": 18
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "error",
+          "output_summary": "Failed to archive due to permission error",
+          "fix_summary": "Retried with corrected permissions",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to archive assets"
+          },
+          "input": {
+            "asset_ids": [
+              "dup_set_1",
+              "dup_set_2"
+            ]
+          },
+          "payload": {}
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Successfully archived 15 duplicate assets",
+          "input": {
+            "asset_ids": [
+              "dup_set_1",
+              "dup_set_2"
+            ]
+          },
+          "payload": {
+            "assets_archived": 15
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_product_001",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate product photos from studio shoot",
+      "intent": "cleanup_duplicates",
+      "summary": "Successfully removed duplicate product photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "commercial_library",
+      "route": "duplicate_cleanup",
+      "tags": [
+        "duplicates",
+        "product",
+        "studio"
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Product Launch",
+          "role": "context"
+        }
+      ],
+      "metadata": {
+        "time_window": "2024-06-05_2024-06-06"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate sets",
+          "input": {
+            "album": "Product Launch"
+          },
+          "payload": {
+            "duplicate_sets": 12
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 10 duplicate assets",
+          "input": {
+            "asset_ids": [
+              "dup_set_3",
+              "dup_set_4"
+            ]
+          },
+          "payload": {
+            "assets_archived": 10
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_wedding_001_051",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from Johnson Wedding shoot",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Failed to process due to network timeout",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection timed out while scanning for duplicates"
+          },
+          "input": {
+            "album": "Johnson Wedding",
+            "similarity_threshold": 0.95
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate groups in Johnson Wedding album, marked 36 assets for removal",
+          "fix_summary": "Retried with reduced similarity threshold",
+          "input": {
+            "album": "Johnson Wedding",
+            "similarity_threshold": 0.9
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_timeout"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_landscape_001",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find duplicates in Iceland landscape photography collection",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 8 duplicate groups in Iceland landscape collection, 24 assets total",
+          "input": {
+            "location": "Iceland",
+            "genre": "landscape",
+            "similarity_threshold": 0.92
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Iceland"
+        },
+        {
+          "type": "genre",
+          "name": "landscape"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_wedding_001_063",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from Johnson Wedding shoot",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Initial scan failed due to corrupted metadata",
+          "error": {
+            "code": "METADATA_CORRUPTED",
+            "message": "Asset metadata corrupted for 5 files"
+          },
+          "input": {
+            "album": "Johnson Wedding",
+            "time_window": "2023-09-10"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate pairs after metadata repair",
+          "fix_summary": "Used backup metadata to repair corrupted files",
+          "input": {
+            "album": "Johnson Wedding",
+            "time_window": "2023-09-10"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "failure_mode",
+          "name": "metadata_corruption"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_portrait_001_070",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate portrait session photos",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 8 duplicate pairs in portrait session",
+          "input": {
+            "album": "Portrait Session",
+            "time_window": "2023-08-22"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Portrait Session"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_wedding_003",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from Johnson Wedding shoot",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Network timeout during duplicate detection",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection to duplicate service timed out"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate sets in Johnson Wedding album",
+          "fix_summary": "Retried after network restored"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_portrait_009",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate portrait session photos",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Portrait Session 2024"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 8 duplicate sets in portrait session"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_beach_003",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from beach shoot",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Failed to find duplicates due to network timeout",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection timed out while scanning for duplicates"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate sets in beach shoot assets",
+          "fix_summary": "Retried after network restored"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Miami Beach"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_timeout"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_portrait_010",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate portrait session photos",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 8 duplicate sets in portrait session"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Portrait Session Nov"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_beach_003_099",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from beach shoot",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Failed to find duplicates due to network timeout",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection timed out during duplicate detection"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 23 duplicate sets in beach shoot assets",
+          "fix_summary": "Retried after network reconnection"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui Beach"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_timeout"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_portrait_010_106",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate portrait session photos",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 15 duplicate sets in portrait session assets"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Portrait Session May"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_beach_001_111",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from beach shoot",
+      "intent": "cleanup_duplicates",
+      "summary": "Found duplicates but failed to archive due to permission error",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui Beach"
+        },
+        {
+          "type": "failure_mode",
+          "name": "permission_error"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate sets in beach photos"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "error",
+          "output_summary": "Failed to archive duplicates",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to archive assets"
+          },
+          "fix_summary": "Retried with correct permissions"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Successfully archived 8 duplicate photos"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_portrait_001_118",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate portrait session photos",
+      "intent": "cleanup_duplicates",
+      "summary": "Successfully removed duplicate portrait photos",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "album",
+          "name": "Portrait Session May"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 7 duplicate sets in portrait session"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 14 duplicate photos"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_yosemite_001_123",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate photos from Yosemite landscape shoot",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Failed to find duplicates due to network timeout",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection timeout while scanning for duplicates"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 15 duplicate sets in Yosemite photos, removed 30 redundant files",
+          "fix_summary": "Retried after network restored"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_timeout"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_beach_001_131",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate beach photos from Maldives vacation",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 8 duplicate sets in Maldives beach photos, removed 16 redundant files"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maldives"
+        },
+        {
+          "type": "time_window",
+          "name": "last_month"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_yosemite_001_135",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from Yosemite shoot",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_timeout"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Network timeout during duplicate detection",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection timed out during asset comparison"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate sets in Yosemite photos",
+          "fix_summary": "Retried after network restored"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_fuji_xt4_001",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate photos from Fuji X-T4 studio shoot",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "entities": [
+        {
+          "type": "camera_model",
+          "name": "Fuji X-T4"
+        },
+        {
+          "type": "time_window",
+          "name": "yesterday"
+        }
+      ],
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 8 duplicate sets in Fuji X-T4 studio photos"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_wedding_003_147",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from Johnson Wedding shoot",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "error",
+          "output_summary": "Failed to find duplicates due to network timeout",
+          "error": {
+            "code": "NETWORK_TIMEOUT",
+            "message": "Connection timed out while scanning assets"
+          }
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 12 duplicate sets in Johnson Wedding photos, marked for removal",
+          "fix_summary": "Retried after network reconnection"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "failure_mode",
+          "name": "network_timeout"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_portrait_009_153",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate portrait session photos",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 8 duplicate sets in portrait session, marked for deletion"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Portrait Session"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_wedding_001_159",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from Johnson Wedding shoot",
+      "intent": "cleanup_duplicates",
+      "summary": "Found duplicates in wedding photos but failed to archive due to permission error",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 23 duplicate sets in Johnson Wedding photos"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "error",
+          "output_summary": "Failed to archive duplicates due to permission error",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to archive assets"
+          },
+          "fix_summary": "Retried with correct permissions"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Successfully archived 45 duplicate photos"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "failure_mode",
+          "name": "permission_error"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_portrait_001_165",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Clean duplicate portrait session photos",
+      "intent": "cleanup_duplicates",
+      "summary": "Successfully removed duplicates from portrait session",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 15 duplicate sets in portrait session"
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 30 duplicate portrait photos"
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Portrait Session Oct"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_beach_001_171",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Find and remove duplicate photos from beach shoot",
+      "intent": "cleanup_duplicates",
+      "summary": "Found duplicates but failed to remove due to permission error",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 23 duplicate sets from beach shoot",
+          "input": {
+            "location": "Maui Beach",
+            "time_window": "2023-07-10"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "error",
+          "output_summary": "Failed to archive duplicates",
+          "fix_summary": "Retried with different selection",
+          "error": {
+            "code": "PERMISSION_DENIED",
+            "message": "Insufficient permissions to archive assets"
+          },
+          "input": {
+            "assets": "duplicate_set_1"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 15 duplicate photos successfully",
+          "input": {
+            "assets": "duplicate_set_2"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Maui Beach"
+        },
+        {
+          "type": "failure_mode",
+          "name": "permission_denied"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_ep_cleanup_duplicate_shoot_portrait_001_177",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Remove duplicate portrait session photos",
+      "intent": "cleanup_duplicates",
+      "summary": "Successfully removed 18 duplicate portraits",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 18 duplicate portraits from studio session",
+          "input": {
+            "album": "Portrait Studio",
+            "time_window": "2023-11-15"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 18 duplicates successfully",
+          "input": {
+            "assets": "portrait_duplicates"
+          }
+        }
+      ],
+      "entities": [
+        {
+          "type": "album",
+          "name": "Portrait Studio"
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query": "How did the Paris album creation go?",
+      "target_episode_ids": [
+        "ep_curate_trip_album_paris_001"
+      ],
+      "entity": "Paris",
+      "status": "succeeded",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Tell me about the duplicate cleanup from the beach shoot that had issues",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_beach_001"
+      ],
+      "entity": "Maui Beach",
+      "status": "recovered",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "What happened when I tried to organize my Paris vacation photos into an album?",
+      "target_episode_ids": [
+        "ep_ep_curate_trip_album_paris_001_014"
+      ],
+      "entity": "Paris",
+      "status": "succeeded",
+      "tags": [
+        "album",
+        "vacation"
+      ],
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Tell me about the time I had trouble removing duplicate wedding photos",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "status": "recovered",
+      "tags": [
+        "wedding",
+        "duplicates"
+      ],
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "How did I handle liking all my best safari shots?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_safari_001"
+      ],
+      "entity": "Serengeti",
+      "status": "succeeded",
+      "tags": [
+        "safari",
+        "highlights"
+      ],
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "How were Yosemite hiking photos organized?",
+      "target_episode_ids": [
+        "ep_curate_trip_album_yosemite_001"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Were there issues removing duplicate wedding photos and how were they fixed?",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "status": "recovered",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "Which highly-rated photos were marked as favorites recently?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_paris_001"
+      ],
+      "entity": "Paris",
+      "status": "succeeded",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "What happened when I tried to archive duplicate photos from Yosemite?",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_yosemite_001"
+      ],
+      "entity": "Yosemite",
+      "status": "recovered",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "Show me episodes where I created albums for trips",
+      "target_episode_ids": [
+        "ep_curate_trip_album_paris_001"
+      ],
+      "entity": "Paris",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Which episodes involved liking highlight photos from events?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_johnson_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "How were duplicates handled for the wedding shoot?",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "status": "recovered",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "Show me the album creation for Paris and Rome trips",
+      "target_episode_ids": [
+        "ep_curate_trip_album_paris_001"
+      ],
+      "entity": "Paris",
+      "status": "succeeded",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "What summaries were generated for selected assets?",
+      "target_episode_ids": [
+        "ep_ep_summarize_selected_assets_hiking_001_163"
+      ],
+      "entity": "Colorado",
+      "status": "succeeded",
+      "target_scenario": "summarize_selected_assets",
+      "target_intent": "summarize_selection"
+    },
+    {
+      "query": "How did I handle duplicate removal for the wedding shoot when metadata was corrupted?",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "status": "recovered"
+    },
+    {
+      "query": "Show me how I created albums for my Paris and Alaska trips",
+      "target_episode_ids": [
+        "ep_curate_trip_album_paris_001"
+      ],
+      "entity": "Paris",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Which high-rated beach photos did I mark as favorites recently?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_beach_001"
+      ],
+      "entity": "Maui",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "How did the system handle creating travel albums?",
+      "target_episode_ids": [
+        "ep_curate_trip_album_paris_002"
+      ],
+      "entity": "Paris Vacation",
+      "status": "succeeded",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Tell me about removing duplicate photos from portrait sessions",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_portrait_009"
+      ],
+      "entity": "Portrait Session 2024",
+      "status": "succeeded",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "What issues occurred when liking family photos and how were they fixed?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_family_010"
+      ],
+      "entity": "Family Reunion 2024",
+      "status": "recovered",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "How were Paris vacation photos organized into an album?",
+      "target_episode_ids": [
+        "ep_curate_trip_album_paris_001"
+      ],
+      "entity": "Paris",
+      "status": "succeeded",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Tell me about dealing with duplicate beach photos after the initial problem",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_beach_003"
+      ],
+      "entity": "Miami Beach",
+      "status": "recovered",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "Show me how wedding highlights were marked as liked",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_johnson_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "status": "succeeded",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "How did you handle creating the Alaska album when there was a naming conflict?",
+      "target_episode_ids": [
+        "ep_curate_trip_album_alaska_001"
+      ],
+      "entity": "Alaska",
+      "status": "recovered",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Which wedding photos did you mark as favorites?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_johnson_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "status": "succeeded",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "How did we organize the Yosemite hiking pictures into an album?",
+      "target_episode_ids": [
+        "ep_curate_trip_album_yosemite_001"
+      ],
+      "entity": "Yosemite",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "What happened when we tried to remove duplicate beach photos and how was it fixed?",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_beach_001"
+      ],
+      "entity": "Maui Beach",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "Which wedding photos did we mark as favorites and how many were there?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_johnson_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "How did I handle duplicate removal for my Yosemite landscape shots?",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_yosemite_001"
+      ],
+      "entity": "Yosemite",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "status": "recovered"
+    },
+    {
+      "query": "Show me when I created albums for my international trips",
+      "target_episode_ids": [
+        "ep_ep_curate_trip_album_paris_001_062"
+      ],
+      "entity": "Paris 2023",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Tell me about liking my mountain photos from the Rockies",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_mountain_001"
+      ],
+      "entity": "Rockies",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like",
+      "status": "recovered"
+    },
+    {
+      "query": "How were vacation photos from Japan organized?",
+      "target_episode_ids": [
+        "ep_curate_trip_album_japan_001"
+      ],
+      "entity": "Japan",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Were there issues removing duplicate shots from Yosemite, and how were they fixed?",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_yosemite_001"
+      ],
+      "entity": "Yosemite",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "status": "recovered"
+    },
+    {
+      "query": "Which wedding highlights got marked as favorites, and were there any problems?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_johnson_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "How did you handle duplicate removal for the Johnson Wedding photos after the initial failure?",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "Which sunset photos from Santorini did you mark as liked, and what filtering issue did you encounter?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_santorini_001"
+      ],
+      "entity": "Santorini",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "What happened when I tried to organize my Paris vacation photos into an album?",
+      "target_episode_ids": [
+        "ep_curate_trip_album_paris_001"
+      ],
+      "entity": "Paris",
+      "status": "succeeded",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Tell me about the time I had issues with duplicate wedding photos and how it was resolved",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_wedding_001"
+      ],
+      "entity": "Johnson Wedding",
+      "status": "recovered",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "How did I handle liking sunset photos when there were technical problems?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_santorini_001"
+      ],
+      "entity": "Santorini",
+      "status": "recovered",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    },
+    {
+      "query": "What happened when I tried to organize photos from my Yosemite trip into an album?",
+      "target_episode_ids": [
+        "ep_curate_trip_album_yosemite_001"
+      ],
+      "entity": "Yosemite",
+      "status": "succeeded",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Tell me about the time I had trouble removing duplicate beach photos",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_beach_001"
+      ],
+      "entity": "Maui Beach",
+      "status": "recovered",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates"
+    },
+    {
+      "query": "What went wrong when I tried to favorite those basketball game photos?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_sports_001"
+      ],
+      "entity": "Lakers Game",
+      "status": "recovered",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like"
+    }
+  ]
+}
