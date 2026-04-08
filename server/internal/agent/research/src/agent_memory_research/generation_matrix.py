@@ -283,6 +283,21 @@ CLUSTER_VARIANTS = (
     ("near_threshold", "rating_threshold"),
 )
 
+SLOT_PRIORITY = [
+    "location",
+    "album_name",
+    "camera_model",
+    "time_window",
+    "selection_theme",
+    "group_by",
+    "tag_focus",
+    "failure_mode",
+    "similarity_threshold",
+    "rating_threshold",
+    "liked_state",
+    "status",
+]
+
 
 def build_generation_plan(
     *,
@@ -294,6 +309,7 @@ def build_generation_plan(
     ordered_scenarios = SCENARIO_VOCAB[:]
     rng.shuffle(ordered_scenarios)
     scenario_cluster_counts = {scenario: 0 for scenario in SCENARIO_VOCAB}
+    scenario_anchor_signatures = {scenario: set() for scenario in SCENARIO_VOCAB}
 
     episode_blueprints: list[dict[str, Any]] = []
     query_blueprints: list[dict[str, Any]] = []
@@ -304,9 +320,14 @@ def build_generation_plan(
         scenario_pointer += 1
         spec = SCENARIO_SPECS[scenario]
         scenario_cluster_index = scenario_cluster_counts[scenario]
-        entity_template = spec["entity_templates"][
-            scenario_cluster_index % len(spec["entity_templates"])
-        ]
+        entity_template = ensure_unique_anchor_entity_bundle(
+            entity_template=spec["entity_templates"][
+                scenario_cluster_index % len(spec["entity_templates"])
+            ],
+            cluster_axes=spec["cluster_axes"],
+            cluster_index=scenario_cluster_index,
+            existing_signatures=scenario_anchor_signatures[scenario],
+        )
         available_variants = build_cluster_variants(
             entity_template,
             spec["cluster_axes"],
@@ -329,6 +350,9 @@ def build_generation_plan(
             )
             if variant_index == 0:
                 anchor_episode_id = episode_id
+                scenario_anchor_signatures[scenario].add(
+                    make_entity_signature(entity_bundle)
+                )
             episode_blueprints.append(
                 {
                     "episode_id": episode_id,
@@ -357,6 +381,7 @@ def build_generation_plan(
 
     query_blueprints = build_query_blueprints(
         anchor_episodes=anchor_episodes,
+        episode_blueprints=episode_blueprints,
         ordered_scenarios=ordered_scenarios,
         query_count=query_count,
     )
@@ -374,12 +399,17 @@ def build_generation_plan(
 def build_query_blueprints(
     *,
     anchor_episodes: list[dict[str, Any]],
+    episode_blueprints: list[dict[str, Any]],
     ordered_scenarios: list[str],
     query_count: int,
 ) -> list[dict[str, Any]]:
     anchors_by_scenario: dict[str, list[dict[str, Any]]] = {}
+    episodes_by_target: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for episode in anchor_episodes:
         anchors_by_scenario.setdefault(episode["scenario"], []).append(episode)
+    for episode in episode_blueprints:
+        key = (episode["scenario"], episode["intent"])
+        episodes_by_target.setdefault(key, []).append(episode)
 
     scenario_order = [
         scenario for scenario in ordered_scenarios if anchors_by_scenario.get(scenario)
@@ -396,6 +426,13 @@ def build_query_blueprints(
         anchors = anchors_by_scenario[scenario]
         episode = anchors[scenario_offsets[scenario] % len(anchors)]
         scenario_offsets[scenario] += 1
+        group_episodes = episodes_by_target.get(
+            (episode["scenario"], episode["intent"]), []
+        )
+        required_slots, hard_negative_episode_ids = analyze_query_discrimination(
+            target_episode=episode,
+            candidate_episodes=group_episodes,
+        )
         query_blueprints.append(
             {
                 "query_index": query_index + 1,
@@ -406,6 +443,8 @@ def build_query_blueprints(
                 "query_focus": episode["query_focus"],
                 "entity_bundle": episode["entity_bundle"],
                 "minimal_difference_axis": episode["minimal_difference_axis"],
+                "required_slots": required_slots,
+                "hard_negative_episode_ids": hard_negative_episode_ids,
             }
         )
     return query_blueprints
@@ -452,6 +491,7 @@ def build_cluster_variants(
             + ["time_window", "location", "camera_model", "rating_threshold"]
         )
     )
+    preferred_axes = [axis for axis in preferred_axes if axis in base]
     rng.shuffle(preferred_axes)
     for axis in preferred_axes[:2]:
         mutated = mutate_entity_bundle(base, axis, cluster_index)
@@ -459,6 +499,152 @@ def build_cluster_variants(
             continue
         variants.append((f"near_{axis}", axis, mutated))
     return variants
+
+
+def ensure_unique_anchor_entity_bundle(
+    *,
+    entity_template: dict[str, str],
+    cluster_axes: list[str],
+    cluster_index: int,
+    existing_signatures: set[tuple[tuple[str, str], ...]],
+) -> dict[str, str]:
+    base = dict(entity_template)
+    candidates: list[dict[str, str]] = [base]
+    available_axes = [axis for axis in cluster_axes if axis in base]
+
+    for axis in available_axes:
+        mutated = mutate_entity_bundle(base, axis, cluster_index)
+        if mutated != base:
+            candidates.append(mutated)
+
+    for first_index, first_axis in enumerate(available_axes):
+        first_mutation = mutate_entity_bundle(base, first_axis, cluster_index)
+        if first_mutation == base:
+            continue
+        for second_axis in available_axes[first_index + 1 :]:
+            second_mutation = mutate_entity_bundle(
+                first_mutation, second_axis, cluster_index + 1
+            )
+            if second_mutation != first_mutation:
+                candidates.append(second_mutation)
+
+    for candidate in candidates:
+        if make_entity_signature(candidate) not in existing_signatures:
+            return candidate
+
+    return base
+
+
+def analyze_query_discrimination(
+    *,
+    target_episode: dict[str, Any],
+    candidate_episodes: list[dict[str, Any]],
+) -> tuple[list[dict[str, str]], list[str]]:
+    target_slots = build_episode_slot_map(target_episode)
+    remaining_candidates: list[dict[str, Any]] = []
+    unresolved_episode_ids: list[str] = []
+
+    for episode in candidate_episodes:
+        episode_id = str(episode.get("episode_id", "")).strip()
+        if not episode_id or episode_id == target_episode["episode_id"]:
+            continue
+        candidate_slots = build_episode_slot_map(episode)
+        differing_keys = [
+            key
+            for key, target_value in target_slots.items()
+            if candidate_slots.get(key, "") != target_value
+        ]
+        if not differing_keys:
+            unresolved_episode_ids.append(episode_id)
+            continue
+        remaining_candidates.append(
+            {
+                "episode_id": episode_id,
+                "slots": candidate_slots,
+                "differing_keys": differing_keys,
+            }
+        )
+
+    selected_keys: list[str] = []
+    uncovered_candidates = remaining_candidates[:]
+    while uncovered_candidates:
+        best_key = ""
+        best_count = -1
+        for key in ordered_slot_keys(target_slots):
+            if key in selected_keys:
+                continue
+            covered_count = sum(
+                1
+                for candidate in uncovered_candidates
+                if candidate["slots"].get(key, "") != target_slots[key]
+            )
+            if covered_count > best_count:
+                best_key = key
+                best_count = covered_count
+        if best_count <= 0 or not best_key:
+            unresolved_episode_ids.extend(
+                candidate["episode_id"] for candidate in uncovered_candidates
+            )
+            break
+        selected_keys.append(best_key)
+        uncovered_candidates = [
+            candidate
+            for candidate in uncovered_candidates
+            if candidate["slots"].get(best_key, "") == target_slots[best_key]
+        ]
+
+    if not selected_keys:
+        fallback_keys = ordered_slot_keys(target_slots)[:2]
+        selected_keys = fallback_keys
+
+    required_slots = [
+        {"slot_name": key, "slot_value": target_slots[key]} for key in selected_keys
+    ]
+    hard_negative_episode_ids = [
+        candidate["episode_id"]
+        for candidate in sorted(
+            remaining_candidates,
+            key=lambda candidate: (
+                len(candidate["differing_keys"]),
+                candidate["episode_id"],
+            ),
+        )[:4]
+    ]
+
+    if unresolved_episode_ids:
+        hard_negative_episode_ids.extend(
+            episode_id
+            for episode_id in unresolved_episode_ids
+            if episode_id not in hard_negative_episode_ids
+        )
+
+    return required_slots, hard_negative_episode_ids
+
+
+def build_episode_slot_map(episode: dict[str, Any]) -> dict[str, str]:
+    slots = {
+        key: str(value)
+        for key, value in episode.get("entity_bundle", {}).items()
+        if str(value).strip()
+    }
+    status = str(episode.get("status", "")).strip()
+    if status:
+        slots["status"] = status
+    return slots
+
+
+def ordered_slot_keys(slots: dict[str, str]) -> list[str]:
+    return sorted(
+        slots,
+        key=lambda key: (
+            SLOT_PRIORITY.index(key) if key in SLOT_PRIORITY else len(SLOT_PRIORITY),
+            key,
+        ),
+    )
+
+
+def make_entity_signature(entity_bundle: dict[str, str]) -> tuple[tuple[str, str], ...]:
+    return tuple(sorted((key, str(value)) for key, value in entity_bundle.items()))
 
 
 def mutate_entity_bundle(

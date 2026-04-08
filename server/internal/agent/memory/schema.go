@@ -2,6 +2,7 @@ package memory
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -122,6 +123,23 @@ func (e Episode) BuildRetrievalText() string {
 			entityParts = append(entityParts, entity.Name)
 		}
 		parts = append(parts, "entities: "+strings.Join(entityParts, ", "))
+	}
+	if len(e.Metadata) > 0 {
+		keys := make([]string, 0, len(e.Metadata))
+		for key, value := range e.Metadata {
+			if strings.TrimSpace(key) == "" || key == "cluster_id" || strings.TrimSpace(value) == "" {
+				continue
+			}
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		slotParts := make([]string, 0, len(keys))
+		for _, key := range keys {
+			slotParts = append(slotParts, fmt.Sprintf("%s=%s", key, e.Metadata[key]))
+		}
+		if len(slotParts) > 0 {
+			parts = append(parts, "slots: "+strings.Join(slotParts, ", "))
+		}
 	}
 	if len(e.Tags) > 0 {
 		parts = append(parts, "tags: "+strings.Join(e.Tags, ", "))

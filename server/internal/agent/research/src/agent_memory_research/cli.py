@@ -119,9 +119,9 @@ def generate_spec_bundle(
         max_tokens=max_tokens,
         log=log,
     )
-    bundle = normalize_bundle_for_schema(bundle, force_retarget_queries=True)
+    bundle = normalize_bundle_for_schema(bundle)
     backfill_missing_query_coverage(bundle, desired_query_count=query_count, log=log)
-    bundle = normalize_bundle_for_schema(bundle, force_retarget_queries=True)
+    bundle = normalize_bundle_for_schema(bundle)
     log("validating generated bundle against episode_spec_bundle.schema.json")
     validate_with_schema(bundle, "episode_spec_bundle.schema.json")
     lint_issues = lint_bundle(bundle)

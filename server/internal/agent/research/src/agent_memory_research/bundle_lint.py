@@ -109,6 +109,12 @@ def lint_bundle(payload: dict[str, Any]) -> list[str]:
                 f"queries[{index}].target_episode_ids must contain at least one episode_id"
             )
             continue
+        if len(target_episode_ids) != 1:
+            issues.append(
+                f"queries[{index}].target_episode_ids must contain exactly one episode_id "
+                f"for strict retrieval, got {len(target_episode_ids)}"
+            )
+            continue
 
         for target_episode_id in target_episode_ids:
             episode = episode_by_id.get(target_episode_id)

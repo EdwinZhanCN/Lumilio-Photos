@@ -21,6 +21,11 @@ func TestBuildRetrievalTextIncludesCoreFields(t *testing.T) {
 		Entities: []EntityRef{
 			{Type: "location", Name: "Tokyo"},
 		},
+		Metadata: map[string]string{
+			"time_window": "spring_2024",
+			"liked_state": "false",
+			"cluster_id":  "cluster_should_not_leak",
+		},
 		ToolTrace: []ToolTraceStep{
 			{Tool: core.ToolIdentity{Name: "mock_find_duplicate_assets"}},
 			{Tool: core.ToolIdentity{Name: "mock_inspect_asset_metadata"}},
@@ -31,8 +36,10 @@ func TestBuildRetrievalTextIncludesCoreFields(t *testing.T) {
 	text := episode.BuildRetrievalText()
 	require.Contains(t, text, "goal: clean up duplicate travel photos while keeping the sharpest version")
 	require.Contains(t, text, "location=Tokyo")
+	require.Contains(t, text, "slots: liked_state=false, time_window=spring_2024")
 	require.Contains(t, text, "mock_find_duplicate_assets -> mock_inspect_asset_metadata -> mock_bulk_archive_assets")
 	require.Contains(t, text, "status: recovered")
+	require.NotContains(t, text, "cluster_should_not_leak")
 }
 
 func TestDefaultWritePolicy(t *testing.T) {
