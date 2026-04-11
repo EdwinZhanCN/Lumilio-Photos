@@ -309,13 +309,21 @@ def build_generation_plan(
     ordered_scenarios = SCENARIO_VOCAB[:]
     rng.shuffle(ordered_scenarios)
     scenario_cluster_counts = {scenario: 0 for scenario in SCENARIO_VOCAB}
-    scenario_anchor_signatures = {scenario: set() for scenario in SCENARIO_VOCAB}
+    scenario_episode_signatures = {scenario: set() for scenario in SCENARIO_VOCAB}
 
     episode_blueprints: list[dict[str, Any]] = []
     query_blueprints: list[dict[str, Any]] = []
 
     scenario_pointer = 0
+    generation_attempts = 0
+    max_generation_attempts = max(episode_count * len(SCENARIO_VOCAB) * 4, 100)
     while len(episode_blueprints) < episode_count:
+        generation_attempts += 1
+        if generation_attempts > max_generation_attempts:
+            raise RuntimeError(
+                "unable to build a collision-free generation plan with the available "
+                "scenario templates"
+            )
         scenario = ordered_scenarios[scenario_pointer % len(ordered_scenarios)]
         scenario_pointer += 1
         spec = SCENARIO_SPECS[scenario]
@@ -326,14 +334,20 @@ def build_generation_plan(
             ],
             cluster_axes=spec["cluster_axes"],
             cluster_index=scenario_cluster_index,
-            existing_signatures=scenario_anchor_signatures[scenario],
+            existing_signatures=scenario_episode_signatures[scenario],
         )
-        available_variants = build_cluster_variants(
-            entity_template,
-            spec["cluster_axes"],
-            scenario_cluster_index,
-            rng,
+        available_variants = select_unique_cluster_variants(
+            build_cluster_variants(
+                entity_template,
+                spec["cluster_axes"],
+                scenario_cluster_index,
+                rng,
+            ),
+            existing_signatures=scenario_episode_signatures[scenario],
         )
+        if not available_variants:
+            scenario_cluster_counts[scenario] = scenario_cluster_index + 1
+            continue
         cluster_size = min(
             len(available_variants), episode_count - len(episode_blueprints)
         )
@@ -350,9 +364,9 @@ def build_generation_plan(
             )
             if variant_index == 0:
                 anchor_episode_id = episode_id
-                scenario_anchor_signatures[scenario].add(
-                    make_entity_signature(entity_bundle)
-                )
+            scenario_episode_signatures[scenario].add(
+                make_entity_signature(entity_bundle)
+            )
             episode_blueprints.append(
                 {
                     "episode_id": episode_id,
@@ -396,6 +410,24 @@ def build_generation_plan(
     }
 
 
+def select_unique_cluster_variants(
+    variants: list[tuple[str, str | None, dict[str, str]]],
+    *,
+    existing_signatures: set[tuple[tuple[str, str], ...]],
+) -> list[tuple[str, str | None, dict[str, str]]]:
+    selected_variants: list[tuple[str, str | None, dict[str, str]]] = []
+    cluster_signatures: set[tuple[tuple[str, str], ...]] = set()
+
+    for variant_role, diff_axis, entity_bundle in variants:
+        signature = make_entity_signature(entity_bundle)
+        if signature in existing_signatures or signature in cluster_signatures:
+            continue
+        selected_variants.append((variant_role, diff_axis, entity_bundle))
+        cluster_signatures.add(signature)
+
+    return selected_variants
+
+
 def build_query_blueprints(
     *,
     anchor_episodes: list[dict[str, Any]],
@@ -411,11 +443,45 @@ def build_query_blueprints(
         key = (episode["scenario"], episode["intent"])
         episodes_by_target.setdefault(key, []).append(episode)
 
+    strict_anchors_by_scenario: dict[str, list[dict[str, Any]]] = {}
+    for scenario, anchors in anchors_by_scenario.items():
+        for episode in anchors:
+            group_episodes = episodes_by_target.get(
+                (episode["scenario"], episode["intent"]), []
+            )
+            (
+                required_slots,
+                hard_negative_episode_ids,
+                unresolved_episode_ids,
+            ) = analyze_query_discrimination(
+                target_episode=episode,
+                candidate_episodes=group_episodes,
+            )
+            if unresolved_episode_ids:
+                continue
+            strict_anchor = dict(episode)
+            strict_anchor["required_slots"] = required_slots
+            strict_anchor["hard_negative_episode_ids"] = hard_negative_episode_ids
+            strict_anchors_by_scenario.setdefault(scenario, []).append(strict_anchor)
+
+    missing_strict_scenarios = sorted(
+        scenario
+        for scenario in anchors_by_scenario
+        if not strict_anchors_by_scenario.get(scenario)
+    )
+    if missing_strict_scenarios:
+        raise RuntimeError(
+            "unable to build strict query targets for scenarios: "
+            + ", ".join(missing_strict_scenarios)
+        )
+
     scenario_order = [
-        scenario for scenario in ordered_scenarios if anchors_by_scenario.get(scenario)
+        scenario
+        for scenario in ordered_scenarios
+        if strict_anchors_by_scenario.get(scenario)
     ]
     if not scenario_order:
-        scenario_order = sorted(anchors_by_scenario)
+        scenario_order = sorted(strict_anchors_by_scenario)
 
     scenario_offsets = {scenario: 0 for scenario in scenario_order}
     query_blueprints: list[dict[str, Any]] = []
@@ -423,16 +489,9 @@ def build_query_blueprints(
     for query_index in range(query_count):
         scenario = scenario_order[scenario_pointer % len(scenario_order)]
         scenario_pointer += 1
-        anchors = anchors_by_scenario[scenario]
+        anchors = strict_anchors_by_scenario[scenario]
         episode = anchors[scenario_offsets[scenario] % len(anchors)]
         scenario_offsets[scenario] += 1
-        group_episodes = episodes_by_target.get(
-            (episode["scenario"], episode["intent"]), []
-        )
-        required_slots, hard_negative_episode_ids = analyze_query_discrimination(
-            target_episode=episode,
-            candidate_episodes=group_episodes,
-        )
         query_blueprints.append(
             {
                 "query_index": query_index + 1,
@@ -443,8 +502,8 @@ def build_query_blueprints(
                 "query_focus": episode["query_focus"],
                 "entity_bundle": episode["entity_bundle"],
                 "minimal_difference_axis": episode["minimal_difference_axis"],
-                "required_slots": required_slots,
-                "hard_negative_episode_ids": hard_negative_episode_ids,
+                "required_slots": episode["required_slots"],
+                "hard_negative_episode_ids": episode["hard_negative_episode_ids"],
             }
         )
     return query_blueprints
@@ -539,7 +598,7 @@ def analyze_query_discrimination(
     *,
     target_episode: dict[str, Any],
     candidate_episodes: list[dict[str, Any]],
-) -> tuple[list[dict[str, str]], list[str]]:
+) -> tuple[list[dict[str, str]], list[str], list[str]]:
     target_slots = build_episode_slot_map(target_episode)
     remaining_candidates: list[dict[str, Any]] = []
     unresolved_episode_ids: list[str] = []
@@ -618,7 +677,7 @@ def analyze_query_discrimination(
             if episode_id not in hard_negative_episode_ids
         )
 
-    return required_slots, hard_negative_episode_ids
+    return required_slots, hard_negative_episode_ids, unresolved_episode_ids
 
 
 def build_episode_slot_map(episode: dict[str, Any]) -> dict[str, str]:
