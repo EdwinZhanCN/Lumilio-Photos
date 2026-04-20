@@ -142,11 +142,16 @@ def make_splits(
     split_seed: int = 42,
     train_ratio: float = 0.8,
     val_ratio: float = 0.1,
+    min_test_clusters_per_scenario: int = 3,
+    min_val_clusters_per_scenario: int = 1,
+    ensure_test_query_per_episode: bool = True,
 ) -> None:
     if train_ratio <= 0 or val_ratio <= 0 or train_ratio + val_ratio >= 1:
         raise typer.BadParameter(
             "train_ratio and val_ratio must be positive and sum to less than 1"
         )
+    if min_test_clusters_per_scenario < 0 or min_val_clusters_per_scenario < 0:
+        raise typer.BadParameter("minimum cluster counts must be non-negative")
 
     bundle = load_json(input_path)
     bundle = normalize_bundle_for_schema(bundle)
@@ -174,7 +179,13 @@ def make_splits(
             ).hexdigest(),
         )
         train_group_count, val_group_count, test_group_count = (
-            compute_group_split_counts(len(ordered_clusters), train_ratio, val_ratio)
+            compute_group_split_counts(
+                len(ordered_clusters),
+                train_ratio,
+                val_ratio,
+                min_test_groups=min_test_clusters_per_scenario,
+                min_val_groups=min_val_clusters_per_scenario,
+            )
         )
         for index, (_, cluster_episodes) in enumerate(ordered_clusters):
             if index < train_group_count:
@@ -188,6 +199,10 @@ def make_splits(
     train_queries, val_queries, test_queries = split_queries_by_target(
         queries, episode_id_to_split
     )
+    if ensure_test_query_per_episode:
+        test_queries = backfill_queries_for_episodes(
+            test, test_queries, split_name="test"
+        )
     ensure_queries_match_split(train, train_queries, "train")
     ensure_queries_match_split(val, val_queries, "val")
     ensure_queries_match_split(test, test_queries, "test")
@@ -244,7 +259,7 @@ def benchmark_retrieval(
     embed_keep_alive: str = "5m",
     limit: int = 10,
     ks: str = "1,5,10",
-    use_filters: bool = True,
+    use_filters: bool = False,
     user_id: str = "",
 ) -> None:
     bundle = load_json(input_path)
@@ -400,7 +415,12 @@ def group_episodes_by_scenario_cluster(
 
 
 def compute_group_split_counts(
-    total_groups: int, train_ratio: float, val_ratio: float
+    total_groups: int,
+    train_ratio: float,
+    val_ratio: float,
+    *,
+    min_test_groups: int = 1,
+    min_val_groups: int = 1,
 ) -> tuple[int, int, int]:
     if total_groups <= 0:
         return 0, 0, 0
@@ -409,24 +429,41 @@ def compute_group_split_counts(
     val_count = int(total_groups * val_ratio)
     test_count = total_groups - train_count - val_count
 
-    if total_groups >= 3:
-        if train_count == 0:
-            train_count = 1
-        if val_count == 0:
-            val_count = 1
-        test_count = total_groups - train_count - val_count
-        if test_count <= 0:
-            test_count = 1
-            if train_count >= val_count and train_count > 1:
-                train_count -= 1
-            elif val_count > 1:
-                val_count -= 1
-            else:
-                train_count = max(1, train_count - 1)
-            test_count = total_groups - train_count - val_count
+    if train_count <= 0:
+        train_count = 1
+        if test_count > 0:
+            test_count -= 1
+        elif val_count > 0:
+            val_count -= 1
 
-    if test_count < 0:
-        test_count = 0
+    max_test_groups = max(total_groups - 1, 0)
+    min_test_groups = min(min_test_groups, max_test_groups)
+    max_val_groups = max(total_groups - 1 - min_test_groups, 0)
+    min_val_groups = min(min_val_groups, max_val_groups)
+
+    if test_count < min_test_groups:
+        deficit = min_test_groups - test_count
+        take_from_train = min(deficit, max(train_count - 1, 0))
+        train_count -= take_from_train
+        test_count += take_from_train
+        deficit -= take_from_train
+        if deficit > 0:
+            take_from_val = min(deficit, max(val_count - min_val_groups, 0))
+            val_count -= take_from_val
+            test_count += take_from_val
+
+    if val_count < min_val_groups:
+        deficit = min_val_groups - val_count
+        take_from_train = min(deficit, max(train_count - 1, 0))
+        train_count -= take_from_train
+        val_count += take_from_train
+        deficit -= take_from_train
+        if deficit > 0:
+            take_from_test = min(deficit, max(test_count - min_test_groups, 0))
+            test_count -= take_from_test
+            val_count += take_from_test
+
+    test_count = max(total_groups - train_count - val_count, 0)
     return train_count, val_count, test_count
 
 
@@ -453,6 +490,37 @@ def split_queries_by_target(
             test_queries.append(query)
 
     return train_queries, val_queries, test_queries
+
+
+def backfill_queries_for_episodes(
+    episodes: list[dict[str, Any]],
+    queries: list[dict[str, Any]],
+    *,
+    split_name: str,
+) -> list[dict[str, Any]]:
+    covered_episode_ids = {
+        str(target_episode_id).strip()
+        for query in queries
+        for target_episode_id in query.get("target_episode_ids", [])
+        if str(target_episode_id).strip()
+    }
+    backfilled = list(queries)
+    missing_count = 0
+    for episode in episodes:
+        episode_id = str(episode.get("episode_id", "")).strip()
+        if not episode_id or episode_id in covered_episode_ids:
+            continue
+        backfilled.append(synthesize_query_from_episode(episode))
+        covered_episode_ids.add(episode_id)
+        missing_count += 1
+
+    if missing_count > 0:
+        typer.secho(
+            f"backfilled {missing_count} synthetic queries to cover unlabeled {split_name} episodes",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+    return backfilled
 
 
 def ensure_queries_match_split(

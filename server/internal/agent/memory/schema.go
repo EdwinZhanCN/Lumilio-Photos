@@ -2,7 +2,6 @@ package memory
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -99,63 +98,56 @@ type SearchHit struct {
 }
 
 func (e Episode) BuildRetrievalText() string {
-	parts := make([]string, 0, 8)
+	sections := make([]string, 0, 4)
 
-	if e.Goal != "" {
-		parts = append(parts, "goal: "+e.Goal)
+	whatParts := make([]string, 0, 3)
+	if strings.TrimSpace(e.Scenario) != "" {
+		whatParts = append(whatParts, "scenario="+e.Scenario)
 	}
-	if e.Intent != "" {
-		parts = append(parts, "intent: "+e.Intent)
+	if strings.TrimSpace(e.Intent) != "" {
+		whatParts = append(whatParts, "intent="+e.Intent)
 	}
-	if e.Scenario != "" {
-		parts = append(parts, "scenario: "+e.Scenario)
+	if strings.TrimSpace(e.Summary) != "" {
+		whatParts = append(whatParts, "summary="+e.Summary)
 	}
-	if e.Summary != "" {
-		parts = append(parts, "summary: "+e.Summary)
+	if len(whatParts) > 0 {
+		sections = append(sections, "what:\n"+strings.Join(whatParts, "\n"))
 	}
-	if len(e.Entities) > 0 {
-		entityParts := make([]string, 0, len(e.Entities))
-		for _, entity := range e.Entities {
-			if entity.Type != "" {
-				entityParts = append(entityParts, fmt.Sprintf("%s=%s", entity.Type, entity.Name))
-				continue
-			}
-			entityParts = append(entityParts, entity.Name)
-		}
-		parts = append(parts, "entities: "+strings.Join(entityParts, ", "))
-	}
-	if len(e.Metadata) > 0 {
-		keys := make([]string, 0, len(e.Metadata))
-		for key, value := range e.Metadata {
-			if strings.TrimSpace(key) == "" || key == "cluster_id" || strings.TrimSpace(value) == "" {
-				continue
-			}
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		slotParts := make([]string, 0, len(keys))
-		for _, key := range keys {
-			slotParts = append(slotParts, fmt.Sprintf("%s=%s", key, e.Metadata[key]))
-		}
-		if len(slotParts) > 0 {
-			parts = append(parts, "slots: "+strings.Join(slotParts, ", "))
-		}
-	}
-	if len(e.Tags) > 0 {
-		parts = append(parts, "tags: "+strings.Join(e.Tags, ", "))
-	}
-	if len(e.ToolTrace) > 0 {
-		toolNames := make([]string, 0, len(e.ToolTrace))
-		for _, step := range e.ToolTrace {
-			if step.Tool.Name != "" {
-				toolNames = append(toolNames, step.Tool.Name)
-			}
-		}
-		if len(toolNames) > 0 {
-			parts = append(parts, "tools: "+strings.Join(toolNames, " -> "))
-		}
-	}
-	parts = append(parts, "status: "+string(e.Status))
 
-	return strings.Join(parts, "\n")
+	if strings.TrimSpace(e.Goal) != "" {
+		sections = append(sections, "goal:\n"+e.Goal)
+	}
+
+	entityParts := make([]string, 0, len(e.Entities))
+	for _, entity := range e.Entities {
+		name := strings.TrimSpace(entity.Name)
+		if name == "" {
+			continue
+		}
+		entityType := strings.TrimSpace(entity.Type)
+		if entityType != "" {
+			entityParts = append(entityParts, fmt.Sprintf("%s=%s", entityType, name))
+			continue
+		}
+		entityParts = append(entityParts, name)
+	}
+	if len(entityParts) > 0 {
+		sections = append(sections, "task_content:\n"+strings.Join(entityParts, "\n"))
+	}
+
+	toolNames := make([]string, 0, len(e.ToolTrace))
+	for _, step := range e.ToolTrace {
+		if strings.TrimSpace(step.Tool.Name) != "" {
+			toolNames = append(toolNames, step.Tool.Name)
+			continue
+		}
+		if strings.TrimSpace(step.Operation) != "" {
+			toolNames = append(toolNames, step.Operation)
+		}
+	}
+	if len(toolNames) > 0 {
+		sections = append(sections, "procedure:\n"+strings.Join(toolNames, " -> "))
+	}
+
+	return strings.Join(sections, "\n\n")
 }

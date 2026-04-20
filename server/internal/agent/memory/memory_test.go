@@ -9,15 +9,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBuildRetrievalTextIncludesCoreFields(t *testing.T) {
+func TestBuildRetrievalTextUsesDenseRetrievalSections(t *testing.T) {
 	t.Parallel()
 
 	episode := Episode{
-		Goal:    "clean up duplicate travel photos while keeping the sharpest version",
-		Intent:  "cleanup_duplicates",
-		Summary: "The agent tightened the duplicate threshold after a false-positive match and finished the cleanup.",
-		Status:  EpisodeStatusRecovered,
-		Tags:    []string{"media", "duplicates"},
+		Scenario: "cleanup_duplicate_shoot",
+		Goal:     "clean up duplicate travel photos while keeping the sharpest version",
+		Intent:   "cleanup_duplicates",
+		Summary:  "The agent tightened the duplicate threshold after a false-positive match and finished the cleanup.",
+		Status:   EpisodeStatusRecovered,
+		Tags:     []string{"media", "duplicates"},
 		Entities: []EntityRef{
 			{Type: "location", Name: "Tokyo"},
 		},
@@ -34,12 +35,16 @@ func TestBuildRetrievalTextIncludesCoreFields(t *testing.T) {
 	}
 
 	text := episode.BuildRetrievalText()
-	require.Contains(t, text, "goal: clean up duplicate travel photos while keeping the sharpest version")
-	require.Contains(t, text, "location=Tokyo")
-	require.Contains(t, text, "slots: liked_state=false, time_window=spring_2024")
-	require.Contains(t, text, "mock_find_duplicate_assets -> mock_inspect_asset_metadata -> mock_bulk_archive_assets")
-	require.Contains(t, text, "status: recovered")
+	require.Contains(t, text, "what:\nscenario=cleanup_duplicate_shoot\nintent=cleanup_duplicates")
+	require.Contains(t, text, "summary=The agent tightened the duplicate threshold after a false-positive match and finished the cleanup.")
+	require.Contains(t, text, "goal:\nclean up duplicate travel photos while keeping the sharpest version")
+	require.Contains(t, text, "task_content:\nlocation=Tokyo")
+	require.Contains(t, text, "procedure:\nmock_find_duplicate_assets -> mock_inspect_asset_metadata -> mock_bulk_archive_assets")
+	require.NotContains(t, text, "slots:")
+	require.NotContains(t, text, "tags:")
+	require.NotContains(t, text, "status:")
 	require.NotContains(t, text, "cluster_should_not_leak")
+	require.NotContains(t, text, "liked_state=false")
 }
 
 func TestDefaultWritePolicy(t *testing.T) {

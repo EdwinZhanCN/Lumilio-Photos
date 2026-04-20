@@ -1,0 +1,707 @@
+{
+  "schema_version": "agent-memory/retrieval-benchmark-report/v1",
+  "created_at": "2026-04-20T17:07:44.390750+00:00",
+  "input_bundle": "data/splits/baseline-v6/test.bundle.json",
+  "collection": "agent_episodic_memory_qwen3_1024_v6_semantic",
+  "embedder": {
+    "provider": "ollama",
+    "base_url": "http://localhost:11434",
+    "model": "qwen3-embedding:0.6b",
+    "dimensions": 1024
+  },
+  "limit": 10,
+  "ks": [
+    1,
+    5,
+    10
+  ],
+  "query_count": 7,
+  "filters_enabled": false,
+  "metrics": {
+    "recall": {
+      "recall@1": 0.857143,
+      "recall@5": 1.0,
+      "recall@10": 1.0
+    },
+    "mrr": {
+      "mrr@10": 0.928571
+    }
+  },
+  "latency_ms": {
+    "embed": {
+      "p50": 68.415,
+      "p95": 102.744,
+      "mean": 73.377
+    },
+    "search": {
+      "p50": 5.927,
+      "p95": 14.552,
+      "mean": 7.281
+    },
+    "end_to_end": {
+      "p50": 73.959,
+      "p95": 117.297,
+      "mean": 80.66
+    }
+  },
+  "per_query": [
+    {
+      "query": "I made an album called Hawaii Blue Hour for my winter 2022 trip. Can you show me how that was put together?",
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "target_episode_ids": [
+        "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022"
+      ],
+      "rank": 1,
+      "embed_ms": 102.744,
+      "search_ms": 14.552,
+      "end_to_end_ms": 117.297,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.6452118,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 2,
+          "score": 0.6277154,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii spring 2023"
+        },
+        {
+          "rank": 3,
+          "score": 0.6149167,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_album_name_wedding_favorites_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Wedding Favorites with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 4,
+          "score": 0.45908222,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 5,
+          "score": 0.4553614,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_selection_theme_yosemite_street_moments_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized street moments selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 6,
+          "score": 0.45092052,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_anchor_wedding_cleanup_alps_2_summer_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Alps summer 2024"
+        },
+        {
+          "rank": 7,
+          "score": 0.4489833,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_time_window_wedding_cleanup_alps_2_autumn_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Alps autumn 2024"
+        },
+        {
+          "rank": 8,
+          "score": 0.44419107,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_location_tokyo_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Tokyo autumn 2023"
+        },
+        {
+          "rank": 9,
+          "score": 0.4373054,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_location_wedding_cleanup_family_holiday_2_summer_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Family Holiday summer 2024"
+        },
+        {
+          "rank": 10,
+          "score": 0.42393315,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_paris_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Liked 75 high-quality Paris photos for Yosemite Picks"
+        }
+      ]
+    },
+    {
+      "query": "I need to archive photos from the Alps in summer 2024 that have low ratings.",
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_archive_low_rated_assets_c06_anchor_wedding_cleanup_alps_2_summer_2024"
+      ],
+      "rank": 1,
+      "embed_ms": 75.115,
+      "search_ms": 8.18,
+      "end_to_end_ms": 83.297,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8256929,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_anchor_wedding_cleanup_alps_2_summer_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Alps summer 2024"
+        },
+        {
+          "rank": 2,
+          "score": 0.8162159,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_time_window_wedding_cleanup_alps_2_autumn_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Alps autumn 2024"
+        },
+        {
+          "rank": 3,
+          "score": 0.78821003,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_location_wedding_cleanup_family_holiday_2_summer_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Family Holiday summer 2024"
+        },
+        {
+          "rank": 4,
+          "score": 0.6743711,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 5,
+          "score": 0.66307414,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_album_name_wedding_favorites_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Wedding Favorites with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 6,
+          "score": 0.66020185,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 7,
+          "score": 0.653144,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii spring 2023"
+        },
+        {
+          "rank": 8,
+          "score": 0.6505654,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_location_tokyo_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Tokyo autumn 2023"
+        },
+        {
+          "rank": 9,
+          "score": 0.648245,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_selection_theme_yosemite_street_moments_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized street moments selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 10,
+          "score": 0.6449368,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_paris_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Liked 75 high-quality Paris photos for Yosemite Picks"
+        }
+      ]
+    },
+    {
+      "query": "Find when I bulk liked photos from Paris for the Yosemite Picks album",
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_paris_4"
+      ],
+      "rank": 1,
+      "embed_ms": 68.029,
+      "search_ms": 5.927,
+      "end_to_end_ms": 73.959,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.86906385,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_paris_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Liked 75 high-quality Paris photos for Yosemite Picks"
+        },
+        {
+          "rank": 2,
+          "score": 0.7310525,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_selection_theme_yosemite_street_moments_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized street moments selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 3,
+          "score": 0.71494186,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 4,
+          "score": 0.7119839,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_location_tokyo_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Tokyo autumn 2023"
+        },
+        {
+          "rank": 5,
+          "score": 0.6705933,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 6,
+          "score": 0.66619337,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_album_name_wedding_favorites_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Wedding Favorites with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 7,
+          "score": 0.66031253,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii spring 2023"
+        },
+        {
+          "rank": 8,
+          "score": 0.64723086,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_anchor_wedding_cleanup_alps_2_summer_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Alps summer 2024"
+        },
+        {
+          "rank": 9,
+          "score": 0.6468819,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_time_window_wedding_cleanup_alps_2_autumn_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Alps autumn 2024"
+        },
+        {
+          "rank": 10,
+          "score": 0.6452304,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_near_location_tag_paris_portrait",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped portrait-tagged assets from Paris location"
+        }
+      ]
+    },
+    {
+      "query": "Give me a summary of family highlight photos from Yosemite in autumn 2023",
+      "target_scenario": "summarize_selected_assets",
+      "target_intent": "summarize_selection",
+      "target_episode_ids": [
+        "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_family_highlights_autumn_2023"
+      ],
+      "rank": 1,
+      "embed_ms": 67.49,
+      "search_ms": 5.223,
+      "end_to_end_ms": 72.714,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.6608428,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 2,
+          "score": 0.5830271,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_selection_theme_yosemite_street_moments_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized street moments selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 3,
+          "score": 0.57230616,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_location_tokyo_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Tokyo autumn 2023"
+        },
+        {
+          "rank": 4,
+          "score": 0.45338282,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_paris_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Liked 75 high-quality Paris photos for Yosemite Picks"
+        },
+        {
+          "rank": 5,
+          "score": 0.40960205,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_near_camera_model_sony_a7iii_hawaii_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected Sony A7III metadata from Hawaii spring trip"
+        },
+        {
+          "rank": 6,
+          "score": 0.40411067,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 7,
+          "score": 0.40163955,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii spring 2023"
+        },
+        {
+          "rank": 8,
+          "score": 0.39530215,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_anchor_canon_eos_r5_hawaii_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected Canon R5 metadata from Hawaii spring trip"
+        },
+        {
+          "rank": 9,
+          "score": 0.3946458,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_album_name_wedding_favorites_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Wedding Favorites with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 10,
+          "score": 0.37817866,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_time_window_wedding_cleanup_alps_2_autumn_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Alps autumn 2024"
+        }
+      ]
+    },
+    {
+      "query": "Can you group the photos from my Portrait Session by tag, focusing on portrait shots?",
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "target_episode_ids": [
+        "ep_group_assets_for_review_group_assets_for_review_c08_anchor_tag_portrait_session_portrait"
+      ],
+      "rank": 1,
+      "embed_ms": 69.576,
+      "search_ms": 5.545,
+      "end_to_end_ms": 75.123,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.86788774,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_anchor_tag_portrait_session_portrait",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Grouped portrait-tagged assets from Portrait Session for review"
+        },
+        {
+          "rank": 2,
+          "score": 0.8007597,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_near_tag_focus_tag_portrait_session_stage",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Grouped stage-tagged assets from Portrait Session for review"
+        },
+        {
+          "rank": 3,
+          "score": 0.76831746,
+          "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_near_location_tag_paris_portrait",
+          "scenario": "group_assets_for_review",
+          "intent": "group_assets",
+          "summary": "Successfully grouped portrait-tagged assets from Paris location"
+        },
+        {
+          "rank": 4,
+          "score": 0.6809581,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_location_tokyo_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Tokyo autumn 2023"
+        },
+        {
+          "rank": 5,
+          "score": 0.66917986,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 6,
+          "score": 0.66837907,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_selection_theme_yosemite_street_moments_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized street moments selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 7,
+          "score": 0.64915645,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 8,
+          "score": 0.6395704,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii spring 2023"
+        },
+        {
+          "rank": 9,
+          "score": 0.63273406,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_album_name_wedding_favorites_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Wedding Favorites with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 10,
+          "score": 0.6242087,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_paris_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Liked 75 high-quality Paris photos for Yosemite Picks"
+        }
+      ]
+    },
+    {
+      "query": "I want to clean up duplicate photos from Yosemite shot with my Sony A7C II, using a similarity threshold of 0.86 to avoid false positives",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_86"
+      ],
+      "rank": 1,
+      "embed_ms": 68.415,
+      "search_ms": 5.388,
+      "end_to_end_ms": 73.804,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.80981797,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_86",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from false positive duplicates at 0.86 threshold by inspecting metadata"
+        },
+        {
+          "rank": 2,
+          "score": 0.77064574,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_failure_mode_sony_a7c_ii_near_duplicate_burst_yosemite_0_86",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from burst shot duplicates by keeping best shot from each sequence"
+        },
+        {
+          "rank": 3,
+          "score": 0.76913214,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_camera_model_fujifilm_x_t5_false_positive_duplicate_yosemite_0_86",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Successfully cleaned false positives from Fujifilm X-T5 photos at Yosemite"
+        },
+        {
+          "rank": 4,
+          "score": 0.60728526,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_paris_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Liked 75 high-quality Paris photos for Yosemite Picks"
+        },
+        {
+          "rank": 5,
+          "score": 0.6008568,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_time_window_wedding_cleanup_alps_2_autumn_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Alps autumn 2024"
+        },
+        {
+          "rank": 6,
+          "score": 0.60034055,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_anchor_wedding_cleanup_alps_2_summer_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Alps summer 2024"
+        },
+        {
+          "rank": 7,
+          "score": 0.58504844,
+          "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_location_wedding_cleanup_family_holiday_2_summer_2024",
+          "scenario": "archive_low_rated_assets",
+          "intent": "bulk_archive",
+          "summary": "Successfully archived low-rated assets from Family Holiday summer 2024"
+        },
+        {
+          "rank": 8,
+          "score": 0.5779656,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_selection_theme_yosemite_street_moments_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized street moments selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 9,
+          "score": 0.5725492,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 10,
+          "score": 0.564091,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Yosemite autumn 2023"
+        }
+      ]
+    },
+    {
+      "query": "Show me the camera metadata for photos taken in Hawaii with my Canon EOS R5",
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "target_episode_ids": [
+        "ep_inspect_camera_metadata_inspect_camera_metadata_c09_anchor_canon_eos_r5_hawaii_spring_2024"
+      ],
+      "rank": 2,
+      "embed_ms": 62.272,
+      "search_ms": 6.151,
+      "end_to_end_ms": 68.425,
+      "results": [
+        {
+          "rank": 1,
+          "score": 0.8502985,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_near_camera_model_sony_a7iii_hawaii_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected Sony A7III metadata from Hawaii spring trip"
+        },
+        {
+          "rank": 2,
+          "score": 0.8499242,
+          "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_anchor_canon_eos_r5_hawaii_spring_2024",
+          "scenario": "inspect_camera_metadata",
+          "intent": "inspect_metadata",
+          "summary": "Successfully inspected Canon R5 metadata from Hawaii spring trip"
+        },
+        {
+          "rank": 3,
+          "score": 0.68568015,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_selection_theme_yosemite_street_moments_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized street moments selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 4,
+          "score": 0.66595703,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_location_tokyo_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Tokyo autumn 2023"
+        },
+        {
+          "rank": 5,
+          "score": 0.66418767,
+          "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_family_highlights_autumn_2023",
+          "scenario": "summarize_selected_assets",
+          "intent": "summarize_selection",
+          "summary": "Summarized family highlights selection from Yosemite autumn 2023"
+        },
+        {
+          "rank": 6,
+          "score": 0.6246233,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 7,
+          "score": 0.6075025,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Hawaii Blue Hour with filtered and grouped assets from Hawaii spring 2023"
+        },
+        {
+          "rank": 8,
+          "score": 0.6026203,
+          "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_album_name_wedding_favorites_nikon_z7_ii_hawaii_winter_2022",
+          "scenario": "curate_trip_album",
+          "intent": "curate_album",
+          "summary": "Created album Wedding Favorites with filtered and grouped assets from Hawaii winter 2022"
+        },
+        {
+          "rank": 9,
+          "score": 0.6022518,
+          "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_86",
+          "scenario": "cleanup_duplicate_shoot",
+          "intent": "cleanup_duplicates",
+          "summary": "Recovered from false positive duplicates at 0.86 threshold by inspecting metadata"
+        },
+        {
+          "rank": 10,
+          "score": 0.5798322,
+          "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_paris_4",
+          "scenario": "bulk_like_highlights",
+          "intent": "bulk_like",
+          "summary": "Liked 75 high-quality Paris photos for Yosemite Picks"
+        }
+      ]
+    }
+  ]
+}
