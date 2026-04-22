@@ -1,0 +1,1412 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c03_anchor_hawaii_rejects_hawaii_1_winter_2022",
+      "cluster_id": "archive_low_rated_assets_c03",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive low-rated assets (rating ≤1) from Hawaii in winter 2022 to album Hawaii Rejects",
+      "intent": "bulk_archive",
+      "summary": "Successfully archived low-rated assets from Hawaii winter 2022 to Hawaii Rejects",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "vacation_library",
+      "route": "cleanup",
+      "tags": [
+        "archive",
+        "low_rating",
+        "Hawaii",
+        "rejects"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "source"
+        },
+        {
+          "type": "rating_threshold",
+          "name": "1",
+          "role": "threshold"
+        },
+        {
+          "type": "time_window",
+          "name": "winter_2022",
+          "role": "period"
+        },
+        {
+          "type": "album_name",
+          "name": "Hawaii Rejects",
+          "role": "target"
+        }
+      ],
+      "metadata": {
+        "variant": "anchor"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 35 assets from Hawaii winter 2022 with rating ≤1",
+          "input": {
+            "location": "Hawaii",
+            "time_window": "winter_2022",
+            "max_rating": "1"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 35 low-rated assets to Hawaii Rejects",
+          "input": {
+            "album_name": "Hawaii Rejects",
+            "asset_count": 35
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c03_near_rating_threshold_hawaii_rejects_hawaii_4_winter_2022",
+      "cluster_id": "archive_low_rated_assets_c03",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive low-rated assets (rating ≤4) from Hawaii in winter 2022 to album Hawaii Rejects",
+      "intent": "bulk_archive",
+      "summary": "Successfully archived low-rated assets from Hawaii winter 2022 with higher threshold to Hawaii Rejects",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "vacation_library",
+      "route": "cleanup",
+      "tags": [
+        "archive",
+        "low_rating",
+        "Hawaii",
+        "rejects"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "source"
+        },
+        {
+          "type": "rating_threshold",
+          "name": "4",
+          "role": "threshold"
+        },
+        {
+          "type": "time_window",
+          "name": "winter_2022",
+          "role": "period"
+        },
+        {
+          "type": "album_name",
+          "name": "Hawaii Rejects",
+          "role": "target"
+        }
+      ],
+      "metadata": {
+        "variant": "near_rating_threshold"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 80 assets from Hawaii winter 2022 with rating ≤4",
+          "input": {
+            "location": "Hawaii",
+            "time_window": "winter_2022",
+            "max_rating": "4"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 80 low-rated assets to Hawaii Rejects for cleanup",
+          "input": {
+            "album_name": "Hawaii Rejects",
+            "asset_count": 80
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c03_near_location_hawaii_rejects_tokyo_1_winter_2022",
+      "cluster_id": "archive_low_rated_assets_c03",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive low-rated assets (rating ≤1) from Tokyo in winter 2022 to album Hawaii Rejects",
+      "intent": "bulk_archive",
+      "summary": "Successfully archived low-rated assets from Tokyo winter 2022 to Hawaii Rejects",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "travel_library",
+      "route": "cleanup",
+      "tags": [
+        "archive",
+        "low_rating",
+        "Tokyo",
+        "rejects"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Tokyo",
+          "role": "source"
+        },
+        {
+          "type": "rating_threshold",
+          "name": "1",
+          "role": "threshold"
+        },
+        {
+          "type": "time_window",
+          "name": "winter_2022",
+          "role": "period"
+        },
+        {
+          "type": "album_name",
+          "name": "Hawaii Rejects",
+          "role": "target"
+        }
+      ],
+      "metadata": {
+        "variant": "near_location"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 25 assets from Tokyo winter 2022 with rating ≤1",
+          "input": {
+            "location": "Tokyo",
+            "time_window": "winter_2022",
+            "max_rating": "1"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Bulk archived 25 low-rated assets to Hawaii Rejects",
+          "input": {
+            "album_name": "Hawaii Rejects",
+            "asset_count": 25
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c04_anchor_nikon_z8_burst_sequence_overlap_safari_trip_0_81",
+      "cluster_id": "cleanup_duplicate_shoot_c04",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Clean up duplicate photos from a Safari Trip shoot taken with Nikon Z8 where burst sequences overlapped",
+      "intent": "cleanup_duplicates",
+      "summary": "Found and archived duplicate photos from Safari Trip with Nikon Z8 using 0.81 similarity threshold, recovered from initial false positives",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "duplicate_management",
+      "tags": [
+        "duplicate",
+        "burst",
+        "safari",
+        "recovered"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Safari Trip",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "Nikon Z8",
+          "role": "tool"
+        },
+        {
+          "type": "failure_mode",
+          "name": "burst_sequence_overlap",
+          "role": "challenge"
+        }
+      ],
+      "metadata": {
+        "similarity_threshold": "0.81"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 45 potential duplicate groups in Safari Trip photos",
+          "input": {
+            "location": "Safari Trip",
+            "similarity_threshold": 0.81
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Verified metadata shows burst sequence timestamps overlapping",
+          "fix_summary": "Adjusted selection to keep best shots from each burst",
+          "input": {
+            "camera_model": "Nikon Z8",
+            "failure_mode": "burst_sequence_overlap"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 23 duplicate photos while preserving best shots",
+          "input": {
+            "archive_reason": "duplicate_cleanup"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Clean up duplicate photos from my Safari Trip where burst shots overlapped",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c04_near_failure_mode_nikon_z8_near_duplicate_burst_safari_trip_0_81",
+      "cluster_id": "cleanup_duplicate_shoot_c04",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Clean up near-duplicate photos from a Safari Trip shoot taken with Nikon Z8 where burst sequences created near-duplicates",
+      "intent": "cleanup_duplicates",
+      "summary": "Successfully cleaned near-duplicate burst photos from Safari Trip with Nikon Z8 using 0.81 threshold",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "duplicate_management",
+      "tags": [
+        "duplicate",
+        "burst",
+        "safari",
+        "near_duplicate"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Safari Trip",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "Nikon Z8",
+          "role": "tool"
+        },
+        {
+          "type": "failure_mode",
+          "name": "near_duplicate_burst",
+          "role": "challenge"
+        }
+      ],
+      "metadata": {
+        "similarity_threshold": "0.81"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 38 near-duplicate groups in Safari Trip photos",
+          "input": {
+            "location": "Safari Trip",
+            "similarity_threshold": 0.81
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Confirmed near-duplicate burst sequences with minor variations",
+          "input": {
+            "camera_model": "Nikon Z8",
+            "failure_mode": "near_duplicate_burst"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 19 near-duplicate photos",
+          "input": {
+            "archive_reason": "duplicate_cleanup"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Remove near-duplicate photos from my Safari Trip burst sequences",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c04_near_location_nikon_z8_burst_sequence_overlap_hawaii_0_81",
+      "cluster_id": "cleanup_duplicate_shoot_c04",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Clean up duplicate photos from a Hawaii shoot taken with Nikon Z8 where burst sequences overlapped",
+      "intent": "cleanup_duplicates",
+      "summary": "Cleaned duplicate photos from Hawaii with Nikon Z8 using 0.81 threshold, recovered from incorrect selection",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "duplicate_management",
+      "tags": [
+        "duplicate",
+        "burst",
+        "hawaii",
+        "recovered"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "subject"
+        },
+        {
+          "type": "camera_model",
+          "name": "Nikon Z8",
+          "role": "tool"
+        },
+        {
+          "type": "failure_mode",
+          "name": "burst_sequence_overlap",
+          "role": "challenge"
+        }
+      ],
+      "metadata": {
+        "similarity_threshold": "0.81"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 52 potential duplicate groups in Hawaii photos",
+          "input": {
+            "location": "Hawaii",
+            "similarity_threshold": 0.81
+          }
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "error",
+          "output_summary": "Initial selection would archive best shots",
+          "fix_summary": "Revised selection to retain highest quality shots from each burst",
+          "error": {
+            "code": "selection_error",
+            "message": "Would archive best shots from sequences"
+          },
+          "input": {
+            "camera_model": "Nikon Z8",
+            "failure_mode": "burst_sequence_overlap"
+          }
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 26 duplicate photos while keeping best shots",
+          "input": {
+            "archive_reason": "duplicate_cleanup"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Clean up duplicate burst photos from my Hawaii trip, but keep the best shots",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_curate_trip_album_c06_anchor_yosemite_keeps_sony_a7iii_yosemite_autumn_2024",
+      "cluster_id": "curate_trip_album_c06",
+      "scenario": "curate_trip_album",
+      "goal": "Create an album 'Yosemite Keeps' with photos from Yosemite taken with Sony A7III in autumn 2024",
+      "intent": "curate_album",
+      "summary": "Created album 'Yosemite Keeps' with 50 assets from Yosemite autumn 2024 shot on Sony A7III",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v2",
+      "workspace": "personal_library",
+      "route": "album_management",
+      "tags": [
+        "Yosemite",
+        "Sony A7III",
+        "autumn_2024",
+        "album_creation"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        },
+        {
+          "type": "time_window",
+          "name": "autumn_2024"
+        },
+        {
+          "type": "album_name",
+          "name": "Yosemite Keeps"
+        }
+      ],
+      "metadata": {
+        "seed": "51"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 50 assets matching location:Yosemite, camera:Sony A7III, time:autumn_2024",
+          "input": {
+            "location": "Yosemite",
+            "camera_model": "Sony A7III",
+            "time_range": "2024-09-01 to 2024-11-30"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 50 assets by date",
+          "input": {
+            "group_by": "date"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Yosemite Keeps' with ID album_001",
+          "input": {
+            "album_name": "Yosemite Keeps",
+            "description": "Yosemite autumn 2024 photos"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 50 assets to album 'Yosemite Keeps'",
+          "input": {
+            "album_id": "album_001",
+            "asset_ids": [
+              "asset_019",
+              "asset_020",
+              "asset_021"
+            ]
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_curate_trip_album_curate_trip_album_c06_near_album_name_yosemite_picks_sony_a7iii_yosemite_autumn_2024",
+      "cluster_id": "curate_trip_album_c06",
+      "scenario": "curate_trip_album",
+      "goal": "Create an album 'Yosemite Picks' with photos from Yosemite taken with Sony A7III in autumn 2024",
+      "intent": "curate_album",
+      "summary": "Created album 'Yosemite Picks' with 48 assets from Yosemite autumn 2024 shot on Sony A7III",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v2",
+      "workspace": "personal_library",
+      "route": "album_management",
+      "tags": [
+        "Yosemite",
+        "Sony A7III",
+        "autumn_2024",
+        "album_creation"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        },
+        {
+          "type": "time_window",
+          "name": "autumn_2024"
+        },
+        {
+          "type": "album_name",
+          "name": "Yosemite Picks"
+        }
+      ],
+      "metadata": {
+        "seed": "51"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 48 assets matching location:Yosemite, camera:Sony A7III, time:autumn_2024",
+          "input": {
+            "location": "Yosemite",
+            "camera_model": "Sony A7III",
+            "time_range": "2024-09-01 to 2024-11-30"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 48 assets by date",
+          "input": {
+            "group_by": "date"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Yosemite Picks' with ID album_002",
+          "input": {
+            "album_name": "Yosemite Picks",
+            "description": "Yosemite autumn 2024 selections"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 48 assets to album 'Yosemite Picks'",
+          "input": {
+            "album_id": "album_002",
+            "asset_ids": [
+              "asset_022",
+              "asset_023",
+              "asset_024"
+            ]
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_curate_trip_album_curate_trip_album_c06_near_location_yosemite_keeps_sony_a7iii_alps_autumn_2024",
+      "cluster_id": "curate_trip_album_c06",
+      "scenario": "curate_trip_album",
+      "goal": "Create an album 'Yosemite Keeps' with photos from the Alps taken with Sony A7III in autumn 2024",
+      "intent": "curate_album",
+      "summary": "Created album 'Yosemite Keeps' with 45 assets from Alps autumn 2024 shot on Sony A7III",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v2",
+      "workspace": "personal_library",
+      "route": "album_management",
+      "tags": [
+        "Alps",
+        "Sony A7III",
+        "autumn_2024",
+        "album_creation"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Alps"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        },
+        {
+          "type": "time_window",
+          "name": "autumn_2024"
+        },
+        {
+          "type": "album_name",
+          "name": "Yosemite Keeps"
+        }
+      ],
+      "metadata": {
+        "seed": "51"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 45 assets matching location:Alps, camera:Sony A7III, time:autumn_2024",
+          "input": {
+            "location": "Alps",
+            "camera_model": "Sony A7III",
+            "time_range": "2024-09-01 to 2024-11-30"
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 45 assets by date",
+          "input": {
+            "group_by": "date"
+          }
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Yosemite Keeps' with ID album_003",
+          "input": {
+            "album_name": "Yosemite Keeps",
+            "description": "Alps autumn 2024 photos"
+          }
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 45 assets to album 'Yosemite Keeps'",
+          "input": {
+            "album_id": "album_003",
+            "asset_ids": [
+              "asset_025",
+              "asset_026",
+              "asset_027"
+            ]
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c09_anchor_beach_landscape_favorites_summer_2023",
+      "cluster_id": "summarize_selected_assets_c09",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize landscape favorite photos from beach summer 2023",
+      "intent": "summarize_selection",
+      "summary": "Successfully summarized beach landscape favorites from summer 2023",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "default",
+      "route": "review",
+      "tags": [
+        "Beach",
+        "landscape",
+        "summer_2023",
+        "summary"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Beach",
+          "role": "source"
+        },
+        {
+          "type": "theme",
+          "name": "landscape_favorites",
+          "role": "selection"
+        },
+        {
+          "type": "time",
+          "name": "summer_2023",
+          "role": "period"
+        }
+      ],
+      "metadata": {
+        "variant": "anchor"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 67 landscape favorite photos from beach summer 2023",
+          "input": {
+            "location": "Beach",
+            "theme": "landscape_favorites",
+            "time_window": "summer_2023"
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 67 beach landscapes from summer 2023, mostly sunset and ocean scenes",
+          "input": {
+            "selection_theme": "landscape_favorites"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c09_near_location_yosemite_landscape_favorites_summer_2023",
+      "cluster_id": "summarize_selected_assets_c09",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize landscape favorite photos from Yosemite summer 2023",
+      "intent": "summarize_selection",
+      "summary": "Successfully summarized Yosemite landscape favorites from summer 2023",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "default",
+      "route": "review",
+      "tags": [
+        "Yosemite",
+        "landscape",
+        "summer_2023",
+        "summary"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Yosemite",
+          "role": "source"
+        },
+        {
+          "type": "theme",
+          "name": "landscape_favorites",
+          "role": "selection"
+        },
+        {
+          "type": "time",
+          "name": "summer_2023",
+          "role": "period"
+        }
+      ],
+      "metadata": {
+        "variant": "near_location"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 92 landscape favorite photos from Yosemite summer 2023",
+          "input": {
+            "location": "Yosemite",
+            "theme": "landscape_favorites",
+            "time_window": "summer_2023"
+          }
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 92 Yosemite landscapes from summer 2023, featuring waterfalls and granite cliffs",
+          "input": {
+            "selection_theme": "landscape_favorites"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c07_anchor_sony_a7iii_paris_winter_2023",
+      "cluster_id": "inspect_camera_metadata_c07",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Check camera settings for Sony A7III photos from Paris winter 2023",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "summary": "Inspected metadata for 50 Sony A7III Paris winter photos",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "input": {
+            "location": "Paris",
+            "camera_model": "Sony A7III",
+            "time_range": "winter_2023"
+          },
+          "output_summary": "Retrieved metadata for 50 assets: f/2.8, 1/125s, ISO 400 typical"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c07_near_camera_model_fujifilm_x_t5_paris_winter_2023",
+      "cluster_id": "inspect_camera_metadata_c07",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Examine Fujifilm X-T5 camera settings from Paris winter 2023",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "summary": "Inspected metadata for Fujifilm X-T5 Paris winter photos",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "input": {
+            "location": "Paris",
+            "camera_model": "Fujifilm X-T5",
+            "time_range": "winter_2023"
+          },
+          "output_summary": "Retrieved metadata for 35 assets: f/4, 1/250s, ISO 800 typical"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "camera_model",
+          "name": "Fujifilm X-T5"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c07_near_time_window_sony_a7iii_paris_winter_2022",
+      "cluster_id": "inspect_camera_metadata_c07",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Review Sony A7III camera settings from Paris winter 2022",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "summary": "Inspected metadata for Sony A7III Paris winter 2022 photos",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "input": {
+            "location": "Paris",
+            "camera_model": "Sony A7III",
+            "time_range": "winter_2022"
+          },
+          "output_summary": "Retrieved metadata for 40 assets: f/3.5, 1/100s, ISO 640 typical"
+        }
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Paris"
+        },
+        {
+          "type": "camera_model",
+          "name": "Sony A7III"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c04_anchor_hawaii_best_of_false_hawaii_5",
+      "cluster_id": "bulk_like_highlights_c04",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all unliked photos from Hawaii with rating 5 into Hawaii Best Of album",
+      "intent": "bulk_like",
+      "summary": "Successfully liked 18 high-rated Hawaii photos into Hawaii Best Of album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "curation_workflow",
+      "tags": [
+        "like",
+        "highlights",
+        "hawaii",
+        "favorites"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Hawaii Best Of",
+          "role": "destination"
+        },
+        {
+          "type": "liked_state",
+          "name": "false",
+          "role": "initial_state"
+        }
+      ],
+      "metadata": {
+        "rating_threshold": "5"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 18 unliked photos from Hawaii with rating 5",
+          "input": {
+            "location": "Hawaii",
+            "rating_min": 5,
+            "liked": false
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 18 photos and added to Hawaii Best Of album",
+          "input": {
+            "album_name": "Hawaii Best Of"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Mark all my top-rated Hawaii photos as favorites",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c04_near_rating_threshold_hawaii_best_of_false_hawaii_4",
+      "cluster_id": "bulk_like_highlights_c04",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all unliked photos from Hawaii with rating 4 or higher into Hawaii Best Of album",
+      "intent": "bulk_like",
+      "summary": "Successfully liked 32 Hawaii photos rated 4+ into Hawaii Best Of album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "curation_workflow",
+      "tags": [
+        "like",
+        "highlights",
+        "hawaii",
+        "good_photos"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Hawaii",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Hawaii Best Of",
+          "role": "destination"
+        },
+        {
+          "type": "liked_state",
+          "name": "false",
+          "role": "initial_state"
+        }
+      ],
+      "metadata": {
+        "rating_threshold": "4"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 32 unliked photos from Hawaii with rating ≥ 4",
+          "input": {
+            "location": "Hawaii",
+            "rating_min": 4,
+            "liked": false
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 32 photos and added to Hawaii Best Of album",
+          "input": {
+            "album_name": "Hawaii Best Of"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Favorite all my good Hawaii photos rated 4 stars or better",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c04_near_location_hawaii_best_of_false_johnson_wedding_5",
+      "cluster_id": "bulk_like_highlights_c04",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all unliked photos from Johnson Wedding with rating 5 into Hawaii Best Of album",
+      "intent": "bulk_like",
+      "summary": "Successfully liked 24 high-rated Johnson Wedding photos into Hawaii Best Of album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent",
+      "workspace": "personal_library",
+      "route": "curation_workflow",
+      "tags": [
+        "like",
+        "highlights",
+        "wedding",
+        "favorites"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Johnson Wedding",
+          "role": "subject"
+        },
+        {
+          "type": "album",
+          "name": "Hawaii Best Of",
+          "role": "destination"
+        },
+        {
+          "type": "liked_state",
+          "name": "false",
+          "role": "initial_state"
+        }
+      ],
+      "metadata": {
+        "rating_threshold": "5"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Selected 24 unliked photos from Johnson Wedding with rating 5",
+          "input": {
+            "location": "Johnson Wedding",
+            "rating_min": 5,
+            "liked": false
+          }
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 24 photos and added to Hawaii Best Of album",
+          "input": {
+            "album_name": "Hawaii Best Of"
+          }
+        }
+      ],
+      "context": [
+        {
+          "kind": "user_request",
+          "text": "Mark all my top-rated Johnson Wedding photos as favorites",
+          "weight": 1.0
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_anchor_rating_concert_stage",
+      "cluster_id": "group_assets_for_review_c06",
+      "scenario": "group_assets_for_review",
+      "goal": "Group Concert photos tagged 'stage' by rating for review",
+      "intent": "group_assets",
+      "summary": "Grouped 60 Concert assets tagged 'stage' into 5 rating groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v2",
+      "workspace": "personal_library",
+      "route": "organization",
+      "tags": [
+        "Concert",
+        "stage",
+        "rating_groups"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Concert"
+        },
+        {
+          "type": "group_by",
+          "name": "rating"
+        },
+        {
+          "type": "tag_focus",
+          "name": "stage"
+        }
+      ],
+      "metadata": {
+        "seed": "51"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 60 assets matching location:Concert, tags:stage",
+          "input": {
+            "location": "Concert",
+            "tags": [
+              "stage"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 60 assets into 5 groups by rating (1-5)",
+          "input": {
+            "group_by": "rating"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_near_group_by_camera_model_concert_stage",
+      "cluster_id": "group_assets_for_review_c06",
+      "scenario": "group_assets_for_review",
+      "goal": "Group Concert photos tagged 'stage' by camera model for review",
+      "intent": "group_assets",
+      "summary": "Grouped 55 Concert assets tagged 'stage' into 3 camera model groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v2",
+      "workspace": "personal_library",
+      "route": "organization",
+      "tags": [
+        "Concert",
+        "stage",
+        "camera_groups"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Concert"
+        },
+        {
+          "type": "group_by",
+          "name": "camera_model"
+        },
+        {
+          "type": "tag_focus",
+          "name": "stage"
+        }
+      ],
+      "metadata": {
+        "seed": "51"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 55 assets matching location:Concert, tags:stage",
+          "input": {
+            "location": "Concert",
+            "tags": [
+              "stage"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 55 assets into 3 groups by camera model",
+          "input": {
+            "group_by": "camera_model"
+          }
+        }
+      ],
+      "context": []
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_group_assets_for_review_c06_near_location_rating_family_holiday_stage",
+      "cluster_id": "group_assets_for_review_c06",
+      "scenario": "group_assets_for_review",
+      "goal": "Group Family Holiday photos tagged 'stage' by rating for review",
+      "intent": "group_assets",
+      "summary": "Grouped 40 Family Holiday assets tagged 'stage' into 5 rating groups",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "agent_name": "media_agent_v2",
+      "workspace": "personal_library",
+      "route": "organization",
+      "tags": [
+        "Family Holiday",
+        "stage",
+        "rating_groups"
+      ],
+      "entities": [
+        {
+          "type": "location",
+          "name": "Family Holiday"
+        },
+        {
+          "type": "group_by",
+          "name": "rating"
+        },
+        {
+          "type": "tag_focus",
+          "name": "stage"
+        }
+      ],
+      "metadata": {
+        "seed": "51"
+      },
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Found 40 assets matching location:Family Holiday, tags:stage",
+          "input": {
+            "location": "Family Holiday",
+            "tags": [
+              "stage"
+            ]
+          }
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped 40 assets into 5 groups by rating (1-5)",
+          "input": {
+            "group_by": "rating"
+          }
+        }
+      ],
+      "context": []
+    }
+  ],
+  "queries": [
+    {
+      "query": "Tell me about archiving Hawaii photos rated below 1 from winter 2022.",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_archive_low_rated_assets_c03_anchor_hawaii_rejects_hawaii_1_winter_2022"
+      ],
+      "entity": "Hawaii",
+      "status": "succeeded",
+      "tags": [
+        "archive_low_rated"
+      ],
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive"
+    },
+    {
+      "query": "Clean up duplicate burst sequence overlap shots from Safari Trip with similarity threshold 0.81",
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c04_anchor_nikon_z8_burst_sequence_overlap_safari_trip_0_81"
+      ],
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": "Safari Trip",
+      "status": "recovered",
+      "tags": [
+        "duplicate",
+        "Safari",
+        "burst"
+      ],
+      "notes": "Targets burst sequence overlap failure mode with 0.81 threshold in Safari Trip, differentiating by location or failure mode"
+    },
+    {
+      "query": "I need to mark all my Hawaii photos with a rating of 5 or higher as liked. Can you help with that?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_bulk_like_highlights_c04_anchor_hawaii_best_of_false_hawaii_5"
+      ],
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like",
+      "entity": "Hawaii",
+      "status": "succeeded",
+      "tags": [
+        "Hawaii",
+        "likes",
+        "high_rating"
+      ],
+      "notes": "Query focuses on bulk liking Hawaii photos with rating 5+"
+    },
+    {
+      "query": "Create an album called Yosemite Keeps with photos from Yosemite in autumn 2024.",
+      "target_episode_ids": [
+        "ep_curate_trip_album_curate_trip_album_c06_anchor_yosemite_keeps_sony_a7iii_yosemite_autumn_2024"
+      ],
+      "entity": "Yosemite Keeps",
+      "status": "succeeded",
+      "tags": [
+        "Yosemite Keeps",
+        "Yosemite",
+        "autumn_2024"
+      ],
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album"
+    },
+    {
+      "query": "Group the Concert photos by rating so I can review them.",
+      "target_episode_ids": [
+        "ep_group_assets_for_review_group_assets_for_review_c06_anchor_rating_concert_stage"
+      ],
+      "entity": "Concert",
+      "status": "succeeded",
+      "tags": [
+        "Concert",
+        "rating"
+      ],
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets"
+    },
+    {
+      "query": "Recall inspecting camera details for Sony A7III photos taken in Paris during winter 2023",
+      "target_episode_ids": [
+        "ep_inspect_camera_metadata_inspect_camera_metadata_c07_anchor_sony_a7iii_paris_winter_2023"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Paris",
+      "status": "succeeded",
+      "tags": [
+        "metadata",
+        "Sony",
+        "Paris"
+      ],
+      "notes": "Query includes camera model, location, and time window to uniquely identify"
+    },
+    {
+      "query": "Can you give me a recap of my landscape favorites from the Beach? I want to know what I captured there.",
+      "target_episode_ids": [
+        "ep_summarize_selected_assets_summarize_selected_assets_c09_anchor_beach_landscape_favorites_summer_2023"
+      ],
+      "entity": "Beach",
+      "target_scenario": "summarize_selected_assets",
+      "target_intent": "summarize_selection"
+    }
+  ]
+}
