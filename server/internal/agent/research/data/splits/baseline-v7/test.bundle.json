@@ -1,0 +1,3699 @@
+{
+    "schema_version": "agent-memory/episode-spec-bundle/v1",
+    "episodes": [
+        {
+            "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_anchor_tokyo_collection_tokyo_2_spring_2023",
+            "cluster_id": "archive_low_rated_assets_c01",
+            "scenario": "archive_low_rated_assets",
+            "goal": "Archive assets rated 2 or lower from Tokyo Collection album taken in Tokyo during spring 2023",
+            "intent": "bulk_archive",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Tokyo"
+                },
+                {
+                    "type": "album",
+                    "name": "Tokyo Collection"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2023"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "rating_max": 2,
+                        "album": "Tokyo Collection",
+                        "time_range": "spring_2023"
+                    },
+                    "output_summary": "Selected 18 assets with rating ≤2"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "asset_ids": [
+                            "tok_001",
+                            "tok_002",
+                            "tok_003",
+                            "tok_004",
+                            "tok_005",
+                            "tok_006",
+                            "tok_007",
+                            "tok_008",
+                            "tok_009",
+                            "tok_010",
+                            "tok_011",
+                            "tok_012",
+                            "tok_013",
+                            "tok_014",
+                            "tok_015",
+                            "tok_016",
+                            "tok_017",
+                            "tok_018"
+                        ]
+                    },
+                    "output_summary": "Archived 18 low-rated assets"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_near_time_window_tokyo_collection_tokyo_2_autumn_2024",
+            "cluster_id": "archive_low_rated_assets_c01",
+            "scenario": "archive_low_rated_assets",
+            "goal": "Archive assets rated 2 or lower from Tokyo Collection album taken in Tokyo during autumn 2024",
+            "intent": "bulk_archive",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Tokyo"
+                },
+                {
+                    "type": "album",
+                    "name": "Tokyo Collection"
+                },
+                {
+                    "type": "time_window",
+                    "name": "autumn_2024"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "rating_max": 2,
+                        "album": "Tokyo Collection",
+                        "time_range": "autumn_2024"
+                    },
+                    "output_summary": "Selected 7 assets with rating ≤2"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "asset_ids": [
+                            "tok_101",
+                            "tok_102",
+                            "tok_103",
+                            "tok_104",
+                            "tok_105",
+                            "tok_106",
+                            "tok_107"
+                        ]
+                    },
+                    "output_summary": "Archived 7 low-rated assets"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_near_rating_threshold_tokyo_collection_tokyo_1_spring_2023",
+            "cluster_id": "archive_low_rated_assets_c01",
+            "scenario": "archive_low_rated_assets",
+            "goal": "Archive assets rated 1 or lower from Tokyo Collection album taken in Tokyo during spring 2023",
+            "intent": "bulk_archive",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Tokyo"
+                },
+                {
+                    "type": "album",
+                    "name": "Tokyo Collection"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2023"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "rating_max": 1,
+                        "album": "Tokyo Collection",
+                        "time_range": "spring_2023"
+                    },
+                    "output_summary": "Selected 5 assets with rating ≤1"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "asset_ids": [
+                            "tok_201",
+                            "tok_202",
+                            "tok_203",
+                            "tok_204",
+                            "tok_205"
+                        ]
+                    },
+                    "output_summary": "Archived 5 very low-rated assets"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_anchor_holiday_cull_family_holiday_2_autumn_2023",
+            "cluster_id": "archive_low_rated_assets_c04",
+            "scenario": "archive_low_rated_assets",
+            "goal": "Archive low-rated photos from Family Holiday autumn 2023",
+            "intent": "bulk_archive",
+            "summary": "Filtered and archived photos rated 2 or below from autumn 2023 Family Holiday",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Family Holiday"
+                },
+                {
+                    "type": "rating_threshold",
+                    "name": "2"
+                },
+                {
+                    "type": "time_window",
+                    "name": "autumn_2023"
+                },
+                {
+                    "type": "album_name",
+                    "name": "Holiday Cull"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Selected 45 assets rated 2 or below from autumn 2023",
+                    "input": {
+                        "rating_max": 2,
+                        "time_range": "autumn_2023",
+                        "location": "Family Holiday"
+                    }
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "output_summary": "Archived 45 low-rated holiday photos",
+                    "input": {
+                        "archive_reason": "low_rating_cleanup"
+                    }
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_near_location_holiday_cull_hawaii_2_autumn_2023",
+            "cluster_id": "archive_low_rated_assets_c04",
+            "scenario": "archive_low_rated_assets",
+            "goal": "Archive low-rated photos from Hawaii autumn 2023",
+            "intent": "bulk_archive",
+            "summary": "Filtered and archived low-rated rejects from Hawaii autumn 2023",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Hawaii"
+                },
+                {
+                    "type": "rating_threshold",
+                    "name": "2"
+                },
+                {
+                    "type": "time_window",
+                    "name": "autumn_2023"
+                },
+                {
+                    "type": "album_name",
+                    "name": "Holiday Cull"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Selected 32 assets rated 2 or below from Hawaii autumn 2023",
+                    "input": {
+                        "rating_max": 2,
+                        "time_range": "autumn_2023",
+                        "location": "Hawaii"
+                    }
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "output_summary": "Archived 32 low-rated Hawaii photos",
+                    "input": {
+                        "archive_reason": "reject_cleanup"
+                    }
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_near_rating_threshold_holiday_cull_family_holiday_5_autumn_2023",
+            "cluster_id": "archive_low_rated_assets_c04",
+            "scenario": "archive_low_rated_assets",
+            "goal": "Archive photos rated 5 or below from Family Holiday autumn 2023",
+            "intent": "bulk_archive",
+            "summary": "Bulk archived photos rated 5 or below from Family Holiday",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Family Holiday"
+                },
+                {
+                    "type": "rating_threshold",
+                    "name": "5"
+                },
+                {
+                    "type": "time_window",
+                    "name": "autumn_2023"
+                },
+                {
+                    "type": "album_name",
+                    "name": "Holiday Cull"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Selected 78 assets rated 5 or below from autumn 2023",
+                    "input": {
+                        "rating_max": 5,
+                        "time_range": "autumn_2023",
+                        "location": "Family Holiday"
+                    }
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "output_summary": "Archived 78 mid-to-low rated holiday photos",
+                    "input": {
+                        "archive_reason": "bulk_rating_cleanup"
+                    }
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_anchor_wedding_cleanup_alps_2_summer_2024",
+            "cluster_id": "archive_low_rated_assets_c06",
+            "scenario": "archive_low_rated_assets",
+            "goal": "Archive assets rated 2 or below from Alps summer 2024 to Wedding Cleanup album",
+            "intent": "bulk_archive",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Alps"
+                },
+                {
+                    "type": "rating_threshold",
+                    "name": "2"
+                },
+                {
+                    "type": "time_window",
+                    "name": "summer_2024"
+                },
+                {
+                    "type": "album",
+                    "name": "Wedding Cleanup"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Alps",
+                        "time_window": "summer_2024",
+                        "max_rating": 2
+                    },
+                    "output_summary": "Found 67 assets rated 2 or below"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "assets": "filtered_selection",
+                        "reason": "low_rating_cleanup"
+                    },
+                    "output_summary": "Successfully archived 67 low-rated assets"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_location_wedding_cleanup_family_holiday_2_summer_2024",
+            "cluster_id": "archive_low_rated_assets_c06",
+            "scenario": "archive_low_rated_assets",
+            "goal": "Archive assets rated 2 or below from Family Holiday summer 2024 to Wedding Cleanup album",
+            "intent": "bulk_archive",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Family Holiday"
+                },
+                {
+                    "type": "rating_threshold",
+                    "name": "2"
+                },
+                {
+                    "type": "time_window",
+                    "name": "summer_2024"
+                },
+                {
+                    "type": "album",
+                    "name": "Wedding Cleanup"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Family Holiday",
+                        "time_window": "summer_2024",
+                        "max_rating": 2
+                    },
+                    "output_summary": "Found 42 assets rated 2 or below"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "assets": "filtered_selection",
+                        "reason": "low_rating_cleanup"
+                    },
+                    "output_summary": "Successfully archived 42 low-rated assets"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_time_window_wedding_cleanup_alps_2_autumn_2024",
+            "cluster_id": "archive_low_rated_assets_c06",
+            "scenario": "archive_low_rated_assets",
+            "goal": "Archive assets rated 2 or below from Alps autumn 2024 to Wedding Cleanup album",
+            "intent": "bulk_archive",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Alps"
+                },
+                {
+                    "type": "rating_threshold",
+                    "name": "2"
+                },
+                {
+                    "type": "time_window",
+                    "name": "autumn_2024"
+                },
+                {
+                    "type": "album",
+                    "name": "Wedding Cleanup"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Alps",
+                        "time_window": "autumn_2024",
+                        "max_rating": 2
+                    },
+                    "output_summary": "Found 38 assets rated 2 or below"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "assets": "filtered_selection",
+                        "reason": "low_rating_cleanup"
+                    },
+                    "output_summary": "Successfully archived 38 low-rated assets"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82",
+            "cluster_id": "cleanup_duplicate_shoot_c01",
+            "scenario": "cleanup_duplicate_shoot",
+            "goal": "Clean up duplicate photos from Yosemite shoot with Sony A7C II using 0.82 similarity threshold",
+            "intent": "cleanup_duplicates",
+            "status": "recovered",
+            "write_trigger": "error_recovered",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Sony A7C II"
+                },
+                {
+                    "type": "failure_mode",
+                    "name": "false_positive_duplicate"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_find_duplicate_assets",
+                    "output_kind": "duplicate_report",
+                    "status": "success",
+                    "input": {
+                        "similarity_threshold": 0.82,
+                        "location": "Yosemite"
+                    },
+                    "output_summary": "Found 15 potential duplicate pairs"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "error",
+                    "error": {
+                        "code": "METADATA_CORRUPTED",
+                        "message": "Metadata for 3 assets could not be parsed"
+                    },
+                    "output_summary": "Failed to inspect metadata for some assets"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "fix_summary": "Retried with fallback parsing method",
+                    "input": {
+                        "camera_model": "Sony A7C II",
+                        "retry_method": "fallback"
+                    },
+                    "output_summary": "Inspected 12 assets, identified 8 as false positives"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "asset_ids": [
+                            "dup_001",
+                            "dup_002",
+                            "dup_003",
+                            "dup_004"
+                        ]
+                    },
+                    "output_summary": "Archived 4 duplicate assets"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_camera_model_canon_eos_r5_false_positive_duplicate_yosemite_0_82",
+            "cluster_id": "cleanup_duplicate_shoot_c01",
+            "scenario": "cleanup_duplicate_shoot",
+            "goal": "Clean up duplicate photos from Yosemite shoot with Canon EOS R5 using 0.82 similarity threshold",
+            "intent": "cleanup_duplicates",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5"
+                },
+                {
+                    "type": "failure_mode",
+                    "name": "false_positive_duplicate"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_find_duplicate_assets",
+                    "output_kind": "duplicate_report",
+                    "status": "success",
+                    "input": {
+                        "similarity_threshold": 0.82,
+                        "location": "Yosemite"
+                    },
+                    "output_summary": "Found 10 potential duplicate pairs"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "camera_model": "Canon EOS R5"
+                    },
+                    "output_summary": "Inspected 10 assets, identified 6 as false positives"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "asset_ids": ["dup_101", "dup_102", "dup_103"]
+                    },
+                    "output_summary": "Archived 3 duplicate assets"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_similarity_threshold_sony_a7c_ii_false_positive_duplicate_yosemite_0_74",
+            "cluster_id": "cleanup_duplicate_shoot_c01",
+            "scenario": "cleanup_duplicate_shoot",
+            "goal": "Clean up duplicate photos from Yosemite shoot with Sony A7C II using 0.74 similarity threshold",
+            "intent": "cleanup_duplicates",
+            "status": "recovered",
+            "write_trigger": "error_recovered",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Sony A7C II"
+                },
+                {
+                    "type": "failure_mode",
+                    "name": "false_positive_duplicate"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_find_duplicate_assets",
+                    "output_kind": "duplicate_report",
+                    "status": "success",
+                    "input": {
+                        "similarity_threshold": 0.74,
+                        "location": "Yosemite"
+                    },
+                    "output_summary": "Found 25 potential duplicate pairs"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "camera_model": "Sony A7C II"
+                    },
+                    "output_summary": "Inspected 25 assets, identified 15 as false positives"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "error",
+                    "error": {
+                        "code": "ARCHIVE_QUOTA_EXCEEDED",
+                        "message": "Cannot archive more than 10 assets at once"
+                    },
+                    "output_summary": "Failed to archive 15 assets due to quota limit"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "fix_summary": "Split into two batches",
+                    "input": {
+                        "asset_ids": [
+                            "dup_201",
+                            "dup_202",
+                            "dup_203",
+                            "dup_204",
+                            "dup_205",
+                            "dup_206",
+                            "dup_207",
+                            "dup_208",
+                            "dup_209",
+                            "dup_210"
+                        ]
+                    },
+                    "output_summary": "Archived 10 duplicate assets in first batch"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c03_anchor_canon_eos_r5_near_duplicate_burst_portrait_session_0_76",
+            "cluster_id": "cleanup_duplicate_shoot_c03",
+            "scenario": "cleanup_duplicate_shoot",
+            "goal": "Clean near-duplicate burst shots from Canon EOS R5 portrait session",
+            "intent": "cleanup_duplicates",
+            "summary": "Recovered from initial error, successfully archived duplicates",
+            "status": "recovered",
+            "write_trigger": "error_recovered",
+            "steps": [
+                {
+                    "tool_name": "mock_find_duplicate_assets",
+                    "output_kind": "duplicate_report",
+                    "status": "success",
+                    "input": {
+                        "similarity_threshold": 0.76
+                    },
+                    "output_summary": "Found 8 duplicate clusters"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "error",
+                    "input": {
+                        "camera_model": "Canon EOS R5"
+                    },
+                    "error": {
+                        "code": "METADATA_FETCH_FAILED",
+                        "message": "Failed to fetch metadata for some assets"
+                    },
+                    "fix_summary": "Retried with specific asset IDs"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "camera_model": "Canon EOS R5",
+                        "asset_ids": ["img_001", "img_002", "img_003"]
+                    },
+                    "output_summary": "Retrieved metadata for 3 key assets"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "asset_count": 15
+                    },
+                    "output_summary": "Archived 15 duplicate assets"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Portrait Session"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5"
+                },
+                {
+                    "type": "failure_mode",
+                    "name": "near_duplicate_burst"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c03_near_location_canon_eos_r5_near_duplicate_burst_tokyo_0_76",
+            "cluster_id": "cleanup_duplicate_shoot_c03",
+            "scenario": "cleanup_duplicate_shoot",
+            "goal": "Clean near-duplicate burst shots from Canon EOS R5 Tokyo shoot",
+            "intent": "cleanup_duplicates",
+            "summary": "Successfully cleaned Tokyo duplicates",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_find_duplicate_assets",
+                    "output_kind": "duplicate_report",
+                    "status": "success",
+                    "input": {
+                        "similarity_threshold": 0.76
+                    },
+                    "output_summary": "Found 5 duplicate clusters"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "camera_model": "Canon EOS R5"
+                    },
+                    "output_summary": "Verified camera metadata for all assets"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "asset_count": 9
+                    },
+                    "output_summary": "Archived 9 duplicate assets"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Tokyo"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5"
+                },
+                {
+                    "type": "failure_mode",
+                    "name": "near_duplicate_burst"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c03_near_failure_mode_canon_eos_r5_false_positive_duplicate_portrait_session_0_76",
+            "cluster_id": "cleanup_duplicate_shoot_c03",
+            "scenario": "cleanup_duplicate_shoot",
+            "goal": "Handle false positive duplicates from Canon EOS R5 portrait session",
+            "intent": "cleanup_duplicates",
+            "summary": "Recovered from false positives, retained best shots",
+            "status": "recovered",
+            "write_trigger": "error_recovered",
+            "steps": [
+                {
+                    "tool_name": "mock_find_duplicate_assets",
+                    "output_kind": "duplicate_report",
+                    "status": "success",
+                    "input": {
+                        "similarity_threshold": 0.76
+                    },
+                    "output_summary": "Found 6 duplicate clusters"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "camera_model": "Canon EOS R5"
+                    },
+                    "output_summary": "Identified 3 false positive clusters"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "error",
+                    "input": {
+                        "asset_count": 12
+                    },
+                    "error": {
+                        "code": "FALSE_POSITIVE_DETECTED",
+                        "message": "Attempting to archive non-duplicate assets"
+                    },
+                    "fix_summary": "Adjusted selection to exclude false positives"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "asset_count": 6
+                    },
+                    "output_summary": "Archived 6 true duplicate assets"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Portrait Session"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5"
+                },
+                {
+                    "type": "failure_mode",
+                    "name": "false_positive_duplicate"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_86",
+            "cluster_id": "cleanup_duplicate_shoot_c09",
+            "scenario": "cleanup_duplicate_shoot",
+            "goal": "Clean up false positive duplicates from Sony A7C II shoot in Yosemite",
+            "intent": "cleanup_duplicates",
+            "summary": "Recovered from false positive duplicate detection by inspecting metadata",
+            "status": "recovered",
+            "write_trigger": "error_recovered",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Sony A7C II"
+                },
+                {
+                    "type": "failure_mode",
+                    "name": "false_positive_duplicate"
+                },
+                {
+                    "type": "similarity_threshold",
+                    "name": "0.86"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_find_duplicate_assets",
+                    "output_kind": "duplicate_report",
+                    "status": "error",
+                    "input": {
+                        "location": "Yosemite",
+                        "similarity_threshold": 0.86
+                    },
+                    "error": {
+                        "code": "false_positive",
+                        "message": "Identified 15 false positive duplicates"
+                    },
+                    "output_summary": "Found 25 potential duplicates, but 15 appear to be false positives"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "assets": "15 flagged assets"
+                    },
+                    "fix_summary": "Verified timestamps and EXIF data show unique shots",
+                    "output_summary": "Metadata confirms 15 assets are unique with different timestamps"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "assets": "10 true duplicates"
+                    },
+                    "output_summary": "Archived 10 true duplicate assets, kept 15 unique ones"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_camera_model_fujifilm_x_t5_false_positive_duplicate_yosemite_0_86",
+            "cluster_id": "cleanup_duplicate_shoot_c09",
+            "scenario": "cleanup_duplicate_shoot",
+            "goal": "Clean up false positive duplicates from Fujifilm X-T5 shoot in Yosemite",
+            "intent": "cleanup_duplicates",
+            "summary": "Successfully cleaned duplicates with Fujifilm X-T5 camera",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Fujifilm X-T5"
+                },
+                {
+                    "type": "failure_mode",
+                    "name": "false_positive_duplicate"
+                },
+                {
+                    "type": "similarity_threshold",
+                    "name": "0.86"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_find_duplicate_assets",
+                    "output_kind": "duplicate_report",
+                    "status": "success",
+                    "input": {
+                        "location": "Yosemite",
+                        "similarity_threshold": 0.86
+                    },
+                    "output_summary": "Found 18 potential duplicates in Yosemite shoot"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "assets": "18 flagged assets"
+                    },
+                    "output_summary": "Confirmed 12 true duplicates, 6 false positives"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "assets": "12 true duplicates"
+                    },
+                    "output_summary": "Archived 12 duplicate assets"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_failure_mode_sony_a7c_ii_near_duplicate_burst_yosemite_0_86",
+            "cluster_id": "cleanup_duplicate_shoot_c09",
+            "scenario": "cleanup_duplicate_shoot",
+            "goal": "Handle near-duplicate burst shots from Sony A7C II in Yosemite",
+            "intent": "cleanup_duplicates",
+            "summary": "Recovered by selecting best shot from burst sequence",
+            "status": "recovered",
+            "write_trigger": "error_recovered",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Sony A7C II"
+                },
+                {
+                    "type": "failure_mode",
+                    "name": "near_duplicate_burst"
+                },
+                {
+                    "type": "similarity_threshold",
+                    "name": "0.86"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_find_duplicate_assets",
+                    "output_kind": "duplicate_report",
+                    "status": "error",
+                    "input": {
+                        "location": "Yosemite",
+                        "similarity_threshold": 0.86
+                    },
+                    "error": {
+                        "code": "burst_sequence",
+                        "message": "Found 8 near-identical burst shots"
+                    },
+                    "output_summary": "Identified 8 burst sequence shots with 0.86+ similarity"
+                },
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "assets": "8 burst shots"
+                    },
+                    "fix_summary": "Analyzed focus and sharpness to select best shot",
+                    "output_summary": "Metadata shows burst sequence over 2 seconds, shot 3 has best focus"
+                },
+                {
+                    "tool_name": "mock_bulk_archive_assets",
+                    "output_kind": "bulk_archive_update",
+                    "status": "success",
+                    "input": {
+                        "assets": "7 inferior burst shots"
+                    },
+                    "output_summary": "Archived 7 burst shots, kept best one"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_curate_trip_album_curate_trip_album_c07_anchor_tokyo_street_album_fujifilm_x_t5_tokyo_spring_2023",
+            "cluster_id": "curate_trip_album_c07",
+            "scenario": "curate_trip_album",
+            "goal": "Create Tokyo Street Album with Fujifilm X-T5 photos from Tokyo spring 2023",
+            "intent": "curate_album",
+            "summary": "Successfully curated Tokyo Street Album with Fujifilm X-T5 photos",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "media_agent",
+            "workspace": "travel_collection",
+            "route": "album_creation",
+            "tags": ["Tokyo", "street", "spring", "Fujifilm"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Tokyo"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Fujifilm X-T5"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2023"
+                },
+                {
+                    "type": "album",
+                    "name": "Tokyo Street Album"
+                }
+            ],
+            "metadata": {
+                "album_size": "78"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Filtered 78 assets from Tokyo spring 2023 shot with Fujifilm X-T5",
+                    "input": {
+                        "location": "Tokyo",
+                        "camera_model": "Fujifilm X-T5",
+                        "time_range": "spring_2023"
+                    }
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "output_summary": "Grouped assets by date for review",
+                    "payload": {
+                        "group_count": 12,
+                        "group_by": "date"
+                    }
+                },
+                {
+                    "tool_name": "mock_create_album",
+                    "output_kind": "album_record",
+                    "status": "success",
+                    "output_summary": "Created album 'Tokyo Street Album'",
+                    "payload": {
+                        "album_id": "alb_tokyo_street_2023",
+                        "name": "Tokyo Street Album"
+                    }
+                },
+                {
+                    "tool_name": "mock_add_assets_to_album",
+                    "output_kind": "album_membership_update",
+                    "status": "success",
+                    "output_summary": "Added 78 assets to Tokyo Street Album",
+                    "payload": {
+                        "album_id": "alb_tokyo_street_2023",
+                        "added_count": 78
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_curate_trip_album_curate_trip_album_c07_near_camera_model_tokyo_street_album_nikon_z7_ii_tokyo_spring_2023",
+            "cluster_id": "curate_trip_album_c07",
+            "scenario": "curate_trip_album",
+            "goal": "Create Tokyo Street Album with Nikon Z7 II photos from Tokyo spring 2023",
+            "intent": "curate_album",
+            "summary": "Successfully curated Tokyo Street Album with Nikon Z7 II photos",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "media_agent",
+            "workspace": "travel_collection",
+            "route": "album_creation",
+            "tags": ["Tokyo", "street", "spring", "Nikon"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Tokyo"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Nikon Z7 II"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2023"
+                },
+                {
+                    "type": "album",
+                    "name": "Tokyo Street Album"
+                }
+            ],
+            "metadata": {
+                "album_size": "92"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Filtered 92 assets from Tokyo spring 2023 shot with Nikon Z7 II",
+                    "input": {
+                        "location": "Tokyo",
+                        "camera_model": "Nikon Z7 II",
+                        "time_range": "spring_2023"
+                    }
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "output_summary": "Grouped assets by location for review",
+                    "payload": {
+                        "group_count": 8,
+                        "group_by": "location"
+                    }
+                },
+                {
+                    "tool_name": "mock_create_album",
+                    "output_kind": "album_record",
+                    "status": "success",
+                    "output_summary": "Created album 'Tokyo Street Album'",
+                    "payload": {
+                        "album_id": "alb_tokyo_street_2023_nikon",
+                        "name": "Tokyo Street Album"
+                    }
+                },
+                {
+                    "tool_name": "mock_add_assets_to_album",
+                    "output_kind": "album_membership_update",
+                    "status": "success",
+                    "output_summary": "Added 92 assets to Tokyo Street Album",
+                    "payload": {
+                        "album_id": "alb_tokyo_street_2023_nikon",
+                        "added_count": 92
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_curate_trip_album_curate_trip_album_c09_anchor_paris_selects_canon_eos_r5_paris_spring_2024",
+            "cluster_id": "curate_trip_album_c09",
+            "scenario": "curate_trip_album",
+            "goal": "Create album 'Paris Selects' with Canon EOS R5 photos from Paris spring 2024",
+            "intent": "curate_album",
+            "summary": "Successfully curated Paris spring 2024 album with Canon EOS R5 photos",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Paris",
+                        "camera_model": "Canon EOS R5",
+                        "time_range": "spring_2024"
+                    },
+                    "output_summary": "Found 245 assets matching criteria"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "filter_001",
+                        "group_by": "date"
+                    },
+                    "output_summary": "Grouped into 12 date-based clusters"
+                },
+                {
+                    "tool_name": "mock_create_album",
+                    "output_kind": "album_record",
+                    "status": "success",
+                    "input": {
+                        "album_name": "Paris Selects",
+                        "description": "Spring 2024 Paris trip photos"
+                    },
+                    "output_summary": "Created album 'Paris Selects' with ID alb_paris_2024_001"
+                },
+                {
+                    "tool_name": "mock_add_assets_to_album",
+                    "output_kind": "album_membership_update",
+                    "status": "success",
+                    "input": {
+                        "album_id": "alb_paris_2024_001",
+                        "asset_ids": ["asset_001", "asset_002", "asset_003"]
+                    },
+                    "output_summary": "Added 85 selected assets to album"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Paris"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5"
+                },
+                {
+                    "type": "album",
+                    "name": "Paris Selects"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_curate_trip_album_curate_trip_album_c09_near_album_name_wedding_favorites_canon_eos_r5_paris_spring_2024",
+            "cluster_id": "curate_trip_album_c09",
+            "scenario": "curate_trip_album",
+            "goal": "Create album 'Wedding Favorites' with Canon EOS R5 photos from Paris spring 2024",
+            "intent": "curate_album",
+            "summary": "Successfully curated wedding album from Paris spring 2024 photos",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Paris",
+                        "camera_model": "Canon EOS R5",
+                        "time_range": "spring_2024",
+                        "tags": ["wedding"]
+                    },
+                    "output_summary": "Found 128 wedding-related assets"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "filter_002",
+                        "group_by": "event"
+                    },
+                    "output_summary": "Grouped into ceremony, reception, portraits clusters"
+                },
+                {
+                    "tool_name": "mock_create_album",
+                    "output_kind": "album_record",
+                    "status": "success",
+                    "input": {
+                        "album_name": "Wedding Favorites",
+                        "description": "Paris wedding spring 2024 highlights"
+                    },
+                    "output_summary": "Created album 'Wedding Favorites' with ID alb_wedding_2024_001"
+                },
+                {
+                    "tool_name": "mock_add_assets_to_album",
+                    "output_kind": "album_membership_update",
+                    "status": "success",
+                    "input": {
+                        "album_id": "alb_wedding_2024_001",
+                        "asset_ids": ["asset_101", "asset_102", "asset_103"]
+                    },
+                    "output_summary": "Added 45 selected wedding assets to album"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Paris"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5"
+                },
+                {
+                    "type": "album",
+                    "name": "Wedding Favorites"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_curate_trip_album_curate_trip_album_c09_near_time_window_paris_selects_canon_eos_r5_paris_spring_2023",
+            "cluster_id": "curate_trip_album_c09",
+            "scenario": "curate_trip_album",
+            "goal": "Create album 'Paris Selects' with Canon EOS R5 photos from Paris spring 2023",
+            "intent": "curate_album",
+            "summary": "Successfully curated Paris spring 2023 album",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Paris",
+                        "camera_model": "Canon EOS R5",
+                        "time_range": "spring_2023"
+                    },
+                    "output_summary": "Found 198 assets from spring 2023"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "filter_003",
+                        "group_by": "date"
+                    },
+                    "output_summary": "Grouped into 10 date-based clusters"
+                },
+                {
+                    "tool_name": "mock_create_album",
+                    "output_kind": "album_record",
+                    "status": "success",
+                    "input": {
+                        "album_name": "Paris Selects",
+                        "description": "Spring 2023 Paris trip photos"
+                    },
+                    "output_summary": "Created album 'Paris Selects' with ID alb_paris_2023_001"
+                },
+                {
+                    "tool_name": "mock_add_assets_to_album",
+                    "output_kind": "album_membership_update",
+                    "status": "success",
+                    "input": {
+                        "album_id": "alb_paris_2023_001",
+                        "asset_ids": ["asset_201", "asset_202", "asset_203"]
+                    },
+                    "output_summary": "Added 72 selected assets to album"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Paris"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5"
+                },
+                {
+                    "type": "album",
+                    "name": "Paris Selects"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022",
+            "cluster_id": "curate_trip_album_c04",
+            "scenario": "curate_trip_album",
+            "goal": "Create Hawaii Blue Hour album from Nikon Z7 II photos taken in Hawaii winter 2022",
+            "intent": "curate_album",
+            "summary": "Created Hawaii Blue Hour album with 67 assets from winter 2022 Hawaii trip",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Hawaii",
+                        "camera_model": "Nikon Z7 II",
+                        "time_window": "winter_2022"
+                    },
+                    "output_summary": "Selected 89 assets matching criteria"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "filter_004",
+                        "group_by": "date"
+                    },
+                    "output_summary": "Grouped into 7 date-based groups"
+                },
+                {
+                    "tool_name": "mock_create_album",
+                    "output_kind": "album_record",
+                    "status": "success",
+                    "input": {
+                        "album_name": "Hawaii Blue Hour",
+                        "description": "Blue hour photos from Hawaii winter 2022"
+                    },
+                    "output_summary": "Created album ALB-2022-HAWAII-BLUE"
+                },
+                {
+                    "tool_name": "mock_add_assets_to_album",
+                    "output_kind": "album_membership_update",
+                    "status": "success",
+                    "input": {
+                        "album_id": "ALB-2022-HAWAII-BLUE",
+                        "asset_ids": ["asset_001", "asset_002", "asset_003"]
+                    },
+                    "output_summary": "Added 67 assets to album"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Hawaii"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Nikon Z7 II"
+                },
+                {
+                    "type": "time_window",
+                    "name": "winter_2022"
+                },
+                {
+                    "type": "album",
+                    "name": "Hawaii Blue Hour"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023",
+            "cluster_id": "curate_trip_album_c04",
+            "scenario": "curate_trip_album",
+            "goal": "Create Hawaii Blue Hour album from Nikon Z7 II photos taken in Hawaii spring 2023",
+            "intent": "curate_album",
+            "summary": "Created Hawaii Blue Hour album with 58 assets from spring 2023 Hawaii trip",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Hawaii",
+                        "camera_model": "Nikon Z7 II",
+                        "time_window": "spring_2023"
+                    },
+                    "output_summary": "Selected 72 assets matching criteria"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "filter_005",
+                        "group_by": "date"
+                    },
+                    "output_summary": "Grouped into 5 date-based groups"
+                },
+                {
+                    "tool_name": "mock_create_album",
+                    "output_kind": "album_record",
+                    "status": "success",
+                    "input": {
+                        "album_name": "Hawaii Blue Hour",
+                        "description": "Blue hour photos from Hawaii spring 2023"
+                    },
+                    "output_summary": "Created album ALB-2023-HAWAII-BLUE"
+                },
+                {
+                    "tool_name": "mock_add_assets_to_album",
+                    "output_kind": "album_membership_update",
+                    "status": "success",
+                    "input": {
+                        "album_id": "ALB-2023-HAWAII-BLUE",
+                        "asset_ids": ["asset_004", "asset_005", "asset_006"]
+                    },
+                    "output_summary": "Added 58 assets to album"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Hawaii"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Nikon Z7 II"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2023"
+                },
+                {
+                    "type": "album",
+                    "name": "Hawaii Blue Hour"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_curate_trip_album_curate_trip_album_c04_near_album_name_wedding_favorites_nikon_z7_ii_hawaii_winter_2022",
+            "cluster_id": "curate_trip_album_c04",
+            "scenario": "curate_trip_album",
+            "goal": "Create Wedding Favorites album from Nikon Z7 II photos taken in Hawaii winter 2022",
+            "intent": "curate_album",
+            "summary": "Created Wedding Favorites album with 42 assets from winter 2022 Hawaii trip",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Hawaii",
+                        "camera_model": "Nikon Z7 II",
+                        "time_window": "winter_2022",
+                        "tags": ["wedding"]
+                    },
+                    "output_summary": "Selected 55 assets matching criteria"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "filter_006",
+                        "group_by": "date"
+                    },
+                    "output_summary": "Grouped into 3 date-based groups"
+                },
+                {
+                    "tool_name": "mock_create_album",
+                    "output_kind": "album_record",
+                    "status": "success",
+                    "input": {
+                        "album_name": "Wedding Favorites",
+                        "description": "Wedding photos from Hawaii winter 2022"
+                    },
+                    "output_summary": "Created album ALB-2022-HAWAII-WEDDING"
+                },
+                {
+                    "tool_name": "mock_add_assets_to_album",
+                    "output_kind": "album_membership_update",
+                    "status": "success",
+                    "input": {
+                        "album_id": "ALB-2022-HAWAII-WEDDING",
+                        "asset_ids": ["asset_007", "asset_008", "asset_009"]
+                    },
+                    "output_summary": "Added 42 assets to album"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Hawaii"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Nikon Z7 II"
+                },
+                {
+                    "type": "time_window",
+                    "name": "winter_2022"
+                },
+                {
+                    "type": "album",
+                    "name": "Wedding Favorites"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_anchor_beach_sunset_summer_2023",
+            "cluster_id": "summarize_selected_assets_c01",
+            "scenario": "summarize_selected_assets",
+            "goal": "Summarize sunset-themed assets from Beach taken during summer 2023",
+            "intent": "summarize_selection",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Beach"
+                },
+                {
+                    "type": "selection_theme",
+                    "name": "sunset"
+                },
+                {
+                    "type": "time_window",
+                    "name": "summer_2023"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "theme": "sunset",
+                        "location": "Beach",
+                        "time_range": "summer_2023"
+                    },
+                    "output_summary": "Selected 38 sunset beach assets"
+                },
+                {
+                    "tool_name": "mock_summarize_selection",
+                    "output_kind": "selection_summary",
+                    "status": "success",
+                    "input": {
+                        "selection_size": 38
+                    },
+                    "output_summary": "Summary: 38 sunset beach photos from summer 2023, average rating 4.2, 12 liked, 3 starred"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_near_location_paris_sunset_summer_2023",
+            "cluster_id": "summarize_selected_assets_c01",
+            "scenario": "summarize_selected_assets",
+            "goal": "Summarize selected sunset photos from Paris in summer 2023",
+            "intent": "summarize_selection",
+            "summary": "Successfully filtered and summarized Paris sunset photos from summer 2023",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Paris"
+                },
+                {
+                    "type": "theme",
+                    "name": "sunset"
+                },
+                {
+                    "type": "time_window",
+                    "name": "summer_2023"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Paris",
+                        "theme": "sunset",
+                        "time_range": "summer_2023"
+                    },
+                    "output_summary": "Found 42 sunset photos from Paris in summer 2023"
+                },
+                {
+                    "tool_name": "mock_summarize_selection",
+                    "output_kind": "selection_summary",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "paris_sunset_summer_2023"
+                    },
+                    "output_summary": "Summary: 42 photos, average rating 4.2, 15 liked, 3 HDR shots"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c01_near_time_window_beach_sunset_spring_2023",
+            "cluster_id": "summarize_selected_assets_c01",
+            "scenario": "summarize_selected_assets",
+            "goal": "Summarize selected sunset photos from Beach in spring 2023",
+            "intent": "summarize_selection",
+            "summary": "Successfully filtered and summarized Beach sunset photos from spring 2023",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Beach"
+                },
+                {
+                    "type": "theme",
+                    "name": "sunset"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2023"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Beach",
+                        "theme": "sunset",
+                        "time_range": "spring_2023"
+                    },
+                    "output_summary": "Found 28 sunset photos from Beach in spring 2023"
+                },
+                {
+                    "tool_name": "mock_summarize_selection",
+                    "output_kind": "selection_summary",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "beach_sunset_spring_2023"
+                    },
+                    "output_summary": "Summary: 28 photos, average rating 3.8, 9 liked, 5 panoramic shots"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_anchor_beach_street_moments_summer_2023",
+            "cluster_id": "summarize_selected_assets_c05",
+            "scenario": "summarize_selected_assets",
+            "goal": "Summarize street moments photos from Beach taken in summer 2023",
+            "intent": "summarize_selection",
+            "summary": "Generated summary of 28 beach street moment photos",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "summary_generator",
+            "workspace": "travel_photos",
+            "route": "summary_workflow",
+            "tags": ["summary", "beach", "street_photography"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Beach",
+                    "role": "source"
+                },
+                {
+                    "type": "selection_theme",
+                    "name": "street_moments",
+                    "role": "theme"
+                },
+                {
+                    "type": "time_window",
+                    "name": "summer_2023",
+                    "role": "period"
+                }
+            ],
+            "metadata": {
+                "seed": "49"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Selected 28 assets: location Beach, theme street_moments, time summer_2023",
+                    "input": {
+                        "location": "Beach",
+                        "theme": "street_moments",
+                        "time_range": "summer_2023"
+                    }
+                },
+                {
+                    "tool_name": "mock_summarize_selection",
+                    "output_kind": "selection_summary",
+                    "status": "success",
+                    "output_summary": "Summary: 28 candid street photos from beach summer 2023, featuring people, architecture, and daily life scenes",
+                    "input": {
+                        "selection_criteria": "beach_street_moments_summer_2023"
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_near_location_johnson_wedding_street_moments_summer_2023",
+            "cluster_id": "summarize_selected_assets_c05",
+            "scenario": "summarize_selected_assets",
+            "goal": "Summarize street moments photos from Johnson Wedding taken in summer 2023",
+            "intent": "summarize_selection",
+            "summary": "Generated summary of 15 wedding street moment photos",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "summary_generator",
+            "workspace": "wedding_collection",
+            "route": "summary_workflow",
+            "tags": ["summary", "wedding", "street_photography"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Johnson Wedding",
+                    "role": "source"
+                },
+                {
+                    "type": "selection_theme",
+                    "name": "street_moments",
+                    "role": "theme"
+                },
+                {
+                    "type": "time_window",
+                    "name": "summer_2023",
+                    "role": "period"
+                }
+            ],
+            "metadata": {
+                "seed": "49"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Selected 15 assets: location Johnson Wedding, theme street_moments, time summer_2023",
+                    "input": {
+                        "location": "Johnson Wedding",
+                        "theme": "street_moments",
+                        "time_range": "summer_2023"
+                    }
+                },
+                {
+                    "tool_name": "mock_summarize_selection",
+                    "output_kind": "selection_summary",
+                    "status": "success",
+                    "output_summary": "Summary: 15 candid wedding street photos from summer 2023, capturing spontaneous moments and details",
+                    "input": {
+                        "selection_criteria": "johnson_wedding_street_moments_summer_2023"
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_near_selection_theme_beach_family_highlights_summer_2023",
+            "cluster_id": "summarize_selected_assets_c05",
+            "scenario": "summarize_selected_assets",
+            "goal": "Summarize family highlights photos from Beach taken in summer 2023",
+            "intent": "summarize_selection",
+            "summary": "Generated summary of 22 beach family highlight photos",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "summary_generator",
+            "workspace": "family_photos",
+            "route": "summary_workflow",
+            "tags": ["summary", "beach", "family"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Beach",
+                    "role": "source"
+                },
+                {
+                    "type": "selection_theme",
+                    "name": "family_highlights",
+                    "role": "theme"
+                },
+                {
+                    "type": "time_window",
+                    "name": "summer_2023",
+                    "role": "period"
+                }
+            ],
+            "metadata": {
+                "seed": "49"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Selected 22 assets: location Beach, theme family_highlights, time summer_2023",
+                    "input": {
+                        "location": "Beach",
+                        "theme": "family_highlights",
+                        "time_range": "summer_2023"
+                    }
+                },
+                {
+                    "tool_name": "mock_summarize_selection",
+                    "output_kind": "selection_summary",
+                    "status": "success",
+                    "output_summary": "Summary: 22 family highlight photos from beach summer 2023, featuring group portraits, activities, and memorable moments",
+                    "input": {
+                        "selection_criteria": "beach_family_highlights_summer_2023"
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_family_highlights_autumn_2023",
+            "cluster_id": "summarize_selected_assets_c08",
+            "scenario": "summarize_selected_assets",
+            "goal": "Summarize Yosemite family highlights from autumn 2023",
+            "intent": "summarize_selection",
+            "summary": "Successfully summarized 8 family highlight assets from Yosemite autumn 2023",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "media_agent",
+            "workspace": "personal_library",
+            "route": "selection_analysis",
+            "tags": ["summary", "family", "Yosemite"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite",
+                    "role": "asset_location"
+                },
+                {
+                    "type": "selection_theme",
+                    "name": "family_highlights",
+                    "role": "theme"
+                },
+                {
+                    "type": "time_window",
+                    "name": "autumn_2023",
+                    "role": "capture_period"
+                }
+            ],
+            "metadata": {
+                "seed": "54"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Filtered 8 family highlight assets from Yosemite autumn 2023",
+                    "input": {
+                        "location": "Yosemite",
+                        "theme": "family_highlights",
+                        "time_range": "2023-09-01 to 2023-11-30"
+                    },
+                    "payload": {
+                        "asset_count": 8,
+                        "filter_criteria": ["location", "theme", "time_range"]
+                    }
+                },
+                {
+                    "tool_name": "mock_summarize_selection",
+                    "output_kind": "selection_summary",
+                    "status": "success",
+                    "output_summary": "Summary: 8 family photos featuring hiking, campfire moments, and scenic views with average rating 4.5",
+                    "input": {
+                        "asset_ids": [
+                            "asset_031",
+                            "asset_032",
+                            "asset_033",
+                            "asset_034",
+                            "asset_035",
+                            "asset_036",
+                            "asset_037",
+                            "asset_038"
+                        ]
+                    },
+                    "payload": {
+                        "asset_count": 8,
+                        "average_rating": 4.5,
+                        "keywords": ["hiking", "campfire", "scenic"]
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_selection_theme_yosemite_street_moments_autumn_2023",
+            "cluster_id": "summarize_selected_assets_c08",
+            "scenario": "summarize_selected_assets",
+            "goal": "Summarize Yosemite street moments from autumn 2023",
+            "intent": "summarize_selection",
+            "summary": "Successfully summarized 6 street moment assets from Yosemite autumn 2023",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "media_agent",
+            "workspace": "personal_library",
+            "route": "selection_analysis",
+            "tags": ["summary", "street", "Yosemite"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite",
+                    "role": "asset_location"
+                },
+                {
+                    "type": "selection_theme",
+                    "name": "street_moments",
+                    "role": "theme"
+                },
+                {
+                    "type": "time_window",
+                    "name": "autumn_2023",
+                    "role": "capture_period"
+                }
+            ],
+            "metadata": {
+                "seed": "54"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Filtered 6 street moment assets from Yosemite autumn 2023",
+                    "input": {
+                        "location": "Yosemite",
+                        "theme": "street_moments",
+                        "time_range": "2023-09-01 to 2023-11-30"
+                    },
+                    "payload": {
+                        "asset_count": 6,
+                        "filter_criteria": ["location", "theme", "time_range"]
+                    }
+                },
+                {
+                    "tool_name": "mock_summarize_selection",
+                    "output_kind": "selection_summary",
+                    "status": "success",
+                    "output_summary": "Summary: 6 street photos featuring local vendors, architecture, and candid shots with average rating 4.2",
+                    "input": {
+                        "asset_ids": [
+                            "asset_039",
+                            "asset_040",
+                            "asset_041",
+                            "asset_042",
+                            "asset_043",
+                            "asset_044"
+                        ]
+                    },
+                    "payload": {
+                        "asset_count": 6,
+                        "average_rating": 4.2,
+                        "keywords": ["vendors", "architecture", "candid"]
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c08_near_location_tokyo_family_highlights_autumn_2023",
+            "cluster_id": "summarize_selected_assets_c08",
+            "scenario": "summarize_selected_assets",
+            "goal": "Summarize selected family highlight assets from Tokyo in autumn 2023",
+            "intent": "summarize_selection",
+            "summary": "Successfully summarized 45 family highlight assets from Tokyo autumn 2023",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "media_curator",
+            "workspace": "personal_library",
+            "route": "selection_review",
+            "tags": ["family", "highlights", "autumn", "Tokyo"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Tokyo",
+                    "role": "primary"
+                },
+                {
+                    "type": "theme",
+                    "name": "family_highlights",
+                    "role": "selection_criteria"
+                },
+                {
+                    "type": "time_window",
+                    "name": "autumn_2023",
+                    "role": "temporal_filter"
+                }
+            ],
+            "metadata": {
+                "selection_count": "45",
+                "average_rating": "4.2"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Filtered 45 assets from Tokyo autumn 2023 with family tag",
+                    "input": {
+                        "location": "Tokyo",
+                        "time_range": "autumn_2023",
+                        "tags": ["family"]
+                    }
+                },
+                {
+                    "tool_name": "mock_summarize_selection",
+                    "output_kind": "selection_summary",
+                    "status": "success",
+                    "output_summary": "Summary: 45 family assets, average rating 4.2, mostly outdoor activities",
+                    "payload": {
+                        "asset_count": 45,
+                        "average_rating": 4.2,
+                        "primary_tags": ["family", "outdoor", "Tokyo"]
+                    }
+                }
+            ],
+            "context": [
+                {
+                    "id": "ctx1",
+                    "kind": "user_request",
+                    "text": "Show me a summary of our family highlights from Tokyo last autumn",
+                    "weight": 1.0
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_anchor_canon_eos_r5_family_holiday_spring_2024",
+            "cluster_id": "inspect_camera_metadata_c05",
+            "scenario": "inspect_camera_metadata",
+            "goal": "Inspect camera metadata for Canon EOS R5 photos from Family Holiday spring 2024",
+            "intent": "inspect_metadata",
+            "summary": "Retrieved detailed camera settings for 25 Canon R5 photos",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "metadata_analyzer",
+            "workspace": "photo_library",
+            "route": "inspection_workflow",
+            "tags": ["camera_metadata", "canon", "spring"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Family Holiday",
+                    "role": "source"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5",
+                    "role": "device"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2024",
+                    "role": "period"
+                }
+            ],
+            "metadata": {
+                "seed": "49"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "output_summary": "Metadata for 25 assets: Canon EOS R5, ISO 100-800, f/2.8-f/8, shutter 1/60-1/1000",
+                    "input": {
+                        "camera_model": "Canon EOS R5",
+                        "location": "Family Holiday",
+                        "time_range": "spring_2024"
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_time_window_canon_eos_r5_family_holiday_spring_2023",
+            "cluster_id": "inspect_camera_metadata_c05",
+            "scenario": "inspect_camera_metadata",
+            "goal": "Inspect camera metadata for Canon EOS R5 photos from Family Holiday spring 2023",
+            "intent": "inspect_metadata",
+            "summary": "Retrieved camera settings for 18 Canon R5 photos from previous year",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "metadata_analyzer",
+            "workspace": "photo_library",
+            "route": "inspection_workflow",
+            "tags": ["camera_metadata", "canon", "spring_2023"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Family Holiday",
+                    "role": "source"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5",
+                    "role": "device"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2023",
+                    "role": "period"
+                }
+            ],
+            "metadata": {
+                "seed": "49"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "output_summary": "Metadata for 18 assets: Canon EOS R5, ISO 200-1600, f/4-f/11, shutter 1/30-1/500",
+                    "input": {
+                        "camera_model": "Canon EOS R5",
+                        "location": "Family Holiday",
+                        "time_range": "spring_2023"
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_camera_model_sony_a7iii_family_holiday_spring_2024",
+            "cluster_id": "inspect_camera_metadata_c05",
+            "scenario": "inspect_camera_metadata",
+            "goal": "Inspect camera metadata for Sony A7III photos from Family Holiday spring 2024",
+            "intent": "inspect_metadata",
+            "summary": "Retrieved detailed camera settings for 22 Sony A7III photos",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "metadata_analyzer",
+            "workspace": "photo_library",
+            "route": "inspection_workflow",
+            "tags": ["camera_metadata", "sony", "spring"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Family Holiday",
+                    "role": "source"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Sony A7III",
+                    "role": "device"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2024",
+                    "role": "period"
+                }
+            ],
+            "metadata": {
+                "seed": "49"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "output_summary": "Metadata for 22 assets: Sony A7III, ISO 100-6400, f/1.8-f/16, shutter 1/50-1/2000",
+                    "input": {
+                        "camera_model": "Sony A7III",
+                        "location": "Family Holiday",
+                        "time_range": "spring_2024"
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c10_anchor_canon_eos_r5_johnson_wedding_spring_2024",
+            "cluster_id": "inspect_camera_metadata_c10",
+            "scenario": "inspect_camera_metadata",
+            "goal": "Inspect Canon EOS R5 camera metadata from Johnson Wedding spring 2024",
+            "intent": "inspect_metadata",
+            "summary": "Successfully inspected camera metadata for quality assessment",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "camera_model": "Canon EOS R5",
+                        "location": "Johnson Wedding",
+                        "time_range": "spring_2024"
+                    },
+                    "output_summary": "Metadata shows consistent settings: f/2.8, 1/250s, ISO 400, 45MP resolution"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5"
+                },
+                {
+                    "type": "location",
+                    "name": "Johnson Wedding"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_anchor_canon_eos_r5_hawaii_spring_2024",
+            "cluster_id": "inspect_camera_metadata_c09",
+            "scenario": "inspect_camera_metadata",
+            "goal": "Inspect Canon EOS R5 camera metadata from Hawaii spring 2024",
+            "intent": "inspect_metadata",
+            "summary": "Successfully inspected Canon R5 metadata from Hawaii trip",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Hawaii"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Canon EOS R5"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2024"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "camera_model": "Canon EOS R5",
+                        "location": "Hawaii",
+                        "time_range": "spring_2024"
+                    },
+                    "output_summary": "Inspected 156 assets: 45MP resolution, f/2.8 average, ISO 100-800 range"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c09_near_camera_model_sony_a7iii_hawaii_spring_2024",
+            "cluster_id": "inspect_camera_metadata_c09",
+            "scenario": "inspect_camera_metadata",
+            "goal": "Inspect Sony A7III camera metadata from Hawaii spring 2024",
+            "intent": "inspect_metadata",
+            "summary": "Successfully inspected Sony A7III metadata from Hawaii trip",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Hawaii"
+                },
+                {
+                    "type": "camera_model",
+                    "name": "Sony A7III"
+                },
+                {
+                    "type": "time_window",
+                    "name": "spring_2024"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_inspect_asset_metadata",
+                    "output_kind": "asset_metadata_report",
+                    "status": "success",
+                    "input": {
+                        "camera_model": "Sony A7III",
+                        "location": "Hawaii",
+                        "time_range": "spring_2024"
+                    },
+                    "output_summary": "Inspected 89 assets: 24MP resolution, f/4 average, ISO 200-1600 range"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_anchor_yosemite_picks_false_yosemite_4",
+            "cluster_id": "bulk_like_highlights_c03",
+            "scenario": "bulk_like_highlights",
+            "goal": "Bulk like Yosemite photos rated 4+ for Yosemite Picks album",
+            "intent": "bulk_like",
+            "summary": "Successfully liked 32 Yosemite photos rated 4+ for Yosemite Picks album",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "media_agent",
+            "workspace": "default",
+            "route": "bulk_like",
+            "tags": ["yosemite", "rating_4", "bulk_like"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite",
+                    "role": "shoot_location"
+                },
+                {
+                    "type": "rating_threshold",
+                    "name": "4",
+                    "role": "selection_criteria"
+                },
+                {
+                    "type": "liked_state",
+                    "name": "false",
+                    "role": "initial_state"
+                },
+                {
+                    "type": "album_name",
+                    "name": "Yosemite Picks",
+                    "role": "target_album"
+                }
+            ],
+            "metadata": {
+                "seed_hint": "46"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Filtered 32 assets from Yosemite with rating >= 4",
+                    "input": {
+                        "location": "Yosemite",
+                        "min_rating": 4
+                    },
+                    "payload": {
+                        "asset_count": 32,
+                        "rating_distribution": {
+                            "4": 18,
+                            "5": 14
+                        }
+                    }
+                },
+                {
+                    "tool_name": "mock_bulk_like_assets",
+                    "output_kind": "bulk_like_update",
+                    "status": "success",
+                    "output_summary": "Liked 32 assets for Yosemite Picks album",
+                    "input": {
+                        "asset_ids": ["asset_001", "asset_002", "asset_003"],
+                        "album": "Yosemite Picks"
+                    },
+                    "payload": {
+                        "updated_count": 32,
+                        "album": "Yosemite Picks"
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c03_near_rating_threshold_yosemite_picks_false_yosemite_3",
+            "cluster_id": "bulk_like_highlights_c03",
+            "scenario": "bulk_like_highlights",
+            "goal": "Bulk like Yosemite photos rated 3+ for Yosemite Picks album",
+            "intent": "bulk_like",
+            "summary": "Successfully liked 48 Yosemite photos rated 3+ for Yosemite Picks album",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "media_agent",
+            "workspace": "default",
+            "route": "bulk_like",
+            "tags": ["yosemite", "rating_3", "bulk_like"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite",
+                    "role": "shoot_location"
+                },
+                {
+                    "type": "rating_threshold",
+                    "name": "3",
+                    "role": "selection_criteria"
+                },
+                {
+                    "type": "liked_state",
+                    "name": "false",
+                    "role": "initial_state"
+                },
+                {
+                    "type": "album_name",
+                    "name": "Yosemite Picks",
+                    "role": "target_album"
+                }
+            ],
+            "metadata": {
+                "seed_hint": "46"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Filtered 48 assets from Yosemite with rating >= 3",
+                    "input": {
+                        "location": "Yosemite",
+                        "min_rating": 3
+                    },
+                    "payload": {
+                        "asset_count": 48,
+                        "rating_distribution": {
+                            "3": 22,
+                            "4": 18,
+                            "5": 8
+                        }
+                    }
+                },
+                {
+                    "tool_name": "mock_bulk_like_assets",
+                    "output_kind": "bulk_like_update",
+                    "status": "success",
+                    "output_summary": "Liked 48 assets for Yosemite Picks album",
+                    "input": {
+                        "asset_ids": ["asset_004", "asset_005", "asset_006"],
+                        "album": "Yosemite Picks"
+                    },
+                    "payload": {
+                        "updated_count": 48,
+                        "album": "Yosemite Picks"
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c05_anchor_wedding_highlights_false_johnson_wedding_1",
+            "cluster_id": "bulk_like_highlights_c05",
+            "scenario": "bulk_like_highlights",
+            "goal": "Like all unliked assets rated 1+ from Johnson Wedding in Wedding Highlights album",
+            "intent": "bulk_like",
+            "summary": "Successfully liked 32 wedding highlight assets",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "curation_assistant",
+            "workspace": "wedding_collection",
+            "route": "like_workflow",
+            "tags": ["bulk_like", "wedding", "highlights"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Johnson Wedding",
+                    "role": "source"
+                },
+                {
+                    "type": "album",
+                    "name": "Wedding Highlights",
+                    "role": "target"
+                },
+                {
+                    "type": "rating",
+                    "name": "1",
+                    "role": "threshold"
+                },
+                {
+                    "type": "liked_state",
+                    "name": "false",
+                    "role": "initial_state"
+                }
+            ],
+            "metadata": {
+                "seed": "49"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Found 32 assets matching criteria: rating >= 1, liked = false, album Wedding Highlights",
+                    "input": {
+                        "rating_min": 1,
+                        "liked": false,
+                        "album": "Wedding Highlights"
+                    }
+                },
+                {
+                    "tool_name": "mock_bulk_like_assets",
+                    "output_kind": "bulk_like_update",
+                    "status": "success",
+                    "output_summary": "Liked 32 assets successfully",
+                    "input": {
+                        "asset_ids": ["wed_001", "wed_002", "wed_003"]
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c05_near_rating_threshold_wedding_highlights_false_johnson_wedding_2",
+            "cluster_id": "bulk_like_highlights_c05",
+            "scenario": "bulk_like_highlights",
+            "goal": "Like all unliked assets rated 2+ from Johnson Wedding in Wedding Highlights album",
+            "intent": "bulk_like",
+            "summary": "Successfully liked 18 high-rated wedding highlight assets",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "curation_assistant",
+            "workspace": "wedding_collection",
+            "route": "like_workflow",
+            "tags": ["bulk_like", "wedding", "high_rating"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Johnson Wedding",
+                    "role": "source"
+                },
+                {
+                    "type": "album",
+                    "name": "Wedding Highlights",
+                    "role": "target"
+                },
+                {
+                    "type": "rating",
+                    "name": "2",
+                    "role": "threshold"
+                },
+                {
+                    "type": "liked_state",
+                    "name": "false",
+                    "role": "initial_state"
+                }
+            ],
+            "metadata": {
+                "seed": "49"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Found 18 assets matching criteria: rating >= 2, liked = false, album Wedding Highlights",
+                    "input": {
+                        "rating_min": 2,
+                        "liked": false,
+                        "album": "Wedding Highlights"
+                    }
+                },
+                {
+                    "tool_name": "mock_bulk_like_assets",
+                    "output_kind": "bulk_like_update",
+                    "status": "success",
+                    "output_summary": "Liked 18 assets successfully",
+                    "input": {
+                        "asset_ids": ["wed_high_001", "wed_high_002"]
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c05_near_location_wedding_highlights_false_family_holiday_1",
+            "cluster_id": "bulk_like_highlights_c05",
+            "scenario": "bulk_like_highlights",
+            "goal": "Like all unliked assets rated 1+ from Family Holiday in Wedding Highlights album",
+            "intent": "bulk_like",
+            "summary": "Successfully liked 12 family holiday assets in wedding album",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "curation_assistant",
+            "workspace": "wedding_collection",
+            "route": "like_workflow",
+            "tags": ["bulk_like", "family", "holiday"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Family Holiday",
+                    "role": "source"
+                },
+                {
+                    "type": "album",
+                    "name": "Wedding Highlights",
+                    "role": "target"
+                },
+                {
+                    "type": "rating",
+                    "name": "1",
+                    "role": "threshold"
+                },
+                {
+                    "type": "liked_state",
+                    "name": "false",
+                    "role": "initial_state"
+                }
+            ],
+            "metadata": {
+                "seed": "49"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Found 12 assets matching criteria: rating >= 1, liked = false, album Wedding Highlights, location Family Holiday",
+                    "input": {
+                        "rating_min": 1,
+                        "liked": false,
+                        "album": "Wedding Highlights",
+                        "location": "Family Holiday"
+                    }
+                },
+                {
+                    "tool_name": "mock_bulk_like_assets",
+                    "output_kind": "bulk_like_update",
+                    "status": "success",
+                    "output_summary": "Liked 12 assets successfully",
+                    "input": {
+                        "asset_ids": ["fam_001", "fam_002"]
+                    }
+                }
+            ],
+            "context": []
+        },
+        {
+            "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_paris_4",
+            "cluster_id": "bulk_like_highlights_c07",
+            "scenario": "bulk_like_highlights",
+            "goal": "Bulk like 4+ star photos from Paris for Yosemite Picks album",
+            "intent": "bulk_like",
+            "summary": "Filtered and liked 27 high-rated Paris photos for Yosemite Picks album",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Paris"
+                },
+                {
+                    "type": "album",
+                    "name": "Yosemite Picks"
+                },
+                {
+                    "type": "rating",
+                    "name": "4"
+                },
+                {
+                    "type": "liked_state",
+                    "name": "false"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Selected 27 assets with rating >=4 from Paris, not yet liked",
+                    "input": {
+                        "rating": 4,
+                        "liked": false,
+                        "location": "Paris"
+                    }
+                },
+                {
+                    "tool_name": "mock_bulk_like_assets",
+                    "output_kind": "bulk_like_update",
+                    "status": "success",
+                    "output_summary": "Liked 27 high-rated assets for Yosemite Picks album",
+                    "input": {
+                        "asset_ids": [
+                            "paris_high_001",
+                            "paris_high_002",
+                            "paris_high_003",
+                            "paris_high_004",
+                            "paris_high_005",
+                            "paris_high_006",
+                            "paris_high_007",
+                            "paris_high_008",
+                            "paris_high_009",
+                            "paris_high_010",
+                            "paris_high_011",
+                            "paris_high_012",
+                            "paris_high_013",
+                            "paris_high_014",
+                            "paris_high_015",
+                            "paris_high_016",
+                            "paris_high_017",
+                            "paris_high_018",
+                            "paris_high_019",
+                            "paris_high_020",
+                            "paris_high_021",
+                            "paris_high_022",
+                            "paris_high_023",
+                            "paris_high_024",
+                            "paris_high_025",
+                            "paris_high_026",
+                            "paris_high_027"
+                        ]
+                    }
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_anchor_date_concert_stage",
+            "cluster_id": "group_assets_for_review_c02",
+            "scenario": "group_assets_for_review",
+            "goal": "Group concert assets by date for stage tag review",
+            "intent": "group_assets",
+            "summary": "Successfully grouped concert stage assets by date",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Concert",
+                        "tags": ["stage"]
+                    },
+                    "output_summary": "Found 28 assets with stage tag"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "group_by": "date"
+                    },
+                    "output_summary": "Grouped into 3 date-based review buckets"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Concert"
+                },
+                {
+                    "type": "tag_focus",
+                    "name": "stage"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_near_location_date_yosemite_stage",
+            "cluster_id": "group_assets_for_review_c02",
+            "scenario": "group_assets_for_review",
+            "goal": "Group Yosemite assets by date for stage tag review",
+            "intent": "group_assets",
+            "summary": "Successfully grouped Yosemite stage assets by date",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Yosemite",
+                        "tags": ["stage"]
+                    },
+                    "output_summary": "Found 15 assets with stage tag"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "group_by": "date"
+                    },
+                    "output_summary": "Grouped into 2 date-based review buckets"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Yosemite"
+                },
+                {
+                    "type": "tag_focus",
+                    "name": "stage"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_group_assets_for_review_group_assets_for_review_c02_near_tag_focus_date_concert_wildlife",
+            "cluster_id": "group_assets_for_review_c02",
+            "scenario": "group_assets_for_review",
+            "goal": "Group concert assets by date for wildlife tag review",
+            "intent": "group_assets",
+            "summary": "Successfully grouped concert wildlife assets by date",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Concert",
+                        "tags": ["wildlife"]
+                    },
+                    "output_summary": "Found 12 assets with wildlife tag"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "group_by": "date"
+                    },
+                    "output_summary": "Grouped into 2 date-based review buckets"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Concert"
+                },
+                {
+                    "type": "tag_focus",
+                    "name": "wildlife"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_group_assets_for_review_group_assets_for_review_c09_anchor_camera_model_tokyo_family",
+            "cluster_id": "group_assets_for_review_c09",
+            "scenario": "group_assets_for_review",
+            "goal": "Group family photos from Tokyo by camera model for review",
+            "intent": "group_assets",
+            "summary": "Successfully grouped Tokyo family photos by camera model",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Tokyo",
+                        "tags": ["family"]
+                    },
+                    "output_summary": "Found 312 family photos from Tokyo"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "filter_004",
+                        "group_by": "camera_model"
+                    },
+                    "output_summary": "Grouped into 3 camera model categories: Sony A7IV, Fujifilm X-T5, iPhone 15 Pro"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Tokyo"
+                },
+                {
+                    "type": "tag",
+                    "name": "family"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_group_assets_for_review_group_assets_for_review_c09_near_location_camera_model_hawaii_family",
+            "cluster_id": "group_assets_for_review_c09",
+            "scenario": "group_assets_for_review",
+            "goal": "Group family photos from Hawaii by camera model for review",
+            "intent": "group_assets",
+            "summary": "Successfully grouped Hawaii family photos by camera model",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Hawaii",
+                        "tags": ["family"]
+                    },
+                    "output_summary": "Found 189 family photos from Hawaii"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "filter_005",
+                        "group_by": "camera_model"
+                    },
+                    "output_summary": "Grouped into 2 camera model categories: Canon R6, GoPro Hero12"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Hawaii"
+                },
+                {
+                    "type": "tag",
+                    "name": "family"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_group_assets_for_review_group_assets_for_review_c09_near_group_by_date_tokyo_family",
+            "cluster_id": "group_assets_for_review_c09",
+            "scenario": "group_assets_for_review",
+            "goal": "Group family photos from Tokyo by date for review",
+            "intent": "group_assets",
+            "summary": "Successfully grouped Tokyo family photos by date",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Tokyo",
+                        "tags": ["family"]
+                    },
+                    "output_summary": "Found 312 family photos from Tokyo"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "selection_id": "filter_006",
+                        "group_by": "date"
+                    },
+                    "output_summary": "Grouped into 7 date-based clusters spanning March 2024"
+                }
+            ],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Tokyo"
+                },
+                {
+                    "type": "tag",
+                    "name": "family"
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_anchor_tag_portrait_session_portrait",
+            "cluster_id": "group_assets_for_review_c08",
+            "scenario": "group_assets_for_review",
+            "goal": "Group portrait session assets by portrait tag for review",
+            "intent": "group_assets",
+            "summary": "Successfully grouped 60 portrait assets into 3 review groups",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "review_assistant",
+            "workspace": "studio_library",
+            "route": "asset_review",
+            "tags": ["portrait", "session", "review"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Portrait Session",
+                    "role": "shoot_location"
+                },
+                {
+                    "type": "tag",
+                    "name": "portrait",
+                    "role": "grouping_criteria"
+                }
+            ],
+            "metadata": {
+                "total_assets": "60",
+                "group_count": "3"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Filtered 60 assets from Portrait Session with portrait tag",
+                    "input": {
+                        "location": "Portrait Session",
+                        "tags": ["portrait"]
+                    }
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "output_summary": "Grouped into 3 categories: headshots, environmental, creative",
+                    "payload": {
+                        "group_count": 3,
+                        "groups": ["headshots", "environmental", "creative"]
+                    }
+                }
+            ],
+            "context": [
+                {
+                    "id": "ctx1",
+                    "kind": "user_request",
+                    "text": "Group all portrait session photos by portrait tag for review",
+                    "weight": 1.0
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_near_tag_focus_tag_portrait_session_stage",
+            "cluster_id": "group_assets_for_review_c08",
+            "scenario": "group_assets_for_review",
+            "goal": "Group portrait session assets by stage tag for review",
+            "intent": "group_assets",
+            "summary": "Successfully grouped 35 stage assets into 2 review groups",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "agent_name": "review_assistant",
+            "workspace": "studio_library",
+            "route": "asset_review",
+            "tags": ["stage", "session", "review"],
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Portrait Session",
+                    "role": "shoot_location"
+                },
+                {
+                    "type": "tag",
+                    "name": "stage",
+                    "role": "grouping_criteria"
+                }
+            ],
+            "metadata": {
+                "total_assets": "35",
+                "group_count": "2"
+            },
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "output_summary": "Filtered 35 assets from Portrait Session with stage tag",
+                    "input": {
+                        "location": "Portrait Session",
+                        "tags": ["stage"]
+                    }
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "output_summary": "Grouped into 2 categories: performance, rehearsal",
+                    "payload": {
+                        "group_count": 2,
+                        "groups": ["performance", "rehearsal"]
+                    }
+                }
+            ],
+            "context": [
+                {
+                    "id": "ctx1",
+                    "kind": "user_request",
+                    "text": "Group stage photos from the portrait session for review",
+                    "weight": 1.0
+                }
+            ]
+        },
+        {
+            "episode_id": "ep_group_assets_for_review_group_assets_for_review_c08_near_location_tag_paris_portrait",
+            "cluster_id": "group_assets_for_review_c08",
+            "scenario": "group_assets_for_review",
+            "goal": "Group assets for review by tag in Paris",
+            "intent": "group_assets",
+            "summary": "Successfully grouped portrait-tagged assets from Paris for review",
+            "status": "succeeded",
+            "write_trigger": "goal_resolved",
+            "entities": [
+                {
+                    "type": "location",
+                    "name": "Paris"
+                },
+                {
+                    "type": "group_by",
+                    "name": "tag"
+                },
+                {
+                    "type": "tag_focus",
+                    "name": "portrait"
+                }
+            ],
+            "steps": [
+                {
+                    "tool_name": "mock_filter_assets",
+                    "output_kind": "asset_selection",
+                    "status": "success",
+                    "input": {
+                        "location": "Paris",
+                        "tag": "portrait"
+                    },
+                    "output_summary": "Found 24 assets with portrait tag in Paris"
+                },
+                {
+                    "tool_name": "mock_group_assets",
+                    "output_kind": "asset_groups",
+                    "status": "success",
+                    "input": {
+                        "assets": "24 portrait assets",
+                        "group_by": "tag"
+                    },
+                    "output_summary": "Grouped into 3 categories: close-up, environmental, candid"
+                }
+            ]
+        }
+    ],
+    "queries": [
+        {
+            "target_episode_ids": [
+                "ep_archive_low_rated_assets_archive_low_rated_assets_c01_anchor_tokyo_collection_tokyo_2_spring_2023"
+            ],
+            "target_scenario": "archive_low_rated_assets",
+            "target_intent": "bulk_archive",
+            "query": "Archive assets rated 2 or lower from Tokyo Collection album taken in Tokyo during spring 2023"
+        },
+        {
+            "target_episode_ids": [
+                "ep_archive_low_rated_assets_archive_low_rated_assets_c01_near_rating_threshold_tokyo_collection_tokyo_1_spring_2023"
+            ],
+            "target_scenario": "archive_low_rated_assets",
+            "target_intent": "bulk_archive",
+            "query": "Archive assets rated 1 or lower from Tokyo Collection album taken in Tokyo during spring 2023"
+        },
+        {
+            "target_episode_ids": [
+                "ep_archive_low_rated_assets_archive_low_rated_assets_c01_near_time_window_tokyo_collection_tokyo_2_autumn_2024"
+            ],
+            "target_scenario": "archive_low_rated_assets",
+            "target_intent": "bulk_archive",
+            "query": "Archive assets rated 2 or lower from Tokyo Collection album taken in Tokyo during autumn 2024"
+        },
+        {
+            "target_episode_ids": [
+                "ep_archive_low_rated_assets_archive_low_rated_assets_c04_anchor_holiday_cull_family_holiday_2_autumn_2023"
+            ],
+            "target_scenario": "archive_low_rated_assets",
+            "target_intent": "bulk_archive",
+            "query": "Archive low-rated photos from Family Holiday autumn 2023"
+        },
+        {
+            "target_episode_ids": [
+                "ep_archive_low_rated_assets_archive_low_rated_assets_c04_near_location_holiday_cull_hawaii_2_autumn_2023"
+            ],
+            "target_scenario": "archive_low_rated_assets",
+            "target_intent": "bulk_archive",
+            "query": "Archive low-rated photos from Hawaii autumn 2023"
+        },
+        {
+            "target_episode_ids": [
+                "ep_archive_low_rated_assets_archive_low_rated_assets_c04_near_rating_threshold_holiday_cull_family_holiday_5_autumn_2023"
+            ],
+            "target_scenario": "archive_low_rated_assets",
+            "target_intent": "bulk_archive",
+            "query": "Archive photos rated 5 or below from Family Holiday autumn 2023"
+        },
+        {
+            "target_episode_ids": [
+                "ep_archive_low_rated_assets_archive_low_rated_assets_c06_anchor_wedding_cleanup_alps_2_summer_2024"
+            ],
+            "target_scenario": "archive_low_rated_assets",
+            "target_intent": "bulk_archive",
+            "query": "Archive assets rated 2 or below from Alps summer 2024 to Wedding Cleanup album"
+        },
+        {
+            "target_episode_ids": [
+                "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_location_wedding_cleanup_family_holiday_2_summer_2024"
+            ],
+            "target_scenario": "archive_low_rated_assets",
+            "target_intent": "bulk_archive",
+            "query": "Archive assets rated 2 or below from Family Holiday summer 2024 to Wedding Cleanup album"
+        },
+        {
+            "target_episode_ids": [
+                "ep_archive_low_rated_assets_archive_low_rated_assets_c06_near_time_window_wedding_cleanup_alps_2_autumn_2024"
+            ],
+            "target_scenario": "archive_low_rated_assets",
+            "target_intent": "bulk_archive",
+            "query": "Archive assets rated 2 or below from Alps autumn 2024 to Wedding Cleanup album"
+        },
+        {
+            "target_episode_ids": [
+                "ep_bulk_like_highlights_bulk_like_highlights_c03_anchor_yosemite_picks_false_yosemite_4"
+            ],
+            "target_scenario": "bulk_like_highlights",
+            "target_intent": "bulk_like",
+            "query": "Find the episode where photos from Yosemite with a rating of 4 or higher were bulk liked for the Yosemite Picks album."
+        },
+        {
+            "target_episode_ids": [
+                "ep_bulk_like_highlights_bulk_like_highlights_c03_near_rating_threshold_yosemite_picks_false_yosemite_3"
+            ],
+            "target_scenario": "bulk_like_highlights",
+            "target_intent": "bulk_like",
+            "query": "Retrieve the episode where Yosemite photos rated 3+ were bulk liked into the Yosemite Picks album, resulting in 48 liked assets."
+        },
+        {
+            "target_episode_ids": [
+                "ep_bulk_like_highlights_bulk_like_highlights_c05_anchor_wedding_highlights_false_johnson_wedding_1"
+            ],
+            "target_scenario": "bulk_like_highlights",
+            "target_intent": "bulk_like",
+            "query": "Locate the episode where unliked assets from Johnson Wedding with a rating threshold of 1 were bulk liked into the Wedding Highlights album."
+        },
+        {
+            "target_episode_ids": [
+                "ep_bulk_like_highlights_bulk_like_highlights_c05_near_location_wedding_highlights_false_family_holiday_1"
+            ],
+            "target_scenario": "bulk_like_highlights",
+            "target_intent": "bulk_like",
+            "query": "Find the episode where 12 assets from Family Holiday with rating 1+ were bulk liked into the Wedding Highlights album."
+        },
+        {
+            "target_episode_ids": [
+                "ep_bulk_like_highlights_bulk_like_highlights_c05_near_rating_threshold_wedding_highlights_false_johnson_wedding_2"
+            ],
+            "target_scenario": "bulk_like_highlights",
+            "target_intent": "bulk_like",
+            "query": "Retrieve the episode where Johnson Wedding assets with a rating threshold of 2 were bulk liked into Wedding Highlights, resulting in 18 liked assets."
+        },
+        {
+            "target_episode_ids": [
+                "ep_bulk_like_highlights_bulk_like_highlights_c07_anchor_yosemite_picks_false_paris_4"
+            ],
+            "target_scenario": "bulk_like_highlights",
+            "target_intent": "bulk_like",
+            "query": "Locate the episode where 27 high-rated (4+) Paris photos were bulk liked for the Yosemite Picks album."
+        },
+        {
+            "target_episode_ids": [
+                "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_82"
+            ],
+            "target_scenario": "cleanup_duplicate_shoot",
+            "target_intent": "cleanup_duplicates",
+            "entity": "Yosemite",
+            "query": "Find previous episode where false positive duplicates were handled for Sony A7C II photos from Yosemite using 0.82 similarity threshold, with metadata inspection revealing 8 false positives among 12 assets."
+        },
+        {
+            "target_episode_ids": [
+                "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_camera_model_canon_eos_r5_false_positive_duplicate_yosemite_0_82"
+            ],
+            "target_scenario": "cleanup_duplicate_shoot",
+            "target_intent": "cleanup_duplicates",
+            "entity": "Canon EOS R5",
+            "query": "Retrieve episode about cleaning false positive duplicates from Yosemite shoot with Canon EOS R5 at 0.82 threshold, where 6 false positives were identified among 10 potential duplicate pairs."
+        },
+        {
+            "target_episode_ids": [
+                "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c01_near_similarity_threshold_sony_a7c_ii_false_positive_duplicate_yosemite_0_74"
+            ],
+            "target_scenario": "cleanup_duplicate_shoot",
+            "target_intent": "cleanup_duplicates",
+            "entity": "0.74",
+            "query": "Search for episode where Sony A7C II photos from Yosemite were processed with 0.74 similarity threshold, resulting in 25 potential duplicate pairs and quota limit issues during archiving."
+        },
+        {
+            "target_episode_ids": [
+                "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c03_anchor_canon_eos_r5_near_duplicate_burst_portrait_session_0_76"
+            ],
+            "target_scenario": "cleanup_duplicate_shoot",
+            "target_intent": "cleanup_duplicates",
+            "entity": "Portrait Session",
+            "query": "Find prior episode dealing with near-duplicate burst shots from Canon EOS R5 portrait session, where 8 duplicate clusters were found and 15 assets were archived after recovery from initial error."
+        },
+        {
+            "target_episode_ids": [
+                "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c03_near_failure_mode_canon_eos_r5_false_positive_duplicate_portrait_session_0_76"
+            ],
+            "target_scenario": "cleanup_duplicate_shoot",
+            "target_intent": "cleanup_duplicates",
+            "entity": "false_positive_duplicate",
+            "query": "Retrieve episode about handling false positive duplicates in Canon EOS R5 portrait session, where 3 false positive clusters were identified among 6 duplicate clusters."
+        },
+        {
+            "target_episode_ids": [
+                "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c03_near_location_canon_eos_r5_near_duplicate_burst_tokyo_0_76"
+            ],
+            "target_scenario": "cleanup_duplicate_shoot",
+            "target_intent": "cleanup_duplicates",
+            "entity": "Tokyo",
+            "query": "Search for episode cleaning near-duplicate burst shots from Canon EOS R5 Tokyo shoot, where 5 duplicate clusters were found and camera metadata was verified for all assets."
+        },
+        {
+            "target_episode_ids": [
+                "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_86"
+            ],
+            "target_scenario": "cleanup_duplicate_shoot",
+            "target_intent": "cleanup_duplicates",
+            "entity": "0.86",
+            "query": "Find previous episode where false positive duplicates from Sony A7C II Yosemite shoot were handled using 0.86 similarity threshold, with metadata inspection confirming 15 unique assets with different timestamps."
+        },
+        {
+            "target_episode_ids": [
+                "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_camera_model_fujifilm_x_t5_false_positive_duplicate_yosemite_0_86"
+            ],
+            "target_scenario": "cleanup_duplicate_shoot",
+            "target_intent": "cleanup_duplicates",
+            "entity": "Fujifilm X-T5",
+            "query": "Retrieve episode about cleaning false positive duplicates from Fujifilm X-T5 Yosemite shoot at 0.86 threshold, where 12 true duplicates were confirmed among 18 potential duplicates."
+        },
+        {
+            "target_episode_ids": [
+                "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_near_failure_mode_sony_a7c_ii_near_duplicate_burst_yosemite_0_86"
+            ],
+            "target_scenario": "cleanup_duplicate_shoot",
+            "target_intent": "cleanup_duplicates",
+            "entity": "near_duplicate_burst",
+            "query": "Search for episode handling near-duplicate burst shots from Sony A7C II in Yosemite with 0.86 threshold, where burst sequence over 2 seconds was identified and shot 3 had best focus."
+        },
+        {
+            "target_episode_ids": [
+                "ep_curate_trip_album_curate_trip_album_c04_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_winter_2022"
+            ],
+            "target_scenario": "curate_trip_album",
+            "target_intent": "curate_album",
+            "query": "Find the episode where I created a Hawaii Blue Hour album using Nikon Z7 II photos from winter 2022 in Hawaii, resulting in 67 assets added."
+        },
+        {
+            "target_episode_ids": [
+                "ep_curate_trip_album_curate_trip_album_c04_near_album_name_wedding_favorites_nikon_z7_ii_hawaii_winter_2022"
+            ],
+            "target_scenario": "curate_trip_album",
+            "target_intent": "curate_album",
+            "query": "Retrieve the episode where I made a Wedding Favorites album from Nikon Z7 II photos taken in Hawaii during winter 2022, with 42 assets added."
+        },
+        {
+            "target_episode_ids": [
+                "ep_curate_trip_album_curate_trip_album_c04_near_time_window_hawaii_blue_hour_nikon_z7_ii_hawaii_spring_2023"
+            ],
+            "target_scenario": "curate_trip_album",
+            "target_intent": "curate_album",
+            "query": "Locate the episode where I curated a Hawaii Blue Hour album using Nikon Z7 II photos from spring 2023 in Hawaii, adding 58 assets."
+        },
+        {
+            "target_episode_ids": [
+                "ep_curate_trip_album_curate_trip_album_c07_anchor_tokyo_street_album_fujifilm_x_t5_tokyo_spring_2023"
+            ],
+            "target_scenario": "curate_trip_album",
+            "target_intent": "curate_album",
+            "query": "Find the episode where I created a Tokyo Street Album with Fujifilm X-T5 photos from Tokyo spring 2023, resulting in 78 assets added."
+        },
+        {
+            "target_episode_ids": [
+                "ep_curate_trip_album_curate_trip_album_c07_near_camera_model_tokyo_street_album_nikon_z7_ii_tokyo_spring_2023"
+            ],
+            "target_scenario": "curate_trip_album",
+            "target_intent": "curate_album",
+            "query": "Retrieve the episode where I made a Tokyo Street Album using Nikon Z7 II photos from Tokyo spring 2023, with 92 assets added."
+        },
+        {
+            "target_episode_ids": [
+                "ep_curate_trip_album_curate_trip_album_c09_anchor_paris_selects_canon_eos_r5_paris_spring_2024"
+            ],
+            "target_scenario": "curate_trip_album",
+            "target_intent": "curate_album",
+            "query": "Locate the episode where I curated a Paris Selects album with Canon EOS R5 photos from Paris spring 2024, adding 85 selected assets."
+        },
+        {
+            "target_episode_ids": [
+                "ep_curate_trip_album_curate_trip_album_c09_near_album_name_wedding_favorites_canon_eos_r5_paris_spring_2024"
+            ],
+            "target_scenario": "curate_trip_album",
+            "target_intent": "curate_album",
+            "query": "Find the episode where I created a Wedding Favorites album using Canon EOS R5 photos from Paris spring 2024, with 45 wedding assets added."
+        },
+        {
+            "target_episode_ids": [
+                "ep_curate_trip_album_curate_trip_album_c09_near_time_window_paris_selects_canon_eos_r5_paris_spring_2023"
+            ],
+            "target_scenario": "curate_trip_album",
+            "target_intent": "curate_album",
+            "query": "Retrieve the episode where I made a Paris Selects album with Canon EOS R5 photos from Paris spring 2023, adding 72 selected assets."
+        },
+        {
+            "target_episode_ids": [
+                "ep_group_assets_for_review_group_assets_for_review_c02_anchor_date_concert_stage"
+            ],
+            "target_scenario": "group_assets_for_review",
+            "target_intent": "group_assets",
+            "entity": "stage",
+            "query": "Find previous grouping of concert assets with stage tag organized by date for review"
+        },
+        {
+            "target_episode_ids": [
+                "ep_group_assets_for_review_group_assets_for_review_c02_near_location_date_yosemite_stage"
+            ],
+            "target_scenario": "group_assets_for_review",
+            "target_intent": "group_assets",
+            "entity": "Yosemite",
+            "query": "Retrieve episode where Yosemite location assets with stage tag were grouped by date into 2 review buckets"
+        },
+        {
+            "target_episode_ids": [
+                "ep_group_assets_for_review_group_assets_for_review_c02_near_tag_focus_date_concert_wildlife"
+            ],
+            "target_scenario": "group_assets_for_review",
+            "target_intent": "group_assets",
+            "entity": "wildlife",
+            "query": "Recall grouping of 12 concert assets with wildlife tag organized by date for review"
+        },
+        {
+            "target_episode_ids": [
+                "ep_group_assets_for_review_group_assets_for_review_c08_anchor_tag_portrait_session_portrait"
+            ],
+            "target_scenario": "group_assets_for_review",
+            "target_intent": "group_assets",
+            "entity": "portrait",
+            "query": "Find previous grouping of 60 portrait session assets by portrait tag into headshots, environmental, and creative categories"
+        },
+        {
+            "target_episode_ids": [
+                "ep_group_assets_for_review_group_assets_for_review_c08_near_location_tag_paris_portrait"
+            ],
+            "target_scenario": "group_assets_for_review",
+            "target_intent": "group_assets",
+            "entity": "Paris",
+            "query": "Retrieve episode where 24 portrait-tagged assets from Paris were grouped into close-up, environmental, and candid categories"
+        },
+        {
+            "target_episode_ids": [
+                "ep_group_assets_for_review_group_assets_for_review_c08_near_tag_focus_tag_portrait_session_stage"
+            ],
+            "target_scenario": "group_assets_for_review",
+            "target_intent": "group_assets",
+            "entity": "stage",
+            "query": "Recall grouping of 35 portrait session assets with stage tag into performance and rehearsal categories"
+        },
+        {
+            "target_episode_ids": [
+                "ep_group_assets_for_review_group_assets_for_review_c09_anchor_camera_model_tokyo_family"
+            ],
+            "target_scenario": "group_assets_for_review",
+            "target_intent": "group_assets",
+            "entity": "family",
+            "query": "Find previous grouping of Tokyo family photos by camera model including Sony A7IV, Fujifilm X-T5, and iPhone 15 Pro"
+        },
+        {
+            "target_episode_ids": [
+                "ep_group_assets_for_review_group_assets_for_review_c09_near_group_by_date_tokyo_family"
+            ],
+            "target_scenario": "group_assets_for_review",
+            "target_intent": "group_assets",
+            "entity": "Tokyo",
+            "query": "Retrieve episode where 312 Tokyo family photos were grouped into 7 date-based clusters spanning March 2024"
+        },
+        {
+            "target_episode_ids": [
+                "ep_group_assets_for_review_group_assets_for_review_c09_near_location_camera_model_hawaii_family"
+            ],
+            "target_scenario": "group_assets_for_review",
+            "target_intent": "group_assets",
+            "entity": "Hawaii",
+            "query": "Recall grouping of 189 Hawaii family photos by camera model into Canon R6 and GoPro Hero12 categories"
+        },
+        {
+            "target_episode_ids": [
+                "ep_inspect_camera_metadata_inspect_camera_metadata_c05_anchor_canon_eos_r5_family_holiday_spring_2024"
+            ],
+            "target_scenario": "inspect_camera_metadata",
+            "target_intent": "inspect_metadata",
+            "entity": "Canon EOS R5",
+            "query": "Retrieve camera metadata for Canon R5 photos taken during Family Holiday in spring 2024, focusing on ISO range and aperture settings"
+        },
+        {
+            "target_episode_ids": [
+                "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_camera_model_sony_a7iii_family_holiday_spring_2024"
+            ],
+            "target_scenario": "inspect_camera_metadata",
+            "target_intent": "inspect_metadata",
+            "entity": "Sony A7III",
+            "query": "Find Sony A7III camera settings from Family Holiday spring 2024, particularly shutter speed range and maximum ISO used"
+        },
+        {
+            "target_episode_ids": [
+                "ep_inspect_camera_metadata_inspect_camera_metadata_c05_near_time_window_canon_eos_r5_family_holiday_spring_2023"
+            ],
+            "target_scenario": "inspect_camera_metadata",
+            "target_intent": "inspect_metadata",
+            "entity": "spring_2023",
+            "query": "Inspect Canon EOS R5 metadata from Family Holiday in spring 2023, comparing aperture range and shutter speeds to more recent trips"
+        },
+        {
+            "target_episode_ids": [
+                "ep_inspect_camera_metadata_inspect_camera_metadata_c09_anchor_canon_eos_r5_hawaii_spring_2024"
+            ],
+            "target_scenario": "inspect_camera_metadata",
+            "target_intent": "inspect_metadata",
+            "entity": "Hawaii",
+            "query": "Retrieve Canon R5 camera settings from Hawaii spring 2024 trip, focusing on resolution details and average aperture values"
+        },
+        {
+            "target_episode_ids": [
+                "ep_inspect_camera_metadata_inspect_camera_metadata_c09_near_camera_model_sony_a7iii_hawaii_spring_2024"
+            ],
+            "target_scenario": "inspect_camera_metadata",
+            "target_intent": "inspect_metadata",
+            "entity": "Sony A7III",
+            "query": "Find Sony A7III metadata from Hawaii spring 2024, examining resolution specifications and ISO range captured"
+        },
+        {
+            "target_episode_ids": [
+                "ep_inspect_camera_metadata_inspect_camera_metadata_c10_anchor_canon_eos_r5_johnson_wedding_spring_2024"
+            ],
+            "target_scenario": "inspect_camera_metadata",
+            "target_intent": "inspect_metadata",
+            "entity": "Johnson Wedding",
+            "query": "Inspect Canon EOS R5 camera settings from Johnson Wedding spring 2024, checking for consistency in shutter speed and ISO values"
+        },
+        {
+            "target_episode_ids": [
+                "ep_summarize_selected_assets_summarize_selected_assets_c01_anchor_beach_sunset_summer_2023"
+            ],
+            "target_scenario": "summarize_selected_assets",
+            "target_intent": "summarize_selection",
+            "entity": "Beach",
+            "query": "Find sunset-themed photos from Beach during summer 2023 with average rating around 4.2"
+        },
+        {
+            "target_episode_ids": [
+                "ep_summarize_selected_assets_summarize_selected_assets_c01_near_location_paris_sunset_summer_2023"
+            ],
+            "target_scenario": "summarize_selected_assets",
+            "target_intent": "summarize_selection",
+            "entity": "Paris",
+            "query": "Retrieve Paris sunset photos from summer 2023 that include HDR shots"
+        },
+        {
+            "target_episode_ids": [
+                "ep_summarize_selected_assets_summarize_selected_assets_c01_near_time_window_beach_sunset_spring_2023"
+            ],
+            "target_scenario": "summarize_selected_assets",
+            "target_intent": "summarize_selection",
+            "entity": "Beach",
+            "query": "Locate Beach sunset photos from spring 2023 with panoramic shots and average rating 3.8"
+        },
+        {
+            "target_episode_ids": [
+                "ep_summarize_selected_assets_summarize_selected_assets_c05_anchor_beach_street_moments_summer_2023"
+            ],
+            "target_scenario": "summarize_selected_assets",
+            "target_intent": "summarize_selection",
+            "entity": "Beach",
+            "query": "Search for candid street photos from Beach summer 2023 featuring architecture and daily life scenes"
+        },
+        {
+            "target_episode_ids": [
+                "ep_summarize_selected_assets_summarize_selected_assets_c05_near_location_johnson_wedding_street_moments_summer_2023"
+            ],
+            "target_scenario": "summarize_selected_assets",
+            "target_intent": "summarize_selection",
+            "entity": "Johnson Wedding",
+            "query": "Find spontaneous wedding street moments from Johnson Wedding during summer 2023"
+        },
+        {
+            "target_episode_ids": [
+                "ep_summarize_selected_assets_summarize_selected_assets_c05_near_selection_theme_beach_family_highlights_summer_2023"
+            ],
+            "target_scenario": "summarize_selected_assets",
+            "target_intent": "summarize_selection",
+            "entity": "Beach",
+            "query": "Retrieve family highlight photos from Beach summer 2023 with group portraits and activity shots"
+        },
+        {
+            "target_episode_ids": [
+                "ep_summarize_selected_assets_summarize_selected_assets_c08_anchor_yosemite_family_highlights_autumn_2023"
+            ],
+            "target_scenario": "summarize_selected_assets",
+            "target_intent": "summarize_selection",
+            "entity": "Yosemite",
+            "query": "Locate family photos from Yosemite autumn 2023 featuring hiking, campfire moments, and scenic views with high ratings"
+        },
+        {
+            "target_episode_ids": [
+                "ep_summarize_selected_assets_summarize_selected_assets_c08_near_location_tokyo_family_highlights_autumn_2023"
+            ],
+            "target_scenario": "summarize_selected_assets",
+            "target_intent": "summarize_selection",
+            "entity": "Tokyo",
+            "query": "Search for family highlight assets from Tokyo autumn 2023 with outdoor activities and average rating 4.2"
+        },
+        {
+            "target_episode_ids": [
+                "ep_summarize_selected_assets_summarize_selected_assets_c08_near_selection_theme_yosemite_street_moments_autumn_2023"
+            ],
+            "target_scenario": "summarize_selected_assets",
+            "target_intent": "summarize_selection",
+            "entity": "Yosemite",
+            "query": "Find street moment photos from Yosemite autumn 2023 featuring local vendors and candid shots"
+        }
+    ]
+}

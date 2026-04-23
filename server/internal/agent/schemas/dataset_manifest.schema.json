@@ -55,6 +55,10 @@
     "source_bundle": {
       "type": "string"
     },
+    "query_generation_protocol": {
+      "type": "string",
+      "minLength": 1
+    },
     "git_commit": {
       "type": "string"
     }

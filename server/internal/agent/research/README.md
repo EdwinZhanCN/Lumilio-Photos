@@ -50,7 +50,8 @@ Important normalization and evaluation rules in the current harness:
 - Each generation batch is now driven by a programmatic generation matrix before calling DeepSeek.
 - DeepSeek output is normalized before schema validation. Numeric metadata values are coerced to strings.
 - Missing `episode_id` or `target_episode_ids` can be backfilled locally for compatibility, but new datasets should emit them explicitly.
-- Missing query coverage for any `scenario + intent` group is backfilled automatically with synthetic queries.
+- The default protocol is now `episodes first, queries second`: generate episodes, split by cluster, then generate split-specific query sets.
+- Split bundles may validly contain zero queries before split-specific query generation.
 - Benchmark filtering uses exact constraints for `entity` and `status`, but does not hard-filter on `tags`.
 - Different embedding models or dimensions should use different Qdrant collections.
 
@@ -117,17 +118,34 @@ uv run agent-memory-research print-generation-plan --episode-count 12 --query-co
 uv run agent-memory-research validate-bundle data/raw/example.bundle.json
 uv run agent-memory-research generate-spec-bundle data/raw/spec.bundle.json
 uv run agent-memory-research make-splits data/raw/spec.bundle.json data/splits/spec
+uv run agent-memory-research generate-split-queries data/splits/spec/train.bundle.json
+uv run agent-memory-research generate-split-queries data/splits/spec/val.bundle.json
+uv run agent-memory-research generate-split-queries data/splits/spec/test.bundle.json
 uv run agent-memory-research benchmark-retrieval \
   data/splits/spec/test.bundle.json \
   --collection agent_episodic_memory_qwen3_1024 \
   --embed-model qwen3-embedding:0.6b \
   --embed-dims 1024 \
   --output-path data/reports/qwen3-spec.json
+uv run agent-memory-research analyze-benchmark-report \
+  data/reports/qwen3-spec.json
+uv run agent-memory-research analyze-benchmark-report \
+  data/reports/qwen3-spec.json \
+  --output-path data/reports/qwen3-spec-analysis.md
 ```
 
-## Reproducing Baseline V1
+## Current Protocol
 
-This is the exact flow used for the current `baseline-v1` sanity benchmark.
+The benchmark construction protocol is now:
+
+1. generate the full episode corpus
+2. split episodes into `train`, `val`, and `test` by `cluster`
+3. generate queries independently for each split
+4. freeze the test split before model development
+
+This means `make-splits` now produces episode-only split bundles with empty `queries` arrays. Split-specific queries are added in a later step with `generate-split-queries`.
+
+## Reproducing the Current Workflow
 
 ### Step 1. Generate the raw bundle
 
@@ -135,9 +153,7 @@ This is the exact flow used for the current `baseline-v1` sanity benchmark.
 cd /Users/zhanzihao/Lumilio-Photos/server/internal/agent/research
 uv run agent-memory-research generate-spec-bundle data/raw/baseline-v1.bundle.json \
   --episode-count 35 \
-  --query-count 18 \
   --batch-episode-count 7 \
-  --batch-query-count 3 \
   --max-tokens 5500 \
   --timeout-seconds 180 \
   --model deepseek-chat
@@ -146,9 +162,8 @@ uv run agent-memory-research generate-spec-bundle data/raw/baseline-v1.bundle.js
 What this does:
 
 - builds a deterministic batch-level generation matrix first
-- generates media-management episodes and retrieval queries in batches
+- generates media-management episodes in batches
 - validates every batch against schema
-- backfills missing `scenario + intent` query coverage if needed
 - writes a final validated bundle to `data/raw/baseline-v1.bundle.json`
 
 ### Step 2. Validate the raw bundle
@@ -174,7 +189,18 @@ Outputs:
 - `data/splits/baseline-v1/test.bundle.json`
 - `data/splits/baseline-v1/manifest.json`
 
-### Step 4. Seed Qwen3 embeddings into Qdrant
+At this point the split bundles contain episodes only. Queries are generated independently per split in the next step.
+
+### Step 4. Generate split-specific query sets
+
+```bash
+cd /Users/zhanzihao/Lumilio-Photos/server/internal/agent/research
+uv run agent-memory-research generate-split-queries data/splits/baseline-v1/train.bundle.json
+uv run agent-memory-research generate-split-queries data/splits/baseline-v1/val.bundle.json
+uv run agent-memory-research generate-split-queries data/splits/baseline-v1/test.bundle.json
+```
+
+### Step 5. Seed Qwen3 embeddings into Qdrant
 
 Use a dedicated collection for this model/dimension pair.
 
@@ -188,7 +214,7 @@ go run ./internal/agent seed-spec-bundle \
   -collection agent_episodic_memory_qwen3_1024
 ```
 
-### Step 5. Run the Qwen3 retrieval benchmark
+### Step 6. Run the Qwen3 retrieval benchmark
 
 ```bash
 cd /Users/zhanzihao/Lumilio-Photos/server/internal/agent/research
@@ -200,7 +226,7 @@ uv run agent-memory-research benchmark-retrieval \
   --output-path data/reports/qwen3-baseline-v1.json
 ```
 
-### Step 6. Seed Granite embeddings into Qdrant
+### Step 7. Seed Granite embeddings into Qdrant
 
 Use a separate collection from Qwen3.
 
@@ -214,7 +240,7 @@ go run ./internal/agent seed-spec-bundle \
   -collection agent_episodic_memory_granite_768
 ```
 
-### Step 7. Run the Granite retrieval benchmark
+### Step 8. Run the Granite retrieval benchmark
 
 ```bash
 cd /Users/zhanzihao/Lumilio-Photos/server/internal/agent/research
@@ -286,9 +312,7 @@ Use smaller batch sizes:
 ```bash
 uv run agent-memory-research generate-spec-bundle data/raw/smoke.bundle.json \
   --episode-count 24 \
-  --query-count 8 \
   --batch-episode-count 6 \
-  --batch-query-count 2 \
   --max-tokens 5000
 ```
 

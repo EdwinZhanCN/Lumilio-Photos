@@ -15,10 +15,14 @@ ENTITY_TYPE_NAMES = {
 }
 
 
-def lint_bundle(payload: dict[str, Any]) -> list[str]:
+def lint_bundle(
+    payload: dict[str, Any], *, require_query_coverage: bool | None = None
+) -> list[str]:
     issues: list[str] = []
     episodes = list(payload.get("episodes", []))
     queries = list(payload.get("queries", []))
+    if require_query_coverage is None:
+        require_query_coverage = len(queries) > 0
     episode_targets: set[tuple[str, str]] = set()
     query_targets: set[tuple[str, str]] = set()
     episode_ids: set[str] = set()
@@ -135,7 +139,7 @@ def lint_bundle(payload: dict[str, Any]) -> list[str]:
                 )
 
     missing_query_targets = sorted(episode_targets - query_targets)
-    if missing_query_targets:
+    if require_query_coverage and missing_query_targets:
         issues.append(
             "query coverage is incomplete for scenario+intent groups: "
             + ", ".join(

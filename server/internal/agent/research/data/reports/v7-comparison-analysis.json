@@ -1,0 +1,411 @@
+{
+  "generated_at": "2026-04-22T23:38:53.001766+00:00",
+  "report_count": 2,
+  "reports": [
+    {
+      "report_name": "qwen3-baseline-v7-semantic.json",
+      "report_path": "data/reports/qwen3-baseline-v7-semantic.json",
+      "collection": "agent_episodic_memory_qwen3_1024_v7_semantic",
+      "embedder": {
+        "provider": "ollama",
+        "base_url": "http://localhost:11434",
+        "model": "qwen3-embedding:0.6b",
+        "dimensions": 1024
+      },
+      "query_count": 56,
+      "overall": {
+        "recall@1": 0.589286,
+        "recall@5": 1.0,
+        "mrr@10": 0.761012
+      },
+      "numeric_slots": {
+        "with_number": {
+          "count": 55.0,
+          "recall@1": 0.5818181818181818,
+          "recall@5": 1.0,
+          "mrr": 0.7566666666666667
+        },
+        "without_number": {
+          "count": 1.0,
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "by_scenario": [
+        {
+          "scenario": "archive_low_rated_assets",
+          "count": 9.0,
+          "recall@1": 0.4444444444444444,
+          "recall@5": 1.0,
+          "mrr": 0.6148148148148148
+        },
+        {
+          "scenario": "bulk_like_highlights",
+          "count": 6.0,
+          "recall@1": 0.3333333333333333,
+          "recall@5": 1.0,
+          "mrr": 0.6388888888888888
+        },
+        {
+          "scenario": "cleanup_duplicate_shoot",
+          "count": 9.0,
+          "recall@1": 0.5555555555555556,
+          "recall@5": 1.0,
+          "mrr": 0.7407407407407407
+        },
+        {
+          "scenario": "curate_trip_album",
+          "count": 8.0,
+          "recall@1": 0.5,
+          "recall@5": 1.0,
+          "mrr": 0.75
+        },
+        {
+          "scenario": "group_assets_for_review",
+          "count": 9.0,
+          "recall@1": 0.8888888888888888,
+          "recall@5": 1.0,
+          "mrr": 0.9444444444444444
+        },
+        {
+          "scenario": "inspect_camera_metadata",
+          "count": 6.0,
+          "recall@1": 0.3333333333333333,
+          "recall@5": 1.0,
+          "mrr": 0.5972222222222222
+        },
+        {
+          "scenario": "summarize_selected_assets",
+          "count": 9.0,
+          "recall@1": 0.8888888888888888,
+          "recall@5": 1.0,
+          "mrr": 0.9444444444444444
+        }
+      ],
+      "error_topology": {
+        "misses": 23,
+        "same_scenario_top1": 22,
+        "same_intent_top1": 22
+      },
+      "top_misses": [
+        {
+          "rank": 2,
+          "query": "Archive assets rated 1 or lower from Tokyo Collection album taken in Tokyo during spring 2023",
+          "target_scenario": "archive_low_rated_assets",
+          "target_intent": "bulk_archive",
+          "top1_scenario": "archive_low_rated_assets",
+          "top1_intent": "bulk_archive",
+          "top1_episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_anchor_tokyo_collection_tokyo_2_spring_2023"
+        },
+        {
+          "rank": 3,
+          "query": "Archive photos rated 5 or below from Family Holiday autumn 2023",
+          "target_scenario": "archive_low_rated_assets",
+          "target_intent": "bulk_archive",
+          "top1_scenario": "archive_low_rated_assets",
+          "top1_intent": "bulk_archive",
+          "top1_episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_anchor_holiday_cull_family_holiday_2_autumn_2023"
+        },
+        {
+          "rank": 5,
+          "query": "Archive assets rated 2 or below from Alps summer 2024 to Wedding Cleanup album",
+          "target_scenario": "archive_low_rated_assets",
+          "target_intent": "bulk_archive",
+          "top1_scenario": "archive_low_rated_assets",
+          "top1_intent": "bulk_archive",
+          "top1_episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_near_time_window_tokyo_collection_tokyo_2_autumn_2024"
+        },
+        {
+          "rank": 4,
+          "query": "Archive assets rated 2 or below from Family Holiday summer 2024 to Wedding Cleanup album",
+          "target_scenario": "archive_low_rated_assets",
+          "target_intent": "bulk_archive",
+          "top1_scenario": "archive_low_rated_assets",
+          "top1_intent": "bulk_archive",
+          "top1_episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_near_time_window_tokyo_collection_tokyo_2_autumn_2024"
+        },
+        {
+          "rank": 4,
+          "query": "Archive assets rated 2 or below from Alps autumn 2024 to Wedding Cleanup album",
+          "target_scenario": "archive_low_rated_assets",
+          "target_intent": "bulk_archive",
+          "top1_scenario": "archive_low_rated_assets",
+          "top1_intent": "bulk_archive",
+          "top1_episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c01_near_time_window_tokyo_collection_tokyo_2_autumn_2024"
+        }
+      ]
+    },
+    {
+      "report_name": "granite-baseline-v7-semantic.json",
+      "report_path": "data/reports/granite-baseline-v7-semantic.json",
+      "collection": "agent_episodic_memory_granite_768_v7_semantic",
+      "embedder": {
+        "provider": "ollama",
+        "base_url": "http://localhost:11434",
+        "model": "granite-embedding:278m",
+        "dimensions": 768
+      },
+      "query_count": 56,
+      "overall": {
+        "recall@1": 0.910714,
+        "recall@5": 1.0,
+        "mrr@10": 0.950893
+      },
+      "numeric_slots": {
+        "with_number": {
+          "count": 55.0,
+          "recall@1": 0.9090909090909091,
+          "recall@5": 1.0,
+          "mrr": 0.95
+        },
+        "without_number": {
+          "count": 1.0,
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0
+        }
+      },
+      "by_scenario": [
+        {
+          "scenario": "archive_low_rated_assets",
+          "count": 9.0,
+          "recall@1": 0.8888888888888888,
+          "recall@5": 1.0,
+          "mrr": 0.9444444444444444
+        },
+        {
+          "scenario": "bulk_like_highlights",
+          "count": 6.0,
+          "recall@1": 0.8333333333333334,
+          "recall@5": 1.0,
+          "mrr": 0.9166666666666666
+        },
+        {
+          "scenario": "cleanup_duplicate_shoot",
+          "count": 9.0,
+          "recall@1": 0.8888888888888888,
+          "recall@5": 1.0,
+          "mrr": 0.9444444444444444
+        },
+        {
+          "scenario": "curate_trip_album",
+          "count": 8.0,
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "scenario": "group_assets_for_review",
+          "count": 9.0,
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "scenario": "inspect_camera_metadata",
+          "count": 6.0,
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "scenario": "summarize_selected_assets",
+          "count": 9.0,
+          "recall@1": 0.7777777777777778,
+          "recall@5": 1.0,
+          "mrr": 0.8611111111111112
+        }
+      ],
+      "error_topology": {
+        "misses": 5,
+        "same_scenario_top1": 5,
+        "same_intent_top1": 5
+      },
+      "top_misses": [
+        {
+          "rank": 2,
+          "query": "Archive photos rated 5 or below from Family Holiday autumn 2023",
+          "target_scenario": "archive_low_rated_assets",
+          "target_intent": "bulk_archive",
+          "top1_scenario": "archive_low_rated_assets",
+          "top1_intent": "bulk_archive",
+          "top1_episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c04_anchor_holiday_cull_family_holiday_2_autumn_2023"
+        },
+        {
+          "rank": 2,
+          "query": "Locate the episode where unliked assets from Johnson Wedding with a rating threshold of 1 were bulk liked into the Wedding Highlights album.",
+          "target_scenario": "bulk_like_highlights",
+          "target_intent": "bulk_like",
+          "top1_scenario": "bulk_like_highlights",
+          "top1_intent": "bulk_like",
+          "top1_episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c05_near_rating_threshold_wedding_highlights_false_johnson_wedding_2"
+        },
+        {
+          "rank": 2,
+          "query": "Find previous episode where false positive duplicates were handled for Sony A7C II photos from Yosemite using 0.82 similarity threshold, with metadata inspection revealing 8 false positives among 12 assets.",
+          "target_scenario": "cleanup_duplicate_shoot",
+          "target_intent": "cleanup_duplicates",
+          "top1_scenario": "cleanup_duplicate_shoot",
+          "top1_intent": "cleanup_duplicates",
+          "top1_episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c09_anchor_sony_a7c_ii_false_positive_duplicate_yosemite_0_86"
+        },
+        {
+          "rank": 4,
+          "query": "Find sunset-themed photos from Beach during summer 2023 with average rating around 4.2",
+          "target_scenario": "summarize_selected_assets",
+          "target_intent": "summarize_selection",
+          "top1_scenario": "summarize_selected_assets",
+          "top1_intent": "summarize_selection",
+          "top1_episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_anchor_beach_street_moments_summer_2023"
+        },
+        {
+          "rank": 2,
+          "query": "Locate Beach sunset photos from spring 2023 with panoramic shots and average rating 3.8",
+          "target_scenario": "summarize_selected_assets",
+          "target_intent": "summarize_selection",
+          "top1_scenario": "summarize_selected_assets",
+          "top1_intent": "summarize_selection",
+          "top1_episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c05_anchor_beach_street_moments_summer_2023"
+        }
+      ]
+    }
+  ],
+  "comparison": {
+    "overall": [
+      {
+        "report_name": "qwen3-baseline-v7-semantic.json",
+        "recall@1": 0.589286,
+        "recall@5": 1.0,
+        "mrr@10": 0.761012
+      },
+      {
+        "report_name": "granite-baseline-v7-semantic.json",
+        "recall@1": 0.910714,
+        "recall@5": 1.0,
+        "mrr@10": 0.950893
+      }
+    ],
+    "by_scenario": [
+      {
+        "scenario": "archive_low_rated_assets",
+        "reports": [
+          {
+            "report_name": "qwen3-baseline-v7-semantic.json",
+            "recall@1": 0.4444444444444444,
+            "recall@5": 1.0,
+            "mrr": 0.6148148148148148
+          },
+          {
+            "report_name": "granite-baseline-v7-semantic.json",
+            "recall@1": 0.8888888888888888,
+            "recall@5": 1.0,
+            "mrr": 0.9444444444444444
+          }
+        ]
+      },
+      {
+        "scenario": "bulk_like_highlights",
+        "reports": [
+          {
+            "report_name": "qwen3-baseline-v7-semantic.json",
+            "recall@1": 0.3333333333333333,
+            "recall@5": 1.0,
+            "mrr": 0.6388888888888888
+          },
+          {
+            "report_name": "granite-baseline-v7-semantic.json",
+            "recall@1": 0.8333333333333334,
+            "recall@5": 1.0,
+            "mrr": 0.9166666666666666
+          }
+        ]
+      },
+      {
+        "scenario": "cleanup_duplicate_shoot",
+        "reports": [
+          {
+            "report_name": "qwen3-baseline-v7-semantic.json",
+            "recall@1": 0.5555555555555556,
+            "recall@5": 1.0,
+            "mrr": 0.7407407407407407
+          },
+          {
+            "report_name": "granite-baseline-v7-semantic.json",
+            "recall@1": 0.8888888888888888,
+            "recall@5": 1.0,
+            "mrr": 0.9444444444444444
+          }
+        ]
+      },
+      {
+        "scenario": "curate_trip_album",
+        "reports": [
+          {
+            "report_name": "qwen3-baseline-v7-semantic.json",
+            "recall@1": 0.5,
+            "recall@5": 1.0,
+            "mrr": 0.75
+          },
+          {
+            "report_name": "granite-baseline-v7-semantic.json",
+            "recall@1": 1.0,
+            "recall@5": 1.0,
+            "mrr": 1.0
+          }
+        ]
+      },
+      {
+        "scenario": "group_assets_for_review",
+        "reports": [
+          {
+            "report_name": "qwen3-baseline-v7-semantic.json",
+            "recall@1": 0.8888888888888888,
+            "recall@5": 1.0,
+            "mrr": 0.9444444444444444
+          },
+          {
+            "report_name": "granite-baseline-v7-semantic.json",
+            "recall@1": 1.0,
+            "recall@5": 1.0,
+            "mrr": 1.0
+          }
+        ]
+      },
+      {
+        "scenario": "inspect_camera_metadata",
+        "reports": [
+          {
+            "report_name": "qwen3-baseline-v7-semantic.json",
+            "recall@1": 0.3333333333333333,
+            "recall@5": 1.0,
+            "mrr": 0.5972222222222222
+          },
+          {
+            "report_name": "granite-baseline-v7-semantic.json",
+            "recall@1": 1.0,
+            "recall@5": 1.0,
+            "mrr": 1.0
+          }
+        ]
+      },
+      {
+        "scenario": "summarize_selected_assets",
+        "reports": [
+          {
+            "report_name": "qwen3-baseline-v7-semantic.json",
+            "recall@1": 0.8888888888888888,
+            "recall@5": 1.0,
+            "mrr": 0.9444444444444444
+          },
+          {
+            "report_name": "granite-baseline-v7-semantic.json",
+            "recall@1": 0.7777777777777778,
+            "recall@5": 1.0,
+            "mrr": 0.8611111111111112
+          }
+        ]
+      }
+    ]
+  }
+}
