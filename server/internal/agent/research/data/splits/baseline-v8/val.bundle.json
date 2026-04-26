@@ -1,0 +1,1189 @@
+{
+  "schema_version": "agent-memory/episode-spec-bundle/v1",
+  "episodes": [
+    {
+      "episode_id": "ep_prepare_client_delivery_prepare_client_delivery_c02_anchor_maya_chen_shared_album_sunday_evening_jpeg_web_resolution_johnson_wedding_ceremony_highlights",
+      "cluster_id": "prepare_client_delivery_c02",
+      "scenario": "prepare_client_delivery",
+      "goal": "Prepare JPEG web resolution delivery for Maya Chen from Johnson Wedding ceremony highlights by Sunday evening",
+      "intent": "prepare_delivery",
+      "summary": "Created and populated shared album with ceremony highlights",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered ceremony highlights"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped by scene"
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created shared album 'Maya Johnson Ceremony'"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added assets to album"
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized delivery package"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_prepare_client_delivery_prepare_client_delivery_c02_near_location_maya_chen_shared_album_sunday_evening_jpeg_web_resolution_yosemite_ceremony_highlights",
+      "cluster_id": "prepare_client_delivery_c02",
+      "scenario": "prepare_client_delivery",
+      "goal": "Prepare JPEG web resolution delivery for Maya Chen from Yosemite ceremony highlights by Sunday evening",
+      "intent": "prepare_delivery",
+      "summary": "Recovered album creation after initial failure",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered ceremony highlights from Yosemite"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped by scene"
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "error",
+          "error": {
+            "code": "ALBUM_EXISTS",
+            "message": "Album name already exists"
+          },
+          "output_summary": "Failed to create album"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added assets to existing album"
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized delivery package"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_prepare_client_delivery_prepare_client_delivery_c02_near_export_format_maya_chen_shared_album_sunday_evening_tiff_16bit_johnson_wedding_ceremony_highlights",
+      "cluster_id": "prepare_client_delivery_c02",
+      "scenario": "prepare_client_delivery",
+      "goal": "Prepare TIFF 16-bit delivery for Maya Chen from Johnson Wedding ceremony highlights by Sunday evening",
+      "intent": "prepare_delivery",
+      "summary": "Created album with TIFF 16-bit export format",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered ceremony highlights"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped by scene"
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Maya Johnson Ceremony TIFF'"
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added assets to album"
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized delivery package"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_curate_trip_album_c08_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_autumn_2024",
+      "cluster_id": "curate_trip_album_c08",
+      "scenario": "curate_trip_album",
+      "goal": "Create album 'Hawaii Blue Hour' from Nikon Z7 II assets in Hawaii, autumn 2024",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "summary": "Created album with 15 assets.",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 15 assets matching criteria."
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped assets by time of day."
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Hawaii Blue Hour'."
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 15 assets to album."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_curate_trip_album_curate_trip_album_c08_near_location_hawaii_blue_hour_nikon_z7_ii_yosemite_autumn_2024",
+      "cluster_id": "curate_trip_album_c08",
+      "scenario": "curate_trip_album",
+      "goal": "Create album 'Hawaii Blue Hour' from Nikon Z7 II assets in Yosemite, autumn 2024",
+      "intent": "curate_album",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "summary": "Created album with 10 assets.",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 10 assets matching criteria."
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped assets by time of day."
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Hawaii Blue Hour'."
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "success",
+          "output_summary": "Added 10 assets to album."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c03_anchor_hawaii_rejects_hawaii_1_winter_2022",
+      "cluster_id": "archive_low_rated_assets_c03",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all assets with rating 1 from Hawaii winter 2022 into 'Hawaii Rejects' album.",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 12 assets with rating 1, location Hawaii, time winter_2022."
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 12 assets to 'Hawaii Rejects' album."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c03_near_location_hawaii_rejects_tokyo_1_winter_2022",
+      "cluster_id": "archive_low_rated_assets_c03",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all assets with rating 1 from Tokyo winter 2022 into 'Hawaii Rejects' album.",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 8 assets with rating 1, location Tokyo, time winter_2022."
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 8 assets to 'Hawaii Rejects' album."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_archive_low_rated_assets_archive_low_rated_assets_c03_near_time_window_hawaii_rejects_hawaii_1_summer_2025",
+      "cluster_id": "archive_low_rated_assets_c03",
+      "scenario": "archive_low_rated_assets",
+      "goal": "Archive all assets with rating 1 from Hawaii summer 2025 into 'Hawaii Rejects' album.",
+      "intent": "bulk_archive",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 5 assets with rating 1, location Hawaii, time summer_2025."
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived 5 assets to 'Hawaii Rejects' album."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c11_anchor_sony_a7iii_johnson_wedding_winter_2023",
+      "cluster_id": "inspect_camera_metadata_c11",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect metadata of Sony A7III photos from Johnson Wedding winter 2023",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Returned metadata for 45 assets: camera model Sony A7III, ISO 200-6400, shutter speeds 1/60-1/2000"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c11_near_location_sony_a7iii_family_holiday_winter_2023",
+      "cluster_id": "inspect_camera_metadata_c11",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect metadata of Sony A7III photos from Family Holiday winter 2023",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Returned metadata for 30 assets: camera model Sony A7III, ISO 400-3200, shutter speeds 1/30-1/1000"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_inspect_camera_metadata_inspect_camera_metadata_c11_near_time_window_sony_a7iii_johnson_wedding_winter_2022",
+      "cluster_id": "inspect_camera_metadata_c11",
+      "scenario": "inspect_camera_metadata",
+      "goal": "Inspect metadata of Sony A7III photos from Johnson Wedding winter 2022",
+      "intent": "inspect_metadata",
+      "status": "succeeded",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Returned metadata for 38 assets: camera model Sony A7III, ISO 100-3200, shutter speeds 1/60-1/1600"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_group_assets_for_review_c11_anchor_lens_hawaii_wildlife",
+      "cluster_id": "group_assets_for_review_c11",
+      "scenario": "group_assets_for_review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "goal": "Group Hawaii wildlife assets by lens for review.",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 200 wildlife assets from Hawaii."
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped into 4 lens buckets: 24-70mm, 70-200mm, 100-400mm, prime."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_group_assets_for_review_c11_near_tag_focus_lens_hawaii_stage",
+      "cluster_id": "group_assets_for_review_c11",
+      "scenario": "group_assets_for_review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "goal": "Group Hawaii stage performance assets by lens for review.",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 150 stage assets from Hawaii."
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped into 3 lens buckets: 24-70mm, 70-200mm, prime."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_group_assets_for_review_group_assets_for_review_c11_near_location_lens_family_holiday_wildlife",
+      "cluster_id": "group_assets_for_review_c11",
+      "scenario": "group_assets_for_review",
+      "intent": "group_assets",
+      "status": "succeeded",
+      "goal": "Group Family Holiday wildlife assets by lens for review.",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 80 wildlife assets from Family Holiday."
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped into 2 lens buckets: 70-200mm, prime."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_resolve_metadata_mismatch_resolve_metadata_mismatch_c02_anchor_gopro_hero12_missing_gps_hawaii_gps_location_spring_2024",
+      "cluster_id": "resolve_metadata_mismatch_c02",
+      "scenario": "resolve_metadata_mismatch",
+      "goal": "Resolve missing GPS metadata on GoPro Hero12 assets from Hawaii in spring 2024",
+      "intent": "resolve_metadata",
+      "summary": "Recovered missing GPS metadata by grouping and summarizing",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found missing GPS location fields"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped assets by camera model"
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized missing metadata patterns"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_resolve_metadata_mismatch_resolve_metadata_mismatch_c02_near_time_window_gopro_hero12_missing_gps_hawaii_gps_location_autumn_2024",
+      "cluster_id": "resolve_metadata_mismatch_c02",
+      "scenario": "resolve_metadata_mismatch",
+      "goal": "Resolve missing GPS metadata on GoPro Hero12 assets from Hawaii in autumn 2024",
+      "intent": "resolve_metadata",
+      "summary": "Inspected and resolved GPS metadata conflicts for autumn 2024",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected GPS location fields"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped assets by time window"
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized metadata fixes"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_resolve_metadata_mismatch_resolve_metadata_mismatch_c02_near_metadata_field_gopro_hero12_missing_gps_hawaii_lens_model_spring_2024",
+      "cluster_id": "resolve_metadata_mismatch_c02",
+      "scenario": "resolve_metadata_mismatch",
+      "goal": "Resolve missing lens model metadata on GoPro Hero12 assets from Hawaii in spring 2024",
+      "intent": "resolve_metadata",
+      "summary": "Recovered missing lens model metadata by inspecting and grouping",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Found missing lens model fields"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped assets by camera model"
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized metadata recovery"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c11_anchor_canon_eos_r5_near_duplicate_burst_hawaii_0_76",
+      "cluster_id": "cleanup_duplicate_shoot_c11",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Cleanup near-duplicate burst from Hawaii shoot with Canon EOS R5.",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "summary": "Recovered from error during duplicate cleanup.",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found near-duplicate pairs."
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected metadata for duplicates."
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived duplicate assets."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c11_near_location_canon_eos_r5_near_duplicate_burst_family_holiday_0_76",
+      "cluster_id": "cleanup_duplicate_shoot_c11",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Cleanup near-duplicate burst from Family Holiday shoot.",
+      "intent": "cleanup_duplicates",
+      "status": "succeeded",
+      "summary": "Cleaned up duplicates successfully.",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found near-duplicate pairs."
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected metadata."
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived duplicates."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c11_near_failure_mode_canon_eos_r5_false_positive_duplicate_hawaii_0_76",
+      "cluster_id": "cleanup_duplicate_shoot_c11",
+      "scenario": "cleanup_duplicate_shoot",
+      "goal": "Handle false positive duplicates from Hawaii shoot.",
+      "intent": "cleanup_duplicates",
+      "status": "recovered",
+      "summary": "Recovered from false positive duplicate detection.",
+      "steps": [
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found false positive duplicates."
+        },
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected metadata to confirm false positives."
+        },
+        {
+          "tool_name": "mock_bulk_archive_assets",
+          "output_kind": "bulk_archive_update",
+          "status": "success",
+          "output_summary": "Archived actual duplicates."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c06_anchor_paris_favorites_false_alps_5",
+      "cluster_id": "bulk_like_highlights_c06",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all assets in album 'Paris Favorites' from Alps location with rating 5.",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 12 assets with rating 5 in Alps."
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 12 assets."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c06_near_rating_threshold_paris_favorites_false_alps_2",
+      "cluster_id": "bulk_like_highlights_c06",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all assets in album 'Paris Favorites' from Alps location with rating 2 or higher.",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 30 assets with rating >=2 in Alps."
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 30 assets."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_bulk_like_highlights_bulk_like_highlights_c06_near_location_paris_favorites_false_family_holiday_5",
+      "cluster_id": "bulk_like_highlights_c06",
+      "scenario": "bulk_like_highlights",
+      "goal": "Like all assets in album 'Paris Favorites' from Family Holiday location with rating 5.",
+      "intent": "bulk_like",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 8 assets with rating 5 in Family Holiday."
+        },
+        {
+          "tool_name": "mock_bulk_like_assets",
+          "output_kind": "bulk_like_update",
+          "status": "success",
+          "output_summary": "Liked 8 assets."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_recover_lost_album_assets_recover_lost_album_assets_c13_anchor_paris_selects_recovery_paris_failed_bulk_add_paris_drafts_spring_2024",
+      "cluster_id": "recover_lost_album_assets_c13",
+      "scenario": "recover_lost_album_assets",
+      "goal": "Recover album membership: Paris Selects Recovery from Paris Drafts after failed bulk add, spring 2024.",
+      "intent": "recover_album_membership",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered 60 assets from Paris Drafts, spring 2024."
+        },
+        {
+          "tool_name": "mock_create_album",
+          "output_kind": "album_record",
+          "status": "success",
+          "output_summary": "Created album 'Paris Selects Recovery'."
+        },
+        {
+          "tool_name": "mock_add_assets_to_album",
+          "output_kind": "album_membership_update",
+          "status": "error",
+          "error": {
+            "code": "BULK_ADD_FAILED",
+            "message": "Bulk add failed due to timeout; only 30/60 assets added."
+          },
+          "output_summary": "Partial add: 30 assets.",
+          "fix_summary": "Retried adding remaining 30 assets; all 60 assets now in album."
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized: 60 assets recovered, album complete."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c11_anchor_family_holiday_street_moments_spring_2024",
+      "cluster_id": "summarize_selected_assets_c11",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected street moments from Family Holiday spring 2024.",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "summary": "Generated summary of selected assets.",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered street moments from spring 2024."
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized the selection."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c11_near_location_johnson_wedding_street_moments_spring_2024",
+      "cluster_id": "summarize_selected_assets_c11",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected street moments from Johnson Wedding spring 2024.",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "summary": "Generated summary of wedding street moments.",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered street moments from spring 2024."
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized the selection."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_summarize_selected_assets_summarize_selected_assets_c11_near_time_window_family_holiday_street_moments_winter_2022",
+      "cluster_id": "summarize_selected_assets_c11",
+      "scenario": "summarize_selected_assets",
+      "goal": "Summarize selected street moments from Family Holiday winter 2022.",
+      "intent": "summarize_selection",
+      "status": "succeeded",
+      "summary": "Generated summary of winter street moments.",
+      "steps": [
+        {
+          "tool_name": "mock_filter_assets",
+          "output_kind": "asset_selection",
+          "status": "success",
+          "output_summary": "Filtered street moments from winter 2022."
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summarized the selection."
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_audit_import_batch_audit_import_batch_c02_anchor_canon_eos_r6_keep_highest_rating_raw_cr3_usb_backup_drive_johnson_wedding",
+      "cluster_id": "audit_import_batch_c02",
+      "scenario": "audit_import_batch",
+      "goal": "Audit imported batch from USB backup drive for Johnson Wedding, keep highest rating duplicates",
+      "intent": "audit_import",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 200 assets, identified 50 RAW CR3 files"
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 10 duplicate groups"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped by file type and camera model"
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 200 assets, 10 duplicates resolved by keeping highest rating"
+        }
+      ],
+      "entities": [
+        {
+          "type": "import_source",
+          "name": "USB_backup_drive"
+        },
+        {
+          "type": "location",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R6"
+        },
+        {
+          "type": "file_type",
+          "name": "RAW_CR3"
+        }
+      ],
+      "context": [
+        {
+          "kind": "duplicate_policy",
+          "text": "keep_highest_rating"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_audit_import_batch_audit_import_batch_c02_near_duplicate_policy_canon_eos_r6_keep_original_raw_cr3_usb_backup_drive_johnson_wedding",
+      "cluster_id": "audit_import_batch_c02",
+      "scenario": "audit_import_batch",
+      "goal": "Audit imported batch from USB backup drive for Johnson Wedding, keep original duplicates",
+      "intent": "audit_import",
+      "status": "recovered",
+      "write_trigger": "error_recovered",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 200 assets, identified 50 RAW CR3 files"
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 10 duplicate groups"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped by file type and camera model"
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "error",
+          "error": {
+            "code": "POLICY_CONFLICT",
+            "message": "Original file missing for group 5"
+          },
+          "fix_summary": "Recovered by using next best original copy, summary adjusted"
+        }
+      ],
+      "entities": [
+        {
+          "type": "import_source",
+          "name": "USB_backup_drive"
+        },
+        {
+          "type": "location",
+          "name": "Johnson Wedding"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R6"
+        },
+        {
+          "type": "file_type",
+          "name": "RAW_CR3"
+        }
+      ],
+      "context": [
+        {
+          "kind": "duplicate_policy",
+          "text": "keep_original"
+        }
+      ]
+    },
+    {
+      "episode_id": "ep_audit_import_batch_audit_import_batch_c02_near_location_canon_eos_r6_keep_highest_rating_raw_cr3_usb_backup_drive_yosemite",
+      "cluster_id": "audit_import_batch_c02",
+      "scenario": "audit_import_batch",
+      "goal": "Audit imported batch from USB backup drive for Yosemite, keep highest rating duplicates",
+      "intent": "audit_import",
+      "status": "succeeded",
+      "write_trigger": "goal_resolved",
+      "steps": [
+        {
+          "tool_name": "mock_inspect_asset_metadata",
+          "output_kind": "asset_metadata_report",
+          "status": "success",
+          "output_summary": "Inspected 150 assets, identified 30 RAW CR3 files"
+        },
+        {
+          "tool_name": "mock_find_duplicate_assets",
+          "output_kind": "duplicate_report",
+          "status": "success",
+          "output_summary": "Found 5 duplicate groups"
+        },
+        {
+          "tool_name": "mock_group_assets",
+          "output_kind": "asset_groups",
+          "status": "success",
+          "output_summary": "Grouped by file type and camera model"
+        },
+        {
+          "tool_name": "mock_summarize_selection",
+          "output_kind": "selection_summary",
+          "status": "success",
+          "output_summary": "Summary: 150 assets, 5 duplicates resolved by keeping highest rating"
+        }
+      ],
+      "entities": [
+        {
+          "type": "import_source",
+          "name": "USB_backup_drive"
+        },
+        {
+          "type": "location",
+          "name": "Yosemite"
+        },
+        {
+          "type": "camera_model",
+          "name": "Canon EOS R6"
+        },
+        {
+          "type": "file_type",
+          "name": "RAW_CR3"
+        }
+      ],
+      "context": [
+        {
+          "kind": "duplicate_policy",
+          "text": "keep_highest_rating"
+        }
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "query": "Which episode archived low-rated Hawaii assets from winter 2022 into 'Hawaii Rejects'?",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_archive_low_rated_assets_c03_anchor_hawaii_rejects_hawaii_1_winter_2022"
+      ],
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "entity": "Hawaii"
+    },
+    {
+      "query": "Find the episode that moved rating-1 Tokyo winter 2022 photos to the 'Hawaii Rejects' album.",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_archive_low_rated_assets_c03_near_location_hawaii_rejects_tokyo_1_winter_2022"
+      ],
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "entity": "Tokyo"
+    },
+    {
+      "query": "Retrieve the episode where rating-1 Hawaii summer 2025 assets were archived into 'Hawaii Rejects'.",
+      "target_episode_ids": [
+        "ep_archive_low_rated_assets_archive_low_rated_assets_c03_near_time_window_hawaii_rejects_hawaii_1_summer_2025"
+      ],
+      "target_scenario": "archive_low_rated_assets",
+      "target_intent": "bulk_archive",
+      "entity": "Hawaii"
+    },
+    {
+      "query": "Which batch audit imported from USB backup drive for Johnson Wedding used Canon EOS R6 RAW CR3 files and kept highest rating duplicates?",
+      "target_episode_ids": [
+        "ep_audit_import_batch_audit_import_batch_c02_anchor_canon_eos_r6_keep_highest_rating_raw_cr3_usb_backup_drive_johnson_wedding"
+      ],
+      "target_scenario": "audit_import_batch",
+      "target_intent": "audit_import",
+      "entity": "Johnson Wedding"
+    },
+    {
+      "query": "Find the audit of imported batch from USB backup drive for Johnson Wedding that kept original duplicates and had an empty summary step.",
+      "target_episode_ids": [
+        "ep_audit_import_batch_audit_import_batch_c02_near_duplicate_policy_canon_eos_r6_keep_original_raw_cr3_usb_backup_drive_johnson_wedding"
+      ],
+      "target_scenario": "audit_import_batch",
+      "target_intent": "audit_import",
+      "entity": "Johnson Wedding"
+    },
+    {
+      "query": "Which batch audit from USB backup drive for Yosemite used Canon EOS R6 RAW CR3 files, kept highest rating duplicates, and had 150 assets?",
+      "target_episode_ids": [
+        "ep_audit_import_batch_audit_import_batch_c02_near_location_canon_eos_r6_keep_highest_rating_raw_cr3_usb_backup_drive_yosemite"
+      ],
+      "target_scenario": "audit_import_batch",
+      "target_intent": "audit_import",
+      "entity": "Yosemite"
+    },
+    {
+      "query": "Which episode involved bulk liking assets from Alps with exact rating 5?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_bulk_like_highlights_c06_anchor_paris_favorites_false_alps_5"
+      ],
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like",
+      "entity": "Alps"
+    },
+    {
+      "query": "Find the episode where assets from Family Holiday location with rating 5 were liked in bulk.",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_bulk_like_highlights_c06_near_location_paris_favorites_false_family_holiday_5"
+      ],
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like",
+      "entity": "Family Holiday"
+    },
+    {
+      "query": "Which episode performed bulk like on assets from Alps with rating 2 or higher?",
+      "target_episode_ids": [
+        "ep_bulk_like_highlights_bulk_like_highlights_c06_near_rating_threshold_paris_favorites_false_alps_2"
+      ],
+      "target_scenario": "bulk_like_highlights",
+      "target_intent": "bulk_like",
+      "entity": "Alps"
+    },
+    {
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c11_anchor_canon_eos_r5_near_duplicate_burst_hawaii_0_76"
+      ],
+      "query": "What steps were taken to clean up near-duplicate burst from Hawaii with Canon EOS R5?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": ""
+    },
+    {
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c11_near_failure_mode_canon_eos_r5_false_positive_duplicate_hawaii_0_76"
+      ],
+      "query": "How were false positive duplicates from the Hawaii shoot detected and handled?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": ""
+    },
+    {
+      "target_episode_ids": [
+        "ep_cleanup_duplicate_shoot_cleanup_duplicate_shoot_c11_near_location_canon_eos_r5_near_duplicate_burst_family_holiday_0_76"
+      ],
+      "query": "During the Family Holiday shoot cleanup, which tools were used to archive near-duplicate bursts?",
+      "target_scenario": "cleanup_duplicate_shoot",
+      "target_intent": "cleanup_duplicates",
+      "entity": ""
+    },
+    {
+      "query": "Find the album 'Hawaii Blue Hour' created from Nikon Z7 II assets in Hawaii, autumn 2024, with 15 filtered assets.",
+      "target_episode_ids": [
+        "ep_curate_trip_album_curate_trip_album_c08_anchor_hawaii_blue_hour_nikon_z7_ii_hawaii_autumn_2024"
+      ],
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "entity": "Hawaii"
+    },
+    {
+      "query": "Retrieve the episode where album 'Hawaii Blue Hour' was made using Nikon Z7 II assets in Yosemite, autumn 2024, yielding 10 assets.",
+      "target_episode_ids": [
+        "ep_curate_trip_album_curate_trip_album_c08_near_location_hawaii_blue_hour_nikon_z7_ii_yosemite_autumn_2024"
+      ],
+      "target_scenario": "curate_trip_album",
+      "target_intent": "curate_album",
+      "entity": "Yosemite"
+    },
+    {
+      "query": "Show me how Hawaii wildlife assets were grouped by lens for review, specifically the lens buckets used.",
+      "target_episode_ids": [
+        "ep_group_assets_for_review_group_assets_for_review_c11_anchor_lens_hawaii_wildlife"
+      ],
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "entity": "Hawaii wildlife"
+    },
+    {
+      "query": "Retrieve the grouping by lens for Family Holiday wildlife assets, including the number of assets and lens buckets.",
+      "target_episode_ids": [
+        "ep_group_assets_for_review_group_assets_for_review_c11_near_location_lens_family_holiday_wildlife"
+      ],
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "entity": "Family Holiday wildlife"
+    },
+    {
+      "query": "Find the episode where Hawaii stage performance assets were grouped by lens, showing the lens categories and asset count.",
+      "target_episode_ids": [
+        "ep_group_assets_for_review_group_assets_for_review_c11_near_tag_focus_lens_hawaii_stage"
+      ],
+      "target_scenario": "group_assets_for_review",
+      "target_intent": "group_assets",
+      "entity": "Hawaii stage performance"
+    },
+    {
+      "query": "Sony A7III photos from Johnson Wedding winter 2023 with ISO 200-6400 and shutter speeds 1/60-1/2000",
+      "target_episode_ids": [
+        "ep_inspect_camera_metadata_inspect_camera_metadata_c11_anchor_sony_a7iii_johnson_wedding_winter_2023"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Sony A7III"
+    },
+    {
+      "query": "Sony A7III photos from Family Holiday winter 2023 with ISO 400-3200 and shutter speeds 1/30-1/1000",
+      "target_episode_ids": [
+        "ep_inspect_camera_metadata_inspect_camera_metadata_c11_near_location_sony_a7iii_family_holiday_winter_2023"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Sony A7III"
+    },
+    {
+      "query": "Sony A7III photos from Johnson Wedding winter 2022 with ISO 100-3200 and shutter speeds 1/60-1/1600",
+      "target_episode_ids": [
+        "ep_inspect_camera_metadata_inspect_camera_metadata_c11_near_time_window_sony_a7iii_johnson_wedding_winter_2022"
+      ],
+      "target_scenario": "inspect_camera_metadata",
+      "target_intent": "inspect_metadata",
+      "entity": "Sony A7III"
+    },
+    {
+      "query": "Find the episode where Maya Chen's Johnson Wedding ceremony highlights were prepared for JPEG web resolution delivery by Sunday evening with a shared album",
+      "target_episode_ids": [
+        "ep_prepare_client_delivery_prepare_client_delivery_c02_anchor_maya_chen_shared_album_sunday_evening_jpeg_web_resolution_johnson_wedding_ceremony_highlights"
+      ],
+      "target_scenario": "prepare_client_delivery",
+      "target_intent": "prepare_delivery"
+    },
+    {
+      "query": "Which episode involved creating a TIFF 16-bit album for Maya Chen from Johnson Wedding ceremony highlights, due Sunday evening?",
+      "target_episode_ids": [
+        "ep_prepare_client_delivery_prepare_client_delivery_c02_near_export_format_maya_chen_shared_album_sunday_evening_tiff_16bit_johnson_wedding_ceremony_highlights"
+      ],
+      "target_scenario": "prepare_client_delivery",
+      "target_intent": "prepare_delivery"
+    },
+    {
+      "query": "Retrieve the episode where Maya Chen's Yosemite ceremony highlights were prepared for JPEG web resolution delivery by Sunday evening, but the album creation initially failed and was recovered",
+      "target_episode_ids": [
+        "ep_prepare_client_delivery_prepare_client_delivery_c02_near_location_maya_chen_shared_album_sunday_evening_jpeg_web_resolution_yosemite_ceremony_highlights"
+      ],
+      "target_scenario": "prepare_client_delivery",
+      "target_intent": "prepare_delivery"
+    },
+    {
+      "query": "Find assets from the 'Paris Drafts' album taken in spring 2024 that failed to be added to the 'Paris Selects' album during a bulk add operation, and recover them to a new album.",
+      "target_episode_ids": [
+        "ep_recover_lost_album_assets_recover_lost_album_assets_c13_anchor_paris_selects_recovery_paris_failed_bulk_add_paris_drafts_spring_2024"
+      ],
+      "target_scenario": "recover_lost_album_assets",
+      "target_intent": "recover_album_membership",
+      "entity": "Paris Drafts"
+    },
+    {
+      "query": "Find the episode where missing GPS metadata on GoPro Hero12 assets from Hawaii in spring 2024 was recovered by grouping and summarizing",
+      "target_episode_ids": [
+        "ep_resolve_metadata_mismatch_resolve_metadata_mismatch_c02_anchor_gopro_hero12_missing_gps_hawaii_gps_location_spring_2024"
+      ],
+      "target_scenario": "resolve_metadata_mismatch",
+      "target_intent": "resolve_metadata"
+    },
+    {
+      "query": "Retrieve the episode about resolving missing lens model metadata on GoPro Hero12 assets from Hawaii in spring 2024, which involved inspecting and grouping",
+      "target_episode_ids": [
+        "ep_resolve_metadata_mismatch_resolve_metadata_mismatch_c02_near_metadata_field_gopro_hero12_missing_gps_hawaii_lens_model_spring_2024"
+      ],
+      "target_scenario": "resolve_metadata_mismatch",
+      "target_intent": "resolve_metadata"
+    },
+    {
+      "query": "Get the episode that inspected and resolved GPS metadata conflicts for GoPro Hero12 assets from Hawaii in autumn 2024, grouping by time window",
+      "target_episode_ids": [
+        "ep_resolve_metadata_mismatch_resolve_metadata_mismatch_c02_near_time_window_gopro_hero12_missing_gps_hawaii_gps_location_autumn_2024"
+      ],
+      "target_scenario": "resolve_metadata_mismatch",
+      "target_intent": "resolve_metadata"
+    },
+    {
+      "query": "What was the summary of street moments from Family Holiday spring 2024?",
+      "target_episode_ids": [
+        "ep_summarize_selected_assets_summarize_selected_assets_c11_anchor_family_holiday_street_moments_spring_2024"
+      ],
+      "target_scenario": "summarize_selected_assets",
+      "target_intent": "summarize_selection"
+    },
+    {
+      "query": "Retrieve the summary of street moments captured at Johnson Wedding in spring 2024.",
+      "target_episode_ids": [
+        "ep_summarize_selected_assets_summarize_selected_assets_c11_near_location_johnson_wedding_street_moments_spring_2024"
+      ],
+      "target_scenario": "summarize_selected_assets",
+      "target_intent": "summarize_selection"
+    },
+    {
+      "query": "Show me the generated summary for Family Holiday street moments from winter 2022.",
+      "target_episode_ids": [
+        "ep_summarize_selected_assets_summarize_selected_assets_c11_near_time_window_family_holiday_street_moments_winter_2022"
+      ],
+      "target_scenario": "summarize_selected_assets",
+      "target_intent": "summarize_selection"
+    }
+  ]
+}

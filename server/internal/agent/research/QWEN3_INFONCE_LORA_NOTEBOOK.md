@@ -167,7 +167,12 @@ print("test queries:", len(test_bundle["queries"]))
 
 ### Cell 4: Episode Text Rendering
 
-This mirrors the Go implementation in `Episode.BuildRetrievalText()`. The production retrieval text intentionally excludes status, tags, write trigger, cluster id, tool outputs, and raw metadata.
+This mirrors the Go implementation used after synthetic specs are compiled into memory episodes:
+
+- `CompileEpisodeSpecs` fills a missing `summary` with `"{goal}. Tool flow: {tools}."`
+- `Episode.BuildRetrievalText()` then renders `scenario`, `intent`, `summary`, `goal`, `entities`, and the tool procedure
+
+The production retrieval text intentionally excludes status, tags, write trigger, cluster id, tool outputs, and raw metadata.
 
 ```python
 def render_entities(entities: list[dict[str, Any]]) -> str:
@@ -193,13 +198,28 @@ def render_steps(steps: list[dict[str, Any]]) -> str:
     return " -> ".join(parts)
 
 
+def render_summary(episode: dict[str, Any], procedure: str) -> str:
+    summary = str(episode.get("summary", "")).strip()
+    if summary:
+        return summary
+
+    goal = str(episode.get("goal", "")).strip()
+    if goal and procedure:
+        return f"{goal}. Tool flow: {procedure}."
+    if goal:
+        return goal
+    return ""
+
+
 def build_episode_text(episode: dict[str, Any]) -> str:
     sections = []
+
+    procedure = render_steps(episode.get("steps", []))
 
     what_parts = []
     scenario = str(episode.get("scenario", "")).strip()
     intent = str(episode.get("intent", "")).strip()
-    summary = str(episode.get("summary", "")).strip()
+    summary = render_summary(episode, procedure)
     if scenario:
         what_parts.append(f"scenario={scenario}")
     if intent:
@@ -217,7 +237,6 @@ def build_episode_text(episode: dict[str, Any]) -> str:
     if entities:
         sections.append("task_content:\n" + entities)
 
-    procedure = render_steps(episode.get("steps", []))
     if procedure:
         sections.append("procedure:\n" + procedure)
 

@@ -37,6 +37,10 @@ INTENT_VOCAB = [
     "inspect_metadata",
     "group_assets",
     "summarize_selection",
+    "prepare_delivery",
+    "resolve_metadata",
+    "recover_album_membership",
+    "audit_import",
 ]
 
 SCENARIO_VOCAB = [
@@ -47,6 +51,10 @@ SCENARIO_VOCAB = [
     "inspect_camera_metadata",
     "group_assets_for_review",
     "summarize_selected_assets",
+    "prepare_client_delivery",
+    "resolve_metadata_mismatch",
+    "recover_lost_album_assets",
+    "audit_import_batch",
 ]
 
 SCENARIO_SPECS: dict[str, dict[str, Any]] = {
@@ -274,6 +282,194 @@ SCENARIO_SPECS: dict[str, dict[str, Any]] = {
         "required_tools": ["mock_filter_assets", "mock_summarize_selection"],
         "query_focus": ["selection summary", "recap", "what was in the chosen set"],
     },
+    "prepare_client_delivery": {
+        "intent": "prepare_delivery",
+        "statuses": ["succeeded", "recovered"],
+        "cluster_axes": ["client_name", "delivery_channel", "export_format"],
+        "entity_templates": [
+            {
+                "client_name": "Northstar Studio",
+                "location": "Paris",
+                "selection_theme": "editorial_selects",
+                "delivery_channel": "client_portal",
+                "export_format": "JPEG_full_resolution",
+                "due_window": "friday_morning",
+            },
+            {
+                "client_name": "Maya Chen",
+                "location": "Johnson Wedding",
+                "selection_theme": "ceremony_highlights",
+                "delivery_channel": "shared_album",
+                "export_format": "JPEG_web_resolution",
+                "due_window": "sunday_evening",
+            },
+            {
+                "client_name": "TrailWorks",
+                "location": "Yosemite",
+                "selection_theme": "landscape_campaign",
+                "delivery_channel": "review_link",
+                "export_format": "TIFF_16bit",
+                "due_window": "monday_noon",
+            },
+            {
+                "client_name": "Blue Hour Agency",
+                "location": "Tokyo",
+                "selection_theme": "street_campaign",
+                "delivery_channel": "client_portal",
+                "export_format": "JPEG_full_resolution",
+                "due_window": "thursday_afternoon",
+            },
+        ],
+        "required_tools": [
+            "mock_filter_assets",
+            "mock_group_assets",
+            "mock_create_album",
+            "mock_add_assets_to_album",
+            "mock_summarize_selection",
+        ],
+        "query_focus": [
+            "client delivery preparation",
+            "export package staging",
+            "delivery album handoff",
+        ],
+    },
+    "resolve_metadata_mismatch": {
+        "intent": "resolve_metadata",
+        "statuses": ["recovered", "succeeded"],
+        "cluster_axes": ["metadata_field", "conflict_type", "camera_model"],
+        "entity_templates": [
+            {
+                "location": "Alps",
+                "camera_model": "Sony A7III",
+                "metadata_field": "capture_time",
+                "conflict_type": "timezone_shift",
+                "time_window": "winter_2023",
+            },
+            {
+                "location": "Hawaii",
+                "camera_model": "GoPro Hero12",
+                "metadata_field": "gps_location",
+                "conflict_type": "missing_gps",
+                "time_window": "spring_2024",
+            },
+            {
+                "location": "Portrait Session",
+                "camera_model": "Canon EOS R5",
+                "metadata_field": "lens_model",
+                "conflict_type": "mixed_lens_labels",
+                "time_window": "summer_2024",
+            },
+            {
+                "location": "Tokyo",
+                "camera_model": "Fujifilm X-T5",
+                "metadata_field": "camera_serial",
+                "conflict_type": "duplicate_serial",
+                "time_window": "autumn_2024",
+            },
+        ],
+        "required_tools": [
+            "mock_inspect_asset_metadata",
+            "mock_group_assets",
+            "mock_summarize_selection",
+        ],
+        "query_focus": [
+            "metadata mismatch resolution",
+            "conflicting metadata inspection",
+            "camera metadata repair",
+        ],
+    },
+    "recover_lost_album_assets": {
+        "intent": "recover_album_membership",
+        "statuses": ["recovered", "succeeded"],
+        "cluster_axes": ["album_name", "source_album", "recovery_reason"],
+        "entity_templates": [
+            {
+                "location": "Paris",
+                "album_name": "Paris Selects Recovery",
+                "source_album": "Paris Drafts",
+                "recovery_reason": "accidental_removal",
+                "time_window": "spring_2024",
+            },
+            {
+                "location": "Johnson Wedding",
+                "album_name": "Ceremony Restored",
+                "source_album": "Wedding Proofs",
+                "recovery_reason": "failed_bulk_add",
+                "time_window": "summer_2024",
+            },
+            {
+                "location": "Yosemite",
+                "album_name": "Trail Favorites Restored",
+                "source_album": "Yosemite Keeps",
+                "recovery_reason": "archive_conflict",
+                "time_window": "autumn_2023",
+            },
+            {
+                "location": "Family Holiday",
+                "album_name": "Family Picks Restored",
+                "source_album": "Holiday Drafts",
+                "recovery_reason": "duplicate_cleanup_overreach",
+                "time_window": "winter_2024",
+            },
+        ],
+        "required_tools": [
+            "mock_filter_assets",
+            "mock_create_album",
+            "mock_add_assets_to_album",
+            "mock_summarize_selection",
+        ],
+        "query_focus": [
+            "album membership recovery",
+            "restoring removed album assets",
+            "recovering failed album updates",
+        ],
+    },
+    "audit_import_batch": {
+        "intent": "audit_import",
+        "statuses": ["succeeded", "recovered"],
+        "cluster_axes": ["import_source", "file_type", "duplicate_policy"],
+        "entity_templates": [
+            {
+                "import_source": "SD_card_A",
+                "location": "Safari",
+                "camera_model": "Nikon Z8",
+                "file_type": "RAW_NEF",
+                "duplicate_policy": "keep_newest",
+            },
+            {
+                "import_source": "USB_backup_drive",
+                "location": "Johnson Wedding",
+                "camera_model": "Canon EOS R6",
+                "file_type": "RAW_CR3",
+                "duplicate_policy": "keep_highest_rating",
+            },
+            {
+                "import_source": "mobile_upload",
+                "location": "Tokyo",
+                "camera_model": "iPhone 15 Pro",
+                "file_type": "HEIC",
+                "duplicate_policy": "keep_original",
+            },
+            {
+                "import_source": "drone_card",
+                "location": "Hawaii",
+                "camera_model": "DJI Air 3",
+                "file_type": "DNG",
+                "duplicate_policy": "keep_geotagged",
+            },
+        ],
+        "required_tools": [
+            "mock_inspect_asset_metadata",
+            "mock_find_duplicate_assets",
+            "mock_group_assets",
+            "mock_summarize_selection",
+        ],
+        "query_focus": [
+            "import batch audit",
+            "new media import verification",
+            "duplicate policy review",
+        ],
+    },
 }
 
 CLUSTER_VARIANTS = (
@@ -295,6 +491,17 @@ SLOT_PRIORITY = [
     "similarity_threshold",
     "rating_threshold",
     "liked_state",
+    "client_name",
+    "delivery_channel",
+    "export_format",
+    "due_window",
+    "metadata_field",
+    "conflict_type",
+    "source_album",
+    "recovery_reason",
+    "import_source",
+    "file_type",
+    "duplicate_policy",
     "status",
 ]
 
@@ -768,6 +975,94 @@ def mutate_entity_bundle(
         mutated[axis] = choose_alternative(value, replacements, cluster_index)
     elif axis == "tag_focus":
         replacements = ["family", "stage", "wildlife", "portrait"]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "client_name":
+        replacements = [
+            "Northstar Studio",
+            "Maya Chen",
+            "TrailWorks",
+            "Blue Hour Agency",
+            "Riverside Gallery",
+        ]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "delivery_channel":
+        replacements = [
+            "client_portal",
+            "shared_album",
+            "review_link",
+            "secure_download",
+        ]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "export_format":
+        replacements = [
+            "JPEG_full_resolution",
+            "JPEG_web_resolution",
+            "TIFF_16bit",
+            "PNG_contact_sheet",
+        ]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "due_window":
+        replacements = [
+            "friday_morning",
+            "sunday_evening",
+            "monday_noon",
+            "thursday_afternoon",
+        ]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "metadata_field":
+        replacements = [
+            "capture_time",
+            "gps_location",
+            "lens_model",
+            "camera_serial",
+            "color_profile",
+        ]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "conflict_type":
+        replacements = [
+            "timezone_shift",
+            "missing_gps",
+            "mixed_lens_labels",
+            "duplicate_serial",
+            "wrong_color_profile",
+        ]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "source_album":
+        replacements = [
+            "Paris Drafts",
+            "Wedding Proofs",
+            "Yosemite Keeps",
+            "Holiday Drafts",
+            "Client Review Queue",
+        ]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "recovery_reason":
+        replacements = [
+            "accidental_removal",
+            "failed_bulk_add",
+            "archive_conflict",
+            "duplicate_cleanup_overreach",
+        ]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "import_source":
+        replacements = [
+            "SD_card_A",
+            "USB_backup_drive",
+            "mobile_upload",
+            "drone_card",
+            "studio_tether",
+        ]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "file_type":
+        replacements = ["RAW_NEF", "RAW_CR3", "HEIC", "DNG", "JPEG"]
+        mutated[axis] = choose_alternative(value, replacements, cluster_index)
+    elif axis == "duplicate_policy":
+        replacements = [
+            "keep_newest",
+            "keep_highest_rating",
+            "keep_original",
+            "keep_geotagged",
+        ]
         mutated[axis] = choose_alternative(value, replacements, cluster_index)
     return mutated
 
