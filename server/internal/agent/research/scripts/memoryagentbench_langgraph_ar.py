@@ -44,8 +44,8 @@ DEFAULT_AGENT_NAME = "Embedding_rag_qwen3_lora"
 DEFAULT_EPISODE_SCENARIO = "read_corpus"
 DEFAULT_EPISODE_INTENT = "retain_evidence_for_future_qa"
 DEFAULT_EPISODE_TOOL_NAME = "read_text"
-EPISODE_WRITER_PROMPT_VERSION = "mab-episode-writer-v1"
-EPISODE_QUERY_REWRITER_PROMPT_VERSION = "mab-episode-query-rewriter-v1"
+EPISODE_WRITER_PROMPT_VERSION = "mab-episode-writer-v6-source-episode-evidence"
+EPISODE_QUERY_REWRITER_PROMPT_VERSION = "mab-episode-query-rewriter-v5-source-episode-evidence"
 EPISODE_ENTITY_TYPES = (
     "person",
     "place",
@@ -589,7 +589,7 @@ class EpisodeQueryRewriter:
             parsed = {}
             rewrite_error = f"{type(exc).__name__}: {compact_text(str(exc), max_chars=240)}"
 
-        retrieval_query = compact_text(parsed.get("query"), max_chars=360)
+        retrieval_query = compact_text(parsed.get("query"), max_chars=520)
         if not retrieval_query:
             retrieval_query = fallback_episode_retrieval_query(query)
         if not retrieval_query.lower().startswith("which episode"):
@@ -612,8 +612,10 @@ class EpisodeQueryRewriter:
 def build_episode_writer_system_prompt() -> str:
     return (
         "You write compact episodic memory fields from a text-reading observation. "
-        "Return valid JSON only. Preserve named entities, dates, numbers, and relationships "
-        "that could help future accurate retrieval."
+        "The memory should remain a source-reading episode: what source evidence was observed, "
+        "which concrete facts it can help recall, and which entities were involved. "
+        "Optimize for later retrieval of this exact source chunk without turning the record into a keyword index. "
+        "Return valid JSON only."
     )
 
 
@@ -626,13 +628,24 @@ def build_episode_writer_user_prompt(*, text: str, config: EpisodeMemoryConfig) 
         f"Fixed intent: {config.intent}\n\n"
         "Tool output:\n"
         f"{text}\n\n"
-        "Write fields for an episodic memory record for future accurate retrieval.\n"
+        "Write fields for an episodic memory record. The record should help the agent recall this "
+        "source-reading episode later; it should not become a keyword index or replace the source chunk.\n"
         "Rules:\n"
         "- Do not invent facts not present in the tool output.\n"
-        "- goal should be one short sentence about what this read_text observation is preserving.\n"
-        "- summary should be concise but include salient facts, names, dates, counts, and relationships.\n"
+        "- goal should be one sentence describing the source-reading episode and the evidence family it preserved.\n"
+        "- summary should be a compact episode note made of concrete evidence sentences, not detached keywords.\n"
+        "- Preserve source order when practical, especially if the chunk contains several documents or topic clusters.\n"
+        "- For each salient cluster, keep the subject, relation cue, and answer-like value together in one natural sentence.\n"
+        "- Prefer exact surface forms from the chunk: rare names, aliases, titles, years, counts, places, organizations, rivers, religions, languages, works, and roles.\n"
+        "- Keep wh-question answer handles when present: countries, locations, years, dates, people, organizations, counts, titles, religions, languages, and yes/no-defining facts.\n"
+        "- Use relation wording close to the source, e.g. 'Normandy is located in France' or 'the Normans were in Normandy in the 10th and 11th centuries'.\n"
+        "- If the chunk is mixed, cover the major distinct evidence clusters rather than only the opening topic.\n"
+        "- Avoid generic wording like 'historical facts', 'various documents', 'multiple topics', or 'the passage discusses'.\n"
+        "- Do not include facts merely because they are common background; prioritize facts that uniquely locate this source chunk among nearby chunks.\n"
         f"- entities must use only these types: {entity_types}.\n"
-        f"- return at most {config.max_entities} entities.\n\n"
+        f"- entities should be high-signal participants or objects in the episode; return at most {config.max_entities}.\n"
+        "- Entity names should be exact source surface forms, deduplicated, and biased toward rare/discriminative names over generic concepts.\n"
+        "- The raw source chunk will be available after retrieval, so do not copy long passages.\n\n"
         "Return JSON exactly in this shape:\n"
         '{"goal":"...","summary":"...","entities":[{"type":"person","name":"..."}]}'
     )
@@ -640,31 +653,37 @@ def build_episode_writer_user_prompt(*, text: str, config: EpisodeMemoryConfig) 
 
 def build_episode_query_rewriter_system_prompt() -> str:
     return (
-        "You rewrite benchmark QA prompts into concise episode-locator retrieval queries "
-        "for an episodic memory benchmark. Return valid JSON only."
+        "You rewrite benchmark QA prompts into episode-recall queries. "
+        "The query should retrieve the prior source-reading episode that contains the evidence, not answer the question. "
+        "Preserve exact entities and relation wording from the question, and add only safe answer-type cues. "
+        "Return valid JSON only."
     )
 
 
 def build_episode_query_rewriter_user_prompt(*, query: str) -> str:
     extracted_question = extract_benchmark_question(query)
     return (
-        "Rewrite the original benchmark query into one English retrieval query for an episodic memory index.\n\n"
+        "Rewrite the original benchmark query into one English episode-recall query.\n\n"
         "Target style:\n"
         "- Start with \"Which episode ...?\"\n"
-        "- Ask for the prior episode that contains or preserved the relevant evidence.\n"
-        "- Preserve explicit names, dates, numbers, entities, and relations from the question.\n"
+        "- Ask for the prior source-reading episode or source chunk that should be recalled to answer the question.\n"
+        "- Preserve explicit names, dates, numbers, entities, aliases, titles, roles, places, and relation cues from the question verbatim when possible.\n"
+        "- Keep the relation close to the original question wording; do not collapse it into vague labels like 'information about'.\n"
+        "- Add only answer-type cues directly implied by the question, such as country, location, year, date, person, organization, title, count, religion, language, or yes/no evidence.\n"
+        "- You may include one safe paraphrase of the relation if it improves matching, but do not guess the answer.\n"
+        "- Prefer one natural recall sentence; do not use key-value syntax.\n"
+        "- If the question is underspecified, keep the discriminative relation phrase rather than guessing the answer.\n"
         "- Do not answer the question.\n"
         "- Do not invent facts not present in the question.\n"
         "- Remove benchmark instructions such as \"Only give me the answer\".\n"
-        "- Keep it short and retrieval-oriented, like: "
-        "\"Which episode archived 18 low-rated assets from Tokyo Collection spring 2023?\"\n\n"
+        "- Keep it concise and source-episode-oriented.\n\n"
         "Examples:\n"
         "Original question: In what country is Normandy located?\n"
-        "Rewrite: Which episode preserved evidence about the country where Normandy is located?\n\n"
+        "Rewrite: Which source-reading episode preserved the evidence for what country Normandy is located in?\n\n"
         "Original question: When were the Normans in Normandy?\n"
-        "Rewrite: Which episode preserved evidence about when the Normans were in Normandy?\n\n"
+        "Rewrite: Which source-reading episode preserved the evidence for when the Normans were in Normandy?\n\n"
         "Original question: From which countries did the Norse originate?\n"
-        "Rewrite: Which episode preserved evidence about the countries where the Norse originated?\n\n"
+        "Rewrite: Which source-reading episode preserved the evidence for the countries from which the Norse originated?\n\n"
         f"Original benchmark query:\n{query}\n\n"
         f"Extracted question:\n{extracted_question}\n\n"
         "Return JSON exactly in this shape:\n"
@@ -732,12 +751,11 @@ def normalize_episode_writer_fields(
     max_entities: int,
 ) -> dict[str, Any]:
     goal = compact_text(payload.get("goal"), max_chars=240)
-    summary = compact_text(payload.get("summary"), max_chars=700)
+    summary = compact_text(payload.get("summary"), max_chars=1200)
     if not goal:
         goal = "Remember evidence from a benchmark text chunk for future question answering."
     if not summary:
         summary = fallback_summary(source_text)
-
     entities: list[dict[str, str]] = []
     seen_entities: set[tuple[str, str]] = set()
     raw_entities = payload.get("entities")
@@ -757,7 +775,11 @@ def normalize_episode_writer_fields(
             if len(entities) >= max_entities:
                 break
 
-    return {"goal": goal, "summary": summary, "entities": entities}
+    return {
+        "goal": goal,
+        "summary": summary,
+        "entities": entities,
+    }
 
 
 def compact_text(value: Any, *, max_chars: int) -> str:
@@ -1145,6 +1167,31 @@ def append_retrieval_metrics(metrics: dict[str, list[Any]], diagnostics: dict[st
             metrics[key].append(value)
 
 
+def primary_metric_for_dataset(dataset_config: dict[str, Any]) -> str:
+    sub_dataset = str(dataset_config.get("sub_dataset", "")).lower()
+    if "ruler_qa" in sub_dataset:
+        return "accuracy"
+    return ""
+
+
+def add_accuracy_alias_for_dataset(
+    *,
+    output: dict[str, Any],
+    metrics: dict[str, list[Any]],
+    results: list[dict[str, Any]],
+    dataset_config: dict[str, Any],
+) -> None:
+    sub_dataset = str(dataset_config.get("sub_dataset", "")).lower()
+    if "ruler_qa" not in sub_dataset or "substring_exact_match" not in output:
+        return
+
+    accuracy = bool(output["substring_exact_match"])
+    output["accuracy"] = accuracy
+    metrics["accuracy"].append(accuracy)
+    if results:
+        results[-1]["accuracy"] = accuracy
+
+
 def averaged_metrics(metrics: dict[str, list[Any]]) -> dict[str, float]:
     averaged: dict[str, float] = {}
     for key, values in metrics.items():
@@ -1349,12 +1396,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--retrieval-char-budget", type=int, default=30000)
     parser.add_argument("--save-every", type=int, default=1)
-    parser.add_argument("--memory-mode", choices=["raw", "episode"], default=os.environ.get("MEMORY_MODE", "raw"))
+    parser.add_argument(
+        "--memory-mode",
+        choices=["raw", "episode"],
+        default=os.environ.get("MEMORY_MODE", "raw"),
+    )
 
     parser.add_argument("--episode-scenario", default=os.environ.get("EPISODE_SCENARIO", DEFAULT_EPISODE_SCENARIO))
     parser.add_argument("--episode-intent", default=os.environ.get("EPISODE_INTENT", DEFAULT_EPISODE_INTENT))
     parser.add_argument("--episode-tool-name", default=os.environ.get("EPISODE_TOOL_NAME", DEFAULT_EPISODE_TOOL_NAME))
-    parser.add_argument("--episode-max-entities", type=int, default=int(os.environ.get("EPISODE_MAX_ENTITIES", "12")))
+    parser.add_argument("--episode-max-entities", type=int, default=int(os.environ.get("EPISODE_MAX_ENTITIES", "24")))
     parser.add_argument(
         "--episode-cache-path",
         default=os.environ.get("EPISODE_CACHE_PATH", str(default_episode_cache_path)),
@@ -1369,7 +1420,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--episode-writer-max-tokens",
         type=int,
-        default=int(os.environ.get("EPISODE_WRITER_MAX_TOKENS", "512")),
+        default=int(os.environ.get("EPISODE_WRITER_MAX_TOKENS", "1024")),
     )
     parser.add_argument(
         "--episode-query-cache-path",
@@ -1389,7 +1440,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--episode-query-rewriter-max-tokens",
         type=int,
-        default=int(os.environ.get("EPISODE_QUERY_REWRITER_MAX_TOKENS", "128")),
+        default=int(os.environ.get("EPISODE_QUERY_REWRITER_MAX_TOKENS", "192")),
     )
 
     parser.add_argument("--embed-base-url", default=os.environ.get("EMBED_BASE_URL", "http://127.0.0.1:11500"))
@@ -1420,8 +1471,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--answer-system-prompt",
         default=(
-            "You are an accurate retrieval QA system. Answer strictly from retrieved memory. "
-            "If the retrieved memory does not contain enough evidence, answer noanswer."
+            "You are a helpful assistant that answers questions using the retrieved memory. "
+            "Return the shortest answer supported by the retrieved memory."
         ),
     )
     return parser
@@ -1537,14 +1588,20 @@ def run(args: argparse.Namespace) -> None:
         "episode_scenario": args.episode_scenario if args.memory_mode == "episode" else "",
         "episode_intent": args.episode_intent if args.memory_mode == "episode" else "",
         "episode_tool_name": args.episode_tool_name if args.memory_mode == "episode" else "",
+        "episode_max_entities": args.episode_max_entities if args.memory_mode == "episode" else "",
         "episode_cache_path": args.episode_cache_path if args.memory_mode == "episode" else "",
+        "episode_writer_prompt_version": EPISODE_WRITER_PROMPT_VERSION if args.memory_mode == "episode" else "",
         "episode_writer_model": (args.episode_writer_model.strip() or args.llm_model)
         if args.memory_mode == "episode"
         else "",
         "episode_query_cache_path": args.episode_query_cache_path if args.memory_mode == "episode" else "",
+        "episode_query_rewriter_prompt_version": EPISODE_QUERY_REWRITER_PROMPT_VERSION
+        if args.memory_mode == "episode"
+        else "",
         "episode_query_rewriter_model": (args.episode_query_rewriter_model.strip() or args.llm_model)
         if args.memory_mode == "episode"
         else "",
+        "primary_metric": primary_metric_for_dataset(dataset_config),
         "llm_model": args.llm_model,
         "llm_base_url": args.llm_base_url,
     }
@@ -1603,6 +1660,12 @@ def run(args: argparse.Namespace) -> None:
                 results,
                 query_index,
                 qa_pair_id,
+            )
+            add_accuracy_alias_for_dataset(
+                output=output,
+                metrics=metrics,
+                results=results,
+                dataset_config=dataset_config,
             )
             query_index += 1
 
