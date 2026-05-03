@@ -1,15 +1,14 @@
 package processors
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
+	"server/internal/utils/imagesource"
 )
 
 // ProcessThumbnailTask handles thumbnail generation for photos and videos; waveform for audio.
@@ -48,22 +47,11 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 
 // generatePhotoThumbnails handles photo thumbnail generation with RAW support.
 func (ap *AssetProcessor) generatePhotoThumbnails(ctx context.Context, fullPath, originalFilename string, repository repo.Repository, asset *repo.Asset) error {
-	// Check if RAW and extract preview
-	previewData, err := ap.extractRAWPreview(ctx, fullPath, originalFilename)
+	reader, err := imagesource.OpenPhoto(ctx, fullPath, originalFilename)
 	if err != nil {
-		return fmt.Errorf("extract RAW preview: %w", err)
+		return fmt.Errorf("open photo source: %w", err)
 	}
+	defer reader.Close()
 
-	if previewData != nil {
-		// RAW file - use preview data for thumbnails
-		return ap.generateThumbnails(ctx, bytes.NewReader(previewData), repository, asset)
-	}
-
-	// Not RAW or preview extraction returned nil - use original file
-	f, err := os.Open(fullPath)
-	if err != nil {
-		return fmt.Errorf("open photo for thumbnails: %w", err)
-	}
-	defer f.Close()
-	return ap.generateThumbnails(ctx, f, repository, asset)
+	return ap.generateThumbnails(ctx, reader, repository, asset)
 }

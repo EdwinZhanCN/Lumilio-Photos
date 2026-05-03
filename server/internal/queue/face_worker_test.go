@@ -131,13 +131,13 @@ func TestProcessFaceWorkerPassesImageDataToFaceService(t *testing.T) {
 			},
 		},
 		ConfigProvider: faceWorkerConfigStub{},
+		ImageLoader:    &workerImageLoaderStub{data: []byte("face-image")},
 	}
 
 	imageData := []byte("face-image")
 	if err := worker.Work(context.Background(), &river.Job[ProcessFaceArgs]{
 		Args: ProcessFaceArgs{
-			AssetID:   assetID,
-			ImageData: imageData,
+			AssetID: assetID,
 		},
 	}); err != nil {
 		t.Fatalf("worker returned error: %v", err)
@@ -172,8 +172,7 @@ func TestProcessFaceWorkerSnoozesWhenTaskUnavailable(t *testing.T) {
 
 	err := worker.Work(context.Background(), &river.Job[ProcessFaceArgs]{
 		Args: ProcessFaceArgs{
-			AssetID:   assetID,
-			ImageData: []byte("face-image"),
+			AssetID: assetID,
 		},
 	})
 	if err == nil {

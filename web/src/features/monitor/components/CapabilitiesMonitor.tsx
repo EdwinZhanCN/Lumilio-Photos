@@ -1,12 +1,4 @@
-import {
-  Bot,
-  Cpu,
-  Loader2,
-  Network,
-  RefreshCcw,
-  Sparkles,
-  Workflow,
-} from "lucide-react";
+import { Bot, Cpu, Loader2, Network, RefreshCcw, Sparkles } from "lucide-react";
 import { useCapabilities } from "@/lib/capabilities/useCapabilities";
 import { useI18n } from "@/lib/i18n.tsx";
 
@@ -112,23 +104,6 @@ export function CapabilitiesMonitor() {
       </div>
 
       <div className="stats stats-vertical xl:stats-horizontal shadow-sm w-full">
-        <div className="stat">
-          <div className="stat-figure text-primary">
-            <Workflow className="w-8 h-8" />
-          </div>
-          <div className="stat-title">
-            {t("settings.serverSettings.autoMode")}
-          </div>
-          <div className="stat-value text-primary text-2xl">
-            {t(
-              `settings.serverSettings.autoModeValues.${capabilities.ml.autoMode}`,
-            )}
-          </div>
-          <div className="stat-desc">
-            {t("settings.serverSettings.taskAvailability")}
-          </div>
-        </div>
-
         <div className="stat">
           <div className="stat-figure text-info">
             <Network className="w-8 h-8" />

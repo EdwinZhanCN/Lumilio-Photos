@@ -8,7 +8,6 @@ type CapabilitiesResponseDTO struct {
 
 // MLCapabilitiesDTO represents ML runtime task availability and discovery state.
 type MLCapabilitiesDTO struct {
-	AutoMode            string       `json:"auto_mode" example:"enable"`
 	DiscoveredNodeCount int          `json:"discovered_node_count" example:"2"`
 	ActiveNodeCount     int          `json:"active_node_count" example:"1"`
 	Tasks               MLTaskSetDTO `json:"tasks"`

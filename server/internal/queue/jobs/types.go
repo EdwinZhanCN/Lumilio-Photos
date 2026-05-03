@@ -13,11 +13,13 @@ import (
 // Duplicated here (instead of importing processors) to avoid import cycles.
 // Keep this in sync with processors.CLIPPayload.
 type ProcessClipArgs struct {
-	AssetID   pgtype.UUID `json:"assetId"`
-	ImageData []byte      `json:"imageData"`
+	AssetID           pgtype.UUID `json:"assetId"`
+	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
 }
 
 func (ProcessClipArgs) Kind() string { return "process_clip" }
+
+const MLPreprocessVersionV1 = "ml-image-v1"
 
 // AssetRetryPayload is the River job payload for selective retry of asset processing tasks
 type AssetRetryPayload struct {
@@ -40,8 +42,8 @@ func (AssetRetryPayload) InsertOpts() river.InsertOpts {
 // ProcessOcrArgs is the River job payload for OCR text extraction.
 // Duplicated here (instead of importing processors) to avoid import cycles.
 type ProcessOcrArgs struct {
-	AssetID   pgtype.UUID `json:"assetId"`
-	ImageData []byte      `json:"imageData"`
+	AssetID           pgtype.UUID `json:"assetId"`
+	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
 }
 
 func (ProcessOcrArgs) Kind() string { return "process_ocr" }
@@ -49,9 +51,9 @@ func (ProcessOcrArgs) Kind() string { return "process_ocr" }
 // ProcessCaptionArgs is the River job payload for AI image captioning.
 // Duplicated here (instead of importing processors) to avoid import cycles.
 type ProcessCaptionArgs struct {
-	AssetID      pgtype.UUID `json:"assetId"`
-	ImageData    []byte      `json:"imageData"`
-	CustomPrompt string      `json:"customPrompt,omitempty"`
+	AssetID           pgtype.UUID `json:"assetId"`
+	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
+	CustomPrompt      string      `json:"customPrompt,omitempty"`
 }
 
 func (ProcessCaptionArgs) Kind() string { return "process_caption" }
@@ -59,8 +61,8 @@ func (ProcessCaptionArgs) Kind() string { return "process_caption" }
 // ProcessFaceArgs is the River job payload for face detection and recognition.
 // Duplicated here (instead of importing processors) to avoid import cycles.
 type ProcessFaceArgs struct {
-	AssetID   pgtype.UUID `json:"assetId"`
-	ImageData []byte      `json:"imageData"`
+	AssetID           pgtype.UUID `json:"assetId"`
+	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
 }
 
 func (ProcessFaceArgs) Kind() string { return "process_face" }

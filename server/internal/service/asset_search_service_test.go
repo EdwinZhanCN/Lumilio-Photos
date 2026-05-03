@@ -28,7 +28,7 @@ func testSearchAsset(t *testing.T, rawID string, filename string) repo.Asset {
 	}
 }
 
-func TestAssetServiceSearchAssets_AutoModePreservesTopResultsAndDedupesResults(t *testing.T) {
+func TestAssetServiceSearchAssets_PreservesTopResultsAndDedupesResults(t *testing.T) {
 	topOnly := testSearchAsset(t, "11111111-1111-1111-1111-111111111111", "top-only.jpg")
 	shared := testSearchAsset(t, "22222222-2222-2222-2222-222222222222", "shared.jpg")
 	filenameOnly := testSearchAsset(t, "33333333-3333-3333-3333-333333333333", "filename-only.jpg")

@@ -1,25 +1,19 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"server/config"
 	"server/internal/db/repo"
 	"server/internal/logging"
 	"server/internal/queue/jobs"
-	"server/internal/utils/imaging"
-	"server/internal/utils/raw"
 
-	"github.com/h2non/bimg"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -270,23 +264,6 @@ func (s *assetIndexingService) ProcessReindexAssets(ctx context.Context, input R
 		return nil
 	}
 
-	runtimeAvailableTasks := FilterRuntimeAvailableIndexingTasks(enabledTasks, s.runtimeChecker)
-	if len(runtimeAvailableTasks) == 0 {
-		s.logger.Info("reindex skipped: no runtime-available tasks",
-			zap.String("operation", "reindex.process"),
-			zap.Any("requested_tasks", requestedTasks),
-		)
-		return nil
-	}
-	if len(runtimeAvailableTasks) != len(enabledTasks) {
-		s.logger.Info("reindex skipping runtime-unavailable tasks",
-			zap.String("operation", "reindex.process"),
-			zap.Any("enabled_tasks", enabledTasks),
-			zap.Any("available_tasks", runtimeAvailableTasks),
-		)
-	}
-	enabledTasks = runtimeAvailableTasks
-
 	repositoryUUID, err := parseRepositoryUUID(input.RepositoryID)
 	if err != nil {
 		return err
@@ -474,43 +451,27 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 		return 0, fmt.Errorf("stat asset file: %w", err)
 	}
 
-	previewData, err := extractRAWPreviewForIndexing(ctx, fullPath, candidate.asset.OriginalFilename)
-	if err != nil {
-		return 0, fmt.Errorf("extract RAW preview: %w", err)
-	}
-
-	readSource := func() (io.ReadCloser, error) {
-		if previewData != nil {
-			return io.NopCloser(bytes.NewReader(previewData)), nil
-		}
-		f, err := os.Open(fullPath)
-		if err != nil {
-			return nil, err
-		}
-		return f, nil
-	}
-
 	queued := 0
 	if candidate.tasks[AssetIndexingTaskClip] {
-		if err := s.enqueueClipTask(ctx, candidate.asset.AssetID, readSource); err != nil {
+		if err := s.enqueueClipTask(ctx, candidate.asset.AssetID); err != nil {
 			return queued, err
 		}
 		queued++
 	}
 	if candidate.tasks[AssetIndexingTaskOCR] {
-		if err := s.enqueueOCRTask(ctx, candidate.asset.AssetID, readSource); err != nil {
+		if err := s.enqueueOCRTask(ctx, candidate.asset.AssetID); err != nil {
 			return queued, err
 		}
 		queued++
 	}
 	if candidate.tasks[AssetIndexingTaskCaption] {
-		if err := s.enqueueCaptionTask(ctx, candidate.asset.AssetID, readSource); err != nil {
+		if err := s.enqueueCaptionTask(ctx, candidate.asset.AssetID); err != nil {
 			return queued, err
 		}
 		queued++
 	}
 	if candidate.tasks[AssetIndexingTaskFace] {
-		if err := s.enqueueFaceTask(ctx, candidate.asset.AssetID, readSource); err != nil {
+		if err := s.enqueueFaceTask(ctx, candidate.asset.AssetID); err != nil {
 			return queued, err
 		}
 		queued++
@@ -522,30 +483,10 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 func (s *assetIndexingService) enqueueClipTask(
 	ctx context.Context,
 	assetID pgtype.UUID,
-	readSource func() (io.ReadCloser, error),
 ) error {
-	reader, err := readSource()
-	if err != nil {
-		return fmt.Errorf("open asset for CLIP: %w", err)
-	}
-	defer reader.Close()
-
-	imageData, err := imaging.ProcessImageStream(reader, bimg.Options{
-		Width:     224,
-		Height:    224,
-		Crop:      true,
-		Gravity:   bimg.GravitySmart,
-		Quality:   90,
-		Type:      bimg.WEBP,
-		NoProfile: true,
-	})
-	if err != nil {
-		return fmt.Errorf("CLIP preprocessing: %w", err)
-	}
-
-	_, err = s.queueClient.Insert(ctx, jobs.ProcessClipArgs{
-		AssetID:   assetID,
-		ImageData: imageData,
+	_, err := s.queueClient.Insert(ctx, jobs.ProcessClipArgs{
+		AssetID:           assetID,
+		PreprocessVersion: jobs.MLPreprocessVersionV1,
 	}, &river.InsertOpts{Queue: "process_clip"})
 	if err != nil {
 		return fmt.Errorf("enqueue CLIP job: %w", err)
@@ -556,28 +497,10 @@ func (s *assetIndexingService) enqueueClipTask(
 func (s *assetIndexingService) enqueueOCRTask(
 	ctx context.Context,
 	assetID pgtype.UUID,
-	readSource func() (io.ReadCloser, error),
 ) error {
-	reader, err := readSource()
-	if err != nil {
-		return fmt.Errorf("open asset for OCR: %w", err)
-	}
-	defer reader.Close()
-
-	imageData, err := imaging.ProcessImageStream(reader, bimg.Options{
-		Width:     1920,
-		Height:    1920,
-		Quality:   90,
-		Type:      bimg.JPEG,
-		NoProfile: true,
-	})
-	if err != nil {
-		return fmt.Errorf("OCR preprocessing: %w", err)
-	}
-
-	_, err = s.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
-		AssetID:   assetID,
-		ImageData: imageData,
+	_, err := s.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
+		AssetID:           assetID,
+		PreprocessVersion: jobs.MLPreprocessVersionV1,
 	}, &river.InsertOpts{Queue: "process_ocr"})
 	if err != nil {
 		return fmt.Errorf("enqueue OCR job: %w", err)
@@ -588,28 +511,10 @@ func (s *assetIndexingService) enqueueOCRTask(
 func (s *assetIndexingService) enqueueCaptionTask(
 	ctx context.Context,
 	assetID pgtype.UUID,
-	readSource func() (io.ReadCloser, error),
 ) error {
-	reader, err := readSource()
-	if err != nil {
-		return fmt.Errorf("open asset for caption: %w", err)
-	}
-	defer reader.Close()
-
-	imageData, err := imaging.ProcessImageStream(reader, bimg.Options{
-		Width:     1024,
-		Height:    1024,
-		Quality:   85,
-		Type:      bimg.JPEG,
-		NoProfile: true,
-	})
-	if err != nil {
-		return fmt.Errorf("caption preprocessing: %w", err)
-	}
-
-	_, err = s.queueClient.Insert(ctx, jobs.ProcessCaptionArgs{
-		AssetID:   assetID,
-		ImageData: imageData,
+	_, err := s.queueClient.Insert(ctx, jobs.ProcessCaptionArgs{
+		AssetID:           assetID,
+		PreprocessVersion: jobs.MLPreprocessVersionV1,
 	}, &river.InsertOpts{Queue: "process_caption"})
 	if err != nil {
 		return fmt.Errorf("enqueue caption job: %w", err)
@@ -620,28 +525,10 @@ func (s *assetIndexingService) enqueueCaptionTask(
 func (s *assetIndexingService) enqueueFaceTask(
 	ctx context.Context,
 	assetID pgtype.UUID,
-	readSource func() (io.ReadCloser, error),
 ) error {
-	reader, err := readSource()
-	if err != nil {
-		return fmt.Errorf("open asset for face: %w", err)
-	}
-	defer reader.Close()
-
-	imageData, err := imaging.ProcessImageStream(reader, bimg.Options{
-		Width:     1920,
-		Height:    1920,
-		Quality:   90,
-		Type:      bimg.JPEG,
-		NoProfile: true,
-	})
-	if err != nil {
-		return fmt.Errorf("face preprocessing: %w", err)
-	}
-
-	_, err = s.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
-		AssetID:   assetID,
-		ImageData: imageData,
+	_, err := s.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
+		AssetID:           assetID,
+		PreprocessVersion: jobs.MLPreprocessVersionV1,
 	}, &river.InsertOpts{Queue: "process_face"})
 	if err != nil {
 		return fmt.Errorf("enqueue face job: %w", err)
@@ -695,25 +582,24 @@ func (s *assetIndexingService) audit(repositoryID *string, repoPath string) logg
 }
 
 func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg config.MLConfig) []AssetIndexingTask {
-	effective := cfg.EffectiveRuntimeConfig()
 	enabled := make([]AssetIndexingTask, 0, len(tasks))
 
 	for _, task := range tasks {
 		switch task {
 		case AssetIndexingTaskClip:
-			if effective.CLIPEnabled {
+			if cfg.CLIPEnabled {
 				enabled = append(enabled, task)
 			}
 		case AssetIndexingTaskOCR:
-			if effective.OCREnabled {
+			if cfg.OCREnabled {
 				enabled = append(enabled, task)
 			}
 		case AssetIndexingTaskCaption:
-			if effective.CaptionEnabled {
+			if cfg.CaptionEnabled {
 				enabled = append(enabled, task)
 			}
 		case AssetIndexingTaskFace:
-			if effective.FaceEnabled {
+			if cfg.FaceEnabled {
 				enabled = append(enabled, task)
 			}
 		}
@@ -728,31 +614,4 @@ func indexingTasksToStrings(tasks []AssetIndexingTask) []string {
 		result = append(result, string(task))
 	}
 	return result
-}
-
-func extractRAWPreviewForIndexing(ctx context.Context, fullPath string, originalFilename string) ([]byte, error) {
-	if !raw.IsRAWFile(originalFilename) {
-		return nil, nil
-	}
-
-	f, err := os.Open(fullPath)
-	if err != nil {
-		return nil, fmt.Errorf("open RAW file: %w", err)
-	}
-	defer f.Close()
-
-	opts := raw.DefaultProcessingOptions()
-	opts.FullRenderTimeout = 30 * time.Second
-	opts.PreferEmbedded = true
-	opts.Quality = 90
-
-	processor := raw.NewProcessor(opts)
-	result, err := processor.ProcessRAW(ctx, f, originalFilename)
-	if err != nil {
-		return nil, fmt.Errorf("process RAW: %w", err)
-	}
-	if !result.IsRAW || len(result.PreviewData) == 0 {
-		return nil, nil
-	}
-	return result.PreviewData, nil
 }

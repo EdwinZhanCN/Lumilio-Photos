@@ -3,7 +3,6 @@ package dto
 import (
 	"time"
 
-	"server/config"
 	"server/internal/service"
 )
 
@@ -23,11 +22,10 @@ type LLMSettingsDTO struct {
 }
 
 type MLSettingsDTO struct {
-	AutoMode       string `json:"auto_mode" example:"disable"`
-	CLIPEnabled    bool   `json:"clip_enabled"`
-	OCREnabled     bool   `json:"ocr_enabled"`
-	CaptionEnabled bool   `json:"caption_enabled"`
-	FaceEnabled    bool   `json:"face_enabled"`
+	CLIPEnabled    bool `json:"clip_enabled"`
+	OCREnabled     bool `json:"ocr_enabled"`
+	CaptionEnabled bool `json:"caption_enabled"`
+	FaceEnabled    bool `json:"face_enabled"`
 }
 
 type UpdateSystemSettingsDTO struct {
@@ -44,11 +42,10 @@ type UpdateLLMSettingsDTO struct {
 }
 
 type UpdateMLSettingsDTO struct {
-	AutoMode       *string `json:"auto_mode,omitempty" binding:"omitempty,oneof=enable disable"`
-	CLIPEnabled    *bool   `json:"clip_enabled,omitempty"`
-	OCREnabled     *bool   `json:"ocr_enabled,omitempty"`
-	CaptionEnabled *bool   `json:"caption_enabled,omitempty"`
-	FaceEnabled    *bool   `json:"face_enabled,omitempty"`
+	CLIPEnabled    *bool `json:"clip_enabled,omitempty"`
+	OCREnabled     *bool `json:"ocr_enabled,omitempty"`
+	CaptionEnabled *bool `json:"caption_enabled,omitempty"`
+	FaceEnabled    *bool `json:"face_enabled,omitempty"`
 }
 
 type ValidateLLMSettingsResponseDTO struct {
@@ -65,7 +62,6 @@ func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {
 			APIKeyConfigured: settings.LLM.APIKeyConfigured,
 		},
 		ML: MLSettingsDTO{
-			AutoMode:       string(settings.ML.AutoMode),
 			CLIPEnabled:    settings.ML.CLIPEnabled,
 			OCREnabled:     settings.ML.OCREnabled,
 			CaptionEnabled: settings.ML.CaptionEnabled,
@@ -92,14 +88,7 @@ func (dto UpdateSystemSettingsDTO) ToServiceInput(updatedBy *int32) (service.Upd
 	}
 
 	if dto.ML != nil {
-		var autoMode *config.MLAutoMode
-		if dto.ML.AutoMode != nil {
-			mode := config.MLAutoMode(*dto.ML.AutoMode)
-			autoMode = &mode
-		}
-
 		input.ML = &service.UpdateMLSettingsInput{
-			AutoMode:       autoMode,
 			CLIPEnabled:    dto.ML.CLIPEnabled,
 			OCREnabled:     dto.ML.OCREnabled,
 			CaptionEnabled: dto.ML.CaptionEnabled,

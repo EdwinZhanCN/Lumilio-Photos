@@ -1,7 +1,6 @@
 package config
 
 import (
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -62,32 +61,11 @@ func (c LLMConfig) IsConfigured() bool {
 	}
 }
 
-type MLAutoMode string
-
-const (
-	MLAutoModeDisable MLAutoMode = "disable"
-	MLAutoModeEnable  MLAutoMode = "enable"
-)
-
 type MLConfig struct {
-	AutoMode       MLAutoMode `env:"ML_AUTO,default=disable"`
-	CLIPEnabled    bool       `env:"ML_CLIP_ENABLED,default=false"`
-	OCREnabled     bool       `env:"ML_OCR_ENABLED,default=false"`
-	CaptionEnabled bool       `env:"ML_CAPTION_ENABLED,default=false"`
-	FaceEnabled    bool       `env:"ML_FACE_ENABLED,default=false"`
-}
-
-func normalizeMLAutoMode(raw string) MLAutoMode {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case string(MLAutoModeEnable):
-		return MLAutoModeEnable
-	default:
-		return MLAutoModeDisable
-	}
-}
-
-func (c MLConfig) IsAutoEnabled() bool {
-	return c.AutoMode == MLAutoModeEnable
+	CLIPEnabled    bool `env:"ML_CLIP_ENABLED,default=false"`
+	OCREnabled     bool `env:"ML_OCR_ENABLED,default=false"`
+	CaptionEnabled bool `env:"ML_CAPTION_ENABLED,default=false"`
+	FaceEnabled    bool `env:"ML_FACE_ENABLED,default=false"`
 }
 
 func (c MLConfig) HasManualTasksEnabled() bool {
@@ -95,22 +73,7 @@ func (c MLConfig) HasManualTasksEnabled() bool {
 }
 
 func (c MLConfig) HasRuntimeDemand() bool {
-	return c.IsAutoEnabled() || c.HasManualTasksEnabled()
-}
-
-// EffectiveRuntimeConfig resolves runtime task enablement.
-// When auto-discovery is enabled, all discovered ML tasks are considered enabled,
-// regardless of the persisted manual toggle values.
-func (c MLConfig) EffectiveRuntimeConfig() MLConfig {
-	if !c.IsAutoEnabled() {
-		return c
-	}
-
-	c.CLIPEnabled = true
-	c.OCREnabled = true
-	c.CaptionEnabled = true
-	c.FaceEnabled = true
-	return c
+	return c.HasManualTasksEnabled()
 }
 
 // WatchmanConfig controls repository file tree monitoring.
@@ -245,7 +208,6 @@ func LoadMLConfig() MLConfig {
 	isDev := IsDevelopmentMode()
 	if isDev {
 		cfg = MLConfig{
-			AutoMode:       MLAutoModeDisable,
 			CLIPEnabled:    false,
 			OCREnabled:     false,
 			CaptionEnabled: false,
@@ -253,22 +215,11 @@ func LoadMLConfig() MLConfig {
 		}
 	} else {
 		cfg = MLConfig{
-			AutoMode:       MLAutoModeDisable,
 			CLIPEnabled:    true,
 			OCREnabled:     true,
 			CaptionEnabled: true,
 			FaceEnabled:    true,
 		}
-	}
-
-	if autoMode := strings.TrimSpace(os.Getenv("ML_AUTO")); autoMode != "" {
-		normalized := normalizeMLAutoMode(autoMode)
-		if normalized == MLAutoModeDisable &&
-			!strings.EqualFold(autoMode, string(MLAutoModeDisable)) &&
-			!strings.EqualFold(autoMode, string(MLAutoModeEnable)) {
-			log.Printf("Invalid ML_AUTO value %q, fallback to %q", autoMode, MLAutoModeDisable)
-		}
-		cfg.AutoMode = normalized
 	}
 
 	// Override with environment variables if set

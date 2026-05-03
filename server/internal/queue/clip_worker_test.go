@@ -6,6 +6,7 @@ import (
 
 	"server/internal/db/repo"
 	"server/internal/service"
+	"server/internal/utils/imagesource"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/client"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
@@ -137,6 +138,20 @@ func (s clipWorkerConfigStub) GetEffectiveMLConfig(context.Context) (struct {
 	panic("not implemented")
 }
 
+type workerImageLoaderStub struct {
+	data    []byte
+	called  int
+	purpose imagesource.Purpose
+	version string
+}
+
+func (s *workerImageLoaderStub) LoadMLImage(_ context.Context, _ pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) ([]byte, error) {
+	s.called++
+	s.purpose = purpose
+	s.version = preprocessVersion
+	return append([]byte(nil), s.data...), nil
+}
+
 func TestProcessClipWorkerSkipsBioClipWhenUnavailable(t *testing.T) {
 	t.Parallel()
 
@@ -168,10 +183,11 @@ func TestProcessClipWorkerSkipsBioClipWhenUnavailable(t *testing.T) {
 		EmbeddingService: embeddingSvc,
 		LumenService:     lumenSvc,
 		TagService:       tagSvc,
+		ImageLoader:      &workerImageLoaderStub{data: []byte("image")},
 	}
 
 	if err := worker.Work(context.Background(), &river.Job[ProcessClipArgs]{
-		Args: ProcessClipArgs{AssetID: assetID, ImageData: []byte("image")},
+		Args: ProcessClipArgs{AssetID: assetID},
 	}); err != nil {
 		t.Fatalf("worker returned error: %v", err)
 	}
@@ -211,11 +227,12 @@ func TestProcessClipWorkerIncludesBioClipWhenAvailable(t *testing.T) {
 			sceneLabel: []types.Label{{Label: "forest", Score: 0.8}},
 			bioLabels:  []types.Label{{Label: "sparrow", Score: 0.7}},
 		},
-		TagService: tagSvc,
+		TagService:  tagSvc,
+		ImageLoader: &workerImageLoaderStub{data: []byte("image")},
 	}
 
 	if err := worker.Work(context.Background(), &river.Job[ProcessClipArgs]{
-		Args: ProcessClipArgs{AssetID: assetID, ImageData: []byte("image")},
+		Args: ProcessClipArgs{AssetID: assetID},
 	}); err != nil {
 		t.Fatalf("worker returned error: %v", err)
 	}
@@ -247,12 +264,17 @@ func TestProcessClipWorkerSnoozesWithoutPrimaryClassifiers(t *testing.T) {
 		},
 		EmbeddingService: &clipWorkerEmbeddingStub{},
 		TagService:       &clipWorkerTagStub{},
+		ImageLoader:      &workerImageLoaderStub{data: []byte("image")},
 	}
 
 	err := worker.Work(context.Background(), &river.Job[ProcessClipArgs]{
-		Args: ProcessClipArgs{AssetID: assetID, ImageData: []byte("image")},
+		Args: ProcessClipArgs{AssetID: assetID},
 	})
 	if err == nil {
 		t.Fatal("expected snooze error")
+	}
+
+	if loader := worker.ImageLoader.(*workerImageLoaderStub); loader.called != 0 {
+		t.Fatalf("expected image loader not to be called while task is unavailable, got %d calls", loader.called)
 	}
 }

@@ -124,9 +124,13 @@ func main() {
 	if err != nil {
 		appLogger.Fatal("failed to load ML settings", zap.String("operation", "settings.ml"), zap.Error(err))
 	}
-	if currentMLConfig.IsAutoEnabled() {
-		appLogger.Info("ML auto mode enabled; discovery mode will accept all discovered ML tasks",
+	if currentMLConfig.HasRuntimeDemand() {
+		appLogger.Info("ML task processing enabled",
 			zap.String("operation", "settings.ml"),
+			zap.Bool("clip_enabled", currentMLConfig.CLIPEnabled),
+			zap.Bool("ocr_enabled", currentMLConfig.OCREnabled),
+			zap.Bool("caption_enabled", currentMLConfig.CaptionEnabled),
+			zap.Bool("face_enabled", currentMLConfig.FaceEnabled),
 		)
 	}
 
@@ -198,7 +202,7 @@ func main() {
 	tools.RegisterBulkLikeTool()
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
-	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService, processorLogger, repoAuditProvider)
+	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, settingsService, processorLogger, repoAuditProvider)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})
 	river.AddWorker[queue.MetadataArgs](workers, &queue.MetadataWorker{Process: assetProcessor.ProcessMetadataTask})
@@ -302,12 +306,14 @@ func initMLServices(
 	tagService := service.NewAIGeneratedTagService(queries)
 	captionService := service.NewCaptionService(queries, lumenService)
 	ocrService := service.NewOCRService(queries)
+	imageLoader := queue.NewDBMLImageLoader(queries)
 
 	river.AddWorker[queue.ProcessClipArgs](workers, &queue.ProcessClipWorker{
 		LumenService:     lumenService,
 		EmbeddingService: embeddingService,
 		TagService:       tagService,
 		ConfigProvider:   settingsService,
+		ImageLoader:      imageLoader,
 	})
 	appLogger.Info("CLIP service and worker registered", zap.String("operation", "ml.init"))
 
@@ -315,6 +321,7 @@ func initMLServices(
 		CaptionService: captionService,
 		LumenService:   lumenService,
 		ConfigProvider: settingsService,
+		ImageLoader:    imageLoader,
 	})
 	appLogger.Info("caption service and worker registered", zap.String("operation", "ml.init"))
 
@@ -322,6 +329,7 @@ func initMLServices(
 		OCRService:     ocrService,
 		LumenService:   lumenService,
 		ConfigProvider: settingsService,
+		ImageLoader:    imageLoader,
 	})
 	appLogger.Info("OCR service and worker registered", zap.String("operation", "ml.init"))
 
@@ -329,6 +337,7 @@ func initMLServices(
 		FaceService:    faceService,
 		LumenService:   lumenService,
 		ConfigProvider: settingsService,
+		ImageLoader:    imageLoader,
 	})
 	appLogger.Info("face service and worker registered", zap.String("operation", "ml.init"))
 

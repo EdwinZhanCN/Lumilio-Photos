@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"server/internal/utils/imagesource"
 	"time"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
@@ -22,6 +23,7 @@ type ProcessClipWorker struct {
 	LumenService     service.LumenService
 	TagService       service.AIGeneratedTagService
 	ConfigProvider   MLConfigProvider
+	ImageLoader      MLImageLoader
 }
 
 func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClipArgs]) error {
@@ -54,8 +56,16 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 	if w.TagService == nil {
 		return fmt.Errorf("ai generated tag service unavailable")
 	}
+	if w.ImageLoader == nil {
+		return fmt.Errorf("ml image loader unavailable")
+	}
 
-	embedding, err := w.LumenService.ClipImageEmbed(ctx, args.ImageData)
+	imageData, err := w.ImageLoader.LoadMLImage(ctx, assetID, imagesource.PurposeClip, args.PreprocessVersion)
+	if err != nil {
+		return fmt.Errorf("load CLIP image: %w", err)
+	}
+
+	embedding, err := w.LumenService.ClipImageEmbed(ctx, imageData)
 	if err != nil {
 		return fmt.Errorf("failed to generate CLIP embedding: %w", err)
 	}
@@ -66,12 +76,12 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 		return fmt.Errorf("failed to save embedding: %w", err)
 	}
 
-	clipLabels, err := w.LumenService.ClipClassify(ctx, args.ImageData, 3)
+	clipLabels, err := w.LumenService.ClipClassify(ctx, imageData, 3)
 	if err != nil {
 		return fmt.Errorf("failed to classify image with CLIP: %w", err)
 	}
 
-	sceneLabels, err := w.LumenService.ClipSceneClassify(ctx, args.ImageData, 1)
+	sceneLabels, err := w.LumenService.ClipSceneClassify(ctx, imageData, 1)
 	if err != nil {
 		return fmt.Errorf("failed to classify image scene with CLIP: %w", err)
 	}
@@ -80,7 +90,7 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 	tags = append(tags, labelsToAIGeneratedTags(sceneLabels, "clip_scene_classify")...)
 
 	if w.LumenService.IsTaskAvailable("bioclip_classify") {
-		bioClipLabels, err := w.LumenService.BioClipClassify(ctx, args.ImageData, 3)
+		bioClipLabels, err := w.LumenService.BioClipClassify(ctx, imageData, 3)
 		if err != nil {
 			return fmt.Errorf("failed to classify image with BioCLIP: %w", err)
 		}

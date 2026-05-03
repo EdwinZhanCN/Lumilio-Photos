@@ -20,7 +20,6 @@ export type SystemSettings = {
     apiKeyConfigured: boolean;
   };
   ml: {
-    autoMode: "enable" | "disable";
     clipEnabled: boolean;
     ocrEnabled: boolean;
     captionEnabled: boolean;
@@ -61,7 +60,6 @@ function normalizeSystemSettings(
       apiKeyConfigured: Boolean(data.llm?.api_key_configured),
     },
     ml: {
-      autoMode: data.ml?.auto_mode === "enable" ? "enable" : "disable",
       clipEnabled: Boolean(data.ml?.clip_enabled),
       ocrEnabled: Boolean(data.ml?.ocr_enabled),
       captionEnabled: Boolean(data.ml?.caption_enabled),
