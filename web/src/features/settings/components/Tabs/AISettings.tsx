@@ -16,7 +16,6 @@ import {
 import { useWorkingRepository } from "@/features/settings/hooks/useWorkingRepository";
 
 type AgentProvider = SystemSettings["llm"]["provider"];
-type AutoMode = SystemSettings["ml"]["autoMode"];
 
 type AIFormState = {
   llm: {
@@ -28,7 +27,6 @@ type AIFormState = {
     clearStoredKey: boolean;
   };
   ml: {
-    autoMode: AutoMode;
     clipEnabled: boolean;
     ocrEnabled: boolean;
     captionEnabled: boolean;
@@ -77,10 +75,6 @@ function formatCoveragePercent(coverage: number): string {
 }
 
 function deriveDefaultReindexTasks(form: AIFormState): ReindexTaskId[] {
-  if (form.ml.autoMode === "enable") {
-    return ["clip", "ocr", "caption", "face"];
-  }
-
   const tasks: ReindexTaskId[] = [];
   if (form.ml.clipEnabled) tasks.push("clip");
   if (form.ml.ocrEnabled) tasks.push("ocr");
@@ -100,7 +94,6 @@ function createFormState(settings: SystemSettings): AIFormState {
       clearStoredKey: false,
     },
     ml: {
-      autoMode: settings.ml.autoMode,
       clipEnabled: settings.ml.clipEnabled,
       ocrEnabled: settings.ml.ocrEnabled,
       captionEnabled: settings.ml.captionEnabled,
@@ -117,7 +110,6 @@ function buildPayload(form: AIFormState): UpdateSystemSettingsPayload {
       base_url: form.llm.baseURL.trim(),
     },
     ml: {
-      auto_mode: form.ml.autoMode,
       clip_enabled: form.ml.clipEnabled,
       ocr_enabled: form.ml.ocrEnabled,
       caption_enabled: form.ml.captionEnabled,
@@ -191,7 +183,6 @@ export default function AISettings() {
     settings?.llm.modelName,
     settings?.llm.baseURL,
     settings?.llm.apiKeyConfigured,
-    settings?.ml.autoMode,
     settings?.ml.clipEnabled,
     settings?.ml.ocrEnabled,
     settings?.ml.captionEnabled,
@@ -205,7 +196,6 @@ export default function AISettings() {
 
     setSelectedReindexTasks(deriveDefaultReindexTasks(form));
   }, [
-    form?.ml.autoMode,
     form?.ml.clipEnabled,
     form?.ml.ocrEnabled,
     form?.ml.captionEnabled,
@@ -224,7 +214,6 @@ export default function AISettings() {
       form.llm.baseURL !== settings.llm.baseURL ||
       form.llm.apiKey.trim().length > 0 ||
       form.llm.clearStoredKey ||
-      form.ml.autoMode !== settings.ml.autoMode ||
       form.ml.clipEnabled !== settings.ml.clipEnabled ||
       form.ml.ocrEnabled !== settings.ml.ocrEnabled ||
       form.ml.captionEnabled !== settings.ml.captionEnabled ||
@@ -701,11 +690,6 @@ export default function AISettings() {
                   ? t("settings.serverSettings.available")
                   : t("settings.serverSettings.unavailable")}
               </span>
-              <span className="badge badge-outline">
-                {t(
-                  `settings.serverSettings.autoModeValues.${capabilities.ml.autoMode}`,
-                )}
-              </span>
             </div>
           ) : (
             <div className="text-sm text-base-content/70">
@@ -772,8 +756,7 @@ export default function AISettings() {
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {mlTasks.map(({ statsKey, key, label }) => {
-                      const selectable =
-                        form.ml.autoMode === "enable" || form.ml[key];
+                      const selectable = form.ml[key];
                       const checked = selectedReindexTasks.includes(statsKey);
 
                       return (
@@ -801,9 +784,7 @@ export default function AISettings() {
                     })}
                   </div>
                   <p className="text-sm text-base-content/70">
-                    {form.ml.autoMode === "enable"
-                      ? t("settings.aiSettings.reindexTasksAutoHint")
-                      : t("settings.aiSettings.reindexTasksManualHint")}
+                    {t("settings.aiSettings.reindexTasksManualHint")}
                   </p>
                 </div>
               </div>
@@ -835,70 +816,6 @@ export default function AISettings() {
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <button
-            type="button"
-            className={[
-              "rounded-2xl border p-4 text-left transition",
-              form.ml.autoMode === "enable"
-                ? "border-primary bg-primary/8 shadow-sm"
-                : "border-base-300 bg-base-100 hover:border-base-content/30",
-            ].join(" ")}
-            onClick={() => {
-              setFeedback(null);
-              setForm((current) =>
-                current
-                  ? {
-                      ...current,
-                      ml: {
-                        ...current.ml,
-                        autoMode: "enable",
-                      },
-                    }
-                  : current,
-              );
-            }}
-          >
-            <div className="font-semibold">
-              {t("settings.aiSettings.autoMode")}
-            </div>
-            <div className="mt-2 text-sm text-base-content/70">
-              {t("settings.aiSettings.autoModeDescription")}
-            </div>
-          </button>
-
-          <button
-            type="button"
-            className={[
-              "rounded-2xl border p-4 text-left transition",
-              form.ml.autoMode === "disable"
-                ? "border-primary bg-primary/8 shadow-sm"
-                : "border-base-300 bg-base-100 hover:border-base-content/30",
-            ].join(" ")}
-            onClick={() => {
-              setFeedback(null);
-              setForm((current) =>
-                current
-                  ? {
-                      ...current,
-                      ml: {
-                        ...current.ml,
-                        autoMode: "disable",
-                      },
-                    }
-                  : current,
-              );
-            }}
-          >
-            <div className="font-semibold">
-              {t("settings.aiSettings.manualMode")}
-            </div>
-            <div className="mt-2 text-sm text-base-content/70">
-              {t("settings.aiSettings.manualModeDescription")}
-            </div>
-          </button>
-        </div>
-
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -909,11 +826,6 @@ export default function AISettings() {
                 {t("settings.aiSettings.tasksDescription")}
               </p>
             </div>
-            {form.ml.autoMode === "enable" && (
-              <span className="badge badge-outline">
-                {t("settings.aiSettings.autoOverrideHint")}
-              </span>
-            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -985,7 +897,6 @@ export default function AISettings() {
                       type="checkbox"
                       className="toggle toggle-primary"
                       checked={form.ml[key]}
-                      disabled={form.ml.autoMode === "enable"}
                       onChange={(event) => {
                         const checked = event.target.checked;
                         setFeedback(null);

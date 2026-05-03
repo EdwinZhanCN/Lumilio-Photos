@@ -794,13 +794,8 @@
             "validate": "验证连接",
             "mlTitle": "AI 索引",
             "mlDescription": "这些设置决定新导入或重新处理资源时会运行哪些 AI 索引任务。语义运行时不可用时，搜索仍会自动回退到文件名匹配。",
-            "autoMode": "自动发现",
-            "autoModeDescription": "让新的索引任务跟随已连接 ML 服务当前可发现的运行时能力。",
-            "manualMode": "手动选择",
-            "manualModeDescription": "明确选择导入或重新处理资源时要运行的索引任务。",
             "tasksTitle": "索引任务",
             "tasksDescription": "这些开关控制索引生产策略，不是用户可见的搜索模式。",
-            "autoOverrideHint": "自动发现模式会跟随下方当前可用的运行时任务。",
             "runtimeTitle": "运行时状态",
             "runtimeDescription": "当前后端对搜索和索引运行时的可见性。",
             "runtimeUnavailable": "运行时状态暂时不可用，但仍可保存设置。",
@@ -818,8 +813,7 @@
             "repositoryOptionsUnavailable": "仓库选项暂时不可用。",
             "allRepositories": "全部仓库",
             "reindexTasksLabel": "回填任务",
-            "reindexTasksAutoHint": "自动模式下可以为任意 ML 任务排队，运行时不可用的任务会由 worker 重试处理。",
-            "reindexTasksManualHint": "手动模式下只允许为当前已配置并已保存的任务排队。",
+            "reindexTasksManualHint": "只允许为当前已配置并已保存的任务排队。",
             "selectAtLeastOneTask": "请至少选择一个索引任务后再排入回填。",
             "saveBeforeReindexHint": "请先保存设置，再排入重建索引任务。",
             "indexingStatsUnavailable": "索引覆盖率暂时不可用。",
@@ -868,7 +862,6 @@
             "capabilitiesError": "加载能力状态失败。",
             "mlTitle": "ML 服务",
             "llmTitle": "LLM Agent",
-            "autoMode": "自动模式",
             "discoveredNodes": "已发现节点",
             "activeNodes": "活跃节点",
             "taskAvailability": "任务可用性",
@@ -882,10 +875,6 @@
             "disabled": "禁用",
             "available": "可用",
             "unavailable": "不可用",
-            "autoModeValues": {
-                "enable": "自动发现",
-                "disable": "手动"
-            },
             "booleanValues": {
                 "true": "是",
                 "false": "否"
@@ -1000,7 +989,7 @@
         "subtitles": {
             "queue": "实时任务队列监控",
             "ml": "ML 索引覆盖率与回填进度",
-            "capabilities": "ML 自动发现与 LLM Agent 运行状态"
+            "capabilities": "ML 服务发现与 LLM Agent 运行状态"
         },
         "tabs": {
             "queue": "队列",

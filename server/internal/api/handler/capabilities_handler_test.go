@@ -58,14 +58,12 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesClipCapabilities(t *testing.
 						APIKeyConfigured: true,
 					},
 					ML: service.MLSettings{
-						AutoMode:    config.MLAutoModeEnable,
 						CLIPEnabled: true,
 					},
 				}, nil
 			},
 			getEffectiveMLFn: func(ctx context.Context) (config.MLConfig, error) {
 				return config.MLConfig{
-					AutoMode:    config.MLAutoModeEnable,
 					CLIPEnabled: true,
 					OCREnabled:  true,
 				}, nil

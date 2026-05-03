@@ -19,7 +19,6 @@ type MLTaskCapability = {
 
 export type Capabilities = {
   ml: {
-    autoMode: "enable" | "disable";
     discoveredNodeCount: number;
     activeNodeCount: number;
     tasks: {
@@ -63,7 +62,6 @@ function normalizeCapabilities(
 
   return {
     ml: {
-      autoMode: data.ml?.auto_mode === "enable" ? "enable" : "disable",
       discoveredNodeCount: data.ml?.discovered_node_count ?? 0,
       activeNodeCount: data.ml?.active_node_count ?? 0,
       tasks: {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"server/internal/utils/imagesource"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -21,6 +22,7 @@ type ProcessCaptionWorker struct {
 	CaptionService service.CaptionService
 	LumenService   service.LumenService
 	ConfigProvider MLConfigProvider
+	ImageLoader    MLImageLoader
 }
 
 func (w *ProcessCaptionWorker) Work(ctx context.Context, job *river.Job[ProcessCaptionArgs]) error {
@@ -47,9 +49,17 @@ func (w *ProcessCaptionWorker) Work(ctx context.Context, job *river.Job[ProcessC
 	if !w.LumenService.IsTaskAvailable("vlm_generate") {
 		return river.JobSnooze(30 * time.Second)
 	}
+	if w.ImageLoader == nil {
+		return fmt.Errorf("ml image loader unavailable")
+	}
+
+	imageData, err := w.ImageLoader.LoadMLImage(ctx, assetID, imagesource.PurposeCaption, args.PreprocessVersion)
+	if err != nil {
+		return fmt.Errorf("load caption image: %w", err)
+	}
 
 	// Save caption using CaptionService
-	_, err = w.CaptionService.GenerateAndSaveCaption(ctx, pgUUID, args.ImageData, args.CustomPrompt)
+	_, err = w.CaptionService.GenerateAndSaveCaption(ctx, pgUUID, imageData, args.CustomPrompt)
 	if err != nil {
 		return fmt.Errorf("failed to save caption: %w", err)
 	}

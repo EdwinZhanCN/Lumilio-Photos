@@ -56,7 +56,6 @@ func (s LLMSettings) IsConfigured() bool {
 }
 
 type MLSettings struct {
-	AutoMode       config.MLAutoMode
 	CLIPEnabled    bool
 	OCREnabled     bool
 	CaptionEnabled bool
@@ -78,7 +77,6 @@ type UpdateLLMSettingsInput struct {
 }
 
 type UpdateMLSettingsInput struct {
-	AutoMode       *config.MLAutoMode
 	CLIPEnabled    *bool
 	OCREnabled     *bool
 	CaptionEnabled *bool
@@ -144,7 +142,7 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		LlmBaseUrl:          strings.TrimSpace(row.LlmBaseUrl),
 		LlmApiKeyCiphertext: cloneBytes(row.LlmApiKeyCiphertext),
 		LlmApiKeyConfigured: row.LlmApiKeyConfigured,
-		MlAuto:              normalizeStoredMLAutoMode(row.MlAuto),
+		MlAuto:              row.MlAuto,
 		MlClipEnabled:       row.MlClipEnabled,
 		MlOcrEnabled:        row.MlOcrEnabled,
 		MlCaptionEnabled:    row.MlCaptionEnabled,
@@ -182,9 +180,6 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 	}
 
 	if input.ML != nil {
-		if input.ML.AutoMode != nil {
-			params.MlAuto = normalizeStoredMLAutoMode(string(*input.ML.AutoMode))
-		}
 		if input.ML.CLIPEnabled != nil {
 			params.MlClipEnabled = *input.ML.CLIPEnabled
 		}
@@ -237,7 +232,6 @@ func (s *settingsService) GetMLConfig(ctx context.Context) (config.MLConfig, err
 	}
 
 	return config.MLConfig{
-		AutoMode:       config.MLAutoMode(normalizeStoredMLAutoMode(row.MlAuto)),
 		CLIPEnabled:    row.MlClipEnabled,
 		OCREnabled:     row.MlOcrEnabled,
 		CaptionEnabled: row.MlCaptionEnabled,
@@ -246,12 +240,7 @@ func (s *settingsService) GetMLConfig(ctx context.Context) (config.MLConfig, err
 }
 
 func (s *settingsService) GetEffectiveMLConfig(ctx context.Context) (config.MLConfig, error) {
-	cfg, err := s.GetMLConfig(ctx)
-	if err != nil {
-		return config.MLConfig{}, err
-	}
-
-	return cfg.EffectiveRuntimeConfig(), nil
+	return s.GetMLConfig(ctx)
 }
 
 func (s *settingsService) ValidateLLMSettings(ctx context.Context) error {
@@ -280,7 +269,7 @@ func (s *settingsService) seedFromEnv(ctx context.Context) error {
 		LlmModelName:        strings.TrimSpace(llmCfg.ModelName),
 		LlmBaseUrl:          strings.TrimSpace(llmCfg.BaseURL),
 		LlmApiKeyConfigured: strings.TrimSpace(llmCfg.APIKey) != "",
-		MlAuto:              string(normalizeMLAutoMode(mlCfg.AutoMode)),
+		MlAuto:              "disable",
 		MlClipEnabled:       mlCfg.CLIPEnabled,
 		MlOcrEnabled:        mlCfg.OCREnabled,
 		MlCaptionEnabled:    mlCfg.CaptionEnabled,
@@ -330,7 +319,6 @@ func mapSystemSettings(row repo.Setting) SystemSettings {
 			APIKeyConfigured: row.LlmApiKeyConfigured,
 		},
 		ML: MLSettings{
-			AutoMode:       config.MLAutoMode(normalizeStoredMLAutoMode(row.MlAuto)),
 			CLIPEnabled:    row.MlClipEnabled,
 			OCREnabled:     row.MlOcrEnabled,
 			CaptionEnabled: row.MlCaptionEnabled,
@@ -353,19 +341,6 @@ func normalizeStoredLLMProvider(raw string) string {
 		return "ark"
 	default:
 		return "ark"
-	}
-}
-
-func normalizeStoredMLAutoMode(raw string) string {
-	return string(normalizeMLAutoMode(config.MLAutoMode(strings.TrimSpace(raw))))
-}
-
-func normalizeMLAutoMode(mode config.MLAutoMode) config.MLAutoMode {
-	switch strings.ToLower(strings.TrimSpace(string(mode))) {
-	case string(config.MLAutoModeEnable):
-		return config.MLAutoModeEnable
-	default:
-		return config.MLAutoModeDisable
 	}
 }
 

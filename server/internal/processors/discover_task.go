@@ -169,7 +169,7 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 		}
 	}
 
-	return ap.enqueueDiscoveredDownstream(ctx, repository, createdOrUpdatedAsset, storagePath, fullPath)
+	return ap.enqueueDiscoveredDownstream(ctx, repository, createdOrUpdatedAsset, storagePath)
 }
 
 func (ap *AssetProcessor) enqueueDiscoveredDownstream(
@@ -177,7 +177,6 @@ func (ap *AssetProcessor) enqueueDiscoveredDownstream(
 	repository repo.Repository,
 	asset *repo.Asset,
 	storagePath string,
-	fullPath string,
 ) error {
 	if asset == nil {
 		return fmt.Errorf("discovered asset is nil")
@@ -219,7 +218,7 @@ func (ap *AssetProcessor) enqueueDiscoveredDownstream(
 			return fmt.Errorf("enqueue thumbnails: %w", err)
 		}
 
-		if err = ap.enqueueMLJobs(ctx, asset, fullPath); err != nil {
+		if err = ap.enqueueMLJobs(ctx, asset); err != nil {
 			return fmt.Errorf("enqueue ML jobs: %w", err)
 		}
 	case dbtypes.AssetTypeVideo:

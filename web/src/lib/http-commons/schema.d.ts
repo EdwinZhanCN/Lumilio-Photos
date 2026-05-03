@@ -7544,15 +7544,11 @@ export interface components {
         "dto.MLCapabilitiesDTO": {
             /** @example 1 */
             active_node_count?: number;
-            /** @example enable */
-            auto_mode?: string;
             /** @example 2 */
             discovered_node_count?: number;
             tasks?: components["schemas"]["dto.MLTaskSetDTO"];
         };
         "dto.MLSettingsDTO": {
-            /** @example disable */
-            auto_mode?: string;
             caption_enabled?: boolean;
             clip_enabled?: boolean;
             face_enabled?: boolean;
@@ -7871,8 +7867,6 @@ export interface components {
             liked?: boolean;
         };
         "dto.UpdateMLSettingsDTO": {
-            /** @enum {string} */
-            auto_mode?: "enable" | "disable";
             caption_enabled?: boolean;
             clip_enabled?: boolean;
             face_enabled?: boolean;

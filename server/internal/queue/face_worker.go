@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"server/internal/utils/imagesource"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -21,6 +22,7 @@ type ProcessFaceWorker struct {
 	FaceService    service.FaceService
 	LumenService   service.LumenService
 	ConfigProvider MLConfigProvider
+	ImageLoader    MLImageLoader
 }
 
 func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFaceArgs]) error {
@@ -48,12 +50,20 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	if !w.LumenService.IsTaskAvailable("face_detect_and_embed") {
 		return river.JobSnooze(30 * time.Second)
 	}
+	if w.ImageLoader == nil {
+		return fmt.Errorf("ml image loader unavailable")
+	}
+
+	imageData, err := w.ImageLoader.LoadMLImage(ctx, assetID, imagesource.PurposeFace, args.PreprocessVersion)
+	if err != nil {
+		return fmt.Errorf("load face image: %w", err)
+	}
 
 	// Start timing the face processing
 	startTime := time.Now()
 
 	// Perform face detection using LumenService
-	faceV1, err := w.LumenService.FaceDetectEmbed(ctx, args.ImageData)
+	faceV1, err := w.LumenService.FaceDetectEmbed(ctx, imageData)
 	if err != nil {
 		return fmt.Errorf("failed to perform face detection: %w", err)
 	}
@@ -62,7 +72,7 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	processingTimeMs := int(time.Since(startTime).Milliseconds())
 
 	// Save face results using FaceService (conversion, crops, clustering, and cleanup happen there).
-	err = w.FaceService.SaveFaceResults(ctx, pgUUID, faceV1, args.ImageData, processingTimeMs)
+	err = w.FaceService.SaveFaceResults(ctx, pgUUID, faceV1, imageData, processingTimeMs)
 	if err != nil {
 		return fmt.Errorf("failed to save face results: %w", err)
 	}

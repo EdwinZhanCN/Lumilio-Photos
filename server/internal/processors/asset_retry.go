@@ -1,16 +1,13 @@
 package processors
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/google/uuid"
-	"github.com/h2non/bimg"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 
@@ -18,8 +15,6 @@ import (
 	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
-	"server/internal/service"
-	"server/internal/utils/imaging"
 )
 
 // ProcessRetryTask is the entry point for the retry worker. It handles AssetRetryPayload.
@@ -198,13 +193,9 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	// Enqueue ML tasks directly if requested (now decoupled from metadata)
 	// ML tasks are only applicable to photos
 	if assetType == dbtypes.AssetTypePhoto {
-		fullPath := filepath.Join(repository.Path, *asset.StoragePath)
-
 		// Check each ML task queue name
 		if queueSet["process_clip"] || queueSet["process_ocr"] || queueSet["process_caption"] || queueSet["process_face"] {
-			// Re-enqueue ML jobs based on which ones failed
-			// We need to pass which specific ML tasks to retry
-			err := ap.retryMLJobs(ctx, asset, fullPath, queueSet)
+			err := ap.retryMLJobs(ctx, asset, queueSet)
 			if err != nil {
 				return fmt.Errorf("enqueue ML retry: %w", err)
 			}
@@ -215,177 +206,47 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	return nil
 }
 
-// retryMLJobs re-enqueues specific ML jobs that failed
-func (ap *AssetProcessor) retryMLJobs(ctx context.Context, asset *repo.Asset, fullPath string, taskSet map[string]bool) error {
+// retryMLJobs re-enqueues specific ML pointer jobs that failed.
+func (ap *AssetProcessor) retryMLJobs(ctx context.Context, asset *repo.Asset, taskSet map[string]bool) error {
 	mlConfig, err := ap.settingsService.GetEffectiveMLConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("load ML settings: %w", err)
 	}
 
-	clipEnabled := taskSet["process_clip"] && mlConfig.CLIPEnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskClip)
-	ocrEnabled := taskSet["process_ocr"] && mlConfig.OCREnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskOCR)
-	captionEnabled := taskSet["process_caption"] && mlConfig.CaptionEnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskCaption)
-	faceEnabled := taskSet["process_face"] && mlConfig.FaceEnabled && ap.runtimeIndexingTaskAvailable(service.AssetIndexingTaskFace)
-
-	if taskSet["process_clip"] && mlConfig.CLIPEnabled && !clipEnabled {
-		log.Printf("Skipping process_clip retry enqueue for asset %s: runtime unavailable", asset.AssetID.String())
-	}
-	if taskSet["process_ocr"] && mlConfig.OCREnabled && !ocrEnabled {
-		log.Printf("Skipping process_ocr retry enqueue for asset %s: runtime unavailable", asset.AssetID.String())
-	}
-	if taskSet["process_caption"] && mlConfig.CaptionEnabled && !captionEnabled {
-		log.Printf("Skipping process_caption retry enqueue for asset %s: runtime unavailable", asset.AssetID.String())
-	}
-	if taskSet["process_face"] && mlConfig.FaceEnabled && !faceEnabled {
-		log.Printf("Skipping process_face retry enqueue for asset %s: runtime unavailable", asset.AssetID.String())
-	}
-	if !clipEnabled && !ocrEnabled && !captionEnabled && !faceEnabled {
-		return nil
-	}
-
-	// Extract RAW preview once (shared by all ML jobs if needed)
-	previewData, err := ap.extractRAWPreview(ctx, fullPath, asset.OriginalFilename)
-	if err != nil {
-		return fmt.Errorf("extract RAW preview for ML retry: %w", err)
-	}
-
-	// Prepare image input reader
-	var imageInput io.Reader
-	var closeFunc func() error
-
-	if previewData != nil {
-		imageInput = bytes.NewReader(previewData)
-		closeFunc = func() error { return nil }
-	} else {
-		f, err := os.Open(fullPath)
-		if err != nil {
-			return fmt.Errorf("open photo for ML retry: %w", err)
-		}
-		imageInput = f
-		closeFunc = f.Close
-	}
-	defer closeFunc()
-
-	// CLIP: process_clip queue
-	if clipEnabled {
-		clipData, err := imaging.ProcessImageStream(imageInput, bimg.Options{
-			Width:     224,
-			Height:    224,
-			Crop:      true,
-			Gravity:   bimg.GravitySmart,
-			Quality:   90,
-			Type:      bimg.WEBP,
-			NoProfile: true,
-		})
-		if err != nil {
-			return fmt.Errorf("CLIP preprocessing for retry: %w", err)
-		}
-
+	if taskSet["process_clip"] && mlConfig.CLIPEnabled {
 		_, err = ap.queueClient.Insert(ctx, jobs.ProcessClipArgs{
-			AssetID:   asset.AssetID,
-			ImageData: clipData,
+			AssetID:           asset.AssetID,
+			PreprocessVersion: jobs.MLPreprocessVersionV1,
 		}, &river.InsertOpts{Queue: "process_clip"})
 		if err != nil {
 			return fmt.Errorf("enqueue process_clip retry: %w", err)
 		}
 	}
 
-	// OCR: process_ocr queue
-	if ocrEnabled {
-		// Reset reader
-		if previewData != nil {
-			imageInput = bytes.NewReader(previewData)
-		} else {
-			f, err := os.Open(fullPath)
-			if err != nil {
-				return fmt.Errorf("open photo for OCR retry: %w", err)
-			}
-			defer f.Close()
-			imageInput = f
-		}
-
-		ocrData, err := imaging.ProcessImageStream(imageInput, bimg.Options{
-			Width:     1920,
-			Height:    1920,
-			Quality:   90,
-			Type:      bimg.JPEG,
-			NoProfile: true,
-		})
-		if err != nil {
-			return fmt.Errorf("OCR preprocessing for retry: %w", err)
-		}
-
+	if taskSet["process_ocr"] && mlConfig.OCREnabled {
 		_, err = ap.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
-			AssetID:   asset.AssetID,
-			ImageData: ocrData,
+			AssetID:           asset.AssetID,
+			PreprocessVersion: jobs.MLPreprocessVersionV1,
 		}, &river.InsertOpts{Queue: "process_ocr"})
 		if err != nil {
 			return fmt.Errorf("enqueue process_ocr retry: %w", err)
 		}
 	}
 
-	// Caption: process_caption queue
-	if captionEnabled {
-		// Reset reader
-		if previewData != nil {
-			imageInput = bytes.NewReader(previewData)
-		} else {
-			f, err := os.Open(fullPath)
-			if err != nil {
-				return fmt.Errorf("open photo for caption retry: %w", err)
-			}
-			defer f.Close()
-			imageInput = f
-		}
-
-		captionData, err := imaging.ProcessImageStream(imageInput, bimg.Options{
-			Width:     1024,
-			Height:    1024,
-			Quality:   85,
-			Type:      bimg.JPEG,
-			NoProfile: true,
-		})
-		if err != nil {
-			return fmt.Errorf("caption preprocessing for retry: %w", err)
-		}
-
+	if taskSet["process_caption"] && mlConfig.CaptionEnabled {
 		_, err = ap.queueClient.Insert(ctx, jobs.ProcessCaptionArgs{
-			AssetID:   asset.AssetID,
-			ImageData: captionData,
+			AssetID:           asset.AssetID,
+			PreprocessVersion: jobs.MLPreprocessVersionV1,
 		}, &river.InsertOpts{Queue: "process_caption"})
 		if err != nil {
 			return fmt.Errorf("enqueue process_caption retry: %w", err)
 		}
 	}
 
-	// Face: process_face queue
-	if faceEnabled {
-		// Reset reader
-		if previewData != nil {
-			imageInput = bytes.NewReader(previewData)
-		} else {
-			f, err := os.Open(fullPath)
-			if err != nil {
-				return fmt.Errorf("open photo for face retry: %w", err)
-			}
-			defer f.Close()
-			imageInput = f
-		}
-
-		faceData, err := imaging.ProcessImageStream(imageInput, bimg.Options{
-			Width:     1920,
-			Height:    1920,
-			Quality:   90,
-			Type:      bimg.JPEG,
-			NoProfile: true,
-		})
-		if err != nil {
-			return fmt.Errorf("face preprocessing for retry: %w", err)
-		}
-
+	if taskSet["process_face"] && mlConfig.FaceEnabled {
 		_, err = ap.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
-			AssetID:   asset.AssetID,
-			ImageData: faceData,
+			AssetID:           asset.AssetID,
+			PreprocessVersion: jobs.MLPreprocessVersionV1,
 		}, &river.InsertOpts{Queue: "process_face"})
 		if err != nil {
 			return fmt.Errorf("enqueue process_face retry: %w", err)

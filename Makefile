@@ -59,8 +59,7 @@ env-dev:
 		"WATCHMAN_INITIAL_SCAN=true" \
 		"WATCHMAN_POLL_FALLBACK_SECONDS=0" \
 		"" \
-		"ML_AUTO=disable" \
-		"ML_CLIP_ENABLED=false" \
+			"ML_CLIP_ENABLED=false" \
 		"ML_OCR_ENABLED=false" \
 		"ML_CAPTION_ENABLED=false" \
 		"ML_FACE_ENABLED=false" \

@@ -196,9 +196,8 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 			return nil, fmt.Errorf("enqueue thumbnails: %w", err)
 		}
 
-		// Enqueue ML jobs directly for photos (decoupled from metadata)
-		fullPath := filepath.Join(repository.Path, storageRelPath)
-		err = ap.enqueueMLJobs(ctx, asset, fullPath)
+		// Enqueue ML pointer jobs directly for photos (decoupled from metadata).
+		err = ap.enqueueMLJobs(ctx, asset)
 		if err != nil {
 			return nil, fmt.Errorf("enqueue ML jobs: %w", err)
 		}

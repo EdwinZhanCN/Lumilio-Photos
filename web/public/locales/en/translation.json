@@ -761,13 +761,8 @@
             "validate": "Validate connection",
             "mlTitle": "AI Indexing",
             "mlDescription": "These settings decide which AI indexing tasks run for new or reprocessed assets. Search still falls back to filename matching when semantic runtime is unavailable.",
-            "autoMode": "Automatic discovery",
-            "autoModeDescription": "Follow the AI runtimes discovered from connected ML services for new indexing jobs.",
-            "manualMode": "Manual selection",
-            "manualModeDescription": "Choose exactly which indexing tasks run when assets are imported or reprocessed.",
             "tasksTitle": "Indexing tasks",
             "tasksDescription": "These toggles control indexing production, not the search mode shown to users.",
-            "autoOverrideHint": "Automatic discovery uses the runtime tasks currently available below.",
             "runtimeTitle": "Runtime status",
             "runtimeDescription": "Current backend runtime visibility for search and indexing.",
             "runtimeUnavailable": "Runtime status is temporarily unavailable. Saving settings is still available.",
@@ -785,8 +780,7 @@
             "repositoryOptionsUnavailable": "Repository options are temporarily unavailable.",
             "allRepositories": "All repositories",
             "reindexTasksLabel": "Tasks to backfill",
-            "reindexTasksAutoHint": "Auto mode can queue any ML task. Unavailable runtimes will be handled by worker retries.",
-            "reindexTasksManualHint": "Manual mode only allows tasks that are currently configured and saved.",
+            "reindexTasksManualHint": "Only currently configured and saved tasks can be queued.",
             "selectAtLeastOneTask": "Select at least one indexing task before queueing reindex.",
             "saveBeforeReindexHint": "Save settings before queueing a reindex batch.",
             "indexingStatsUnavailable": "Indexing coverage is temporarily unavailable.",
@@ -835,7 +829,6 @@
             "capabilitiesError": "Failed to load capabilities.",
             "mlTitle": "ML Services",
             "llmTitle": "LLM Agent",
-            "autoMode": "Auto mode",
             "discoveredNodes": "Discovered nodes",
             "activeNodes": "Active nodes",
             "taskAvailability": "Task availability",
@@ -849,10 +842,6 @@
             "disabled": "Disabled",
             "available": "Available",
             "unavailable": "Unavailable",
-            "autoModeValues": {
-                "enable": "Auto discovery",
-                "disable": "Manual"
-            },
             "booleanValues": {
                 "true": "Yes",
                 "false": "No"

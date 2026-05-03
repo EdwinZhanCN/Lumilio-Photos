@@ -32,7 +32,6 @@ type AssetProcessor struct {
 	stagingManager  storage.StagingManager
 	queueClient     *river.Client[pgx.Tx]
 	settingsService service.SettingsService
-	lumenService    service.LumenService
 	logger          *zap.Logger
 	auditProvider   logging.RepositoryAuditProvider
 }
@@ -45,7 +44,6 @@ func NewAssetProcessor(
 	stagingManager storage.StagingManager,
 	queueClient *river.Client[pgx.Tx],
 	settingsService service.SettingsService,
-	lumenService service.LumenService,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
 ) *AssetProcessor {
@@ -62,14 +60,9 @@ func NewAssetProcessor(
 		stagingManager:  stagingManager,
 		queueClient:     queueClient,
 		settingsService: settingsService,
-		lumenService:    lumenService,
 		logger:          logger.With(zap.String("component", "processor")),
 		auditProvider:   auditProvider,
 	}
-}
-
-func (ap *AssetProcessor) runtimeIndexingTaskAvailable(task service.AssetIndexingTask) bool {
-	return service.IsIndexingTaskRuntimeAvailable(ap.lumenService, task)
 }
 
 func (ap *AssetProcessor) repoAudit(repoPath string) logging.RepositoryAuditLogger {

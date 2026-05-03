@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"server/internal/queue/jobs"
 	"server/internal/service"
+	"server/internal/utils/imagesource"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -21,6 +22,7 @@ type ProcessOcrWorker struct {
 	OCRService     service.OCRService
 	LumenService   service.LumenService
 	ConfigProvider MLConfigProvider
+	ImageLoader    MLImageLoader
 }
 
 func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrArgs]) error {
@@ -48,9 +50,17 @@ func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrAr
 	if !w.LumenService.IsTaskAvailable("ocr") {
 		return river.JobSnooze(30 * time.Second)
 	}
+	if w.ImageLoader == nil {
+		return fmt.Errorf("ml image loader unavailable")
+	}
+
+	imageData, err := w.ImageLoader.LoadMLImage(ctx, assetID, imagesource.PurposeOCR, args.PreprocessVersion)
+	if err != nil {
+		return fmt.Errorf("load OCR image: %w", err)
+	}
 
 	// Perform OCR using LumenService
-	ocrResult, err := w.LumenService.OCR(ctx, args.ImageData)
+	ocrResult, err := w.LumenService.OCR(ctx, imageData)
 	if err != nil {
 		return fmt.Errorf("failed to perform OCR: %w", err)
 	}

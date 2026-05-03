@@ -1067,10 +1067,6 @@ const docTemplate = `{
                         "example": 1,
                         "type": "integer"
                     },
-                    "auto_mode": {
-                        "example": "enable",
-                        "type": "string"
-                    },
                     "discovered_node_count": {
                         "example": 2,
                         "type": "integer"
@@ -1083,10 +1079,6 @@ const docTemplate = `{
             },
             "dto.MLSettingsDTO": {
                 "properties": {
-                    "auto_mode": {
-                        "example": "disable",
-                        "type": "string"
-                    },
                     "caption_enabled": {
                         "type": "boolean"
                     },
@@ -1971,13 +1963,6 @@ const docTemplate = `{
             },
             "dto.UpdateMLSettingsDTO": {
                 "properties": {
-                    "auto_mode": {
-                        "enum": [
-                            "enable",
-                            "disable"
-                        ],
-                        "type": "string"
-                    },
                     "caption_enabled": {
                         "type": "boolean"
                     },

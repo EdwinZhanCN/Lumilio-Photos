@@ -75,7 +75,6 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 
 	response := dto.CapabilitiesResponseDTO{
 		ML: dto.MLCapabilitiesDTO{
-			AutoMode:            string(systemSettings.ML.AutoMode),
 			DiscoveredNodeCount: discoveredNodeCount,
 			ActiveNodeCount:     activeNodeCount,
 			Tasks: dto.MLTaskSetDTO{
