@@ -22,10 +22,12 @@ import {
   formatAssetGroupLabel,
 } from "@/features/assets/utils/assetGroups";
 import EmptyState from "@/components/EmptyState";
+import type { AssetGroup } from "@/features/assets/types/assets.type";
 
 type LayoutState = {
   signature: string;
   layouts: Record<string, LayoutResult>;
+  groups: AssetGroup[];
 };
 
 const getThumbnailSize = (width: number) => {
@@ -71,6 +73,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   const [layoutState, setLayoutState] = useState<LayoutState>({
     signature: "",
     layouts: {},
+    groups: [],
   });
   const [layoutError, setLayoutError] = useState<string | null>(null);
 
@@ -126,11 +129,15 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     });
   }, [groupEntries, layoutConfig, layoutInputs]);
 
-  const layouts = useMemo(
-    () =>
-      layoutState.signature === layoutSignature ? layoutState.layouts : {},
-    [layoutSignature, layoutState],
-  );
+  const hasCurrentLayouts = layoutState.signature === layoutSignature;
+  const hasCompleteCurrentLayout =
+    hasCurrentLayouts &&
+    groupEntries.every((group) => Boolean(layoutState.layouts[group.key]));
+  const displayGroupEntries =
+    hasCurrentLayouts || layoutState.groups.length === 0
+      ? groupEntries
+      : layoutState.groups;
+  const layouts = layoutState.layouts;
 
   useEffect(() => {
     const element = containerRef.current;
@@ -177,7 +184,17 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     }
 
     if (!layoutConfig || groupEntries.length === 0) {
-      setLayoutState({ signature: "", layouts: {} });
+      setLayoutState((current) => {
+        if (isLoading && current.groups.length > 0) return current;
+        if (current.signature === "" && current.groups.length === 0) {
+          return current;
+        }
+        return { signature: "", layouts: {}, groups: [] };
+      });
+      return;
+    }
+
+    if (hasCompleteCurrentLayout) {
       return;
     }
 
@@ -185,16 +202,15 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     const requestId = layoutRequestRef.current;
     let isCancelled = false;
     setLayoutError(null);
-    setLayoutState((current) =>
-      current.signature === layoutSignature
-        ? current
-        : { signature: layoutSignature, layouts: {} },
-    );
 
     calculateMultipleLayouts(layoutInputs, layoutConfig)
       .then((results) => {
         if (isCancelled || requestId !== layoutRequestRef.current) return;
-        setLayoutState({ signature: layoutSignature, layouts: results });
+        setLayoutState({
+          signature: layoutSignature,
+          layouts: results,
+          groups: groupEntries,
+        });
       })
       .catch((err) => {
         if (isCancelled || requestId !== layoutRequestRef.current) return;
@@ -209,6 +225,9 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     calculateMultipleLayouts,
     containerWidth,
     groupEntries.length,
+    groupEntries,
+    hasCompleteCurrentLayout,
+    isLoading,
     layoutConfig,
     layoutInputs,
     layoutSignature,
@@ -227,9 +246,9 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   );
 
   const isLayoutPending =
-    groupEntries.length > 0 &&
+    displayGroupEntries.length > 0 &&
     layoutConfig !== null &&
-    groupEntries.some((group) => !layouts[group.key]);
+    displayGroupEntries.some((group) => !layouts[group.key]);
 
   const supportsIntersectionObserver = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -311,7 +330,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
         </div>
       )}
 
-        {groupEntries.map((group) => {
+        {displayGroupEntries.map((group) => {
           const groupKey = group.key;
           const assets = group.assets;
           const layout = layouts[groupKey];

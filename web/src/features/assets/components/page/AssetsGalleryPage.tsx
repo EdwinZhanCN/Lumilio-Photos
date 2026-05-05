@@ -58,7 +58,6 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     hasMore: hasNextPage,
     isFetched,
     error,
-    viewKey,
   } = useCurrentTabAssets({
     withGroups: true,
     groupBy,
@@ -178,7 +177,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
 
         {photoSearchView.topResults.length > 0 && (
           <GalleryComponent
-            key={`search-top:${currentLayout}:${photoSearchView.viewKey}`}
+            key={`search-top:${currentLayout}`}
             groups={topResultsGroup}
             openCarousel={openCarousel}
             onLoadMore={() => {}}
@@ -190,7 +189,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
 
         {(!error || photoSearchView.resultAssets.length > 0) && (
           <GalleryComponent
-            key={`search-results:${currentLayout}:${photoSearchView.viewKey}`}
+            key={`search-results:${currentLayout}`}
             groups={photoSearchView.resultGroups}
             openCarousel={openCarousel}
             onLoadMore={handleLoadMore}
@@ -280,7 +279,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
         <PhotosLoadingSkeleton />
       ) : (
         <GalleryComponent
-          key={`browse:${currentLayout}:${viewKey}`}
+          key={`browse:${currentLayout}`}
           {...browseGalleryProps}
         />
       )}

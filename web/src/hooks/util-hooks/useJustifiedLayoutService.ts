@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useWorker } from "@/contexts/WorkerProvider.tsx";
 import type {
   LayoutBox,
@@ -30,26 +30,41 @@ export const useJustifiedLayoutService = (): UseJustifiedLayoutServiceResult => 
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isReadyRef = useRef(false);
+  const initPromiseRef = useRef<Promise<void> | null>(null);
 
   const initialize = useCallback(async (): Promise<void> => {
-    if (isReady || isLoading) {
+    if (isReadyRef.current) {
       return;
+    }
+
+    if (initPromiseRef.current) {
+      return initPromiseRef.current;
     }
 
     setIsLoading(true);
     setError(null);
 
-    try {
-      await workerClient.initializeJustifiedLayout();
-      setIsReady(true);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      setError(errorMessage);
-      console.error("Failed to initialize justified layout worker:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isReady, isLoading, workerClient]);
+    initPromiseRef.current = workerClient
+      .initializeJustifiedLayout()
+      .then(() => {
+        isReadyRef.current = true;
+        setIsReady(true);
+      })
+      .catch((err) => {
+        initPromiseRef.current = null;
+        const errorMessage =
+          err instanceof Error ? err.message : "Unknown error";
+        setError(errorMessage);
+        console.error("Failed to initialize justified layout worker:", err);
+        throw err;
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+
+    return initPromiseRef.current;
+  }, [workerClient]);
 
   const calculateLayout = useCallback(
     async (boxes: LayoutBox[], config: LayoutConfig): Promise<LayoutResult> => {
@@ -72,10 +87,11 @@ export const useJustifiedLayoutService = (): UseJustifiedLayoutServiceResult => 
 
   // Auto-initialize on mount
   useEffect(() => {
-    if (!isReady && !isLoading && !error) {
-      initialize();
-    }
-  }, [isReady, isLoading, error, initialize]);
+    initialize().catch(() => {
+      // The exposed error state is enough for consumers; avoid an unhandled
+      // rejection from background warmup.
+    });
+  }, [initialize]);
 
   return {
     isReady,
