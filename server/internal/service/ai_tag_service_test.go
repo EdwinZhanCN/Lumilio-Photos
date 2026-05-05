@@ -17,9 +17,7 @@ func TestNormalizeAssetTagSource(t *testing.T) {
 		{name: "system", input: "system", output: "system"},
 		{name: "user", input: "user", output: "user"},
 		{name: "ai", input: "ai", output: "ai"},
-		{name: "clip classify", input: "clip_classify", output: "ai"},
-		{name: "scene classify", input: "clip_scene_classify", output: "ai"},
-		{name: "bioclip classify", input: "bioclip_classify", output: "ai"},
+		{name: "bioclip classify", input: "bioclip_classify", output: "bioclip_classify"},
 	}
 
 	for _, tt := range tests {
@@ -36,8 +34,6 @@ func TestNormalizeAssetTagSourcesDedupesNormalizedValues(t *testing.T) {
 	t.Parallel()
 
 	got := normalizeAssetTagSources([]string{
-		"clip_classify",
-		"clip_scene_classify",
 		"bioclip_classify",
 		"ai",
 		"user",
@@ -45,7 +41,7 @@ func TestNormalizeAssetTagSourcesDedupesNormalizedValues(t *testing.T) {
 		"user",
 	})
 
-	want := []string{"ai", "user"}
+	want := []string{"bioclip_classify", "ai", "user"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("normalizeAssetTagSources() = %#v, want %#v", got, want)
 	}

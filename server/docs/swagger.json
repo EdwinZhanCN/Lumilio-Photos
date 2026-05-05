@@ -395,6 +395,9 @@
             },
             "dto.AssetIndexingTaskSetStatsDTO": {
                 "properties": {
+                    "bioclip": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
                     "caption": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     },
@@ -1186,6 +1189,9 @@
             },
             "dto.MLSettingsDTO": {
                 "properties": {
+                    "bioclip_enabled": {
+                        "type": "boolean"
+                    },
                     "caption_enabled": {
                         "type": "boolean"
                     },
@@ -1214,13 +1220,10 @@
             },
             "dto.MLTaskSetDTO": {
                 "properties": {
-                    "clip_classify": {
+                    "bioclip_classify": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     },
                     "clip_image_embed": {
-                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
-                    },
-                    "clip_scene_classify": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     },
                     "clip_text_embed": {
@@ -2212,6 +2215,9 @@
             },
             "dto.UpdateMLSettingsDTO": {
                 "properties": {
+                    "bioclip_enabled": {
+                        "type": "boolean"
+                    },
                     "caption_enabled": {
                         "type": "boolean"
                     },

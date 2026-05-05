@@ -25,10 +25,13 @@ type AssetIndexingTask string
 
 const (
 	AssetIndexingTaskClip    AssetIndexingTask = "clip"
+	AssetIndexingTaskBioCLIP AssetIndexingTask = "bioclip"
 	AssetIndexingTaskOCR     AssetIndexingTask = "ocr"
 	AssetIndexingTaskCaption AssetIndexingTask = "caption"
 	AssetIndexingTaskFace    AssetIndexingTask = "face"
 )
+
+const aiTagSourceBioCLIP = "bioclip_classify"
 
 const defaultIndexingBatchSize = 200
 const maxIndexingBatchSize = 500
@@ -43,6 +46,7 @@ type AssetIndexingStats struct {
 	ReindexJobs int64
 	Tasks       struct {
 		Clip    AssetIndexingTaskStats
+		BioCLIP AssetIndexingTaskStats
 		OCR     AssetIndexingTaskStats
 		Caption AssetIndexingTaskStats
 		Face    AssetIndexingTaskStats
@@ -131,6 +135,7 @@ func normalizeRequestedIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingT
 	if len(tasks) == 0 {
 		return []AssetIndexingTask{
 			AssetIndexingTaskClip,
+			AssetIndexingTaskBioCLIP,
 			AssetIndexingTaskOCR,
 			AssetIndexingTaskCaption,
 			AssetIndexingTaskFace,
@@ -141,7 +146,7 @@ func normalizeRequestedIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingT
 	result := make([]AssetIndexingTask, 0, len(tasks))
 	for _, task := range tasks {
 		switch task {
-		case AssetIndexingTaskClip, AssetIndexingTaskOCR, AssetIndexingTaskCaption, AssetIndexingTaskFace:
+		case AssetIndexingTaskClip, AssetIndexingTaskBioCLIP, AssetIndexingTaskOCR, AssetIndexingTaskCaption, AssetIndexingTaskFace:
 			if seen[task] {
 				continue
 			}
@@ -189,6 +194,14 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 		return AssetIndexingStats{}, fmt.Errorf("count clip coverage: %w", err)
 	}
 
+	stats.Tasks.BioCLIP.IndexedCount, err = s.queries.CountPhotoAssetsWithGeneratedTagSource(ctx, repo.CountPhotoAssetsWithGeneratedTagSourceParams{
+		RepositoryID: repositoryUUID,
+		Source:       aiTagSourceBioCLIP,
+	})
+	if err != nil {
+		return AssetIndexingStats{}, fmt.Errorf("count bioclip coverage: %w", err)
+	}
+
 	stats.Tasks.OCR.IndexedCount, err = s.queries.CountPhotoAssetsWithOCRResults(ctx, repositoryUUID)
 	if err != nil {
 		return AssetIndexingStats{}, fmt.Errorf("count ocr coverage: %w", err)
@@ -205,6 +218,7 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 	}
 
 	stats.Tasks.Clip.QueuedJobs = s.countPendingQueueJobs(ctx, "process_clip")
+	stats.Tasks.BioCLIP.QueuedJobs = s.countPendingQueueJobs(ctx, "process_bioclip")
 	stats.Tasks.OCR.QueuedJobs = s.countPendingQueueJobs(ctx, "process_ocr")
 	stats.Tasks.Caption.QueuedJobs = s.countPendingQueueJobs(ctx, "process_caption")
 	stats.Tasks.Face.QueuedJobs = s.countPendingQueueJobs(ctx, "process_face")
@@ -400,6 +414,13 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 			Limit:         int32(limit),
 			Offset:        0,
 		})
+	case AssetIndexingTaskBioCLIP:
+		return s.queries.ListPhotoAssetsMissingGeneratedTagSource(ctx, repo.ListPhotoAssetsMissingGeneratedTagSourceParams{
+			RepositoryID: repositoryUUID,
+			Source:       aiTagSourceBioCLIP,
+			Limit:        int32(limit),
+			Offset:       0,
+		})
 	case AssetIndexingTaskOCR:
 		return s.queries.ListPhotoAssetsMissingOCRResults(ctx, repo.ListPhotoAssetsMissingOCRResultsParams{
 			RepositoryID: repositoryUUID,
@@ -458,6 +479,12 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 		}
 		queued++
 	}
+	if candidate.tasks[AssetIndexingTaskBioCLIP] {
+		if err := s.enqueueBioCLIPTask(ctx, candidate.asset.AssetID); err != nil {
+			return queued, err
+		}
+		queued++
+	}
 	if candidate.tasks[AssetIndexingTaskOCR] {
 		if err := s.enqueueOCRTask(ctx, candidate.asset.AssetID); err != nil {
 			return queued, err
@@ -490,6 +517,20 @@ func (s *assetIndexingService) enqueueClipTask(
 	}, &river.InsertOpts{Queue: "process_clip"})
 	if err != nil {
 		return fmt.Errorf("enqueue CLIP job: %w", err)
+	}
+	return nil
+}
+
+func (s *assetIndexingService) enqueueBioCLIPTask(
+	ctx context.Context,
+	assetID pgtype.UUID,
+) error {
+	_, err := s.queueClient.Insert(ctx, jobs.ProcessBioClipArgs{
+		AssetID:           assetID,
+		PreprocessVersion: jobs.MLPreprocessVersionV1,
+	}, &river.InsertOpts{Queue: "process_bioclip"})
+	if err != nil {
+		return fmt.Errorf("enqueue BioCLIP job: %w", err)
 	}
 	return nil
 }
@@ -588,6 +629,10 @@ func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg config.MLConfig) 
 		switch task {
 		case AssetIndexingTaskClip:
 			if cfg.CLIPEnabled {
+				enabled = append(enabled, task)
+			}
+		case AssetIndexingTaskBioCLIP:
+			if cfg.BioCLIPEnabled {
 				enabled = append(enabled, task)
 			}
 		case AssetIndexingTaskOCR:

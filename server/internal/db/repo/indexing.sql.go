@@ -93,6 +93,32 @@ func (q *Queries) CountPhotoAssetsWithFaceResults(ctx context.Context, repositor
 	return count, err
 }
 
+const countPhotoAssetsWithGeneratedTagSource = `-- name: CountPhotoAssetsWithGeneratedTagSource :one
+SELECT COUNT(*) AS count
+FROM assets a
+WHERE a.type = 'PHOTO'
+  AND a.is_deleted = false
+  AND EXISTS (
+    SELECT 1
+    FROM asset_tags at
+    WHERE at.asset_id = a.asset_id
+      AND at.source = $1::text
+  )
+  AND ($2::uuid IS NULL OR a.repository_id = $2)
+`
+
+type CountPhotoAssetsWithGeneratedTagSourceParams struct {
+	Source       string      `db:"source" json:"source"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+}
+
+func (q *Queries) CountPhotoAssetsWithGeneratedTagSource(ctx context.Context, arg CountPhotoAssetsWithGeneratedTagSourceParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countPhotoAssetsWithGeneratedTagSource, arg.Source, arg.RepositoryID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countPhotoAssetsWithOCRResults = `-- name: CountPhotoAssetsWithOCRResults :one
 SELECT COUNT(*) AS count
 FROM assets a
@@ -379,6 +405,90 @@ type ListPhotoAssetsMissingFaceResultsParams struct {
 
 func (q *Queries) ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error) {
 	rows, err := q.db.Query(ctx, listPhotoAssetsMissingFaceResults, arg.RepositoryID, arg.Offset, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.CaptureOffsetMinutes,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPhotoAssetsMissingGeneratedTagSource = `-- name: ListPhotoAssetsMissingGeneratedTagSource :many
+WITH page_ids AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    COALESCE(a.taken_time, a.upload_time) AS sort_time
+  FROM assets a
+  WHERE a.type = 'PHOTO'
+    AND a.is_deleted = false
+    AND NOT EXISTS (
+      SELECT 1
+      FROM asset_tags at
+      WHERE at.asset_id = a.asset_id
+        AND at.source = $1::text
+    )
+    AND ($2::uuid IS NULL OR a.repository_id = $2)
+  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
+  LIMIT $4
+  OFFSET $3
+)
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7
+FROM page_ids p
+JOIN assets a ON a.asset_id = p.asset_id
+ORDER BY p.sort_time DESC, p.asset_id DESC
+`
+
+type ListPhotoAssetsMissingGeneratedTagSourceParams struct {
+	Source       string      `db:"source" json:"source"`
+	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	Offset       int32       `db:"offset" json:"offset"`
+	Limit        int32       `db:"limit" json:"limit"`
+}
+
+func (q *Queries) ListPhotoAssetsMissingGeneratedTagSource(ctx context.Context, arg ListPhotoAssetsMissingGeneratedTagSourceParams) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, listPhotoAssetsMissingGeneratedTagSource,
+		arg.Source,
+		arg.RepositoryID,
+		arg.Offset,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}

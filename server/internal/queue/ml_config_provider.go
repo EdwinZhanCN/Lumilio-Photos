@@ -23,6 +23,8 @@ func isMLTaskEnabled(ctx context.Context, provider MLConfigProvider, queueName s
 	switch queueName {
 	case "process_clip":
 		return cfg.CLIPEnabled, nil
+	case "process_bioclip":
+		return cfg.BioCLIPEnabled, nil
 	case "process_ocr":
 		return cfg.OCREnabled, nil
 	case "process_caption":

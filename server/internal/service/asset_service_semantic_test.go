@@ -36,14 +36,6 @@ func (s *semanticTestLumenStub) ClipImageEmbed(context.Context, []byte) (*types.
 	panic("not implemented")
 }
 
-func (s *semanticTestLumenStub) ClipClassify(context.Context, []byte, int) ([]types.Label, error) {
-	panic("not implemented")
-}
-
-func (s *semanticTestLumenStub) ClipSceneClassify(context.Context, []byte, int) ([]types.Label, error) {
-	panic("not implemented")
-}
-
 func (s *semanticTestLumenStub) BioClipClassify(context.Context, []byte, int) ([]types.Label, error) {
 	panic("not implemented")
 }

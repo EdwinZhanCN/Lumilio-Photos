@@ -13,6 +13,7 @@ INSERT INTO settings (
     llm_api_key_configured,
     ml_auto,
     ml_clip_enabled,
+    ml_bioclip_enabled,
     ml_ocr_enabled,
     ml_caption_enabled,
     ml_face_enabled,
@@ -31,7 +32,8 @@ VALUES (
     $9,
     $10,
     $11,
-    $12
+    $12,
+    $13
 )
 ON CONFLICT (id) DO UPDATE SET
     llm_agent_enabled = EXCLUDED.llm_agent_enabled,
@@ -42,6 +44,7 @@ ON CONFLICT (id) DO UPDATE SET
     llm_api_key_configured = EXCLUDED.llm_api_key_configured,
     ml_auto = EXCLUDED.ml_auto,
     ml_clip_enabled = EXCLUDED.ml_clip_enabled,
+    ml_bioclip_enabled = EXCLUDED.ml_bioclip_enabled,
     ml_ocr_enabled = EXCLUDED.ml_ocr_enabled,
     ml_caption_enabled = EXCLUDED.ml_caption_enabled,
     ml_face_enabled = EXCLUDED.ml_face_enabled,

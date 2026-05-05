@@ -17,8 +17,6 @@ type LumenService interface {
 	ClipTextEmbed(ctx context.Context, text []byte) (*types.EmbeddingV1, error)
 	ClipTextEmbedFast(ctx context.Context, text []byte) (*types.EmbeddingV1, error)
 	ClipImageEmbed(ctx context.Context, imageData []byte) (*types.EmbeddingV1, error)
-	ClipClassify(ctx context.Context, imageData []byte, topK int) ([]types.Label, error)
-	ClipSceneClassify(ctx context.Context, imageData []byte, topK int) ([]types.Label, error)
 	BioClipClassify(ctx context.Context, imageData []byte, topK int) ([]types.Label, error)
 	FaceDetectEmbed(ctx context.Context, imageData []byte) (*types.FaceV1, error)
 	OCR(ctx context.Context, imageData []byte) (*types.OCRV1, error)
@@ -135,14 +133,6 @@ func (s *lumenService) ClipImageEmbed(ctx context.Context, imageData []byte) (*t
 		zap.Int("dimensions", len(embedResp.Vector)))
 
 	return embedResp, nil
-}
-
-func (s *lumenService) ClipClassify(ctx context.Context, imageData []byte, topK int) ([]types.Label, error) {
-	return s.classifyImage(ctx, imageData, "clip_classify", topK, 10*time.Second)
-}
-
-func (s *lumenService) ClipSceneClassify(ctx context.Context, imageData []byte, topK int) ([]types.Label, error) {
-	return s.classifyImage(ctx, imageData, "clip_scene_classify", topK, 10*time.Second)
 }
 
 func (s *lumenService) BioClipClassify(ctx context.Context, imageData []byte, topK int) ([]types.Label, error) {

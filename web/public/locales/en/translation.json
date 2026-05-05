@@ -912,8 +912,7 @@
             "taskNames": {
                 "clipImageEmbed": "CLIP image embed",
                 "clipTextEmbed": "CLIP text embed",
-                "clipClassify": "CLIP classify",
-                "clipSceneClassify": "CLIP scene classify",
+                "bioClipClassify": "BioCLIP classify",
                 "ocr": "OCR",
                 "vlmGenerate": "VLM caption",
                 "faceDetectAndEmbed": "Face detect & embed"

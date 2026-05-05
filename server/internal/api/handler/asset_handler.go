@@ -1205,6 +1205,7 @@ func parseIndexingTasks(tasks []string) ([]service.AssetIndexingTask, error) {
 		task := service.AssetIndexingTask(strings.ToLower(strings.TrimSpace(rawTask)))
 		switch task {
 		case service.AssetIndexingTaskClip,
+			service.AssetIndexingTaskBioCLIP,
 			service.AssetIndexingTaskOCR,
 			service.AssetIndexingTaskCaption,
 			service.AssetIndexingTaskFace:
@@ -1224,6 +1225,10 @@ func toIndexingStatsResponseDTO(stats service.AssetIndexingStats) dto.AssetIndex
 			Clip: dto.AssetIndexingTaskStatsDTO{
 				IndexedCount: int(stats.Tasks.Clip.IndexedCount),
 				QueuedJobs:   int(stats.Tasks.Clip.QueuedJobs),
+			},
+			BioCLIP: dto.AssetIndexingTaskStatsDTO{
+				IndexedCount: int(stats.Tasks.BioCLIP.IndexedCount),
+				QueuedJobs:   int(stats.Tasks.BioCLIP.QueuedJobs),
 			},
 			OCR: dto.AssetIndexingTaskStatsDTO{
 				IndexedCount: int(stats.Tasks.OCR.IndexedCount),
@@ -1458,10 +1463,10 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 
 	totalInt := int(total)
 	response := dto.QueryAssetsResponseDTO{
-		Assets:  toAssetDTOs(assets),
-		Total:   &totalInt,
-		Limit:   req.Pagination.Limit,
-		Offset:  req.Pagination.Offset,
+		Assets: toAssetDTOs(assets),
+		Total:  &totalInt,
+		Limit:  req.Pagination.Limit,
+		Offset: req.Pagination.Offset,
 	}
 	api.GinSuccess(c, response)
 }
@@ -2814,6 +2819,7 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 			"thumbnail_asset": true,
 			"transcode_asset": true,
 			"process_clip":    true,
+			"process_bioclip": true,
 			"process_ocr":     true,
 			"process_caption": true,
 			"process_face":    true,

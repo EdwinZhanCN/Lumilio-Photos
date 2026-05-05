@@ -945,8 +945,7 @@
             "taskNames": {
                 "clipImageEmbed": "CLIP 图像嵌入",
                 "clipTextEmbed": "CLIP 文本嵌入",
-                "clipClassify": "CLIP 分类",
-                "clipSceneClassify": "CLIP 场景分类",
+                "bioClipClassify": "BioCLIP 分类",
                 "ocr": "OCR",
                 "vlmGenerate": "VLM 描述",
                 "faceDetectAndEmbed": "人脸检测与嵌入"

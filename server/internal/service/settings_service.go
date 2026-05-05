@@ -57,6 +57,7 @@ func (s LLMSettings) IsConfigured() bool {
 
 type MLSettings struct {
 	CLIPEnabled    bool
+	BioCLIPEnabled bool
 	OCREnabled     bool
 	CaptionEnabled bool
 	FaceEnabled    bool
@@ -78,6 +79,7 @@ type UpdateLLMSettingsInput struct {
 
 type UpdateMLSettingsInput struct {
 	CLIPEnabled    *bool
+	BioCLIPEnabled *bool
 	OCREnabled     *bool
 	CaptionEnabled *bool
 	FaceEnabled    *bool
@@ -144,6 +146,7 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		LlmApiKeyConfigured: row.LlmApiKeyConfigured,
 		MlAuto:              row.MlAuto,
 		MlClipEnabled:       row.MlClipEnabled,
+		MlBioclipEnabled:    row.MlBioclipEnabled,
 		MlOcrEnabled:        row.MlOcrEnabled,
 		MlCaptionEnabled:    row.MlCaptionEnabled,
 		MlFaceEnabled:       row.MlFaceEnabled,
@@ -182,6 +185,9 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 	if input.ML != nil {
 		if input.ML.CLIPEnabled != nil {
 			params.MlClipEnabled = *input.ML.CLIPEnabled
+		}
+		if input.ML.BioCLIPEnabled != nil {
+			params.MlBioclipEnabled = *input.ML.BioCLIPEnabled
 		}
 		if input.ML.OCREnabled != nil {
 			params.MlOcrEnabled = *input.ML.OCREnabled
@@ -233,6 +239,7 @@ func (s *settingsService) GetMLConfig(ctx context.Context) (config.MLConfig, err
 
 	return config.MLConfig{
 		CLIPEnabled:    row.MlClipEnabled,
+		BioCLIPEnabled: row.MlBioclipEnabled,
 		OCREnabled:     row.MlOcrEnabled,
 		CaptionEnabled: row.MlCaptionEnabled,
 		FaceEnabled:    row.MlFaceEnabled,
@@ -271,6 +278,7 @@ func (s *settingsService) seedFromEnv(ctx context.Context) error {
 		LlmApiKeyConfigured: strings.TrimSpace(llmCfg.APIKey) != "",
 		MlAuto:              "disable",
 		MlClipEnabled:       mlCfg.CLIPEnabled,
+		MlBioclipEnabled:    mlCfg.BioCLIPEnabled,
 		MlOcrEnabled:        mlCfg.OCREnabled,
 		MlCaptionEnabled:    mlCfg.CaptionEnabled,
 		MlFaceEnabled:       mlCfg.FaceEnabled,
@@ -320,6 +328,7 @@ func mapSystemSettings(row repo.Setting) SystemSettings {
 		},
 		ML: MLSettings{
 			CLIPEnabled:    row.MlClipEnabled,
+			BioCLIPEnabled: row.MlBioclipEnabled,
 			OCREnabled:     row.MlOcrEnabled,
 			CaptionEnabled: row.MlCaptionEnabled,
 			FaceEnabled:    row.MlFaceEnabled,

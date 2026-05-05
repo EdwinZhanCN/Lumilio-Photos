@@ -21,6 +21,15 @@ func (ProcessClipArgs) Kind() string { return "process_clip" }
 
 const MLPreprocessVersionV1 = "ml-image-v1"
 
+// ProcessBioClipArgs is the River job payload for BioCLIP classification.
+// Duplicated here (instead of importing processors) to avoid import cycles.
+type ProcessBioClipArgs struct {
+	AssetID           pgtype.UUID `json:"assetId"`
+	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
+}
+
+func (ProcessBioClipArgs) Kind() string { return "process_bioclip" }
+
 // AssetRetryPayload is the River job payload for selective retry of asset processing tasks
 type AssetRetryPayload struct {
 	AssetID        string   `json:"assetId" river:"unique"`

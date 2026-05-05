@@ -21,7 +21,6 @@ type ProcessClipWorker struct {
 	river.WorkerDefaults[ProcessClipArgs]
 	EmbeddingService service.EmbeddingService
 	LumenService     service.LumenService
-	TagService       service.AIGeneratedTagService
 	ConfigProvider   MLConfigProvider
 	ImageLoader      MLImageLoader
 }
@@ -48,13 +47,8 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 	if w.LumenService == nil {
 		return river.JobSnooze(30 * time.Second)
 	}
-	if !w.LumenService.IsTaskAvailable("clip_image_embed") ||
-		!w.LumenService.IsTaskAvailable("clip_classify") ||
-		!w.LumenService.IsTaskAvailable("clip_scene_classify") {
+	if !w.LumenService.IsTaskAvailable("clip_image_embed") {
 		return river.JobSnooze(30 * time.Second)
-	}
-	if w.TagService == nil {
-		return fmt.Errorf("ai generated tag service unavailable")
 	}
 	if w.ImageLoader == nil {
 		return fmt.Errorf("ml image loader unavailable")
@@ -74,35 +68,6 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 		service.EmbeddingTypeCLIP, embedding.ModelID, embedding.Vector, true)
 	if err != nil {
 		return fmt.Errorf("failed to save embedding: %w", err)
-	}
-
-	clipLabels, err := w.LumenService.ClipClassify(ctx, imageData, 3)
-	if err != nil {
-		return fmt.Errorf("failed to classify image with CLIP: %w", err)
-	}
-
-	sceneLabels, err := w.LumenService.ClipSceneClassify(ctx, imageData, 1)
-	if err != nil {
-		return fmt.Errorf("failed to classify image scene with CLIP: %w", err)
-	}
-
-	tags := labelsToAIGeneratedTags(clipLabels, "clip_classify")
-	tags = append(tags, labelsToAIGeneratedTags(sceneLabels, "clip_scene_classify")...)
-
-	if w.LumenService.IsTaskAvailable("bioclip_classify") {
-		bioClipLabels, err := w.LumenService.BioClipClassify(ctx, imageData, 3)
-		if err != nil {
-			return fmt.Errorf("failed to classify image with BioCLIP: %w", err)
-		}
-		tags = append(tags, labelsToAIGeneratedTags(bioClipLabels, "bioclip_classify")...)
-	}
-
-	if err := w.TagService.ReplaceAssetAIGeneratedTags(ctx, pgUUID, tags, []string{
-		"clip_classify",
-		"clip_scene_classify",
-		"bioclip_classify",
-	}); err != nil {
-		return fmt.Errorf("failed to save ai generated tags: %w", err)
 	}
 
 	return nil

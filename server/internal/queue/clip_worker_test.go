@@ -15,10 +15,8 @@ import (
 )
 
 type clipWorkerLumenStub struct {
-	available  map[string]bool
-	clipLabels []types.Label
-	sceneLabel []types.Label
-	bioLabels  []types.Label
+	available map[string]bool
+	bioLabels []types.Label
 }
 
 func (s *clipWorkerLumenStub) ClipTextEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
@@ -31,14 +29,6 @@ func (s *clipWorkerLumenStub) ClipTextEmbedFast(context.Context, []byte) (*types
 
 func (s *clipWorkerLumenStub) ClipImageEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
 	return &types.EmbeddingV1{ModelID: "clip-image", Vector: []float32{0.1, 0.2}}, nil
-}
-
-func (s *clipWorkerLumenStub) ClipClassify(context.Context, []byte, int) ([]types.Label, error) {
-	return s.clipLabels, nil
-}
-
-func (s *clipWorkerLumenStub) ClipSceneClassify(context.Context, []byte, int) ([]types.Label, error) {
-	return s.sceneLabel, nil
 }
 
 func (s *clipWorkerLumenStub) BioClipClassify(context.Context, []byte, int) ([]types.Label, error) {
@@ -125,19 +115,6 @@ func (s *clipWorkerTagStub) ReplaceAssetAIGeneratedTags(_ context.Context, _ pgt
 	return nil
 }
 
-type clipWorkerConfigStub struct {
-	enabled bool
-}
-
-func (s clipWorkerConfigStub) GetEffectiveMLConfig(context.Context) (struct {
-	CLIPEnabled    bool
-	OCREnabled     bool
-	CaptionEnabled bool
-	FaceEnabled    bool
-}, error) {
-	panic("not implemented")
-}
-
 type workerImageLoaderStub struct {
 	data    []byte
 	called  int
@@ -152,7 +129,7 @@ func (s *workerImageLoaderStub) LoadMLImage(_ context.Context, _ pgtype.UUID, pu
 	return append([]byte(nil), s.data...), nil
 }
 
-func TestProcessClipWorkerSkipsBioClipWhenUnavailable(t *testing.T) {
+func TestProcessClipWorkerSavesImageEmbedding(t *testing.T) {
 	t.Parallel()
 
 	assetID := pgtype.UUID{}
@@ -161,29 +138,17 @@ func TestProcessClipWorkerSkipsBioClipWhenUnavailable(t *testing.T) {
 	}
 
 	embeddingSvc := &clipWorkerEmbeddingStub{}
-	tagSvc := &clipWorkerTagStub{}
 	lumenSvc := &clipWorkerLumenStub{
 		available: map[string]bool{
-			"clip_image_embed":    true,
-			"clip_classify":       true,
-			"clip_scene_classify": true,
-			"bioclip_classify":    false,
-		},
-		clipLabels: []types.Label{
-			{Label: "bird", Score: 0.91},
-			{Label: "tree", Score: 0.74},
-			{Label: "nature", Score: 0.63},
-		},
-		sceneLabel: []types.Label{
-			{Label: "forest", Score: 0.88},
+			"clip_image_embed": true,
 		},
 	}
+	imageLoader := &workerImageLoaderStub{data: []byte("image")}
 
 	worker := &ProcessClipWorker{
 		EmbeddingService: embeddingSvc,
 		LumenService:     lumenSvc,
-		TagService:       tagSvc,
-		ImageLoader:      &workerImageLoaderStub{data: []byte("image")},
+		ImageLoader:      imageLoader,
 	}
 
 	if err := worker.Work(context.Background(), &river.Job[ProcessClipArgs]{
@@ -195,58 +160,12 @@ func TestProcessClipWorkerSkipsBioClipWhenUnavailable(t *testing.T) {
 	if embeddingSvc.savedType != service.EmbeddingTypeCLIP {
 		t.Fatalf("expected clip embedding type, got %q", embeddingSvc.savedType)
 	}
-
-	if len(tagSvc.tags) != 4 {
-		t.Fatalf("expected 4 tags, got %d", len(tagSvc.tags))
-	}
-
-	if tagSvc.tags[0].Source != "clip_classify" || tagSvc.tags[3].Source != "clip_scene_classify" {
-		t.Fatalf("unexpected tag sources: %#v", tagSvc.tags)
+	if imageLoader.purpose != imagesource.PurposeClip {
+		t.Fatalf("expected CLIP image purpose, got %q", imageLoader.purpose)
 	}
 }
 
-func TestProcessClipWorkerIncludesBioClipWhenAvailable(t *testing.T) {
-	t.Parallel()
-
-	assetID := pgtype.UUID{}
-	if err := assetID.Scan("22222222-2222-2222-2222-222222222222"); err != nil {
-		t.Fatalf("scan asset id: %v", err)
-	}
-
-	tagSvc := &clipWorkerTagStub{}
-	worker := &ProcessClipWorker{
-		EmbeddingService: &clipWorkerEmbeddingStub{},
-		LumenService: &clipWorkerLumenStub{
-			available: map[string]bool{
-				"clip_image_embed":    true,
-				"clip_classify":       true,
-				"clip_scene_classify": true,
-				"bioclip_classify":    true,
-			},
-			clipLabels: []types.Label{{Label: "bird", Score: 0.9}},
-			sceneLabel: []types.Label{{Label: "forest", Score: 0.8}},
-			bioLabels:  []types.Label{{Label: "sparrow", Score: 0.7}},
-		},
-		TagService:  tagSvc,
-		ImageLoader: &workerImageLoaderStub{data: []byte("image")},
-	}
-
-	if err := worker.Work(context.Background(), &river.Job[ProcessClipArgs]{
-		Args: ProcessClipArgs{AssetID: assetID},
-	}); err != nil {
-		t.Fatalf("worker returned error: %v", err)
-	}
-
-	if len(tagSvc.tags) != 3 {
-		t.Fatalf("expected 3 tags, got %d", len(tagSvc.tags))
-	}
-
-	if tagSvc.tags[2].Source != "bioclip_classify" {
-		t.Fatalf("expected BioCLIP tag to be appended, got %#v", tagSvc.tags[2])
-	}
-}
-
-func TestProcessClipWorkerSnoozesWithoutPrimaryClassifiers(t *testing.T) {
+func TestProcessClipWorkerSnoozesWithoutImageEmbeddingTask(t *testing.T) {
 	t.Parallel()
 
 	assetID := pgtype.UUID{}
@@ -257,13 +176,10 @@ func TestProcessClipWorkerSnoozesWithoutPrimaryClassifiers(t *testing.T) {
 	worker := &ProcessClipWorker{
 		LumenService: &clipWorkerLumenStub{
 			available: map[string]bool{
-				"clip_image_embed":    true,
-				"clip_classify":       true,
-				"clip_scene_classify": false,
+				"clip_image_embed": false,
 			},
 		},
 		EmbeddingService: &clipWorkerEmbeddingStub{},
-		TagService:       &clipWorkerTagStub{},
 		ImageLoader:      &workerImageLoaderStub{data: []byte("image")},
 	}
 

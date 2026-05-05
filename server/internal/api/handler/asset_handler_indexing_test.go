@@ -114,6 +114,7 @@ func TestAssetHandlerGetIndexingStats_ReturnsStats(t *testing.T) {
 					ReindexJobs: 2,
 				}
 				stats.Tasks.Clip = service.AssetIndexingTaskStats{IndexedCount: 120, QueuedJobs: 4}
+				stats.Tasks.BioCLIP = service.AssetIndexingTaskStats{IndexedCount: 80, QueuedJobs: 5}
 				stats.Tasks.OCR = service.AssetIndexingTaskStats{IndexedCount: 110, QueuedJobs: 3}
 				stats.Tasks.Caption = service.AssetIndexingTaskStats{IndexedCount: 90, QueuedJobs: 2}
 				stats.Tasks.Face = service.AssetIndexingTaskStats{IndexedCount: 60, QueuedJobs: 1}
@@ -140,6 +141,8 @@ func TestAssetHandlerGetIndexingStats_ReturnsStats(t *testing.T) {
 	require.Equal(t, 2, response.Data.ReindexJobs)
 	require.Equal(t, 120, response.Data.Tasks.Clip.IndexedCount)
 	require.Equal(t, 4, response.Data.Tasks.Clip.QueuedJobs)
+	require.Equal(t, 80, response.Data.Tasks.BioCLIP.IndexedCount)
+	require.Equal(t, 5, response.Data.Tasks.BioCLIP.QueuedJobs)
 	require.Equal(t, 110, response.Data.Tasks.OCR.IndexedCount)
 	require.Equal(t, 3, response.Data.Tasks.OCR.QueuedJobs)
 	require.Equal(t, 90, response.Data.Tasks.Caption.IndexedCount)

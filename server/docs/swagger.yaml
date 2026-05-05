@@ -274,6 +274,8 @@ components:
       type: object
     dto.AssetIndexingTaskSetStatsDTO:
       properties:
+        bioclip:
+          $ref: '#/components/schemas/dto.AssetIndexingTaskStatsDTO'
         caption:
           $ref: '#/components/schemas/dto.AssetIndexingTaskStatsDTO'
         clip:
@@ -826,6 +828,8 @@ components:
       type: object
     dto.MLSettingsDTO:
       properties:
+        bioclip_enabled:
+          type: boolean
         caption_enabled:
           type: boolean
         clip_enabled:
@@ -844,11 +848,9 @@ components:
       type: object
     dto.MLTaskSetDTO:
       properties:
-        clip_classify:
+        bioclip_classify:
           $ref: '#/components/schemas/dto.MLTaskCapabilityDTO'
         clip_image_embed:
-          $ref: '#/components/schemas/dto.MLTaskCapabilityDTO'
-        clip_scene_classify:
           $ref: '#/components/schemas/dto.MLTaskCapabilityDTO'
         clip_text_embed:
           $ref: '#/components/schemas/dto.MLTaskCapabilityDTO'
@@ -1523,6 +1525,8 @@ components:
       type: object
     dto.UpdateMLSettingsDTO:
       properties:
+        bioclip_enabled:
+          type: boolean
         caption_enabled:
           type: boolean
         clip_enabled:
