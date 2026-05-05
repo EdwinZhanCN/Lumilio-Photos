@@ -36,7 +36,8 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 	if !validation.Valid {
 		return nil, fmt.Errorf("file validation failed: %s", validation.ErrorReason)
 	}
-	contentType := validation.AssetType
+	assetType := validation.AssetType
+	canonicalMimeType := validation.MimeType
 
 	// Staging file check
 	info, err := os.Stat(task.StagedPath)
@@ -86,7 +87,7 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 	}
 
 	// Initial status
-	statusJSON, err := buildTrackedProcessingStatus(contentType, "Asset ingestion started")
+	statusJSON, err := buildTrackedProcessingStatus(assetType, "Asset ingestion started")
 	if err != nil {
 		return nil, fmt.Errorf("marshal status: %w", err)
 	}
@@ -94,10 +95,10 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 	// Create asset record with empty storage path
 	asset, err := ap.assetService.CreateAssetRecord(ctx, repo.CreateAssetParams{
 		OwnerID:          ownerIDPtr,
-		Type:             string(contentType),
+		Type:             string(assetType),
 		OriginalFilename: task.FileName,
 		StoragePath:      nil,
-		MimeType:         task.ContentType,
+		MimeType:         canonicalMimeType,
 		FileSize:         fileSize,
 		Hash:             &normalizedHash,
 		TakenTime:        pgtype.Timestamptz{Time: time.Now(), Valid: true},
@@ -148,7 +149,7 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 		return asset, nil
 	}
 
-	assetType := dbtypes.AssetType(asset.Type)
+	assetType = dbtypes.AssetType(asset.Type)
 
 	// Update storage path + keep status processing
 	_, err = ap.queries.UpdateAssetStoragePathAndStatus(ctx, repo.UpdateAssetStoragePathAndStatusParams{

@@ -41,7 +41,9 @@ function SideBar() {
         <li>
           <Link
             to="/collections"
-            className={location.pathname === "/favorites" ? "active" : ""}
+            className={
+              location.pathname.startsWith("/collections") ? "active" : ""
+            }
           >
             <Album size={20} strokeWidth={1.5} />
             {t("sidebar.collections")}

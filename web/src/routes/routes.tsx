@@ -6,7 +6,9 @@ import Settings from "@/features/settings/routes/Settings";
 import Monitor from "@/features/monitor/routes/Monitor";
 import Manage from "@/features/manage/routes/Manage";
 import Collections from "@/features/collections/routes/Collections";
+import Albums from "@/features/collections/routes/Albums";
 import AlbumDetails from "@/features/collections/routes/AlbumDetails";
+import People from "@/features/collections/routes/People";
 import PersonDetails from "@/features/people/routes/PersonDetails";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
 import { AssetsProvider } from "@/features/assets";
@@ -54,6 +56,14 @@ export const appRoutes = [
   {
     path: "/collections",
     element: <Collections />,
+  },
+  {
+    path: "/collections/albums",
+    element: <Albums />,
+  },
+  {
+    path: "/collections/people",
+    element: <People />,
   },
   {
     path: "/collections/:albumId",

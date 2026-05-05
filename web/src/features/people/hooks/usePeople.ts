@@ -5,6 +5,7 @@ import type {
   ApiResult,
   ListPeopleResponse,
   PersonDetail,
+  PersonSummaryList,
   UpdatePersonRequest,
 } from "../people.types";
 
@@ -17,7 +18,7 @@ export type UsePeopleOptions = {
 export function usePeople(
   options: UsePeopleOptions = {},
 ): UseQueryResult<ApiResult<ListPeopleResponse>, unknown> & {
-  people: ListPeopleResponse["people"];
+  people: PersonSummaryList;
   total: number;
 } {
   const { scopedRepositoryId } = useWorkingRepository();

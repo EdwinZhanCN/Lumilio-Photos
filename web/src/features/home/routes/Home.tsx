@@ -9,12 +9,10 @@ import GalleryGrid from "../components/GalleryGrid";
 import StatsCards from "../components/StatsCards";
 import SpacetimeMapCard from "../components/SpacetimeMapCard";
 import InfoCard from "../components/InfoCard";
-import PeopleGrid from "../components/PeopleGrid";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
 import { useWorkingRepository } from "@/features/settings";
-import { usePeople } from "@/features/people/hooks/usePeople";
 
 function Home() {
   const { t } = useI18n();
@@ -53,15 +51,6 @@ function Home() {
     isFetchingNextPage: isMapFetchingNextPage,
     hasNextPage: mapHasNextPage,
   } = useMapPhotoAssets({ repositoryId: scopedRepositoryId });
-  const {
-    people,
-    isLoading: isPeopleLoading,
-    isError: isPeopleError,
-    error: peopleError,
-  } = usePeople({
-    limit: 24,
-    repositoryId: scopedRepositoryId,
-  });
 
   const mapSubtitle =
     isMapLoading && mapLoadedPhotos === 0
@@ -130,29 +119,6 @@ function Home() {
                 </span>
               </div>
             )}
-            {isPeopleError && (
-              <div className="alert alert-warning">
-                <ExclamationTriangleIcon className="size-5" />
-                <span>
-                  {t("home.errors.peopleLoadFailed", {
-                    message:
-                      peopleError instanceof Error
-                        ? peopleError.message
-                        : t("home.errors.unknown"),
-                  })}
-                </span>
-              </div>
-            )}
-
-            <PeopleGrid
-              people={people}
-              isLoading={isPeopleLoading}
-              repositoryId={scopedRepositoryId}
-              onPersonClick={(person) => {
-                if (!person?.person_id) return;
-                navigate(`/people/${person.person_id}?groupBy=date`);
-              }}
-            />
 
             <GalleryGrid
               assets={featuredAssets}

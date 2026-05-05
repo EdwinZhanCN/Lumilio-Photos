@@ -1,4 +1,9 @@
 import init, { generate_thumbnail } from "../wasm/thumbnail/thumbnail_wasm";
+import {
+  getAssetTypeFromExtension,
+  getFileExtension,
+  isRAWExtension,
+} from "../lib/utils/accept-file-extensions";
 
 interface WorkerMessageData {
   files?: File[];
@@ -131,11 +136,13 @@ async function generatePreview(
     const file = files[i];
     let url: string;
 
-    if (file.type.startsWith("video/")) {
+    const assetType = getAssetTypeFromExtension(file.name);
+
+    if (assetType === "video" || file.type.startsWith("video/")) {
       url = createVideoPreview();
     } else if (isRawFile(file)) {
       // Do not generate thumbnails for RAW files as requested
-      url = ""; 
+      url = "";
     } else {
       try {
         const arrayBuffer = await file.arrayBuffer();
@@ -164,31 +171,8 @@ async function generatePreview(
 
 // --- Helper Functions ---
 function isRawFile(file: File): boolean {
-  const rawMimeTypes = [
-    "image/x-canon-cr2",
-    "image/x-nikon-nef",
-    "image/x-sony-arw",
-    "image/x-adobe-dng",
-    "image/x-fuji-raf",
-    "image/x-panasonic-rw2",
-  ];
-  const rawExtensions = [
-    "cr2",
-    "nef",
-    "arw",
-    "raf",
-    "rw2",
-    "dng",
-    "cr3",
-    "3fr",
-    "orf",
-  ];
-
-  const extension = file.name.split(".").pop()?.toLowerCase();
-  return (
-    (extension && rawExtensions.includes(extension)) ||
-    rawMimeTypes.includes(file.type)
-  );
+  const extension = getFileExtension(file.name);
+  return isRAWExtension(extension);
 }
 
 function createVideoPreview(): string {

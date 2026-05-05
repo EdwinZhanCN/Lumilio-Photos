@@ -14,7 +14,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/utils/exif"
-	"server/internal/utils/raw"
+	"server/internal/utils/file"
 )
 
 // ProcessMetadataTask handles EXIF/ffprobe metadata extraction only.
@@ -81,7 +81,7 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 
 	// Update photo metadata
 	if meta, ok := res.Metadata.(*dbtypes.PhotoSpecificMetadata); ok {
-		meta.IsRAW = raw.IsRAWFile(asset.OriginalFilename)
+		meta.IsRAW = file.IsRAWFile(asset.OriginalFilename)
 
 		// Parse dimensions and update asset
 		// The dimensions in meta.Dimensions are already corrected by orientation

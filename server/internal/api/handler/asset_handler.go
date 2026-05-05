@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"log"
 	"mime/multipart"
@@ -27,9 +27,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/gabriel-vasile/mimetype"
-	"github.com/google/uuid"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -126,42 +123,13 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 	}
 	defer file.Close()
 
-	// Create a buffer to store file header for MIME type detection
-	// Using 1024 bytes for better format detection compatibility
-	headerBuf := bytes.NewBuffer(make([]byte, 0, 1024))
-
-	// Create a TeeReader that reads from file and writes to buffer
-	// This allows us to detect MIME type while preserving the file stream
-	teeReader := io.TeeReader(file, headerBuf)
-
-	// Read just the first 1024 bytes to limit buffer size
-	limitedReader := io.LimitReader(teeReader, 1024)
-	_, err = io.Copy(io.Discard, limitedReader)
-	if err != nil {
-		api.GinBadRequest(c, fmt.Errorf("failed to read file header: %w", err))
-		return
-	}
-
-	// Detect MIME type from the header
-	detectedMIME := mimetype.Detect(headerBuf.Bytes())
-	detectedType := detectedMIME.String()
-
-	// Use detected MIME type if the provided one is generic octet-stream
-	finalContentType := header.Header.Get("Content-Type")
-	if finalContentType == "application/octet-stream" || finalContentType == "" {
-		finalContentType = detectedType
-	}
-
-	log.Printf("Original Content-Type: %s, Detected MIME: %s, Final Content-Type: %s",
-		header.Header.Get("Content-Type"), detectedType, finalContentType)
-
-	// Validate file type using the corrected content type
-	validationResult := filevalidator.ValidateFile(header.Filename, finalContentType)
+	validationResult := filevalidator.ValidateFile(header.Filename, header.Header.Get("Content-Type"))
 	if !validationResult.Valid {
 		api.GinBadRequest(c, fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason))
 		return
 	}
-	log.Printf("Validated file %s as %s (RAW: %v)", header.Filename, validationResult.AssetType, validationResult.IsRAW)
+	log.Printf("Validated file %s as %s with canonical MIME %s (RAW: %v)",
+		header.Filename, validationResult.AssetType, validationResult.MimeType, validationResult.IsRAW)
 
 	repositoryID := req.RepositoryID
 	var repository repo.Repository
@@ -202,16 +170,6 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		log.Printf("Failed to open staging file: %v", err)
 		api.GinInternalError(c, err, "Upload failed")
 		return
-	}
-
-	if headerBuf.Len() > 0 {
-		if _, err = osFile.Write(headerBuf.Bytes()); err != nil {
-			osFile.Close()
-			log.Printf("Failed to write sniffed header to staging: %v", err)
-			h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "write upload header to staging")
-			api.GinInternalError(c, err, "Upload failed")
-			return
-		}
 	}
 
 	_, err = io.Copy(osFile, file)
@@ -257,7 +215,7 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		StagedPath:   stagingFile.Path,
 		UserID:       userID,
 		Timestamp:    time.Now(),
-		ContentType:  finalContentType,
+		ContentType:  validationResult.MimeType,
 		FileName:     header.Filename,
 		RepositoryID: uuid.UUID(repository.RepoID.Bytes).String(),
 	}
@@ -2737,36 +2695,13 @@ func (h *AssetHandler) processCompletedUpload(ctx context.Context, header *multi
 		log.Printf("Calculated %s hash for %s: %s", hashMethod, header.Filename, finalHash)
 	}
 
-	// Detect actual MIME type from file content for chunked uploads
-	// Read only the first 512 bytes for efficient detection
-	file, err := os.Open(stagingFilePath)
-	if err != nil {
-		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "open file for MIME detection")
-		return nil, fmt.Errorf("failed to open file for MIME detection: %w", err)
+	validationResult := filevalidator.ValidateFile(header.Filename, session.ContentType)
+	if !validationResult.Valid {
+		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "validate completed upload")
+		return nil, fmt.Errorf("unsupported file type: %s", validationResult.ErrorReason)
 	}
-	defer file.Close()
-
-	// Read only the first 1024 bytes for efficient MIME type detection
-	headerBuf := make([]byte, 1024)
-	n, err := file.Read(headerBuf)
-	if err != nil && err != io.EOF {
-		h.handleUploadFailureFile(repository.Path, stagingFilePath, header.Filename, "read file header for MIME detection")
-		return nil, fmt.Errorf("failed to read file header for MIME detection: %w", err)
-	}
-	headerBuf = headerBuf[:n]
-
-	// Detect MIME type from file header
-	detectedMIME := mimetype.Detect(headerBuf)
-	detectedType := detectedMIME.String()
-
-	// Use detected MIME type if original one is generic octet-stream
-	finalContentType := session.ContentType
-	if session.ContentType == "application/octet-stream" || session.ContentType == "" {
-		finalContentType = detectedType
-	}
-
-	log.Printf("Chunked upload - Original Content-Type: %s, Detected MIME: %s, Final Content-Type: %s",
-		session.ContentType, detectedType, finalContentType)
+	finalContentType := validationResult.MimeType
+	log.Printf("Completed upload resolved canonical MIME %s for %s", finalContentType, header.Filename)
 
 	// Check for hash collision before enqueueing
 	collision, err := h.checkHashCollisionBeforeEnqueue(ctx, finalHash, header.Filename, uuid.UUID(repository.RepoID.Bytes).String())

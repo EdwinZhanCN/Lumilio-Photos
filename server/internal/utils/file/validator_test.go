@@ -15,6 +15,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 		contentType string
 		wantValid   bool
 		wantType    dbtypes.AssetType
+		wantMime    string
 		wantIsRAW   bool
 		wantError   string
 	}{
@@ -25,6 +26,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "image/jpeg",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypePhoto,
+			wantMime:    "image/jpeg",
 			wantIsRAW:   false,
 		},
 		{
@@ -33,6 +35,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "image/png",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypePhoto,
+			wantMime:    "image/png",
 			wantIsRAW:   false,
 		},
 		{
@@ -41,6 +44,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "image/heic",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypePhoto,
+			wantMime:    "image/heic",
 			wantIsRAW:   false,
 		},
 		// Valid RAW formats
@@ -50,6 +54,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "image/x-canon-cr2",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypePhoto,
+			wantMime:    "image/x-canon-cr2",
 			wantIsRAW:   true,
 		},
 		{
@@ -58,6 +63,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "image/x-nikon-nef",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypePhoto,
+			wantMime:    "image/x-nikon-nef",
 			wantIsRAW:   true,
 		},
 		{
@@ -66,6 +72,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "image/x-sony-arw",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypePhoto,
+			wantMime:    "image/x-sony-arw",
 			wantIsRAW:   true,
 		},
 		{
@@ -74,6 +81,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "image/x-adobe-dng",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypePhoto,
+			wantMime:    "image/x-adobe-dng",
 			wantIsRAW:   true,
 		},
 		// Valid video formats
@@ -83,6 +91,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "video/mp4",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypeVideo,
+			wantMime:    "video/mp4",
 			wantIsRAW:   false,
 		},
 		{
@@ -91,6 +100,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "video/quicktime",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypeVideo,
+			wantMime:    "video/quicktime",
 			wantIsRAW:   false,
 		},
 		{
@@ -99,6 +109,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "video/x-matroska",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypeVideo,
+			wantMime:    "video/x-matroska",
 			wantIsRAW:   false,
 		},
 		// Valid audio formats
@@ -108,6 +119,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "audio/mpeg",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypeAudio,
+			wantMime:    "audio/mpeg",
 			wantIsRAW:   false,
 		},
 		{
@@ -116,6 +128,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "audio/flac",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypeAudio,
+			wantMime:    "audio/flac",
 			wantIsRAW:   false,
 		},
 		{
@@ -124,6 +137,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "audio/mp4",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypeAudio,
+			wantMime:    "audio/mp4",
 			wantIsRAW:   false,
 		},
 		// Invalid cases
@@ -142,11 +156,13 @@ func TestValidator_ValidateFile(t *testing.T) {
 			wantError:   "unsupported file extension: .pdf",
 		},
 		{
-			name:        "Mismatched MIME type",
+			name:        "Ignores mismatched MIME type",
 			filename:    "photo.jpg",
 			contentType: "video/mp4",
-			wantValid:   false,
-			wantError:   "MIME type 'video/mp4' does not match file extension '.jpg'",
+			wantValid:   true,
+			wantType:    dbtypes.AssetTypePhoto,
+			wantMime:    "image/jpeg",
+			wantIsRAW:   false,
 		},
 		// Case insensitive
 		{
@@ -155,6 +171,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "image/jpeg",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypePhoto,
+			wantMime:    "image/jpeg",
 			wantIsRAW:   false,
 		},
 		// Empty MIME type (should still work based on extension)
@@ -164,6 +181,7 @@ func TestValidator_ValidateFile(t *testing.T) {
 			contentType: "",
 			wantValid:   true,
 			wantType:    dbtypes.AssetTypePhoto,
+			wantMime:    "image/jpeg",
 			wantIsRAW:   false,
 		},
 	}
@@ -180,6 +198,9 @@ func TestValidator_ValidateFile(t *testing.T) {
 				if result.AssetType != tt.wantType {
 					t.Errorf("ValidateFile() AssetType = %v, want %v", result.AssetType, tt.wantType)
 				}
+				if result.MimeType != tt.wantMime {
+					t.Errorf("ValidateFile() MimeType = %v, want %v", result.MimeType, tt.wantMime)
+				}
 				if result.IsRAW != tt.wantIsRAW {
 					t.Errorf("ValidateFile() IsRAW = %v, want %v", result.IsRAW, tt.wantIsRAW)
 				}
@@ -187,6 +208,75 @@ func TestValidator_ValidateFile(t *testing.T) {
 				if tt.wantError != "" && result.ErrorReason != tt.wantError {
 					t.Errorf("ValidateFile() ErrorReason = %v, want %v", result.ErrorReason, tt.wantError)
 				}
+			}
+		})
+	}
+}
+
+func TestValidator_ResolveMedia(t *testing.T) {
+	validator := NewValidator()
+
+	tests := []struct {
+		name       string
+		filename   string
+		wantType   dbtypes.AssetType
+		wantMime   string
+		wantIsRAW  bool
+		wantFormat string
+		wantErr    string
+	}{
+		{
+			name:      "JPEG",
+			filename:  "photo.jpg",
+			wantType:  dbtypes.AssetTypePhoto,
+			wantMime:  "image/jpeg",
+			wantIsRAW: false,
+		},
+		{
+			name:       "RAW",
+			filename:   "photo.cr3",
+			wantType:   dbtypes.AssetTypePhoto,
+			wantMime:   "image/x-canon-cr3",
+			wantIsRAW:  true,
+			wantFormat: "CR3",
+		},
+		{
+			name:      "Video transport stream",
+			filename:  "clip.m2ts",
+			wantType:  dbtypes.AssetTypeVideo,
+			wantMime:  "video/mp2t",
+			wantIsRAW: false,
+		},
+		{
+			name:     "Unsupported",
+			filename: "document.pdf",
+			wantErr:  "unsupported file extension: .pdf",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := validator.ResolveMedia(tt.filename)
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Fatalf("ResolveMedia() error = %v, want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ResolveMedia() error = %v", err)
+			}
+			if got.AssetType != tt.wantType {
+				t.Errorf("ResolveMedia() AssetType = %v, want %v", got.AssetType, tt.wantType)
+			}
+			if got.MimeType != tt.wantMime {
+				t.Errorf("ResolveMedia() MimeType = %v, want %v", got.MimeType, tt.wantMime)
+			}
+			if got.IsRAW != tt.wantIsRAW {
+				t.Errorf("ResolveMedia() IsRAW = %v, want %v", got.IsRAW, tt.wantIsRAW)
+			}
+			if got.RawFormat != tt.wantFormat {
+				t.Errorf("ResolveMedia() RawFormat = %v, want %v", got.RawFormat, tt.wantFormat)
 			}
 		})
 	}

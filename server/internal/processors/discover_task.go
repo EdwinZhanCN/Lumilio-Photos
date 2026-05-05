@@ -77,16 +77,12 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 		filename = filepath.Base(storagePath)
 	}
 
-	contentType := strings.TrimSpace(args.ContentType)
-	validation := file.ValidateFile(filename, contentType)
+	validation := file.ValidateFile(filename, args.ContentType)
 	if !validation.Valid {
 		// Discovery queue should not retry unsupported files.
 		return nil
 	}
-
-	if contentType == "" || contentType == "application/octet-stream" {
-		contentType = file.NewValidator().GetMimeTypeFromExtension(validation.Extension)
-	}
+	contentType := validation.MimeType
 
 	hashResult, err := hash.CalculateFileHash(fullPath, hash.AlgorithmBLAKE3, true)
 	if err != nil {
