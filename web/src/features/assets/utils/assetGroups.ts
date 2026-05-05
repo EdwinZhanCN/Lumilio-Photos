@@ -92,10 +92,6 @@ const buildDateGroupKey = (
   const thisMonthStart = useUTC
     ? new Date(Date.UTC(nowParts.year, nowParts.month - 1, 1))
     : new Date(nowParts.year, nowParts.month - 1, 1);
-  const thisYearStart = useUTC
-    ? new Date(Date.UTC(nowParts.year, 0, 1))
-    : new Date(nowParts.year, 0, 1);
-
   const assetStamp = assetDay.getTime();
 
   switch (true) {
@@ -107,12 +103,10 @@ const buildDateGroupKey = (
       return "date:this_week";
     case assetStamp >= thisMonthStart.getTime():
       return "date:this_month";
-    case assetStamp >= thisYearStart.getTime():
+    default:
       return `date:month:${assetParts.year.toString().padStart(4, "0")}-${assetParts.month
         .toString()
         .padStart(2, "0")}`;
-    default:
-      return `date:year:${assetParts.year.toString().padStart(4, "0")}`;
   }
 };
 

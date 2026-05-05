@@ -309,9 +309,7 @@ export const AssetsProvider = ({
       routeState?.assetsInitialFilter,
     );
 
-    if (syncUrl) {
-      setCurrentTab(resolveTabFromPathname(location.pathname));
-    }
+    setCurrentTab(resolveTabFromPathname(location.pathname));
 
     if (persistedState.filters) {
       batchUpdateFilters(persistedState.filters);
@@ -369,7 +367,7 @@ export const AssetsProvider = ({
   }, [filtersState, isHydrated, isMainPersistentScope, selectionState, uiState]);
 
   useEffect(() => {
-    if (!syncUrl || !isHydrated) return;
+    if (!isHydrated) return;
 
     const currentTab = resolveTabFromPathname(location.pathname);
     if (currentTab !== uiState.currentTab) {
@@ -379,7 +377,6 @@ export const AssetsProvider = ({
     isHydrated,
     location.pathname,
     setCurrentTab,
-    syncUrl,
     uiState.currentTab,
   ]);
 

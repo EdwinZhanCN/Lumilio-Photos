@@ -12,10 +12,11 @@ export default function SearchBar() {
   const currentTab = useCurrentTab();
   const searchQuery = useSearchQuery();
   const { setSearchQuery, applySearch } = useUIActions();
+  const normalizedSearchQuery = searchQuery.trim();
 
-  const [searchText, setSearchText] = useState("");
+  const [searchText, setSearchText] = useState(normalizedSearchQuery);
   const [isSearching, setIsSearching] = useState(false);
-  const [active, setActive] = useState(false);
+  const [active, setActive] = useState(normalizedSearchQuery.length > 0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,36 +26,41 @@ export default function SearchBar() {
   // Debounced search function
   const performSearch = useCallback(
     (query: string) => {
+      const normalizedQuery = query.trim();
+      if (normalizedQuery === normalizedSearchQuery) {
+        return;
+      }
+
       setIsSearching(true);
       try {
-        applySearch(query);
+        applySearch(normalizedQuery);
       } catch (error) {
         console.error("Search error:", error);
       } finally {
         setIsSearching(false);
       }
     },
-    [applySearch],
+    [applySearch, normalizedSearchQuery],
   );
 
   // Debounce search execution
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchText || searchText === "") {
-        performSearch(searchText);
-      }
+      performSearch(searchText);
     }, 300);
 
     return () => clearTimeout(timer);
   }, [searchText, performSearch]);
 
   useEffect(() => {
-    const nextQuery = searchQuery.trim();
-    setSearchText(nextQuery);
-    if (nextQuery.length > 0) {
-      setActive(true);
-    }
-  }, [searchQuery]);
+    setSearchText((currentText) =>
+      currentText === normalizedSearchQuery ? currentText : normalizedSearchQuery,
+    );
+    setActive((currentActive) => {
+      const nextActive = normalizedSearchQuery.length > 0;
+      return currentActive === nextActive ? currentActive : nextActive;
+    });
+  }, [normalizedSearchQuery]);
 
   useEffect(() => {
     if (active) {
