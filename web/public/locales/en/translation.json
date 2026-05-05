@@ -48,6 +48,7 @@
         "studio": "Studio",
         "portfolio": "Portfolio",
         "upload": "Upload",
+        "manage": "Manage",
         "settings": "Settings",
         "updates": "Updates",
         "serverMonitor": "Server Monitor",
@@ -67,6 +68,7 @@
         "studio": "Studio",
         "portfolio": "Portfolio",
         "upload": "Upload Photos",
+        "manage": "Manage",
         "settings": "Settings",
         "updates": "Updates",
         "serverMonitor": "Server Monitor",
@@ -450,6 +452,14 @@
                 "label": "Selection",
                 "selectedCount": "{{count}} selected"
             },
+            "scan": {
+                "label": "Scan current library",
+                "title": "Scan {{scope}}",
+                "currentQueued": "Scan queued for {{name}}.",
+                "allQueued": "Scans queued for {{count}} libraries.",
+                "failed": "Failed to queue scan.",
+                "noRepositories": "No repositories are available to scan."
+            },
             "actions": {
                 "title": "Actions",
                 "applyToItems": "Apply to {{count}} items",
@@ -483,6 +493,33 @@
             "thisWeek": "This Week",
             "thisMonth": "This Month",
             "allResults": "All Results"
+        }
+    },
+    "manage": {
+        "pageTitle": "Manage Libraries",
+        "errorBoundaryTitle": "Manage Section Error!",
+        "errorBoundaryMessage": "The manage section failed to load or encountered an error during operation.",
+        "repositories": {
+            "title": "Libraries",
+            "description": "Connected repositories available for upload, filtering, and file-system scans.",
+            "primaryBadge": "Primary",
+            "assetCount": "Assets",
+            "createAction": "Add library",
+            "createTitle": "Add library",
+            "createDescription": "Create a repository folder inside the mounted storage root.",
+            "createNameLabel": "Library name",
+            "createNamePlaceholder": "Family Photos",
+            "createNameHint": "Use a short, recognizable name.",
+            "createSubmit": "Create library",
+            "createSuccess": "{{name}} was added.",
+            "createFailed": "Failed to create library.",
+            "scanAll": "Scan all libraries",
+            "scanRepository": "Scan {{name}}",
+            "scanQueued": "Scan queued for {{name}}.",
+            "scanAllQueued": "Scans queued for {{count}} libraries.",
+            "scanFailed": "Failed to queue scan.",
+            "empty": "No repositories are available.",
+            "unavailable": "Repository options are temporarily unavailable."
         }
     },
     "upload": {
@@ -528,6 +565,12 @@
             "server_chunk_size": "Server chunk size",
             "server_concurrency": "Server concurrency",
             "server_in_flight": "In-flight requests",
+            "upload_target_label": "Upload target",
+            "upload_target_default": "Default",
+            "upload_target_from_settings": "From Settings",
+            "default_upload_target": "Default repository",
+            "default_upload_target_hint": "No working library is selected; uploads will use the primary/default repository.",
+            "upload_target_unavailable": "The selected repository is temporarily unavailable.",
             "server_active_sessions": "Active sessions",
             "server_completed_files": "Completed files",
             "server_failed_sessions": "Failed sessions",

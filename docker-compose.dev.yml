@@ -16,28 +16,12 @@ services:
             timeout: 5s
             retries: 5
 
-    watchman:
-        build:
-            context: .
-            dockerfile: server/watchman.Dockerfile
-        restart: unless-stopped
-        volumes:
-            - server_storage:/data/storage
-            - watchman_socket:/watchman-sock
-        healthcheck:
-            test: ["CMD-SHELL", "test -S /watchman-sock/watchman.sock"]
-            interval: 5s
-            timeout: 3s
-            retries: 20
-
     server:
         build:
             context: .
             dockerfile: server/Dockerfile
         depends_on:
             db:
-                condition: service_healthy
-            watchman:
                 condition: service_healthy
         environment:
             SERVER_PORT: 8080
@@ -53,11 +37,11 @@ services:
             STORAGE_STRATEGY: date
             STORAGE_PRESERVE_FILENAME: "true"
             STORAGE_DUPLICATE_HANDLING: rename
-            WATCHMAN_ENABLED: "true"
-            WATCHMAN_SOCK: /watchman-sock/watchman.sock
-            WATCHMAN_SETTLE_SECONDS: "3"
-            WATCHMAN_INITIAL_SCAN: "true"
-            WATCHMAN_POLL_FALLBACK_SECONDS: "5"
+            REPOSITORY_SCAN_ENABLED: "true"
+            REPOSITORY_SCAN_INTERVAL_SECONDS: "300"
+            REPOSITORY_SCAN_SETTLE_SECONDS: "5"
+            REPOSITORY_SCAN_MAX_CONCURRENT_REPOS: "1"
+            REPOSITORY_SCAN_BATCH_SIZE: "500"
             ML_CLIP_ENABLED: "false"
             ML_OCR_ENABLED: "false"
             ML_CAPTION_ENABLED: "false"
@@ -70,7 +54,6 @@ services:
             LLM_BASE_URL: your-openai-compatiable-base-url
         volumes:
             - server_storage:/data/storage
-            - watchman_socket:/watchman-sock
         ports:
             - "8080:8080"
 
@@ -93,4 +76,3 @@ services:
 volumes:
     db_data:
     server_storage:
-    watchman_socket:

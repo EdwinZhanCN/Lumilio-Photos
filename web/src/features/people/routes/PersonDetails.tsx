@@ -300,7 +300,12 @@ const PersonDetails = () => {
 
   return (
     <WorkerProvider preload={["exif", "export"]}>
-      <AssetsProvider persist={false} basePath={`/people/${personId}`}>
+      <AssetsProvider
+        key={`person:${personId}`}
+        scopeId={`person:${personId}`}
+        persist={false}
+        basePath={`/people/${personId}`}
+      >
         <PersonAssetsContent />
       </AssetsProvider>
     </WorkerProvider>

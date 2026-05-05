@@ -17,8 +17,9 @@ import {
   InformationCircleIcon,
   FolderPlusIcon,
 } from "@heroicons/react/24/outline";
-import { X } from "lucide-react";
+import { FolderUp, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
+import { useWorkingRepository } from "@/features/settings";
 
 type UploadQueueRow = {
   key: string;
@@ -68,6 +69,31 @@ function UnifiedUploadSection(): React.JSX.Element {
   const serverProgress = uploadProgressQuery.data?.data;
   const serverSummary = serverProgress?.summary;
   const serverSessions = serverProgress?.sessions ?? [];
+  const {
+    repositories,
+    repositoriesQuery,
+    selectedRepository,
+    scopedRepositoryId,
+    getRepositoryLabel,
+  } = useWorkingRepository();
+  const primaryRepository = useMemo(
+    () => repositories.find((repository) => repository.isPrimary),
+    [repositories],
+  );
+  const uploadTargetRepository = selectedRepository ?? primaryRepository;
+  const uploadTargetName = uploadTargetRepository
+    ? getRepositoryLabel(uploadTargetRepository)
+    : repositoriesQuery.isLoading
+      ? t("common.loading", { defaultValue: "Loading..." })
+      : t("upload.UnifiedUploadSection.default_upload_target");
+  const uploadTargetMode = scopedRepositoryId
+    ? t("upload.UnifiedUploadSection.upload_target_from_settings")
+    : t("upload.UnifiedUploadSection.upload_target_default");
+  const uploadTargetDescription = uploadTargetRepository?.path
+    ? uploadTargetRepository.path
+    : scopedRepositoryId
+      ? t("upload.UnifiedUploadSection.upload_target_unavailable")
+      : t("upload.UnifiedUploadSection.default_upload_target_hint");
 
   const formatBytes = (value?: number) => {
     if (!value && value !== 0) return "-";
@@ -296,6 +322,33 @@ function UnifiedUploadSection(): React.JSX.Element {
                 </p>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2 rounded-lg border border-base-300 bg-base-200/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <FolderUp size={18} />
+          </div>
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-base-content/70">
+                {t("upload.UnifiedUploadSection.upload_target_label")}
+              </span>
+              <span className="truncate text-sm font-semibold text-base-content">
+                {uploadTargetName}
+              </span>
+              <span className="badge badge-outline badge-sm">
+                {uploadTargetMode}
+              </span>
+            </div>
+            <p
+              className="mt-1 truncate text-xs text-base-content/55"
+              title={uploadTargetDescription}
+            >
+              {uploadTargetDescription}
+            </p>
           </div>
         </div>
       </div>

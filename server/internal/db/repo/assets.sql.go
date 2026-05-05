@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/pgvector/pgvector-go"
 	"server/internal/db/dbtypes"
 )
 
@@ -229,40 +228,81 @@ WHERE a.is_deleted = false
         AND aa.album_id = $7
     )
   )
-  AND ($8::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $8)
-  AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $9)
-  AND ($10::boolean IS NULL OR
+  AND ($8::text IS NULL OR
+    CASE COALESCE($9::text, 'contains')
+      WHEN 'matches' THEN a.original_filename ILIKE $8
+      WHEN 'starts_with' THEN a.original_filename ILIKE $8 || '%'
+      WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $8
+      ELSE a.original_filename ILIKE '%' || $8 || '%'
+    END
+  )
+  AND ($10::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $10)
+  AND ($11::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $11)
+  AND ($12::boolean IS NULL OR
     CASE
-      WHEN $10 = true THEN a.specific_metadata->>'is_raw' = 'true'
+      WHEN $12 = true THEN a.specific_metadata->>'is_raw' = 'true'
       ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
     END
   )
-  AND ($11::integer IS NULL OR
+  AND ($13::integer IS NULL OR
     CASE
-      WHEN $11 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $11
+      WHEN $13 = 0 THEN a.rating IS NULL OR a.rating = 0
+      ELSE a.rating = $13
     END
   )
-  AND ($12::boolean IS NULL OR a.liked = $12)
-  AND ($13::text IS NULL OR a.specific_metadata->>'camera_model' = $13)
-  AND ($14::text IS NULL OR a.specific_metadata->>'lens_model' = $14)
+  AND ($14::boolean IS NULL OR
+    CASE
+      WHEN $14 = false THEN a.liked IS NULL OR a.liked = false
+      ELSE a.liked = true
+    END
+  )
+  AND ($15::text IS NULL OR a.specific_metadata->>'camera_model' = $15)
+  AND ($16::text IS NULL OR a.specific_metadata->>'lens_model' = $16)
+  AND (
+    $17::float8 IS NULL
+    OR $18::float8 IS NULL
+    OR $19::float8 IS NULL
+    OR $20::float8 IS NULL
+    OR (
+      jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
+      AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
+      AND (a.specific_metadata->>'gps_latitude')::double precision
+        BETWEEN LEAST($18::float8, $17::float8)
+        AND GREATEST($18::float8, $17::float8)
+      AND (
+        CASE
+          WHEN $20::float8 <= $19::float8 THEN
+            (a.specific_metadata->>'gps_longitude')::double precision BETWEEN $20::float8 AND $19::float8
+          ELSE
+            (a.specific_metadata->>'gps_longitude')::double precision >= $20::float8
+            OR (a.specific_metadata->>'gps_longitude')::double precision <= $19::float8
+        END
+      )
+    )
+  )
 `
 
 type CountAssetsUnifiedParams struct {
-	Query        *string            `db:"query" json:"query"`
-	AssetType    *string            `db:"asset_type" json:"asset_type"`
-	AssetTypes   []string           `db:"asset_types" json:"asset_types"`
-	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
-	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	PersonID     *int32             `db:"person_id" json:"person_id"`
-	AlbumID      *int32             `db:"album_id" json:"album_id"`
-	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
-	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
-	IsRaw        *bool              `db:"is_raw" json:"is_raw"`
-	Rating       *int32             `db:"rating" json:"rating"`
-	Liked        *bool              `db:"liked" json:"liked"`
-	CameraModel  *string            `db:"camera_model" json:"camera_model"`
-	LensModel    *string            `db:"lens_model" json:"lens_model"`
+	Query            *string            `db:"query" json:"query"`
+	AssetType        *string            `db:"asset_type" json:"asset_type"`
+	AssetTypes       []string           `db:"asset_types" json:"asset_types"`
+	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID     pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	PersonID         *int32             `db:"person_id" json:"person_id"`
+	AlbumID          *int32             `db:"album_id" json:"album_id"`
+	FilenameVal      *string            `db:"filename_val" json:"filename_val"`
+	FilenameOperator *string            `db:"filename_operator" json:"filename_operator"`
+	DateFrom         pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo           pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw            *bool              `db:"is_raw" json:"is_raw"`
+	Rating           *int32             `db:"rating" json:"rating"`
+	Liked            *bool              `db:"liked" json:"liked"`
+	CameraModel      *string            `db:"camera_model" json:"camera_model"`
+	LensModel        *string            `db:"lens_model" json:"lens_model"`
+	LocationNorth    *float64           `db:"location_north" json:"location_north"`
+	LocationSouth    *float64           `db:"location_south" json:"location_south"`
+	LocationEast     *float64           `db:"location_east" json:"location_east"`
+	LocationWest     *float64           `db:"location_west" json:"location_west"`
 }
 
 // Count query matching GetAssetsUnified WHERE clause
@@ -276,6 +316,8 @@ func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnified
 		arg.RepositoryID,
 		arg.PersonID,
 		arg.AlbumID,
+		arg.FilenameVal,
+		arg.FilenameOperator,
 		arg.DateFrom,
 		arg.DateTo,
 		arg.IsRaw,
@@ -283,6 +325,10 @@ func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnified
 		arg.Liked,
 		arg.CameraModel,
 		arg.LensModel,
+		arg.LocationNorth,
+		arg.LocationSouth,
+		arg.LocationEast,
+		arg.LocationWest,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -449,122 +495,6 @@ WHERE asset_id = $1
 func (q *Queries) DeleteAsset(ctx context.Context, assetID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, deleteAsset, assetID)
 	return err
-}
-
-const filterAssets = `-- name: FilterAssets :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
-LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
-WHERE a.is_deleted = false
-  AND ($1::text IS NULL OR a.type = $1)
-  AND ($2::integer IS NULL OR a.owner_id = $2)
-  AND ($3::uuid IS NULL OR a.repository_id = $3)
-  AND ($4::integer IS NULL OR aa.album_id = $4)
-  AND ($5::text IS NULL OR
-    CASE $6::text
-      WHEN 'contains' THEN a.original_filename ILIKE '%' || $5 || '%'
-      WHEN 'matches' THEN a.original_filename ILIKE $5
-      WHEN 'startswith' THEN a.original_filename ILIKE $5 || '%'
-      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $5
-      ELSE true
-    END
-  )
-  AND ($7::timestamptz IS NULL OR a.upload_time >= $7)
-  AND ($8::timestamptz IS NULL OR a.upload_time <= $8)
-  AND ($9::boolean IS NULL OR
-    CASE
-      WHEN $9 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
-      WHEN $9 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
-      ELSE true
-    END
-  )
-  AND ($10::integer IS NULL OR
-    CASE
-      WHEN $10 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $10
-    END
-  )
-  AND ($11::boolean IS NULL OR a.liked = $11)
-  AND ($12::text IS NULL OR a.specific_metadata->>'camera_model' = $12)
-  AND ($13::text IS NULL OR a.specific_metadata->>'lens_model' = $13)
-ORDER BY a.upload_time DESC
-LIMIT $15 OFFSET $14
-`
-
-type FilterAssetsParams struct {
-	AssetType    *string            `db:"asset_type" json:"asset_type"`
-	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
-	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	AlbumID      *int32             `db:"album_id" json:"album_id"`
-	FilenameVal  *string            `db:"filename_val" json:"filename_val"`
-	FilenameMode *string            `db:"filename_mode" json:"filename_mode"`
-	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
-	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
-	IsRaw        *bool              `db:"is_raw" json:"is_raw"`
-	Rating       *int32             `db:"rating" json:"rating"`
-	Liked        *bool              `db:"liked" json:"liked"`
-	CameraModel  *string            `db:"camera_model" json:"camera_model"`
-	LensModel    *string            `db:"lens_model" json:"lens_model"`
-	Offset       int32              `db:"offset" json:"offset"`
-	Limit        int32              `db:"limit" json:"limit"`
-}
-
-func (q *Queries) FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, filterAssets,
-		arg.AssetType,
-		arg.OwnerID,
-		arg.RepositoryID,
-		arg.AlbumID,
-		arg.FilenameVal,
-		arg.FilenameMode,
-		arg.DateFrom,
-		arg.DateTo,
-		arg.IsRaw,
-		arg.Rating,
-		arg.Liked,
-		arg.CameraModel,
-		arg.LensModel,
-		arg.Offset,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Asset
-	for rows.Next() {
-		var i Asset
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.OwnerID,
-			&i.Type,
-			&i.OriginalFilename,
-			&i.StoragePath,
-			&i.MimeType,
-			&i.FileSize,
-			&i.Hash,
-			&i.Width,
-			&i.Height,
-			&i.Duration,
-			&i.UploadTime,
-			&i.TakenTime,
-			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
-			&i.SpecificMetadata,
-			&i.Rating,
-			&i.Liked,
-			&i.RepositoryID,
-			&i.Status,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getAssetByHashAndRepository = `-- name: GetAssetByHashAndRepository :one
@@ -1562,28 +1492,63 @@ WITH page_ids AS MATERIALIZED (
           AND aa.album_id = $8
       )
     )
-    AND ($9::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $9)
-    AND ($10::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $10)
-    AND ($11::boolean IS NULL OR
+    AND ($9::text IS NULL OR
+      CASE COALESCE($10::text, 'contains')
+        WHEN 'matches' THEN a.original_filename ILIKE $9
+        WHEN 'starts_with' THEN a.original_filename ILIKE $9 || '%'
+        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $9
+        ELSE a.original_filename ILIKE '%' || $9 || '%'
+      END
+    )
+    AND ($11::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $11)
+    AND ($12::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $12)
+    AND ($13::boolean IS NULL OR
       CASE
-        WHEN $11 = true THEN a.specific_metadata->>'is_raw' = 'true'
+        WHEN $13 = true THEN a.specific_metadata->>'is_raw' = 'true'
         ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
       END
     )
-    AND ($12::integer IS NULL OR
+    AND ($14::integer IS NULL OR
       CASE
-        WHEN $12 = 0 THEN a.rating IS NULL
-        ELSE a.rating = $12
+        WHEN $14 = 0 THEN a.rating IS NULL OR a.rating = 0
+        ELSE a.rating = $14
       END
     )
-    AND ($13::boolean IS NULL OR a.liked = $13)
-    AND ($14::text IS NULL OR a.specific_metadata->>'camera_model' = $14)
-    AND ($15::text IS NULL OR a.specific_metadata->>'lens_model' = $15)
+    AND ($15::boolean IS NULL OR
+      CASE
+        WHEN $15 = false THEN a.liked IS NULL OR a.liked = false
+        ELSE a.liked = true
+      END
+    )
+    AND ($16::text IS NULL OR a.specific_metadata->>'camera_model' = $16)
+    AND ($17::text IS NULL OR a.specific_metadata->>'lens_model' = $17)
+    AND (
+      $18::float8 IS NULL
+      OR $19::float8 IS NULL
+      OR $20::float8 IS NULL
+      OR $21::float8 IS NULL
+      OR (
+        jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
+        AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
+        AND (a.specific_metadata->>'gps_latitude')::double precision
+          BETWEEN LEAST($19::float8, $18::float8)
+          AND GREATEST($19::float8, $18::float8)
+        AND (
+          CASE
+            WHEN $21::float8 <= $20::float8 THEN
+              (a.specific_metadata->>'gps_longitude')::double precision BETWEEN $21::float8 AND $20::float8
+            ELSE
+              (a.specific_metadata->>'gps_longitude')::double precision >= $21::float8
+              OR (a.specific_metadata->>'gps_longitude')::double precision <= $20::float8
+          END
+        )
+      )
+    )
   ORDER BY
     CASE WHEN $1::text = 'type' THEN a.mime_type END ASC,
     COALESCE(a.taken_time, a.upload_time) DESC,
     a.asset_id DESC
-  LIMIT $17 OFFSET $16
+  LIMIT $23 OFFSET $22
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
 FROM page_ids p
@@ -1592,23 +1557,29 @@ ORDER BY p.sort_mime ASC NULLS LAST, p.sort_time DESC, p.asset_id DESC
 `
 
 type GetAssetsUnifiedParams struct {
-	SortBy       *string            `db:"sort_by" json:"sort_by"`
-	Query        *string            `db:"query" json:"query"`
-	AssetType    *string            `db:"asset_type" json:"asset_type"`
-	AssetTypes   []string           `db:"asset_types" json:"asset_types"`
-	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
-	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	PersonID     *int32             `db:"person_id" json:"person_id"`
-	AlbumID      *int32             `db:"album_id" json:"album_id"`
-	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
-	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
-	IsRaw        *bool              `db:"is_raw" json:"is_raw"`
-	Rating       *int32             `db:"rating" json:"rating"`
-	Liked        *bool              `db:"liked" json:"liked"`
-	CameraModel  *string            `db:"camera_model" json:"camera_model"`
-	LensModel    *string            `db:"lens_model" json:"lens_model"`
-	Offset       int32              `db:"offset" json:"offset"`
-	Limit        int32              `db:"limit" json:"limit"`
+	SortBy           *string            `db:"sort_by" json:"sort_by"`
+	Query            *string            `db:"query" json:"query"`
+	AssetType        *string            `db:"asset_type" json:"asset_type"`
+	AssetTypes       []string           `db:"asset_types" json:"asset_types"`
+	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID     pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	PersonID         *int32             `db:"person_id" json:"person_id"`
+	AlbumID          *int32             `db:"album_id" json:"album_id"`
+	FilenameVal      *string            `db:"filename_val" json:"filename_val"`
+	FilenameOperator *string            `db:"filename_operator" json:"filename_operator"`
+	DateFrom         pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo           pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw            *bool              `db:"is_raw" json:"is_raw"`
+	Rating           *int32             `db:"rating" json:"rating"`
+	Liked            *bool              `db:"liked" json:"liked"`
+	CameraModel      *string            `db:"camera_model" json:"camera_model"`
+	LensModel        *string            `db:"lens_model" json:"lens_model"`
+	LocationNorth    *float64           `db:"location_north" json:"location_north"`
+	LocationSouth    *float64           `db:"location_south" json:"location_south"`
+	LocationEast     *float64           `db:"location_east" json:"location_east"`
+	LocationWest     *float64           `db:"location_west" json:"location_west"`
+	Offset           int32              `db:"offset" json:"offset"`
+	Limit            int32              `db:"limit" json:"limit"`
 }
 
 // ============================================================================
@@ -1627,6 +1598,8 @@ func (q *Queries) GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedPara
 		arg.RepositoryID,
 		arg.PersonID,
 		arg.AlbumID,
+		arg.FilenameVal,
+		arg.FilenameOperator,
 		arg.DateFrom,
 		arg.DateTo,
 		arg.IsRaw,
@@ -1634,6 +1607,10 @@ func (q *Queries) GetAssetsUnified(ctx context.Context, arg GetAssetsUnifiedPara
 		arg.Liked,
 		arg.CameraModel,
 		arg.LensModel,
+		arg.LocationNorth,
+		arg.LocationSouth,
+		arg.LocationEast,
+		arg.LocationWest,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -1788,7 +1765,7 @@ func (q *Queries) GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWa
 	return items, nil
 }
 
-const getDistinctCameraMakes = `-- name: GetDistinctCameraMakes :many
+const getDistinctCameraModels = `-- name: GetDistinctCameraModels :many
 SELECT DISTINCT a.specific_metadata->>'camera_model' as camera_model
 FROM assets a
 WHERE a.is_deleted = false
@@ -1797,8 +1774,8 @@ WHERE a.is_deleted = false
 ORDER BY camera_model
 `
 
-func (q *Queries) GetDistinctCameraMakes(ctx context.Context) ([]interface{}, error) {
-	rows, err := q.db.Query(ctx, getDistinctCameraMakes)
+func (q *Queries) GetDistinctCameraModels(ctx context.Context) ([]interface{}, error) {
+	rows, err := q.db.Query(ctx, getDistinctCameraModels)
 	if err != nil {
 		return nil, err
 	}
@@ -2297,6 +2274,56 @@ func (q *Queries) GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsPa
 	return items, nil
 }
 
+const listAssetsByRepositoryAny = `-- name: ListAssetsByRepositoryAny :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at FROM assets
+WHERE repository_id = $1
+  AND storage_path IS NOT NULL
+ORDER BY storage_path ASC
+`
+
+func (q *Queries) ListAssetsByRepositoryAny(ctx context.Context, repositoryID pgtype.UUID) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, listAssetsByRepositoryAny, repositoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.CaptureOffsetMinutes,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeAssetFromAlbum = `-- name: RemoveAssetFromAlbum :exec
 DELETE FROM album_assets
 WHERE asset_id = $1 AND album_id = $2
@@ -2437,279 +2464,6 @@ func (q *Queries) SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]A
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const searchAssetsFilename = `-- name: SearchAssetsFilename :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
-LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
-WHERE a.is_deleted = false
-  AND a.original_filename ILIKE '%' || $1 || '%'
-  AND ($2::text IS NULL OR a.type = $2)
-  AND ($3::integer IS NULL OR a.owner_id = $3)
-  AND ($4::uuid IS NULL OR a.repository_id = $4)
-  AND ($5::integer IS NULL OR aa.album_id = $5)
-  AND ($6::text IS NULL OR
-    CASE $7::text
-      WHEN 'contains' THEN a.original_filename ILIKE '%' || $6 || '%'
-      WHEN 'matches' THEN a.original_filename ILIKE $6
-      WHEN 'startswith' THEN a.original_filename ILIKE $6 || '%'
-      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $6
-      ELSE true
-    END
-  )
-  AND ($8::timestamptz IS NULL OR a.upload_time >= $8)
-  AND ($9::timestamptz IS NULL OR a.upload_time <= $9)
-  AND ($10::boolean IS NULL OR
-    CASE
-      WHEN $10 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
-      WHEN $10 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
-      ELSE true
-    END
-  )
-  AND ($11::integer IS NULL OR
-    CASE
-      WHEN $11 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $11
-    END
-  )
-  AND ($12::boolean IS NULL OR a.liked = $12)
-  AND ($13::text IS NULL OR a.specific_metadata->>'camera_model' = $13)
-  AND ($14::text IS NULL OR a.specific_metadata->>'lens_model' = $14)
-ORDER BY a.upload_time DESC
-LIMIT $16 OFFSET $15
-`
-
-type SearchAssetsFilenameParams struct {
-	Query        *string            `db:"query" json:"query"`
-	AssetType    *string            `db:"asset_type" json:"asset_type"`
-	OwnerID      *int32             `db:"owner_id" json:"owner_id"`
-	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	AlbumID      *int32             `db:"album_id" json:"album_id"`
-	FilenameVal  *string            `db:"filename_val" json:"filename_val"`
-	FilenameMode *string            `db:"filename_mode" json:"filename_mode"`
-	DateFrom     pgtype.Timestamptz `db:"date_from" json:"date_from"`
-	DateTo       pgtype.Timestamptz `db:"date_to" json:"date_to"`
-	IsRaw        *bool              `db:"is_raw" json:"is_raw"`
-	Rating       *int32             `db:"rating" json:"rating"`
-	Liked        *bool              `db:"liked" json:"liked"`
-	CameraModel  *string            `db:"camera_model" json:"camera_model"`
-	LensModel    *string            `db:"lens_model" json:"lens_model"`
-	Offset       int32              `db:"offset" json:"offset"`
-	Limit        int32              `db:"limit" json:"limit"`
-}
-
-func (q *Queries) SearchAssetsFilename(ctx context.Context, arg SearchAssetsFilenameParams) ([]Asset, error) {
-	rows, err := q.db.Query(ctx, searchAssetsFilename,
-		arg.Query,
-		arg.AssetType,
-		arg.OwnerID,
-		arg.RepositoryID,
-		arg.AlbumID,
-		arg.FilenameVal,
-		arg.FilenameMode,
-		arg.DateFrom,
-		arg.DateTo,
-		arg.IsRaw,
-		arg.Rating,
-		arg.Liked,
-		arg.CameraModel,
-		arg.LensModel,
-		arg.Offset,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Asset
-	for rows.Next() {
-		var i Asset
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.OwnerID,
-			&i.Type,
-			&i.OriginalFilename,
-			&i.StoragePath,
-			&i.MimeType,
-			&i.FileSize,
-			&i.Hash,
-			&i.Width,
-			&i.Height,
-			&i.Duration,
-			&i.UploadTime,
-			&i.TakenTime,
-			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
-			&i.SpecificMetadata,
-			&i.Rating,
-			&i.Liked,
-			&i.RepositoryID,
-			&i.Status,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const searchAssetsVector = `-- name: SearchAssetsVector :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, (e.embedding <-> $1::vector) AS distance
-FROM assets a
-JOIN embeddings e ON a.asset_id = e.asset_id
-LEFT JOIN album_assets aa ON a.asset_id = aa.asset_id
-WHERE a.is_deleted = false
-  AND e.embedding_type = $2::text
-  AND e.is_primary = true
-  AND ($3::text IS NULL OR a.type = $3)
-  AND ($4::integer IS NULL OR a.owner_id = $4)
-  AND ($5::uuid IS NULL OR a.repository_id = $5)
-  AND ($6::integer IS NULL OR aa.album_id = $6)
-  AND ($7::text IS NULL OR
-    CASE $8::text
-      WHEN 'contains' THEN a.original_filename ILIKE '%' || $7 || '%'
-      WHEN 'matches' THEN a.original_filename ILIKE $7
-      WHEN 'startswith' THEN a.original_filename ILIKE $7 || '%'
-      WHEN 'endswith' THEN a.original_filename ILIKE '%' || $7
-      ELSE true
-    END
-  )
-  AND ($9::timestamptz IS NULL OR a.upload_time >= $9)
-  AND ($10::timestamptz IS NULL OR a.upload_time <= $10)
-  AND ($11::boolean IS NULL OR
-    CASE
-      WHEN $11 = true THEN (a.specific_metadata->>'is_raw')::boolean = true
-      WHEN $11 = false THEN (a.specific_metadata->>'is_raw')::boolean = false OR a.specific_metadata->>'is_raw' IS NULL
-      ELSE true
-    END
-  )
-  AND ($12::integer IS NULL OR
-    CASE
-      WHEN $12 = 0 THEN a.rating IS NULL
-      ELSE a.rating = $12
-    END
-  )
-  AND ($13::boolean IS NULL OR a.liked = $13)
-  AND ($14::text IS NULL OR a.specific_metadata->>'camera_model' = $14)
-  AND ($15::text IS NULL OR a.specific_metadata->>'lens_model' = $15)
-  AND (e.embedding <-> $1::vector) <= $16::float8
-ORDER BY (e.embedding <-> $1::vector)
-LIMIT $18 OFFSET $17
-`
-
-type SearchAssetsVectorParams struct {
-	Embedding     *pgvector.Vector   `db:"embedding" json:"embedding"`
-	EmbeddingType string             `db:"embedding_type" json:"embedding_type"`
-	AssetType     *string            `db:"asset_type" json:"asset_type"`
-	OwnerID       *int32             `db:"owner_id" json:"owner_id"`
-	RepositoryID  pgtype.UUID        `db:"repository_id" json:"repository_id"`
-	AlbumID       *int32             `db:"album_id" json:"album_id"`
-	FilenameVal   *string            `db:"filename_val" json:"filename_val"`
-	FilenameMode  *string            `db:"filename_mode" json:"filename_mode"`
-	DateFrom      pgtype.Timestamptz `db:"date_from" json:"date_from"`
-	DateTo        pgtype.Timestamptz `db:"date_to" json:"date_to"`
-	IsRaw         *bool              `db:"is_raw" json:"is_raw"`
-	Rating        *int32             `db:"rating" json:"rating"`
-	Liked         *bool              `db:"liked" json:"liked"`
-	CameraModel   *string            `db:"camera_model" json:"camera_model"`
-	LensModel     *string            `db:"lens_model" json:"lens_model"`
-	MaxDistance   *float64           `db:"max_distance" json:"max_distance"`
-	Offset        int32              `db:"offset" json:"offset"`
-	Limit         int32              `db:"limit" json:"limit"`
-}
-
-type SearchAssetsVectorRow struct {
-	AssetID              pgtype.UUID              `db:"asset_id" json:"asset_id"`
-	OwnerID              *int32                   `db:"owner_id" json:"owner_id"`
-	Type                 string                   `db:"type" json:"type"`
-	OriginalFilename     string                   `db:"original_filename" json:"original_filename"`
-	StoragePath          *string                  `db:"storage_path" json:"storage_path"`
-	MimeType             string                   `db:"mime_type" json:"mime_type"`
-	FileSize             int64                    `db:"file_size" json:"file_size"`
-	Hash                 *string                  `db:"hash" json:"hash"`
-	Width                *int32                   `db:"width" json:"width"`
-	Height               *int32                   `db:"height" json:"height"`
-	Duration             *float64                 `db:"duration" json:"duration"`
-	UploadTime           pgtype.Timestamptz       `db:"upload_time" json:"upload_time"`
-	TakenTime            pgtype.Timestamptz       `db:"taken_time" json:"taken_time"`
-	CaptureOffsetMinutes *int16                   `db:"capture_offset_minutes" json:"capture_offset_minutes"`
-	IsDeleted            *bool                    `db:"is_deleted" json:"is_deleted"`
-	DeletedAt            pgtype.Timestamptz       `db:"deleted_at" json:"deleted_at"`
-	SpecificMetadata     dbtypes.SpecificMetadata `db:"specific_metadata" json:"specific_metadata"`
-	Rating               *int32                   `db:"rating" json:"rating"`
-	Liked                *bool                    `db:"liked" json:"liked"`
-	RepositoryID         pgtype.UUID              `db:"repository_id" json:"repository_id"`
-	Status               []byte                   `db:"status" json:"status"`
-	UpdatedAt            pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
-	Distance             interface{}              `db:"distance" json:"distance"`
-}
-
-func (q *Queries) SearchAssetsVector(ctx context.Context, arg SearchAssetsVectorParams) ([]SearchAssetsVectorRow, error) {
-	rows, err := q.db.Query(ctx, searchAssetsVector,
-		arg.Embedding,
-		arg.EmbeddingType,
-		arg.AssetType,
-		arg.OwnerID,
-		arg.RepositoryID,
-		arg.AlbumID,
-		arg.FilenameVal,
-		arg.FilenameMode,
-		arg.DateFrom,
-		arg.DateTo,
-		arg.IsRaw,
-		arg.Rating,
-		arg.Liked,
-		arg.CameraModel,
-		arg.LensModel,
-		arg.MaxDistance,
-		arg.Offset,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []SearchAssetsVectorRow
-	for rows.Next() {
-		var i SearchAssetsVectorRow
-		if err := rows.Scan(
-			&i.AssetID,
-			&i.OwnerID,
-			&i.Type,
-			&i.OriginalFilename,
-			&i.StoragePath,
-			&i.MimeType,
-			&i.FileSize,
-			&i.Hash,
-			&i.Width,
-			&i.Height,
-			&i.Duration,
-			&i.UploadTime,
-			&i.TakenTime,
-			&i.CaptureOffsetMinutes,
-			&i.IsDeleted,
-			&i.DeletedAt,
-			&i.SpecificMetadata,
-			&i.Rating,
-			&i.Liked,
-			&i.RepositoryID,
-			&i.Status,
-			&i.UpdatedAt,
-			&i.Distance,
 		); err != nil {
 			return nil, err
 		}

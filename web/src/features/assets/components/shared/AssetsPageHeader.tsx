@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   X,
   Plus,
+  RefreshCcwDot,
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import FilterTool, {
@@ -49,6 +50,8 @@ import {
 import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult, ListAlbumsResponse } from "@/lib/albums/types";
+import { useWorkingRepository } from "@/features/settings";
+import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 
 interface AssetsPageHeaderProps {
   groupBy: GroupByType;
@@ -81,6 +84,12 @@ const AssetsPageHeader = ({
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
   const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
+  const {
+    repositories,
+    selectedRepository,
+    scopeLabel,
+  } = useWorkingRepository();
+  const { scanRepositories, isScanning } = useRepositoryScan();
 
   // Hydrate FilterTool from global filters (single source of truth)
   const inboundDTO = useMemo(() => {
@@ -99,7 +108,7 @@ const AssetsPageHeader = ({
     if (f.date && (f.date.from || f.date.to)) {
       dto.date = { from: f.date.from, to: f.date.to };
     }
-    if (f.camera_make?.trim()) dto.camera_make = f.camera_make.trim();
+    if (f.camera_model?.trim()) dto.camera_model = f.camera_model.trim();
     if (f.lens?.trim()) dto.lens = f.lens.trim();
     return dto;
   }, [filters]);
@@ -157,7 +166,7 @@ const AssetsPageHeader = ({
         liked: undefined,
         filename: undefined,
         date: undefined,
-        camera_make: undefined,
+        camera_model: undefined,
         lens: undefined,
       };
 
@@ -179,8 +188,8 @@ const AssetsPageHeader = ({
         };
       }
 
-      if (newFilters.camera_make && newFilters.camera_make.trim()) {
-        payload.camera_make = newFilters.camera_make.trim();
+      if (newFilters.camera_model && newFilters.camera_model.trim()) {
+        payload.camera_model = newFilters.camera_model.trim();
       }
 
       if (newFilters.lens && newFilters.lens.trim()) {
@@ -198,6 +207,45 @@ const AssetsPageHeader = ({
   const handleToggleSelection = useCallback(() => {
     selection.setEnabled(!selection.enabled);
   }, [selection]);
+
+  const handleScanCurrentLibrary = useCallback(async () => {
+    const targetRepositoryIds = selectedRepository
+      ? [selectedRepository.id]
+      : repositories.map((repository) => repository.id).filter(Boolean);
+
+    if (targetRepositoryIds.length === 0) {
+      showMessage("info", t("assets.assetsPageHeader.scan.noRepositories"));
+      return;
+    }
+
+    try {
+      await scanRepositories(targetRepositoryIds);
+      showMessage(
+        "success",
+        selectedRepository
+          ? t("assets.assetsPageHeader.scan.currentQueued", {
+              name: scopeLabel,
+            })
+          : t("assets.assetsPageHeader.scan.allQueued", {
+              count: targetRepositoryIds.length,
+            }),
+      );
+    } catch (error) {
+      showMessage(
+        "error",
+        error instanceof Error
+          ? error.message
+          : t("assets.assetsPageHeader.scan.failed"),
+      );
+    }
+  }, [
+    repositories,
+    scanRepositories,
+    scopeLabel,
+    selectedRepository,
+    showMessage,
+    t,
+  ]);
 
   const handleDeleteClick = () => {
     setIsDeleteConfirmOpen(true);
@@ -359,6 +407,25 @@ const AssetsPageHeader = ({
           onChange={handleFiltersChange}
           autoApply={true}
         />
+
+        <button
+          type="button"
+          className="btn btn-sm btn-soft btn-info gap-2 rounded-full"
+          onClick={handleScanCurrentLibrary}
+          disabled={isScanning || repositories.length === 0}
+          title={t("assets.assetsPageHeader.scan.title", {
+            scope: scopeLabel,
+          })}
+        >
+          {isScanning ? (
+            <span className="loading loading-spinner loading-xs" />
+          ) : (
+            <RefreshCcwDot className="h-4 w-4" />
+          )}
+          <span className="hidden md:inline text-xs font-medium">
+            {t("assets.assetsPageHeader.scan.label")}
+          </span>
+        </button>
 
         {/* Selection Toggle Button */}
         <button

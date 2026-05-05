@@ -204,6 +204,16 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		return
 	}
 
+	if headerBuf.Len() > 0 {
+		if _, err = osFile.Write(headerBuf.Bytes()); err != nil {
+			osFile.Close()
+			log.Printf("Failed to write sniffed header to staging: %v", err)
+			h.handleUploadFailureFile(repository.Path, stagingFile.Path, header.Filename, "write upload header to staging")
+			api.GinInternalError(c, err, "Upload failed")
+			return
+		}
+	}
+
 	_, err = io.Copy(osFile, file)
 	osFile.Close()
 	if err != nil {
@@ -1316,18 +1326,48 @@ func normalizeAssetQueryGroupBy(groupBy, searchType string) string {
 	}
 }
 
+func normalizeFilenameOperator(operator string) string {
+	switch strings.ToLower(strings.TrimSpace(operator)) {
+	case "matches":
+		return "matches"
+	case "starts_with", "startswith":
+		return "starts_with"
+	case "ends_with", "endswith":
+		return "ends_with"
+	default:
+		return "contains"
+	}
+}
+
+func assetQueryDateLocation(viewerTimeZone string) *time.Location {
+	if strings.TrimSpace(viewerTimeZone) == "" {
+		return time.UTC
+	}
+	location, err := time.LoadLocation(strings.TrimSpace(viewerTimeZone))
+	if err != nil {
+		return time.UTC
+	}
+	return location
+}
+
 func buildQueryAssetsParams(query, searchType, groupBy, viewerTimeZone string, filter dto.AssetFilterDTO, pagination dto.PaginationDTO) service.QueryAssetsParams {
 	var dateFrom, dateTo *time.Time
 	if filter.Date != nil {
 		dateFrom = filter.Date.From
 		dateTo = filter.Date.To
 
-		// Normalize date-only inputs to inclusive end-of-day
-		if dateFrom != nil && dateTo == nil {
-			end := time.Date(dateFrom.Year(), dateFrom.Month(), dateFrom.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), dateFrom.Location())
+		// Normalize date-only inputs in the viewer's timezone. Exact timestamps
+		// remain exact.
+		location := assetQueryDateLocation(viewerTimeZone)
+		if dateFrom != nil && filter.Date.FromDateOnly {
+			start := time.Date(dateFrom.Year(), dateFrom.Month(), dateFrom.Day(), 0, 0, 0, 0, location)
+			dateFrom = &start
+		}
+		if dateFrom != nil && dateTo == nil && filter.Date.FromDateOnly {
+			end := time.Date(dateFrom.Year(), dateFrom.Month(), dateFrom.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), location)
 			dateTo = &end
-		} else if dateTo != nil {
-			end := time.Date(dateTo.Year(), dateTo.Month(), dateTo.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), dateTo.Location())
+		} else if dateTo != nil && filter.Date.ToDateOnly {
+			end := time.Date(dateTo.Year(), dateTo.Month(), dateTo.Day(), 23, 59, 59, int(time.Second-time.Nanosecond), location)
 			dateTo = &end
 		}
 	}
@@ -1338,25 +1378,47 @@ func buildQueryAssetsParams(query, searchType, groupBy, viewerTimeZone string, f
 		albumIDPtr = &id
 	}
 
+	var filenameValue, filenameOperator *string
+	if filter.Filename != nil && strings.TrimSpace(filter.Filename.Value) != "" {
+		value := strings.TrimSpace(filter.Filename.Value)
+		operator := normalizeFilenameOperator(filter.Filename.Operator)
+		filenameValue = &value
+		filenameOperator = &operator
+	}
+
+	var locationNorth, locationSouth, locationEast, locationWest *float64
+	if filter.Location != nil {
+		locationNorth = &filter.Location.North
+		locationSouth = &filter.Location.South
+		locationEast = &filter.Location.East
+		locationWest = &filter.Location.West
+	}
+
 	return service.QueryAssetsParams{
-		Query:          query,
-		SearchType:     searchType,
-		ViewerTimeZone: viewerTimeZone,
-		RepositoryID:   filter.RepositoryID,
-		AssetType:      filter.Type,
-		AssetTypes:     filter.Types,
-		OwnerID:        filter.OwnerID,
-		AlbumID:        albumIDPtr,
-		DateFrom:       dateFrom,
-		DateTo:         dateTo,
-		IsRaw:          filter.RAW,
-		Rating:         filter.Rating,
-		Liked:          filter.Liked,
-		CameraModel:    filter.CameraMake,
-		LensModel:      filter.Lens,
-		GroupBy:        normalizeAssetQueryGroupBy(groupBy, searchType),
-		Limit:          pagination.Limit,
-		Offset:         pagination.Offset,
+		Query:            query,
+		SearchType:       searchType,
+		ViewerTimeZone:   viewerTimeZone,
+		RepositoryID:     filter.RepositoryID,
+		AssetType:        filter.Type,
+		AssetTypes:       filter.Types,
+		OwnerID:          filter.OwnerID,
+		AlbumID:          albumIDPtr,
+		FilenameValue:    filenameValue,
+		FilenameOperator: filenameOperator,
+		DateFrom:         dateFrom,
+		DateTo:           dateTo,
+		IsRaw:            filter.RAW,
+		Rating:           filter.Rating,
+		Liked:            filter.Liked,
+		CameraModel:      filter.CameraModel,
+		LensModel:        filter.Lens,
+		LocationNorth:    locationNorth,
+		LocationSouth:    locationSouth,
+		LocationEast:     locationEast,
+		LocationWest:     locationWest,
+		GroupBy:          normalizeAssetQueryGroupBy(groupBy, searchType),
+		Limit:            pagination.Limit,
+		Offset:           pagination.Offset,
 	}
 }
 
@@ -1830,7 +1892,7 @@ func countUniqueAssets(assets []repo.Asset) int {
 
 // GetFilterOptions returns available options for filters
 // @Summary Get filter options
-// @Description Get available camera makes and lenses for filter dropdowns
+// @Description Get available camera models and lenses for filter dropdowns
 // @Tags assets
 // @Accept json
 // @Produce json
@@ -1840,9 +1902,9 @@ func countUniqueAssets(assets []repo.Asset) int {
 func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	cameraMakes, err := h.assetService.GetDistinctCameraMakes(ctx)
+	cameraModels, err := h.assetService.GetDistinctCameraModels(ctx)
 	if err != nil {
-		log.Printf("Failed to get camera makes: %v", err)
+		log.Printf("Failed to get camera models: %v", err)
 		api.GinInternalError(c, err, "Failed to get filter options")
 		return
 	}
@@ -1855,8 +1917,8 @@ func (h *AssetHandler) GetFilterOptions(c *gin.Context) {
 	}
 
 	response := dto.OptionsResponseDTO{
-		CameraMakes: cameraMakes,
-		Lenses:      lenses,
+		CameraModels: cameraModels,
+		Lenses:       lenses,
 	}
 	api.GinSuccess(c, response)
 }

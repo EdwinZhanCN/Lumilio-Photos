@@ -300,7 +300,11 @@ const CreateAlbumModal: React.FC = () => {
 
               <div className="flex-1 overflow-hidden">
                 <WorkerProvider preload={["justified"]}>
-                  <AssetsProvider persist={false} defaultSelectionMode="single">
+                  <AssetsProvider
+                    scopeId="photo-picker"
+                    persist={false}
+                    defaultSelectionMode="single"
+                  >
                     <PhotoPicker onSelect={handlePhotoSelect} />
                   </AssetsProvider>
                 </WorkerProvider>

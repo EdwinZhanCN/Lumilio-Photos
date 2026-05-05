@@ -2728,7 +2728,7 @@ export interface paths {
         };
         /**
          * Get filter options
-         * @description Get available camera makes and lenses for filter dropdowns
+         * @description Get available camera models and lenses for filter dropdowns
          */
         get: {
             parameters: {
@@ -5979,6 +5979,330 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/repositories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create repository
+         * @description Create a repository folder under the server storage root. If the target folder already contains a .lumiliorepo file, it is registered instead.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Repository name */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.CreateRepositoryRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Repository created successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue repository scan
+         * @description Queue a manual scan for a repository free workspace.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Scan request */
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.RepositoryScanRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Repository scan queued successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/scans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List repository scans
+         * @description List recent scan runs for a repository.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Limit */
+                    limit?: number;
+                    /** @description Offset */
+                    offset?: number;
+                };
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository scan runs retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/scans/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get latest repository scan
+         * @description Return the latest scan run for a repository.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Latest repository scan retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description No scan run found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/system": {
         parameters: {
             query?: never;
@@ -7233,14 +7557,15 @@ export interface components {
         "dto.AssetFilterDTO": {
             /** @example 123 */
             album_id?: number;
-            /** @example Canon */
-            camera_make?: string;
+            /** @example Canon EOS R5 */
+            camera_model?: string;
             date?: components["schemas"]["dto.DateRangeDTO"];
             filename?: components["schemas"]["dto.FilenameFilterDTO"];
             /** @example EF 50mm f/1.8 */
             lens?: string;
             /** @example true */
             liked?: boolean;
+            location?: components["schemas"]["dto.LocationBBoxDTO"];
             /** @example 123 */
             owner_id?: number;
             /** @example 5 */
@@ -7437,6 +7762,13 @@ export interface components {
             cover_asset_id?: string;
             description?: string;
         };
+        "dto.CreateRepositoryRequestDTO": {
+            /** @example Family Photos */
+            name: string;
+        };
+        "dto.CreateRepositoryResponseDTO": {
+            repository?: components["schemas"]["dto.RepositoryDTO"];
+        };
         "dto.DateRangeDTO": {
             from?: string;
             to?: string;
@@ -7463,10 +7795,10 @@ export interface components {
         };
         "dto.FilenameFilterDTO": {
             /**
-             * @example startswith
+             * @example starts_with
              * @enum {string}
              */
-            mode?: "contains" | "matches" | "startswith" | "endswith";
+            operator?: "contains" | "matches" | "starts_with" | "ends_with";
             /** @example IMG_ */
             value?: string;
         };
@@ -7530,6 +7862,16 @@ export interface components {
             total?: number;
             users?: components["schemas"]["dto.ManagedUserDTO"][];
         };
+        "dto.LocationBBoxDTO": {
+            /** @example -122.3 */
+            east?: number;
+            /** @example 37.9 */
+            north?: number;
+            /** @example 37.7 */
+            south?: number;
+            /** @example -122.5 */
+            west?: number;
+        };
         "dto.LoginRequestDTO": {
             password: string;
             username: string;
@@ -7590,7 +7932,7 @@ export interface components {
             message?: string;
         };
         "dto.OptionsResponseDTO": {
-            camera_makes?: string[];
+            camera_models?: string[];
             lenses?: string[];
         };
         /** @description limit, offset */
@@ -7732,6 +8074,56 @@ export interface components {
             issuer?: string;
             otpauth_uri?: string;
             secret?: string;
+        };
+        "dto.RepositoryDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /** @example false */
+            is_primary?: boolean;
+            /** @example Family Photos */
+            name?: string;
+            /** @example /data/storage/family-photos */
+            path?: string;
+        };
+        "dto.RepositoryScanQueuedDTO": {
+            /** @example 12345 */
+            job_id?: number;
+            /** @example manual */
+            mode?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            /** @example queued */
+            status?: string;
+        };
+        "dto.RepositoryScanRequestDTO": {
+            /** @example false */
+            force?: boolean;
+        };
+        "dto.RepositoryScanRunDTO": {
+            /** @example 1 */
+            deleted_count?: number;
+            /** @example 10 */
+            discovered_count?: number;
+            error?: string;
+            finished_at?: string;
+            /** @example manual */
+            mode?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            /** @example edwin */
+            requested_by?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            scan_id?: string;
+            /** @example 4 */
+            skipped_count?: number;
+            started_at?: string;
+            /** @example completed */
+            status?: string;
+            /** @example 2 */
+            updated_count?: number;
+        };
+        "dto.RepositoryScanRunListDTO": {
+            scans?: components["schemas"]["dto.RepositoryScanRunDTO"][];
         };
         "dto.ReprocessAssetRequestDTO": {
             /** @example false */

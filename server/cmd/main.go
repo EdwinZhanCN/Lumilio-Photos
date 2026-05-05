@@ -22,8 +22,8 @@ import (
 	"server/internal/queue"
 	"server/internal/service"
 	"server/internal/storage"
-	"server/internal/storage/monitor"
 	"server/internal/storage/repocfg"
+	"server/internal/storage/scanner"
 
 	lumenconfig "github.com/edwinzhancn/lumen-sdk/pkg/config"
 	"github.com/google/uuid"
@@ -83,7 +83,7 @@ func main() {
 	repositoryLogger := logRuntime.Named("repository")
 	processorLogger := logRuntime.Named("processor")
 	indexingLogger := logRuntime.Named("indexing")
-	watchmanLogger := logRuntime.Named("watchman")
+	scannerLogger := logRuntime.Named("repository_scanner")
 	repoAuditProvider := logging.NewRepositoryAuditProvider(logRuntime.Named("repo_audit"))
 
 	appLogger.Info("starting Lumilio Photos API",
@@ -203,6 +203,7 @@ func main() {
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
 	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, settingsService, processorLogger, repoAuditProvider)
+	repositoryScanner := scanner.NewScanner(queries, queueClient, appConfig.RepositoryScan, scannerLogger)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})
 	river.AddWorker[queue.MetadataArgs](workers, &queue.MetadataWorker{Process: assetProcessor.ProcessMetadataTask})
@@ -210,6 +211,7 @@ func main() {
 	river.AddWorker[queue.TranscodeArgs](workers, &queue.TranscodeWorker{Process: assetProcessor.ProcessTranscodeTask})
 	river.AddWorker[queue.AssetRetryArgs](workers, &queue.AssetRetryWorker{ProcessRetry: assetProcessor.ProcessRetryTask})
 	river.AddWorker[queue.ReindexAssetsArgs](workers, &queue.ReindexAssetsWorker{IndexingService: indexingService})
+	river.AddWorker[queue.ScanRepositoryArgs](workers, &queue.ScanRepositoryWorker{ProcessScan: repositoryScanner.ProcessScanRepository})
 
 	go func() {
 		if err := queueClient.Start(context.Background()); err != nil {
@@ -219,11 +221,11 @@ func main() {
 
 	appLogger.Info("queues initialized successfully", zap.String("operation", "queue.init"))
 
-	repoMonitor := monitor.NewWatchmanMonitor(queries, queueClient, appConfig.WatchmanConfig, watchmanLogger)
-	if err := repoMonitor.Start(ctx); err != nil {
-		appLogger.Fatal("failed to start watchman monitor", zap.String("operation", "watchman.start"), zap.Error(err))
+	repositoryScanScheduler := scanner.NewScheduler(repositoryScanner, scannerLogger)
+	if err := repositoryScanScheduler.Start(ctx); err != nil {
+		appLogger.Fatal("failed to start repository scan scheduler", zap.String("operation", "repository_scan.start"), zap.Error(err))
 	}
-	defer repoMonitor.Stop()
+	defer repositoryScanScheduler.Stop()
 
 	// Initialize controllers with new storage system
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, queries, repoManager, stagingManager, queueClient)
@@ -236,6 +238,7 @@ func main() {
 	agentController := handler.NewAgentHandler(agentService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
 	settingsController := handler.NewSettingsHandler(settingsService)
+	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, os.Getenv("STORAGE_PATH"))
 
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
@@ -256,6 +259,7 @@ func main() {
 		capabilitiesController,
 		settingsController,
 		userController,
+		repositoryScanController,
 		handler.RequireLLMAgentEnabled(settingsService),
 	)
 

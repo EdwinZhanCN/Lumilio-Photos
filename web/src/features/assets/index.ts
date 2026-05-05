@@ -16,8 +16,17 @@ export { useAssetsNavigation } from "./hooks/useAssetsNavigation";
 // Export selectors for fine-grained access
 export * from "./selectors";
 
-// Export Zustand store
-export { useAssetsStore } from "./assets.store";
+// Export scoped Zustand store helpers
+export {
+  createAssetsStore,
+  useAssetsStore,
+  useAssetsStoreApi,
+} from "./assets.store";
+export type {
+  AssetsStore,
+  AssetsStoreApi,
+  AssetsStoreInitialState,
+} from "./assets.store";
 
 // Export types
 export type {

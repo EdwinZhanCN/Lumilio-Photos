@@ -5,8 +5,38 @@ import tailwindcss from "@tailwindcss/vite";
 import wasm from "vite-plugin-wasm";
 import path from "path";
 import topLevelAwait from "vite-plugin-top-level-await";
-import {preview} from "@vitest/browser-preview";
+import { preview } from "@vitest/browser-preview";
 
+const browserTestsEnabled = process.env.VITEST_BROWSER === "true";
+const testProjects = [
+  {
+    extends: true,
+    test: {
+      name: "happy-dom",
+      environment: "happy-dom",
+      setupFiles: ["./setup.happy-dom.ts"],
+      include: ["src/**/*.{test,spec}.{ts,tsx}"],
+      exclude: ["src/workers/*", "**/node_modules/**"],
+    },
+  },
+  ...(browserTestsEnabled
+    ? [
+        {
+          extends: true,
+          test: {
+            name: "browser",
+            include: ["src/workers/*"],
+            exclude: ["**/node_modules/**"],
+            browser: {
+              provider: preview(),
+              instances: [{ browser: "chrome" }],
+              enabled: true,
+            },
+          },
+        },
+      ]
+    : []),
+];
 
 export default defineConfig({
   resolve: {
@@ -29,33 +59,8 @@ export default defineConfig({
   },
 
   test: {
-    projects: [
-      {
-        extends: true,
-        test: {
-          name: "happy-dom",
-          environment: "happy-dom",
-          setupFiles: ["./setup.happy-dom.ts"],
-          include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/workers/*", "**/node_modules/**"],
-        }
-      },
-      {
-        extends: true,
-        test: {
-          name: "browser",
-          include: ["src/workers/*"],
-          exclude: ["**/node_modules/**"],
-          browser: {
-            provider: preview(),
-            instances: [
-              { browser: 'chrome' },
-            ],
-            enabled: true,
-          },
-        }
-      },
-    ],  },
+    projects: testProjects,
+  },
 
   optimizeDeps: {
     exclude: ["@immich/justified-layout-wasm"],

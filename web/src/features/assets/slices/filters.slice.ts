@@ -10,7 +10,7 @@ export interface FiltersSlice {
   setFilterLiked: (liked: boolean | undefined) => void;
   setFilterFilename: (filename: FiltersState["filename"]) => void;
   setFilterDate: (date: FiltersState["date"]) => void;
-  setFilterCameraMake: (cameraMake: string | undefined) => void;
+  setFilterCameraModel: (cameraModel: string | undefined) => void;
   setFilterLens: (lens: string | undefined) => void;
   resetFilters: () => void;
   batchUpdateFilters: (updates: Partial<FiltersState>) => void;
@@ -29,7 +29,7 @@ export const createFiltersSlice: StateCreator<
     liked: undefined,
     filename: undefined,
     date: undefined,
-    camera_make: undefined,
+    camera_model: undefined,
     lens: undefined,
   },
 
@@ -63,9 +63,9 @@ export const createFiltersSlice: StateCreator<
       state.filters.date = date;
     }),
 
-  setFilterCameraMake: (cameraMake) =>
+  setFilterCameraModel: (cameraModel) =>
     set((state) => {
-      state.filters.camera_make = cameraMake;
+      state.filters.camera_model = cameraModel;
     }),
 
   setFilterLens: (lens) =>
@@ -82,7 +82,7 @@ export const createFiltersSlice: StateCreator<
         liked: undefined,
         filename: undefined,
         date: undefined,
-        camera_make: undefined,
+        camera_model: undefined,
         lens: undefined,
       };
     }),
@@ -119,7 +119,7 @@ export const selectActiveFilterCount = (input: FiltersInput): number => {
     state.liked !== undefined,
     state.filename?.value?.trim(),
     state.date && (state.date.from || state.date.to),
-    state.camera_make?.trim(),
+    state.camera_model?.trim(),
     state.lens?.trim(),
   ];
 
@@ -157,8 +157,8 @@ export const selectFilterAsAssetFilter = (input: FiltersInput) => {
       to: state.date.to,
     };
   }
-  if (state.camera_make && state.camera_make.trim()) {
-    filter.camera_make = state.camera_make.trim();
+  if (state.camera_model && state.camera_model.trim()) {
+    filter.camera_model = state.camera_model.trim();
   }
   if (state.lens && state.lens.trim()) {
     filter.lens = state.lens.trim();

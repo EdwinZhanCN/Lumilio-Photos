@@ -281,7 +281,12 @@ const AlbumDetails = () => {
 
   return (
     <WorkerProvider preload={["exif", "export"]}>
-      <AssetsProvider persist={false} basePath={`/collections/${albumId}`}>
+      <AssetsProvider
+        key={`album:${albumId}`}
+        scopeId={`album:${albumId}`}
+        persist={false}
+        basePath={`/collections/${albumId}`}
+      >
         <AlbumAssetsContent />
       </AssetsProvider>
     </WorkerProvider>

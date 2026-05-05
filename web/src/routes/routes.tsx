@@ -4,7 +4,7 @@ import { Studio } from "@/features/studio/routes/Studio";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import Settings from "@/features/settings/routes/Settings";
 import Monitor from "@/features/monitor/routes/Monitor";
-import UploadAssets from "@/features/upload/routes/UploadAssets";
+import Manage from "@/features/manage/routes/Manage";
 import Collections from "@/features/collections/routes/Collections";
 import AlbumDetails from "@/features/collections/routes/AlbumDetails";
 import PersonDetails from "@/features/people/routes/PersonDetails";
@@ -14,6 +14,7 @@ import LoginPage from "@/features/auth/routes/LoginPage.tsx";
 import MFAPage from "@/features/auth/routes/MFAPage.tsx";
 import ChangePasswordPage from "@/features/auth/routes/ChangePasswordPage.tsx";
 import RegisterPage from "@/features/auth/routes/RegisterPage.tsx";
+import { Navigate } from "react-router-dom";
 
 export const publicRoutes = [
   {
@@ -99,8 +100,12 @@ export const appRoutes = [
     element: <Assets />,
   },
   {
+    path: "/manage",
+    element: <Manage />,
+  },
+  {
     path: "/upload-photos",
-    element: <UploadAssets />,
+    element: <Navigate to="/manage" replace />,
   },
   {
     path: "/studio",
@@ -117,7 +122,7 @@ export const appRoutes = [
   {
     path: "/lumilio",
     element: (
-      <AssetsProvider>
+      <AssetsProvider scopeId="lumilio">
         <LumilioChatPage />
       </AssetsProvider>
     ),

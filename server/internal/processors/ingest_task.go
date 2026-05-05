@@ -148,6 +148,8 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 		return asset, nil
 	}
 
+	assetType := dbtypes.AssetType(asset.Type)
+
 	// Update storage path + keep status processing
 	_, err = ap.queries.UpdateAssetStoragePathAndStatus(ctx, repo.UpdateAssetStoragePathAndStatusParams{
 		AssetID:     asset.AssetID,
@@ -155,12 +157,12 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 		Status:      statusJSON,
 	})
 	if err != nil {
+		ap.markPipelineTasksFailed(ctx, asset.AssetID, trackedPipelineTasks(assetType), fmt.Errorf("update asset storage path: %w", err))
 		return nil, fmt.Errorf("update asset storage path: %w", err)
 	}
 
 	// Enqueue downstream tasks
 	pgID := asset.AssetID
-	assetType := dbtypes.AssetType(asset.Type)
 	commonMeta := jobs.MetadataArgs{
 		AssetID:          pgID,
 		RepoPath:         repository.Path,
@@ -186,6 +188,7 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 	// Always enqueue metadata first
 	_, err = ap.queueClient.Insert(ctx, commonMeta, &river.InsertOpts{Queue: "metadata_asset"})
 	if err != nil {
+		ap.markPipelineTasksFailed(ctx, asset.AssetID, trackedPipelineTasks(assetType), fmt.Errorf("enqueue metadata: %w", err))
 		return nil, fmt.Errorf("enqueue metadata: %w", err)
 	}
 
@@ -193,6 +196,7 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 	case dbtypes.AssetTypePhoto:
 		_, err = ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
 		if err != nil {
+			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskThumbnail}, fmt.Errorf("enqueue thumbnails: %w", err))
 			return nil, fmt.Errorf("enqueue thumbnails: %w", err)
 		}
 
@@ -205,15 +209,18 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 	case dbtypes.AssetTypeVideo:
 		_, err = ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
 		if err != nil {
+			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskThumbnail, taskTranscode}, fmt.Errorf("enqueue thumbnails: %w", err))
 			return nil, fmt.Errorf("enqueue thumbnails: %w", err)
 		}
 		_, err = ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
 		if err != nil {
+			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskTranscode}, fmt.Errorf("enqueue transcode: %w", err))
 			return nil, fmt.Errorf("enqueue transcode: %w", err)
 		}
 	case dbtypes.AssetTypeAudio:
 		_, err = ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
 		if err != nil {
+			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskTranscode}, fmt.Errorf("enqueue transcode: %w", err))
 			return nil, fmt.Errorf("enqueue transcode: %w", err)
 		}
 	default:

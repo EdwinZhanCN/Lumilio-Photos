@@ -354,7 +354,7 @@ assert_storage_strategy_cas() {
 
 run_m1() {
   require_repo_path
-  info "M1: watchman -> discover -> DB 变更闭环"
+  info "M1: repository scan -> discover -> DB 变更闭环"
 
   local workspace="$REPO_PATH/manual_acceptance"
   mkdir -p "$workspace"

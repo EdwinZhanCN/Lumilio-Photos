@@ -3,7 +3,6 @@ import type {
   InfiniteData,
   UseInfiniteQueryResult,
 } from "@tanstack/react-query";
-import { keepPreviousData } from "@tanstack/react-query";
 import { useAssetsStore } from "@/features/assets/assets.store";
 import { useGroupBy } from "@/features/assets/selectors";
 import {
@@ -156,7 +155,6 @@ export function usePersonAssetsView(
     },
     {
       enabled: autoFetch && !disabled && personId > 0,
-      placeholderData: keepPreviousData,
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {

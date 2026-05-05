@@ -70,60 +70,27 @@ export const useUIActions = () => {
     })),
   );
 
-  const updateSearchParams = useCallback(
-    (updater: (params: URLSearchParams) => void) => {
-      if (typeof window === "undefined") return;
-
-      const url = new URL(window.location.href);
-      const params = new URLSearchParams(url.search);
-      updater(params);
-
-      const nextSearch = params.toString();
-      const nextUrl = `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash}`;
-      window.history.replaceState(window.history.state, "", nextUrl);
-    },
-    [],
-  );
-
   const setGroupBy = useCallback(
     (groupBy: GroupByType) => {
       store.setGroupByState(groupBy);
-      updateSearchParams((params) => {
-        params.set("groupBy", groupBy);
-      });
     },
-    [store, updateSearchParams],
+    [store],
   );
 
   const setSearchQuery = useCallback(
     (query: string) => {
       const normalizedQuery = query.trim();
       store.setSearchQueryState(normalizedQuery);
-      updateSearchParams((params) => {
-        if (normalizedQuery) {
-          params.set("q", normalizedQuery);
-        } else {
-          params.delete("q");
-        }
-      });
     },
-    [store, updateSearchParams],
+    [store],
   );
 
   const applySearch = useCallback(
     (query: string) => {
       const normalizedQuery = query.trim();
       store.setSearchQueryState(normalizedQuery);
-
-      updateSearchParams((params) => {
-        if (normalizedQuery) {
-          params.set("q", normalizedQuery);
-        } else {
-          params.delete("q");
-        }
-      });
     },
-    [store, updateSearchParams],
+    [store],
   );
 
   return {
@@ -143,7 +110,7 @@ export const useFilterActions = () =>
       setLiked: s.setFilterLiked,
       setFilename: s.setFilterFilename,
       setDate: s.setFilterDate,
-      setCameraMake: s.setFilterCameraMake,
+      setCameraModel: s.setFilterCameraModel,
       setLens: s.setFilterLens,
       resetFilters: s.resetFilters,
       batchUpdateFilters: s.batchUpdateFilters,

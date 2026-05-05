@@ -2,6 +2,7 @@ package processors
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"server/internal/db/dbtypes"
@@ -71,4 +72,26 @@ func (ap *AssetProcessor) tryMutateAssetStatus(
 	}); err != nil {
 		log.Printf("Failed to mutate asset %s status: %v", assetID.String(), err)
 	}
+}
+
+func (ap *AssetProcessor) markPipelineTasksFailed(
+	ctx context.Context,
+	assetID pgtype.UUID,
+	tasks []string,
+	err error,
+) {
+	if len(tasks) == 0 {
+		return
+	}
+
+	detail := "pipeline task failed before it could be queued"
+	if err != nil {
+		detail = err.Error()
+	}
+
+	ap.tryMutateAssetStatus(ctx, assetID, func(status *statusdb.AssetStatus) {
+		for _, taskName := range tasks {
+			status.MarkTaskFailed(taskName, fmt.Sprintf("%s failed before queueing", taskName), detail)
+		}
+	})
 }

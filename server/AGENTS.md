@@ -13,12 +13,12 @@
   - Media tools on PATH: `exiftool`, `ffmpeg`, `ffprobe`, `dcraw`
 
 ## Important Modules
-- `server/cmd/main.go`: startup order, auto-migration, queue workers, watchman, ML bootstrap.
+- `server/cmd/main.go`: startup order, auto-migration, queue workers, repository scanner, ML bootstrap.
 - `server/internal/api/router.go`: route map, auth boundaries, CORS policy.
 - `server/internal/api/handler/*.go`: request validation + HTTP contracts.
 - `server/internal/service/*.go`: business logic and ML adapters.
 - `server/internal/processors/*.go`: async ingest/metadata/thumbnail/transcode pipeline.
-- `server/internal/storage/*`: repository layout, staging, watchman integration.
+- `server/internal/storage/*`: repository layout, staging, scanner, and repository config.
 - `server/internal/db/*` and `server/migrations/*`: schema and migration runtime.
 
 ## Common Tasks -> Entry Files
@@ -31,7 +31,7 @@
 ## Frequent Bugs -> Fast Triage Path
 - DB connection fails locally: check `server/.env.development` port (`5433` in local Docker) -> `internal/db/db.go`.
 - Server starts but queue errors later: River migration not applied -> `internal/db/migration.go` and `river --version`.
-- Boot fails with watchman enabled: invalid or empty `WATCHMAN_SOCK` -> `internal/storage/monitor/watchman_monitor.go`.
+- Repository free-workspace files do not sync: check `REPOSITORY_SCAN_ENABLED`, `scan_repository` jobs, and `internal/storage/scanner`.
 - Storage init failure on startup: `STORAGE_PATH` must be a storage root; primary repo is `<STORAGE_PATH>/primary` -> `cmd/main.go:initPrimaryStorage`.
 - Browser API blocked in dev: origin must match current CORS config (`http://localhost:6657`) -> `internal/api/router.go`.
 

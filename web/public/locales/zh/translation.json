@@ -48,6 +48,7 @@
         "studio": "工作室",
         "portfolio": "作品集",
         "upload": "上传",
+        "manage": "管理",
         "settings": "设置",
         "updates": "更新",
         "serverMonitor": "服务器监控",
@@ -67,6 +68,7 @@
         "studio": "工作室",
         "portfolio": "作品集",
         "upload": "上传照片",
+        "manage": "管理",
         "settings": "设置",
         "updates": "更新",
         "serverMonitor": "服务器监控",
@@ -449,6 +451,14 @@
                 "label": "选择模式",
                 "selectedCount": "已选择 {{count}} 项"
             },
+            "scan": {
+                "label": "扫描当前资源库",
+                "title": "扫描 {{scope}}",
+                "currentQueued": "已为 {{name}} 加入扫描队列。",
+                "allQueued": "已为 {{count}} 个资源库加入扫描队列。",
+                "failed": "加入扫描队列失败。",
+                "noRepositories": "没有可扫描的资源库。"
+            },
             "actions": {
                 "title": "操作",
                 "applyToItems": "应用到 {{count}} 项",
@@ -482,6 +492,33 @@
             "thisWeek": "本周",
             "thisMonth": "本月",
             "allResults": "全部结果"
+        }
+    },
+    "manage": {
+        "pageTitle": "管理资源库",
+        "errorBoundaryTitle": "管理区域错误！",
+        "errorBoundaryMessage": "管理区域加载失败或在操作过程中发生错误。",
+        "repositories": {
+            "title": "资源库",
+            "description": "当前接入的仓库，可用于上传、筛选和文件系统扫描。",
+            "primaryBadge": "主仓库",
+            "assetCount": "资产数量",
+            "createAction": "添加资源库",
+            "createTitle": "添加资源库",
+            "createDescription": "在已挂载的存储根目录中创建一个资源库文件夹。",
+            "createNameLabel": "资源库名称",
+            "createNamePlaceholder": "家庭照片",
+            "createNameHint": "使用简短、容易识别的名称。",
+            "createSubmit": "创建资源库",
+            "createSuccess": "已添加 {{name}}。",
+            "createFailed": "创建资源库失败。",
+            "scanAll": "扫描全部资源库",
+            "scanRepository": "扫描 {{name}}",
+            "scanQueued": "已为 {{name}} 加入扫描队列。",
+            "scanAllQueued": "已为 {{count}} 个资源库加入扫描队列。",
+            "scanFailed": "加入扫描队列失败。",
+            "empty": "暂无可用仓库。",
+            "unavailable": "仓库选项暂时不可用。"
         }
     },
     "upload": {
@@ -527,6 +564,12 @@
             "server_chunk_size": "服务器分块大小",
             "server_concurrency": "服务器并发数",
             "server_in_flight": "进行中的请求",
+            "upload_target_label": "上传目标",
+            "upload_target_default": "默认",
+            "upload_target_from_settings": "来自设置",
+            "default_upload_target": "默认资源库",
+            "default_upload_target_hint": "当前未选择具体工作资源库；上传会进入主/默认资源库。",
+            "upload_target_unavailable": "当前选择的资源库暂时不可用。",
             "server_active_sessions": "活跃会话",
             "server_completed_files": "已完成文件",
             "server_failed_sessions": "失败会话",

@@ -77,6 +77,27 @@ type ReindexAssetsArgs struct {
 
 func (ReindexAssetsArgs) Kind() string { return "reindex_assets" }
 
+const (
+	RepositoryScanModePeriodic = "periodic"
+	RepositoryScanModeManual   = "manual"
+)
+
+// ScanRepositoryArgs queues a repository free-workspace scan.
+type ScanRepositoryArgs struct {
+	RepositoryID string `json:"repositoryId" river:"unique"`
+	Mode         string `json:"mode,omitempty" river:"unique"`
+	RequestedBy  string `json:"requestedBy,omitempty"`
+	Force        bool   `json:"force,omitempty"`
+}
+
+func (ScanRepositoryArgs) Kind() string { return "scan_repository" }
+
+func (ScanRepositoryArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{UniqueOpts: river.UniqueOpts{
+		ByPeriod: 1 * time.Minute,
+	}}
+}
+
 // IngestAssetArgs handles initial staging ingestion and asset creation.
 type IngestAssetArgs struct {
 	ClientHash   string    `json:"clientHash" river:"unique"`

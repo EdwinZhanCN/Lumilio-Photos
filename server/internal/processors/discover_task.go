@@ -208,6 +208,7 @@ func (ap *AssetProcessor) enqueueDiscoveredDownstream(
 
 	_, err := ap.queueClient.Insert(ctx, commonMeta, &river.InsertOpts{Queue: "metadata_asset"})
 	if err != nil {
+		ap.markPipelineTasksFailed(ctx, asset.AssetID, trackedPipelineTasks(assetType), fmt.Errorf("enqueue metadata: %w", err))
 		return fmt.Errorf("enqueue metadata: %w", err)
 	}
 
@@ -215,6 +216,7 @@ func (ap *AssetProcessor) enqueueDiscoveredDownstream(
 	case dbtypes.AssetTypePhoto:
 		_, err = ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
 		if err != nil {
+			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskThumbnail}, fmt.Errorf("enqueue thumbnails: %w", err))
 			return fmt.Errorf("enqueue thumbnails: %w", err)
 		}
 
@@ -224,15 +226,18 @@ func (ap *AssetProcessor) enqueueDiscoveredDownstream(
 	case dbtypes.AssetTypeVideo:
 		_, err = ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
 		if err != nil {
+			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskThumbnail, taskTranscode}, fmt.Errorf("enqueue thumbnails: %w", err))
 			return fmt.Errorf("enqueue thumbnails: %w", err)
 		}
 		_, err = ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
 		if err != nil {
+			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskTranscode}, fmt.Errorf("enqueue transcode: %w", err))
 			return fmt.Errorf("enqueue transcode: %w", err)
 		}
 	case dbtypes.AssetTypeAudio:
 		_, err = ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
 		if err != nil {
+			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskTranscode}, fmt.Errorf("enqueue transcode: %w", err))
 			return fmt.Errorf("enqueue transcode: %w", err)
 		}
 	default:

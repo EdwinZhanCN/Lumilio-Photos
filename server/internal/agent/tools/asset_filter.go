@@ -109,8 +109,8 @@ func buildFilterDTO(input *AssetFilterInput) dto.AssetFilterDTO {
 	// Filename
 	if input.Filename != "" {
 		filter.Filename = &dto.FilenameFilterDTO{
-			Value: input.Filename,
-			Mode:  "contains", // Default mode
+			Value:    input.Filename,
+			Operator: "contains",
 		}
 	}
 

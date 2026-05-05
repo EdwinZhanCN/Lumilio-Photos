@@ -18,7 +18,7 @@ export interface AssetViewDefinition {
   types?: TabType[];
   /** Filter conditions */
   filter?: AssetFilter;
-  /** Whether to inherit global filters */
+  /** @deprecated Filters are scoped explicitly by the caller. */
   inheritGlobalFilter?: boolean;
   /** Search configuration */
   search?: {
@@ -82,7 +82,7 @@ export interface FiltersState {
     from?: string;
     to?: string;
   };
-  camera_make?: string;
+  camera_model?: string;
   lens?: string;
 }
 
