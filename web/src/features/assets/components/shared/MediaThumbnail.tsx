@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Play, Music, Video, Headphones, Check } from "lucide-react";
 import {
   isVideo,
@@ -34,6 +34,15 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   const audioAsset = isAudio(asset);
   const duration = asset.duration;
   const ariaLabel = getAssetAriaLabel(asset);
+  const resolvedThumbnailUrl = thumbnailUrl?.trim();
+  const [imageState, setImageState] = useState({
+    url: "",
+    loaded: false,
+    failed: false,
+  });
+  const imageStateMatches = imageState.url === (resolvedThumbnailUrl ?? "");
+  const imageLoaded = imageStateMatches && imageState.loaded;
+  const imageFailed = imageStateMatches && imageState.failed;
 
   const selectionTint = isSelectionMode ? (
     <div
@@ -69,8 +78,9 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
       ? "ring-1 ring-black/10 ring-inset shadow-[0_16px_40px_-30px_rgba(15,23,42,0.5)]"
       : "shadow-[0_16px_40px_-30px_rgba(15,23,42,0.45)]";
 
-  // Photo or thumbnail available - render image with potential overlays
-  if (thumbnailUrl && !audioAsset) {
+  // Photo or thumbnail available - render image with potential overlays.
+  // Keep a skeleton visible while the thumbnail request is loading or failed.
+  if (!audioAsset) {
     return (
       <div
         className={`group relative h-full w-full cursor-pointer overflow-hidden border border-base-100/10 bg-base-200/40 transition-all duration-200 ease-out ${selectionClass} ${className}`}
@@ -87,16 +97,38 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
       >
         {selectionOverlay}
         {selectionTint}
-        <img
-          src={thumbnailUrl}
-          alt={
-            asset.original_filename || t("assets.mediaThumbnail.asset_alt_text")
-          }
-          className={`h-full w-full object-cover transition-transform duration-300 ease-out ${
-            isSelectionMode || isSelected ? "" : "group-hover:scale-[1.03]"
-          }`}
-          loading="lazy"
-        />
+        {(!resolvedThumbnailUrl || !imageLoaded || imageFailed) && (
+          <div className="skeleton absolute inset-0 h-full w-full rounded-none bg-base-300" />
+        )}
+        {resolvedThumbnailUrl && !imageFailed && (
+          <img
+            src={resolvedThumbnailUrl}
+            alt={
+              asset.original_filename ||
+              t("assets.mediaThumbnail.asset_alt_text")
+            }
+            className={`h-full w-full object-cover transition-all duration-300 ease-out ${
+              imageLoaded ? "opacity-100" : "opacity-0"
+            } ${
+              isSelectionMode || isSelected ? "" : "group-hover:scale-[1.03]"
+            }`}
+            loading="lazy"
+            onLoad={() =>
+              setImageState({
+                url: resolvedThumbnailUrl,
+                loaded: true,
+                failed: false,
+              })
+            }
+            onError={() => {
+              setImageState({
+                url: resolvedThumbnailUrl,
+                loaded: false,
+                failed: true,
+              });
+            }}
+          />
+        )}
 
         {/* Media type indicator badge */}
         {videoAsset && (

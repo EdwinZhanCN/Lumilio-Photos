@@ -179,6 +179,25 @@ function resolveTabFromPathname(pathname: string): TabType {
   return "photos";
 }
 
+function toCompleteLocationBBox(location?: AssetFilter["location"]) {
+  if (
+    !location ||
+    typeof location.north !== "number" ||
+    typeof location.south !== "number" ||
+    typeof location.east !== "number" ||
+    typeof location.west !== "number"
+  ) {
+    return undefined;
+  }
+
+  return {
+    north: location.north,
+    south: location.south,
+    east: location.east,
+    west: location.west,
+  };
+}
+
 function assetFilterToFiltersState(filter?: AssetFilter): Partial<FiltersState> {
   if (!filter) return {};
 
@@ -203,6 +222,8 @@ function assetFilterToFiltersState(filter?: AssetFilter): Partial<FiltersState> 
   }
   if (filter.camera_model) filters.camera_model = filter.camera_model;
   if (filter.lens) filters.lens = filter.lens;
+  const location = toCompleteLocationBBox(filter.location);
+  if (location) filters.location = location;
 
   return filters;
 }

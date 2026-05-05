@@ -110,6 +110,7 @@ const AssetsPageHeader = ({
     }
     if (f.camera_model?.trim()) dto.camera_model = f.camera_model.trim();
     if (f.lens?.trim()) dto.lens = f.lens.trim();
+    if (f.location) dto.location = { ...f.location };
     return dto;
   }, [filters]);
 
@@ -168,6 +169,7 @@ const AssetsPageHeader = ({
         date: undefined,
         camera_model: undefined,
         lens: undefined,
+        location: undefined,
       };
 
       if (newFilters.raw !== undefined) payload.raw = newFilters.raw;
@@ -194,6 +196,10 @@ const AssetsPageHeader = ({
 
       if (newFilters.lens && newFilters.lens.trim()) {
         payload.lens = newFilters.lens.trim();
+      }
+
+      if (newFilters.location) {
+        payload.location = { ...newFilters.location };
       }
 
       batchUpdateFilters(payload);

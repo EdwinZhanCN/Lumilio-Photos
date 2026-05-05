@@ -68,3 +68,27 @@ func TestWalkRepositorySkipsExcludedAndUnsettledFiles(t *testing.T) {
 		t.Fatalf("expected skipped files to be counted")
 	}
 }
+
+func TestWalkRepositoryCanIncludeUnsettledFiles(t *testing.T) {
+	root := t.TempDir()
+	for _, rel := range []string{"photo-1.jpg", "nested/photo-2.jpg"} {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatalf("mkdir: %v", err)
+		}
+		if err := os.WriteFile(path, []byte("data"), 0644); err != nil {
+			t.Fatalf("write file: %v", err)
+		}
+	}
+
+	entries, skipped, err := walkRepository(root, 0)
+	if err != nil {
+		t.Fatalf("walk repository: %v", err)
+	}
+	if skipped != 0 {
+		t.Fatalf("expected no skipped files, got %d", skipped)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected two scanned entries, got %#v", entries)
+	}
+}

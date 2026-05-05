@@ -2,6 +2,7 @@ import { ListFilterIcon } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n";
+import MapComponent from "@/components/MapComponent";
 
 /* =========================
    Types
@@ -519,6 +520,15 @@ const LocationSection = memo(function LocationSection({
     onBBoxChange(newBBox);
   }, [locationCenterLat, locationCenterLon, locationRadiusKm, onBBoxChange]);
 
+  const previewCenter = useMemo<[number, number]>(() => {
+    if (!isZeroBBox(bbox)) {
+      return [(bbox.north + bbox.south) / 2, (bbox.east + bbox.west) / 2];
+    }
+    return [locationCenterLat, locationCenterLon];
+  }, [bbox, locationCenterLat, locationCenterLon]);
+
+  const previewBounds = isZeroBBox(bbox) ? undefined : bbox;
+
   return (
     <>
       <SectionShell
@@ -680,18 +690,12 @@ const LocationSection = memo(function LocationSection({
                 {t("assets.filterTool.locationSection.preview_map")}
               </div>
               <div className="w-full h-48 rounded-box overflow-hidden border border-base-300">
-                <iframe
-                  title="map"
-                  className="w-full h-full"
-                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(
-                    (bbox.west || -180).toString(),
-                  )}%2C${encodeURIComponent(
-                    (bbox.south || -85).toString(),
-                  )}%2C${encodeURIComponent(
-                    (bbox.east || 180).toString(),
-                  )}%2C${encodeURIComponent(
-                    (bbox.north || 85).toString(),
-                  )}&layer=mapnik`}
+                <MapComponent
+                  center={previewCenter}
+                  zoom={previewBounds ? 10 : 3}
+                  height="100%"
+                  rounded={false}
+                  boundsOverlay={previewBounds}
                 />
               </div>
               <div className="text-xs opacity-70 mt-2">

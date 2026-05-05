@@ -94,6 +94,7 @@ func (ScanRepositoryArgs) Kind() string { return "scan_repository" }
 
 func (ScanRepositoryArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{UniqueOpts: river.UniqueOpts{
+		ByArgs:   true,
 		ByPeriod: 1 * time.Minute,
 	}}
 }
@@ -133,6 +134,7 @@ func (DiscoverAssetArgs) Kind() string { return "discover_asset" }
 func (DiscoverAssetArgs) InsertOpts() river.InsertOpts {
 	return river.InsertOpts{
 		UniqueOpts: river.UniqueOpts{
+			ByArgs:   true,
 			ByPeriod: 1 * time.Minute,
 		},
 	}

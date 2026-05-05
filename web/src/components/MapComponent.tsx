@@ -1,4 +1,11 @@
-import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  Marker,
+  Popup,
+  Rectangle,
+  TileLayer,
+  useMap,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L, { DivIcon, LatLngExpression, LatLngTuple } from "leaflet";
 import Supercluster, {
@@ -34,6 +41,13 @@ export type PhotoLocation = {
   asset?: Asset;
 };
 
+export type MapBoundsOverlay = {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+};
+
 // Map component props
 interface MapComponentProps {
   photoLocations?: PhotoLocation[];
@@ -44,6 +58,7 @@ interface MapComponentProps {
   className?: string;
   rounded?: boolean;
   showSinglePhoto?: boolean; // For single photo display (basic info view)
+  boundsOverlay?: MapBoundsOverlay;
 }
 
 type ClusterPointProperties = {
@@ -254,6 +269,7 @@ function MapComponent({
   className = "",
   rounded = true,
   showSinglePhoto = false,
+  boundsOverlay,
 }: MapComponentProps) {
   const { state } = useSettingsContext();
   const { t } = useI18n();
@@ -302,14 +318,42 @@ function MapComponent({
     if (convertedPhotoLocations.length === 1) {
       return convertedPhotoLocations[0].position as LatLngTuple;
     }
+    if (boundsOverlay) {
+      const centerLat = (boundsOverlay.north + boundsOverlay.south) / 2;
+      const centerLng = (boundsOverlay.east + boundsOverlay.west) / 2;
+      const converted = convertCoordinatesForMap(centerLng, centerLat, isChina);
+      return [converted.latitude, converted.longitude];
+    }
     return getDefaultCenter();
-  }, [convertedPhotoLocations, getDefaultCenter]);
+  }, [boundsOverlay, convertedPhotoLocations, getDefaultCenter, isChina]);
 
   const initialZoom = showSinglePhoto ? 15 : zoom;
 
+  const overlayBounds = useMemo(() => {
+    if (!boundsOverlay) {
+      return null;
+    }
+
+    const southWest = convertCoordinatesForMap(
+      boundsOverlay.west,
+      boundsOverlay.south,
+      isChina,
+    );
+    const northEast = convertCoordinatesForMap(
+      boundsOverlay.east,
+      boundsOverlay.north,
+      isChina,
+    );
+
+    return L.latLngBounds(
+      [southWest.latitude, southWest.longitude],
+      [northEast.latitude, northEast.longitude],
+    );
+  }, [boundsOverlay, isChina]);
+
   const fitBounds = useMemo(() => {
     if (showSinglePhoto || convertedPhotoLocations.length <= 1) {
-      return null;
+      return overlayBounds;
     }
 
     return L.latLngBounds(
@@ -317,7 +361,7 @@ function MapComponent({
         (location) => location.position as LatLngTuple,
       ),
     );
-  }, [convertedPhotoLocations, showSinglePhoto]);
+  }, [convertedPhotoLocations, overlayBounds, showSinglePhoto]);
 
   const locationById = useMemo(() => {
     const lookup = new Map<string, PhotoLocation>();
@@ -570,6 +614,18 @@ function MapComponent({
           enabled={!showSinglePhoto}
           fitKey={mapKey}
         />
+
+        {overlayBounds && (
+          <Rectangle
+            bounds={overlayBounds}
+            pathOptions={{
+              color: "#2563eb",
+              fillColor: "#38bdf8",
+              fillOpacity: 0.18,
+              weight: 2,
+            }}
+          />
+        )}
 
         {showSinglePhoto
           ? convertedPhotoLocations.map((location) => {
