@@ -32,7 +32,7 @@ export interface FilterDTO {
   liked?: boolean;
   filename?: FilenameFilter;
   date?: DateRange;
-  camera_make?: string;
+  camera_model?: string;
   lens?: string;
 
   // Extended field to represent spatial filtering
@@ -45,9 +45,9 @@ type FilterToolProps = {
   autoApply?: boolean;
 
   // Options can be provided directly via props, or fetched via provided functions, or fetched from default endpoints.
-  cameraMakeOptions?: string[];
+  cameraModelOptions?: string[];
   lensOptions?: string[];
-  fetchCameraMakes?: () => Promise<string[]>;
+  fetchCameraModels?: () => Promise<string[]>;
   fetchLenses?: () => Promise<string[]>;
 };
 
@@ -89,28 +89,29 @@ function toDateInput(val: string): string {
 
 function useFilterOptions({
   open,
-  cameraMakeOptions,
+  cameraModelOptions,
   lensOptions,
-  fetchCameraMakes,
+  fetchCameraModels,
   fetchLenses,
 }: {
   open: boolean;
-  cameraMakeOptions?: string[];
+  cameraModelOptions?: string[];
   lensOptions?: string[];
-  fetchCameraMakes?: () => Promise<string[]>;
+  fetchCameraModels?: () => Promise<string[]>;
   fetchLenses?: () => Promise<string[]>;
 }) {
-  const [cameraMakeItems, setCameraMakeItems] = useState<string[]>(
-    cameraMakeOptions ?? [],
+  const [cameraModelItems, setCameraModelItems] = useState<string[]>(
+    cameraModelOptions ?? [],
   );
   const [lensItems, setLensItems] = useState<string[]>(lensOptions ?? []);
   const [isCustomLoading, setIsCustomLoading] = useState<boolean>(false);
   const [hasLoaded, setHasLoaded] = useState(false);
 
-  const needsCameraMakes = !cameraMakeOptions || cameraMakeOptions.length === 0;
+  const needsCameraModels =
+    !cameraModelOptions || cameraModelOptions.length === 0;
   const needsLenses = !lensOptions || lensOptions.length === 0;
-  const needsOptions = needsCameraMakes || needsLenses;
-  const canUseCustomFetchers = !!fetchCameraMakes && !!fetchLenses;
+  const needsOptions = needsCameraModels || needsLenses;
+  const canUseCustomFetchers = !!fetchCameraModels && !!fetchLenses;
   const shouldFetchDefault =
     open && !hasLoaded && needsOptions && !canUseCustomFetchers;
 
@@ -134,14 +135,14 @@ function useFilterOptions({
       try {
         setIsCustomLoading(true);
 
-        let cm: string[] = cameraMakeOptions ?? [];
+        let cm: string[] = cameraModelOptions ?? [];
         let ln: string[] = lensOptions ?? [];
 
-        cm = await fetchCameraMakes!();
+        cm = await fetchCameraModels!();
         ln = await fetchLenses!();
 
         if (running) {
-          setCameraMakeItems(cm);
+          setCameraModelItems(cm);
           setLensItems(ln);
           setHasLoaded(true);
         }
@@ -158,9 +159,9 @@ function useFilterOptions({
     };
   }, [
     open,
-    cameraMakeOptions,
+    cameraModelOptions,
     lensOptions,
-    fetchCameraMakes,
+    fetchCameraModels,
     fetchLenses,
     needsOptions,
     canUseCustomFetchers,
@@ -172,8 +173,8 @@ function useFilterOptions({
     const response = filterOptionsQuery.data;
     if (!response?.data) return;
 
-    if (needsCameraMakes) {
-      setCameraMakeItems(response.data.camera_makes || []);
+    if (needsCameraModels) {
+      setCameraModelItems(response.data.camera_models || []);
     }
     if (needsLenses) {
       setLensItems(response.data.lenses || []);
@@ -183,11 +184,11 @@ function useFilterOptions({
   }, [
     shouldFetchDefault,
     filterOptionsQuery.data,
-    needsCameraMakes,
+    needsCameraModels,
     needsLenses,
   ]);
 
-  return { cameraMakeItems, lensItems, loadingOptions };
+  return { cameraModelItems, lensItems, loadingOptions };
 }
 
 /* =========================
@@ -843,83 +844,71 @@ export default function FilterTool({
   initial,
   onChange,
   autoApply = true,
-  cameraMakeOptions,
+  cameraModelOptions,
   lensOptions,
-  fetchCameraMakes,
+  fetchCameraModels,
   fetchLenses,
 }: FilterToolProps) {
   const { t } = useI18n();
   // Dropdown open state (independent of filter enabled)
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  // Freeze initial props after first mount to avoid reinitialization from incoming prop changes
-  const mountedRef = useRef(false);
-  const initialStableRef = useRef<FilterDTO | undefined>(initial);
-  useEffect(() => {
-    mountedRef.current = true;
-    // ignore subsequent initial prop changes
-  }, []);
+  const initialDTO = useMemo(() => initial ?? {}, [initial]);
+  const initialHash = useMemo(() => JSON.stringify(initialDTO), [initialDTO]);
 
   // Global filter enable/disable
   const [filterEnabled, setFilterEnabled] = useState<boolean>(
-    !!initialStableRef.current &&
-      Object.keys(initialStableRef.current).length > 0,
+    Object.keys(initialDTO).length > 0,
   );
 
   // RAW
   const [rawEnabled, setRawEnabled] = useState<boolean>(
-    typeof initialStableRef.current?.raw === "boolean",
+    typeof initialDTO.raw === "boolean",
   );
   const [rawMode, setRawMode] = useState<"include" | "exclude">(
-    initialStableRef.current?.raw === false ? "exclude" : "include",
+    initialDTO.raw === false ? "exclude" : "include",
   );
 
   // Rating: 5/4/3/2/1/unrated(0)
   const [ratingEnabled, setRatingEnabled] = useState<boolean>(
-    typeof initialStableRef.current?.rating === "number",
+    typeof initialDTO.rating === "number",
   );
   const [ratingValue, setRatingValue] = useState<number>(
-    typeof initialStableRef.current?.rating === "number"
-      ? initialStableRef.current!.rating!
-      : 5,
+    typeof initialDTO.rating === "number" ? initialDTO.rating : 5,
   );
 
   // Liked: liked/unliked
   const [likedEnabled, setLikedEnabled] = useState<boolean>(
-    typeof initialStableRef.current?.liked === "boolean",
+    typeof initialDTO.liked === "boolean",
   );
-  const [likedValue, setLikedValue] = useState<boolean>(
-    initialStableRef.current?.liked ?? true,
-  );
+  const [likedValue, setLikedValue] = useState<boolean>(initialDTO.liked ?? true);
 
   // Filename: operator + value
   const [filenameEnabled, setFilenameEnabled] = useState<boolean>(
-    !!initialStableRef.current?.filename,
+    !!initialDTO.filename,
   );
   const [filenameOperator, setFilenameOperator] = useState<FilenameOperator>(
-    initialStableRef.current?.filename?.operator ?? "contains",
+    initialDTO.filename?.operator ?? "contains",
   );
   const [filenameValue, setFilenameValue] = useState<string>(
-    initialStableRef.current?.filename?.value ?? "",
+    initialDTO.filename?.value ?? "",
   );
 
   // Date range
-  const [dateEnabled, setDateEnabled] = useState<boolean>(
-    !!initialStableRef.current?.date,
-  );
+  const [dateEnabled, setDateEnabled] = useState<boolean>(!!initialDTO.date);
   const [dateFrom, setDateFrom] = useState<string>(
-    toDateInput(initialStableRef.current?.date?.from ?? ""),
+    toDateInput(initialDTO.date?.from ?? ""),
   );
   const [dateTo, setDateTo] = useState<string>(
-    toDateInput(initialStableRef.current?.date?.to ?? ""),
+    toDateInput(initialDTO.date?.to ?? ""),
   );
 
   // Location (BBox)
   const [locationEnabled, setLocationEnabled] = useState<boolean>(
-    !!initialStableRef.current?.location,
+    !!initialDTO.location,
   );
   const [location, setLocation] = useState<LocationBBox>(
-    initialStableRef.current?.location ?? {
+    initialDTO.location ?? {
       north: 0,
       south: 0,
       east: 0,
@@ -927,26 +916,61 @@ export default function FilterTool({
     },
   );
 
-  // Camera make / Lens
-  const [cameraMakeEnabled, setCameraMakeEnabled] = useState<boolean>(
-    !!initialStableRef.current?.camera_make,
+  // Camera model / Lens
+  const [cameraModelEnabled, setCameraModelEnabled] = useState<boolean>(
+    !!initialDTO.camera_model,
   );
-  const [cameraMake, setCameraMake] = useState<string>(
-    initialStableRef.current?.camera_make ?? "",
+  const [cameraModel, setCameraModel] = useState<string>(
+    initialDTO.camera_model ?? "",
   );
-  const [lensEnabled, setLensEnabled] = useState<boolean>(
-    !!initialStableRef.current?.lens,
-  );
-  const [lens, setLens] = useState<string>(
-    initialStableRef.current?.lens ?? "",
-  );
+  const [lensEnabled, setLensEnabled] = useState<boolean>(!!initialDTO.lens);
+  const [lens, setLens] = useState<string>(initialDTO.lens ?? "");
+
+  useEffect(() => {
+    const next = initialDTO;
+
+    setFilterEnabled(Object.keys(next).length > 0);
+
+    setRawEnabled(typeof next.raw === "boolean");
+    setRawMode(next.raw === false ? "exclude" : "include");
+
+    setRatingEnabled(typeof next.rating === "number");
+    setRatingValue(typeof next.rating === "number" ? next.rating : 5);
+
+    setLikedEnabled(typeof next.liked === "boolean");
+    setLikedValue(next.liked ?? true);
+
+    setFilenameEnabled(!!next.filename);
+    setFilenameOperator(next.filename?.operator ?? "contains");
+    setFilenameValue(next.filename?.value ?? "");
+
+    setDateEnabled(!!next.date);
+    setDateFrom(toDateInput(next.date?.from ?? ""));
+    setDateTo(toDateInput(next.date?.to ?? ""));
+
+    setLocationEnabled(!!next.location);
+    setLocation(
+      next.location ?? {
+        north: 0,
+        south: 0,
+        east: 0,
+        west: 0,
+      },
+    );
+
+    setCameraModelEnabled(!!next.camera_model);
+    setCameraModel(next.camera_model ?? "");
+
+    setLensEnabled(!!next.lens);
+    setLens(next.lens ?? "");
+  }, [initialDTO, initialHash]);
 
   // Options hook
-  const { cameraMakeItems, lensItems, loadingOptions } = useFilterOptions({
+  const { cameraModelItems, lensItems, loadingOptions } = useFilterOptions({
     open,
-    cameraMakeOptions,
+    cameraModelOptions,
     lensOptions,
-    fetchCameraMakes,
+    fetchCameraModels,
     fetchLenses,
   });
 
@@ -959,7 +983,7 @@ export default function FilterTool({
     if (filenameEnabled && filenameValue.trim() !== "") count++;
     if (dateEnabled && (dateFrom || dateTo)) count++;
     if (locationEnabled && !isZeroBBox(location)) count++;
-    if (cameraMakeEnabled && cameraMake) count++;
+    if (cameraModelEnabled && cameraModel) count++;
     if (lensEnabled && lens) count++;
     return count;
   }, [
@@ -974,8 +998,8 @@ export default function FilterTool({
     dateTo,
     locationEnabled,
     location,
-    cameraMakeEnabled,
-    cameraMake,
+    cameraModelEnabled,
+    cameraModel,
     lensEnabled,
     lens,
   ]);
@@ -1003,7 +1027,7 @@ export default function FilterTool({
     if (locationEnabled && !isZeroBBox(location)) {
       dto.location = { ...location };
     }
-    if (cameraMakeEnabled && cameraMake) dto.camera_make = cameraMake;
+    if (cameraModelEnabled && cameraModel) dto.camera_model = cameraModel;
     if (lensEnabled && lens) dto.lens = lens;
     return dto;
   }, [
@@ -1022,8 +1046,8 @@ export default function FilterTool({
     dateTo,
     locationEnabled,
     location,
-    cameraMakeEnabled,
-    cameraMake,
+    cameraModelEnabled,
+    cameraModel,
     lensEnabled,
     lens,
   ]);
@@ -1051,8 +1075,8 @@ export default function FilterTool({
       dateTo,
       locationEnabled,
       location,
-      cameraMakeEnabled,
-      cameraMake,
+      cameraModelEnabled,
+      cameraModel,
       lensEnabled,
       lens,
     ],
@@ -1101,8 +1125,8 @@ export default function FilterTool({
     setLocationEnabled(false);
     setLocation({ north: 0, south: 0, east: 0, west: 0 });
 
-    setCameraMakeEnabled(false);
-    setCameraMake("");
+    setCameraModelEnabled(false);
+    setCameraModel("");
 
     setLensEnabled(false);
     setLens("");
@@ -1222,11 +1246,11 @@ export default function FilterTool({
 
         <CameraMakeSection
           filterDisabled={!filterEnabled}
-          enabled={cameraMakeEnabled}
-          onEnabledChange={setCameraMakeEnabled}
-          value={cameraMake}
-          onValueChange={setCameraMake}
-          items={cameraMakeItems}
+          enabled={cameraModelEnabled}
+          onEnabledChange={setCameraModelEnabled}
+          value={cameraModel}
+          onValueChange={setCameraModel}
+          items={cameraModelItems}
           loading={loadingOptions}
         />
 

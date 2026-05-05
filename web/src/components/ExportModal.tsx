@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Loader2,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   useExportImage,
   type ExportOptions,
@@ -16,8 +16,11 @@ import {
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { $api } from "@/lib/http-commons/queryClient";
 import { PaintBrushIcon } from "@heroicons/react/24/outline";
-import { Asset } from "@/lib/assets/types";
-import { RETRY_TASKS_BY_CATEGORY } from "@/config/retryTasks";
+import type { Asset } from "@/lib/assets/types";
+import {
+  getRetryTasksByCategoryForAssetType,
+  isRetryTaskSupportedForAssetType,
+} from "@/config/retryTasks";
 import { isBrowserExportSupported } from "@/lib/utils/mediaTypes";
 
 type ExportFormat = "png" | "jpeg" | "webp";
@@ -71,6 +74,33 @@ export default function ExportModal({
 
   const canAct = !!asset && !isExporting;
   const canBrowserExport = !!asset && isBrowserExportSupported(asset);
+  const retryTasksByCategory = useMemo(
+    () => getRetryTasksByCategoryForAssetType(asset?.type),
+    [asset?.type],
+  );
+  const supportedSelectedTasks = useMemo(
+    () =>
+      selectedTasks.filter((task) =>
+        isRetryTaskSupportedForAssetType(task, asset?.type),
+      ),
+    [asset?.type, selectedTasks],
+  );
+  const hasRetryableTasks =
+    retryTasksByCategory.metadata.length > 0 ||
+    retryTasksByCategory.media.length > 0 ||
+    retryTasksByCategory.ml.length > 0;
+  const canSubmitRetry =
+    !!asset?.asset_id &&
+    !isRetrying &&
+    (forceFullRetry || supportedSelectedTasks.length > 0);
+
+  useEffect(() => {
+    setSelectedTasks((current) =>
+      current.filter((task) =>
+        isRetryTaskSupportedForAssetType(task, asset?.type),
+      ),
+    );
+  }, [asset?.type]);
 
   const handleDownloadOriginal = useCallback(async () => {
     if (!asset) return;
@@ -129,14 +159,19 @@ export default function ExportModal({
   }, [asset, canBrowserExport, buildExportOptions, exportImage, onExport]);
 
   const handleRetry = useCallback(async () => {
-    if (!asset?.asset_id || selectedTasks.length === 0) return;
+    if (
+      !asset?.asset_id ||
+      (!forceFullRetry && supportedSelectedTasks.length === 0)
+    ) {
+      return;
+    }
 
     setIsRetrying(true);
     try {
       await reprocessMutation.mutateAsync({
         params: { path: { id: asset.asset_id } },
         body: {
-          tasks: selectedTasks,
+          tasks: forceFullRetry ? [] : supportedSelectedTasks,
           force_full_retry: forceFullRetry,
         },
       });
@@ -152,14 +187,17 @@ export default function ExportModal({
       setForceFullRetry(false);
 
       // TODO: Show success toast
-      console.log("Retry job submitted successfully for tasks:", selectedTasks);
+      console.log(
+        "Retry job submitted successfully for tasks:",
+        forceFullRetry ? "full retry" : supportedSelectedTasks,
+      );
     } catch (err) {
       console.error("Failed to submit retry job:", err);
       // TODO: Show error toast
     } finally {
       setIsRetrying(false);
     }
-  }, [asset, selectedTasks, forceFullRetry]);
+  }, [asset, forceFullRetry, reprocessMutation, supportedSelectedTasks]);
 
   return (
     <dialog id="export_modal" className="modal">
@@ -309,120 +347,138 @@ export default function ExportModal({
               <label className="label">
                 <span className="label-text">Select Tasks to Retry</span>
                 <span className="label-text-alt">
-                  {selectedTasks.length} selected
+                  {supportedSelectedTasks.length} selected
                 </span>
               </label>
 
               {/* Metadata Tasks */}
-              <div className="mb-3">
-                <div className="text-xs font-semibold opacity-60 uppercase mb-2">
-                  Metadata
+              {retryTasksByCategory.metadata.length > 0 && (
+                <div className="mb-3">
+                  <div className="text-xs font-semibold opacity-60 uppercase mb-2">
+                    Metadata
+                  </div>
+                  <div className="space-y-2">
+                    {retryTasksByCategory.metadata.map((task) => (
+                      <label
+                        key={task.key}
+                        className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded px-2"
+                      >
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={selectedTasks.includes(task.key)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTasks([...selectedTasks, task.key]);
+                            } else {
+                              setSelectedTasks(
+                                selectedTasks.filter((t) => t !== task.key),
+                              );
+                            }
+                          }}
+                          disabled={isRetrying}
+                        />
+                        <div className="flex-1">
+                          <span className="label-text font-medium">
+                            {task.label}
+                          </span>
+                          <p className="text-xs opacity-60">
+                            {task.description}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {RETRY_TASKS_BY_CATEGORY.metadata.map((task) => (
-                    <label
-                      key={task.key}
-                      className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded px-2"
-                    >
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm"
-                        checked={selectedTasks.includes(task.key)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedTasks([...selectedTasks, task.key]);
-                          } else {
-                            setSelectedTasks(
-                              selectedTasks.filter((t) => t !== task.key),
-                            );
-                          }
-                        }}
-                        disabled={isRetrying}
-                      />
-                      <div className="flex-1">
-                        <span className="label-text font-medium">
-                          {task.label}
-                        </span>
-                        <p className="text-xs opacity-60">{task.description}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              )}
 
               {/* Media Tasks */}
-              <div className="mb-3">
-                <div className="text-xs font-semibold opacity-60 uppercase mb-2">
-                  Media Processing
+              {retryTasksByCategory.media.length > 0 && (
+                <div className="mb-3">
+                  <div className="text-xs font-semibold opacity-60 uppercase mb-2">
+                    Media Processing
+                  </div>
+                  <div className="space-y-2">
+                    {retryTasksByCategory.media.map((task) => (
+                      <label
+                        key={task.key}
+                        className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded px-2"
+                      >
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={selectedTasks.includes(task.key)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTasks([...selectedTasks, task.key]);
+                            } else {
+                              setSelectedTasks(
+                                selectedTasks.filter((t) => t !== task.key),
+                              );
+                            }
+                          }}
+                          disabled={isRetrying}
+                        />
+                        <div className="flex-1">
+                          <span className="label-text font-medium">
+                            {task.label}
+                          </span>
+                          <p className="text-xs opacity-60">
+                            {task.description}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {RETRY_TASKS_BY_CATEGORY.media.map((task) => (
-                    <label
-                      key={task.key}
-                      className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded px-2"
-                    >
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm"
-                        checked={selectedTasks.includes(task.key)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedTasks([...selectedTasks, task.key]);
-                          } else {
-                            setSelectedTasks(
-                              selectedTasks.filter((t) => t !== task.key),
-                            );
-                          }
-                        }}
-                        disabled={isRetrying}
-                      />
-                      <div className="flex-1">
-                        <span className="label-text font-medium">
-                          {task.label}
-                        </span>
-                        <p className="text-xs opacity-60">{task.description}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              )}
 
               {/* ML Tasks */}
-              <div className="mb-3">
-                <div className="text-xs font-semibold opacity-60 uppercase mb-2">
-                  Machine Learning
+              {retryTasksByCategory.ml.length > 0 && (
+                <div className="mb-3">
+                  <div className="text-xs font-semibold opacity-60 uppercase mb-2">
+                    Machine Learning
+                  </div>
+                  <div className="space-y-2">
+                    {retryTasksByCategory.ml.map((task) => (
+                      <label
+                        key={task.key}
+                        className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded px-2"
+                      >
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={selectedTasks.includes(task.key)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedTasks([...selectedTasks, task.key]);
+                            } else {
+                              setSelectedTasks(
+                                selectedTasks.filter((t) => t !== task.key),
+                              );
+                            }
+                          }}
+                          disabled={isRetrying}
+                        />
+                        <div className="flex-1">
+                          <span className="label-text font-medium">
+                            {task.label}
+                          </span>
+                          <p className="text-xs opacity-60">
+                            {task.description}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {RETRY_TASKS_BY_CATEGORY.ml.map((task) => (
-                    <label
-                      key={task.key}
-                      className="label cursor-pointer justify-start gap-3 hover:bg-base-200 rounded px-2"
-                    >
-                      <input
-                        type="checkbox"
-                        className="checkbox checkbox-sm"
-                        checked={selectedTasks.includes(task.key)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedTasks([...selectedTasks, task.key]);
-                          } else {
-                            setSelectedTasks(
-                              selectedTasks.filter((t) => t !== task.key),
-                            );
-                          }
-                        }}
-                        disabled={isRetrying}
-                      />
-                      <div className="flex-1">
-                        <span className="label-text font-medium">
-                          {task.label}
-                        </span>
-                        <p className="text-xs opacity-60">{task.description}</p>
-                      </div>
-                    </label>
-                  ))}
+              )}
+
+              {!hasRetryableTasks && (
+                <div className="text-sm opacity-70">
+                  No retry tasks are available for this asset type.
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="form-control">
@@ -452,7 +508,7 @@ export default function ExportModal({
             </form>
             <button
               className="btn btn-primary"
-              disabled={selectedTasks.length === 0 || isRetrying}
+              disabled={!canSubmitRetry}
               onClick={handleRetry}
             >
               {isRetrying ? (

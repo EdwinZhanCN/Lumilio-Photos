@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import Photos from "./Photos";
 import Audios from "./Audios";
@@ -26,20 +26,17 @@ const AssetsContent = ({ activeTab }: { activeTab: string }) => {
 
 const Assets = () => {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState("photos");
   const { t } = useI18n();
 
-  // Determine active tab based on URL path
-  useEffect(() => {
+  const activeTab = useMemo(() => {
     const path = location.pathname;
     if (path.includes("/videos")) {
-      setActiveTab("videos");
-    } else if (path.includes("/audios")) {
-      setActiveTab("audios");
-    } else {
-      // Default to photos for /assets/ or /assets/photos
-      setActiveTab("photos");
+      return "videos";
     }
+    if (path.includes("/audios")) {
+      return "audios";
+    }
+    return "photos";
   }, [location.pathname]);
 
   return (
@@ -48,7 +45,7 @@ const Assets = () => {
         <ErrorFallBack code={500} title={t("assets.errorFallback.something_went_wrong")} {...props} />
       )}
     >
-      <AssetsProvider>
+      <AssetsProvider scopeId="assets:main" persist syncUrl>
         <AssetsContent activeTab={activeTab} />
       </AssetsProvider>
     </ErrorBoundary>

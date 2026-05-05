@@ -2,13 +2,12 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   AdjustmentsHorizontalIcon,
-  ArrowUpTrayIcon,
   HomeIcon,
   PhotoIcon,
   PaintBrushIcon,
 } from "@heroicons/react/24/outline/index.js";
 
-import { Album, Activity } from "lucide-react";
+import { Album, Activity, Folders } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useGlobal } from "@/contexts/GlobalContext";
 import { useAuth } from "@/features/auth";
@@ -61,10 +60,13 @@ function SideBar() {
           </Link>
         </li> */}
         <li>
-          <div className="bg-linear-50 from-ctp-maroon-300 text-ctp-base">
-            <ArrowUpTrayIcon className="size-5" />
-            <Link to="/upload-photos">{t("sidebar.upload")}</Link>
-          </div>
+          <Link
+            to="/manage"
+            className={location.pathname.startsWith("/manage") ? "active" : ""}
+          >
+            <Folders className="size-5" />
+            {t("sidebar.manage")}
+          </Link>
         </li>
         <li>
           <Link to="/settings">

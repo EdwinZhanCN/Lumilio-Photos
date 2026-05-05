@@ -9,6 +9,11 @@ import (
 	"github.com/h2non/bimg"
 )
 
+// libvips/libexif can deadlock under concurrent EXIF metadata parsing on macOS.
+// Keep image transforms serialized in-process; thumbnail queues provide the
+// outer throughput control.
+var bimgMu sync.Mutex
+
 // ProcessImageStream reads an image from the provided io.Reader, processes it using bimg
 func ProcessImageStream(r io.Reader, opts bimg.Options) ([]byte, error) {
 	// Read entire input into buffer
@@ -16,6 +21,9 @@ func ProcessImageStream(r io.Reader, opts bimg.Options) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	bimgMu.Lock()
+	defer bimgMu.Unlock()
 
 	// Initialize bimg image
 	img := bimg.NewImage(buf)
@@ -38,6 +46,10 @@ func StreamThumbnails(
 	if err != nil {
 		return fmt.Errorf("read source image: %w", err)
 	}
+
+	bimgMu.Lock()
+	defer bimgMu.Unlock()
+
 	size, err := bimg.NewImage(srcBuf).Size()
 	if err != nil {
 		return fmt.Errorf("get source image size: %w", err)
@@ -46,60 +58,49 @@ func StreamThumbnails(
 		return fmt.Errorf("invalid source image size")
 	}
 
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(sizes))
-
 	for name, dim := range sizes {
 		w, ok := outputs[name]
 		if !ok {
 			return fmt.Errorf("missing writer for size %q", name)
 		}
 
-		wg.Add(1)
-		go func(name string, w io.Writer, width, height int) {
-			defer wg.Done()
+		// Calculate scale to fit within max dimensions while preserving aspect ratio
+		scaleW := float64(dim[0]) / float64(size.Width)
+		scaleH := float64(dim[1]) / float64(size.Height)
+		scale := math.Min(scaleW, scaleH)
+		if scale > 1 {
+			scale = 1
+		}
+		targetWidth := int(float64(size.Width) * scale)
+		if targetWidth < 1 {
+			targetWidth = 1
+		}
 
-			// Calculate scale to fit within max dimensions while preserving aspect ratio
-			scaleW := float64(width) / float64(size.Width)
-			scaleH := float64(height) / float64(size.Height)
-			scale := math.Min(scaleW, scaleH)
-			if scale > 1 {
-				scale = 1
-			}
-			targetWidth := int(float64(size.Width) * scale)
-			if targetWidth < 1 {
-				targetWidth = 1
-			}
-
-			opts := bimg.Options{
-				Width:   targetWidth,
-				Crop:    false,
-				Quality: 80,
-				Type:    bimg.WEBP,
-				Enlarge: false,
-			}
-			thumb, err := bimg.NewImage(srcBuf).Process(opts)
-			if err != nil {
-				errCh <- fmt.Errorf("[%s] process: %w", name, err)
-				return
-			}
-			if _, err := w.Write(thumb); err != nil {
-				errCh <- fmt.Errorf("[%s] write: %w", name, err)
-			}
-		}(name, w, dim[0], dim[1])
-	}
-
-	wg.Wait()
-	close(errCh)
-
-	if err, ok := <-errCh; ok {
-		return err
+		opts := bimg.Options{
+			Width:         targetWidth,
+			Crop:          false,
+			Quality:       80,
+			Type:          bimg.WEBP,
+			Enlarge:       false,
+			NoProfile:     true,
+			StripMetadata: true,
+		}
+		thumb, err := bimg.NewImage(srcBuf).Process(opts)
+		if err != nil {
+			return fmt.Errorf("[%s] process: %w", name, err)
+		}
+		if _, err := w.Write(thumb); err != nil {
+			return fmt.Errorf("[%s] write: %w", name, err)
+		}
 	}
 	return nil
 }
 
 // ProcessImageBytes processes raw image bytes with bimg options and returns the result.
 func ProcessImageBytes(buf []byte, opts bimg.Options) ([]byte, error) {
+	bimgMu.Lock()
+	defer bimgMu.Unlock()
+
 	img := bimg.NewImage(buf)
 	return img.Process(opts)
 }

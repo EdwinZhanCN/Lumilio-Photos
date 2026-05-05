@@ -252,6 +252,21 @@ type Repository struct {
 	UpdatedAt pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 }
 
+type RepositoryScanRun struct {
+	ScanID          pgtype.UUID        `db:"scan_id" json:"scan_id"`
+	RepositoryID    pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	Mode            string             `db:"mode" json:"mode"`
+	RequestedBy     *string            `db:"requested_by" json:"requested_by"`
+	Status          string             `db:"status" json:"status"`
+	StartedAt       pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	FinishedAt      pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
+	DiscoveredCount int64              `db:"discovered_count" json:"discovered_count"`
+	UpdatedCount    int64              `db:"updated_count" json:"updated_count"`
+	DeletedCount    int64              `db:"deleted_count" json:"deleted_count"`
+	SkippedCount    int64              `db:"skipped_count" json:"skipped_count"`
+	Error           *string            `db:"error" json:"error"`
+}
+
 type Setting struct {
 	ID                  int32              `db:"id" json:"id"`
 	LlmAgentEnabled     bool               `db:"llm_agent_enabled" json:"llm_agent_enabled"`

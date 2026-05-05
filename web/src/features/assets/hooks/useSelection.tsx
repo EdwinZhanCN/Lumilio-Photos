@@ -1,11 +1,16 @@
-import { useCallback, useMemo } from "react";
-import { useAssetsStore } from "../assets.store";
+import { useCallback, useContext, useMemo, useRef } from "react";
+import { useStore } from "zustand";
+import {
+  AssetsStoreApi,
+  AssetsStoreContext,
+  createAssetsStore,
+  useAssetsStoreApi,
+} from "../assets.store";
 import { SelectionResult } from "@/features/assets";
 import {
   useSelectionEnabled,
   useSelectedIds,
   useSelectionMode,
-  useSelectionActions,
 } from "../selectors";
 import {
   selectLastSelectedId,
@@ -15,6 +20,18 @@ import { assetUrls } from "@/lib/assets/assetUrls";
 import { $api } from "@/lib/http-commons/queryClient";
 import { Asset } from "@/lib/assets/types";
 
+const useFallbackAssetsStore = (): AssetsStoreApi => {
+  const storeRef = useRef<AssetsStoreApi | null>(null);
+  if (storeRef.current === null) {
+    storeRef.current = createAssetsStore({
+      selection: {
+        enabled: false,
+      },
+    });
+  }
+  return storeRef.current;
+};
+
 /**
  * Hook for managing asset selection state and operations.
  * Provides comprehensive selection functionality including single/multiple modes,
@@ -22,22 +39,26 @@ import { Asset } from "@/lib/assets/types";
  *
  * @returns SelectionResult with selection state and operations
  */
-export const useSelection = (): SelectionResult => {
+const useSelectionFromStore = (store: AssetsStoreApi): SelectionResult => {
   // Fine-grained subscriptions
-  const enabled = useSelectionEnabled();
-  const selectedIds = useSelectedIds();
-  const selectionMode = useSelectionMode();
+  const enabled = useStore(store, (state) => state.selection.enabled);
+  const selectedIds = useStore(store, (state) => state.selection.selectedIds);
+  const selectionMode = useStore(
+    store,
+    (state) => state.selection.selectionMode,
+  );
 
   // Actions
-  const {
-    toggle: toggleAssetSelection,
-    select: selectAsset,
-    deselect: deselectAsset,
-    selectAll: selectAllAssets,
-    clear: clearSelection,
-    setEnabled,
-    setMode: setSelectionMode,
-  } = useSelectionActions();
+  const toggleAssetSelection = useStore(
+    store,
+    (state) => state.toggleAssetSelection,
+  );
+  const selectAsset = useStore(store, (state) => state.selectAsset);
+  const deselectAsset = useStore(store, (state) => state.deselectAsset);
+  const selectAllAssets = useStore(store, (state) => state.selectAll);
+  const clearSelection = useStore(store, (state) => state.clearSelection);
+  const setEnabled = useStore(store, (state) => state.setSelectionEnabled);
+  const setSelectionMode = useStore(store, (state) => state.setSelectionMode);
 
   // Derived values
   const selectedCount = selectedIds.size;
@@ -101,7 +122,7 @@ export const useSelection = (): SelectionResult => {
   const selectRange = useCallback(
     (fromAssetId: string, toAssetId: string, assetIds: string[]): void => {
       // Check current state from store
-      const state = useAssetsStore.getState();
+      const state = store.getState();
       if (!state.selection.enabled || state.selection.selectionMode !== "multiple") return;
 
       const fromIndex = assetIds.indexOf(fromAssetId);
@@ -119,12 +140,12 @@ export const useSelection = (): SelectionResult => {
         }
       });
     },
-    [selectAsset],
+    [selectAsset, store],
   );
 
   const toggleRange = useCallback(
     (fromAssetId: string, toAssetId: string, assetIds: string[]): void => {
-      const state = useAssetsStore.getState();
+      const state = store.getState();
       if (!state.selection.enabled || state.selection.selectionMode !== "multiple") return;
 
       const fromIndex = assetIds.indexOf(fromAssetId);
@@ -147,39 +168,39 @@ export const useSelection = (): SelectionResult => {
         }
       });
     },
-    [selectAsset, deselectAsset],
+    [selectAsset, deselectAsset, store],
   );
 
   const selectFiltered = useCallback(
     (assetIds: string[], predicate: (assetId: string) => boolean): void => {
-      const state = useAssetsStore.getState();
+      const state = store.getState();
       if (!state.selection.enabled) return;
 
       const filteredIds = assetIds.filter(predicate);
       filteredIds.forEach(selectAsset);
     },
-    [selectAsset],
+    [selectAsset, store],
   );
 
   const deselectFiltered = useCallback(
     (assetIds: string[], predicate: (assetId: string) => boolean): void => {
-      const state = useAssetsStore.getState();
+      const state = store.getState();
       if (!state.selection.enabled) return;
 
       const filteredIds = assetIds.filter(predicate);
       filteredIds.forEach(deselectAsset);
     },
-    [deselectAsset],
+    [deselectAsset, store],
   );
 
   const invertSelection = useCallback(
     (assetIds: string[]): void => {
-      const state = useAssetsStore.getState();
+      const state = store.getState();
       if (!state.selection.enabled) return;
 
       assetIds.forEach(toggleAssetSelection);
     },
-    [toggleAssetSelection],
+    [toggleAssetSelection, store],
   );
 
   return {
@@ -212,11 +233,19 @@ export const useSelection = (): SelectionResult => {
   };
 };
 
+export const useSelection = (): SelectionResult => {
+  const store = useAssetsStoreApi();
+  return useSelectionFromStore(store);
+};
+
 /**
  * Hook for keyboard-enhanced selection operations.
  */
-export const useKeyboardSelection = (assetIds: string[]) => {
-  const selection = useSelection();
+const useKeyboardSelectionFromStore = (
+  store: AssetsStoreApi,
+  assetIds: string[],
+) => {
+  const selection = useSelectionFromStore(store);
   // We need to access the store state directly for event handlers
 
   const handleClick = useCallback(
@@ -230,7 +259,7 @@ export const useKeyboardSelection = (assetIds: string[]) => {
         selection.toggle(assetId);
       } else if (event.shiftKey && selection.selectedCount > 0) {
         // Shift + Click: Select range
-        const state = useAssetsStore.getState();
+        const state = store.getState();
         const lastSelected = selectLastSelectedId(state.selection);
         // Or simpler:
         // const lastSelected = state.selection.lastSelectedId;
@@ -247,7 +276,7 @@ export const useKeyboardSelection = (assetIds: string[]) => {
         selection.select(assetId);
       }
     },
-    [selection, assetIds],
+    [selection, assetIds, store],
   );
 
   const handleKeyDown = useCallback(
@@ -280,6 +309,17 @@ export const useKeyboardSelection = (assetIds: string[]) => {
     handleClick,
     handleKeyDown,
   };
+};
+
+export const useKeyboardSelection = (assetIds: string[]) => {
+  const store = useAssetsStoreApi();
+  return useKeyboardSelectionFromStore(store, assetIds);
+};
+
+export const useOptionalKeyboardSelection = (assetIds: string[]) => {
+  const contextStore = useContext(AssetsStoreContext);
+  const fallbackStore = useFallbackAssetsStore();
+  return useKeyboardSelectionFromStore(contextStore ?? fallbackStore, assetIds);
 };
 
 /**

@@ -19,6 +19,8 @@ type Querier interface {
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
 	BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error
+	CancelRepositoryScanRun(ctx context.Context, arg CancelRepositoryScanRunParams) (RepositoryScanRun, error)
+	CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error)
 	CountActiveUsersByRole(ctx context.Context, role string) (int64, error)
 	CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error)
 	CountAssetsByRating(ctx context.Context, ownerID *int32) ([]CountAssetsByRatingRow, error)
@@ -40,6 +42,7 @@ type Querier interface {
 	CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
+	CountRunningRepositoryScanRuns(ctx context.Context, arg CountRunningRepositoryScanRunsParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
@@ -53,6 +56,7 @@ type Querier interface {
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRegistrationSession(ctx context.Context, arg CreateRegistrationSessionParams) (RegistrationSession, error)
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
+	CreateRepositoryScanRun(ctx context.Context, arg CreateRepositoryScanRunParams) (RepositoryScanRun, error)
 	CreateSpeciesPrediction(ctx context.Context, arg CreateSpeciesPredictionParams) (SpeciesPrediction, error)
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
 	CreateThumbnail(ctx context.Context, arg CreateThumbnailParams) (Thumbnail, error)
@@ -82,7 +86,7 @@ type Querier interface {
 	DeleteUserTOTPCredential(ctx context.Context, userID int32) error
 	DeleteUserWebAuthnCredential(ctx context.Context, arg DeleteUserWebAuthnCredentialParams) (int64, error)
 	DeleteUserWebAuthnCredentials(ctx context.Context, userID int32) error
-	FilterAssets(ctx context.Context, arg FilterAssetsParams) ([]Asset, error)
+	FailRepositoryScanRun(ctx context.Context, arg FailRepositoryScanRunParams) (RepositoryScanRun, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAssetCountScopedParams) (int64, error)
 	GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error)
@@ -136,7 +140,7 @@ type Querier interface {
 	// 获取每日拍摄活跃度热力图数据
 	GetDailyActivityHeatmap(ctx context.Context, arg GetDailyActivityHeatmapParams) ([]GetDailyActivityHeatmapRow, error)
 	GetDefaultEmbeddingSpaceByType(ctx context.Context, embeddingType string) (EmbeddingSpace, error)
-	GetDistinctCameraMakes(ctx context.Context) ([]interface{}, error)
+	GetDistinctCameraModels(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
 	GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (GetEmbeddingRow, error)
 	GetEmbeddingByType(ctx context.Context, arg GetEmbeddingByTypeParams) (GetEmbeddingByTypeRow, error)
@@ -158,6 +162,7 @@ type Querier interface {
 	// 获取焦距分布统计
 	GetFocalLengthDistribution(ctx context.Context, repositoryID pgtype.UUID) ([]GetFocalLengthDistributionRow, error)
 	GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error)
+	GetLatestRepositoryScanRun(ctx context.Context, repositoryID pgtype.UUID) (RepositoryScanRun, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
@@ -178,6 +183,7 @@ type Querier interface {
 	// Repository Asset Statistics (kept for repository management)
 	GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error)
 	GetRepositoryByPath(ctx context.Context, path string) (Repository, error)
+	GetRepositoryScanRun(ctx context.Context, scanID pgtype.UUID) (RepositoryScanRun, error)
 	GetSettings(ctx context.Context) (Setting, error)
 	GetSimilarFaces(ctx context.Context, arg GetSimilarFacesParams) ([]GetSimilarFacesRow, error)
 	GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]SpeciesPrediction, error)
@@ -205,6 +211,7 @@ type Querier interface {
 	GetUserTOTPCredential(ctx context.Context, userID int32) (UserMfaTotpCredential, error)
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
 	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
+	ListAssetsByRepositoryAny(ctx context.Context, repositoryID pgtype.UUID) ([]Asset, error)
 	ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error)
 	ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error)
 	ListPhotoAssetsMissingCaptions(ctx context.Context, arg ListPhotoAssetsMissingCaptionsParams) ([]Asset, error)
@@ -212,6 +219,7 @@ type Querier interface {
 	ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error)
 	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
+	ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
 	ListUserWebAuthnCredentialSummaries(ctx context.Context, userID int32) ([]ListUserWebAuthnCredentialSummariesRow, error)
 	ListUserWebAuthnCredentials(ctx context.Context, userID int32) ([]UserWebauthnCredential, error)
@@ -236,8 +244,6 @@ type Querier interface {
 	SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error)
 	SearchAssetsByOCRTextWithConfidence(ctx context.Context, arg SearchAssetsByOCRTextWithConfidenceParams) ([]Asset, error)
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
-	SearchAssetsFilename(ctx context.Context, arg SearchAssetsFilenameParams) ([]Asset, error)
-	SearchAssetsVector(ctx context.Context, arg SearchAssetsVectorParams) ([]SearchAssetsVectorRow, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
 	SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error)

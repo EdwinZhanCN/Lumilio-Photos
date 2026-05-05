@@ -5,6 +5,7 @@ import {
   useMemo,
   useCallback,
   useRef,
+  useState,
 } from "react";
 import {
   useLocation,
@@ -12,11 +13,24 @@ import {
   useSearchParams,
   useParams,
 } from "react-router-dom";
-import { TabType } from "./types/assets.type";
-import { useSettingsContext } from "@/features/settings";
-import { useAssetsStore } from "./assets.store";
+import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import {
+  AssetFilter,
+  FiltersState,
+  SelectionState,
+  TabType,
+  UIState,
+} from "./types/assets.type";
+import {
+  AssetsStoreInitialState,
+  AssetsStoreApi,
+  AssetsStoreContext,
+  createAssetsStore,
+} from "./assets.store";
+import { useSettingsContext } from "@/features/settings";
 import { isGroupByType, resolveGroupByFromUrl } from "./utils/groupBy";
+import { mapFilenameOperatorToMode } from "./utils/filterUtils";
 import {
   ASSETS_STATE_STORAGE_KEY,
   ASSETS_STATE_STORAGE_VERSION,
@@ -28,7 +42,8 @@ import {
   writeVersionedStorageData,
 } from "@/lib/settings/storage";
 
-// Context for navigation helpers which depend on router
+export const MAIN_ASSETS_SCOPE_ID = "assets:main";
+
 interface AssetsNavigationContextValue {
   openCarousel: (assetId: string) => void;
   closeCarousel: () => void;
@@ -39,38 +54,38 @@ export const AssetsNavigationContext = createContext<
   AssetsNavigationContextValue | undefined
 >(undefined);
 
-const STORAGE_FIELDS = ["filters", "selection"] as const;
+type PersistedAssetsState = {
+  filters?: Partial<FiltersState>;
+  ui?: Partial<Pick<UIState, "groupBy" | "searchQuery">>;
+  selection?: Partial<Pick<SelectionState, "selectionMode">>;
+};
 
-function toStorageSnapshot(
-  state: Record<string, unknown>,
-): Record<string, unknown> {
-  const toSave: Record<string, unknown> = {};
+type AssetsRouteState = {
+  assetsInitialFilter?: AssetFilter;
+} | null;
 
-  STORAGE_FIELDS.forEach((field) => {
-    if (state[field]) {
-      if (field === "selection" && isRecord(state.selection)) {
-        const rawSelectedIds = state.selection.selectedIds;
-        const selectedIds =
-          rawSelectedIds instanceof Set
-            ? Array.from(rawSelectedIds)
-            : Array.isArray(rawSelectedIds)
-              ? rawSelectedIds
-              : [];
-
-        toSave[field] = {
-          ...state.selection,
-          selectedIds,
-        };
-      } else {
-        toSave[field] = state[field];
-      }
-    }
-  });
-
-  return toSave;
+function toStorageSnapshot(state: {
+  filters: FiltersState;
+  ui: UIState;
+  selection: SelectionState;
+}): PersistedAssetsState {
+  return {
+    filters: state.filters,
+    ui: {
+      groupBy: state.ui.groupBy,
+      searchQuery: state.ui.searchQuery,
+    },
+    selection: {
+      selectionMode: state.selection.selectionMode,
+    },
+  };
 }
 
-function writeStateToStorage(state: Record<string, unknown>) {
+function writeStateToStorage(state: {
+  filters: FiltersState;
+  ui: UIState;
+  selection: SelectionState;
+}) {
   writeVersionedStorageData(
     ASSETS_STATE_STORAGE_KEY,
     ASSETS_STATE_STORAGE_VERSION,
@@ -79,65 +94,66 @@ function writeStateToStorage(state: Record<string, unknown>) {
   localStorage.removeItem(LEGACY_ASSETS_STATE_STORAGE_KEY);
 }
 
-interface AssetsProviderProps {
-  children: ReactNode;
-  persist?: boolean;
-  basePath?: string; // Optional base path for carousel navigation
-  defaultSelectionMode?: "single" | "multiple";
-}
-
-function loadPersistedState() {
+function loadPersistedState(): PersistedAssetsState {
   try {
     if (typeof localStorage === "undefined") {
       return {};
     }
-
-    const parseCandidate = (candidate: unknown): Record<string, unknown> => {
-      if (!isRecord(candidate)) return {};
-      const restored: Record<string, unknown> = {};
-
-      STORAGE_FIELDS.forEach((field) => {
-        if (!candidate[field]) return;
-
-        if (field === "selection" && isRecord(candidate.selection)) {
-          const rawSelectedIds = candidate.selection.selectedIds;
-          const selectedIds = Array.isArray(rawSelectedIds)
-            ? rawSelectedIds
-            : rawSelectedIds instanceof Set
-              ? Array.from(rawSelectedIds)
-              : [];
-
-          restored[field] = {
-            ...candidate.selection,
-            selectedIds: new Set(selectedIds),
-          };
-        } else {
-          restored[field] = candidate[field];
-        }
-      });
-
-      return restored;
-    };
 
     const readResult = readVersionedStorageCandidate({
       key: ASSETS_STATE_STORAGE_KEY,
       version: ASSETS_STATE_STORAGE_VERSION,
       legacyKeys: [LEGACY_ASSETS_STATE_STORAGE_KEY],
     });
-    if (readResult.candidate !== null) {
-      const restored = parseCandidate(readResult.candidate);
-      if (readResult.needsRewrite) {
-        writeStateToStorage(restored);
-      }
-      return restored;
+
+    if (readResult.candidate === null || !isRecord(readResult.candidate)) {
+      return {};
     }
+
+    const candidate = readResult.candidate;
+    const restored: PersistedAssetsState = {};
+
+    if (isRecord(candidate.filters)) {
+      restored.filters = candidate.filters as Partial<FiltersState>;
+    }
+
+    if (isRecord(candidate.ui)) {
+      restored.ui = {
+        groupBy: isGroupByType(candidate.ui.groupBy as string | null)
+          ? (candidate.ui.groupBy as UIState["groupBy"])
+          : undefined,
+        searchQuery:
+          typeof candidate.ui.searchQuery === "string"
+            ? candidate.ui.searchQuery
+            : undefined,
+      };
+    }
+
+    if (isRecord(candidate.selection)) {
+      const mode = candidate.selection.selectionMode;
+      restored.selection = {
+        selectionMode:
+          mode === "single" || mode === "multiple" ? mode : undefined,
+      };
+    }
+
+    if (readResult.needsRewrite) {
+      const snapshot = createAssetsStore(restored).getState();
+      writeStateToStorage(snapshot);
+    }
+
+    return restored;
   } catch (e) {
     console.warn("[AssetsProvider] Failed to parse stored state", e);
   }
   return {};
 }
 
-function saveStateToStorage(state: any) {
+function saveStateToStorage(state: {
+  filters: FiltersState;
+  ui: UIState;
+  selection: SelectionState;
+}) {
   try {
     if (typeof localStorage === "undefined") {
       return;
@@ -157,19 +173,79 @@ function getLiveSearchParams(fallback: URLSearchParams): URLSearchParams {
   return new URLSearchParams(window.location.search);
 }
 
+function resolveTabFromPathname(pathname: string): TabType {
+  if (pathname.includes("/videos")) return "videos";
+  if (pathname.includes("/audios")) return "audios";
+  return "photos";
+}
+
+function assetFilterToFiltersState(filter?: AssetFilter): Partial<FiltersState> {
+  if (!filter) return {};
+
+  const filters: Partial<FiltersState> = {
+    enabled: Object.keys(filter).length > 0,
+  };
+
+  if (filter.raw !== undefined) filters.raw = filter.raw;
+  if (filter.rating !== undefined) filters.rating = filter.rating;
+  if (filter.liked !== undefined) filters.liked = filter.liked;
+  if (filter.filename) {
+    filters.filename = {
+      mode: mapFilenameOperatorToMode(filter.filename.operator) ?? "contains",
+      value: filter.filename.value ?? "",
+    };
+  }
+  if (filter.date) {
+    filters.date = {
+      from: filter.date.from,
+      to: filter.date.to,
+    };
+  }
+  if (filter.camera_model) filters.camera_model = filter.camera_model;
+  if (filter.lens) filters.lens = filter.lens;
+
+  return filters;
+}
+
+interface AssetsProviderProps {
+  children: ReactNode;
+  scopeId: string;
+  persist?: boolean;
+  syncUrl?: boolean;
+  basePath?: string;
+  defaultSelectionMode?: "single" | "multiple";
+  initialState?: AssetsStoreInitialState;
+}
+
 export const AssetsProvider = ({
   children,
-  persist = true,
+  scopeId,
+  persist = false,
+  syncUrl = false,
   basePath,
   defaultSelectionMode = "multiple",
+  initialState,
 }: AssetsProviderProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams<{ assetId?: string }>();
   const { state: settingsState } = useSettingsContext();
+  const [isHydrated, setIsHydrated] = useState(false);
+  const storeRef = useRef<AssetsStoreApi | null>(null);
+  const isMainPersistentScope = persist && scopeId === MAIN_ASSETS_SCOPE_ID;
 
-  // Store actions
+  if (storeRef.current === null) {
+    storeRef.current = createAssetsStore({
+      ...initialState,
+      selection: {
+        selectionMode: defaultSelectionMode,
+        ...initialState?.selection,
+      },
+    });
+  }
+
+  const store = storeRef.current;
   const {
     setCurrentTab,
     setCarouselOpen,
@@ -177,9 +253,8 @@ export const AssetsProvider = ({
     hydrateUIFromURL,
     setSelectionMode,
     batchUpdateFilters,
-    setSelectionEnabled,
-    selectAll,
-  } = useAssetsStore(
+  } = useStore(
+    store,
     useShallow((state) => ({
       setCurrentTab: state.setCurrentTab,
       setCarouselOpen: state.setCarouselOpen,
@@ -187,91 +262,138 @@ export const AssetsProvider = ({
       hydrateUIFromURL: state.hydrateUIFromURL,
       setSelectionMode: state.setSelectionMode,
       batchUpdateFilters: state.batchUpdateFilters,
-      setSelectionEnabled: state.setSelectionEnabled,
-      selectAll: state.selectAll,
     })),
   );
 
-  // Store state for effects
-  const uiState = useAssetsStore(useShallow((state) => state.ui));
-  const filtersState = useAssetsStore(useShallow((state) => state.filters));
-  const selectionState = useAssetsStore(useShallow((state) => state.selection));
+  const uiState = useStore(store, useShallow((state) => state.ui));
+  const filtersState = useStore(store, useShallow((state) => state.filters));
+  const selectionState = useStore(
+    store,
+    useShallow((state) => state.selection),
+  );
 
-  // Initialize state from storage and URL
   const initialized = useRef(false);
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
 
-    let persistedState: Record<string, any> = {};
-    // Load persisted state
-    if (persist) {
-      persistedState = loadPersistedState();
-      if (persistedState.filters) {
-        batchUpdateFilters(persistedState.filters);
-      }
-      if (persistedState.selection) {
-        // We need to manually reconstruct the selection state
-        // because the slice actions expect specific calls
-        if (persistedState.selection.enabled) {
-          setSelectionEnabled(true);
-        }
-        if (persistedState.selection.selectionMode) {
-          setSelectionMode(persistedState.selection.selectionMode);
-        }
-        if (persistedState.selection.selectedIds?.size > 0) {
-          selectAll(Array.from(persistedState.selection.selectedIds));
-        }
-      }
+    const liveSearchParams = getLiveSearchParams(searchParams);
+    const urlGroupBy = liveSearchParams.get("groupBy");
+    const urlQuery = liveSearchParams.get("q");
+    const resolvedGroupBy = resolveGroupByFromUrl(
+      urlGroupBy,
+      settingsState.ui.asset_page?.layout,
+    );
+    const persistedState = isMainPersistentScope ? loadPersistedState() : {};
+    const initialGroupBy =
+      syncUrl && isGroupByType(urlGroupBy)
+        ? resolvedGroupBy
+        : persistedState.ui?.groupBy ?? resolvedGroupBy;
+    const initialSearchQuery =
+      syncUrl && urlQuery !== null
+        ? urlQuery
+        : persistedState.ui?.searchQuery ?? "";
+    const routeState = location.state as AssetsRouteState;
+    const routeFilter = assetFilterToFiltersState(
+      routeState?.assetsInitialFilter,
+    );
+
+    if (syncUrl) {
+      setCurrentTab(resolveTabFromPathname(location.pathname));
     }
 
-    // Set default selection mode
-    if (!persist || !persistedState.selection) {
+    if (persistedState.filters) {
+      batchUpdateFilters(persistedState.filters);
+    }
+
+    if (Object.keys(routeFilter).length > 0) {
+      batchUpdateFilters(routeFilter);
+    }
+
+    if (persistedState.selection?.selectionMode) {
+      setSelectionMode(persistedState.selection.selectionMode);
+    } else {
       setSelectionMode(defaultSelectionMode);
     }
-  }, [
-    persist,
-    defaultSelectionMode,
-    batchUpdateFilters,
-    setSelectionEnabled,
-    setSelectionMode,
-    selectAll,
-  ]);
 
-  // Persist state changes
-  useEffect(() => {
-    if (persist) {
-      saveStateToStorage({
-        filters: filtersState,
-        selection: selectionState,
+    hydrateUIFromURL({
+      groupBy: syncUrl ? initialGroupBy : persistedState.ui?.groupBy ?? uiState.groupBy,
+      searchQuery: syncUrl
+        ? initialSearchQuery
+        : persistedState.ui?.searchQuery ?? uiState.searchQuery,
+    });
+
+    if (syncUrl && !isGroupByType(urlGroupBy)) {
+      const params = new URLSearchParams(liveSearchParams);
+      params.set("groupBy", initialGroupBy);
+      setSearchParams(params, { replace: true });
+    }
+
+    if (routeState?.assetsInitialFilter) {
+      navigate(`${location.pathname}${location.search}`, {
+        replace: true,
+        state: null,
       });
     }
-  }, [filtersState, selectionState, persist]);
 
-  // Sync Tab with URL
+    setIsHydrated(true);
+  }, [
+    batchUpdateFilters,
+    defaultSelectionMode,
+    hydrateUIFromURL,
+    isMainPersistentScope,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+    searchParams,
+    setCurrentTab,
+    setSearchParams,
+    setSelectionMode,
+    settingsState.ui.asset_page?.layout,
+    syncUrl,
+    uiState.groupBy,
+    uiState.searchQuery,
+  ]);
+
   useEffect(() => {
-    const currentTab: TabType = location.pathname.includes("/videos")
-      ? "videos"
-      : location.pathname.includes("/audios")
-        ? "audios"
-        : "photos";
+    if (!isMainPersistentScope || !isHydrated) return;
 
+    saveStateToStorage({
+      filters: filtersState,
+      ui: uiState,
+      selection: selectionState,
+    });
+  }, [filtersState, isHydrated, isMainPersistentScope, selectionState, uiState]);
+
+  useEffect(() => {
+    if (!syncUrl || !isHydrated) return;
+
+    const currentTab = resolveTabFromPathname(location.pathname);
     if (currentTab !== uiState.currentTab) {
       setCurrentTab(currentTab);
     }
-  }, [location.pathname, uiState.currentTab, setCurrentTab]);
+  }, [
+    isHydrated,
+    location.pathname,
+    setCurrentTab,
+    syncUrl,
+    uiState.currentTab,
+  ]);
 
-  // Sync Carousel with URL
   useEffect(() => {
+    if (!isHydrated) return;
+
     const isCarouselOpen = !!params.assetId;
     const activeAssetId = params.assetId;
 
     setCarouselOpen(isCarouselOpen);
     setActiveAssetId(activeAssetId);
-  }, [params.assetId, setCarouselOpen, setActiveAssetId]);
+  }, [isHydrated, params.assetId, setActiveAssetId, setCarouselOpen]);
 
-  // Sync UI state from URL params
   useEffect(() => {
+    if (!syncUrl || !isHydrated) return;
+
     const liveSearchParams = getLiveSearchParams(searchParams);
     const urlGroupBy = liveSearchParams.get("groupBy");
     const urlQuery = liveSearchParams.get("q");
@@ -281,31 +403,50 @@ export const AssetsProvider = ({
     );
     const resolvedQuery = urlQuery ?? "";
 
-    if (resolvedGroupBy !== uiState.groupBy) {
-      hydrateUIFromURL({ groupBy: resolvedGroupBy as any });
+    if (urlGroupBy !== null && resolvedGroupBy !== uiState.groupBy) {
+      hydrateUIFromURL({ groupBy: resolvedGroupBy });
     }
 
-    if (resolvedQuery !== uiState.searchQuery) {
+    if (urlQuery !== null && resolvedQuery !== uiState.searchQuery) {
       hydrateUIFromURL({ searchQuery: resolvedQuery });
     }
-
-    if (!isGroupByType(urlGroupBy)) {
-      const params = new URLSearchParams(liveSearchParams);
-      params.set("groupBy", resolvedGroupBy);
-      setSearchParams(params, { replace: true });
-    }
   }, [
+    hydrateUIFromURL,
+    isHydrated,
     searchParams,
     settingsState.ui.asset_page?.layout,
+    syncUrl,
     uiState.groupBy,
     uiState.searchQuery,
-    hydrateUIFromURL,
+  ]);
+
+  useEffect(() => {
+    if (!syncUrl || !isHydrated) return;
+
+    const liveSearchParams = getLiveSearchParams(searchParams);
+    const nextParams = new URLSearchParams(liveSearchParams);
+    nextParams.set("groupBy", uiState.groupBy);
+    if (uiState.searchQuery.trim()) {
+      nextParams.set("q", uiState.searchQuery.trim());
+    } else {
+      nextParams.delete("q");
+    }
+
+    if (nextParams.toString() !== liveSearchParams.toString()) {
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [
+    isHydrated,
+    searchParams,
     setSearchParams,
+    syncUrl,
+    uiState.groupBy,
+    uiState.searchQuery,
   ]);
 
   const openCarousel = useCallback(
     (assetId: string) => {
-      const currentParams = getLiveSearchParams(searchParams);
+      const currentParams = syncUrl ? getLiveSearchParams(searchParams) : null;
       let path = basePath || "/assets/photos";
 
       if (!basePath) {
@@ -313,14 +454,14 @@ export const AssetsProvider = ({
         else if (uiState.currentTab === "audios") path = "/assets/audios";
       }
 
-      const targetUrl = `${path}/${assetId}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
-      navigate(targetUrl);
+      const query = currentParams?.toString();
+      navigate(`${path}/${assetId}${query ? `?${query}` : ""}`);
     },
-    [navigate, searchParams, uiState.currentTab, basePath],
+    [basePath, navigate, searchParams, syncUrl, uiState.currentTab],
   );
 
   const closeCarousel = useCallback(() => {
-    const currentParams = getLiveSearchParams(searchParams);
+    const currentParams = syncUrl ? getLiveSearchParams(searchParams) : null;
     let path = basePath || "/assets/photos";
 
     if (!basePath) {
@@ -328,20 +469,20 @@ export const AssetsProvider = ({
       else if (uiState.currentTab === "audios") path = "/assets/audios";
     }
 
-    const targetUrl = `${path}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
-    navigate(targetUrl);
-  }, [navigate, searchParams, uiState.currentTab, basePath]);
+    const query = currentParams?.toString();
+    navigate(`${path}${query ? `?${query}` : ""}`);
+  }, [basePath, navigate, searchParams, syncUrl, uiState.currentTab]);
 
   const switchTab = useCallback(
     (tab: TabType) => {
-      const currentParams = getLiveSearchParams(searchParams);
+      const currentParams = syncUrl ? getLiveSearchParams(searchParams) : null;
       let path = "/assets/photos";
       if (tab === "videos") path = "/assets/videos";
       else if (tab === "audios") path = "/assets/audios";
-      const targetUrl = `${path}${currentParams.toString() ? `?${currentParams.toString()}` : ""}`;
-      navigate(targetUrl);
+      const query = currentParams?.toString();
+      navigate(`${path}${query ? `?${query}` : ""}`);
     },
-    [navigate, searchParams],
+    [navigate, searchParams, syncUrl],
   );
 
   const contextValue = useMemo<AssetsNavigationContextValue>(
@@ -354,8 +495,10 @@ export const AssetsProvider = ({
   );
 
   return (
-    <AssetsNavigationContext.Provider value={contextValue}>
-      {children}
-    </AssetsNavigationContext.Provider>
+    <AssetsStoreContext.Provider value={store}>
+      <AssetsNavigationContext.Provider value={contextValue}>
+        {isHydrated ? children : null}
+      </AssetsNavigationContext.Provider>
+    </AssetsStoreContext.Provider>
   );
 };

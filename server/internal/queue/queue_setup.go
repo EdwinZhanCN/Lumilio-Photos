@@ -19,6 +19,7 @@ func New(dbpool *pgxpool.Pool, workers *river.Workers, logger *slog.Logger) (*ri
 		"transcode_asset": {MaxWorkers: 1},
 		"retry_asset":     {MaxWorkers: 2},
 		"reindex_assets":  {MaxWorkers: 1},
+		"scan_repository": {MaxWorkers: 1},
 		"process_clip":    {MaxWorkers: 2},
 		"process_ocr":     {MaxWorkers: 3},
 		"process_caption": {MaxWorkers: 1},

@@ -78,7 +78,7 @@ type AssetService interface {
 
 	SaveNewAsset(ctx context.Context, fileReader io.Reader, filename string, hash string) (string, error)
 	SaveNewThumbnail(ctx context.Context, repoPath string, buffers io.Reader, asset *repo.Asset, size string) error
-	GetDistinctCameraMakes(ctx context.Context) ([]string, error)
+	GetDistinctCameraModels(ctx context.Context) ([]string, error)
 	GetDistinctLenses(ctx context.Context) ([]string, error)
 
 	// Video and Audio processing methods
@@ -95,25 +95,31 @@ type AssetService interface {
 
 // QueryAssetsParams contains all parameters for the unified asset query
 type QueryAssetsParams struct {
-	Query          string // Filename search query (empty for list-only)
-	SearchType     string // "filename" (default) | "semantic"
-	ViewerTimeZone string
-	RepositoryID   *string
-	PersonID       *int32
-	AssetType      *string  // Single type filter
-	AssetTypes     []string // Multiple types filter
-	OwnerID        *int32
-	AlbumID        *int32
-	DateFrom       *time.Time
-	DateTo         *time.Time
-	IsRaw          *bool
-	Rating         *int
-	Liked          *bool
-	CameraModel    *string
-	LensModel      *string
-	GroupBy        string // Grouping strategy for server-side sorting (e.g., "type")
-	Limit          int
-	Offset         int
+	Query            string // Filename search query (empty for list-only)
+	SearchType       string // "filename" (default) | "semantic"
+	ViewerTimeZone   string
+	RepositoryID     *string
+	PersonID         *int32
+	AssetType        *string  // Single type filter
+	AssetTypes       []string // Multiple types filter
+	OwnerID          *int32
+	AlbumID          *int32
+	FilenameValue    *string
+	FilenameOperator *string
+	DateFrom         *time.Time
+	DateTo           *time.Time
+	IsRaw            *bool
+	Rating           *int
+	Liked            *bool
+	CameraModel      *string
+	LensModel        *string
+	LocationNorth    *float64
+	LocationSouth    *float64
+	LocationEast     *float64
+	LocationWest     *float64
+	GroupBy          string // Grouping strategy for server-side sorting (e.g., "type")
+	Limit            int
+	Offset           int
 }
 
 type SearchEnhancementMode string
@@ -829,20 +835,20 @@ func matchFilename(filename, pattern, mode string) bool {
 	}
 }
 
-func (s *assetService) GetDistinctCameraMakes(ctx context.Context) ([]string, error) {
-	rows, err := s.queries.GetDistinctCameraMakes(ctx)
+func (s *assetService) GetDistinctCameraModels(ctx context.Context) ([]string, error) {
+	rows, err := s.queries.GetDistinctCameraModels(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get distinct camera makes: %w", err)
+		return nil, fmt.Errorf("failed to get distinct camera models: %w", err)
 	}
 
-	makes := make([]string, 0, len(rows))
+	models := make([]string, 0, len(rows))
 	for _, row := range rows {
 		if str, ok := row.(string); ok && str != "" {
-			makes = append(makes, str)
+			models = append(models, str)
 		}
 	}
 
-	return makes, nil
+	return models, nil
 }
 
 func (s *assetService) GetDistinctLenses(ctx context.Context) ([]string, error) {
@@ -1308,20 +1314,26 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 
 	// Get total count
 	countResult, err := s.queries.CountAssetsUnified(ctx, repo.CountAssetsUnifiedParams{
-		AssetType:    params.AssetType,
-		AssetTypes:   params.AssetTypes,
-		RepositoryID: repoUUID,
-		PersonID:     params.PersonID,
-		OwnerID:      params.OwnerID,
-		AlbumID:      params.AlbumID,
-		Query:        queryPtr,
-		IsRaw:        params.IsRaw,
-		Rating:       ratingPtr,
-		Liked:        params.Liked,
-		CameraModel:  params.CameraModel,
-		LensModel:    params.LensModel,
-		DateFrom:     fromTime,
-		DateTo:       toTime,
+		AssetType:        params.AssetType,
+		AssetTypes:       params.AssetTypes,
+		RepositoryID:     repoUUID,
+		PersonID:         params.PersonID,
+		OwnerID:          params.OwnerID,
+		AlbumID:          params.AlbumID,
+		Query:            queryPtr,
+		FilenameVal:      params.FilenameValue,
+		FilenameOperator: params.FilenameOperator,
+		IsRaw:            params.IsRaw,
+		Rating:           ratingPtr,
+		Liked:            params.Liked,
+		CameraModel:      params.CameraModel,
+		LensModel:        params.LensModel,
+		LocationNorth:    params.LocationNorth,
+		LocationSouth:    params.LocationSouth,
+		LocationEast:     params.LocationEast,
+		LocationWest:     params.LocationWest,
+		DateFrom:         fromTime,
+		DateTo:           toTime,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count assets: %w", err)
@@ -1329,23 +1341,29 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 
 	// Get assets
 	assets, err := s.queries.GetAssetsUnified(ctx, repo.GetAssetsUnifiedParams{
-		AssetType:    params.AssetType,
-		AssetTypes:   params.AssetTypes,
-		RepositoryID: repoUUID,
-		PersonID:     params.PersonID,
-		OwnerID:      params.OwnerID,
-		AlbumID:      params.AlbumID,
-		Query:        queryPtr,
-		IsRaw:        params.IsRaw,
-		Rating:       ratingPtr,
-		Liked:        params.Liked,
-		CameraModel:  params.CameraModel,
-		LensModel:    params.LensModel,
-		SortBy:       sortByPtr,
-		DateFrom:     fromTime,
-		DateTo:       toTime,
-		Limit:        int32(params.Limit),
-		Offset:       int32(params.Offset),
+		AssetType:        params.AssetType,
+		AssetTypes:       params.AssetTypes,
+		RepositoryID:     repoUUID,
+		PersonID:         params.PersonID,
+		OwnerID:          params.OwnerID,
+		AlbumID:          params.AlbumID,
+		Query:            queryPtr,
+		FilenameVal:      params.FilenameValue,
+		FilenameOperator: params.FilenameOperator,
+		IsRaw:            params.IsRaw,
+		Rating:           ratingPtr,
+		Liked:            params.Liked,
+		CameraModel:      params.CameraModel,
+		LensModel:        params.LensModel,
+		LocationNorth:    params.LocationNorth,
+		LocationSouth:    params.LocationSouth,
+		LocationEast:     params.LocationEast,
+		LocationWest:     params.LocationWest,
+		SortBy:           sortByPtr,
+		DateFrom:         fromTime,
+		DateTo:           toTime,
+		Limit:            int32(params.Limit),
+		Offset:           int32(params.Offset),
 	})
 	if err != nil {
 		return nil, 0, err
@@ -1549,6 +1567,19 @@ func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, p
 			  AND aa.album_id = %s
 		)`, albumPlaceholder))
 	}
+	if params.FilenameValue != nil {
+		filenamePlaceholder := builder.addArg(*params.FilenameValue)
+		switch {
+		case params.FilenameOperator != nil && *params.FilenameOperator == "matches":
+			conditions = append(conditions, fmt.Sprintf("a.original_filename ILIKE %s", filenamePlaceholder))
+		case params.FilenameOperator != nil && *params.FilenameOperator == "starts_with":
+			conditions = append(conditions, fmt.Sprintf("a.original_filename ILIKE %s || '%%'", filenamePlaceholder))
+		case params.FilenameOperator != nil && *params.FilenameOperator == "ends_with":
+			conditions = append(conditions, fmt.Sprintf("a.original_filename ILIKE '%%' || %s", filenamePlaceholder))
+		default:
+			conditions = append(conditions, fmt.Sprintf("a.original_filename ILIKE '%%' || %s || '%%'", filenamePlaceholder))
+		}
+	}
 	if params.DateFrom != nil {
 		conditions = append(conditions, fmt.Sprintf("COALESCE(a.taken_time, a.upload_time) >= %s", builder.addArg(*params.DateFrom)))
 	}
@@ -1564,19 +1595,38 @@ func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, p
 	}
 	if params.Rating != nil {
 		if *params.Rating == 0 {
-			conditions = append(conditions, "a.rating IS NULL")
+			conditions = append(conditions, "(a.rating IS NULL OR a.rating = 0)")
 		} else {
 			conditions = append(conditions, fmt.Sprintf("a.rating = %s", builder.addArg(*params.Rating)))
 		}
 	}
 	if params.Liked != nil {
-		conditions = append(conditions, fmt.Sprintf("a.liked = %s", builder.addArg(*params.Liked)))
+		if *params.Liked {
+			conditions = append(conditions, "a.liked = true")
+		} else {
+			conditions = append(conditions, "(a.liked IS NULL OR a.liked = false)")
+		}
 	}
 	if params.CameraModel != nil {
 		conditions = append(conditions, fmt.Sprintf("a.specific_metadata->>'camera_model' = %s", builder.addArg(*params.CameraModel)))
 	}
 	if params.LensModel != nil {
 		conditions = append(conditions, fmt.Sprintf("a.specific_metadata->>'lens_model' = %s", builder.addArg(*params.LensModel)))
+	}
+	if params.LocationNorth != nil && params.LocationSouth != nil && params.LocationEast != nil && params.LocationWest != nil {
+		northPlaceholder := builder.addArg(*params.LocationNorth)
+		southPlaceholder := builder.addArg(*params.LocationSouth)
+		eastPlaceholder := builder.addArg(*params.LocationEast)
+		westPlaceholder := builder.addArg(*params.LocationWest)
+		conditions = append(conditions, fmt.Sprintf(`jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
+  AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
+  AND (a.specific_metadata->>'gps_latitude')::double precision BETWEEN LEAST(%s::float8, %s::float8) AND GREATEST(%s::float8, %s::float8)
+  AND (
+    CASE
+      WHEN %s::float8 <= %s::float8 THEN (a.specific_metadata->>'gps_longitude')::double precision BETWEEN %s::float8 AND %s::float8
+      ELSE (a.specific_metadata->>'gps_longitude')::double precision >= %s::float8 OR (a.specific_metadata->>'gps_longitude')::double precision <= %s::float8
+    END
+  )`, southPlaceholder, northPlaceholder, southPlaceholder, northPlaceholder, westPlaceholder, eastPlaceholder, westPlaceholder, eastPlaceholder, westPlaceholder, eastPlaceholder))
 	}
 
 	baseSQL := fmt.Sprintf(`

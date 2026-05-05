@@ -66,7 +66,7 @@ COPY --from=builder /go/bin/river /usr/local/bin/river
 COPY --from=builder /app/migrations ./migrations
 
 # Prepare storage path
-RUN mkdir -p "${STORAGE_PATH}" /watchman-sock && chown -R app:app /data /app /watchman-sock
+RUN mkdir -p "${STORAGE_PATH}" && chown -R app:app /data /app
 
 USER app
 

@@ -58,6 +58,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     hasMore: hasNextPage,
     isFetched,
     error,
+    viewKey,
   } = useCurrentTabAssets({
     withGroups: true,
     groupBy,
@@ -120,6 +121,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
       return (
         <div className="relative">
           <GalleryComponent
+            key={`search-transition:${currentLayout}:${compactColumns}`}
             groups={lastBrowseGroups}
             openCarousel={openCarousel}
             onLoadMore={() => {}}
@@ -176,6 +178,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
 
         {photoSearchView.topResults.length > 0 && (
           <GalleryComponent
+            key={`search-top:${currentLayout}:${photoSearchView.viewKey}`}
             groups={topResultsGroup}
             openCarousel={openCarousel}
             onLoadMore={() => {}}
@@ -187,6 +190,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
 
         {(!error || photoSearchView.resultAssets.length > 0) && (
           <GalleryComponent
+            key={`search-results:${currentLayout}:${photoSearchView.viewKey}`}
             groups={photoSearchView.resultGroups}
             openCarousel={openCarousel}
             onLoadMore={handleLoadMore}
@@ -275,7 +279,10 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
       ) : isFetching && allAssets.length === 0 ? (
         <PhotosLoadingSkeleton />
       ) : (
-        <GalleryComponent {...browseGalleryProps} />
+        <GalleryComponent
+          key={`browse:${currentLayout}:${viewKey}`}
+          {...browseGalleryProps}
+        />
       )}
 
       {showEndOfResults && (

@@ -1,7 +1,6 @@
 import React, { useCallback, useState, useMemo } from "react";
 import { GalleryThumbnails, X, ExternalLink, Hammer } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAssetsStore } from "@/features/assets/assets.store";
 import { useAssetsView } from "@/features/assets/hooks/useAssetsView";
 import { SideChannelEvent } from "@/features/lumilio/schema";
 import { AssetFilter } from "@/lib/assets/types";
@@ -27,37 +26,19 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
 }) => {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const resetFilters = useAssetsStore((s) => s.resetFilters);
-  const batchUpdateFilters = useAssetsStore((s) => s.batchUpdateFilters);
   const filterDTO = event.data?.payload as AssetFilter;
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleOpenMainView = useCallback(() => {
     if (!filterDTO) return;
 
-    // Reset and apply filters to global context
-    resetFilters();
-
-    const payload: any = { enabled: true };
-    if (filterDTO.raw !== undefined) payload.raw = filterDTO.raw;
-    if (filterDTO.rating !== undefined) payload.rating = filterDTO.rating;
-    if (filterDTO.liked !== undefined) payload.liked = filterDTO.liked;
-    if (filterDTO.filename) {
-      payload.filename = {
-        mode: filterDTO.filename.mode,
-        value: filterDTO.filename.value
-      };
-    }
-    if (filterDTO.date) {
-      payload.date = { from: filterDTO.date.from, to: filterDTO.date.to };
-    }
-    if (filterDTO.camera_make) payload.camera_make = filterDTO.camera_make;
-    if (filterDTO.lens) payload.lens = filterDTO.lens;
-
-    batchUpdateFilters(payload);
-    navigate("/assets/photos");
+    navigate("/assets/photos", {
+      state: {
+        assetsInitialFilter: filterDTO,
+      },
+    });
     setIsModalOpen(false);
-  }, [resetFilters, batchUpdateFilters, filterDTO, navigate]);
+  }, [filterDTO, navigate]);
 
   if (!filterDTO) return null;
 
@@ -96,7 +77,11 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
             {/* Content */}
             <div className="flex-1 overflow-y-auto relative bg-base-100" id="agent-gallery-container">
               <WorkerProvider preload={["exif", "export"]}>
-                <AssetsProvider persist={false}>
+                <AssetsProvider
+                  key={`lumilio-result:${event.tool.executionId}`}
+                  scopeId={`lumilio-result:${event.tool.executionId}`}
+                  persist={false}
+                >
                   <AgentGallery filter={filterDTO} />
                 </AssetsProvider>
               </WorkerProvider>
@@ -122,7 +107,6 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
     types: ["photos", "videos", "audios"],
     groupBy: "date",
     pageSize: 50,
-    inheritGlobalFilter: false,
   }), [filter]);
 
   const {

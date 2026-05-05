@@ -6,6 +6,7 @@ import (
 	"server/internal/agent/core"
 	"server/internal/api/dto"
 	"server/internal/db/repo"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -95,7 +96,7 @@ func RegisterBulkLikeTool() {
 				}
 			}
 
-			assets, err := deps.Queries.FilterAssets(ctx, queryParams)
+			assets, err := deps.Queries.GetAssetsUnified(ctx, queryParams)
 			if err != nil {
 				return handleBulkError(ctx, deps, executionID, startTime, err)
 			}
@@ -227,8 +228,8 @@ func boolToVerb(liked bool) string {
 	return "unlike"
 }
 
-func convertDTOToParams(f dto.AssetFilterDTO) repo.FilterAssetsParams {
-	params := repo.FilterAssetsParams{}
+func convertDTOToParams(f dto.AssetFilterDTO) repo.GetAssetsUnifiedParams {
+	params := repo.GetAssetsUnifiedParams{}
 
 	if f.Type != nil {
 		params.AssetType = f.Type
@@ -237,17 +238,14 @@ func convertDTOToParams(f dto.AssetFilterDTO) repo.FilterAssetsParams {
 		params.OwnerID = f.OwnerID
 	}
 	if f.RepositoryID != nil {
-		// Assuming UUID parsing is handled or we need to parse string to pgtype.UUID
-		// For simplicity in this snippet, we might skip complex UUID parsing if not strictly needed or handle it safely
-		// In a real app, parse the UUID string
+		if parsed, err := uuid.Parse(strings.TrimSpace(*f.RepositoryID)); err == nil {
+			params.RepositoryID = pgtype.UUID{Bytes: parsed, Valid: true}
+		}
 	}
 	if f.Filename != nil {
 		params.FilenameVal = &f.Filename.Value
-		mode := f.Filename.Mode
-		if mode == "" {
-			mode = "contains"
-		}
-		params.FilenameMode = &mode
+		operator := normalizeFilenameOperator(f.Filename.Operator)
+		params.FilenameOperator = &operator
 	}
 	if f.Date != nil {
 		if f.Date.From != nil {
@@ -267,14 +265,33 @@ func convertDTOToParams(f dto.AssetFilterDTO) repo.FilterAssetsParams {
 	if f.Liked != nil {
 		params.Liked = f.Liked
 	}
-	if f.CameraMake != nil {
-		params.CameraModel = f.CameraMake
+	if f.CameraModel != nil {
+		params.CameraModel = f.CameraModel
 	}
 	if f.Lens != nil {
 		params.LensModel = f.Lens
 	}
+	if f.Location != nil {
+		params.LocationNorth = &f.Location.North
+		params.LocationSouth = &f.Location.South
+		params.LocationEast = &f.Location.East
+		params.LocationWest = &f.Location.West
+	}
 
 	return params
+}
+
+func normalizeFilenameOperator(operator string) string {
+	switch strings.ToLower(strings.TrimSpace(operator)) {
+	case "matches":
+		return "matches"
+	case "starts_with", "startswith":
+		return "starts_with"
+	case "ends_with", "endswith":
+		return "ends_with"
+	default:
+		return "contains"
+	}
 }
 
 func handleBulkError(ctx context.Context, deps *core.ToolDependencies, executionID string, startTime time.Time, err error) (*BulkLikeOutput, error) {

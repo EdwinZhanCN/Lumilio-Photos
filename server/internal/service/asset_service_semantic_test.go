@@ -216,6 +216,35 @@ func TestBuildSemanticSearchBaseSQLUsesSpaceIsolation(t *testing.T) {
 	}
 }
 
+func TestBuildSemanticSearchBaseSQLTreatsUnratedAndUnlikedAsEmptyStates(t *testing.T) {
+	t.Parallel()
+
+	svc := &assetService{}
+	builder := &semanticSQLBuilder{}
+	vector := pgvector.NewVector([]float32{0.1, 0.2, 0.3})
+	rating := 0
+	liked := false
+	params := QueryAssetsParams{
+		Rating: &rating,
+		Liked:  &liked,
+	}
+
+	baseSQL, _, err := svc.buildSemanticSearchBaseSQL(builder, params, repo.EmbeddingSpace{
+		ID:         42,
+		Dimensions: 768,
+	}, &vector)
+	if err != nil {
+		t.Fatalf("buildSemanticSearchBaseSQL returned error: %v", err)
+	}
+
+	if !strings.Contains(baseSQL, "(a.rating IS NULL OR a.rating = 0)") {
+		t.Fatalf("expected unrated filter to include NULL and zero ratings, got:\n%s", baseSQL)
+	}
+	if !strings.Contains(baseSQL, "(a.liked IS NULL OR a.liked = false)") {
+		t.Fatalf("expected unliked filter to include NULL and false liked states, got:\n%s", baseSQL)
+	}
+}
+
 func TestSemanticMaxDistanceHonorsEnvironment(t *testing.T) {
 	const key = "SEMANTIC_MAX_DISTANCE"
 	t.Setenv(key, "0.33")

@@ -23,7 +23,7 @@ type AppConfig struct {
 	ServerConfig   ServerConfig
 	LLMConfig      LLMConfig
 	MLConfig       MLConfig
-	WatchmanConfig WatchmanConfig
+	RepositoryScan RepositoryScanConfig
 }
 
 type ServerConfig struct {
@@ -76,13 +76,13 @@ func (c MLConfig) HasRuntimeDemand() bool {
 	return c.HasManualTasksEnabled()
 }
 
-// WatchmanConfig controls repository file tree monitoring.
-type WatchmanConfig struct {
-	Enabled             bool
-	SocketPath          string
-	SettleSeconds       int
-	InitialScan         bool
-	PollFallbackSeconds int
+// RepositoryScanConfig controls periodic repository free-workspace scanning.
+type RepositoryScanConfig struct {
+	Enabled            bool
+	IntervalSeconds    int
+	SettleSeconds      int
+	MaxConcurrentRepos int
+	BatchSize          int
 }
 
 // IsDevelopmentMode checks if the application is running in development mode
@@ -167,7 +167,7 @@ func LoadAppConfig() AppConfig {
 	cfg.ServerConfig = LoadServerConfig()
 	cfg.MLConfig = LoadMLConfig()
 	cfg.LLMConfig = LoadLLMConfig()
-	cfg.WatchmanConfig = LoadWatchmanConfig()
+	cfg.RepositoryScan = LoadRepositoryScanConfig()
 
 	return cfg
 }
@@ -279,37 +279,41 @@ func LoadLLMConfig() LLMConfig {
 	return cfg
 }
 
-// LoadWatchmanConfig loads file tree monitoring settings.
-func LoadWatchmanConfig() WatchmanConfig {
-	cfg := WatchmanConfig{
-		Enabled:             false,
-		SocketPath:          "",
-		SettleSeconds:       3,
-		InitialScan:         true,
-		PollFallbackSeconds: 10,
+// LoadRepositoryScanConfig loads file tree scan settings.
+func LoadRepositoryScanConfig() RepositoryScanConfig {
+	cfg := RepositoryScanConfig{
+		Enabled:            true,
+		IntervalSeconds:    300,
+		SettleSeconds:      5,
+		MaxConcurrentRepos: 1,
+		BatchSize:          500,
 	}
 
-	if enabled := strings.ToLower(strings.TrimSpace(os.Getenv("WATCHMAN_ENABLED"))); enabled == "true" {
-		cfg.Enabled = true
+	if enabled := strings.ToLower(strings.TrimSpace(os.Getenv("REPOSITORY_SCAN_ENABLED"))); enabled == "false" {
+		cfg.Enabled = false
 	}
 
-	if socketPath := strings.TrimSpace(os.Getenv("WATCHMAN_SOCK")); socketPath != "" {
-		cfg.SocketPath = socketPath
+	if intervalRaw := strings.TrimSpace(os.Getenv("REPOSITORY_SCAN_INTERVAL_SECONDS")); intervalRaw != "" {
+		if intervalSeconds, err := strconv.Atoi(intervalRaw); err == nil && intervalSeconds > 0 {
+			cfg.IntervalSeconds = intervalSeconds
+		}
 	}
 
-	if settleRaw := strings.TrimSpace(os.Getenv("WATCHMAN_SETTLE_SECONDS")); settleRaw != "" {
+	if settleRaw := strings.TrimSpace(os.Getenv("REPOSITORY_SCAN_SETTLE_SECONDS")); settleRaw != "" {
 		if settleSeconds, err := strconv.Atoi(settleRaw); err == nil && settleSeconds > 0 {
 			cfg.SettleSeconds = settleSeconds
 		}
 	}
 
-	if initialScanRaw := strings.ToLower(strings.TrimSpace(os.Getenv("WATCHMAN_INITIAL_SCAN"))); initialScanRaw == "false" {
-		cfg.InitialScan = false
+	if concurrentRaw := strings.TrimSpace(os.Getenv("REPOSITORY_SCAN_MAX_CONCURRENT_REPOS")); concurrentRaw != "" {
+		if maxConcurrent, err := strconv.Atoi(concurrentRaw); err == nil && maxConcurrent > 0 {
+			cfg.MaxConcurrentRepos = maxConcurrent
+		}
 	}
 
-	if pollRaw := strings.TrimSpace(os.Getenv("WATCHMAN_POLL_FALLBACK_SECONDS")); pollRaw != "" {
-		if pollSeconds, err := strconv.Atoi(pollRaw); err == nil && pollSeconds >= 0 {
-			cfg.PollFallbackSeconds = pollSeconds
+	if batchRaw := strings.TrimSpace(os.Getenv("REPOSITORY_SCAN_BATCH_SIZE")); batchRaw != "" {
+		if batchSize, err := strconv.Atoi(batchRaw); err == nil && batchSize > 0 {
+			cfg.BatchSize = batchSize
 		}
 	}
 

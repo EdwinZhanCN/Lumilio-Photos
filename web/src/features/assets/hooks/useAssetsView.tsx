@@ -3,7 +3,6 @@ import type {
   InfiniteData,
   UseInfiniteQueryResult,
 } from "@tanstack/react-query";
-import { keepPreviousData } from "@tanstack/react-query";
 import { useAssetsStore } from "../assets.store";
 import { useGroupBy } from "../selectors";
 import {
@@ -169,20 +168,11 @@ const normalizeSearchGroupBy = (
   }
 };
 
-const useEffectiveFilter = (definition: AssetViewDefinition): AssetFilter => {
-  const filtersState = useAssetsStore((state) => state.filters);
+const useDefinitionFilter = (definition: AssetViewDefinition): AssetFilter => {
   const { scopedRepositoryId } = useWorkingRepository();
 
   return useMemo(() => {
-    const globalFilter = selectFiltersEnabled({ filters: filtersState } as any)
-      ? selectFilterAsAssetFilter({ filters: filtersState } as any)
-      : {};
-
-    const baseFilter =
-      definition.inheritGlobalFilter !== false ? globalFilter : {};
-
     const mergedFilter: AssetFilter = {
-      ...baseFilter,
       ...definition.filter,
     };
 
@@ -193,8 +183,6 @@ const useEffectiveFilter = (definition: AssetViewDefinition): AssetFilter => {
     return mergedFilter;
   }, [
     definition.filter,
-    definition.inheritGlobalFilter,
-    filtersState,
     scopedRepositoryId,
   ]);
 };
@@ -224,14 +212,25 @@ export const useAssetsViewQuery = (
   options: ViewDefinitionOptions = {},
 ): AssetsViewQueryResult => {
   const { autoFetch = true, disabled = false } = options;
-  const viewKey = useMemo(() => generateViewKey(definition), [definition]);
-  const effectiveFilter = useEffectiveFilter(definition);
+  const effectiveFilter = useDefinitionFilter(definition);
+  const apiFilter = useMemo(
+    () => buildApiFilter(definition, effectiveFilter),
+    [definition, effectiveFilter],
+  );
+  const viewKey = useMemo(
+    () =>
+      generateViewKey({
+        ...definition,
+        filter: apiFilter,
+      }),
+    [apiFilter, definition],
+  );
   const pageSize = definition.pageSize || 50;
   const viewerTimeZone = useMemo(() => getViewerTimeZone(), []);
 
   const createUnifiedRequest = useCallback((): AssetQueryRequest => {
     const request: AssetQueryRequest = {
-      filter: buildApiFilter(definition, effectiveFilter),
+      filter: apiFilter,
       pagination: {
         limit: pageSize,
         offset: 0,
@@ -245,7 +244,7 @@ export const useAssetsViewQuery = (
     }
 
     return request;
-  }, [definition, effectiveFilter, pageSize, viewerTimeZone]);
+  }, [apiFilter, definition, pageSize, viewerTimeZone]);
 
   const query = $api.useInfiniteQuery(
     "post",
@@ -255,7 +254,6 @@ export const useAssetsViewQuery = (
     },
     {
       enabled: autoFetch && !disabled,
-      placeholderData: keepPreviousData,
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
@@ -367,19 +365,27 @@ export const usePhotoSearchView = (
   options: ViewDefinitionOptions = {},
 ): PhotoSearchViewResult => {
   const { autoFetch = true, disabled = false, withGroups = false } = options;
-  const effectiveFilter = useEffectiveFilter(definition);
+  const effectiveFilter = useDefinitionFilter(definition);
+  const apiFilter = useMemo(
+    () => buildApiFilter(definition, effectiveFilter),
+    [definition, effectiveFilter],
+  );
   const pageSize = definition.pageSize || 50;
   const queryText = definition.search?.query?.trim() ?? "";
   const viewerTimeZone = useMemo(() => getViewerTimeZone(), []);
   const viewKey = useMemo(
-    () => `${generateViewKey(definition)}:photo-search`,
-    [definition],
+    () =>
+      `${generateViewKey({
+        ...definition,
+        filter: apiFilter,
+      })}:photo-search`,
+    [apiFilter, definition],
   );
 
   const createSearchRequest = useCallback(
     (): SearchAssetsRequest => ({
       query: queryText,
-      filter: buildApiFilter(definition, effectiveFilter),
+      filter: apiFilter,
       pagination: {
         limit: pageSize,
         offset: 0,
@@ -389,7 +395,7 @@ export const usePhotoSearchView = (
       group_by: normalizeSearchGroupBy(definition.groupBy),
       viewer_timezone: viewerTimeZone,
     }),
-    [definition, effectiveFilter, pageSize, queryText, viewerTimeZone],
+    [apiFilter, pageSize, queryText, viewerTimeZone],
   );
 
   const query = $api.useInfiniteQuery(
@@ -400,7 +406,6 @@ export const usePhotoSearchView = (
     },
     {
       enabled: autoFetch && !disabled && queryText.length > 0,
-      placeholderData: keepPreviousData,
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
@@ -521,11 +526,20 @@ export const useCurrentTabPhotoSearchView = (
   const currentTab = useAssetsStore((state) => state.ui.currentTab);
   const uiGroupBy = useGroupBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
+  const filtersState = useAssetsStore((state) => state.filters);
   const { groupBy, pageSize, ...viewOptions } = options;
+  const scopedFilter = useMemo(
+    () =>
+      selectFiltersEnabled({ filters: filtersState } as any)
+        ? selectFilterAsAssetFilter({ filters: filtersState } as any)
+        : {},
+    [filtersState],
+  );
 
   const definition: AssetViewDefinition = useMemo(
     () => ({
       types: [currentTab],
+      filter: scopedFilter,
       groupBy: (groupBy as any) || uiGroupBy,
       pageSize: pageSize || 50,
       sort: { direction: "desc" },
@@ -535,7 +549,7 @@ export const useCurrentTabPhotoSearchView = (
           }
         : undefined,
     }),
-    [currentTab, uiGroupBy, searchQuery, groupBy, pageSize],
+    [currentTab, scopedFilter, uiGroupBy, searchQuery, groupBy, pageSize],
   );
 
   const enabled = currentTab === "photos" && searchQuery.trim().length > 0;
@@ -555,12 +569,21 @@ export const useCurrentTabAssets = (
   const currentTab = useAssetsStore((state) => state.ui.currentTab);
   const uiGroupBy = useGroupBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
+  const filtersState = useAssetsStore((state) => state.filters);
 
   const { groupBy, pageSize, ...viewOptions } = options;
+  const scopedFilter = useMemo(
+    () =>
+      selectFiltersEnabled({ filters: filtersState } as any)
+        ? selectFilterAsAssetFilter({ filters: filtersState } as any)
+        : {},
+    [filtersState],
+  );
 
   const definition: AssetViewDefinition = useMemo(
     () => ({
       types: [currentTab],
+      filter: scopedFilter,
       groupBy: (groupBy as any) || uiGroupBy,
       pageSize: pageSize || 50,
       sort: { direction: "desc" },
@@ -570,7 +593,7 @@ export const useCurrentTabAssets = (
           }
         : undefined,
     }),
-    [currentTab, uiGroupBy, searchQuery, groupBy, pageSize],
+    [currentTab, scopedFilter, uiGroupBy, searchQuery, groupBy, pageSize],
   );
 
   const standardView = useAssetsView(definition, {

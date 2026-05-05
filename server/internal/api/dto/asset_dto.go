@@ -309,14 +309,37 @@ type AssetTypesResponseDTO struct {
 
 // FilenameFilterDTO represents filename filtering options
 type FilenameFilterDTO struct {
-	Value string `json:"value" example:"IMG_"`
-	Mode  string `json:"mode" example:"startswith" enums:"contains,matches,startswith,endswith"`
+	Value    string `json:"value" example:"IMG_"`
+	Operator string `json:"operator" example:"starts_with" enums:"contains,matches,starts_with,ends_with"`
+}
+
+// UnmarshalJSON accepts the current operator field and the legacy mode field.
+func (f *FilenameFilterDTO) UnmarshalJSON(data []byte) error {
+	type alias struct {
+		Value    string `json:"value"`
+		Operator string `json:"operator"`
+		Mode     string `json:"mode"`
+	}
+
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+
+	f.Value = a.Value
+	f.Operator = a.Operator
+	if f.Operator == "" {
+		f.Operator = a.Mode
+	}
+	return nil
 }
 
 // DateRangeDTO represents a date range filter
 type DateRangeDTO struct {
-	From *time.Time `json:"from,omitempty"`
-	To   *time.Time `json:"to,omitempty"`
+	From         *time.Time `json:"from,omitempty"`
+	To           *time.Time `json:"to,omitempty"`
+	FromDateOnly bool       `json:"-"`
+	ToDateOnly   bool       `json:"-"`
 }
 
 // UnmarshalJSON supports parsing both date-only (YYYY-MM-DD) and RFC3339 timestamps.
@@ -331,9 +354,9 @@ func (d *DateRangeDTO) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	parse := func(val *string) (*time.Time, error) {
+	parse := func(val *string) (*time.Time, bool, error) {
 		if val == nil || *val == "" {
-			return nil, nil
+			return nil, false, nil
 		}
 		layouts := []string{
 			"2006-01-02",
@@ -342,20 +365,28 @@ func (d *DateRangeDTO) UnmarshalJSON(data []byte) error {
 		}
 		for _, layout := range layouts {
 			if t, err := time.Parse(layout, *val); err == nil {
-				return &t, nil
+				return &t, layout == "2006-01-02", nil
 			}
 		}
-		return nil, fmt.Errorf("invalid date format: %s", *val)
+		return nil, false, fmt.Errorf("invalid date format: %s", *val)
 	}
 
 	var err error
-	if d.From, err = parse(a.From); err != nil {
+	if d.From, d.FromDateOnly, err = parse(a.From); err != nil {
 		return err
 	}
-	if d.To, err = parse(a.To); err != nil {
+	if d.To, d.ToDateOnly, err = parse(a.To); err != nil {
 		return err
 	}
 	return nil
+}
+
+// LocationBBoxDTO represents a GPS bounding-box filter.
+type LocationBBoxDTO struct {
+	North float64 `json:"north" example:"37.9"`
+	South float64 `json:"south" example:"37.7"`
+	East  float64 `json:"east" example:"-122.3"`
+	West  float64 `json:"west" example:"-122.5"`
 }
 
 // AssetFilterDTO represents comprehensive filtering options
@@ -370,8 +401,9 @@ type AssetFilterDTO struct {
 	Liked        *bool              `json:"liked,omitempty" example:"true"`
 	Filename     *FilenameFilterDTO `json:"filename,omitempty"`
 	Date         *DateRangeDTO      `json:"date,omitempty"`
-	CameraMake   *string            `json:"camera_make,omitempty" example:"Canon"`
+	CameraModel  *string            `json:"camera_model,omitempty" example:"Canon EOS R5"`
 	Lens         *string            `json:"lens,omitempty" example:"EF 50mm f/1.8"`
+	Location     *LocationBBoxDTO   `json:"location,omitempty"`
 }
 
 // FilterAssetsRequestDTO represents the request structure for filtering assets
@@ -410,8 +442,8 @@ type SearchAssetsResponseDTO struct {
 
 // OptionsResponseDTO represents the response for filter options
 type OptionsResponseDTO struct {
-	CameraMakes []string `json:"camera_makes"`
-	Lenses      []string `json:"lenses"`
+	CameraModels []string `json:"camera_models"`
+	Lenses       []string `json:"lenses"`
 }
 
 // BulkLikeUpdateDTO represents the result of a bulk like/unlike operation

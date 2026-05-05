@@ -38,6 +38,22 @@ func TestProcessArgsDecodeLegacyImageDataWithoutPersistingBytes(t *testing.T) {
 	}
 }
 
+func TestScanRepositoryArgsKindAndInsertOpts(t *testing.T) {
+	args := ScanRepositoryArgs{
+		RepositoryID: "11111111-1111-1111-1111-111111111111",
+		Mode:         RepositoryScanModeManual,
+		Force:        true,
+	}
+
+	if args.Kind() != "scan_repository" {
+		t.Fatalf("unexpected kind: %s", args.Kind())
+	}
+	opts := args.InsertOpts()
+	if opts.UniqueOpts.ByPeriod == 0 {
+		t.Fatalf("expected scan repository jobs to use uniqueness by period")
+	}
+}
+
 func containsJSONField(data []byte, field string) bool {
 	var decoded map[string]any
 	if err := json.Unmarshal(data, &decoded); err != nil {

@@ -143,6 +143,13 @@ type UserControllerInterface interface {
 	ResetUserAccess(c *gin.Context)
 }
 
+type RepositoryScanControllerInterface interface {
+	CreateRepository(c *gin.Context)
+	QueueRepositoryScan(c *gin.Context)
+	GetLatestRepositoryScan(c *gin.Context)
+	ListRepositoryScans(c *gin.Context)
+}
+
 func NewRouter(
 	assetController AssetControllerInterface,
 	authController AuthControllerInterface,
@@ -154,6 +161,7 @@ func NewRouter(
 	capabilitiesController CapabilitiesControllerInterface,
 	settingsController SettingsControllerInterface,
 	userController UserControllerInterface,
+	repositoryScanController RepositoryScanControllerInterface,
 	agentAvailabilityMiddleware gin.HandlerFunc,
 ) *gin.Engine {
 	r := gin.Default()
@@ -222,6 +230,15 @@ func NewRouter(
 			users.GET("", authController.RequireAdmin(), userController.ListUsers)
 			users.PATCH("/:id", authController.RequireAdmin(), userController.UpdateUser)
 			users.POST("/:id/reset-access", authController.RequireAdmin(), userController.ResetUserAccess)
+		}
+
+		repositories := v1.Group("/repositories")
+		repositories.Use(authController.AuthMiddleware(), authController.RequireAdmin())
+		{
+			repositories.POST("", repositoryScanController.CreateRepository)
+			repositories.POST("/:id/scan", repositoryScanController.QueueRepositoryScan)
+			repositories.GET("/:id/scans/latest", repositoryScanController.GetLatestRepositoryScan)
+			repositories.GET("/:id/scans", repositoryScanController.ListRepositoryScans)
 		}
 
 		// Asset routes (new unified API) - with optional authentication

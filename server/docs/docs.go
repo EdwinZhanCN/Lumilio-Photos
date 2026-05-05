@@ -318,8 +318,8 @@ const docTemplate = `{
                         "example": 123,
                         "type": "integer"
                     },
-                    "camera_make": {
-                        "example": "Canon",
+                    "camera_model": {
+                        "example": "Canon EOS R5",
                         "type": "string"
                     },
                     "date": {
@@ -335,6 +335,9 @@ const docTemplate = `{
                     "liked": {
                         "example": true,
                         "type": "boolean"
+                    },
+                    "location": {
+                        "$ref": "#/components/schemas/dto.LocationBBoxDTO"
                     },
                     "owner_id": {
                         "example": 123,
@@ -764,6 +767,26 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.CreateRepositoryRequestDTO": {
+                "properties": {
+                    "name": {
+                        "example": "Family Photos",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "type": "object"
+            },
+            "dto.CreateRepositoryResponseDTO": {
+                "properties": {
+                    "repository": {
+                        "$ref": "#/components/schemas/dto.RepositoryDTO"
+                    }
+                },
+                "type": "object"
+            },
             "dto.DateRangeDTO": {
                 "properties": {
                     "from": {
@@ -835,14 +858,14 @@ const docTemplate = `{
             },
             "dto.FilenameFilterDTO": {
                 "properties": {
-                    "mode": {
+                    "operator": {
                         "enum": [
                             "contains",
                             "matches",
-                            "startswith",
-                            "endswith"
+                            "starts_with",
+                            "ends_with"
                         ],
-                        "example": "startswith",
+                        "example": "starts_with",
                         "type": "string"
                     },
                     "value": {
@@ -1018,6 +1041,27 @@ const docTemplate = `{
                         },
                         "type": "array",
                         "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LocationBBoxDTO": {
+                "properties": {
+                    "east": {
+                        "example": -122.3,
+                        "type": "number"
+                    },
+                    "north": {
+                        "example": 37.9,
+                        "type": "number"
+                    },
+                    "south": {
+                        "example": 37.7,
+                        "type": "number"
+                    },
+                    "west": {
+                        "example": -122.5,
+                        "type": "number"
                     }
                 },
                 "type": "object"
@@ -1198,7 +1242,7 @@ const docTemplate = `{
             },
             "dto.OptionsResponseDTO": {
                 "properties": {
-                    "camera_makes": {
+                    "camera_models": {
                         "items": {
                             "type": "string"
                         },
@@ -1621,6 +1665,119 @@ const docTemplate = `{
                     },
                     "secret": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryDTO": {
+                "properties": {
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "is_primary": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "example": "Family Photos",
+                        "type": "string"
+                    },
+                    "path": {
+                        "example": "/data/storage/family-photos",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryScanQueuedDTO": {
+                "properties": {
+                    "job_id": {
+                        "example": 12345,
+                        "type": "integer"
+                    },
+                    "mode": {
+                        "example": "manual",
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "status": {
+                        "example": "queued",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryScanRequestDTO": {
+                "properties": {
+                    "force": {
+                        "example": false,
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryScanRunDTO": {
+                "properties": {
+                    "deleted_count": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "discovered_count": {
+                        "example": 10,
+                        "type": "integer"
+                    },
+                    "error": {
+                        "type": "string"
+                    },
+                    "finished_at": {
+                        "type": "string"
+                    },
+                    "mode": {
+                        "example": "manual",
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "requested_by": {
+                        "example": "edwin",
+                        "type": "string"
+                    },
+                    "scan_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "skipped_count": {
+                        "example": 4,
+                        "type": "integer"
+                    },
+                    "started_at": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "example": "completed",
+                        "type": "string"
+                    },
+                    "updated_count": {
+                        "example": 2,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RepositoryScanRunListDTO": {
+                "properties": {
+                    "scans": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.RepositoryScanRunDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -4373,7 +4530,7 @@ const docTemplate = `{
         },
         "/api/v1/assets/filter-options": {
             "get": {
-                "description": "Get available camera makes and lenses for filter dropdowns",
+                "description": "Get available camera models and lenses for filter dropdowns",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -9225,6 +9382,388 @@ const docTemplate = `{
                 "summary": "Get person cover",
                 "tags": [
                     "people"
+                ]
+            }
+        },
+        "/api/v1/repositories": {
+            "post": {
+                "description": "Create a repository folder under the server storage root. If the target folder already contains a .lumiliorepo file, it is registered instead.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.CreateRepositoryRequestDTO",
+                                        "summary": "request",
+                                        "description": "Repository name"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Repository name",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Repository created successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Create repository",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/scan": {
+            "post": {
+                "description": "Queue a manual scan for a repository free workspace.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RepositoryScanRequestDTO",
+                                        "summary": "request",
+                                        "description": "Scan request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Scan request"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Repository scan queued successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Queue repository scan",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/scans": {
+            "get": {
+                "description": "List recent scan runs for a repository.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Limit",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 20,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Offset",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "default": 0,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Repository scan runs retrieved successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List repository scans",
+                "tags": [
+                    "repositories"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/scans/latest": {
+            "get": {
+                "description": "Return the latest scan run for a repository.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Latest repository scan retrieved successfully"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "No scan run found"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get latest repository scan",
+                "tags": [
+                    "repositories"
                 ]
             }
         },

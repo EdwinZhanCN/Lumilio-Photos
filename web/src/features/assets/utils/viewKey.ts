@@ -8,7 +8,6 @@ export const generateViewKey = (definition: AssetViewDefinition): string => {
   const normalizedDef = {
     types: definition.types ? [...definition.types].sort() : [],
     filter: definition.filter || {},
-    inheritGlobalFilter: definition.inheritGlobalFilter ?? true,
     search: definition.search,
     groupBy: definition.groupBy || "date",
     sort: definition.sort || { field: "taken_time", direction: "desc" },

@@ -11,7 +11,10 @@ export interface RetryTaskOption {
   label: string;
   description: string;
   category: "metadata" | "media" | "ml";
+  supportedAssetTypes: readonly AssetType[];
 }
+
+export type AssetType = "PHOTO" | "VIDEO" | "AUDIO";
 
 /**
  * Available retry tasks using queue names as identifiers.
@@ -23,42 +26,49 @@ export const RETRY_TASK_OPTIONS: RetryTaskOption[] = [
     label: "Metadata Extraction",
     description: "Extract EXIF and file metadata",
     category: "metadata",
+    supportedAssetTypes: ["PHOTO", "VIDEO", "AUDIO"],
   },
   {
     key: "thumbnail_asset",
     label: "Thumbnail Generation",
     description: "Generate thumbnails at multiple sizes",
     category: "media",
+    supportedAssetTypes: ["PHOTO", "VIDEO"],
   },
   {
     key: "transcode_asset",
     label: "Media Transcoding",
     description: "Transcode video/audio to web-optimized formats",
     category: "media",
+    supportedAssetTypes: ["VIDEO", "AUDIO"],
   },
   {
     key: "process_clip",
     label: "CLIP Embedding",
     description: "Generate AI embeddings for semantic search",
     category: "ml",
+    supportedAssetTypes: ["PHOTO"],
   },
   {
     key: "process_ocr",
     label: "OCR Text Extraction",
     description: "Extract text from images using OCR",
     category: "ml",
+    supportedAssetTypes: ["PHOTO"],
   },
   {
     key: "process_caption",
     label: "AI Image Captioning",
     description: "Generate AI-powered image descriptions",
     category: "ml",
+    supportedAssetTypes: ["PHOTO"],
   },
   {
     key: "process_face",
     label: "Face Detection",
     description: "Detect and recognize faces in images",
     category: "ml",
+    supportedAssetTypes: ["PHOTO"],
   },
 ];
 
@@ -70,6 +80,44 @@ export const RETRY_TASKS_BY_CATEGORY = {
   media: RETRY_TASK_OPTIONS.filter((t) => t.category === "media"),
   ml: RETRY_TASK_OPTIONS.filter((t) => t.category === "ml"),
 };
+
+export function normalizeAssetType(assetType: string | undefined): AssetType | undefined {
+  switch (assetType) {
+    case "PHOTO":
+    case "VIDEO":
+    case "AUDIO":
+      return assetType;
+    default:
+      return undefined;
+  }
+}
+
+export function isRetryTaskSupportedForAssetType(
+  queueName: string,
+  assetType: string | undefined,
+): boolean {
+  const normalizedAssetType = normalizeAssetType(assetType);
+  if (!normalizedAssetType) return false;
+
+  const task = getRetryTaskOption(queueName);
+  return task?.supportedAssetTypes.includes(normalizedAssetType) ?? false;
+}
+
+export function getRetryTasksByCategoryForAssetType(
+  assetType: string | undefined,
+): typeof RETRY_TASKS_BY_CATEGORY {
+  return {
+    metadata: RETRY_TASKS_BY_CATEGORY.metadata.filter((task) =>
+      isRetryTaskSupportedForAssetType(task.key, assetType),
+    ),
+    media: RETRY_TASKS_BY_CATEGORY.media.filter((task) =>
+      isRetryTaskSupportedForAssetType(task.key, assetType),
+    ),
+    ml: RETRY_TASKS_BY_CATEGORY.ml.filter((task) =>
+      isRetryTaskSupportedForAssetType(task.key, assetType),
+    ),
+  };
+}
 
 /**
  * Get task option by queue name.

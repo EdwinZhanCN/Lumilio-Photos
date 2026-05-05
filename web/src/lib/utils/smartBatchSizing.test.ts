@@ -26,6 +26,17 @@ describe('SmartBatchSizer', () => {
   let batchSizer: SmartBatchSizer;
 
   beforeEach(() => {
+    Object.defineProperty(performance, 'memory', {
+      value: {
+        jsHeapSizeLimit: 1024 * 1024 * 1024,
+        usedJSHeapSize: 512 * 1024 * 1024,
+      },
+      configurable: true,
+    });
+    Object.defineProperty(navigator, 'hardwareConcurrency', {
+      value: 8,
+      configurable: true,
+    });
     batchSizer = new SmartBatchSizer();
     batchSizer.resetMetrics();
   });
@@ -72,7 +83,7 @@ describe('SmartBatchSizer', () => {
       
       // Record slow processing metrics
       for (let i = 0; i < 3; i++) {
-        recordProcessingMetrics({
+        batchSizer.recordMetrics({
           operationType: 'thumbnail',
           batchSize: initialBatchSize,
           processingTimeMs: 10000, // Very slow
@@ -92,7 +103,7 @@ describe('SmartBatchSizer', () => {
       
       // Record fast processing metrics
       for (let i = 0; i < 3; i++) {
-        recordProcessingMetrics({
+        batchSizer.recordMetrics({
           operationType: 'thumbnail',
           batchSize: initialBatchSize,
           processingTimeMs: 1000, // Very fast
@@ -113,7 +124,7 @@ describe('SmartBatchSizer', () => {
       
       // Record high error rate metrics
       for (let i = 0; i < 3; i++) {
-        recordProcessingMetrics({
+        batchSizer.recordMetrics({
           operationType: 'thumbnail',
           batchSize: initialBatchSize,
           processingTimeMs: 3000,

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
-import { useKeyboardSelection } from "@/features/assets";
+import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
@@ -65,7 +65,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
     [groupEntries],
   );
 
-  const selection = useKeyboardSelection(flatAssetIds);
+  const selection = useOptionalKeyboardSelection(flatAssetIds);
 
   const handleAssetClick = useCallback(
     (asset: Asset, event: React.MouseEvent | React.KeyboardEvent) => {

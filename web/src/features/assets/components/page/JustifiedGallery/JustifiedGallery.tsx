@@ -6,7 +6,7 @@ import React, {
   useState,
 } from "react";
 import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
-import { useKeyboardSelection } from "@/features/assets";
+import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useJustifiedLayoutService } from "@/hooks/util-hooks/useJustifiedLayoutService";
 import type { LayoutResult } from "@/lib/layout/justifiedLayout";
@@ -22,6 +22,11 @@ import {
   formatAssetGroupLabel,
 } from "@/features/assets/utils/assetGroups";
 import EmptyState from "@/components/EmptyState";
+
+type LayoutState = {
+  signature: string;
+  layouts: Record<string, LayoutResult>;
+};
 
 const getThumbnailSize = (width: number) => {
   if (width >= 520) return "large";
@@ -42,6 +47,13 @@ const getScrollParent = (element: HTMLElement | null): HTMLElement | null => {
   return null;
 };
 
+const readContainerWidth = (element: HTMLElement | null): number => {
+  if (!element) return 0;
+  const rectWidth = element.getBoundingClientRect().width;
+  const width = rectWidth || element.clientWidth;
+  return Math.max(0, Math.round(width));
+};
+
 const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   groups,
   openCarousel,
@@ -56,7 +68,10 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const layoutRequestRef = useRef(0);
   const [containerWidth, setContainerWidth] = useState(0);
-  const [layouts, setLayouts] = useState<Record<string, LayoutResult>>({});
+  const [layoutState, setLayoutState] = useState<LayoutState>({
+    signature: "",
+    layouts: {},
+  });
   const [layoutError, setLayoutError] = useState<string | null>(null);
 
   const { calculateMultipleLayouts, error: layoutServiceError } =
@@ -81,7 +96,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     [groupEntries],
   );
 
-  const selection = useKeyboardSelection(flatAssetIds);
+  const selection = useOptionalKeyboardSelection(flatAssetIds);
 
   const layoutInputs = useMemo(() => {
     const inputs: Record<string, ReturnType<typeof assetsToLayoutBoxes>> = {};
@@ -96,19 +111,42 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     [containerWidth],
   );
 
+  const layoutSignature = useMemo(() => {
+    if (!layoutConfig) return "";
+
+    return JSON.stringify({
+      config: layoutConfig,
+      groups: groupEntries.map((group) => ({
+        key: group.key,
+        assets: group.assets.map((asset, index) => ({
+          id: asset.asset_id,
+          box: layoutInputs[group.key]?.[index],
+        })),
+      })),
+    });
+  }, [groupEntries, layoutConfig, layoutInputs]);
+
+  const layouts = useMemo(
+    () =>
+      layoutState.signature === layoutSignature ? layoutState.layouts : {},
+    [layoutSignature, layoutState],
+  );
+
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
 
     let rafId = 0;
     const updateWidth = (width: number) => {
+      const nextWidth = Math.round(width);
+      if (nextWidth <= 0) return;
       if (rafId) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        setContainerWidth(Math.max(1, Math.round(width)));
+        setContainerWidth(nextWidth);
       });
     };
 
-    updateWidth(element.clientWidth);
+    updateWidth(readContainerWidth(element));
 
     if (typeof ResizeObserver === "undefined") {
       const handleResize = () => updateWidth(element.clientWidth);
@@ -132,8 +170,14 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   }, []);
 
   useEffect(() => {
+    const measuredWidth = readContainerWidth(containerRef.current);
+    if (measuredWidth > 0 && measuredWidth !== containerWidth) {
+      setContainerWidth(measuredWidth);
+      return;
+    }
+
     if (!layoutConfig || groupEntries.length === 0) {
-      setLayouts({});
+      setLayoutState({ signature: "", layouts: {} });
       return;
     }
 
@@ -141,11 +185,16 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     const requestId = layoutRequestRef.current;
     let isCancelled = false;
     setLayoutError(null);
+    setLayoutState((current) =>
+      current.signature === layoutSignature
+        ? current
+        : { signature: layoutSignature, layouts: {} },
+    );
 
     calculateMultipleLayouts(layoutInputs, layoutConfig)
       .then((results) => {
         if (isCancelled || requestId !== layoutRequestRef.current) return;
-        setLayouts(results);
+        setLayoutState({ signature: layoutSignature, layouts: results });
       })
       .catch((err) => {
         if (isCancelled || requestId !== layoutRequestRef.current) return;
@@ -158,9 +207,11 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     };
   }, [
     calculateMultipleLayouts,
+    containerWidth,
     groupEntries.length,
     layoutConfig,
     layoutInputs,
+    layoutSignature,
   ]);
 
   const handleAssetClick = useCallback(
