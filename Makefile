@@ -17,8 +17,10 @@ DEV_DB_PORT ?= 5433
 DEV_DB_NAME ?= lumiliophotos
 DEV_DB_USER ?= postgres
 DEV_DB_PASSWORD ?= postgres
+GEODATA_IMAGE ?= lumilio-geodata-import:latest
+GEODATA_VOLUME ?= lumilio-naturalearth-data
 
-.PHONY: setup env-dev env-web-dev db-build db-up db-down db-reset db-logs db-shell db-wait server-dev server-test server-build web-dev dev clean dto
+.PHONY: setup env-dev env-web-dev db-build db-up db-down db-reset db-logs db-shell db-wait geodata-build geodata-import geodata-reset server-dev server-test server-build web-dev dev clean dto
 
 setup:
 	@echo "==> Installing Go dependencies"
@@ -63,6 +65,7 @@ env-dev:
 		"GEOCODING_NOMINATIM_ENDPOINT=" \
 		"GEOCODING_LANGUAGE=en" \
 		"GEOCODING_USER_AGENT=Lumilio-Photos/1.0" \
+		"GEOCODING_NATURALEARTH_CITY_RADIUS_METERS=50000" \
 		"" \
 		"ML_CLIP_ENABLED=false" \
 		"ML_OCR_ENABLED=false" \
@@ -160,6 +163,36 @@ db-logs:
 
 db-shell:
 	$(DOCKER) exec -it $(DEV_DB_CONTAINER) psql -U $(DEV_DB_USER) -d $(DEV_DB_NAME)
+
+geodata-build:
+	@echo "==> Building Natural Earth import image..."
+	@$(DOCKER) build -f $(SERVER_DIR)/geodata.Dockerfile -t $(GEODATA_IMAGE) .
+
+geodata-import: db-wait geodata-build
+	@echo "==> Importing Natural Earth data into development database..."
+	@$(DOCKER) run --rm \
+		--network container:$(DEV_DB_CONTAINER) \
+		-e PGHOST=localhost \
+		-e PGPORT=5432 \
+		-e PGDATABASE=$(DEV_DB_NAME) \
+		-e PGUSER=$(DEV_DB_USER) \
+		-e PGPASSWORD=$(DEV_DB_PASSWORD) \
+		-v $(GEODATA_VOLUME):/data/naturalearth \
+		-v "$(CURDIR)/$(SERVER_DIR)/scripts/import-natural-earth.sh:/import-natural-earth.sh:ro" \
+		$(GEODATA_IMAGE) /bin/bash /import-natural-earth.sh
+
+geodata-reset: db-wait geodata-build
+	@echo "==> Reimporting Natural Earth data into development database..."
+	@$(DOCKER) run --rm \
+		--network container:$(DEV_DB_CONTAINER) \
+		-e PGHOST=localhost \
+		-e PGPORT=5432 \
+		-e PGDATABASE=$(DEV_DB_NAME) \
+		-e PGUSER=$(DEV_DB_USER) \
+		-e PGPASSWORD=$(DEV_DB_PASSWORD) \
+		-v $(GEODATA_VOLUME):/data/naturalearth \
+		-v "$(CURDIR)/$(SERVER_DIR)/scripts/import-natural-earth.sh:/import-natural-earth.sh:ro" \
+		$(GEODATA_IMAGE) /bin/bash /import-natural-earth.sh --force
 
 server-dev: env-dev
 	@echo "==> Starting server in development mode..."
