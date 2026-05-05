@@ -36,7 +36,7 @@ func TestReverseGeocoderDefaultsToDisabled(t *testing.T) {
 	t.Setenv("GEOCODING_PROVIDER", "")
 	t.Setenv("GEOCODING_NOMINATIM_ENDPOINT", "")
 
-	geocoder := newReverseGeocoderFromEnv()
+	geocoder := newReverseGeocoderFromEnv(nil)
 
 	require.Equal(t, geocoderProviderDisabled, geocoder.Provider())
 	_, err := geocoder.Reverse(context.Background(), 0, 0)
@@ -60,7 +60,7 @@ func TestNominatimGeocoderUsesMockEndpoint(t *testing.T) {
 	t.Setenv("GEOCODING_LANGUAGE", "en")
 	t.Setenv("GEOCODING_USER_AGENT", "Lumilio-Test/1.0")
 
-	geocoder := newReverseGeocoderFromEnv()
+	geocoder := newReverseGeocoderFromEnv(nil)
 	result, err := geocoder.Reverse(context.Background(), 0, 0)
 
 	require.NoError(t, err)
@@ -70,4 +70,15 @@ func TestNominatimGeocoderUsesMockEndpoint(t *testing.T) {
 	require.NotNil(t, result.Country)
 	require.Equal(t, "Ocean", *result.Country)
 	require.NotEmpty(t, result.RawResponse)
+}
+
+func TestNaturalEarthNameColumnsPreferLanguage(t *testing.T) {
+	require.Equal(t,
+		[]string{"name_zh", "name", "name_en"},
+		naturalEarthNameColumns("zh-CN", "name", "name_en"),
+	)
+	require.Equal(t,
+		[]string{"name_en", "name", "admin"},
+		naturalEarthNameColumns("en", "name", "admin"),
+	)
 }
