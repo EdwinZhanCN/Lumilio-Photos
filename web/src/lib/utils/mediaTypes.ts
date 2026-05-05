@@ -5,33 +5,51 @@
 import { isPhotoMetadata, type Asset } from "@/lib/http-commons";
 
 /**
- * Determines if an asset is a video based on MIME type or legacy type
+ * Determines if an asset is a video based on asset type first, with MIME fallback.
  */
 export const isVideo = (asset: Asset): boolean => {
+  if (asset.type === "VIDEO") {
+    return true;
+  }
+  if (asset.type === "PHOTO" || asset.type === "AUDIO") {
+    return false;
+  }
   if (asset.mime_type) {
     return asset.mime_type.startsWith("video/");
   }
-  return asset.type === "VIDEO";
+  return false;
 };
 
 /**
- * Determines if an asset is audio based on MIME type or legacy type
+ * Determines if an asset is audio based on asset type first, with MIME fallback.
  */
 export const isAudio = (asset: Asset): boolean => {
+  if (asset.type === "AUDIO") {
+    return true;
+  }
+  if (asset.type === "PHOTO" || asset.type === "VIDEO") {
+    return false;
+  }
   if (asset.mime_type) {
     return asset.mime_type.startsWith("audio/");
   }
-  return asset.type === "AUDIO";
+  return false;
 };
 
 /**
- * Determines if an asset is a photo/image based on MIME type or legacy type
+ * Determines if an asset is a photo/image based on asset type first, with MIME fallback.
  */
 export const isPhoto = (asset: Asset): boolean => {
+  if (asset.type === "PHOTO") {
+    return true;
+  }
+  if (asset.type === "VIDEO" || asset.type === "AUDIO") {
+    return false;
+  }
   if (asset.mime_type) {
     return asset.mime_type.startsWith("image/");
   }
-  return asset.type === "PHOTO";
+  return false;
 };
 
 /**

@@ -335,7 +335,9 @@ func (s *Scanner) enqueueDiscover(ctx context.Context, repositoryID pgtype.UUID,
 		DetectedAt:   time.Now().UTC(),
 	}
 	if operation == jobs.DiscoverOperationUpsert {
-		args.ContentType = file.NewValidator().GetMimeTypeFromExtension(filepath.Ext(entry.Filename))
+		if mediaInfo, err := file.ResolveMedia(entry.Filename); err == nil {
+			args.ContentType = mediaInfo.MimeType
+		}
 		args.FileSize = entry.Size
 	}
 

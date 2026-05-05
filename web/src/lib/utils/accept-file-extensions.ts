@@ -74,6 +74,56 @@ export const acceptFileExtensions = [
   ...supportedAudioExtensions,
 ] as const;
 
+export const canonicalMimeByExtension: Record<SupportedExtension, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".bmp": "image/bmp",
+  ".tiff": "image/tiff",
+  ".tif": "image/tiff",
+  ".heic": "image/heic",
+  ".heif": "image/heif",
+  ".cr2": "image/x-canon-cr2",
+  ".cr3": "image/x-canon-cr3",
+  ".nef": "image/x-nikon-nef",
+  ".arw": "image/x-sony-arw",
+  ".dng": "image/x-adobe-dng",
+  ".orf": "image/x-olympus-orf",
+  ".rw2": "image/x-panasonic-rw2",
+  ".pef": "image/x-pentax-pef",
+  ".raf": "image/x-fuji-raf",
+  ".mrw": "image/x-minolta-mrw",
+  ".srw": "image/x-samsung-srw",
+  ".rwl": "image/x-leica-rwl",
+  ".x3f": "image/x-sigma-x3f",
+  ".mp4": "video/mp4",
+  ".mov": "video/quicktime",
+  ".avi": "video/x-msvideo",
+  ".mkv": "video/x-matroska",
+  ".webm": "video/webm",
+  ".flv": "video/x-flv",
+  ".wmv": "video/x-ms-wmv",
+  ".m4v": "video/mp4",
+  ".3gp": "video/3gpp",
+  ".mpg": "video/mpeg",
+  ".mpeg": "video/mpeg",
+  ".m2ts": "video/mp2t",
+  ".mts": "video/mp2t",
+  ".ogv": "video/ogg",
+  ".mp3": "audio/mpeg",
+  ".aac": "audio/aac",
+  ".m4a": "audio/mp4",
+  ".flac": "audio/flac",
+  ".wav": "audio/wav",
+  ".ogg": "audio/ogg",
+  ".aiff": "audio/x-aiff",
+  ".wma": "audio/x-ms-wma",
+  ".opus": "audio/opus",
+  ".oga": "audio/ogg",
+};
+
 // Type definitions
 export type PhotoExtension = (typeof supportedPhotoExtensions)[number];
 export type RAWExtension = (typeof supportedRAWExtensions)[number];
@@ -108,6 +158,15 @@ export const isSupportedExtension = (ext: string): boolean => {
 export const getFileExtension = (filename: string): string => {
   const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0];
   return ext || "";
+};
+
+export const getCanonicalMimeTypeFromExtension = (ext: string): string => {
+  const normalized = ext.toLowerCase() as SupportedExtension;
+  return canonicalMimeByExtension[normalized] || "application/octet-stream";
+};
+
+export const getCanonicalMimeTypeForFilename = (filename: string): string => {
+  return getCanonicalMimeTypeFromExtension(getFileExtension(filename));
 };
 
 /**

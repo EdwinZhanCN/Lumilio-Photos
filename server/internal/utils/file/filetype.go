@@ -28,6 +28,11 @@ func ValidateFile(filename, contentType string) *ValidationResult {
 	return defaultValidator.ValidateFile(filename, contentType)
 }
 
+// ResolveMedia returns the canonical media info for a supported filename.
+func ResolveMedia(filename string) (*MediaInfo, error) {
+	return defaultValidator.ResolveMedia(filename)
+}
+
 // IsSupported checks if a filename has a supported extension
 func IsSupported(filename string) bool {
 	return defaultValidator.IsSupported(filename)

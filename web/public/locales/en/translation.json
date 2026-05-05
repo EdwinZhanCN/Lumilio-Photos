@@ -159,13 +159,21 @@
         "createSuccess": "Album created successfully",
         "newAlbum": "New Album",
         "updateSuccess": "Album updated successfully",
+        "emptyAlbums": "No albums yet.",
+        "emptyPeople": "No recognized people yet.",
         "itemsCount_one": "{{count}} item",
         "itemsCount_other": "{{count}} items",
         "coverAlt": "Album cover image",
         "coverAltWithName": "Cover image for album {{albumName}}",
+        "sections": {
+            "albums": "Albums",
+            "people": "People"
+        },
         "messages": {
             "deleteSuccess": "Albums deleted successfully",
-            "deleteError": "Failed to delete albums"
+            "deleteError": "Failed to delete albums",
+            "loadAlbumsError": "Failed to load albums: {{message}}",
+            "loadPeopleError": "Failed to load people: {{message}}"
         },
         "deleteModal": {
             "title": "Delete albums",
@@ -987,6 +995,7 @@
         "pressCtrlEnterToSave": "Press Ctrl+Enter to save",
         "clickToEdit": "Click to edit",
         "loadMore": "Load More",
+        "viewAll": "View All",
         "emptyState": {
             "title": "Nothing here yet",
             "description": "Items will appear here when available."

@@ -159,13 +159,21 @@
         "createSuccess": "相册创建成功",
         "updateSuccess": "相册更新成功",
         "newAlbum": "新建相册",
+        "emptyAlbums": "还没有相册。",
+        "emptyPeople": "还没有识别出人物。",
         "itemsCount_one": "{{count}} 项",
         "itemsCount_other": "{{count}} 项",
         "coverAlt": "相册封面图",
         "coverAltWithName": "相册 {{albumName}} 的封面图",
+        "sections": {
+            "albums": "相册",
+            "people": "人物"
+        },
         "messages": {
             "deleteSuccess": "相册删除成功",
-            "deleteError": "删除相册失败"
+            "deleteError": "删除相册失败",
+            "loadAlbumsError": "加载相册失败：{{message}}",
+            "loadPeopleError": "加载人物失败：{{message}}"
         },
         "deleteModal": {
             "title": "删除相册",
@@ -1020,6 +1028,7 @@
         "pressCtrlEnterToSave": "按 Ctrl+Enter 保存",
         "clickToEdit": "点击编辑",
         "loadMore": "加载更多",
+        "viewAll": "查看全部",
         "emptyState": {
             "title": "这里还没有内容",
             "description": "有内容时会显示在这里。"

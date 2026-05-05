@@ -2,7 +2,6 @@ package file
 
 import (
 	"fmt"
-	"mime"
 	"path/filepath"
 	"server/internal/db/dbtypes"
 	"strings"
@@ -124,6 +123,72 @@ var (
 		"audio/x-ms-wma": dbtypes.AssetTypeAudio,
 		"audio/opus":     dbtypes.AssetTypeAudio,
 	}
+
+	canonicalMimeByExtension = map[string]string{
+		".jpg":  "image/jpeg",
+		".jpeg": "image/jpeg",
+		".png":  "image/png",
+		".webp": "image/webp",
+		".gif":  "image/gif",
+		".bmp":  "image/bmp",
+		".tiff": "image/tiff",
+		".tif":  "image/tiff",
+		".heic": "image/heic",
+		".heif": "image/heif",
+		".cr2":  "image/x-canon-cr2",
+		".cr3":  "image/x-canon-cr3",
+		".nef":  "image/x-nikon-nef",
+		".arw":  "image/x-sony-arw",
+		".dng":  "image/x-adobe-dng",
+		".orf":  "image/x-olympus-orf",
+		".rw2":  "image/x-panasonic-rw2",
+		".pef":  "image/x-pentax-pef",
+		".raf":  "image/x-fuji-raf",
+		".mrw":  "image/x-minolta-mrw",
+		".srw":  "image/x-samsung-srw",
+		".rwl":  "image/x-leica-rwl",
+		".x3f":  "image/x-sigma-x3f",
+		".mp4":  "video/mp4",
+		".mov":  "video/quicktime",
+		".avi":  "video/x-msvideo",
+		".mkv":  "video/x-matroska",
+		".webm": "video/webm",
+		".flv":  "video/x-flv",
+		".wmv":  "video/x-ms-wmv",
+		".m4v":  "video/mp4",
+		".3gp":  "video/3gpp",
+		".mpg":  "video/mpeg",
+		".mpeg": "video/mpeg",
+		".m2ts": "video/mp2t",
+		".mts":  "video/mp2t",
+		".ogv":  "video/ogg",
+		".mp3":  "audio/mpeg",
+		".aac":  "audio/aac",
+		".m4a":  "audio/mp4",
+		".flac": "audio/flac",
+		".wav":  "audio/wav",
+		".ogg":  "audio/ogg",
+		".aiff": "audio/x-aiff",
+		".wma":  "audio/x-ms-wma",
+		".opus": "audio/opus",
+		".oga":  "audio/ogg",
+	}
+
+	rawFormatByExtension = map[string]string{
+		".cr2": "CR2",
+		".cr3": "CR3",
+		".nef": "NEF",
+		".arw": "ARW",
+		".dng": "DNG",
+		".orf": "ORF",
+		".rw2": "RW2",
+		".pef": "PEF",
+		".raf": "RAF",
+		".mrw": "MRW",
+		".srw": "SRW",
+		".rwl": "RWL",
+		".x3f": "X3F",
+	}
 )
 
 // Validator handles file validation logic
@@ -134,6 +199,15 @@ func NewValidator() *Validator {
 	return &Validator{}
 }
 
+// MediaInfo is the canonical media description derived from the filename.
+type MediaInfo struct {
+	AssetType dbtypes.AssetType
+	Extension string
+	MimeType  string
+	IsRAW     bool
+	RawFormat string
+}
+
 // ValidationResult contains the result of file validation
 type ValidationResult struct {
 	Valid       bool
@@ -141,45 +215,57 @@ type ValidationResult struct {
 	Extension   string
 	MimeType    string
 	IsRAW       bool
+	RawFormat   string
 	ErrorReason string
 }
 
-// ValidateFile validates a file based on filename and content type
-func (v *Validator) ValidateFile(filename, contentType string) *ValidationResult {
-	result := &ValidationResult{
-		Extension: strings.ToLower(filepath.Ext(filename)),
-		MimeType:  strings.ToLower(strings.TrimSpace(contentType)),
+// ResolveMedia returns the canonical media info for a supported filename.
+func (v *Validator) ResolveMedia(filename string) (*MediaInfo, error) {
+	ext := normalizeExtension(filepath.Ext(filename))
+	if ext == "" {
+		return nil, fmt.Errorf("file has no extension")
 	}
 
-	// Check if extension is empty
-	if result.Extension == "" {
-		result.Valid = false
-		result.ErrorReason = "file has no extension"
-		return result
-	}
-
-	// Determine asset type by extension first (more reliable)
-	assetType, isSupported := v.GetAssetTypeByExtension(result.Extension)
+	assetType, isSupported := v.GetAssetTypeByExtension(ext)
 	if !isSupported {
-		result.Valid = false
-		result.ErrorReason = fmt.Sprintf("unsupported file extension: %s", result.Extension)
-		return result
+		return nil, fmt.Errorf("unsupported file extension: %s", ext)
 	}
 
-	result.AssetType = assetType
-	result.IsRAW = supportedRAWExts[result.Extension]
+	mimeType, exists := canonicalMimeByExtension[ext]
+	if !exists {
+		return nil, fmt.Errorf("no canonical MIME type configured for extension: %s", ext)
+	}
 
-	// Validate MIME type if provided and not the generic octet-stream
-	if result.MimeType != "" && result.MimeType != "application/octet-stream" {
-		if !v.IsValidMimeType(result.MimeType, assetType) {
-			result.Valid = false
-			result.ErrorReason = fmt.Sprintf("MIME type '%s' does not match file extension '%s'", result.MimeType, result.Extension)
-			return result
+	info := &MediaInfo{
+		AssetType: assetType,
+		Extension: ext,
+		MimeType:  mimeType,
+		IsRAW:     supportedRAWExts[ext],
+		RawFormat: rawFormatByExtension[ext],
+	}
+
+	return info, nil
+}
+
+// ValidateFile validates a file based on filename only.
+func (v *Validator) ValidateFile(filename, contentType string) *ValidationResult {
+	info, err := v.ResolveMedia(filename)
+	if err != nil {
+		return &ValidationResult{
+			Valid:       false,
+			Extension:   normalizeExtension(filepath.Ext(filename)),
+			ErrorReason: err.Error(),
 		}
 	}
 
-	result.Valid = true
-	return result
+	return &ValidationResult{
+		Valid:     true,
+		AssetType: info.AssetType,
+		Extension: info.Extension,
+		MimeType:  info.MimeType,
+		IsRAW:     info.IsRAW,
+		RawFormat: info.RawFormat,
+	}
 }
 
 // IsSupported checks if a file extension is supported
@@ -193,10 +279,7 @@ func (v *Validator) IsSupported(filename string) bool {
 
 // IsSupportedExtension checks if an extension is supported
 func (v *Validator) IsSupportedExtension(ext string) bool {
-	ext = strings.ToLower(ext)
-	if !strings.HasPrefix(ext, ".") {
-		ext = "." + ext
-	}
+	ext = normalizeExtension(ext)
 	return supportedPhotoExts[ext] ||
 		supportedRAWExts[ext] ||
 		supportedVideoExts[ext] ||
@@ -205,10 +288,7 @@ func (v *Validator) IsSupportedExtension(ext string) bool {
 
 // GetAssetTypeByExtension determines asset type from file extension
 func (v *Validator) GetAssetTypeByExtension(ext string) (dbtypes.AssetType, bool) {
-	ext = strings.ToLower(ext)
-	if !strings.HasPrefix(ext, ".") {
-		ext = "." + ext
-	}
+	ext = normalizeExtension(ext)
 
 	if supportedPhotoExts[ext] || supportedRAWExts[ext] {
 		return dbtypes.AssetTypePhoto, true
@@ -291,52 +371,15 @@ func (v *Validator) IsValidMimeType(mimeType string, assetType dbtypes.AssetType
 
 // IsRAWFile checks if a file is a RAW camera format
 func (v *Validator) IsRAWFile(filename string) bool {
-	ext := strings.ToLower(filepath.Ext(filename))
+	ext := normalizeExtension(filepath.Ext(filename))
 	return supportedRAWExts[ext]
 }
 
 // GetMimeTypeFromExtension returns the MIME type for a given extension
 func (v *Validator) GetMimeTypeFromExtension(ext string) string {
-	ext = strings.ToLower(ext)
-	if !strings.HasPrefix(ext, ".") {
-		ext = "." + ext
-	}
-
-	// Use Go's mime package first
-	mimeType := mime.TypeByExtension(ext)
-	if mimeType != "" {
+	ext = normalizeExtension(ext)
+	if mimeType, exists := canonicalMimeByExtension[ext]; exists {
 		return mimeType
-	}
-
-	// Fallback to common mappings
-	switch ext {
-	// RAW formats
-	case ".cr2":
-		return "image/x-canon-cr2"
-	case ".cr3":
-		return "image/x-canon-cr3"
-	case ".nef":
-		return "image/x-nikon-nef"
-	case ".arw":
-		return "image/x-sony-arw"
-	case ".dng":
-		return "image/x-adobe-dng"
-	case ".orf":
-		return "image/x-olympus-orf"
-	case ".rw2":
-		return "image/x-panasonic-rw2"
-	case ".raf":
-		return "image/x-fuji-raf"
-	// Audio
-	case ".m4a":
-		return "audio/mp4"
-	case ".opus":
-		return "audio/opus"
-	// Video
-	case ".m4v":
-		return "video/mp4"
-	case ".webm":
-		return "video/webm"
 	}
 
 	return "application/octet-stream"
@@ -404,6 +447,17 @@ func copyMap(m map[string]bool) map[string]bool {
 		result[k] = v
 	}
 	return result
+}
+
+func normalizeExtension(ext string) string {
+	ext = strings.ToLower(strings.TrimSpace(ext))
+	if ext == "" {
+		return ""
+	}
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+	return ext
 }
 
 // FormatValidationError creates a user-friendly validation error message
