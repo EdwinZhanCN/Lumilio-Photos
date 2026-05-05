@@ -32,7 +32,7 @@ export const AssetGalleryRenderer: React.FC<AssetGalleryRendererProps> = ({
   const handleOpenMainView = useCallback(() => {
     if (!filterDTO) return;
 
-    navigate("/assets/photos", {
+    navigate("/assets", {
       state: {
         assetsInitialFilter: filterDTO,
       },

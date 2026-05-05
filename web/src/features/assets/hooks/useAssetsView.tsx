@@ -4,7 +4,7 @@ import type {
   UseInfiniteQueryResult,
 } from "@tanstack/react-query";
 import { useAssetsStore } from "../assets.store";
-import { useSortBy } from "../selectors";
+import { useFilterState, useSortBy } from "../selectors";
 import {
   AssetGroup,
   AssetViewDefinition,
@@ -112,6 +112,9 @@ const getApiMimeTypes = (
   const mimeTypes: ("PHOTO" | "VIDEO" | "AUDIO")[] = [];
   tabTypes.forEach((type) => {
     switch (type) {
+      case "all":
+        mimeTypes.push("PHOTO", "VIDEO");
+        break;
       case "photos":
         mimeTypes.push("PHOTO");
         break;
@@ -193,7 +196,11 @@ const buildApiFilter = (
 ): AssetFilter => {
   const filter: AssetFilter = { ...effectiveFilter };
 
-  if (definition.types && definition.types.length > 0) {
+  if (
+    (filter.type === undefined && filter.types === undefined) &&
+    definition.types &&
+    definition.types.length > 0
+  ) {
     const mimeTypes = getApiMimeTypes(definition.types);
     if (mimeTypes.length === 1) {
       filter.type = mimeTypes[0];
@@ -203,6 +210,55 @@ const buildApiFilter = (
   }
 
   return filter;
+};
+
+const stripAssetTypeConstraints = (filter: AssetFilter): AssetFilter => {
+  const nextFilter = { ...filter };
+  delete nextFilter.type;
+  delete nextFilter.types;
+  return nextFilter;
+};
+
+const resolveCurrentTabTypes = (
+  currentTab: TabType,
+  filter: AssetFilter,
+): TabType[] => {
+  if (currentTab !== "all") {
+    return [currentTab];
+  }
+
+  if (filter.type === "PHOTO") {
+    return ["photos"];
+  }
+
+  if (filter.type === "VIDEO") {
+    return ["videos"];
+  }
+
+  if (Array.isArray(filter.types) && filter.types.length > 0) {
+    const normalized = filter.types
+      .map((type) => {
+        switch (type) {
+          case "PHOTO":
+            return "photos";
+          case "VIDEO":
+            return "videos";
+          case "AUDIO":
+            return "audios";
+          default:
+            return null;
+        }
+      })
+      .filter(
+        (type): type is "photos" | "videos" | "audios" => type !== null,
+      );
+
+    if (normalized.length > 0) {
+      return normalized;
+    }
+  }
+
+  return ["photos", "videos"];
 };
 
 const countAssets = (assets: Asset[]) => assets.length;
@@ -534,19 +590,30 @@ export const useCurrentTabPhotoSearchView = (
   const currentTab = useAssetsStore((state) => state.ui.currentTab);
   const uiSortBy = useSortBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
-  const filtersState = useAssetsStore((state) => state.filters);
+  const filtersState = useFilterState();
   const { sortBy, pageSize, ...viewOptions } = options;
-  const scopedFilter = useMemo(
+  const rawScopedFilter = useMemo(
     () =>
       selectFiltersEnabled({ filters: filtersState } as any)
         ? selectFilterAsAssetFilter({ filters: filtersState } as any)
         : {},
     [filtersState],
   );
+  const scopedFilter = useMemo(
+    () =>
+      currentTab === "all"
+        ? stripAssetTypeConstraints(rawScopedFilter)
+        : rawScopedFilter,
+    [currentTab, rawScopedFilter],
+  );
+  const resolvedTypes = useMemo(
+    () => resolveCurrentTabTypes(currentTab, rawScopedFilter),
+    [currentTab, rawScopedFilter],
+  );
 
   const definition: AssetViewDefinition = useMemo(
     () => ({
-      types: [currentTab],
+      types: resolvedTypes,
       filter: scopedFilter,
       sortBy: sortBy || uiSortBy,
       pageSize: pageSize || 50,
@@ -556,7 +623,7 @@ export const useCurrentTabPhotoSearchView = (
           }
         : undefined,
     }),
-    [currentTab, scopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
+    [resolvedTypes, scopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
   );
 
   const enabled = currentTab === "photos" && searchQuery.trim().length > 0;
@@ -576,20 +643,31 @@ export const useCurrentTabAssets = (
   const currentTab = useAssetsStore((state) => state.ui.currentTab);
   const uiSortBy = useSortBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
-  const filtersState = useAssetsStore((state) => state.filters);
+  const filtersState = useFilterState();
 
   const { sortBy, pageSize, ...viewOptions } = options;
-  const scopedFilter = useMemo(
+  const rawScopedFilter = useMemo(
     () =>
       selectFiltersEnabled({ filters: filtersState } as any)
         ? selectFilterAsAssetFilter({ filters: filtersState } as any)
         : {},
     [filtersState],
   );
+  const scopedFilter = useMemo(
+    () =>
+      currentTab === "all"
+        ? stripAssetTypeConstraints(rawScopedFilter)
+        : rawScopedFilter,
+    [currentTab, rawScopedFilter],
+  );
+  const resolvedTypes = useMemo(
+    () => resolveCurrentTabTypes(currentTab, rawScopedFilter),
+    [currentTab, rawScopedFilter],
+  );
 
   const definition: AssetViewDefinition = useMemo(
     () => ({
-      types: [currentTab],
+      types: resolvedTypes,
       filter: scopedFilter,
       sortBy: sortBy || uiSortBy,
       pageSize: pageSize || 50,
@@ -599,7 +677,7 @@ export const useCurrentTabAssets = (
           }
         : undefined,
     }),
-    [currentTab, scopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
+    [resolvedTypes, scopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
   );
 
   const standardView = useAssetsView(definition, {

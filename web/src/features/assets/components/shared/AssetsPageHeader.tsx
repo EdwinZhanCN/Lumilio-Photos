@@ -104,6 +104,7 @@ const AssetsPageHeader = ({
     const f = filters;
     if (!f?.enabled) return {};
     const dto: FilterDTO = {};
+    if (f.type === "PHOTO" || f.type === "VIDEO") dto.type = f.type;
     if (typeof f.raw === "boolean") dto.raw = f.raw;
     if (typeof f.rating === "number") dto.rating = f.rating;
     if (typeof f.liked === "boolean") dto.liked = f.liked;
@@ -129,6 +130,8 @@ const AssetsPageHeader = ({
 
   const tabTitle = useMemo(() => {
     switch (currentTab) {
+      case "all":
+        return t("assets.all.title");
       case "videos":
         return t("assets.videos.title");
       case "audios":
@@ -141,6 +144,8 @@ const AssetsPageHeader = ({
   // Get appropriate icon for current tab
   const TabIcon = useMemo(() => {
     switch (currentTab) {
+      case "all":
+        return PhotoIcon;
       case "videos":
         return VideoCameraIcon;
       case "audios":
@@ -170,6 +175,7 @@ const AssetsPageHeader = ({
       // Build a full payload resetting all fields first (single source of truth)
       const payload: any = {
         enabled: Object.keys(newFilters).length > 0,
+        type: undefined,
         raw: undefined,
         rating: undefined,
         liked: undefined,
@@ -180,6 +186,9 @@ const AssetsPageHeader = ({
         location: undefined,
       };
 
+      if (newFilters.type === "PHOTO" || newFilters.type === "VIDEO") {
+        payload.type = newFilters.type;
+      }
       if (newFilters.raw !== undefined) payload.raw = newFilters.raw;
       if (newFilters.rating !== undefined) payload.rating = newFilters.rating;
       if (newFilters.liked !== undefined) payload.liked = newFilters.liked;

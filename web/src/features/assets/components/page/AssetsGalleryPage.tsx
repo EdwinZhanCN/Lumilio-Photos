@@ -25,7 +25,7 @@ import {
   flattenAssetGroups,
 } from "@/features/assets/utils/assetGroups";
 
-export type AssetCategory = "photos" | "videos" | "audios";
+export type AssetCategory = "all" | "photos" | "videos" | "audios";
 
 interface AssetsGalleryPageProps {
   category: AssetCategory;

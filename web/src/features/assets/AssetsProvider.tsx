@@ -172,10 +172,14 @@ function getLiveSearchParams(fallback: URLSearchParams): URLSearchParams {
   return new URLSearchParams(window.location.search);
 }
 
-function resolveTabFromPathname(pathname: string): TabType {
+function resolveTabFromPathname(
+  pathname: string,
+  fallbackTab: TabType = "photos",
+): TabType {
+  if (pathname.includes("/photos")) return "photos";
   if (pathname.includes("/videos")) return "videos";
   if (pathname.includes("/audios")) return "audios";
-  return "photos";
+  return fallbackTab;
 }
 
 function toCompleteLocationBBox(location?: AssetFilter["location"]) {
@@ -204,6 +208,9 @@ function assetFilterToFiltersState(filter?: AssetFilter): Partial<FiltersState> 
     enabled: Object.keys(filter).length > 0,
   };
 
+  if (filter.type === "PHOTO" || filter.type === "VIDEO") {
+    filters.type = filter.type;
+  }
   if (filter.raw !== undefined) filters.raw = filter.raw;
   if (filter.rating !== undefined) filters.rating = filter.rating;
   if (filter.liked !== undefined) filters.liked = filter.liked;
@@ -253,6 +260,8 @@ export const AssetsProvider = ({
   const [isHydrated, setIsHydrated] = useState(false);
   const storeRef = useRef<AssetsStoreApi | null>(null);
   const isMainPersistentScope = persist && scopeId === MAIN_ASSETS_SCOPE_ID;
+  const defaultTab: TabType =
+    scopeId === MAIN_ASSETS_SCOPE_ID && !basePath ? "all" : "photos";
 
   if (storeRef.current === null) {
     storeRef.current = createAssetsStore({
@@ -309,7 +318,7 @@ export const AssetsProvider = ({
       routeState?.assetsInitialFilter,
     );
 
-    setCurrentTab(resolveTabFromPathname(location.pathname));
+    setCurrentTab(resolveTabFromPathname(location.pathname, defaultTab));
 
     if (persistedState.filters) {
       batchUpdateFilters(persistedState.filters);
@@ -343,6 +352,7 @@ export const AssetsProvider = ({
   }, [
     batchUpdateFilters,
     defaultSelectionMode,
+    defaultTab,
     hydrateUI,
     isMainPersistentScope,
     location.pathname,
@@ -369,13 +379,14 @@ export const AssetsProvider = ({
   useEffect(() => {
     if (!isHydrated) return;
 
-    const currentTab = resolveTabFromPathname(location.pathname);
+    const currentTab = resolveTabFromPathname(location.pathname, defaultTab);
     if (currentTab !== uiState.currentTab) {
       setCurrentTab(currentTab);
     }
   }, [
     isHydrated,
     location.pathname,
+    defaultTab,
     setCurrentTab,
     uiState.currentTab,
   ]);
@@ -433,38 +444,26 @@ export const AssetsProvider = ({
   const openCarousel = useCallback(
     (assetId: string) => {
       const currentParams = syncUrl ? getLiveSearchParams(searchParams) : null;
-      let path = basePath || "/assets/photos";
-
-      if (!basePath) {
-        if (uiState.currentTab === "videos") path = "/assets/videos";
-        else if (uiState.currentTab === "audios") path = "/assets/audios";
-      }
+      const path = basePath || "/assets";
 
       const query = currentParams?.toString();
       navigate(`${path}/${assetId}${query ? `?${query}` : ""}`);
     },
-    [basePath, navigate, searchParams, syncUrl, uiState.currentTab],
+    [basePath, navigate, searchParams, syncUrl],
   );
 
   const closeCarousel = useCallback(() => {
     const currentParams = syncUrl ? getLiveSearchParams(searchParams) : null;
-    let path = basePath || "/assets/photos";
-
-    if (!basePath) {
-      if (uiState.currentTab === "videos") path = "/assets/videos";
-      else if (uiState.currentTab === "audios") path = "/assets/audios";
-    }
+    const path = basePath || "/assets";
 
     const query = currentParams?.toString();
     navigate(`${path}${query ? `?${query}` : ""}`);
-  }, [basePath, navigate, searchParams, syncUrl, uiState.currentTab]);
+  }, [basePath, navigate, searchParams, syncUrl]);
 
   const switchTab = useCallback(
-    (tab: TabType) => {
+    (_tab: TabType) => {
       const currentParams = syncUrl ? getLiveSearchParams(searchParams) : null;
-      let path = "/assets/photos";
-      if (tab === "videos") path = "/assets/videos";
-      else if (tab === "audios") path = "/assets/audios";
+      const path = "/assets";
       const query = currentParams?.toString();
       navigate(`${path}${query ? `?${query}` : ""}`);
     },

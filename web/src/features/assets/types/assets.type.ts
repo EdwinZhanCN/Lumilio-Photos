@@ -5,7 +5,7 @@ import type { components } from "@/lib/http-commons";
 
 // ===== Core Types =====
 export type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
-export type TabType = "photos" | "videos" | "audios";
+export type TabType = "all" | "photos" | "videos" | "audios";
 export type SortByType = "date_captured" | "recently_added";
 export interface AssetGroup {
   key: string;
@@ -66,6 +66,7 @@ export interface UIState {
 // ===== Filters State =====
 export interface FiltersState {
   enabled: boolean;
+  type?: "PHOTO" | "VIDEO";
   raw?: boolean;
   rating?: number;
   liked?: boolean;

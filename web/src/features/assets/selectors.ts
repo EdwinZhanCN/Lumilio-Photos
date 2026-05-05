@@ -99,6 +99,7 @@ export const useFilterActions = () =>
   useAssetsStore(
     useShallow((s) => ({
       setFiltersEnabled: s.setFiltersEnabled,
+      setType: s.setFilterType,
       setRaw: s.setFilterRaw,
       setRating: s.setFilterRating,
       setLiked: s.setFilterLiked,

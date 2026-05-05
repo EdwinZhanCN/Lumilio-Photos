@@ -20,7 +20,7 @@ export const createUISlice: StateCreator<
   UISlice
 > = (set) => ({
   ui: {
-    currentTab: "photos",
+    currentTab: "all",
     sortBy: "date_captured",
     searchQuery: "",
     isCarouselOpen: false,
@@ -109,6 +109,8 @@ export const selectIsSearchActive = (state: UISlice): boolean => {
 // Utility selectors (Static helpers)
 export const selectTabAssetTypes = (tab: TabType): TabType[] => {
   switch (tab) {
+    case "all":
+      return ["photos", "videos"];
     case "photos":
       return ["photos"];
     case "videos":
@@ -122,6 +124,8 @@ export const selectTabAssetTypes = (tab: TabType): TabType[] => {
 
 export const selectTabTitle = (tab: TabType): string => {
   switch (tab) {
+    case "all":
+      return "Assets";
     case "photos":
       return "Photos";
     case "videos":

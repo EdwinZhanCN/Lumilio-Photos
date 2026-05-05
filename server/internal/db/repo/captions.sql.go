@@ -277,7 +277,7 @@ func (q *Queries) GetTopCaptionsByTokens(ctx context.Context, limit int32) ([]Ca
 }
 
 const searchAssetsByCaption = `-- name: SearchAssetsByCaption :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7 FROM assets a
 JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.description) @@ plainto_tsquery('english', $1)
 ORDER BY a.upload_time DESC, a.asset_id DESC
@@ -322,6 +322,10 @@ func (q *Queries) SearchAssetsByCaption(ctx context.Context, arg SearchAssetsByC
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
 		); err != nil {
 			return nil, err
 		}
@@ -334,7 +338,7 @@ func (q *Queries) SearchAssetsByCaption(ctx context.Context, arg SearchAssetsByC
 }
 
 const searchAssetsByCaptionSummary = `-- name: SearchAssetsByCaptionSummary :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7 FROM assets a
 JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.summary) @@ plainto_tsquery('english', $1)
 AND d.summary IS NOT NULL
@@ -380,6 +384,10 @@ func (q *Queries) SearchAssetsByCaptionSummary(ctx context.Context, arg SearchAs
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
 		); err != nil {
 			return nil, err
 		}
@@ -392,7 +400,7 @@ func (q *Queries) SearchAssetsByCaptionSummary(ctx context.Context, arg SearchAs
 }
 
 const searchAssetsByCaptionWithConfidence = `-- name: SearchAssetsByCaptionWithConfidence :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at FROM assets a
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7 FROM assets a
 JOIN captions d ON a.asset_id = d.asset_id
 WHERE to_tsvector('english', d.description) @@ plainto_tsquery('english', $1)
 AND d.confidence >= $4
@@ -444,6 +452,10 @@ func (q *Queries) SearchAssetsByCaptionWithConfidence(ctx context.Context, arg S
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
 		); err != nil {
 			return nil, err
 		}

@@ -54,17 +54,23 @@ func TestWalkRepositorySkipsExcludedAndUnsettledFiles(t *testing.T) {
 	writeFile("album/recent.jpg", time.Now())
 	writeFile("album/readme.txt", old)
 
-	entries, skipped, err := walkRepository(root, 5*time.Second)
+	result, err := walkRepository(root, 5*time.Second)
 	if err != nil {
 		t.Fatalf("walk repository: %v", err)
 	}
-	if _, ok := entries["album/photo.jpg"]; !ok {
-		t.Fatalf("expected album/photo.jpg to be scanned, got %#v", entries)
+	if _, ok := result.entries["album/photo.jpg"]; !ok {
+		t.Fatalf("expected album/photo.jpg to be scanned, got %#v", result.entries)
 	}
-	if len(entries) != 1 {
-		t.Fatalf("expected only one scanned entry, got %#v", entries)
+	if len(result.entries) != 1 {
+		t.Fatalf("expected only one scanned entry, got %#v", result.entries)
 	}
-	if skipped == 0 {
+	if _, ok := result.deferredPaths["album/recent.jpg"]; !ok {
+		t.Fatalf("expected unsettled file to be deferred, got %#v", result.deferredPaths)
+	}
+	if !result.deleteSafe {
+		t.Fatalf("expected unsettled files to keep delete reconciliation safe")
+	}
+	if result.skipped == 0 {
 		t.Fatalf("expected skipped files to be counted")
 	}
 }
@@ -81,14 +87,14 @@ func TestWalkRepositoryCanIncludeUnsettledFiles(t *testing.T) {
 		}
 	}
 
-	entries, skipped, err := walkRepository(root, 0)
+	result, err := walkRepository(root, 0)
 	if err != nil {
 		t.Fatalf("walk repository: %v", err)
 	}
-	if skipped != 0 {
-		t.Fatalf("expected no skipped files, got %d", skipped)
+	if result.skipped != 0 {
+		t.Fatalf("expected no skipped files, got %d", result.skipped)
 	}
-	if len(entries) != 2 {
-		t.Fatalf("expected two scanned entries, got %#v", entries)
+	if len(result.entries) != 2 {
+		t.Fatalf("expected two scanned entries, got %#v", result.entries)
 	}
 }
