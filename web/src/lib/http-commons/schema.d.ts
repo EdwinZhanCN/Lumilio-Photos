@@ -5546,6 +5546,174 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/locations/clusters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get location clusters
+         * @description Return paginated persisted photo location clusters with cached labels when available.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Page size (1-1000) */
+                    limit?: number;
+                    /** @description Page offset */
+                    offset?: number;
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                    /** @description Optional geohash filter */
+                    geohash?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Location clusters retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue location cluster rebuild
+         * @description Queue a location cluster rebuild for all photos or one repository.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Rebuild request */
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.RebuildLocationClustersRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Location cluster rebuild queued successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request body */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/people": {
         parameters: {
             query?: never;
@@ -7867,6 +8035,45 @@ export interface components {
             /** @example -122.5 */
             west?: number;
         };
+        "dto.LocationClusterDTO": {
+            /** @example 37.7749 */
+            centroid_latitude?: number;
+            /** @example -122.4194 */
+            centroid_longitude?: number;
+            /** @example San Francisco */
+            city?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            cluster_id?: string;
+            /** @example United States */
+            country?: string;
+            /** @example resolved */
+            geocode_status?: string;
+            /** @example 2026-02-10T12:00:00Z */
+            geocoded_at?: string;
+            /** @example 9q8yyk8 */
+            geohash?: string;
+            /** @example San Francisco, California, United States */
+            label?: string;
+            /** @example 42 */
+            photo_count?: number;
+            /** @example 7 */
+            precision?: number;
+            /** @example nominatim */
+            provider?: string;
+            /** @example California */
+            region?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+        };
+        "dto.LocationClusterListResponseDTO": {
+            clusters?: components["schemas"]["dto.LocationClusterDTO"][];
+            /** @example 100 */
+            limit?: number;
+            /** @example 0 */
+            offset?: number;
+            /** @example 150 */
+            total?: number;
+        };
         "dto.LoginRequestDTO": {
             password: string;
             username: string;
@@ -8024,6 +8231,20 @@ export interface components {
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             repository_id?: string;
             requested_tasks?: string[];
+            /** @example queued */
+            status?: string;
+        };
+        "dto.RebuildLocationClustersRequestDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+        };
+        "dto.RebuildLocationClustersResponseDTO": {
+            /** @example 123 */
+            job_id?: number;
+            /** @example Location cluster rebuild queued successfully */
+            message?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
             /** @example queued */
             status?: string;
         };

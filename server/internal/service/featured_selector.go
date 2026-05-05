@@ -355,9 +355,14 @@ func isFinite(v float64) bool {
 }
 
 func hasValidGPS(meta dbtypes.PhotoSpecificMetadata) bool {
-	if !isFinite(meta.GPSLatitude) || !isFinite(meta.GPSLongitude) {
+	if meta.GPSLatitude == nil || meta.GPSLongitude == nil {
+		return false
+	}
+	lat := *meta.GPSLatitude
+	lng := *meta.GPSLongitude
+	if !isFinite(lat) || !isFinite(lng) {
 		return false
 	}
 	// Treat (0,0) as unknown/noisy metadata; keep equator/prime-meridian valid otherwise.
-	return !(meta.GPSLatitude == 0 && meta.GPSLongitude == 0)
+	return !(lat == 0 && lng == 0)
 }

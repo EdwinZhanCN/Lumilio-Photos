@@ -1,6 +1,9 @@
 services:
     db:
-        image: pgvector/pgvector:pg16
+        build:
+            context: .
+            dockerfile: server/db.Dockerfile
+        image: lumilio-db:latest
         restart: unless-stopped
         environment:
             POSTGRES_DB: lumiliophotos
@@ -42,6 +45,10 @@ services:
             REPOSITORY_SCAN_SETTLE_SECONDS: "5"
             REPOSITORY_SCAN_MAX_CONCURRENT_REPOS: "1"
             REPOSITORY_SCAN_BATCH_SIZE: "500"
+            GEOCODING_PROVIDER: disabled
+            GEOCODING_NOMINATIM_ENDPOINT: ""
+            GEOCODING_LANGUAGE: en
+            GEOCODING_USER_AGENT: Lumilio-Photos/1.0
             ML_CLIP_ENABLED: "false"
             ML_OCR_ENABLED: "false"
             ML_CAPTION_ENABLED: "false"

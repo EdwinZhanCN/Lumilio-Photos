@@ -289,14 +289,14 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 	// Parse GPS Latitude
 	if lat, exists := rawData["GPSLatitude"]; exists {
 		if val, err := parseGPSCoordinate(lat); err == nil {
-			metadata.GPSLatitude = val
+			metadata.GPSLatitude = &val
 		}
 	}
 
 	// Parse GPS Longitude
 	if lon, exists := rawData["GPSLongitude"]; exists {
 		if val, err := parseGPSCoordinate(lon); err == nil {
-			metadata.GPSLongitude = val
+			metadata.GPSLongitude = &val
 		}
 	}
 
@@ -498,14 +498,14 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 	// Parse GPS Latitude
 	if lat, exists := rawData["GPSLatitude"]; exists {
 		if val, err := parseGPSCoordinate(lat); err == nil {
-			metadata.GPSLatitude = val
+			metadata.GPSLatitude = &val
 		}
 	}
 
 	// Parse GPS Longitude
 	if lon, exists := rawData["GPSLongitude"]; exists {
 		if val, err := parseGPSCoordinate(lon); err == nil {
-			metadata.GPSLongitude = val
+			metadata.GPSLongitude = &val
 		}
 	}
 

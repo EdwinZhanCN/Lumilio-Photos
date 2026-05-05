@@ -42,7 +42,31 @@ SET specific_metadata = sqlc.arg('specific_metadata'),
     capture_offset_minutes = COALESCE(
         sqlc.narg('capture_offset_minutes')::smallint,
         capture_offset_minutes
-    )
+    ),
+    gps_latitude = CASE
+        WHEN sqlc.narg('gps_latitude')::float8 BETWEEN -90 AND 90
+         AND sqlc.narg('gps_longitude')::float8 BETWEEN -180 AND 180
+        THEN sqlc.narg('gps_latitude')::float8
+        ELSE NULL
+    END,
+    gps_longitude = CASE
+        WHEN sqlc.narg('gps_latitude')::float8 BETWEEN -90 AND 90
+         AND sqlc.narg('gps_longitude')::float8 BETWEEN -180 AND 180
+        THEN sqlc.narg('gps_longitude')::float8
+        ELSE NULL
+    END,
+    gps_geohash_5 = CASE
+        WHEN sqlc.narg('gps_latitude')::float8 BETWEEN -90 AND 90
+         AND sqlc.narg('gps_longitude')::float8 BETWEEN -180 AND 180
+        THEN ST_GeoHash(ST_SetSRID(ST_MakePoint(sqlc.narg('gps_longitude')::float8, sqlc.narg('gps_latitude')::float8), 4326), 5)
+        ELSE NULL
+    END,
+    gps_geohash_7 = CASE
+        WHEN sqlc.narg('gps_latitude')::float8 BETWEEN -90 AND 90
+         AND sqlc.narg('gps_longitude')::float8 BETWEEN -180 AND 180
+        THEN ST_GeoHash(ST_SetSRID(ST_MakePoint(sqlc.narg('gps_longitude')::float8, sqlc.narg('gps_latitude')::float8), 4326), 7)
+        ELSE NULL
+    END
 WHERE asset_id = sqlc.arg('asset_id');
 
 -- name: DeleteAsset :exec
@@ -70,6 +94,17 @@ SET
     storage_path = $2,
     status = $3
 WHERE asset_id = $1
+RETURNING *;
+
+-- name: MoveAssetWithinRepository :one
+UPDATE assets
+SET
+    storage_path = sqlc.arg('storage_path'),
+    original_filename = sqlc.arg('original_filename'),
+    is_deleted = false,
+    deleted_at = NULL
+WHERE asset_id = sqlc.arg('asset_id')
+  AND repository_id = sqlc.arg('repository_id')
 RETURNING *;
 
 -- name: GetAssetsByStatus :many
@@ -519,18 +554,18 @@ WITH page_ids AS MATERIALIZED (
       OR sqlc.narg('location_east')::float8 IS NULL
       OR sqlc.narg('location_west')::float8 IS NULL
       OR (
-        jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
-        AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
-        AND (a.specific_metadata->>'gps_latitude')::double precision
+        a.gps_latitude IS NOT NULL
+        AND a.gps_longitude IS NOT NULL
+        AND a.gps_latitude
           BETWEEN LEAST(sqlc.narg('location_south')::float8, sqlc.narg('location_north')::float8)
           AND GREATEST(sqlc.narg('location_south')::float8, sqlc.narg('location_north')::float8)
         AND (
           CASE
             WHEN sqlc.narg('location_west')::float8 <= sqlc.narg('location_east')::float8 THEN
-              (a.specific_metadata->>'gps_longitude')::double precision BETWEEN sqlc.narg('location_west')::float8 AND sqlc.narg('location_east')::float8
+              a.gps_longitude BETWEEN sqlc.narg('location_west')::float8 AND sqlc.narg('location_east')::float8
             ELSE
-              (a.specific_metadata->>'gps_longitude')::double precision >= sqlc.narg('location_west')::float8
-              OR (a.specific_metadata->>'gps_longitude')::double precision <= sqlc.narg('location_east')::float8
+              a.gps_longitude >= sqlc.narg('location_west')::float8
+              OR a.gps_longitude <= sqlc.narg('location_east')::float8
           END
         )
       )
@@ -611,20 +646,20 @@ WHERE a.is_deleted = false
     OR sqlc.narg('location_east')::float8 IS NULL
     OR sqlc.narg('location_west')::float8 IS NULL
     OR (
-      jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
-      AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
-      AND (a.specific_metadata->>'gps_latitude')::double precision
-        BETWEEN LEAST(sqlc.narg('location_south')::float8, sqlc.narg('location_north')::float8)
-        AND GREATEST(sqlc.narg('location_south')::float8, sqlc.narg('location_north')::float8)
-      AND (
-        CASE
-          WHEN sqlc.narg('location_west')::float8 <= sqlc.narg('location_east')::float8 THEN
-            (a.specific_metadata->>'gps_longitude')::double precision BETWEEN sqlc.narg('location_west')::float8 AND sqlc.narg('location_east')::float8
-          ELSE
-            (a.specific_metadata->>'gps_longitude')::double precision >= sqlc.narg('location_west')::float8
-            OR (a.specific_metadata->>'gps_longitude')::double precision <= sqlc.narg('location_east')::float8
-        END
-      )
+    a.gps_latitude IS NOT NULL
+    AND a.gps_longitude IS NOT NULL
+    AND a.gps_latitude
+      BETWEEN LEAST(sqlc.narg('location_south')::float8, sqlc.narg('location_north')::float8)
+      AND GREATEST(sqlc.narg('location_south')::float8, sqlc.narg('location_north')::float8)
+    AND (
+      CASE
+        WHEN sqlc.narg('location_west')::float8 <= sqlc.narg('location_east')::float8 THEN
+          a.gps_longitude BETWEEN sqlc.narg('location_west')::float8 AND sqlc.narg('location_east')::float8
+        ELSE
+          a.gps_longitude >= sqlc.narg('location_west')::float8
+          OR a.gps_longitude <= sqlc.narg('location_east')::float8
+      END
+    )
     )
   );
 
@@ -635,17 +670,15 @@ SELECT
   a.original_filename,
   a.upload_time,
   a.taken_time,
-  (a.specific_metadata->>'gps_latitude')::double precision AS gps_latitude,
-  (a.specific_metadata->>'gps_longitude')::double precision AS gps_longitude
+  a.gps_latitude AS gps_latitude,
+  a.gps_longitude AS gps_longitude
 FROM assets a
 WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
-  AND jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
-  AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
-  AND (a.specific_metadata->>'gps_latitude')::double precision BETWEEN -90 AND 90
-  AND (a.specific_metadata->>'gps_longitude')::double precision BETWEEN -180 AND 180
+  AND a.gps_latitude IS NOT NULL
+  AND a.gps_longitude IS NOT NULL
 ORDER BY COALESCE(a.taken_time, a.upload_time) DESC
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
@@ -657,7 +690,5 @@ WHERE a.is_deleted = false
   AND a.type = 'PHOTO'
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
-  AND jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
-  AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
-  AND (a.specific_metadata->>'gps_latitude')::double precision BETWEEN -90 AND 90
-  AND (a.specific_metadata->>'gps_longitude')::double precision BETWEEN -180 AND 180;
+  AND a.gps_latitude IS NOT NULL
+  AND a.gps_longitude IS NOT NULL;

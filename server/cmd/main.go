@@ -188,6 +188,7 @@ func main() {
 	if err != nil {
 		appLogger.Fatal("failed to initialize asset service", zap.String("operation", "asset.init"), zap.Error(err))
 	}
+	locationService := service.NewLocationService(queries, pgxPool)
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool, indexingLogger, repoAuditProvider)
 	authService := service.NewAuthService(queries, pgxPool)
 	albumService := service.NewAlbumService(queries)
@@ -211,6 +212,7 @@ func main() {
 	river.AddWorker[queue.TranscodeArgs](workers, &queue.TranscodeWorker{Process: assetProcessor.ProcessTranscodeTask})
 	river.AddWorker[queue.AssetRetryArgs](workers, &queue.AssetRetryWorker{ProcessRetry: assetProcessor.ProcessRetryTask})
 	river.AddWorker[queue.ReindexAssetsArgs](workers, &queue.ReindexAssetsWorker{IndexingService: indexingService})
+	river.AddWorker[queue.RebuildLocationClustersArgs](workers, &queue.RebuildLocationClustersWorker{LocationService: locationService})
 	river.AddWorker[queue.ScanRepositoryArgs](workers, &queue.ScanRepositoryWorker{ProcessScan: repositoryScanner.ProcessScanRepository})
 
 	go func() {
@@ -232,6 +234,7 @@ func main() {
 	authController := handler.NewAuthHandler(authService)
 	albumController := handler.NewAlbumHandler(&albumService, queries)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
+	locationController := handler.NewLocationHandler(locationService, queueClient)
 	userController := handler.NewUserHandler(userService)
 	queueController := handler.NewQueueHandler(queueClient, pgxPool)
 	statsController := handler.NewStatsHandler(queries)
@@ -253,6 +256,7 @@ func main() {
 		authController,
 		albumController,
 		peopleController,
+		locationController,
 		queueController,
 		statsController,
 		agentController,

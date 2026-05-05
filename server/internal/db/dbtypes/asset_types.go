@@ -58,8 +58,8 @@ type PhotoSpecificMetadata struct {
 	Exposure             float32    `json:"exposure"`
 	Dimensions           string     `json:"dimensions,omitempty"`
 	Resolution           string     `json:"resolution,omitempty"`
-	GPSLatitude          float64    `json:"gps_latitude,omitempty"`
-	GPSLongitude         float64    `json:"gps_longitude,omitempty"`
+	GPSLatitude          *float64   `json:"gps_latitude,omitempty"`
+	GPSLongitude         *float64   `json:"gps_longitude,omitempty"`
 	Description          string     `json:"description,omitempty"`
 	IsRAW                bool       `json:"is_raw,omitempty"`
 }
@@ -71,8 +71,8 @@ type VideoSpecificMetadata struct {
 	RecordedTime         *time.Time `json:"recorded_time,omitempty" example:"2023-01-01T00:00:00Z"`
 	CaptureOffsetMinutes *int16     `json:"capture_offset_minutes,omitempty"`
 	CameraModel          string     `json:"camera_model,omitempty" example:"Canon EOS 5D Mark IV"`
-	GPSLatitude          float64    `json:"gps_latitude,omitempty" example:"37.7749"`
-	GPSLongitude         float64    `json:"gps_longitude,omitempty" example:"-122.4194"`
+	GPSLatitude          *float64   `json:"gps_latitude,omitempty" example:"37.7749"`
+	GPSLongitude         *float64   `json:"gps_longitude,omitempty" example:"-122.4194"`
 	Description          string     `json:"description,omitempty" example:"A beautiful sunset over the ocean"`
 }
 

@@ -1051,6 +1051,91 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.LocationClusterDTO": {
+                "properties": {
+                    "centroid_latitude": {
+                        "example": 37.7749,
+                        "type": "number"
+                    },
+                    "centroid_longitude": {
+                        "example": -122.4194,
+                        "type": "number"
+                    },
+                    "city": {
+                        "example": "San Francisco",
+                        "type": "string"
+                    },
+                    "cluster_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "country": {
+                        "example": "United States",
+                        "type": "string"
+                    },
+                    "geocode_status": {
+                        "example": "resolved",
+                        "type": "string"
+                    },
+                    "geocoded_at": {
+                        "example": "2026-02-10T12:00:00Z",
+                        "type": "string"
+                    },
+                    "geohash": {
+                        "example": "9q8yyk8",
+                        "type": "string"
+                    },
+                    "label": {
+                        "example": "San Francisco, California, United States",
+                        "type": "string"
+                    },
+                    "photo_count": {
+                        "example": 42,
+                        "type": "integer"
+                    },
+                    "precision": {
+                        "example": 7,
+                        "type": "integer"
+                    },
+                    "provider": {
+                        "example": "nominatim",
+                        "type": "string"
+                    },
+                    "region": {
+                        "example": "California",
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LocationClusterListResponseDTO": {
+                "properties": {
+                    "clusters": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.LocationClusterDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "example": 100,
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "total": {
+                        "example": 150,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.LoginRequestDTO": {
                 "properties": {
                     "password": {
@@ -1496,6 +1581,36 @@ const docTemplate = `{
                         },
                         "type": "array",
                         "uniqueItems": false
+                    },
+                    "status": {
+                        "example": "queued",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RebuildLocationClustersRequestDTO": {
+                "properties": {
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RebuildLocationClustersResponseDTO": {
+                "properties": {
+                    "job_id": {
+                        "example": 123,
+                        "type": "integer"
+                    },
+                    "message": {
+                        "example": "Location cluster rebuild queued successfully",
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
                     },
                     "status": {
                         "example": "queued",
@@ -8854,6 +8969,206 @@ const docTemplate = `{
                 "summary": "Health check",
                 "tags": [
                     "Health"
+                ]
+            }
+        },
+        "/api/v1/locations/clusters": {
+            "get": {
+                "description": "Return paginated persisted photo location clusters with cached labels when available.",
+                "parameters": [
+                    {
+                        "description": "Page size (1-1000)",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 100,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Page offset",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "default": 0,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Optional geohash filter",
+                        "in": "query",
+                        "name": "geohash",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Location clusters retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get location clusters",
+                "tags": [
+                    "locations"
+                ]
+            }
+        },
+        "/api/v1/locations/rebuild": {
+            "post": {
+                "description": "Queue a location cluster rebuild for all photos or one repository.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.RebuildLocationClustersRequestDTO",
+                                        "summary": "request",
+                                        "description": "Rebuild request"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Rebuild request"
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Location cluster rebuild queued successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request body"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Queue location cluster rebuild",
+                "tags": [
+                    "locations"
                 ]
             }
         },

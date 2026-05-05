@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"server/internal/db/dbtypes"
@@ -440,6 +441,8 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 	// Extract taken_time from metadata based on asset type
 	var takenTime *time.Time
 	var captureOffsetMinutes *int16
+	var gpsLatitude *float64
+	var gpsLongitude *float64
 	assetType := dbtypes.AssetType(asset.Type)
 
 	switch assetType {
@@ -447,11 +450,13 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 		if photoMeta, err := metadata.UnmarshalPhoto(); err == nil {
 			takenTime = photoMeta.TakenTime
 			captureOffsetMinutes = photoMeta.CaptureOffsetMinutes
+			gpsLatitude, gpsLongitude = normalizedGPS(photoMeta.GPSLatitude, photoMeta.GPSLongitude)
 		}
 	case dbtypes.AssetTypeVideo:
 		if videoMeta, err := metadata.UnmarshalVideo(); err == nil {
 			takenTime = videoMeta.RecordedTime
 			captureOffsetMinutes = videoMeta.CaptureOffsetMinutes
+			gpsLatitude, gpsLongitude = normalizedGPS(videoMeta.GPSLatitude, videoMeta.GPSLongitude)
 		}
 	case dbtypes.AssetTypeAudio:
 		// Audio doesn't have taken time
@@ -472,9 +477,26 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 		SpecificMetadata:     metadata,
 		TakenTime:            takenTimeParam,
 		CaptureOffsetMinutes: captureOffsetMinutes,
+		GpsLatitude:          gpsLatitude,
+		GpsLongitude:         gpsLongitude,
 	}
 
 	return s.queries.UpdateAssetMetadataWithTakenTime(ctx, params)
+}
+
+func normalizedGPS(latitude, longitude *float64) (*float64, *float64) {
+	if latitude == nil || longitude == nil {
+		return nil, nil
+	}
+	lat := *latitude
+	lng := *longitude
+	if math.IsNaN(lat) || math.IsInf(lat, 0) || math.IsNaN(lng) || math.IsInf(lng, 0) {
+		return nil, nil
+	}
+	if lat < -90 || lat > 90 || lng < -180 || lng > 180 {
+		return nil, nil
+	}
+	return &lat, &lng
 }
 
 // DeleteAsset marks an asset as deleted, and move the asset to the trash folder
@@ -1617,13 +1639,13 @@ func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, p
 		southPlaceholder := builder.addArg(*params.LocationSouth)
 		eastPlaceholder := builder.addArg(*params.LocationEast)
 		westPlaceholder := builder.addArg(*params.LocationWest)
-		conditions = append(conditions, fmt.Sprintf(`jsonb_typeof(a.specific_metadata->'gps_latitude') = 'number'
-  AND jsonb_typeof(a.specific_metadata->'gps_longitude') = 'number'
-  AND (a.specific_metadata->>'gps_latitude')::double precision BETWEEN LEAST(%s::float8, %s::float8) AND GREATEST(%s::float8, %s::float8)
+		conditions = append(conditions, fmt.Sprintf(`a.gps_latitude IS NOT NULL
+  AND a.gps_longitude IS NOT NULL
+  AND a.gps_latitude BETWEEN LEAST(%s::float8, %s::float8) AND GREATEST(%s::float8, %s::float8)
   AND (
     CASE
-      WHEN %s::float8 <= %s::float8 THEN (a.specific_metadata->>'gps_longitude')::double precision BETWEEN %s::float8 AND %s::float8
-      ELSE (a.specific_metadata->>'gps_longitude')::double precision >= %s::float8 OR (a.specific_metadata->>'gps_longitude')::double precision <= %s::float8
+      WHEN %s::float8 <= %s::float8 THEN a.gps_longitude BETWEEN %s::float8 AND %s::float8
+      ELSE a.gps_longitude >= %s::float8 OR a.gps_longitude <= %s::float8
     END
   )`, southPlaceholder, northPlaceholder, southPlaceholder, northPlaceholder, westPlaceholder, eastPlaceholder, westPlaceholder, eastPlaceholder, westPlaceholder, eastPlaceholder))
 	}
@@ -1676,7 +1698,7 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 
 	points := make([]PhotoMapPoint, 0, len(rows))
 	for _, row := range rows {
-		if !row.AssetID.Valid || !row.UploadTime.Valid {
+		if !row.AssetID.Valid || !row.UploadTime.Valid || row.GpsLatitude == nil || row.GpsLongitude == nil {
 			continue
 		}
 
@@ -1696,8 +1718,8 @@ func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhot
 			OriginalFilename: row.OriginalFilename,
 			UploadTime:       row.UploadTime.Time,
 			TakenTime:        takenTime,
-			GPSLatitude:      row.GpsLatitude,
-			GPSLongitude:     row.GpsLongitude,
+			GPSLatitude:      *row.GpsLatitude,
+			GPSLongitude:     *row.GpsLongitude,
 		})
 	}
 

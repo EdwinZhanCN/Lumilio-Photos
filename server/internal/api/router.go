@@ -99,6 +99,11 @@ type PeopleControllerInterface interface {
 	ListPersonAssets(c *gin.Context)
 }
 
+type LocationControllerInterface interface {
+	ListLocationClusters(c *gin.Context)
+	RebuildLocationClusters(c *gin.Context)
+}
+
 // QueueControllerInterface defines the interface for queue monitoring controllers
 type QueueControllerInterface interface {
 	ListJobs(c *gin.Context)
@@ -155,6 +160,7 @@ func NewRouter(
 	authController AuthControllerInterface,
 	albumController AlbumControllerInterface,
 	peopleController PeopleControllerInterface,
+	locationController LocationControllerInterface,
 	queueController QueueControllerInterface,
 	statsController StatsControllerInterface,
 	agentController AgentControllerInterface,
@@ -239,6 +245,13 @@ func NewRouter(
 			repositories.POST("/:id/scan", repositoryScanController.QueueRepositoryScan)
 			repositories.GET("/:id/scans/latest", repositoryScanController.GetLatestRepositoryScan)
 			repositories.GET("/:id/scans", repositoryScanController.ListRepositoryScans)
+		}
+
+		locations := v1.Group("/locations")
+		locations.Use(authController.OptionalAuthMiddleware())
+		{
+			locations.GET("/clusters", locationController.ListLocationClusters)
+			locations.POST("/rebuild", authController.AuthMiddleware(), authController.RequireAdmin(), locationController.RebuildLocationClusters)
 		}
 
 		// Asset routes (new unified API) - with optional authentication

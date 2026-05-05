@@ -97,6 +97,7 @@
             "title": "Spacetime Trail",
             "loading": "Loading map data...",
             "loadedStatus": "Located {{pointsCount}} photos / Loaded {{loadedCount}}{{hasTotal, select, true { / Total {{totalCount}}} other {}}}{{loadingMore, select, true { (loading more)} other {}}}",
+            "placesCount": "{{count}} places",
             "empty": "No photos with location data yet."
         },
         "info": {
@@ -238,6 +239,14 @@
         "errorFallback": {
             "something_went_wrong": "Something went wrong"
         },
+        "all": {
+            "title": "Assets",
+            "end_of_results": "No more results.",
+            "locating_asset": "Locating asset...",
+            "loading_more_data": "Loading more data to find the asset...",
+            "asset_not_available": "Asset may not be available in the current view.",
+            "loading_assets": "Loading assets..."
+        },
         "photos": {
             "title": "Photos",
             "end_of_results": "No more results.",
@@ -322,6 +331,11 @@
         "filterTool": {
             "sectionShell": {
                 "enable": "Enable"
+            },
+            "typeSection": {
+                "title": "Type",
+                "photo": "Photo",
+                "video": "Video"
             },
             "rawSection": {
                 "title": "RAW",
