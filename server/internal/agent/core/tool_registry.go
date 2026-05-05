@@ -95,7 +95,7 @@ const (
 )
 
 type JustifiedGalleryConfig struct {
-	GroupBy string `json:"groupBy"` // "date", "type", "flat"
+	SortBy string `json:"sortBy"` // "date_captured" | "recently_added"
 }
 
 // ExtraInfo provides tool-specific extension data

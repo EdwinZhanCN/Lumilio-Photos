@@ -1,26 +1,159 @@
 import type { TFunction } from "i18next";
-import type { components } from "@/lib/http-commons/schema.d.ts";
 import type { Asset } from "@/lib/assets/types";
-import type { AssetGroup } from "@/features/assets/types/assets.type";
+import type {
+  AssetGroup,
+  SortByType,
+} from "@/features/assets/types/assets.type";
 
-type AssetGroupDTO = components["schemas"]["dto.AssetGroupDTO"];
-
-export const DEFAULT_GROUP_KEYS = new Set(["flat:all"]);
+export const DEFAULT_GROUP_KEYS = new Set<string>();
 
 const normalizeVisibleAssets = (assets: Asset[]): Asset[] =>
   assets.filter((asset) => !asset.is_deleted && !asset.deleted_at);
 
-export const normalizeAssetGroups = (
-  groups?: AssetGroupDTO[],
-): AssetGroup[] => {
-  if (!Array.isArray(groups)) return [];
+const parseAssetDate = (value?: string | null): Date => {
+  if (!value) return new Date(0);
 
-  return groups
-    .map((group) => ({
-      key: group.key ?? "flat:all",
-      assets: normalizeVisibleAssets(group.assets ?? []),
-    }))
-    .filter((group) => group.assets.length > 0);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date(0);
+  }
+
+  return parsed;
+};
+
+const getSortDate = (asset: Asset, sortBy: SortByType): Date => {
+  if (sortBy === "recently_added") {
+    return parseAssetDate(asset.upload_time);
+  }
+
+  return parseAssetDate(asset.taken_time ?? asset.upload_time);
+};
+
+type CalendarParts = {
+  year: number;
+  month: number;
+  day: number;
+  weekday: number;
+};
+
+const getCalendarParts = (date: Date, offsetMinutes?: number): CalendarParts => {
+  if (typeof offsetMinutes === "number") {
+    const shifted = new Date(date.getTime() + offsetMinutes * 60_000);
+    return {
+      year: shifted.getUTCFullYear(),
+      month: shifted.getUTCMonth() + 1,
+      day: shifted.getUTCDate(),
+      weekday: shifted.getUTCDay(),
+    };
+  }
+
+  return {
+    year: date.getFullYear(),
+    month: date.getMonth() + 1,
+    day: date.getDate(),
+    weekday: date.getDay(),
+  };
+};
+
+const createBoundaryDate = (
+  parts: CalendarParts,
+  useUTC: boolean,
+): Date => {
+  if (useUTC) {
+    return new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  }
+
+  return new Date(parts.year, parts.month - 1, parts.day);
+};
+
+const addDays = (date: Date, days: number, useUTC: boolean): Date => {
+  const next = new Date(date.getTime());
+  if (useUTC) {
+    next.setUTCDate(next.getUTCDate() + days);
+  } else {
+    next.setDate(next.getDate() + days);
+  }
+  return next;
+};
+
+const buildDateGroupKey = (
+  assetDate: Date,
+  now: Date,
+  offsetMinutes?: number,
+): string => {
+  const useUTC = typeof offsetMinutes === "number";
+  const assetParts = getCalendarParts(assetDate, offsetMinutes);
+  const nowParts = getCalendarParts(now, offsetMinutes);
+
+  const assetDay = createBoundaryDate(assetParts, useUTC);
+  const today = createBoundaryDate(nowParts, useUTC);
+  const yesterday = addDays(today, -1, useUTC);
+  const thisWeekStart = addDays(today, -nowParts.weekday, useUTC);
+  const thisMonthStart = useUTC
+    ? new Date(Date.UTC(nowParts.year, nowParts.month - 1, 1))
+    : new Date(nowParts.year, nowParts.month - 1, 1);
+  const thisYearStart = useUTC
+    ? new Date(Date.UTC(nowParts.year, 0, 1))
+    : new Date(nowParts.year, 0, 1);
+
+  const assetStamp = assetDay.getTime();
+
+  switch (true) {
+    case assetStamp === today.getTime():
+      return "date:today";
+    case assetStamp === yesterday.getTime():
+      return "date:yesterday";
+    case assetStamp >= thisWeekStart.getTime():
+      return "date:this_week";
+    case assetStamp >= thisMonthStart.getTime():
+      return "date:this_month";
+    case assetStamp >= thisYearStart.getTime():
+      return `date:month:${assetParts.year.toString().padStart(4, "0")}-${assetParts.month
+        .toString()
+        .padStart(2, "0")}`;
+    default:
+      return `date:year:${assetParts.year.toString().padStart(4, "0")}`;
+  }
+};
+
+const getAssetGroupKey = (
+  asset: Asset,
+  sortBy: SortByType,
+  now: Date,
+): string => {
+  const sortDate = getSortDate(asset, sortBy);
+  const captureOffsetMinutes =
+    sortBy === "date_captured" ? asset.capture_offset_minutes : undefined;
+
+  return buildDateGroupKey(sortDate, now, captureOffsetMinutes);
+};
+
+export const groupAssetsBySort = (
+  assets: Asset[],
+  sortBy: SortByType,
+  now: Date = new Date(),
+): AssetGroup[] => {
+  const visibleAssets = normalizeVisibleAssets(assets);
+  if (visibleAssets.length === 0) {
+    return [];
+  }
+
+  const groups: AssetGroup[] = [];
+  visibleAssets.forEach((asset) => {
+    const key = getAssetGroupKey(asset, sortBy, now);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.assets = [...last.assets, asset];
+      return;
+    }
+
+    groups.push({
+      key,
+      assets: [asset],
+    });
+  });
+
+  return groups;
 };
 
 export const mergeAdjacentAssetGroups = (

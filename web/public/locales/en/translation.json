@@ -447,12 +447,10 @@
                 "addToAlbumSuccess": "Added {{count}} items to album",
                 "addToAlbumError": "Failed to add items to album"
             },
-            "groupBy": "Group by {{groupBy}}",
-            "groupByOptions": {
-                "date": "Date",
-                "type": "Type",
-                "album": "Album",
-                "flat": "Flat"
+            "sortBy": "Sort by {{sortBy}}",
+            "sortByOptions": {
+                "dateCaptured": "Date Captured",
+                "recentlyAdded": "Recently Added"
             },
             "selectionMode": {
                 "exit": "Exit Selection Mode",

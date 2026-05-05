@@ -215,8 +215,8 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 		api.GinBadRequest(c, err, "Search type must be 'filename' or 'semantic'")
 		return
 	}
-	if err := validateAssetQueryGroupBy(req.GroupBy); err != nil {
-		api.GinBadRequest(c, err, "group_by must be 'date', 'type', or 'flat'")
+	if err := validateAssetQuerySortBy(req.SortBy); err != nil {
+		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
 		return
 	}
 	if req.SearchType == "" {
@@ -239,7 +239,7 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 		return
 	}
 
-	params := buildQueryAssetsParams(req.Query, req.SearchType, req.GroupBy, req.ViewerTimezone, req.Filter, req.Pagination)
+	params := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.Filter, req.Pagination)
 	params.PersonID = &personID
 	params = applyAssetOwnershipScope(c, params)
 
@@ -256,10 +256,10 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 
 	totalInt := int(total)
 	api.GinSuccess(c, dto.QueryAssetsResponseDTO{
-		Groups: toAssetGroupDTOs(service.GroupAssetsPage(assets, params.GroupBy, params.ViewerTimeZone)),
-		Total:  &totalInt,
-		Limit:  req.Pagination.Limit,
-		Offset: req.Pagination.Offset,
+		Assets:  toAssetDTOs(assets),
+		Total:   &totalInt,
+		Limit:   req.Pagination.Limit,
+		Offset:  req.Pagination.Offset,
 	})
 }
 

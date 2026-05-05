@@ -11,7 +11,7 @@ import {
   useCurrentTabPhotoSearchView,
 } from "@/features/assets/hooks/useAssetsView";
 import {
-  useGroupBy,
+  useSortBy,
   useIsCarouselOpen,
   useSearchQuery,
   useUIActions,
@@ -38,10 +38,10 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
   const { state: settingsState } = useSettingsContext();
 
   // Selectors
-  const groupBy = useGroupBy();
+  const sortBy = useSortBy();
   const searchQuery = useSearchQuery();
   const isCarouselOpen = useIsCarouselOpen();
-  const { setGroupBy } = useUIActions();
+  const { setSortBy } = useUIActions();
   const isPhotoSearchActive =
     category === "photos" && searchQuery.trim().length > 0;
   const currentLayout = settingsState.ui.asset_page?.layout ?? "full";
@@ -60,11 +60,11 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     error,
   } = useCurrentTabAssets({
     withGroups: true,
-    groupBy,
+    sortBy,
   });
   const photoSearchView = useCurrentTabPhotoSearchView({
     withGroups: false,
-    groupBy,
+    sortBy,
   });
   const [lastBrowseGroups, setLastBrowseGroups] = useState<AssetGroup[] | null>(
     null,
@@ -268,8 +268,8 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
   return (
     <div>
       <AssetsPageHeader
-        groupBy={groupBy}
-        onGroupByChange={setGroupBy}
+        sortBy={sortBy}
+        onSortByChange={setSortBy}
         onFiltersChange={() => {}}
       />
 

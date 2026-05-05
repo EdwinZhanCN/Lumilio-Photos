@@ -1462,10 +1462,9 @@ WITH page_ids AS MATERIALIZED (
   SELECT
     a.asset_id,
     CASE
-      WHEN $1::text = 'type' THEN a.mime_type
-      ELSE NULL
-    END AS sort_mime,
-    COALESCE(a.taken_time, a.upload_time) AS sort_time
+      WHEN $1::text = 'recently_added' THEN a.upload_time
+      ELSE COALESCE(a.taken_time, a.upload_time)
+    END AS sort_time
   FROM assets a
   WHERE a.is_deleted = false
     AND ($2::text IS NULL OR a.original_filename ILIKE '%' || $2 || '%')
@@ -1545,15 +1544,14 @@ WITH page_ids AS MATERIALIZED (
       )
     )
   ORDER BY
-    CASE WHEN $1::text = 'type' THEN a.mime_type END ASC,
-    COALESCE(a.taken_time, a.upload_time) DESC,
+    sort_time DESC,
     a.asset_id DESC
   LIMIT $23 OFFSET $22
 )
 SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
-ORDER BY p.sort_mime ASC NULLS LAST, p.sort_time DESC, p.asset_id DESC
+ORDER BY p.sort_time DESC, p.asset_id DESC
 `
 
 type GetAssetsUnifiedParams struct {

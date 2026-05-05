@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createAssetsStore } from "./assets.store";
 
 describe("createAssetsStore", () => {
-  it("keeps filters, search, group, and selection isolated per store", () => {
+  it("keeps filters, search, sort, and selection isolated per store", () => {
     const mainStore = createAssetsStore();
     const pickerStore = createAssetsStore({
       selection: {
@@ -15,7 +15,7 @@ describe("createAssetsStore", () => {
       raw: false,
     });
     mainStore.getState().setSearchQuery("raw exclude");
-    mainStore.getState().setGroupBy("flat");
+    mainStore.getState().setSortBy("recently_added");
     mainStore.getState().setSelectionEnabled(true);
     mainStore.getState().selectAsset("asset-main");
 
@@ -24,7 +24,7 @@ describe("createAssetsStore", () => {
       liked: true,
     });
     pickerStore.getState().setSearchQuery("cover");
-    pickerStore.getState().setGroupBy("date");
+    pickerStore.getState().setSortBy("date_captured");
     pickerStore.getState().setSelectionEnabled(true);
     pickerStore.getState().selectAsset("asset-picker");
 
@@ -34,7 +34,7 @@ describe("createAssetsStore", () => {
       liked: undefined,
     });
     expect(mainStore.getState().ui.searchQuery).toBe("raw exclude");
-    expect(mainStore.getState().ui.groupBy).toBe("flat");
+    expect(mainStore.getState().ui.sortBy).toBe("recently_added");
     expect(mainStore.getState().selection.selectionMode).toBe("multiple");
     expect(mainStore.getState().selection.selectedIds.has("asset-main")).toBe(
       true,
@@ -49,7 +49,7 @@ describe("createAssetsStore", () => {
       raw: undefined,
     });
     expect(pickerStore.getState().ui.searchQuery).toBe("cover");
-    expect(pickerStore.getState().ui.groupBy).toBe("date");
+    expect(pickerStore.getState().ui.sortBy).toBe("date_captured");
     expect(pickerStore.getState().selection.selectionMode).toBe("single");
     expect(pickerStore.getState().selection.selectedIds.has("asset-picker")).toBe(
       true,

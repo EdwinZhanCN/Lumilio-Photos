@@ -125,7 +125,7 @@ function Home() {
               placeholderCount={8}
               onItemClick={(asset) => {
                 if (!asset?.asset_id) return;
-                navigate(`/assets/photos/${asset.asset_id}?groupBy=date`);
+                navigate(`/assets/photos/${asset.asset_id}`);
               }}
             />
           </div>
@@ -142,7 +142,7 @@ function Home() {
           points={mapPoints}
           subtitle={mapSubtitle}
           onPointClick={(assetId) => {
-            navigate(`/assets/photos/${assetId}?groupBy=date`);
+            navigate(`/assets/photos/${assetId}`);
           }}
           className="mx-4 mb-8"
         />

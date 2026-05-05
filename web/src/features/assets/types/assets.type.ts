@@ -6,7 +6,7 @@ import type { components } from "@/lib/http-commons";
 // ===== Core Types =====
 export type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
 export type TabType = "photos" | "videos" | "audios";
-export type GroupByType = "date" | "type" | "flat";
+export type SortByType = "date_captured" | "recently_added";
 export interface AssetGroup {
   key: string;
   assets: Asset[];
@@ -24,13 +24,8 @@ export interface AssetViewDefinition {
   search?: {
     query: string;
   };
-  /** Grouping strategy */
-  groupBy?: GroupByType;
-  /** Sorting configuration */
-  sort?: {
-    field?: "taken_time" | "upload_time" | "type";
-    direction: "desc" | "asc";
-  };
+  /** Sorting strategy */
+  sortBy?: SortByType;
   /** Page size for pagination */
   pageSize?: number;
   /** Pagination mode */
@@ -62,7 +57,7 @@ export interface AssetsPageInfo {
 // ===== UI State =====
 export interface UIState {
   currentTab: TabType;
-  groupBy: GroupByType;
+  sortBy: SortByType;
   searchQuery: string;
   isCarouselOpen: boolean;
   activeAssetId?: string;

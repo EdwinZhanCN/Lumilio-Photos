@@ -162,6 +162,7 @@ type AssetDTO struct {
 	Duration         *float64                 `json:"duration"`
 	UploadTime       time.Time                `json:"upload_time"`
 	TakenTime        *time.Time               `json:"taken_time,omitempty"`
+	CaptureOffsetMinutes *int16               `json:"capture_offset_minutes,omitempty"`
 	Rating           *int32                   `json:"rating,omitempty"`
 	Liked            *bool                    `json:"liked,omitempty"`
 	IsDeleted        *bool                    `json:"is_deleted"`
@@ -219,6 +220,7 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 		Duration:         a.Duration,
 		UploadTime:       uploadTime,
 		TakenTime:        takenTime,
+		CaptureOffsetMinutes: a.CaptureOffsetMinutes,
 		Rating:           a.Rating,
 		Liked:            a.Liked,
 		IsDeleted:        a.IsDeleted,
@@ -237,10 +239,10 @@ type AssetListResponseDTO struct {
 }
 
 type QueryAssetsResponseDTO struct {
-	Groups []AssetGroupDTO `json:"groups"`
-	Total  *int            `json:"total,omitempty" example:"150"`
-	Limit  int             `json:"limit" example:"20"`
-	Offset int             `json:"offset" example:"0"`
+	Assets []AssetDTO `json:"assets"`
+	Total  *int       `json:"total,omitempty" example:"150"`
+	Limit  int        `json:"limit" example:"20"`
+	Offset int        `json:"offset" example:"0"`
 }
 
 // FeaturedAssetsResponseDTO represents curated featured photos for home/gallery use.
@@ -417,7 +419,7 @@ type FilterAssetsRequestDTO struct {
 type SearchAssetsRequestDTO struct {
 	Query           string         `json:"query" binding:"required" example:"red bird on branch"`
 	Filter          AssetFilterDTO `json:"filter,omitempty"`
-	GroupBy         string         `json:"group_by,omitempty" example:"type" enums:"date,type,flat"`
+	SortBy          string         `json:"sort_by,omitempty" example:"date_captured" enums:"recently_added,date_captured"`
 	ViewerTimezone  string         `json:"viewer_timezone,omitempty" example:"America/New_York"`
 	Pagination      PaginationDTO  `json:"pagination"`
 	EnhancementMode string         `json:"enhancement_mode,omitempty" example:"auto" enums:"auto,off,only"`
@@ -434,7 +436,7 @@ type SearchTopResultsMetaDTO struct {
 type SearchAssetsResponseDTO struct {
 	TopResults     []AssetDTO              `json:"top_results"`
 	TopResultsMeta SearchTopResultsMetaDTO `json:"top_results_meta"`
-	ResultGroups   []AssetGroupDTO         `json:"result_groups"`
+	Results        []AssetDTO              `json:"results"`
 	ResultsTotal   *int                    `json:"results_total,omitempty" example:"150"`
 	Limit          int                     `json:"limit" example:"20"`
 	Offset         int                     `json:"offset" example:"0"`
@@ -490,7 +492,7 @@ type AssetQueryRequestDTO struct {
 	Query          string         `json:"query,omitempty" example:"sunset photo"`                             // Search keyword (optional)
 	SearchType     string         `json:"search_type,omitempty" example:"filename" enums:"filename,semantic"` // "filename" (default) | "semantic"
 	Filter         AssetFilterDTO `json:"filter,omitempty"`                                                   // Unified filter options
-	GroupBy        string         `json:"group_by,omitempty" example:"type" enums:"date,type,flat"`           // Grouping strategy for server-side sorting
+	SortBy         string         `json:"sort_by,omitempty" example:"date_captured" enums:"recently_added,date_captured"`
 	ViewerTimezone string         `json:"viewer_timezone,omitempty" example:"America/New_York"`
 	Pagination     PaginationDTO  `json:"pagination"` // limit, offset
 }

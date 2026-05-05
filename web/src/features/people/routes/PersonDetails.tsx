@@ -4,7 +4,7 @@ import { Users, UserRound, Check } from "lucide-react";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import {
-  useGroupBy,
+  useSortBy,
   useIsCarouselOpen,
   useUIActions,
 } from "@/features/assets/selectors";
@@ -30,9 +30,9 @@ const PersonAssetsContent = () => {
     assetId: string;
   }>();
   const { scopedRepositoryId } = useWorkingRepository();
-  const groupBy = useGroupBy();
+  const sortBy = useSortBy();
   const isCarouselOpen = useIsCarouselOpen();
-  const { setGroupBy } = useUIActions();
+  const { setSortBy } = useUIActions();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const [isScrolled, setIsScrolled] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -138,8 +138,8 @@ const PersonAssetsContent = () => {
     <div className="flex h-full flex-col relative">
       <div className="sticky top-0 z-30 border-b border-base-200/30 bg-base-100/80 backdrop-blur-md">
         <AssetsPageHeader
-          groupBy={groupBy}
-          onGroupByChange={setGroupBy}
+          sortBy={sortBy}
+          onSortByChange={setSortBy}
           title={displayName}
           icon={<Users className="w-6 h-6 text-primary" />}
         />

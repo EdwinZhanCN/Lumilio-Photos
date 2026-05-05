@@ -9,8 +9,7 @@ export const generateViewKey = (definition: AssetViewDefinition): string => {
     types: definition.types ? [...definition.types].sort() : [],
     filter: definition.filter || {},
     search: definition.search,
-    groupBy: definition.groupBy || "date",
-    sort: definition.sort || { field: "taken_time", direction: "desc" },
+    sortBy: definition.sortBy || "date_captured",
     pageSize: definition.pageSize || 50,
     pagination: definition.pagination || "cursor",
   };
