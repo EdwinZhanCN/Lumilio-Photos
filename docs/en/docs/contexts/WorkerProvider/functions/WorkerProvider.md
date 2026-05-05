@@ -4,7 +4,7 @@
 
 > **WorkerProvider**(`__namedParameters`): `Element`
 
-Defined in: [contexts/WorkerProvider.tsx:38](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2088ad673ecdb728141c4e715f5c611acb4338a/web/src/contexts/WorkerProvider.tsx#L38)
+Defined in: [contexts/WorkerProvider.tsx:38](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/537badf90516b2ec16bedde5572890eea49af02b/web/src/contexts/WorkerProvider.tsx#L38)
 
 ## Parameters
 
