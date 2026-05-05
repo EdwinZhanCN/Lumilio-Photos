@@ -16,7 +16,12 @@ import LoginPage from "@/features/auth/routes/LoginPage.tsx";
 import MFAPage from "@/features/auth/routes/MFAPage.tsx";
 import ChangePasswordPage from "@/features/auth/routes/ChangePasswordPage.tsx";
 import RegisterPage from "@/features/auth/routes/RegisterPage.tsx";
-import { Navigate } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
+
+const LegacyAssetDetailRedirect = () => {
+  const { assetId } = useParams<{ assetId: string }>();
+  return <Navigate to={assetId ? `/assets/${assetId}` : "/assets"} replace />;
+};
 
 export const publicRoutes = [
   {
@@ -82,32 +87,36 @@ export const appRoutes = [
     element: <PersonDetails />,
   },
   {
+    path: "/assets",
+    element: <Assets />,
+  },
+  {
+    path: "/assets/:assetId",
+    element: <Assets />,
+  },
+  {
     path: "/assets/photos",
-    element: <Assets />,
-  },
-  {
-    path: "/assets/",
-    element: <Assets />,
-  },
-  {
-    path: "/assets/photos/:assetId",
-    element: <Assets />,
+    element: <Navigate to="/assets" replace />,
   },
   {
     path: "/assets/videos",
-    element: <Assets />,
-  },
-  {
-    path: "/assets/videos/:assetId",
-    element: <Assets />,
+    element: <Navigate to="/assets" replace />,
   },
   {
     path: "/assets/audios",
-    element: <Assets />,
+    element: <Navigate to="/assets" replace />,
+  },
+  {
+    path: "/assets/photos/:assetId",
+    element: <LegacyAssetDetailRedirect />,
+  },
+  {
+    path: "/assets/videos/:assetId",
+    element: <LegacyAssetDetailRedirect />,
   },
   {
     path: "/assets/audios/:assetId",
-    element: <Assets />,
+    element: <LegacyAssetDetailRedirect />,
   },
   {
     path: "/manage",

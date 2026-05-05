@@ -5,6 +5,7 @@ import { mapFilenameModeToDTO } from "../utils/filterUtils";
 export interface FiltersSlice {
   filters: FiltersState;
   setFiltersEnabled: (enabled: boolean) => void;
+  setFilterType: (type: FiltersState["type"]) => void;
   setFilterRaw: (raw: boolean | undefined) => void;
   setFilterRating: (rating: number | undefined) => void;
   setFilterLiked: (liked: boolean | undefined) => void;
@@ -25,6 +26,7 @@ export const createFiltersSlice: StateCreator<
 > = (set) => ({
   filters: {
     enabled: false,
+    type: undefined,
     raw: undefined,
     rating: undefined,
     liked: undefined,
@@ -38,6 +40,11 @@ export const createFiltersSlice: StateCreator<
   setFiltersEnabled: (enabled) =>
     set((state) => {
       state.filters.enabled = enabled;
+    }),
+
+  setFilterType: (type) =>
+    set((state) => {
+      state.filters.type = type;
     }),
 
   setFilterRaw: (raw) =>
@@ -84,6 +91,7 @@ export const createFiltersSlice: StateCreator<
     set((state) => {
       state.filters = {
         enabled: false,
+        type: undefined,
         raw: undefined,
         rating: undefined,
         liked: undefined,
@@ -97,7 +105,10 @@ export const createFiltersSlice: StateCreator<
 
   batchUpdateFilters: (updates) =>
     set((state) => {
-      Object.assign(state.filters, updates);
+      state.filters = {
+        ...state.filters,
+        ...updates,
+      };
     }),
 });
 
@@ -131,6 +142,7 @@ export const selectActiveFilterCount = (input: FiltersInput): number => {
   if (!state.enabled) return 0;
 
   const activeCriteria = [
+    state.type === "PHOTO" || state.type === "VIDEO",
     state.raw !== undefined,
     state.rating !== undefined,
     state.liked !== undefined,
@@ -154,6 +166,9 @@ export const selectFilterAsAssetFilter = (input: FiltersInput) => {
 
   const filter: any = {};
 
+  if (state.type === "PHOTO" || state.type === "VIDEO") {
+    filter.type = state.type;
+  }
   if (state.raw !== undefined) {
     filter.raw = state.raw;
   }

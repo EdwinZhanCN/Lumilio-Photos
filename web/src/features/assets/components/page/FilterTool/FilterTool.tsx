@@ -9,6 +9,7 @@ import MapComponent from "@/components/MapComponent";
    ========================= */
 
 type FilenameOperator = "contains" | "matches" | "starts_with" | "ends_with";
+type MediaTypeFilter = "PHOTO" | "VIDEO";
 
 export interface FilenameFilter {
   operator: FilenameOperator;
@@ -28,6 +29,7 @@ export interface LocationBBox {
 }
 
 export interface FilterDTO {
+  type?: MediaTypeFilter;
   raw?: boolean;
   rating?: number; // 0-5, where 0 means unrated
   liked?: boolean;
@@ -273,6 +275,49 @@ const RawSection = memo(function RawSection({
           onClick={() => onModeChange("exclude")}
         >
           {t("assets.filterTool.rawSection.exclude")}
+        </button>
+      </div>
+    </SectionShell>
+  );
+});
+
+const TypeSection = memo(function TypeSection({
+  filterDisabled,
+  enabled,
+  onEnabledChange,
+  value,
+  onValueChange,
+}: {
+  filterDisabled: boolean;
+  enabled: boolean;
+  onEnabledChange: (v: boolean) => void;
+  value: MediaTypeFilter;
+  onValueChange: (value: MediaTypeFilter) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <SectionShell
+      title={t("assets.filterTool.typeSection.title")}
+      enabled={enabled}
+      onToggle={onEnabledChange}
+      disabled={filterDisabled}
+    >
+      <div className="join">
+        <button
+          type="button"
+          className={`btn btn-sm join-item ${value === "PHOTO" ? "btn-primary" : "btn-outline"}`}
+          disabled={filterDisabled || !enabled}
+          onClick={() => onValueChange("PHOTO")}
+        >
+          {t("assets.filterTool.typeSection.photo")}
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm join-item ${value === "VIDEO" ? "btn-primary" : "btn-outline"}`}
+          disabled={filterDisabled || !enabled}
+          onClick={() => onValueChange("VIDEO")}
+        >
+          {t("assets.filterTool.typeSection.video")}
         </button>
       </div>
     </SectionShell>
@@ -865,6 +910,14 @@ export default function FilterTool({
     Object.keys(initialDTO).length > 0,
   );
 
+  // Type
+  const [typeEnabled, setTypeEnabled] = useState<boolean>(
+    initialDTO.type === "PHOTO" || initialDTO.type === "VIDEO",
+  );
+  const [typeValue, setTypeValue] = useState<MediaTypeFilter>(
+    initialDTO.type === "VIDEO" ? "VIDEO" : "PHOTO",
+  );
+
   // RAW
   const [rawEnabled, setRawEnabled] = useState<boolean>(
     typeof initialDTO.raw === "boolean",
@@ -935,6 +988,9 @@ export default function FilterTool({
 
     setFilterEnabled(Object.keys(next).length > 0);
 
+    setTypeEnabled(next.type === "PHOTO" || next.type === "VIDEO");
+    setTypeValue(next.type === "VIDEO" ? "VIDEO" : "PHOTO");
+
     setRawEnabled(typeof next.raw === "boolean");
     setRawMode(next.raw === false ? "exclude" : "include");
 
@@ -982,6 +1038,7 @@ export default function FilterTool({
     if (!filterEnabled) return 0;
     let count = 0;
     if (rawEnabled) count++;
+    if (typeEnabled) count++;
     if (ratingEnabled) count++;
     if (likedEnabled) count++;
     if (filenameEnabled && filenameValue.trim() !== "") count++;
@@ -992,6 +1049,7 @@ export default function FilterTool({
     return count;
   }, [
     filterEnabled,
+    typeEnabled,
     rawEnabled,
     ratingEnabled,
     likedEnabled,
@@ -1013,6 +1071,7 @@ export default function FilterTool({
   const buildDTO = useCallback((): FilterDTO => {
     if (!filterEnabled) return {};
     const dto: FilterDTO = {};
+    if (typeEnabled) dto.type = typeValue;
     if (rawEnabled) dto.raw = rawMode === "include";
     if (ratingEnabled) dto.rating = ratingValue;
     if (likedEnabled) dto.liked = likedValue;
@@ -1036,6 +1095,8 @@ export default function FilterTool({
     return dto;
   }, [
     filterEnabled,
+    typeEnabled,
+    typeValue,
     rawEnabled,
     rawMode,
     ratingEnabled,
@@ -1061,30 +1122,7 @@ export default function FilterTool({
   onChangeRef.current = onChange;
 
   // Memoize the filter DTO to prevent unnecessary re-renders
-  const filterDTO = useMemo(
-    () => buildDTO(),
-    [
-      filterEnabled,
-      rawEnabled,
-      rawMode,
-      ratingEnabled,
-      ratingValue,
-      likedEnabled,
-      likedValue,
-      filenameEnabled,
-      filenameOperator,
-      filenameValue,
-      dateEnabled,
-      dateFrom,
-      dateTo,
-      locationEnabled,
-      location,
-      cameraModelEnabled,
-      cameraModel,
-      lensEnabled,
-      lens,
-    ],
-  );
+  const filterDTO = useMemo(() => buildDTO(), [buildDTO]);
 
   // Auto-emit on filter state change if enabled
   useEffect(() => {
@@ -1108,6 +1146,9 @@ export default function FilterTool({
 
   const resetAll = useCallback(() => {
     setFilterEnabled(false);
+
+    setTypeEnabled(false);
+    setTypeValue("PHOTO");
 
     setRawEnabled(false);
     setRawMode("include");
@@ -1196,6 +1237,14 @@ export default function FilterTool({
         <div className="divider my-2" />
 
         {/* Sections */}
+        <TypeSection
+          filterDisabled={!filterEnabled}
+          enabled={typeEnabled}
+          onEnabledChange={setTypeEnabled}
+          value={typeValue}
+          onValueChange={setTypeValue}
+        />
+
         <RawSection
           filterDisabled={!filterEnabled}
           enabled={rawEnabled}

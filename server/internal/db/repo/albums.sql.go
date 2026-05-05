@@ -129,7 +129,7 @@ func (q *Queries) GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAsse
 }
 
 const getAlbumAssets = `-- name: GetAlbumAssets :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = $1 AND a.is_deleted = false
@@ -159,6 +159,10 @@ type GetAlbumAssetsRow struct {
 	RepositoryID         pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Status               []byte                   `db:"status" json:"status"`
 	UpdatedAt            pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
 	Position             *int32                   `db:"position" json:"position"`
 	AddedTime            pgtype.Timestamptz       `db:"added_time" json:"added_time"`
 }
@@ -195,6 +199,10 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
 			&i.Position,
 			&i.AddedTime,
 		); err != nil {
@@ -209,7 +217,7 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 }
 
 const getAlbumAssetsScoped = `-- name: GetAlbumAssetsScoped :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = $1
@@ -249,6 +257,10 @@ type GetAlbumAssetsScopedRow struct {
 	RepositoryID         pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Status               []byte                   `db:"status" json:"status"`
 	UpdatedAt            pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
 	Position             *int32                   `db:"position" json:"position"`
 	AddedTime            pgtype.Timestamptz       `db:"added_time" json:"added_time"`
 }
@@ -285,6 +297,10 @@ func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsSc
 			&i.RepositoryID,
 			&i.Status,
 			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
 			&i.Position,
 			&i.AddedTime,
 		); err != nil {
