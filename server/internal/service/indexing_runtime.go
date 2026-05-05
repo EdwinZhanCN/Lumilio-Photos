@@ -7,7 +7,8 @@ type TaskAvailabilityChecker interface {
 }
 
 var indexingTaskRuntimeRequirements = map[AssetIndexingTask][]string{
-	AssetIndexingTaskClip:    {"clip_image_embed", "clip_classify", "clip_scene_classify"},
+	AssetIndexingTaskClip:    {"clip_image_embed"},
+	AssetIndexingTaskBioCLIP: {"bioclip_classify"},
 	AssetIndexingTaskOCR:     {"ocr"},
 	AssetIndexingTaskCaption: {"vlm_generate"},
 	AssetIndexingTaskFace:    {"face_detect_and_embed"},

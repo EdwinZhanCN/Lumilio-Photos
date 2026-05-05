@@ -38,6 +38,7 @@ type Querier interface {
 	CountPhotoAssetsWithCaptions(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountPhotoAssetsWithEmbeddingType(ctx context.Context, arg CountPhotoAssetsWithEmbeddingTypeParams) (int64, error)
 	CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountPhotoAssetsWithGeneratedTagSource(ctx context.Context, arg CountPhotoAssetsWithGeneratedTagSourceParams) (int64, error)
 	CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	// Count query matching GetPhotoMapPoints.
 	CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error)
@@ -224,6 +225,7 @@ type Querier interface {
 	ListPhotoAssetsMissingCaptions(ctx context.Context, arg ListPhotoAssetsMissingCaptionsParams) ([]Asset, error)
 	ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg ListPhotoAssetsMissingEmbeddingTypeParams) ([]Asset, error)
 	ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error)
+	ListPhotoAssetsMissingGeneratedTagSource(ctx context.Context, arg ListPhotoAssetsMissingGeneratedTagSourceParams) ([]Asset, error)
 	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error)

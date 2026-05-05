@@ -50,8 +50,7 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 	taskAvailability := map[string]bool{
 		"clip_image_embed":      false,
 		"clip_text_embed":       false,
-		"clip_classify":         false,
-		"clip_scene_classify":   false,
+		"bioclip_classify":      false,
 		"ocr":                   false,
 		"vlm_generate":          false,
 		"face_detect_and_embed": false,
@@ -86,13 +85,9 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 					Enabled:   effectiveMLConfig.CLIPEnabled,
 					Available: taskAvailability["clip_text_embed"],
 				},
-				ClipClassify: dto.MLTaskCapabilityDTO{
-					Enabled:   effectiveMLConfig.CLIPEnabled,
-					Available: taskAvailability["clip_classify"],
-				},
-				ClipSceneClassify: dto.MLTaskCapabilityDTO{
-					Enabled:   effectiveMLConfig.CLIPEnabled,
-					Available: taskAvailability["clip_scene_classify"],
+				BioClipClassify: dto.MLTaskCapabilityDTO{
+					Enabled:   effectiveMLConfig.BioCLIPEnabled,
+					Available: taskAvailability["bioclip_classify"],
 				},
 				OCR: dto.MLTaskCapabilityDTO{
 					Enabled:   effectiveMLConfig.OCREnabled,

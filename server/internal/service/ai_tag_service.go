@@ -136,7 +136,7 @@ func normalizeAssetTagSource(source string) string {
 	switch strings.TrimSpace(source) {
 	case "":
 		return ""
-	case "system", "user", "ai":
+	case "system", "user", "ai", "bioclip_classify":
 		return strings.TrimSpace(source)
 	default:
 		return "ai"

@@ -7765,6 +7765,7 @@ export interface components {
             tasks?: components["schemas"]["dto.AssetIndexingTaskSetStatsDTO"];
         };
         "dto.AssetIndexingTaskSetStatsDTO": {
+            bioclip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             caption?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             clip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             face?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
@@ -8093,6 +8094,7 @@ export interface components {
             tasks?: components["schemas"]["dto.MLTaskSetDTO"];
         };
         "dto.MLSettingsDTO": {
+            bioclip_enabled?: boolean;
             caption_enabled?: boolean;
             clip_enabled?: boolean;
             face_enabled?: boolean;
@@ -8103,9 +8105,8 @@ export interface components {
             enabled?: boolean;
         };
         "dto.MLTaskSetDTO": {
-            clip_classify?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+            bioclip_classify?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             clip_image_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
-            clip_scene_classify?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             clip_text_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             face_detect_and_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             ocr?: components["schemas"]["dto.MLTaskCapabilityDTO"];
@@ -8475,6 +8476,7 @@ export interface components {
             liked?: boolean;
         };
         "dto.UpdateMLSettingsDTO": {
+            bioclip_enabled?: boolean;
             caption_enabled?: boolean;
             clip_enabled?: boolean;
             face_enabled?: boolean;

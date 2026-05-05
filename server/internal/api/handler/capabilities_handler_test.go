@@ -64,8 +64,9 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesClipCapabilities(t *testing.
 			},
 			getEffectiveMLFn: func(ctx context.Context) (config.MLConfig, error) {
 				return config.MLConfig{
-					CLIPEnabled: true,
-					OCREnabled:  true,
+					CLIPEnabled:    true,
+					BioCLIPEnabled: true,
+					OCREnabled:     true,
 				}, nil
 			},
 		},
@@ -76,8 +77,7 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesClipCapabilities(t *testing.
 			isTaskAvailableFn: func(taskName string) bool {
 				return taskName == "clip_image_embed" ||
 					taskName == "clip_text_embed" ||
-					taskName == "clip_classify" ||
-					taskName == "clip_scene_classify"
+					taskName == "bioclip_classify"
 			},
 		},
 	)
@@ -100,8 +100,6 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesClipCapabilities(t *testing.
 	require.True(t, response.Data.ML.Tasks.ClipImageEmbed.Available)
 	require.True(t, response.Data.ML.Tasks.ClipTextEmbed.Enabled)
 	require.True(t, response.Data.ML.Tasks.ClipTextEmbed.Available)
-	require.True(t, response.Data.ML.Tasks.ClipClassify.Enabled)
-	require.True(t, response.Data.ML.Tasks.ClipClassify.Available)
-	require.True(t, response.Data.ML.Tasks.ClipSceneClassify.Enabled)
-	require.True(t, response.Data.ML.Tasks.ClipSceneClassify.Available)
+	require.True(t, response.Data.ML.Tasks.BioClipClassify.Enabled)
+	require.True(t, response.Data.ML.Tasks.BioClipClassify.Available)
 }

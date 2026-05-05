@@ -8,6 +8,7 @@ import (
 func TestProcessArgsDecodeLegacyImageDataWithoutPersistingBytes(t *testing.T) {
 	tests := map[string]any{
 		"clip":    &ProcessClipArgs{},
+		"bioclip": &ProcessBioClipArgs{},
 		"ocr":     &ProcessOcrArgs{},
 		"caption": &ProcessCaptionArgs{},
 		"face":    &ProcessFaceArgs{},

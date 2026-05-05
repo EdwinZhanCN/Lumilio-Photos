@@ -30,14 +30,6 @@ func (s *faceWorkerLumenStub) ClipImageEmbed(context.Context, []byte) (*types.Em
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) ClipClassify(context.Context, []byte, int) ([]types.Label, error) {
-	panic("not implemented")
-}
-
-func (s *faceWorkerLumenStub) ClipSceneClassify(context.Context, []byte, int) ([]types.Label, error) {
-	panic("not implemented")
-}
-
 func (s *faceWorkerLumenStub) BioClipClassify(context.Context, []byte, int) ([]types.Label, error) {
 	panic("not implemented")
 }

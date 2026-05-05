@@ -402,6 +402,9 @@ const docTemplate = `{
             },
             "dto.AssetIndexingTaskSetStatsDTO": {
                 "properties": {
+                    "bioclip": {
+                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
+                    },
                     "caption": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     },
@@ -1193,6 +1196,9 @@ const docTemplate = `{
             },
             "dto.MLSettingsDTO": {
                 "properties": {
+                    "bioclip_enabled": {
+                        "type": "boolean"
+                    },
                     "caption_enabled": {
                         "type": "boolean"
                     },
@@ -1221,13 +1227,10 @@ const docTemplate = `{
             },
             "dto.MLTaskSetDTO": {
                 "properties": {
-                    "clip_classify": {
+                    "bioclip_classify": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     },
                     "clip_image_embed": {
-                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
-                    },
-                    "clip_scene_classify": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     },
                     "clip_text_embed": {
@@ -2219,6 +2222,9 @@ const docTemplate = `{
             },
             "dto.UpdateMLSettingsDTO": {
                 "properties": {
+                    "bioclip_enabled": {
+                        "type": "boolean"
+                    },
                     "caption_enabled": {
                         "type": "boolean"
                     },

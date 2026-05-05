@@ -18,6 +18,7 @@ type Purpose string
 
 const (
 	PurposeClip    Purpose = "clip"
+	PurposeBioClip Purpose = "bioclip"
 	PurposeOCR     Purpose = "ocr"
 	PurposeCaption Purpose = "caption"
 	PurposeFace    Purpose = "face"
@@ -76,7 +77,7 @@ func ProcessMLImage(ctx context.Context, fullPath string, originalFilename strin
 
 func mlOptions(purpose Purpose) (bimg.Options, error) {
 	switch purpose {
-	case PurposeClip:
+	case PurposeClip, PurposeBioClip:
 		return bimg.Options{
 			Width:     224,
 			Height:    224,

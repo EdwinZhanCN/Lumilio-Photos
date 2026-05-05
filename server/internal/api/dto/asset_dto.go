@@ -71,6 +71,7 @@ type AssetIndexingTaskStatsDTO struct {
 
 type AssetIndexingTaskSetStatsDTO struct {
 	Clip    AssetIndexingTaskStatsDTO `json:"clip"`
+	BioCLIP AssetIndexingTaskStatsDTO `json:"bioclip"`
 	OCR     AssetIndexingTaskStatsDTO `json:"ocr"`
 	Caption AssetIndexingTaskStatsDTO `json:"caption"`
 	Face    AssetIndexingTaskStatsDTO `json:"face"`
@@ -148,27 +149,27 @@ type UploadProgressResponseDTO struct {
 
 // AssetDTO represents an asset
 type AssetDTO struct {
-	AssetID          string                   `json:"asset_id"`
-	OwnerID          *int32                   `json:"owner_id"`
-	RepositoryID     *string                  `json:"repository_id,omitempty"`
-	Type             string                   `json:"type"`
-	OriginalFilename string                   `json:"original_filename"`
-	StoragePath      string                   `json:"storage_path"`
-	MimeType         string                   `json:"mime_type"`
-	FileSize         int64                    `json:"file_size"`
-	Hash             *string                  `json:"hash"`
-	Width            *int32                   `json:"width"`
-	Height           *int32                   `json:"height"`
-	Duration         *float64                 `json:"duration"`
-	UploadTime       time.Time                `json:"upload_time"`
-	TakenTime        *time.Time               `json:"taken_time,omitempty"`
-	CaptureOffsetMinutes *int16               `json:"capture_offset_minutes,omitempty"`
-	Rating           *int32                   `json:"rating,omitempty"`
-	Liked            *bool                    `json:"liked,omitempty"`
-	IsDeleted        *bool                    `json:"is_deleted"`
-	DeletedAt        *time.Time               `json:"deleted_at,omitempty"`
-	Metadata         dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object" oneOf:"dbtypes.PhotoSpecificMetadata,dbtypes.VideoSpecificMetadata,dbtypes.AudioSpecificMetadata"`
-	Status           []byte                   `json:"status"`
+	AssetID              string                   `json:"asset_id"`
+	OwnerID              *int32                   `json:"owner_id"`
+	RepositoryID         *string                  `json:"repository_id,omitempty"`
+	Type                 string                   `json:"type"`
+	OriginalFilename     string                   `json:"original_filename"`
+	StoragePath          string                   `json:"storage_path"`
+	MimeType             string                   `json:"mime_type"`
+	FileSize             int64                    `json:"file_size"`
+	Hash                 *string                  `json:"hash"`
+	Width                *int32                   `json:"width"`
+	Height               *int32                   `json:"height"`
+	Duration             *float64                 `json:"duration"`
+	UploadTime           time.Time                `json:"upload_time"`
+	TakenTime            *time.Time               `json:"taken_time,omitempty"`
+	CaptureOffsetMinutes *int16                   `json:"capture_offset_minutes,omitempty"`
+	Rating               *int32                   `json:"rating,omitempty"`
+	Liked                *bool                    `json:"liked,omitempty"`
+	IsDeleted            *bool                    `json:"is_deleted"`
+	DeletedAt            *time.Time               `json:"deleted_at,omitempty"`
+	Metadata             dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object" oneOf:"dbtypes.PhotoSpecificMetadata,dbtypes.VideoSpecificMetadata,dbtypes.AudioSpecificMetadata"`
+	Status               []byte                   `json:"status"`
 }
 
 type AssetGroupDTO struct {
@@ -206,27 +207,27 @@ func ToAssetDTO(a repo.Asset) AssetDTO {
 		takenTime = &t
 	}
 	return AssetDTO{
-		AssetID:          id,
-		OwnerID:          a.OwnerID,
-		RepositoryID:     repositoryID,
-		Type:             a.Type,
-		OriginalFilename: a.OriginalFilename,
-		StoragePath:      storagePath,
-		MimeType:         a.MimeType,
-		FileSize:         a.FileSize,
-		Hash:             a.Hash,
-		Width:            a.Width,
-		Height:           a.Height,
-		Duration:         a.Duration,
-		UploadTime:       uploadTime,
-		TakenTime:        takenTime,
+		AssetID:              id,
+		OwnerID:              a.OwnerID,
+		RepositoryID:         repositoryID,
+		Type:                 a.Type,
+		OriginalFilename:     a.OriginalFilename,
+		StoragePath:          storagePath,
+		MimeType:             a.MimeType,
+		FileSize:             a.FileSize,
+		Hash:                 a.Hash,
+		Width:                a.Width,
+		Height:               a.Height,
+		Duration:             a.Duration,
+		UploadTime:           uploadTime,
+		TakenTime:            takenTime,
 		CaptureOffsetMinutes: a.CaptureOffsetMinutes,
-		Rating:           a.Rating,
-		Liked:            a.Liked,
-		IsDeleted:        a.IsDeleted,
-		DeletedAt:        deletedAt,
-		Metadata:         a.SpecificMetadata,
-		Status:           a.Status,
+		Rating:               a.Rating,
+		Liked:                a.Liked,
+		IsDeleted:            a.IsDeleted,
+		DeletedAt:            deletedAt,
+		Metadata:             a.SpecificMetadata,
+		Status:               a.Status,
 	}
 }
 

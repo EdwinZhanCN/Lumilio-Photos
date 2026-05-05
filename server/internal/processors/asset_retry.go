@@ -132,7 +132,7 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	}
 
 	// Enqueue tasks based on queue names (bijection: queue name = task name)
-	// Available queues: metadata_asset, thumbnail_asset, transcode_asset, process_clip, process_ocr, process_caption, process_face
+	// Available queues: metadata_asset, thumbnail_asset, transcode_asset, process_clip, process_bioclip, process_ocr, process_caption, process_face
 
 	// Enqueue metadata_asset if requested (all asset types support metadata)
 	if queueSet["metadata_asset"] {
@@ -194,7 +194,7 @@ func (ap *AssetProcessor) enqueueRetryTasks(
 	// ML tasks are only applicable to photos
 	if assetType == dbtypes.AssetTypePhoto {
 		// Check each ML task queue name
-		if queueSet["process_clip"] || queueSet["process_ocr"] || queueSet["process_caption"] || queueSet["process_face"] {
+		if queueSet["process_clip"] || queueSet["process_bioclip"] || queueSet["process_ocr"] || queueSet["process_caption"] || queueSet["process_face"] {
 			err := ap.retryMLJobs(ctx, asset, queueSet)
 			if err != nil {
 				return fmt.Errorf("enqueue ML retry: %w", err)
@@ -220,6 +220,16 @@ func (ap *AssetProcessor) retryMLJobs(ctx context.Context, asset *repo.Asset, ta
 		}, &river.InsertOpts{Queue: "process_clip"})
 		if err != nil {
 			return fmt.Errorf("enqueue process_clip retry: %w", err)
+		}
+	}
+
+	if taskSet["process_bioclip"] && mlConfig.BioCLIPEnabled {
+		_, err = ap.queueClient.Insert(ctx, jobs.ProcessBioClipArgs{
+			AssetID:           asset.AssetID,
+			PreprocessVersion: jobs.MLPreprocessVersionV1,
+		}, &river.InsertOpts{Queue: "process_bioclip"})
+		if err != nil {
+			return fmt.Errorf("enqueue process_bioclip retry: %w", err)
 		}
 	}
 

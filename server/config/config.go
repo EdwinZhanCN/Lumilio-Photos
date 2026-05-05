@@ -63,13 +63,14 @@ func (c LLMConfig) IsConfigured() bool {
 
 type MLConfig struct {
 	CLIPEnabled    bool `env:"ML_CLIP_ENABLED,default=false"`
+	BioCLIPEnabled bool `env:"ML_BIOCLIP_ENABLED,default=false"`
 	OCREnabled     bool `env:"ML_OCR_ENABLED,default=false"`
 	CaptionEnabled bool `env:"ML_CAPTION_ENABLED,default=false"`
 	FaceEnabled    bool `env:"ML_FACE_ENABLED,default=false"`
 }
 
 func (c MLConfig) HasManualTasksEnabled() bool {
-	return c.CLIPEnabled || c.OCREnabled || c.CaptionEnabled || c.FaceEnabled
+	return c.CLIPEnabled || c.BioCLIPEnabled || c.OCREnabled || c.CaptionEnabled || c.FaceEnabled
 }
 
 func (c MLConfig) HasRuntimeDemand() bool {
@@ -209,6 +210,7 @@ func LoadMLConfig() MLConfig {
 	if isDev {
 		cfg = MLConfig{
 			CLIPEnabled:    false,
+			BioCLIPEnabled: false,
 			OCREnabled:     false,
 			CaptionEnabled: false,
 			FaceEnabled:    false,
@@ -216,6 +218,7 @@ func LoadMLConfig() MLConfig {
 	} else {
 		cfg = MLConfig{
 			CLIPEnabled:    true,
+			BioCLIPEnabled: true,
 			OCREnabled:     true,
 			CaptionEnabled: true,
 			FaceEnabled:    true,
@@ -227,6 +230,12 @@ func LoadMLConfig() MLConfig {
 		cfg.CLIPEnabled = true
 	} else if clipEnabled == "false" {
 		cfg.CLIPEnabled = false
+	}
+
+	if bioClipEnabled := os.Getenv("ML_BIOCLIP_ENABLED"); bioClipEnabled == "true" {
+		cfg.BioCLIPEnabled = true
+	} else if bioClipEnabled == "false" {
+		cfg.BioCLIPEnabled = false
 	}
 
 	if ocrEnabled := os.Getenv("ML_OCR_ENABLED"); ocrEnabled == "true" {

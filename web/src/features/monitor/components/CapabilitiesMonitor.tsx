@@ -62,14 +62,9 @@ export function CapabilitiesMonitor() {
       capability: capabilities.ml.tasks.clipTextEmbed,
     },
     {
-      key: "clip-classify",
-      label: t("settings.serverSettings.taskNames.clipClassify"),
-      capability: capabilities.ml.tasks.clipClassify,
-    },
-    {
-      key: "clip-scene-classify",
-      label: t("settings.serverSettings.taskNames.clipSceneClassify"),
-      capability: capabilities.ml.tasks.clipSceneClassify,
+      key: "bioclip-classify",
+      label: t("settings.serverSettings.taskNames.bioClipClassify"),
+      capability: capabilities.ml.tasks.bioClipClassify,
     },
     {
       key: "ocr",

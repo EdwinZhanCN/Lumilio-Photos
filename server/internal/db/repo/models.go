@@ -328,6 +328,7 @@ type Setting struct {
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	UpdatedBy           *int32             `db:"updated_by" json:"updated_by"`
+	MlBioclipEnabled    bool               `db:"ml_bioclip_enabled" json:"ml_bioclip_enabled"`
 }
 
 type SpeciesPrediction struct {
