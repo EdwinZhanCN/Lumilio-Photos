@@ -49,8 +49,31 @@ func TestScanRepositoryArgsKindAndInsertOpts(t *testing.T) {
 		t.Fatalf("unexpected kind: %s", args.Kind())
 	}
 	opts := args.InsertOpts()
+	if !opts.UniqueOpts.ByArgs {
+		t.Fatalf("expected scan repository jobs to be unique by args")
+	}
 	if opts.UniqueOpts.ByPeriod == 0 {
 		t.Fatalf("expected scan repository jobs to use uniqueness by period")
+	}
+}
+
+func TestDiscoverAssetArgsInsertOptsAreUniqueByPath(t *testing.T) {
+	args := DiscoverAssetArgs{
+		RepositoryID: "11111111-1111-1111-1111-111111111111",
+		RelativePath: "album/photo.jpg",
+		Operation:    DiscoverOperationUpsert,
+		FileName:     "photo.jpg",
+	}
+
+	if args.Kind() != "discover_asset" {
+		t.Fatalf("unexpected kind: %s", args.Kind())
+	}
+	opts := args.InsertOpts()
+	if !opts.UniqueOpts.ByArgs {
+		t.Fatalf("expected discover asset jobs to be unique by args")
+	}
+	if opts.UniqueOpts.ByPeriod == 0 {
+		t.Fatalf("expected discover asset jobs to use uniqueness by period")
 	}
 }
 

@@ -112,6 +112,7 @@ export const useFilterActions = () =>
       setDate: s.setFilterDate,
       setCameraModel: s.setFilterCameraModel,
       setLens: s.setFilterLens,
+      setLocation: s.setFilterLocation,
       resetFilters: s.resetFilters,
       batchUpdateFilters: s.batchUpdateFilters,
     })),

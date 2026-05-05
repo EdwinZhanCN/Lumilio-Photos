@@ -84,6 +84,12 @@ export interface FiltersState {
   };
   camera_model?: string;
   lens?: string;
+  location?: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  };
 }
 
 // ===== Selection State =====

@@ -177,7 +177,7 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 		return err
 	}
 
-	counters, scanErr := s.scanRepository(ctx, repository, args.Force)
+	counters, scanErr := s.scanRepository(ctx, repository, normalizeMode(args.Mode), args.Force)
 	finishedAt := pgtype.Timestamptz{Time: time.Now().UTC(), Valid: true}
 	if scanErr != nil {
 		_, failErr := s.queries.FailRepositoryScanRun(ctx, repo.FailRepositoryScanRunParams{
@@ -256,8 +256,13 @@ func (s *Scanner) ListScanRuns(ctx context.Context, repositoryID string, limit, 
 	})
 }
 
-func (s *Scanner) scanRepository(ctx context.Context, repository repo.Repository, force bool) (scanCounters, error) {
-	diskEntries, skipped, err := walkRepository(repository.Path, time.Duration(s.cfg.SettleSeconds)*time.Second)
+func (s *Scanner) scanRepository(ctx context.Context, repository repo.Repository, mode string, force bool) (scanCounters, error) {
+	settle := time.Duration(s.cfg.SettleSeconds) * time.Second
+	if force || normalizeMode(mode) == jobs.RepositoryScanModeManual {
+		settle = 0
+	}
+
+	diskEntries, skipped, err := walkRepository(repository.Path, settle)
 	counters := scanCounters{skipped: skipped}
 	if err != nil {
 		return counters, err
