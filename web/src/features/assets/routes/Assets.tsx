@@ -45,7 +45,7 @@ const Assets = () => {
         <ErrorFallBack code={500} title={t("assets.errorFallback.something_went_wrong")} {...props} />
       )}
     >
-      <AssetsProvider scopeId="assets:main" persist syncUrl>
+      <AssetsProvider scopeId="assets:main" persist>
         <AssetsContent activeTab={activeTab} />
       </AssetsProvider>
     </ErrorBoundary>

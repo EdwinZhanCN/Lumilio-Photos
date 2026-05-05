@@ -29,21 +29,30 @@ export const createUISlice: StateCreator<
 
   setCurrentTab: (tab) =>
     set((state) => {
+      if (state.ui.currentTab === tab) return;
       state.ui.currentTab = tab;
     }),
 
   setSortBy: (sortBy) =>
     set((state) => {
+      if (state.ui.sortBy === sortBy) return;
       state.ui.sortBy = sortBy;
     }),
 
   setSearchQuery: (query) =>
     set((state) => {
+      if (state.ui.searchQuery === query) return;
       state.ui.searchQuery = query;
     }),
 
   setCarouselOpen: (isOpen) =>
     set((state) => {
+      if (
+        state.ui.isCarouselOpen === isOpen &&
+        (isOpen || state.ui.activeAssetId === undefined)
+      ) {
+        return;
+      }
       state.ui.isCarouselOpen = isOpen;
       // Clear active asset when closing carousel
       if (!isOpen) {
@@ -53,6 +62,12 @@ export const createUISlice: StateCreator<
 
   setActiveAssetId: (assetId) =>
     set((state) => {
+      if (
+        state.ui.activeAssetId === assetId &&
+        state.ui.isCarouselOpen === !!assetId
+      ) {
+        return;
+      }
       state.ui.activeAssetId = assetId;
       // Open carousel when setting active asset, close when clearing asset
       state.ui.isCarouselOpen = !!assetId;
@@ -60,10 +75,13 @@ export const createUISlice: StateCreator<
 
   hydrateUI: (params) =>
     set((state) => {
-      if (params.sortBy) {
+      if (params.sortBy && state.ui.sortBy !== params.sortBy) {
         state.ui.sortBy = params.sortBy;
       }
-      if (params.searchQuery !== undefined) {
+      if (
+        params.searchQuery !== undefined &&
+        state.ui.searchQuery !== params.searchQuery
+      ) {
         state.ui.searchQuery = params.searchQuery;
       }
     }),

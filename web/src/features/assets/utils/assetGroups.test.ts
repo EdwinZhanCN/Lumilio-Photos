@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   flattenAssetGroups,
   formatAssetGroupLabel,
+  groupAssetsBySort,
   mergeAdjacentAssetGroups,
 } from "./assetGroups";
 
@@ -14,7 +15,7 @@ describe("assetGroups", () => {
       ],
       [
         { key: "date:yesterday", assets: [{ asset_id: "c" } as any] },
-        { key: "date:year:2025", assets: [{ asset_id: "d" } as any] },
+        { key: "date:month:2025-03", assets: [{ asset_id: "d" } as any] },
       ],
     );
 
@@ -37,8 +38,30 @@ describe("assetGroups", () => {
     expect(formatAssetGroupLabel("type:image/jpeg", t as any, "en")).toBe(
       "image/jpeg",
     );
-    expect(formatAssetGroupLabel("date:year:2025", t as any, "en")).toBe(
-      "2025",
+    expect(formatAssetGroupLabel("date:month:2025-03", t as any, "en")).toBe(
+      "March 2025",
     );
+  });
+
+  it("groups older assets by month instead of year", () => {
+    const groups = groupAssetsBySort(
+      [
+        {
+          asset_id: "march",
+          taken_time: "2024-03-15T12:00:00.000Z",
+        } as any,
+        {
+          asset_id: "feb",
+          taken_time: "2024-02-15T12:00:00.000Z",
+        } as any,
+      ],
+      "date_captured",
+      new Date("2026-05-05T12:00:00.000Z"),
+    );
+
+    expect(groups.map((group) => group.key)).toEqual([
+      "date:month:2024-03",
+      "date:month:2024-02",
+    ]);
   });
 });

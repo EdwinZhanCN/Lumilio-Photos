@@ -51,9 +51,13 @@ const getScrollParent = (element: HTMLElement | null): HTMLElement | null => {
 
 const readContainerWidth = (element: HTMLElement | null): number => {
   if (!element) return 0;
+  const computedStyle = window.getComputedStyle(element);
+  const paddingLeft = Number.parseFloat(computedStyle.paddingLeft) || 0;
+  const paddingRight = Number.parseFloat(computedStyle.paddingRight) || 0;
   const rectWidth = element.getBoundingClientRect().width;
   const width = rectWidth || element.clientWidth;
-  return Math.max(0, Math.round(width));
+  const contentWidth = width - paddingLeft - paddingRight;
+  return Math.max(0, Math.round(contentWidth));
 };
 
 const JustifiedGallery: React.FC<AssetGalleryProps> = ({
