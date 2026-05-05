@@ -1,8 +1,8 @@
-import { useState, useEffect, useOptimistic, useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { SquarePen, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useSettingsContext } from "@/features/settings";
 import { useAssetActions } from "@/features/assets/hooks/useAssetActions";
+import { useAssetLocationCluster } from "@/features/assets/hooks/useAssetLocationCluster";
 import RatingComponent from "@/components/ui/RatingComponent";
 import InlineTextEditor from "@/components/ui/InlineTextEditor";
 import MapComponent from "@/components/MapComponent";
@@ -14,7 +14,9 @@ interface GeoResponse {
   display_name: string;
 }
 
-const reverseGeocode = async (
+// Legacy browser-side reverse geocode fallback. Keep this dead code around for
+// reference while the product moves to backend-owned cached location labels.
+export const legacyBrowserReverseGeocode = async (
   latitude: number,
   longitude: number,
   region: string = "other",
@@ -64,10 +66,7 @@ export default function PhotoInfoView({
   isLoadingExif,
 }: PhotoInfoViewProps) {
   const { t } = useI18n();
-  const { state: settings } = useSettingsContext();
   const [isPending, startTransition] = useTransition();
-  const [locationName, setLocationName] = useState<string>("");
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const { updateRating, updateDescription } = useAssetActions();
 
   // Use React 19's useOptimistic for better UX
@@ -85,6 +84,20 @@ export default function PhotoInfoView({
   const metadata = isPhotoMetadata(asset.type, asset.specific_metadata)
     ? (asset.specific_metadata as PhotoSpecificMetadata)
     : ({} as PhotoSpecificMetadata);
+  const hasGPS =
+    typeof metadata.gps_latitude === "number" &&
+    typeof metadata.gps_longitude === "number";
+  const locationClusterQuery = useAssetLocationCluster({
+    latitude: hasGPS ? metadata.gps_latitude : undefined,
+    longitude: hasGPS ? metadata.gps_longitude : undefined,
+    repositoryId: asset.repository_id,
+  });
+  const locationCluster = locationClusterQuery.cluster;
+  const locationName =
+    locationCluster?.label ||
+    [locationCluster?.city, locationCluster?.region, locationCluster?.country]
+      .filter(Boolean)
+      .join(", ");
 
   const fmt = (v: any, fallback = "-") =>
     v === undefined || v === null || v === "" ? fallback : v;
@@ -176,39 +189,6 @@ export default function PhotoInfoView({
       }
     });
   };
-
-  // Fetch location name when GPS coordinates are available
-  useEffect(() => {
-    if (metadata.gps_latitude && metadata.gps_longitude) {
-      setIsLoadingLocation(true);
-      const region = settings.ui.region || "other";
-      const language = settings.ui.language || "en";
-
-      reverseGeocode(
-        metadata.gps_latitude,
-        metadata.gps_longitude,
-        region,
-        language,
-      )
-        .then((name) => {
-          setLocationName(name);
-        })
-        .catch((error) => {
-          console.error("Failed to get location name:", error);
-          setLocationName(
-            `${metadata.gps_latitude!.toFixed(4)}, ${metadata.gps_longitude!.toFixed(4)}`,
-          );
-        })
-        .finally(() => {
-          setIsLoadingLocation(false);
-        });
-    }
-  }, [
-    metadata.gps_latitude,
-    metadata.gps_longitude,
-    settings.ui.region,
-    settings.ui.language,
-  ]);
 
   return (
     <div className="absolute top-5 right-5 z-10 font-mono">
@@ -305,7 +285,7 @@ export default function PhotoInfoView({
             </div>
 
             {/* GPS Coordinates and Location */}
-            {(metadata.gps_latitude || metadata.gps_longitude) && (
+            {hasGPS && (
               <div className="rounded bg-base-200 p-3">
                 <div className="text-[10px] uppercase tracking-wider font-bold text-base-content/50 mb-2">
                   {t("assets.basicInfo.location")}
@@ -313,7 +293,7 @@ export default function PhotoInfoView({
 
                 {/* Location Name */}
                 <div className="text-sm mb-2">
-                  {isLoadingLocation ? (
+                  {locationClusterQuery.isLoading ? (
                     <div className="flex items-center gap-2">
                       <span className="loading loading-spinner loading-xs"></span>
                       <span className="text-base-content/50 text-xs">
@@ -329,17 +309,15 @@ export default function PhotoInfoView({
 
                 {/* GPS Coordinates */}
                 <div className="text-[10px] font-mono text-base-content/50">
-                  {metadata.gps_latitude &&
-                    `${t("assets.basicInfo.latitude")}: ${metadata.gps_latitude.toFixed(6)}`}
-                  {metadata.gps_latitude && metadata.gps_longitude && " • "}
-                  {metadata.gps_longitude &&
-                    `${t("assets.basicInfo.longitude")}: ${metadata.gps_longitude.toFixed(6)}`}
+                  {`${t("assets.basicInfo.latitude")}: ${metadata.gps_latitude!.toFixed(6)}`}
+                  {" • "}
+                  {`${t("assets.basicInfo.longitude")}: ${metadata.gps_longitude!.toFixed(6)}`}
                 </div>
               </div>
             )}
 
             {/* Map Display */}
-            {(metadata.gps_latitude || metadata.gps_longitude) && asset && (
+            {hasGPS && asset && (
               <div className="rounded bg-base-200 p-1">
                 <div className="h-48 rounded overflow-hidden">
                   {(() => {

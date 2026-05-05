@@ -10,7 +10,7 @@ DOCKER := docker
 API_URL ?= http://localhost:8080
 VITE_API_URL ?= $(API_URL)
 
-DEV_DB_IMAGE ?= lumilio-dev-db
+DEV_DB_IMAGE ?= lumilio-db:latest
 DEV_DB_CONTAINER ?= lumilio-dev-db
 DEV_DB_VOLUME ?= lumilio-dev-db-data
 DEV_DB_PORT ?= 5433
@@ -59,7 +59,12 @@ env-dev:
 		"REPOSITORY_SCAN_MAX_CONCURRENT_REPOS=1" \
 		"REPOSITORY_SCAN_BATCH_SIZE=500" \
 		"" \
-			"ML_CLIP_ENABLED=false" \
+		"GEOCODING_PROVIDER=disabled" \
+		"GEOCODING_NOMINATIM_ENDPOINT=" \
+		"GEOCODING_LANGUAGE=en" \
+		"GEOCODING_USER_AGENT=Lumilio-Photos/1.0" \
+		"" \
+		"ML_CLIP_ENABLED=false" \
 		"ML_OCR_ENABLED=false" \
 		"ML_CAPTION_ENABLED=false" \
 		"ML_FACE_ENABLED=false" \

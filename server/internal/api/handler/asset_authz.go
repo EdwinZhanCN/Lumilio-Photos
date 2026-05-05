@@ -35,6 +35,17 @@ func applyMapPointOwnershipScope(c *gin.Context, params service.QueryPhotoMapPoi
 	return params
 }
 
+func applyLocationClusterOwnershipScope(c *gin.Context, params service.ListLocationClustersParams) service.ListLocationClustersParams {
+	user, ok := currentUserFromContext(c)
+	if !ok || service.IsAdminRole(user.Role) {
+		return params
+	}
+
+	ownerID := int32(user.UserID)
+	params.OwnerID = &ownerID
+	return params
+}
+
 func (h *AssetHandler) loadAsset(c *gin.Context, assetID uuid.UUID) (*repo.Asset, bool) {
 	asset, err := h.assetService.GetAsset(c.Request.Context(), assetID)
 	if err != nil {

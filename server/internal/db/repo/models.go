@@ -57,6 +57,10 @@ type Asset struct {
 	RepositoryID         pgtype.UUID              `db:"repository_id" json:"repository_id"`
 	Status               []byte                   `db:"status" json:"status"`
 	UpdatedAt            pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	GpsLatitude          *float64                 `db:"gps_latitude" json:"gps_latitude"`
+	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
+	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
+	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
 }
 
 type AssetTag struct {
@@ -192,6 +196,32 @@ type FaceResult struct {
 	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type LocationCluster struct {
+	ClusterID         pgtype.UUID        `db:"cluster_id" json:"cluster_id"`
+	OwnerID           int32              `db:"owner_id" json:"owner_id"`
+	RepositoryID      pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	Geohash           string             `db:"geohash" json:"geohash"`
+	Precision         int32              `db:"precision" json:"precision"`
+	CentroidLatitude  float64            `db:"centroid_latitude" json:"centroid_latitude"`
+	CentroidLongitude float64            `db:"centroid_longitude" json:"centroid_longitude"`
+	PhotoCount        int32              `db:"photo_count" json:"photo_count"`
+	Label             *string            `db:"label" json:"label"`
+	Country           *string            `db:"country" json:"country"`
+	Region            *string            `db:"region" json:"region"`
+	City              *string            `db:"city" json:"city"`
+	Provider          *string            `db:"provider" json:"provider"`
+	GeocodeStatus     string             `db:"geocode_status" json:"geocode_status"`
+	GeocodedAt        pgtype.Timestamptz `db:"geocoded_at" json:"geocoded_at"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type LocationClusterAsset struct {
+	ClusterID pgtype.UUID        `db:"cluster_id" json:"cluster_id"`
+	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 // OCR recognition results main table, storing OCR processing summary for each image
 type OcrResult struct {
 	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
@@ -265,6 +295,21 @@ type RepositoryScanRun struct {
 	DeletedCount    int64              `db:"deleted_count" json:"deleted_count"`
 	SkippedCount    int64              `db:"skipped_count" json:"skipped_count"`
 	Error           *string            `db:"error" json:"error"`
+}
+
+type ReverseGeocodeCache struct {
+	CacheKey    string             `db:"cache_key" json:"cache_key"`
+	Provider    string             `db:"provider" json:"provider"`
+	Language    string             `db:"language" json:"language"`
+	Latitude    float64            `db:"latitude" json:"latitude"`
+	Longitude   float64            `db:"longitude" json:"longitude"`
+	Label       *string            `db:"label" json:"label"`
+	Country     *string            `db:"country" json:"country"`
+	Region      *string            `db:"region" json:"region"`
+	City        *string            `db:"city" json:"city"`
+	RawResponse []byte             `db:"raw_response" json:"raw_response"`
+	QueriedAt   pgtype.Timestamptz `db:"queried_at" json:"queried_at"`
+	ExpiresAt   pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
 
 type Setting struct {

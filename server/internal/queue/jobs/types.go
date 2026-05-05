@@ -77,6 +77,21 @@ type ReindexAssetsArgs struct {
 
 func (ReindexAssetsArgs) Kind() string { return "reindex_assets" }
 
+// RebuildLocationClustersArgs rebuilds persisted geohash location clusters.
+type RebuildLocationClustersArgs struct {
+	RepositoryID *string `json:"repositoryId,omitempty" river:"unique"`
+	OwnerID      *int32  `json:"ownerId,omitempty" river:"unique"`
+}
+
+func (RebuildLocationClustersArgs) Kind() string { return "rebuild_location_clusters" }
+
+func (RebuildLocationClustersArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{UniqueOpts: river.UniqueOpts{
+		ByArgs:   true,
+		ByPeriod: 1 * time.Minute,
+	}}
+}
+
 const (
 	RepositoryScanModePeriodic = "periodic"
 	RepositoryScanModeManual   = "manual"

@@ -28,3 +28,15 @@ func TestParseDateTimeWithCaptureOffset_UsesEmbeddedOffset(t *testing.T) {
 	require.Equal(t, int16(-240), *offsetMinutes)
 	require.Equal(t, time.Date(2024, time.April, 11, 20, 0, 26, 0, time.UTC), parsedTime)
 }
+
+func TestParsePhotoMetadataPreservesZeroGPSCoordinates(t *testing.T) {
+	metadata := parsePhotoMetadata(map[string]string{
+		"GPSLatitude":  "0",
+		"GPSLongitude": "0",
+	})
+
+	require.NotNil(t, metadata.GPSLatitude)
+	require.NotNil(t, metadata.GPSLongitude)
+	require.Equal(t, 0.0, *metadata.GPSLatitude)
+	require.Equal(t, 0.0, *metadata.GPSLongitude)
+}

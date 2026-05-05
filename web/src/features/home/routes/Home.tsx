@@ -11,6 +11,7 @@ import SpacetimeMapCard from "../components/SpacetimeMapCard";
 import InfoCard from "../components/InfoCard";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
+import { useLocationClusters } from "../hooks/useLocationClusters";
 import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
 import { useWorkingRepository } from "@/features/settings";
 
@@ -51,6 +52,10 @@ function Home() {
     isFetchingNextPage: isMapFetchingNextPage,
     hasNextPage: mapHasNextPage,
   } = useMapPhotoAssets({ repositoryId: scopedRepositoryId });
+  const {
+    loadedClusters,
+    totalClusters,
+  } = useLocationClusters({ repositoryId: scopedRepositoryId });
 
   const mapSubtitle =
     isMapLoading && mapLoadedPhotos === 0
@@ -125,7 +130,7 @@ function Home() {
               placeholderCount={8}
               onItemClick={(asset) => {
                 if (!asset?.asset_id) return;
-                navigate(`/assets/photos/${asset.asset_id}`);
+                navigate(`/assets/${asset.asset_id}`);
               }}
             />
           </div>
@@ -141,8 +146,17 @@ function Home() {
         <SpacetimeMapCard
           points={mapPoints}
           subtitle={mapSubtitle}
+          headerRight={
+            loadedClusters > 0 ? (
+              <span className="badge badge-outline">
+                {t("home.map.placesCount", {
+                  count: totalClusters ?? loadedClusters,
+                })}
+              </span>
+            ) : undefined
+          }
           onPointClick={(assetId) => {
-            navigate(`/assets/photos/${assetId}`);
+            navigate(`/assets/${assetId}`);
           }}
           className="mx-4 mb-8"
         />

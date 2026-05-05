@@ -97,6 +97,7 @@
             "title": "时空轨迹",
             "loading": "正在加载地图数据...",
             "loadedStatus": "定位照片 {{pointsCount}} 张 / 已加载 {{loadedCount}}{{hasTotal, select, true { / 总计 {{totalCount}}} other {}}}{{loadingMore, select, true {（继续加载中）} other {}}}",
+            "placesCount": "{{count}} 个地点",
             "empty": "暂无带地理位置的照片。"
         },
         "info": {
@@ -238,6 +239,14 @@
         "errorFallback": {
             "something_went_wrong": "出了些问题"
         },
+        "all": {
+            "title": "资产",
+            "end_of_results": "已无更多结果。",
+            "locating_asset": "正在定位资产...",
+            "loading_more_data": "正在加载更多数据以查找资产...",
+            "asset_not_available": "资产可能在当前视图中不可用。",
+            "loading_assets": "正在加载资产..."
+        },
         "photos": {
             "title": "照片",
             "end_of_results": "已无更多结果。",
@@ -321,6 +330,11 @@
         "filterTool": {
             "sectionShell": {
                 "enable": "启用"
+            },
+            "typeSection": {
+                "title": "类型",
+                "photo": "照片",
+                "video": "视频"
             },
             "rawSection": {
                 "title": "RAW",

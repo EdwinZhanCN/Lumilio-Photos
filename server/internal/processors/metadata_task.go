@@ -3,6 +3,7 @@ package processors
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"go.uber.org/zap"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
@@ -95,10 +97,43 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 		sm, err := dbtypes.MarshalMeta(meta)
 		if err == nil {
 			_ = ap.assetService.UpdateAssetMetadata(ctx, asset.AssetID.Bytes, sm)
+			if hasValidLocationGPS(meta.GPSLatitude, meta.GPSLongitude) {
+				ap.enqueueLocationClusterRebuild(ctx, asset)
+			}
 		}
 	}
 
 	return nil
+}
+
+func (ap *AssetProcessor) enqueueLocationClusterRebuild(ctx context.Context, asset *repo.Asset) {
+	if ap == nil || ap.queueClient == nil || asset == nil || !asset.RepositoryID.Valid {
+		return
+	}
+	repositoryID := asset.RepositoryID.String()
+	args := jobs.RebuildLocationClustersArgs{
+		RepositoryID: &repositoryID,
+		OwnerID:      asset.OwnerID,
+	}
+	opts := args.InsertOpts()
+	opts.Queue = "rebuild_location_clusters"
+	if _, err := ap.queueClient.Insert(ctx, args, &opts); err != nil && ap.logger != nil {
+		ap.logger.Warn("failed to enqueue location cluster rebuild", zap.Error(err))
+	}
+}
+
+func hasValidLocationGPS(latitude, longitude *float64) bool {
+	if latitude == nil || longitude == nil {
+		return false
+	}
+	lat := *latitude
+	lng := *longitude
+	return !math.IsNaN(lat) &&
+		!math.IsInf(lat, 0) &&
+		!math.IsNaN(lng) &&
+		!math.IsInf(lng, 0) &&
+		lat >= -90 && lat <= 90 &&
+		lng >= -180 && lng <= 180
 }
 
 // loadAssetAndRepo loads asset and repository by asset ID.
