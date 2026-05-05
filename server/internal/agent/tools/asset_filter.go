@@ -172,7 +172,7 @@ func sendFilterSuccessEvent(ctx context.Context, deps *core.ToolDependencies, ex
 			Payload:     filterDTO,
 			Rendering: &core.RenderingConfig{
 				Component: core.ComponentJustifiedGallery,
-				Config:    &core.JustifiedGalleryConfig{GroupBy: "date"},
+				Config:    &core.JustifiedGalleryConfig{SortBy: "date_captured"},
 			},
 		},
 	}

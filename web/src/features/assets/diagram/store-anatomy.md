@@ -30,18 +30,18 @@ classDiagram
         <<Slice>>
         %% State
         +TabType currentTab
-        +GroupByType groupBy
+        +SortByType sortBy
         +string searchQuery
         +boolean isCarouselOpen
         +string activeAssetId
         
         %% Actions
         +setCurrentTab(tab)
-        +setGroupBy(groupBy)
+        +setSortBy(sortBy)
         +setSearchQuery(query)
         +setCarouselOpen(isOpen)
         +setActiveAssetId(id)
-        +hydrateUIFromURL(params)
+        +hydrateUI(params)
     }
     
     %% ========== FILTERS SLICE ==========
@@ -101,7 +101,7 @@ classDiagram
         
         %% UI
         +useCurrentTab()
-        +useGroupBy()
+        +useSortBy()
         +useSearchQuery()
         +useIsCarouselOpen()
         +useActiveAssetId()

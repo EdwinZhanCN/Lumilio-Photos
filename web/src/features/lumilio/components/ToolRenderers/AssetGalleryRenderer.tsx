@@ -105,7 +105,7 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
     // Default to all types to prevent "missing query parameters" error from backend
     // when filter is empty (which triggers listAssets instead of filterAssets)
     types: ["photos", "videos", "audios"],
-    groupBy: "date",
+    sortBy: "date_captured",
     pageSize: 50,
   }), [filter]);
 

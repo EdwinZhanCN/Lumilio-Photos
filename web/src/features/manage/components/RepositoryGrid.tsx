@@ -39,7 +39,7 @@ function useRepositoryAssetCount(repositoryId: string) {
         limit: 1,
         offset: 0,
       },
-      group_by: "flat" as const,
+      sort_by: "recently_added" as const,
       viewer_timezone: getViewerTimeZone(),
     }),
     [repositoryId],

@@ -30,7 +30,7 @@ import {
   useSelection,
   useBulkAssetOperations,
 } from "@/features/assets/hooks/useSelection";
-import { GroupByType } from "@/features/assets/types/assets.type";
+import { SortByType } from "@/features/assets/types/assets.type";
 import {
   useCallback,
   useMemo,
@@ -54,16 +54,16 @@ import { useWorkingRepository } from "@/features/settings";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 
 interface AssetsPageHeaderProps {
-  groupBy: GroupByType;
-  onGroupByChange: (groupBy: GroupByType) => void;
+  sortBy: SortByType;
+  onSortByChange: (sortBy: SortByType) => void;
   onFiltersChange?: (filters: FilterDTO) => void;
   title?: string;
   icon?: ReactNode;
 }
 
 const AssetsPageHeader = ({
-  groupBy,
-  onGroupByChange,
+  sortBy,
+  onSortByChange,
   onFiltersChange,
   title,
   icon,
@@ -72,6 +72,14 @@ const AssetsPageHeader = ({
   const selection = useSelection();
   const bulkOps = useBulkAssetOperations();
   const showMessage = useMessage();
+  const activeSortByLabel = useMemo(() => {
+    switch (sortBy) {
+      case "recently_added":
+        return t("assets.assetsPageHeader.sortByOptions.recentlyAdded");
+      default:
+        return t("assets.assetsPageHeader.sortByOptions.dateCaptured");
+    }
+  }, [sortBy, t]);
 
   // Selectors & Actions
   const filters = useFilterState();
@@ -366,7 +374,7 @@ const AssetsPageHeader = ({
           </div>
         )}
 
-        {/* Group By Dropdown */}
+        {/* Sort By Dropdown */}
         <div className="dropdown">
           <div
             tabIndex={0}
@@ -374,7 +382,7 @@ const AssetsPageHeader = ({
             className="btn btn-sm btn-soft btn-info"
           >
             <FunnelIcon className="size-4" />
-            {t("assets.assetsPageHeader.groupBy", { groupBy })}
+            {t("assets.assetsPageHeader.sortBy", { sortBy: activeSortByLabel })}
           </div>
           <ul
             tabIndex={0}
@@ -382,26 +390,18 @@ const AssetsPageHeader = ({
           >
             <li>
               <a
-                onClick={() => onGroupByChange("date")}
-                className={groupBy === "date" ? "active" : ""}
+                onClick={() => onSortByChange("date_captured")}
+                className={sortBy === "date_captured" ? "active" : ""}
               >
-                {t("assets.assetsPageHeader.groupByOptions.date")}
+                {t("assets.assetsPageHeader.sortByOptions.dateCaptured")}
               </a>
             </li>
             <li>
               <a
-                onClick={() => onGroupByChange("type")}
-                className={groupBy === "type" ? "active" : ""}
+                onClick={() => onSortByChange("recently_added")}
+                className={sortBy === "recently_added" ? "active" : ""}
               >
-                {t("assets.assetsPageHeader.groupByOptions.type")}
-              </a>
-            </li>
-            <li>
-              <a
-                onClick={() => onGroupByChange("flat")}
-                className={groupBy === "flat" ? "active" : ""}
-              >
-                {t("assets.assetsPageHeader.groupByOptions.flat")}
+                {t("assets.assetsPageHeader.sortByOptions.recentlyAdded")}
               </a>
             </li>
           </ul>

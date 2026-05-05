@@ -4,10 +4,10 @@ import type {
   UseInfiniteQueryResult,
 } from "@tanstack/react-query";
 import { useAssetsStore } from "@/features/assets/assets.store";
-import { useGroupBy } from "@/features/assets/selectors";
+import { useSortBy } from "@/features/assets/selectors";
 import {
-  AssetGroup,
   AssetsViewResult,
+  SortByType,
   TabType,
   ViewDefinitionOptions,
 } from "@/features/assets/types/assets.type";
@@ -22,9 +22,9 @@ import type { Asset } from "@/lib/assets/types";
 import { useWorkingRepository } from "@/features/settings";
 import {
   flattenAssetGroups,
+  groupAssetsBySort,
   getViewerTimeZone,
   mergeAdjacentAssetGroups,
-  normalizeAssetGroups,
 } from "@/features/assets/utils/assetGroups";
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
@@ -37,7 +37,7 @@ type PersonAssetsApiResult = Omit<
   data?: QueryAssetsResponse;
 };
 
-const countGroupedAssets = (groups: AssetGroup[]) => flattenAssetGroups(groups).length;
+const countAssets = (assets: Asset[]) => assets.length;
 
 const getApiMimeTypes = (
   tabTypes: TabType[],
@@ -62,20 +62,21 @@ const getApiMimeTypes = (
 const normalizeVisibleAssets = (assets: Asset[]): Asset[] =>
   assets.filter((asset) => !asset.is_deleted && !asset.deleted_at);
 
-const normalizeSearchGroupBy = (groupBy?: string): "date" | "type" | "flat" => {
-  switch (groupBy) {
-    case "type":
-    case "flat":
-      return groupBy;
+const normalizeSearchSortBy = (
+  sortBy?: SortByType,
+): "recently_added" | "date_captured" => {
+  switch (sortBy) {
+    case "recently_added":
+      return sortBy;
     default:
-      return "date";
+      return "date_captured";
   }
 };
 
 export function usePersonAssetsView(
   personId: number,
   options: ViewDefinitionOptions & {
-    groupBy?: string;
+    sortBy?: SortByType;
     pageSize?: number;
   } = {},
 ): AssetsViewResult {
@@ -83,10 +84,10 @@ export function usePersonAssetsView(
   const filtersState = useAssetsStore((state) => state.filters);
   const currentTab = useAssetsStore((state) => state.ui.currentTab);
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
-  const uiGroupBy = useGroupBy();
+  const uiSortBy = useSortBy();
   const { autoFetch = true, disabled = false, withGroups = false } = options;
   const pageSize = options.pageSize ?? 50;
-  const groupBy = options.groupBy ?? uiGroupBy;
+  const sortBy = options.sortBy ?? uiSortBy;
   const viewerTimeZone = useMemo(() => getViewerTimeZone(), []);
 
   const effectiveFilter = useMemo(() => {
@@ -119,7 +120,7 @@ export function usePersonAssetsView(
         limit: pageSize,
         offset: 0,
       },
-      group_by: normalizeSearchGroupBy(groupBy),
+      sort_by: normalizeSearchSortBy(sortBy),
       viewer_timezone: viewerTimeZone,
     };
 
@@ -128,18 +129,18 @@ export function usePersonAssetsView(
     }
 
     return request;
-  }, [effectiveFilter, groupBy, pageSize, searchQuery, viewerTimeZone]);
+  }, [effectiveFilter, pageSize, searchQuery, sortBy, viewerTimeZone]);
 
   const viewKey = useMemo(
     () =>
       `person:${personId}:${generateViewKey({
         types: [currentTab],
         filter: effectiveFilter,
-        groupBy: groupBy as any,
+        sortBy,
         search: searchQuery.trim() ? { query: searchQuery.trim() } : undefined,
         pageSize,
       })}`,
-    [currentTab, effectiveFilter, groupBy, pageSize, personId, searchQuery],
+    [currentTab, effectiveFilter, pageSize, personId, searchQuery, sortBy],
   );
 
   const query = $api.useInfiniteQuery(
@@ -159,10 +160,10 @@ export function usePersonAssetsView(
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const responseData = (lastPage as PersonAssetsApiResult | undefined)?.data;
-        const pageGroups = normalizeAssetGroups(responseData?.groups);
+        const pageAssets = normalizeVisibleAssets(responseData?.assets ?? []);
         const total = responseData?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = countGroupedAssets(pageGroups);
+        const loadedCount = countAssets(pageAssets);
         const hasMore =
           typeof total === "number"
             ? offset + loadedCount < total
@@ -180,17 +181,18 @@ export function usePersonAssetsView(
     return responsePages.map((page, index) => {
       const offset = Number(pageParams[index] ?? 0) || 0;
       const responseData = page?.data;
-      const groups = normalizeAssetGroups(responseData?.groups);
+      const assets = normalizeVisibleAssets(responseData?.assets ?? []);
+      const groups = groupAssetsBySort(assets, sortBy);
       const total = responseData?.total;
-      const loadedCount = countGroupedAssets(groups);
+      const loadedCount = countAssets(assets);
       const hasMore =
         typeof total === "number"
           ? offset + loadedCount < total
           : loadedCount >= pageSize;
 
-      return { groups, offset, total, hasMore };
+      return { assets, groups, offset, total, hasMore };
     });
-  }, [pageSize, query.data?.pageParams, query.dataUpdatedAt]);
+  }, [pageSize, query.data?.pageParams, query.dataUpdatedAt, sortBy]);
 
   const groups = useMemo(
     () => mergeAdjacentAssetGroups(...pages.map((page) => page.groups)),

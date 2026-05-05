@@ -180,7 +180,7 @@ func TestPeopleHandlerListPersonAssetsInjectsPersonScope(t *testing.T) {
 			RepositoryID: strPtr("550e8400-e29b-41d4-a716-446655440000"),
 		},
 		Pagination: dto.PaginationDTO{Limit: 20, Offset: 0},
-		GroupBy:    "date",
+		SortBy:     "date_captured",
 	})
 	require.NoError(t, err)
 

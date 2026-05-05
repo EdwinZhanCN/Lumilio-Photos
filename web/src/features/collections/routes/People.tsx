@@ -50,7 +50,7 @@ function PeopleContent() {
             repositoryId={scopedRepositoryId}
             onPersonClick={(person) => {
               if (!person?.person_id) return;
-              navigate(`/people/${person.person_id}?groupBy=date`);
+              navigate(`/people/${person.person_id}`);
             }}
           />
 

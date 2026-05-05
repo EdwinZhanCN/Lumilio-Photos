@@ -454,10 +454,9 @@ WITH page_ids AS MATERIALIZED (
   SELECT
     a.asset_id,
     CASE
-      WHEN sqlc.narg('sort_by')::text = 'type' THEN a.mime_type
-      ELSE NULL
-    END AS sort_mime,
-    COALESCE(a.taken_time, a.upload_time) AS sort_time
+      WHEN sqlc.narg('sort_by')::text = 'recently_added' THEN a.upload_time
+      ELSE COALESCE(a.taken_time, a.upload_time)
+    END AS sort_time
   FROM assets a
   WHERE a.is_deleted = false
     AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
@@ -537,15 +536,14 @@ WITH page_ids AS MATERIALIZED (
       )
     )
   ORDER BY
-    CASE WHEN sqlc.narg('sort_by')::text = 'type' THEN a.mime_type END ASC,
-    COALESCE(a.taken_time, a.upload_time) DESC,
+    sort_time DESC,
     a.asset_id DESC
   LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
 )
 SELECT a.*
 FROM page_ids p
 JOIN assets a ON a.asset_id = p.asset_id
-ORDER BY p.sort_mime ASC NULLS LAST, p.sort_time DESC, p.asset_id DESC;
+ORDER BY p.sort_time DESC, p.asset_id DESC;
 
 -- name: CountAssetsUnified :one
 -- Count query matching GetAssetsUnified WHERE clause

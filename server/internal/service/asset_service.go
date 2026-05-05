@@ -117,7 +117,7 @@ type QueryAssetsParams struct {
 	LocationSouth    *float64
 	LocationEast     *float64
 	LocationWest     *float64
-	GroupBy          string // Grouping strategy for server-side sorting (e.g., "type")
+	SortBy           string
 	Limit            int
 	Offset           int
 }
@@ -1301,16 +1301,15 @@ func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAsset
 		queryPtr = &params.Query
 	}
 
-	// Determine SortBy based on GroupBy for server-side sorting
-	// This ensures that when grouping by type, all assets of the same type
-	// are returned together, maintaining group continuity across pagination
 	var sortByPtr *string
-	if params.GroupBy == "type" {
-		s := "type"
+	switch params.SortBy {
+	case "recently_added":
+		s := "recently_added"
+		sortByPtr = &s
+	case "date_captured":
+		s := "date_captured"
 		sortByPtr = &s
 	}
-	// For other GroupBy values (e.g., "date", "flat", or empty),
-	// sortByPtr remains nil, which defaults to time-based sorting in SQL
 
 	// Get total count
 	countResult, err := s.queries.CountAssetsUnified(ctx, repo.CountAssetsUnifiedParams{

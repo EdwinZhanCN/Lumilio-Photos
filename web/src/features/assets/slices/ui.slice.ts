@@ -1,15 +1,15 @@
 import { StateCreator } from "zustand";
-import { GroupByType, TabType, UIState } from "../types/assets.type";
+import { SortByType, TabType, UIState } from "../types/assets.type";
 
 export interface UISlice {
   ui: UIState;
   setCurrentTab: (tab: TabType) => void;
-  setGroupBy: (groupBy: GroupByType) => void;
+  setSortBy: (sortBy: SortByType) => void;
   setSearchQuery: (query: string) => void;
   setCarouselOpen: (isOpen: boolean) => void;
   setActiveAssetId: (assetId: string | undefined) => void;
-  hydrateUIFromURL: (
-    params: Partial<Pick<UIState, "groupBy" | "searchQuery">>,
+  hydrateUI: (
+    params: Partial<Pick<UIState, "sortBy" | "searchQuery">>,
   ) => void;
 }
 
@@ -21,7 +21,7 @@ export const createUISlice: StateCreator<
 > = (set) => ({
   ui: {
     currentTab: "photos",
-    groupBy: "date",
+    sortBy: "date_captured",
     searchQuery: "",
     isCarouselOpen: false,
     activeAssetId: undefined,
@@ -32,9 +32,9 @@ export const createUISlice: StateCreator<
       state.ui.currentTab = tab;
     }),
 
-  setGroupBy: (groupBy) =>
+  setSortBy: (sortBy) =>
     set((state) => {
-      state.ui.groupBy = groupBy;
+      state.ui.sortBy = sortBy;
     }),
 
   setSearchQuery: (query) =>
@@ -58,10 +58,10 @@ export const createUISlice: StateCreator<
       state.ui.isCarouselOpen = !!assetId;
     }),
 
-  hydrateUIFromURL: (params) =>
+  hydrateUI: (params) =>
     set((state) => {
-      if (params.groupBy) {
-        state.ui.groupBy = params.groupBy;
+      if (params.sortBy) {
+        state.ui.sortBy = params.sortBy;
       }
       if (params.searchQuery !== undefined) {
         state.ui.searchQuery = params.searchQuery;
@@ -73,7 +73,7 @@ export const createUISlice: StateCreator<
 export const selectCurrentTab = (state: UISlice): TabType =>
   state.ui.currentTab;
 
-export const selectGroupBy = (state: UISlice): GroupByType => state.ui.groupBy;
+export const selectSortBy = (state: UISlice): SortByType => state.ui.sortBy;
 
 export const selectSearchQuery = (state: UISlice): string =>
   state.ui.searchQuery;

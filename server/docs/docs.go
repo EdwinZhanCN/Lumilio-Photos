@@ -236,6 +236,9 @@ const docTemplate = `{
                     "asset_id": {
                         "type": "string"
                     },
+                    "capture_offset_minutes": {
+                        "type": "integer"
+                    },
                     "deleted_at": {
                         "type": "string"
                     },
@@ -381,22 +384,6 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "dto.AssetGroupDTO": {
-                "properties": {
-                    "assets": {
-                        "items": {
-                            "$ref": "#/components/schemas/dto.AssetDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    },
-                    "key": {
-                        "example": "date:today",
-                        "type": "string"
-                    }
-                },
-                "type": "object"
-            },
             "dto.AssetIndexingStatsResponseDTO": {
                 "properties": {
                     "photo_total": {
@@ -525,16 +512,6 @@ const docTemplate = `{
                     "filter": {
                         "$ref": "#/components/schemas/dto.AssetFilterDTO"
                     },
-                    "group_by": {
-                        "description": "Grouping strategy for server-side sorting",
-                        "enum": [
-                            "date",
-                            "type",
-                            "flat"
-                        ],
-                        "example": "type",
-                        "type": "string"
-                    },
                     "pagination": {
                         "$ref": "#/components/schemas/dto.PaginationDTO"
                     },
@@ -550,6 +527,14 @@ const docTemplate = `{
                             "semantic"
                         ],
                         "example": "filename",
+                        "type": "string"
+                    },
+                    "sort_by": {
+                        "enum": [
+                            "recently_added",
+                            "date_captured"
+                        ],
+                        "example": "date_captured",
                         "type": "string"
                     },
                     "viewer_timezone": {
@@ -1431,9 +1416,9 @@ const docTemplate = `{
             },
             "dto.QueryAssetsResponseDTO": {
                 "properties": {
-                    "groups": {
+                    "assets": {
                         "items": {
-                            "$ref": "#/components/schemas/dto.AssetGroupDTO"
+                            "$ref": "#/components/schemas/dto.AssetDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
@@ -1870,20 +1855,19 @@ const docTemplate = `{
                     "filter": {
                         "$ref": "#/components/schemas/dto.AssetFilterDTO"
                     },
-                    "group_by": {
-                        "enum": [
-                            "date",
-                            "type",
-                            "flat"
-                        ],
-                        "example": "type",
-                        "type": "string"
-                    },
                     "pagination": {
                         "$ref": "#/components/schemas/dto.PaginationDTO"
                     },
                     "query": {
                         "example": "red bird on branch",
+                        "type": "string"
+                    },
+                    "sort_by": {
+                        "enum": [
+                            "recently_added",
+                            "date_captured"
+                        ],
+                        "example": "date_captured",
                         "type": "string"
                     },
                     "top_results_limit": {
@@ -1912,9 +1896,9 @@ const docTemplate = `{
                         "example": 0,
                         "type": "integer"
                     },
-                    "result_groups": {
+                    "results": {
                         "items": {
-                            "$ref": "#/components/schemas/dto.AssetGroupDTO"
+                            "$ref": "#/components/schemas/dto.AssetDTO"
                         },
                         "type": "array",
                         "uniqueItems": false

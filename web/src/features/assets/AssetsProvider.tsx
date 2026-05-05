@@ -28,8 +28,7 @@ import {
   AssetsStoreContext,
   createAssetsStore,
 } from "./assets.store";
-import { useSettingsContext } from "@/features/settings";
-import { isGroupByType, resolveGroupByFromUrl } from "./utils/groupBy";
+import { isSortByType, resolveSortBy } from "./utils/sortBy";
 import { mapFilenameOperatorToMode } from "./utils/filterUtils";
 import {
   ASSETS_STATE_STORAGE_KEY,
@@ -56,7 +55,7 @@ export const AssetsNavigationContext = createContext<
 
 type PersistedAssetsState = {
   filters?: Partial<FiltersState>;
-  ui?: Partial<Pick<UIState, "groupBy" | "searchQuery">>;
+  ui?: Partial<Pick<UIState, "sortBy" | "searchQuery">>;
   selection?: Partial<Pick<SelectionState, "selectionMode">>;
 };
 
@@ -72,7 +71,7 @@ function toStorageSnapshot(state: {
   return {
     filters: state.filters,
     ui: {
-      groupBy: state.ui.groupBy,
+      sortBy: state.ui.sortBy,
       searchQuery: state.ui.searchQuery,
     },
     selection: {
@@ -119,8 +118,8 @@ function loadPersistedState(): PersistedAssetsState {
 
     if (isRecord(candidate.ui)) {
       restored.ui = {
-        groupBy: isGroupByType(candidate.ui.groupBy as string | null)
-          ? (candidate.ui.groupBy as UIState["groupBy"])
+        sortBy: isSortByType(candidate.ui.sortBy as string | null)
+          ? (candidate.ui.sortBy as UIState["sortBy"])
           : undefined,
         searchQuery:
           typeof candidate.ui.searchQuery === "string"
@@ -251,7 +250,6 @@ export const AssetsProvider = ({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams<{ assetId?: string }>();
-  const { state: settingsState } = useSettingsContext();
   const [isHydrated, setIsHydrated] = useState(false);
   const storeRef = useRef<AssetsStoreApi | null>(null);
   const isMainPersistentScope = persist && scopeId === MAIN_ASSETS_SCOPE_ID;
@@ -271,7 +269,7 @@ export const AssetsProvider = ({
     setCurrentTab,
     setCarouselOpen,
     setActiveAssetId,
-    hydrateUIFromURL,
+    hydrateUI,
     setSelectionMode,
     batchUpdateFilters,
   } = useStore(
@@ -280,7 +278,7 @@ export const AssetsProvider = ({
       setCurrentTab: state.setCurrentTab,
       setCarouselOpen: state.setCarouselOpen,
       setActiveAssetId: state.setActiveAssetId,
-      hydrateUIFromURL: state.hydrateUIFromURL,
+      hydrateUI: state.hydrateUI,
       setSelectionMode: state.setSelectionMode,
       batchUpdateFilters: state.batchUpdateFilters,
     })),
@@ -299,17 +297,9 @@ export const AssetsProvider = ({
     initialized.current = true;
 
     const liveSearchParams = getLiveSearchParams(searchParams);
-    const urlGroupBy = liveSearchParams.get("groupBy");
     const urlQuery = liveSearchParams.get("q");
-    const resolvedGroupBy = resolveGroupByFromUrl(
-      urlGroupBy,
-      settingsState.ui.asset_page?.layout,
-    );
     const persistedState = isMainPersistentScope ? loadPersistedState() : {};
-    const initialGroupBy =
-      syncUrl && isGroupByType(urlGroupBy)
-        ? resolvedGroupBy
-        : persistedState.ui?.groupBy ?? resolvedGroupBy;
+    const initialSortBy = resolveSortBy(persistedState.ui?.sortBy);
     const initialSearchQuery =
       syncUrl && urlQuery !== null
         ? urlQuery
@@ -337,18 +327,12 @@ export const AssetsProvider = ({
       setSelectionMode(defaultSelectionMode);
     }
 
-    hydrateUIFromURL({
-      groupBy: syncUrl ? initialGroupBy : persistedState.ui?.groupBy ?? uiState.groupBy,
+    hydrateUI({
+      sortBy: initialSortBy,
       searchQuery: syncUrl
         ? initialSearchQuery
         : persistedState.ui?.searchQuery ?? uiState.searchQuery,
     });
-
-    if (syncUrl && !isGroupByType(urlGroupBy)) {
-      const params = new URLSearchParams(liveSearchParams);
-      params.set("groupBy", initialGroupBy);
-      setSearchParams(params, { replace: true });
-    }
 
     if (routeState?.assetsInitialFilter) {
       navigate(`${location.pathname}${location.search}`, {
@@ -361,7 +345,7 @@ export const AssetsProvider = ({
   }, [
     batchUpdateFilters,
     defaultSelectionMode,
-    hydrateUIFromURL,
+    hydrateUI,
     isMainPersistentScope,
     location.pathname,
     location.search,
@@ -369,11 +353,8 @@ export const AssetsProvider = ({
     navigate,
     searchParams,
     setCurrentTab,
-    setSearchParams,
     setSelectionMode,
-    settingsState.ui.asset_page?.layout,
     syncUrl,
-    uiState.groupBy,
     uiState.searchQuery,
   ]);
 
@@ -416,28 +397,17 @@ export const AssetsProvider = ({
     if (!syncUrl || !isHydrated) return;
 
     const liveSearchParams = getLiveSearchParams(searchParams);
-    const urlGroupBy = liveSearchParams.get("groupBy");
     const urlQuery = liveSearchParams.get("q");
-    const resolvedGroupBy = resolveGroupByFromUrl(
-      urlGroupBy,
-      settingsState.ui.asset_page?.layout,
-    );
     const resolvedQuery = urlQuery ?? "";
 
-    if (urlGroupBy !== null && resolvedGroupBy !== uiState.groupBy) {
-      hydrateUIFromURL({ groupBy: resolvedGroupBy });
-    }
-
     if (urlQuery !== null && resolvedQuery !== uiState.searchQuery) {
-      hydrateUIFromURL({ searchQuery: resolvedQuery });
+      hydrateUI({ searchQuery: resolvedQuery });
     }
   }, [
-    hydrateUIFromURL,
+    hydrateUI,
     isHydrated,
     searchParams,
-    settingsState.ui.asset_page?.layout,
     syncUrl,
-    uiState.groupBy,
     uiState.searchQuery,
   ]);
 
@@ -446,7 +416,6 @@ export const AssetsProvider = ({
 
     const liveSearchParams = getLiveSearchParams(searchParams);
     const nextParams = new URLSearchParams(liveSearchParams);
-    nextParams.set("groupBy", uiState.groupBy);
     if (uiState.searchQuery.trim()) {
       nextParams.set("q", uiState.searchQuery.trim());
     } else {
@@ -461,7 +430,6 @@ export const AssetsProvider = ({
     searchParams,
     setSearchParams,
     syncUrl,
-    uiState.groupBy,
     uiState.searchQuery,
   ]);
 

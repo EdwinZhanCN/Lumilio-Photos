@@ -7533,6 +7533,7 @@ export interface components {
         };
         "dto.AssetDTO": {
             asset_id?: string;
+            capture_offset_minutes?: number;
             deleted_at?: string;
             duration?: number;
             file_size?: number;
@@ -7588,11 +7589,6 @@ export interface components {
              */
             types?: string[];
         };
-        "dto.AssetGroupDTO": {
-            assets?: components["schemas"]["dto.AssetDTO"][];
-            /** @example date:today */
-            key?: string;
-        };
         "dto.AssetIndexingStatsResponseDTO": {
             /** @example 2400 */
             photo_total?: number;
@@ -7646,12 +7642,6 @@ export interface components {
         };
         "dto.AssetQueryRequestDTO": {
             filter?: components["schemas"]["dto.AssetFilterDTO"];
-            /**
-             * @description Grouping strategy for server-side sorting
-             * @example type
-             * @enum {string}
-             */
-            group_by?: "date" | "type" | "flat";
             pagination?: components["schemas"]["dto.PaginationDTO"];
             /**
              * @description Search keyword (optional)
@@ -7664,6 +7654,11 @@ export interface components {
              * @enum {string}
              */
             search_type?: "filename" | "semantic";
+            /**
+             * @example date_captured
+             * @enum {string}
+             */
+            sort_by?: "recently_added" | "date_captured";
             /** @example America/New_York */
             viewer_timezone?: string;
         };
@@ -7994,7 +7989,7 @@ export interface components {
             total_sessions?: number;
         };
         "dto.QueryAssetsResponseDTO": {
-            groups?: components["schemas"]["dto.AssetGroupDTO"][];
+            assets?: components["schemas"]["dto.AssetDTO"][];
             /** @example 20 */
             limit?: number;
             /** @example 0 */
@@ -8171,14 +8166,14 @@ export interface components {
              */
             enhancement_mode?: "auto" | "off" | "only";
             filter?: components["schemas"]["dto.AssetFilterDTO"];
-            /**
-             * @example type
-             * @enum {string}
-             */
-            group_by?: "date" | "type" | "flat";
             pagination?: components["schemas"]["dto.PaginationDTO"];
             /** @example red bird on branch */
             query: string;
+            /**
+             * @example date_captured
+             * @enum {string}
+             */
+            sort_by?: "recently_added" | "date_captured";
             /** @example 12 */
             top_results_limit?: number;
             /** @example America/New_York */
@@ -8189,7 +8184,7 @@ export interface components {
             limit?: number;
             /** @example 0 */
             offset?: number;
-            result_groups?: components["schemas"]["dto.AssetGroupDTO"][];
+            results?: components["schemas"]["dto.AssetDTO"][];
             /** @example 150 */
             results_total?: number;
             top_results?: components["schemas"]["dto.AssetDTO"][];

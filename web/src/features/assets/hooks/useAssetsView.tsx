@@ -4,11 +4,12 @@ import type {
   UseInfiniteQueryResult,
 } from "@tanstack/react-query";
 import { useAssetsStore } from "../assets.store";
-import { useGroupBy } from "../selectors";
+import { useSortBy } from "../selectors";
 import {
   AssetGroup,
   AssetViewDefinition,
   AssetsViewResult,
+  SortByType,
   TabType,
   ViewDefinitionOptions,
 } from "@/features/assets/types/assets.type";
@@ -23,9 +24,9 @@ import { Asset } from "@/lib/assets/types";
 import { useWorkingRepository } from "@/features/settings";
 import {
   flattenAssetGroups,
+  groupAssetsBySort,
   getViewerTimeZone,
   mergeAdjacentAssetGroups,
-  normalizeAssetGroups,
 } from "@/features/assets/utils/assetGroups";
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
@@ -155,16 +156,15 @@ const normalizeTopResultsMeta = (
   source_types: meta?.source_types ?? [],
 });
 
-const normalizeSearchGroupBy = (
-  groupBy?: AssetViewDefinition["groupBy"],
-): SearchAssetsRequest["group_by"] => {
-  switch (groupBy) {
-    case "date":
-    case "type":
-    case "flat":
-      return groupBy;
+const normalizeSearchSortBy = (
+  sortBy?: AssetViewDefinition["sortBy"],
+): SearchAssetsRequest["sort_by"] => {
+  switch (sortBy) {
+    case "recently_added":
+    case "date_captured":
+      return sortBy;
     default:
-      return "flat";
+      return "date_captured";
   }
 };
 
@@ -205,7 +205,7 @@ const buildApiFilter = (
   return filter;
 };
 
-const countGroupedAssets = (groups: AssetGroup[]) => flattenAssetGroups(groups).length;
+const countAssets = (assets: Asset[]) => assets.length;
 
 export const useAssetsViewQuery = (
   definition: AssetViewDefinition,
@@ -235,7 +235,7 @@ export const useAssetsViewQuery = (
         limit: pageSize,
         offset: 0,
       },
-      group_by: normalizeSearchGroupBy(definition.groupBy),
+      sort_by: normalizeSearchSortBy(definition.sortBy),
       viewer_timezone: viewerTimeZone,
     };
 
@@ -258,10 +258,10 @@ export const useAssetsViewQuery = (
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const responseData = (lastPage as QueryAssetsApiResult | undefined)?.data;
-        const pageGroups = normalizeAssetGroups(responseData?.groups);
+        const pageAssets = normalizeVisibleAssets(responseData?.assets ?? []);
         const total = responseData?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = countGroupedAssets(pageGroups);
+        const loadedCount = countAssets(pageAssets);
         const hasMore =
           typeof total === "number"
             ? offset + loadedCount < total
@@ -279,9 +279,13 @@ export const useAssetsViewQuery = (
     return pages.map((page, index) => {
       const offset = Number(pageParams[index] ?? 0) || 0;
       const responseData = page?.data;
-      const groups = normalizeAssetGroups(responseData?.groups);
+      const assets = normalizeVisibleAssets(responseData?.assets ?? []);
+      const groups = groupAssetsBySort(
+        assets,
+        definition.sortBy ?? "date_captured",
+      );
       const total = responseData?.total;
-      const loadedCount = countGroupedAssets(groups);
+      const loadedCount = countAssets(assets);
       const hasMore =
         typeof total === "number"
           ? offset + loadedCount < total
@@ -392,7 +396,7 @@ export const usePhotoSearchView = (
       },
       enhancement_mode: "auto",
       top_results_limit: TOP_RESULTS_LIMIT,
-      group_by: normalizeSearchGroupBy(definition.groupBy),
+      sort_by: normalizeSearchSortBy(definition.sortBy),
       viewer_timezone: viewerTimeZone,
     }),
     [apiFilter, pageSize, queryText, viewerTimeZone],
@@ -410,10 +414,10 @@ export const usePhotoSearchView = (
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const responseData = (lastPage as SearchAssetsApiResult | undefined)?.data;
-        const pageGroups = normalizeAssetGroups(responseData?.result_groups);
+        const pageAssets = normalizeVisibleAssets(responseData?.results ?? []);
         const total = responseData?.results_total;
         const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = countGroupedAssets(pageGroups);
+        const loadedCount = countAssets(pageAssets);
         const hasMore =
           typeof total === "number"
             ? offset + loadedCount < total
@@ -431,9 +435,13 @@ export const usePhotoSearchView = (
     return pages.map((page, index) => {
       const responseData = page?.data;
       const offset = Number(pageParams[index] ?? 0) || 0;
-      const resultGroups = normalizeAssetGroups(responseData?.result_groups);
+      const results = normalizeVisibleAssets(responseData?.results ?? []);
+      const resultGroups = groupAssetsBySort(
+        results,
+        definition.sortBy ?? "date_captured",
+      );
       const total = responseData?.results_total;
-      const loadedCount = countGroupedAssets(resultGroups);
+      const loadedCount = countAssets(results);
       const hasMore =
         typeof total === "number"
           ? offset + loadedCount < total
@@ -519,15 +527,15 @@ export const usePhotoSearchView = (
 
 export const useCurrentTabPhotoSearchView = (
   options: ViewDefinitionOptions & {
-    groupBy?: string;
+    sortBy?: SortByType;
     pageSize?: number;
   } = {},
 ): PhotoSearchViewResult => {
   const currentTab = useAssetsStore((state) => state.ui.currentTab);
-  const uiGroupBy = useGroupBy();
+  const uiSortBy = useSortBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
   const filtersState = useAssetsStore((state) => state.filters);
-  const { groupBy, pageSize, ...viewOptions } = options;
+  const { sortBy, pageSize, ...viewOptions } = options;
   const scopedFilter = useMemo(
     () =>
       selectFiltersEnabled({ filters: filtersState } as any)
@@ -540,16 +548,15 @@ export const useCurrentTabPhotoSearchView = (
     () => ({
       types: [currentTab],
       filter: scopedFilter,
-      groupBy: (groupBy as any) || uiGroupBy,
+      sortBy: sortBy || uiSortBy,
       pageSize: pageSize || 50,
-      sort: { direction: "desc" },
       search: searchQuery.trim()
         ? {
             query: searchQuery.trim(),
           }
         : undefined,
     }),
-    [currentTab, scopedFilter, uiGroupBy, searchQuery, groupBy, pageSize],
+    [currentTab, scopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
   );
 
   const enabled = currentTab === "photos" && searchQuery.trim().length > 0;
@@ -562,16 +569,16 @@ export const useCurrentTabPhotoSearchView = (
 
 export const useCurrentTabAssets = (
   options: ViewDefinitionOptions & {
-    groupBy?: string;
+    sortBy?: SortByType;
     pageSize?: number;
   } = {},
 ): AssetsViewResult => {
   const currentTab = useAssetsStore((state) => state.ui.currentTab);
-  const uiGroupBy = useGroupBy();
+  const uiSortBy = useSortBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
   const filtersState = useAssetsStore((state) => state.filters);
 
-  const { groupBy, pageSize, ...viewOptions } = options;
+  const { sortBy, pageSize, ...viewOptions } = options;
   const scopedFilter = useMemo(
     () =>
       selectFiltersEnabled({ filters: filtersState } as any)
@@ -584,16 +591,15 @@ export const useCurrentTabAssets = (
     () => ({
       types: [currentTab],
       filter: scopedFilter,
-      groupBy: (groupBy as any) || uiGroupBy,
+      sortBy: sortBy || uiSortBy,
       pageSize: pageSize || 50,
-      sort: { direction: "desc" },
       search: searchQuery.trim()
         ? {
             query: searchQuery.trim(),
           }
         : undefined,
     }),
-    [currentTab, scopedFilter, uiGroupBy, searchQuery, groupBy, pageSize],
+    [currentTab, scopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
   );
 
   const standardView = useAssetsView(definition, {

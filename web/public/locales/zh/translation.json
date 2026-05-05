@@ -446,12 +446,10 @@
                 "addToAlbumSuccess": "已将 {{count}} 项添加到相册",
                 "addToAlbumError": "添加到相册失败"
             },
-            "groupBy": "按 {{groupBy}} 分组",
-            "groupByOptions": {
-                "date": "日期",
-                "type": "类型",
-                "album": "相册",
-                "flat": "平铺"
+            "sortBy": "按 {{sortBy}} 排序",
+            "sortByOptions": {
+                "dateCaptured": "拍摄时间",
+                "recentlyAdded": "最近添加"
             },
             "selectionMode": {
                 "exit": "退出选择模式",

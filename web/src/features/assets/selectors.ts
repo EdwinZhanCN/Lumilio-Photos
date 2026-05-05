@@ -1,10 +1,8 @@
 import { useAssetsStore } from "./assets.store";
 import { useShallow } from "zustand/react/shallow";
 import { selectActiveFilterCount } from "./slices/filters.slice";
-import { useSettingsContext } from "@/features/settings";
 import { useCallback } from "react";
-import { GroupByType } from "./types/assets.type";
-import { resolveGroupByFromUrl } from "./utils/groupBy";
+import { SortByType } from "./types/assets.type";
 
 // ===== Selection Selectors =====
 export const useSelectionEnabled = () =>
@@ -25,11 +23,7 @@ export const useSelectionMode = () =>
 // ===== UI Selectors =====
 export const useCurrentTab = () => useAssetsStore((s) => s.ui.currentTab);
 
-export const useGroupBy = (): GroupByType => {
-  const { state: settingsState } = useSettingsContext();
-  const groupBy = useAssetsStore((s) => s.ui.groupBy);
-  return resolveGroupByFromUrl(groupBy, settingsState.ui.asset_page?.layout);
-};
+export const useSortBy = (): SortByType => useAssetsStore((s) => s.ui.sortBy);
 
 export const useSearchQuery = () => useAssetsStore((s) => s.ui.searchQuery);
 
@@ -66,13 +60,13 @@ export const useUIActions = () => {
     useShallow((s) => ({
       setTab: s.setCurrentTab,
       setSearchQueryState: s.setSearchQuery,
-      setGroupByState: s.setGroupBy,
+      setSortByState: s.setSortBy,
     })),
   );
 
-  const setGroupBy = useCallback(
-    (groupBy: GroupByType) => {
-      store.setGroupByState(groupBy);
+  const setSortBy = useCallback(
+    (sortBy: SortByType) => {
+      store.setSortByState(sortBy);
     },
     [store],
   );
@@ -95,7 +89,7 @@ export const useUIActions = () => {
 
   return {
     ...store,
-    setGroupBy,
+    setSortBy,
     setSearchQuery,
     applySearch,
   };

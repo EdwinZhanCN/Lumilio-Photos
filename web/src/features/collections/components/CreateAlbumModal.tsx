@@ -5,7 +5,7 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { X, FolderPlus, Image as ImageIcon, MoveLeft } from "lucide-react";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import {
-  useGroupBy,
+  useSortBy,
   useUIActions,
   useFilterActions,
   useSelectionActions,
@@ -24,8 +24,8 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
   onSelect,
 }) => {
   const { t } = useI18n();
-  const groupBy = useGroupBy();
-  const { setGroupBy, setSearchQuery } = useUIActions();
+  const sortBy = useSortBy();
+  const { setSortBy, setSearchQuery } = useUIActions();
   const { resetFilters } = useFilterActions();
   const { clear: clearSelection, setEnabled: setSelectionEnabled } =
     useSelectionActions();
@@ -41,7 +41,7 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
     viewKey,
   } = useCurrentTabAssets({
     withGroups: true,
-    groupBy,
+    sortBy,
   });
 
   const flatAssets = useMemo(() => {
@@ -81,8 +81,8 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
   return (
     <div className="flex flex-col h-full bg-base-100 overflow-hidden">
       <AssetsPageHeader
-        groupBy={groupBy}
-        onGroupByChange={setGroupBy}
+        sortBy={sortBy}
+        onSortByChange={setSortBy}
         title={t("collections.createModal.coverPicker.title")}
         icon={<ImageIcon className="w-6 h-6 text-primary" />}
       />

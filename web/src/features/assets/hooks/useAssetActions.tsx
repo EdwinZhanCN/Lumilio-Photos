@@ -50,19 +50,14 @@ export const useAssetActions = (): AssetActionsResult => {
    * Helper to manually update asset in cache without invalidation
    */
   const updateAssetInCache = useCallback((assetId: string, updateFn: (asset: Asset) => Asset) => {
-    const updateAssetGroups = (groups: any[] | undefined) => {
-      if (!Array.isArray(groups)) return groups;
-      return groups.map((group) => ({
-        ...group,
-        assets: Array.isArray(group.assets)
-          ? group.assets.map((asset: Asset) => {
-              if (asset.asset_id === assetId) {
-                return updateFn(asset);
-              }
-              return asset;
-            })
-          : group.assets,
-      }));
+    const updateAssets = (assets: Asset[] | undefined) => {
+      if (!Array.isArray(assets)) return assets;
+      return assets.map((asset: Asset) => {
+        if (asset.asset_id === assetId) {
+          return updateFn(asset);
+        }
+        return asset;
+      });
     };
 
     queryClient.setQueriesData(
@@ -89,16 +84,9 @@ export const useAssetActions = (): AssetActionsResult => {
               if (page.data) {
                 const nextData = {
                   ...page.data,
-                  groups: updateAssetGroups(page.data.groups),
-                  result_groups: updateAssetGroups(page.data.result_groups),
-                  top_results: Array.isArray(page.data.top_results)
-                    ? page.data.top_results.map((asset: Asset) => {
-                        if (asset.asset_id === assetId) {
-                          return updateFn(asset);
-                        }
-                        return asset;
-                      })
-                    : page.data.top_results,
+                  assets: updateAssets(page.data.assets),
+                  results: updateAssets(page.data.results),
+                  top_results: updateAssets(page.data.top_results),
                 };
 
                 return {

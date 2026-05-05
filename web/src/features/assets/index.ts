@@ -36,7 +36,7 @@ export type {
   AssetActionsResult,
   SelectionResult,
   TabType,
-  GroupByType,
+  SortByType,
   AssetGroup,
   ViewDefinitionOptions,
 } from "./types/assets.type";
