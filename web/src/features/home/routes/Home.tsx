@@ -14,6 +14,7 @@ import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { useLocationClusters } from "../hooks/useLocationClusters";
 import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
 import { useWorkingRepository } from "@/features/settings";
+import {HomeIcon} from "@heroicons/react/24/outline/index.js";
 
 function Home() {
   const { t } = useI18n();
@@ -74,7 +75,7 @@ function Home() {
     <div className="flex flex-col h-full min-h-0">
       <PageHeader
         title={t("routes.home")}
-        icon={<SparklesIcon className="w-6 h-6 text-primary" />}
+        icon={<HomeIcon className="w-6 h-6 text-primary" />}
       >
         <div
           role="tablist"

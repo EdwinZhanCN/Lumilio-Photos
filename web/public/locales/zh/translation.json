@@ -836,7 +836,7 @@
             }
         },
         "aiSettings": {
-            "description": "管理 Lumilio Agent 和 AI 索引设置。",
+            "description": "配置智能助手和照片智能能力。",
             "saveSuccess": "设置已保存。",
             "saveError": "保存设置失败。",
             "validationSuccess": "LLM 配置验证成功。",
@@ -855,39 +855,40 @@
             "apiKeyConfigured": "已保存 API Key",
             "clearStoredKey": "清除已保存的 API Key",
             "validate": "验证连接",
-            "mlTitle": "AI 索引",
-            "mlDescription": "这些设置决定新导入或重新处理资源时会运行哪些 AI 索引任务。语义运行时不可用时，搜索仍会自动回退到文件名匹配。",
-            "tasksTitle": "索引任务",
-            "tasksDescription": "这些开关控制索引生产策略，不是用户可见的搜索模式。",
-            "runtimeTitle": "运行时状态",
-            "runtimeDescription": "当前后端对搜索和索引运行时的可见性。",
+            "mlTitle": "照片智能",
+            "mlDescription": "选择新导入或重新处理照片时自动运行哪些 AI 能力。",
+            "tasksTitle": "新照片处理能力",
+            "tasksDescription": "这些开关控制后续处理。已有照片需要在下方单独回填。",
+            "runtimeTitle": "运行时诊断",
+            "runtimeDescription": "底层 ML 能力状态，用于排查服务发现和任务可用性。",
             "runtimeUnavailable": "运行时状态暂时不可用，但仍可保存设置。",
             "nodesSummary": "{{active}} 个活跃节点 / {{discovered}} 个已发现节点",
             "searchRuntime": "语义搜索运行时",
-            "coverageTitle": "覆盖率与回填",
-            "coverageDescription": "覆盖率表示现有照片里已有多少资源完成了各类索引。重建索引只会为缺失索引的历史资源排入后台批任务。",
+            "backfillTitle": "回填已有照片",
+            "backfillDescription": "为缺少对应结果的历史照片排入后台任务。",
+            "backfillMode": "只处理缺失结果",
             "photoTotalStatus": "现有照片",
-            "reindexJobsStatus": "待处理重建任务",
-            "queueMissingAssets": "为缺失资源排队",
-            "queueMissingAssetsPending": "正在排入重建任务...",
-            "queueMissingAssetsHint": "会按当前已保存的索引设置，为最多 {{limit}} 张缺失索引的照片排入后台任务。",
+            "reindexJobsStatus": "回填任务",
+            "queueMissingAssets": "排入回填",
+            "queueMissingAssetsPending": "正在排入回填...",
+            "queueMissingAssetsHint": "会按当前已保存的能力设置，为最多 {{limit}} 张缺失结果的照片排入后台任务。",
             "repositoryScopeLabel": "仓库范围",
             "repositoryScopeHint": "保留为全部仓库时，会对所有仓库统一排入回填批任务。",
             "repositoryOptionsUnavailable": "仓库选项暂时不可用。",
             "allRepositories": "全部仓库",
-            "reindexTasksLabel": "回填任务",
-            "reindexTasksManualHint": "只允许为当前已配置并已保存的任务排队。",
-            "selectAtLeastOneTask": "请至少选择一个索引任务后再排入回填。",
-            "saveBeforeReindexHint": "请先保存设置，再排入重建索引任务。",
+            "reindexTasksLabel": "回填能力",
+            "reindexTasksManualHint": "只允许为当前已配置并已保存的能力排队。",
+            "selectAtLeastOneTask": "请至少选择一个能力后再排入回填。",
+            "saveBeforeReindexHint": "请先保存设置，再排入回填任务。",
             "indexingStatsUnavailable": "索引覆盖率暂时不可用。",
-            "reindexQueuedSuccess": "已为历史照片排入重建索引批任务。",
-            "reindexQueuedError": "排入重建索引任务失败。",
-            "existingAssetsHint": "修改这些设置不会自动回填历史资源。已有照片需要单独重建索引后，新的 AI 任务才会生效。",
-            "configuredStatus": "配置状态",
-            "runtimeStatus": "索引运行时",
+            "reindexQueuedSuccess": "已为历史照片排入回填批任务。",
+            "reindexQueuedError": "排入回填任务失败。",
+            "existingAssetsHint": "修改能力开关不会自动更新已有照片，需要单独排入回填。",
+            "configuredStatus": "启用状态",
+            "runtimeStatus": "运行时",
             "queryRuntimeStatus": "查询运行时",
-            "coverageStatus": "覆盖率",
-            "coverageValue": "{{indexed}} / {{total}} 已建立索引（{{percent}}）",
+            "coverageStatus": "已处理",
+            "coverageValue": "{{indexed}} / {{total}} 张照片（{{percent}}）",
             "queuedJobsStatus": "队列任务",
             "providerOptions": {
                 "unset": "未设置",
@@ -897,16 +898,26 @@
                 "ollama": "Ollama"
             },
             "taskNames": {
-                "clip": "CLIP 嵌入",
-                "ocr": "OCR",
-                "caption": "VLM 描述",
-                "face": "人脸检测与嵌入"
+                "clip": "语义搜索",
+                "bioclip": "生物图鉴",
+                "ocr": "文字识别",
+                "caption": "图片描述",
+                "face": "人脸识别"
             },
             "taskDescriptions": {
-                "clip": "生成视觉嵌入，用于最佳结果和后续语义匹配。",
-                "ocr": "提取图片中的文字，让搜索可以命中画面里的文本。",
-                "caption": "生成场景描述，为后续更丰富的搜索能力做准备。",
-                "face": "检测并嵌入人脸，用于人物聚类和未来的人物搜索。"
+                "clip": "让照片可以按画面语义被找到。",
+                "bioclip": "识别植物、动物等生物主题。",
+                "ocr": "读取照片画面中的可见文字。",
+                "caption": "生成简短自然语言描述。",
+                "face": "检测并归类可识别的人脸。"
+            },
+            "runtimeTaskNames": {
+                "clipImage": "CLIP 图片嵌入",
+                "clipText": "CLIP 文本嵌入",
+                "bioclip": "BioCLIP 分类",
+                "ocr": "OCR",
+                "vlm": "VLM 生成",
+                "face": "人脸检测与嵌入"
             }
         },
         "serverSettings": {
@@ -1065,17 +1076,23 @@
         },
         "ml": {
             "loadError": "加载 ML 索引统计失败。",
-            "scopeHint": "选择某个仓库后，可只查看该图库的覆盖率。",
             "existingPhotos": "现有照片",
-            "photoScope": "当前统计范围",
             "queuedMlJobs": "待处理 ML 任务",
-            "taskWorkers": "任务 worker 队列",
             "reindexJobs": "待处理重建任务",
-            "batchQueue": "后台回填批任务",
+            "reindex": "重建索引",
             "coverageValue": "{{indexed}} / {{total}} 已建立索引（{{percent}}）",
             "indexedAssets": "已索引",
             "remainingAssets": "剩余",
-            "queuedJobs": "队列中"
+            "queuedJobs": "队列中",
+            "reindexModal": {
+                "title": "重建索引 — {{task}}",
+                "descriptionMissing": "为 {{count}} 张尚未索引的照片补充索引。",
+                "descriptionAll": "将重新索引全部 {{count}} 张照片。仅建议在升级模型或修复数据时使用。",
+                "reindexAllCheckbox": "全量重建（而非仅补缺）",
+                "existingJobsWarning": "队列中已有 {{count}} 个重建任务，提交新的任务可能导致重复工作。",
+                "confirm": "开始重建",
+                "cancel": "取消"
+            }
         },
         "status": {
             "online": "在线",
@@ -1128,16 +1145,9 @@
                 "created": "创建于"
             },
             "filters": {
-                "time": "时间",
                 "state": "状态",
                 "queue": "队列",
                 "allQueues": "全部",
-                "timeRanges": {
-                    "1h": "< 1小时",
-                    "24h": "< 1天",
-                    "30d": "< 30天",
-                    "all": "全部"
-                },
                 "states": {
                     "all": "全部",
                     "running": "运行中",

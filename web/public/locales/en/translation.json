@@ -803,7 +803,7 @@
             }
         },
         "aiSettings": {
-            "description": "Manage the Lumilio Agent and AI indexing settings.",
+            "description": "Configure the assistant and photo intelligence features.",
             "saveSuccess": "Settings saved.",
             "saveError": "Failed to save settings.",
             "validationSuccess": "LLM configuration validated successfully.",
@@ -822,39 +822,40 @@
             "apiKeyConfigured": "Stored API key",
             "clearStoredKey": "Clear stored API key",
             "validate": "Validate connection",
-            "mlTitle": "AI Indexing",
-            "mlDescription": "These settings decide which AI indexing tasks run for new or reprocessed assets. Search still falls back to filename matching when semantic runtime is unavailable.",
-            "tasksTitle": "Indexing tasks",
-            "tasksDescription": "These toggles control indexing production, not the search mode shown to users.",
-            "runtimeTitle": "Runtime status",
-            "runtimeDescription": "Current backend runtime visibility for search and indexing.",
+            "mlTitle": "Photo Intelligence",
+            "mlDescription": "Choose which AI features run for newly imported or reprocessed photos.",
+            "tasksTitle": "Features for new photos",
+            "tasksDescription": "These switches control future processing. Existing photos need a separate backfill pass below.",
+            "runtimeTitle": "Runtime diagnostics",
+            "runtimeDescription": "Low-level ML capability status for troubleshooting.",
             "runtimeUnavailable": "Runtime status is temporarily unavailable. Saving settings is still available.",
             "nodesSummary": "{{active}} active / {{discovered}} discovered nodes",
             "searchRuntime": "Semantic search runtime",
-            "coverageTitle": "Coverage & backfill",
-            "coverageDescription": "Coverage tracks how many existing photos already have each index. Reindex queues a background batch for missing assets only.",
+            "backfillTitle": "Backfill existing photos",
+            "backfillDescription": "Queue background work for photos that are missing results from enabled features.",
+            "backfillMode": "Missing results only",
             "photoTotalStatus": "Existing photos",
-            "reindexJobsStatus": "Queued reindex jobs",
-            "queueMissingAssets": "Queue missing assets",
-            "queueMissingAssetsPending": "Queueing reindex...",
-            "queueMissingAssetsHint": "Queues up to {{limit}} missing photos using the currently saved indexing settings.",
+            "reindexJobsStatus": "Backfill jobs",
+            "queueMissingAssets": "Queue backfill",
+            "queueMissingAssetsPending": "Queueing backfill...",
+            "queueMissingAssetsHint": "Queues up to {{limit}} missing photos using the currently saved feature settings.",
             "repositoryScopeLabel": "Repository scope",
             "repositoryScopeHint": "Leave this on All repositories to queue a global backfill batch.",
             "repositoryOptionsUnavailable": "Repository options are temporarily unavailable.",
             "allRepositories": "All repositories",
-            "reindexTasksLabel": "Tasks to backfill",
-            "reindexTasksManualHint": "Only currently configured and saved tasks can be queued.",
-            "selectAtLeastOneTask": "Select at least one indexing task before queueing reindex.",
-            "saveBeforeReindexHint": "Save settings before queueing a reindex batch.",
+            "reindexTasksLabel": "Features to backfill",
+            "reindexTasksManualHint": "Only currently configured and saved features can be queued.",
+            "selectAtLeastOneTask": "Select at least one feature before queueing backfill.",
+            "saveBeforeReindexHint": "Save settings before queueing a backfill batch.",
             "indexingStatsUnavailable": "Indexing coverage is temporarily unavailable.",
-            "reindexQueuedSuccess": "Reindex batch queued for existing photos.",
-            "reindexQueuedError": "Failed to queue reindex batch.",
-            "existingAssetsHint": "Changing these settings does not backfill existing assets. Existing photos need a separate reindex pass to become searchable by new AI tasks.",
-            "configuredStatus": "Configured",
-            "runtimeStatus": "Indexing runtime",
+            "reindexQueuedSuccess": "Backfill batch queued for existing photos.",
+            "reindexQueuedError": "Failed to queue backfill batch.",
+            "existingAssetsHint": "Changing feature switches does not update existing photos until you queue a backfill.",
+            "configuredStatus": "Enabled",
+            "runtimeStatus": "Runtime",
             "queryRuntimeStatus": "Query runtime",
-            "coverageStatus": "Coverage",
-            "coverageValue": "{{indexed}} / {{total}} indexed ({{percent}})",
+            "coverageStatus": "Indexed",
+            "coverageValue": "{{indexed}} / {{total}} photos ({{percent}})",
             "queuedJobsStatus": "Queued jobs",
             "providerOptions": {
                 "unset": "Not set",
@@ -864,16 +865,26 @@
                 "ollama": "Ollama"
             },
             "taskNames": {
-                "clip": "CLIP embeddings",
-                "ocr": "OCR",
-                "caption": "VLM caption",
-                "face": "Face detect & embed"
+                "clip": "Semantic search",
+                "bioclip": "Field guide",
+                "ocr": "Text recognition",
+                "caption": "Captions",
+                "face": "Face recognition"
             },
             "taskDescriptions": {
-                "clip": "Generates visual embeddings used for Top Results and future semantic matching.",
-                "ocr": "Extracts text inside images so searches can match visible words.",
-                "caption": "Generates scene descriptions that can support richer search later.",
-                "face": "Detects and embeds faces for clustering and future people search."
+                "clip": "Find photos by visual meaning, not only filenames.",
+                "bioclip": "Identify plants, animals, and other biological subjects.",
+                "ocr": "Read visible text inside photos.",
+                "caption": "Generate short natural-language descriptions.",
+                "face": "Detect and group recognizable faces."
+            },
+            "runtimeTaskNames": {
+                "clipImage": "CLIP image embedding",
+                "clipText": "CLIP text embedding",
+                "bioclip": "BioCLIP classification",
+                "ocr": "OCR",
+                "vlm": "VLM generation",
+                "face": "Face detect & embed"
             }
         },
         "serverSettings": {
@@ -1032,17 +1043,23 @@
         },
         "ml": {
             "loadError": "Failed to load ML indexing stats.",
-            "scopeHint": "Choose a repository to inspect coverage for that library only.",
             "existingPhotos": "Existing photos",
-            "photoScope": "Current indexing scope",
             "queuedMlJobs": "Queued ML jobs",
-            "taskWorkers": "Task worker queues",
             "reindexJobs": "Queued reindex jobs",
-            "batchQueue": "Background backfill batches",
+            "reindex": "Reindex",
             "coverageValue": "{{indexed}} / {{total}} indexed ({{percent}})",
             "indexedAssets": "Indexed",
             "remainingAssets": "Remaining",
-            "queuedJobs": "Queued"
+            "queuedJobs": "Queued",
+            "reindexModal": {
+                "title": "Reindex — {{task}}",
+                "descriptionMissing": "Fill missing indexes for {{count}} photo(s) that have not been indexed yet.",
+                "descriptionAll": "This will reindex all {{count}} photos. Use this only when upgrading models or repairing data.",
+                "reindexAllCheckbox": "Reindex all (not just missing)",
+                "existingJobsWarning": "{{count}} reindex job(s) already in queue. Submitting another may cause duplicate work.",
+                "confirm": "Start reindex",
+                "cancel": "Cancel"
+            }
         },
         "status": {
             "online": "Online",
@@ -1095,16 +1112,9 @@
                 "created": "Created"
             },
             "filters": {
-                "time": "Time",
                 "state": "State",
                 "queue": "Queue",
                 "allQueues": "All",
-                "timeRanges": {
-                    "1h": "< 1h",
-                    "24h": "< 1d",
-                    "30d": "< 30d",
-                    "all": "All"
-                },
                 "states": {
                     "all": "All",
                     "running": "Running",

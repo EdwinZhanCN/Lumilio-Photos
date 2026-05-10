@@ -1,7 +1,6 @@
 import React from "react";
 import {
   getFormatGroups,
-  getSupportedFormatsSummary,
   type FormatGroup,
 } from "@/lib/utils/accept-file-extensions";
 import {
@@ -23,7 +22,6 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
 }) => {
   const { t } = useI18n(); // Initialize useI18n
   const formatGroups = getFormatGroups();
-  const summary = getSupportedFormatsSummary();
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -78,24 +76,6 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
             >
               ✕
             </button>
-          </div>
-
-          {/* Summary */}
-          <div className="alert alert-info mb-6">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              className="stroke-current shrink-0 w-6 h-6"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span className="text-sm">{t('upload.SupportedFormatsModal.summary_message', { summary })}</span>
           </div>
 
           {/* Format groups */}
