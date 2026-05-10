@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Activity } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import PageHeader from "@/components/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
+import { useIndexingRepositories } from "@/features/settings/hooks/useAssetIndexing";
 import {
   CapabilitiesMonitor,
   MLMonitor,
@@ -20,6 +22,11 @@ export default function Monitor() {
     requestedView === "capabilities" || requestedView === "ml"
       ? requestedView
       : "queue";
+
+  const [localRepoId, setLocalRepoId] = useState<string | undefined>(
+    undefined,
+  );
+  const { repositories } = useIndexingRepositories();
 
   const setView = (nextView: "queue" | "ml" | "capabilities") => {
     const params = new URLSearchParams(searchParams);
@@ -61,28 +68,50 @@ export default function Monitor() {
         }
         icon={<Activity className="w-6 h-6 text-primary" />}
       >
-        <div role="tablist" className="tabs tabs-box">
-          <button
-            role="tab"
-            className={`tab ${view === "queue" ? "tab-active" : ""}`}
-            onClick={() => setView("queue")}
-          >
-            {t("monitor.tabs.queue")}
-          </button>
-          <button
-            role="tab"
-            className={`tab ${view === "ml" ? "tab-active" : ""}`}
-            onClick={() => setView("ml")}
-          >
-            {t("monitor.tabs.ml")}
-          </button>
-          <button
-            role="tab"
-            className={`tab ${view === "capabilities" ? "tab-active" : ""}`}
-            onClick={() => setView("capabilities")}
-          >
-            {t("monitor.tabs.capabilities")}
-          </button>
+        <div className="flex items-center gap-2">
+          {view === "ml" && (
+            <select
+              className="select select-bordered select-sm w-48"
+              value={localRepoId ?? ""}
+              onChange={(e) =>
+                setLocalRepoId(e.target.value || undefined)
+              }
+            >
+              <option value="">
+                {t("navbar.repository.all", {
+                  defaultValue: "All repositories",
+                })}
+              </option>
+              {repositories.map((repo) => (
+                <option key={repo.id} value={repo.id}>
+                  {repo.name || repo.path}
+                </option>
+              ))}
+            </select>
+          )}
+          <div role="tablist" className="tabs tabs-box">
+            <button
+              role="tab"
+              className={`tab ${view === "queue" ? "tab-active" : ""}`}
+              onClick={() => setView("queue")}
+            >
+              {t("monitor.tabs.queue")}
+            </button>
+            <button
+              role="tab"
+              className={`tab ${view === "ml" ? "tab-active" : ""}`}
+              onClick={() => setView("ml")}
+            >
+              {t("monitor.tabs.ml")}
+            </button>
+            <button
+              role="tab"
+              className={`tab ${view === "capabilities" ? "tab-active" : ""}`}
+              onClick={() => setView("capabilities")}
+            >
+              {t("monitor.tabs.capabilities")}
+            </button>
+          </div>
         </div>
       </PageHeader>
 
@@ -112,7 +141,7 @@ export default function Monitor() {
             </div>
           </>
         ) : view === "ml" ? (
-          <MLMonitor />
+          <MLMonitor localRepoId={localRepoId} />
         ) : (
           <CapabilitiesMonitor />
         )}

@@ -1,47 +1,46 @@
-import { useMemo } from "react";
-import { Cpu, Database, Loader2, RefreshCcw, Workflow } from "lucide-react";
-import { useAssetIndexingStats } from "@/features/settings/hooks/useAssetIndexing";
+import { useMemo, useState } from "react";
+import {
+  Cpu,
+  Database,
+  Loader2,
+  RefreshCcw,
+  Workflow,
+} from "lucide-react";
+import {
+  useAssetIndexingStats,
+  useRebuildAssetIndexes,
+} from "@/features/settings/hooks/useAssetIndexing";
 import { useI18n } from "@/lib/i18n.tsx";
-import { useWorkingRepository } from "@/features/settings";
+
+interface MLMonitorProps {
+  localRepoId?: string;
+}
 
 function formatCoveragePercent(coverage: number): string {
   return `${Math.round(coverage * 100)}%`;
 }
 
-export function MLMonitor() {
+const ML_TASK_KEYS = ["clip", "bioclip", "ocr", "caption", "face"] as const;
+
+export function MLMonitor({ localRepoId }: MLMonitorProps) {
   const { t } = useI18n();
-  const {
-    repositoriesQuery,
-    scopedRepositoryId,
-    scopeLabel,
-    scopeDescription,
-  } = useWorkingRepository();
-  const statsQuery = useAssetIndexingStats(scopedRepositoryId);
+  const statsQuery = useAssetIndexingStats(localRepoId);
   const stats = statsQuery.stats;
+  const rebuildMutation = useRebuildAssetIndexes();
+
+  const [reindexModal, setReindexModal] = useState<{
+    taskKey: string;
+    taskLabel: string;
+  } | null>(null);
+  const [reindexAll, setReindexAll] = useState(false);
 
   const taskCards = useMemo(
-    () => [
-      {
-        key: "clip",
-        label: t("settings.aiSettings.taskNames.clip"),
-        stats: stats?.tasks.clip,
-      },
-      {
-        key: "ocr",
-        label: t("settings.aiSettings.taskNames.ocr"),
-        stats: stats?.tasks.ocr,
-      },
-      {
-        key: "caption",
-        label: t("settings.aiSettings.taskNames.caption"),
-        stats: stats?.tasks.caption,
-      },
-      {
-        key: "face",
-        label: t("settings.aiSettings.taskNames.face"),
-        stats: stats?.tasks.face,
-      },
-    ],
+    () =>
+      ML_TASK_KEYS.map((key) => ({
+        key,
+        label: t(`settings.aiSettings.taskNames.${key}`),
+        stats: stats?.tasks[key],
+      })),
     [stats, t],
   );
 
@@ -69,31 +68,14 @@ export function MLMonitor() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-2 max-w-xl">
-          <span className="font-semibold">
-            {t("settings.aiSettings.repositoryScopeLabel")}
-          </span>
-          <div className="rounded-xl border border-base-300 bg-base-100 px-4 py-3">
-            <div className="font-medium">{scopeLabel}</div>
-            <div className="mt-1 text-sm text-base-content/70">
-              {scopeDescription}
-            </div>
-          </div>
-        </div>
-
+      <div className="flex justify-end">
         <button
-          className="btn btn-ghost btn-sm self-start lg:self-auto"
-          onClick={() =>
-            void Promise.all([
-              repositoriesQuery.refetch(),
-              statsQuery.refetch(),
-            ])
-          }
-          disabled={repositoriesQuery.isFetching || statsQuery.isFetching}
+          className="btn btn-ghost btn-sm"
+          onClick={() => statsQuery.refetch()}
+          disabled={statsQuery.isFetching}
         >
           <RefreshCcw
-            className={`w-4 h-4 ${repositoriesQuery.isFetching || statsQuery.isFetching ? "animate-spin" : ""}`}
+            className={`w-4 h-4 ${statsQuery.isFetching ? "animate-spin" : ""}`}
           />
           {t("settings.serverSettings.refresh")}
         </button>
@@ -108,7 +90,6 @@ export function MLMonitor() {
           <div className="stat-value text-primary">
             {stats?.photoTotal ?? 0}
           </div>
-          <div className="stat-desc">{t("monitor.ml.photoScope")}</div>
         </div>
 
         <div className="stat">
@@ -117,7 +98,6 @@ export function MLMonitor() {
           </div>
           <div className="stat-title">{t("monitor.ml.queuedMlJobs")}</div>
           <div className="stat-value text-info">{totalQueuedMLJobs}</div>
-          <div className="stat-desc">{t("monitor.ml.taskWorkers")}</div>
         </div>
 
         <div className="stat">
@@ -128,7 +108,6 @@ export function MLMonitor() {
           <div className="stat-value text-secondary">
             {stats?.reindexJobs ?? 0}
           </div>
-          <div className="stat-desc">{t("monitor.ml.batchQueue")}</div>
         </div>
       </div>
 
@@ -189,10 +168,105 @@ export function MLMonitor() {
                   <div className="mt-1 font-semibold">{queuedJobs}</div>
                 </div>
               </div>
+
+              {remaining > 0 && (
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setReindexAll(false);
+                    setReindexModal({ taskKey: key, taskLabel: label });
+                  }}
+                  disabled={
+                    rebuildMutation.isPending &&
+                    rebuildMutation.variables?.tasks?.includes(key)
+                  }
+                >
+                  <RefreshCcw
+                    className={`w-4 h-4 ${
+                      rebuildMutation.isPending &&
+                      rebuildMutation.variables?.tasks?.includes(key)
+                        ? "animate-spin"
+                        : ""
+                    }`}
+                  />
+                  {t("monitor.ml.reindex")}
+                </button>
+              )}
             </section>
           );
         })}
       </div>
+
+      {reindexModal && (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-sm">
+            <h3 className="font-semibold text-lg">
+              {t("monitor.ml.reindexModal.title", {
+                task: reindexModal.taskLabel,
+              })}
+            </h3>
+            <p className="py-4 text-sm text-base-content/70">
+              {reindexAll
+                ? t("monitor.ml.reindexModal.descriptionAll", {
+                    count: stats?.photoTotal ?? 0,
+                  })
+                : t("monitor.ml.reindexModal.descriptionMissing", {
+                    count:
+                      (stats?.photoTotal ?? 0) -
+                      (taskCards.find((tc) => tc.key === reindexModal.taskKey)
+                        ?.stats?.indexedCount ?? 0),
+                  })}
+            </p>
+            {stats?.reindexJobs != null && stats.reindexJobs > 0 && (
+              <div className="alert alert-warning mb-4 py-2 text-sm">
+                {t("monitor.ml.reindexModal.existingJobsWarning", {
+                  count: stats.reindexJobs,
+                })}
+              </div>
+            )}
+            <div className="form-control">
+              <label className="label cursor-pointer justify-start gap-3">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={reindexAll}
+                  onChange={(e) => setReindexAll(e.target.checked)}
+                />
+                <span className="label-text">
+                  {t("monitor.ml.reindexModal.reindexAllCheckbox")}
+                </span>
+              </label>
+            </div>
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setReindexModal(null);
+                  setReindexAll(false);
+                }}
+              >
+                {t("monitor.ml.reindexModal.cancel")}
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  rebuildMutation.mutate({
+                    body: {
+                      repository_id: localRepoId || undefined,
+                      tasks: [reindexModal.taskKey],
+                      missing_only: !reindexAll,
+                    },
+                  });
+                  setReindexModal(null);
+                  setReindexAll(false);
+                }}
+              >
+                {t("monitor.ml.reindexModal.confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

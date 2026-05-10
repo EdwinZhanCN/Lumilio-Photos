@@ -289,17 +289,3 @@ export const getFormatGroups = (): FormatGroup[] => {
     },
   ];
 };
-
-/**
- * Get supported formats summary for display
- */
-export const getSupportedFormatsSummary = (): string => {
-  const counts = {
-    photos: supportedPhotoExtensions.length,
-    raw: supportedRAWExtensions.length,
-    videos: supportedVideoExtensions.length,
-    audio: supportedAudioExtensions.length,
-  };
-
-  return `${counts.photos + counts.raw} image formats, ${counts.videos} video formats, ${counts.audio} audio formats`;
-};

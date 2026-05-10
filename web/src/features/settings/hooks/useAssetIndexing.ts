@@ -27,6 +27,7 @@ export type AssetIndexingStats = {
   reindexJobs: number;
   tasks: {
     clip: AssetIndexingTaskStats;
+    bioclip: AssetIndexingTaskStats;
     ocr: AssetIndexingTaskStats;
     caption: AssetIndexingTaskStats;
     face: AssetIndexingTaskStats;
@@ -79,6 +80,7 @@ function normalizeAssetIndexingStats(
     reindexJobs: data.reindex_jobs ?? 0,
     tasks: {
       clip: normalizeTaskStats(data.tasks?.clip, photoTotal),
+      bioclip: normalizeTaskStats(data.tasks?.bioclip, photoTotal),
       ocr: normalizeTaskStats(data.tasks?.ocr, photoTotal),
       caption: normalizeTaskStats(data.tasks?.caption, photoTotal),
       face: normalizeTaskStats(data.tasks?.face, photoTotal),

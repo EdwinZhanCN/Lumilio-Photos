@@ -72,6 +72,7 @@ services:
             GEOCODING_USER_AGENT: Lumilio-Photos/1.0
             GEOCODING_NATURALEARTH_CITY_RADIUS_METERS: "50000"
             ML_CLIP_ENABLED: "false"
+            ML_BIOCLIP_ENABLED: "false"
             ML_OCR_ENABLED: "false"
             ML_CAPTION_ENABLED: "false"
             ML_FACE_ENABLED: "false"

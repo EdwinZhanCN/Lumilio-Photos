@@ -100,9 +100,6 @@ export function TaskMonitor() {
   const [error, setError] = useState<string | null>(null);
   const [filterState, setFilterState] = useState<JobState | "all">("all");
   const [filterQueue, setFilterQueue] = useState<string>("all");
-  const [timeRange, setTimeRange] = useState<"1h" | "24h" | "30d" | "all">(
-    "24h",
-  );
   const [currentCursor, setCurrentCursor] = useState<string | undefined>(
     undefined,
   );
@@ -134,9 +131,7 @@ export function TaskMonitor() {
           params.queue = filterQueue;
         }
 
-        if (timeRange !== "all") {
-          params.time_range = timeRange;
-        }
+        params.time_range = "24h";
 
         if (currentCursor) {
           params.cursor = currentCursor;
@@ -180,7 +175,7 @@ export function TaskMonitor() {
       mounted = false;
       clearInterval(interval);
     };
-  }, [filterState, filterQueue, timeRange, currentCursor]);
+  }, [filterState, filterQueue, currentCursor]);
 
   // Get unique queues from jobs for filter
   const queues = Array.from(new Set(jobs.map((j) => j.queue)));
@@ -238,18 +233,6 @@ export function TaskMonitor() {
       // This is a limitation of cursor-based pagination
       setPageInput(String(currentPage));
     }
-  };
-
-  const handleTimeRangeChange = (range: "1h" | "24h" | "30d" | "all") => {
-    setTimeRange(range);
-    // Reset pagination when changing filters
-    setCurrentCursor(undefined);
-    setNextCursor(undefined);
-    setPageHistory([]);
-    setCurrentPage(1);
-    setPageInput("1");
-    setTotalCount(null);
-    setTotalPages(null);
   };
 
   // Get state icon
@@ -316,38 +299,6 @@ export function TaskMonitor() {
       <div className="sticky top-0 z-10 bg-base-100 p-3 border-b border-base-300 space-y-2">
         {/* First Row: Filters */}
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex items-center gap-2">
-            <label className="text-xs opacity-60 uppercase tracking-wide font-semibold">
-              {t("monitor.jobs.filters.time")}
-            </label>
-            <div className="btn-group">
-              <button
-                className={`btn btn-xs ${timeRange === "1h" ? "btn-active" : ""}`}
-                onClick={() => handleTimeRangeChange("1h")}
-              >
-                {t("monitor.jobs.filters.timeRanges.1h")}
-              </button>
-              <button
-                className={`btn btn-xs ${timeRange === "24h" ? "btn-active" : ""}`}
-                onClick={() => handleTimeRangeChange("24h")}
-              >
-                {t("monitor.jobs.filters.timeRanges.24h")}
-              </button>
-              <button
-                className={`btn btn-xs ${timeRange === "30d" ? "btn-active" : ""}`}
-                onClick={() => handleTimeRangeChange("30d")}
-              >
-                {t("monitor.jobs.filters.timeRanges.30d")}
-              </button>
-              <button
-                className={`btn btn-xs ${timeRange === "all" ? "btn-active" : ""}`}
-                onClick={() => handleTimeRangeChange("all")}
-              >
-                {t("monitor.jobs.filters.timeRanges.all")}
-              </button>
-            </div>
-          </div>
-
           <div className="flex items-center gap-2">
             <label className="text-xs opacity-60 uppercase tracking-wide font-semibold">
               {t("monitor.jobs.filters.state")}

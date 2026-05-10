@@ -68,6 +68,7 @@ env-dev:
 		"GEOCODING_NATURALEARTH_CITY_RADIUS_METERS=50000" \
 		"" \
 		"ML_CLIP_ENABLED=false" \
+		"ML_BIOCLIP_ENABLED=false" \
 		"ML_OCR_ENABLED=false" \
 		"ML_CAPTION_ENABLED=false" \
 		"ML_FACE_ENABLED=false" \
