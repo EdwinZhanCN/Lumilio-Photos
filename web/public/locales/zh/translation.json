@@ -100,25 +100,6 @@
             "placesCount": "{{count}} 个地点",
             "empty": "暂无带地理位置的照片。"
         },
-        "info": {
-            "title": "摄影网站资讯",
-            "description": "发现 500px、Flickr 等平台的优秀作品与摄影技巧分享。",
-            "browse": "浏览资讯",
-            "links": {
-                "0": {
-                    "description": "高质量摄影作品分享社区"
-                },
-                "1": {
-                    "description": "历史悠久的摄影作品平台"
-                },
-                "2": {
-                    "description": "免费高质量图片社区"
-                },
-                "3": {
-                    "description": "摄影新闻与技巧"
-                }
-            }
-        },
         "stats": {
             "unknown": "未知",
             "error": "加载统计数据失败：{{error}}",

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/utils/exif"
@@ -77,7 +78,7 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 }
 
 // transcodeVideoSmart applies a best-effort, resource-aware transcoding strategy.
-func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string, videoInfo *VideoInfo) error {
+func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string, videoInfo *VideoInfo, cfg config.TranscodeConfig) error {
 	maxHeight := 1080
 
 	if videoInfo.Height <= maxHeight && strings.ToLower(videoInfo.Format) == "mp4" && strings.Contains(strings.ToLower(videoInfo.Codec), "h264") {
@@ -85,7 +86,7 @@ func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath stri
 	}
 
 	if videoInfo.Height <= maxHeight {
-		outputPath, err := ap.transcodeVideoToMP4(ctx, videoPath, videoInfo.Width, videoInfo.Height)
+		outputPath, err := ap.transcodeVideoToMP4(ctx, videoPath, videoInfo.Width, videoInfo.Height, cfg)
 		if err != nil {
 			return fmt.Errorf("transcode to mp4: %w", err)
 		}
@@ -100,7 +101,7 @@ func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath stri
 		newWidth--
 	}
 
-	outputPath1080p, err := ap.transcodeVideoToMP4(ctx, videoPath, newWidth, maxHeight)
+	outputPath1080p, err := ap.transcodeVideoToMP4(ctx, videoPath, newWidth, maxHeight, cfg)
 	if err != nil {
 		return fmt.Errorf("transcode to 1080p: %w", err)
 	}
@@ -114,32 +115,78 @@ func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath stri
 }
 
 // transcodeVideoToMP4 runs ffmpeg to produce an H.264/AAC MP4 at the target size.
-func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath string, width, height int) (string, error) {
+func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath string, width, height int, cfg config.TranscodeConfig) (string, error) {
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("transcoded_%d_%s.mp4", height, filepath.Base(inputPath)))
 
-	cmd := exec.CommandContext(ctx, "ffmpeg",
-		"-i", inputPath,
-		"-c:v", "libx264",
-		"-preset", "medium",
-		"-crf", "23",
-		"-maxrate", "5000k",
-		"-bufsize", "10000k",
-		"-vf", fmt.Sprintf("scale=%d:%d", width, height),
-		"-c:a", "aac",
-		"-b:a", "128k",
-		"-movflags", "+faststart",
-		"-avoid_negative_ts", "make_zero",
-		"-threads", "0",
-		"-f", "mp4",
-		"-y",
-		outputPath,
-	)
+	args := buildTranscodeArgs(inputPath, outputPath, width, height, cfg)
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("ffmpeg transcode failed: %w", err)
 	}
 
 	return outputPath, nil
+}
+
+func buildTranscodeArgs(inputPath, outputPath string, width, height int, cfg config.TranscodeConfig) []string {
+	scaleFilter := fmt.Sprintf("scale=%d:%d", width, height)
+
+	switch cfg.HardwareAccel {
+	case "vaapi":
+		return []string{
+			"-vaapi_device", "/dev/dri/renderD128",
+			"-hwaccel", "vaapi",
+			"-hwaccel_output_format", "vaapi",
+			"-i", inputPath,
+			"-vf", "scale_vaapi=" + scaleFilter[6:], // remove "scale=" prefix
+			"-c:v", "h264_vaapi",
+			"-qp", "23",
+			"-maxrate", "5000k",
+			"-bufsize", "10000k",
+			"-c:a", "aac",
+			"-b:a", "128k",
+			"-movflags", "+faststart",
+			"-avoid_negative_ts", "make_zero",
+			"-f", "mp4",
+			"-y",
+			outputPath,
+		}
+	case "nvenc":
+		return []string{
+			"-i", inputPath,
+			"-c:v", "h264_nvenc",
+			"-preset", "p4",
+			"-qp", "23",
+			"-maxrate", "5000k",
+			"-bufsize", "10000k",
+			"-vf", scaleFilter,
+			"-c:a", "aac",
+			"-b:a", "128k",
+			"-movflags", "+faststart",
+			"-avoid_negative_ts", "make_zero",
+			"-f", "mp4",
+			"-y",
+			outputPath,
+		}
+	default:
+		return []string{
+			"-i", inputPath,
+			"-c:v", "libx264",
+			"-preset", "medium",
+			"-crf", "23",
+			"-maxrate", "5000k",
+			"-bufsize", "10000k",
+			"-vf", scaleFilter,
+			"-c:a", "aac",
+			"-b:a", "128k",
+			"-movflags", "+faststart",
+			"-avoid_negative_ts", "make_zero",
+			"-threads", "0",
+			"-f", "mp4",
+			"-y",
+			outputPath,
+		}
+	}
 }
 
 // copyVideoAsWebVersion saves the provided video file as the web version.
@@ -165,7 +212,7 @@ func (ap *AssetProcessor) saveTranscodedVideo(ctx context.Context, repoPath stri
 }
 
 // generateVideoThumbnail creates thumbnails from a representative video frame.
-func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string, info *VideoInfo) error {
+func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string, info *VideoInfo, cfg config.TranscodeConfig) error {
 	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("thumb_%s.jpg", asset.AssetID))
 	defer os.Remove(outputPath)
 
@@ -175,7 +222,16 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 		thumbnailTime = fmt.Sprintf("00:00:%02d", int(thumbnailSeconds))
 	}
 
-	cmd := exec.CommandContext(ctx, "ffmpeg",
+	args := []string{}
+
+	if cfg.HardwareAccel == "vaapi" {
+		args = append(args,
+			"-hwaccel", "vaapi",
+			"-vaapi_device", "/dev/dri/renderD128",
+		)
+	}
+
+	args = append(args,
 		"-ss", thumbnailTime,
 		"-i", videoPath,
 		"-vframes", "1",
@@ -186,6 +242,8 @@ func (ap *AssetProcessor) generateVideoThumbnail(ctx context.Context, repoPath s
 		"-y",
 		outputPath,
 	)
+
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr

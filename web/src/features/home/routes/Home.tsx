@@ -8,7 +8,6 @@ import PageHeader from "@/components/PageHeader";
 import GalleryGrid from "../components/GalleryGrid";
 import StatsCards from "../components/StatsCards";
 import SpacetimeMapCard from "../components/SpacetimeMapCard";
-import InfoCard from "../components/InfoCard";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { useLocationClusters } from "../hooks/useLocationClusters";
@@ -140,7 +139,6 @@ function Home() {
         {displayMode === "stats" && (
           <div className="mx-4 mb-8 space-y-8 animate-fadeIn">
             <StatsCards repositoryId={scopedRepositoryId} />
-            <InfoCard />
           </div>
         )}
 

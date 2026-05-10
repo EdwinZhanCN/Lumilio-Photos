@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -84,6 +85,36 @@ type RepositoryScanConfig struct {
 	SettleSeconds      int
 	MaxConcurrentRepos int
 	BatchSize          int
+}
+
+// TranscodeConfig controls hardware acceleration for video transcoding.
+type TranscodeConfig struct {
+	// HardwareAccel: auto, vaapi, nvenc, qsv, none
+	HardwareAccel string
+}
+
+// LoadTranscodeConfig returns transcoding configuration.
+func LoadTranscodeConfig() TranscodeConfig {
+	cfg := TranscodeConfig{
+		HardwareAccel: "none",
+	}
+	if v := strings.ToLower(strings.TrimSpace(os.Getenv("TRANSCODE_HW_ACCEL"))); v != "" {
+		cfg.HardwareAccel = v
+	}
+	if cfg.HardwareAccel == "auto" {
+		cfg.HardwareAccel = detectHardwareAccel()
+	}
+	return cfg
+}
+
+func detectHardwareAccel() string {
+	if _, err := os.Stat("/dev/dri/renderD128"); err == nil {
+		return "vaapi"
+	}
+	if _, err := exec.LookPath("nvidia-smi"); err == nil {
+		return "nvenc"
+	}
+	return "none"
 }
 
 // IsDevelopmentMode checks if the application is running in development mode

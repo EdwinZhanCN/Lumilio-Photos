@@ -82,6 +82,9 @@ services:
             LLM_API_KEY: your-api-key-here
             LLM_MODEL_NAME: your-model-name
             LLM_BASE_URL: your-openai-compatiable-base-url
+            TRANSCODE_HW_ACCEL: auto
+        devices:
+            - /dev/dri:/dev/dri
         volumes:
             - server_storage:/data/storage
         ports:
