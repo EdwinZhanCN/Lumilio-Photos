@@ -100,25 +100,6 @@
             "placesCount": "{{count}} places",
             "empty": "No photos with location data yet."
         },
-        "info": {
-            "title": "Photography Resources",
-            "description": "Discover excellent works and photography insights from platforms like 500px and Flickr.",
-            "browse": "Browse Resources",
-            "links": {
-                "0": {
-                    "description": "A high-quality photography sharing community"
-                },
-                "1": {
-                    "description": "A long-standing photo platform"
-                },
-                "2": {
-                    "description": "A free high-quality image community"
-                },
-                "3": {
-                    "description": "Photography news and techniques"
-                }
-            }
-        },
         "stats": {
             "unknown": "Unknown",
             "error": "Failed to load statistics: {{error}}",

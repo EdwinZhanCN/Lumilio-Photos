@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/queue/jobs"
 )
@@ -15,6 +16,8 @@ func (ap *AssetProcessor) ProcessTranscodeTask(ctx context.Context, args jobs.Tr
 	if err != nil {
 		return err
 	}
+
+	transcodeCfg := config.LoadTranscodeConfig()
 
 	return ap.runTrackedAssetTask(
 		ctx,
@@ -30,7 +33,7 @@ func (ap *AssetProcessor) ProcessTranscodeTask(ctx context.Context, args jobs.Tr
 				if err != nil {
 					return err
 				}
-				return ap.transcodeVideoSmart(ctx, repository.Path, asset, fullPath, info)
+				return ap.transcodeVideoSmart(ctx, repository.Path, asset, fullPath, info, transcodeCfg)
 			case dbtypes.AssetTypeAudio:
 				info, err := ap.getAudioInfo(fullPath)
 				if err != nil {

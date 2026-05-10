@@ -43,6 +43,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     exiftool \
     libvips42 \
     libraw20 \
+    intel-media-va-driver \
+    libva-drm2 \
+    libva2 \
     tzdata \
     && rm -rf /var/lib/apt/lists/*
 

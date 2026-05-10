@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"server/config"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
@@ -34,7 +35,8 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 				if err != nil {
 					return err
 				}
-				return ap.generateVideoThumbnail(ctx, repository.Path, asset, fullPath, info)
+				transcodeCfg := config.LoadTranscodeConfig()
+				return ap.generateVideoThumbnail(ctx, repository.Path, asset, fullPath, info, transcodeCfg)
 			case dbtypes.AssetTypeAudio:
 				// Optional waveform thumbnail for audio
 				return ap.generateWaveform(ctx, repository.Path, asset, fullPath)
