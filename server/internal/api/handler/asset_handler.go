@@ -40,6 +40,7 @@ type AssetHandler struct {
 	assetService    service.AssetService
 	authService     *service.AuthService
 	indexingService service.AssetIndexingService
+	stackService    service.StackService
 	queries         *repo.Queries
 	repoManager     storage.RepositoryManager
 	stagingManager  storage.StagingManager
@@ -55,6 +56,7 @@ func NewAssetHandler(
 	assetService service.AssetService,
 	authService *service.AuthService,
 	indexingService service.AssetIndexingService,
+	stackService service.StackService,
 	queries *repo.Queries,
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
@@ -70,6 +72,7 @@ func NewAssetHandler(
 		assetService:    assetService,
 		authService:     authService,
 		indexingService: indexingService,
+		stackService:    stackService,
 		queries:         queries,
 		repoManager:     repoManager,
 		stagingManager:  stagingManager,
@@ -261,6 +264,18 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 		ContentHash: clientHash,
 		Message:     fmt.Sprintf("File received and queued for processing in repository '%s'", repository.Name),
 	}
+
+	// Trigger automatic RAW+JPEG stack detection asynchronously after upload.
+	if repositoryID != "" {
+		go func(repoID string) {
+			if _, err := h.queueClient.Insert(context.Background(), jobs.DetectStacksArgs{
+				RepositoryID: repoID,
+			}, &river.InsertOpts{Queue: "detect_stacks"}); err != nil {
+				log.Printf("failed to enqueue detect stacks after upload: %v", err)
+			}
+		}(repositoryID)
+	}
+
 	api.GinSuccess(c, response)
 }
 
@@ -538,6 +553,19 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 
 	if len(sessions) > 0 {
 		go h.cleanupExpiredSessions()
+	}
+
+	// Trigger automatic RAW+JPEG stack detection asynchronously.
+	// This is best-effort: if metadata has not been extracted yet, the next
+	// scan or manual trigger will complete the stacking.
+	if repositoryID != "" {
+		go func(repoID string) {
+			if _, err := h.queueClient.Insert(context.Background(), jobs.DetectStacksArgs{
+				RepositoryID: repoID,
+			}, &river.InsertOpts{Queue: "detect_stacks"}); err != nil {
+				log.Printf("failed to enqueue detect stacks after upload: %v", err)
+			}
+		}(repositoryID)
 	}
 
 	api.GinSuccess(c, dto.BatchUploadResponseDTO{Results: results})
@@ -1440,6 +1468,74 @@ func toAssetDTOs(assets []repo.Asset) []dto.AssetDTO {
 	return items
 }
 
+// enrichAssetDTOsWithStackInfo batch-fetches stack membership for the given
+// asset DTOs and attaches a StackPreviewDTO to each asset that belongs to a stack.
+func (h *AssetHandler) enrichAssetDTOsWithStackInfo(ctx context.Context, dtos []dto.AssetDTO) error {
+	if len(dtos) == 0 || h.stackService == nil {
+		return nil
+	}
+
+	assetIDs := make([]uuid.UUID, 0, len(dtos))
+	for _, d := range dtos {
+		if d.AssetID == "" {
+			continue
+		}
+		id, err := uuid.Parse(d.AssetID)
+		if err != nil {
+			continue
+		}
+		assetIDs = append(assetIDs, id)
+	}
+
+	if len(assetIDs) == 0 {
+		return nil
+	}
+
+	stacks, err := h.stackService.GetStacksByAssets(ctx, assetIDs)
+	if err != nil {
+		return fmt.Errorf("batch fetch stacks: %w", err)
+	}
+
+	for i := range dtos {
+		assetID, err := uuid.Parse(dtos[i].AssetID)
+		if err != nil {
+			continue
+		}
+
+		stackInfo, ok := stacks[assetID]
+		if !ok {
+			continue
+		}
+
+		// Determine if this asset is the cover (lowest position)
+		isCover := false
+		minPos := int32(0)
+		if len(stackInfo.Members) > 0 {
+			minPos = stackInfo.Members[0].Position
+			for _, m := range stackInfo.Members {
+				if m.Position < minPos {
+					minPos = m.Position
+				}
+			}
+			for _, m := range stackInfo.Members {
+				if m.AssetID == assetID && m.Position == minPos {
+					isCover = true
+					break
+				}
+			}
+		}
+
+		size := int(stackInfo.MemberCount)
+		dtos[i].Stack = &dto.StackPreviewDTO{
+			StackID:    stackInfo.StackID.String(),
+			StackCover: isCover,
+			StackSize:  &size,
+		}
+	}
+
+	return nil
+}
+
 func toSearchAssetsResponseDTO(result service.SearchAssetsResult, limit, offset int) dto.SearchAssetsResponseDTO {
 	var total *int
 	if result.ResultsTotal >= 0 {
@@ -1512,9 +1608,15 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		return
 	}
 
+	assetDTOs := toAssetDTOs(assets)
+	if err := h.enrichAssetDTOsWithStackInfo(c.Request.Context(), assetDTOs); err != nil {
+		log.Printf("Failed to enrich assets with stack info: %v", err)
+		// Non-fatal: continue without stack info
+	}
+
 	totalInt := int(total)
 	response := dto.QueryAssetsResponseDTO{
-		Assets: toAssetDTOs(assets),
+		Assets: assetDTOs,
 		Total:  &totalInt,
 		Limit:  req.Pagination.Limit,
 		Offset: req.Pagination.Offset,
@@ -1568,7 +1670,17 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		return
 	}
 
-	api.GinSuccess(c, toSearchAssetsResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset))
+	searchResponse := toSearchAssetsResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset)
+
+	// Enrich with stack info (non-fatal)
+	if err := h.enrichAssetDTOsWithStackInfo(c.Request.Context(), searchResponse.TopResults); err != nil {
+		log.Printf("Failed to enrich top results with stack info: %v", err)
+	}
+	if err := h.enrichAssetDTOsWithStackInfo(c.Request.Context(), searchResponse.Results); err != nil {
+		log.Printf("Failed to enrich search results with stack info: %v", err)
+	}
+
+	api.GinSuccess(c, searchResponse)
 }
 
 // ListIndexingRepositories returns repository options for indexing filters and reindex scope selection.
@@ -3055,4 +3167,174 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 		c.JSON(http.StatusOK, response)
 		return
 	}
+}
+
+// ============================================================================
+// Stack operations
+// ============================================================================
+
+// GetAssetStack returns the stack that contains the given asset.
+// @Summary Get asset stack
+// @Description Returns the stack (group) that contains the specified asset
+// @Tags assets
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Success 200 {object} api.Result{data=dto.StackByAssetResponseDTO}
+// @Failure 404 {object} api.Result
+// @Router /api/v1/assets/{id}/stack [get]
+// @Security BearerAuth
+func (h *AssetHandler) GetAssetStack(c *gin.Context) {
+	assetIDStr := c.Param("id")
+	assetID, err := uuid.Parse(assetIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID"})
+		return
+	}
+
+	stackInfo, err := h.stackService.GetStackByAsset(c.Request.Context(), assetID)
+	if err != nil {
+		if errors.Is(err, service.ErrStackNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Asset is not in a stack"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get stack"})
+		return
+	}
+
+	// Convert to DTO
+	members := make([]dto.StackMemberDTO, len(stackInfo.Members))
+	for i, m := range stackInfo.Members {
+		members[i] = dto.StackMemberDTO{
+			AssetID:  m.AssetID.String(),
+			Relation: string(m.Relation),
+			Position: m.Position,
+		}
+	}
+
+	response := dto.StackByAssetResponseDTO{
+		AssetID: assetID.String(),
+		Stack: dto.StackDTO{
+			StackID:     stackInfo.StackID.String(),
+			MemberCount: stackInfo.MemberCount,
+			Members:     members,
+		},
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// CreateManualStack manually groups assets into a stack.
+// @Summary Create manual stack
+// @Description Manually groups the specified assets into a new stack
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param request body dto.CreateManualStackRequestDTO true "Asset IDs to stack"
+// @Success 201 {object} api.Result{data=dto.StackDTO}
+// @Failure 400 {object} api.Result
+// @Failure 409 {object} api.Result
+// @Router /api/v1/assets/stacks [post]
+// @Security BearerAuth
+func (h *AssetHandler) CreateManualStack(c *gin.Context) {
+	var req dto.CreateManualStackRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+
+	if len(req.AssetIDs) < 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "At least 2 asset IDs are required"})
+		return
+	}
+
+	assetIDs := make([]uuid.UUID, len(req.AssetIDs))
+	for i, idStr := range req.AssetIDs {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Invalid asset ID: %s", idStr)})
+			return
+		}
+		assetIDs[i] = id
+	}
+
+	stackInfo, err := h.stackService.CreateManualStack(c.Request.Context(), assetIDs)
+	if err != nil {
+		if errors.Is(err, service.ErrAssetAlreadyStacked) {
+			c.JSON(http.StatusConflict, gin.H{"error": "One or more assets already belong to a stack"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create stack"})
+		return
+	}
+
+	members := make([]dto.StackMemberDTO, len(stackInfo.Members))
+	for i, m := range stackInfo.Members {
+		members[i] = dto.StackMemberDTO{
+			AssetID:  m.AssetID.String(),
+			Relation: string(m.Relation),
+			Position: m.Position,
+		}
+	}
+
+	response := dto.StackDTO{
+		StackID:     stackInfo.StackID.String(),
+		MemberCount: stackInfo.MemberCount,
+		Members:     members,
+	}
+
+	c.JSON(http.StatusCreated, response)
+}
+
+// UnstackAsset removes an asset from its stack.
+// @Summary Remove asset from stack
+// @Description Removes an asset from its stack, making it standalone
+// @Tags assets
+// @Produce json
+// @Param id path string true "Asset ID"
+// @Success 200 {object} api.Result
+// @Router /api/v1/assets/{id}/stack [delete]
+// @Security BearerAuth
+func (h *AssetHandler) UnstackAsset(c *gin.Context) {
+	assetIDStr := c.Param("id")
+	assetID, err := uuid.Parse(assetIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID"})
+		return
+	}
+
+	if err := h.stackService.RemoveFromStack(c.Request.Context(), assetID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unstack asset"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Asset removed from stack"})
+}
+
+// AutoDetectStacks triggers automatic RAW+JPEG stack detection for a repository.
+// @Summary Auto-detect stacks
+// @Description Scans a repository for RAW+JPEG pairs and creates stacks automatically
+// @Tags repositories
+// @Produce json
+// @Param repositoryId path string true "Repository ID"
+// @Success 200 {object} api.Result{data=dto.AutoDetectStacksResponseDTO}
+// @Router /api/v1/repositories/{repositoryId}/stacks/detect [post]
+// @Security BearerAuth
+func (h *AssetHandler) AutoDetectStacks(c *gin.Context) {
+	repoIDStr := c.Param("repositoryId")
+	repoID, err := uuid.Parse(repoIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid repository ID"})
+		return
+	}
+
+	count, err := h.stackService.AutoDetectStacks(c.Request.Context(), repoID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to detect stacks: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.AutoDetectStacksResponseDTO{
+		RepositoryID:  repoID.String(),
+		StacksCreated: count,
+	})
 }

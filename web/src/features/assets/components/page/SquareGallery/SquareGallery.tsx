@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
+import StackedThumbnail from "@/features/assets/components/shared/StackedThumbnail";
 import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { Asset } from "@/lib/assets/types";
@@ -192,16 +193,30 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
                     data-asset-id={assetId}
                   >
                     <figure className="h-full w-full rounded-2xl">
-                      <MediaThumbnail
-                        asset={asset}
-                        thumbnailUrl={thumbnailUrl}
-                        onClick={(event) => handleAssetClick(asset, event)}
-                        isSelected={
-                          assetId ? selection.isSelected(assetId) : false
-                        }
-                        isSelectionMode={selection.enabled}
-                        className="rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
-                      />
+                      {asset.stack?.stack_cover && asset.stack?.stack_size && asset.stack.stack_size > 1 ? (
+                        <StackedThumbnail
+                          asset={asset}
+                          thumbnailUrl={thumbnailUrl}
+                          stackInfo={asset.stack}
+                          onClick={(event) => handleAssetClick(asset, event)}
+                          isSelected={
+                            assetId ? selection.isSelected(assetId) : false
+                          }
+                          isSelectionMode={selection.enabled}
+                          className="rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                        />
+                      ) : (
+                        <MediaThumbnail
+                          asset={asset}
+                          thumbnailUrl={thumbnailUrl}
+                          onClick={(event) => handleAssetClick(asset, event)}
+                          isSelected={
+                            assetId ? selection.isSelected(assetId) : false
+                          }
+                          isSelectionMode={selection.enabled}
+                          className="rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                        />
+                      )}
                       {caption && (
                         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 rounded-b-2xl bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
                           {caption}
