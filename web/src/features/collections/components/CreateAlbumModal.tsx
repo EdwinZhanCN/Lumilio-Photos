@@ -11,7 +11,7 @@ import {
   useSelectionActions,
 } from "@/features/assets/selectors";
 import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
-import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
+import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import { useSelection } from "@/features/assets/hooks/useSelection";
 import { $api } from "@/lib/http-commons/queryClient";
@@ -87,7 +87,7 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
         icon={<ImageIcon className="w-6 h-6 text-primary" />}
       />
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
-        <JustifiedGallery
+        <SquareGallery
           groups={groupedAssets || []}
           key={layoutKey}
           openCarousel={() => {}}
@@ -95,6 +95,7 @@ const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
           isLoading={isLoading && allAssets.length === 0}
+          columns={5}
         />
       </div>
     </div>
@@ -135,7 +136,7 @@ const CreateAlbumModal: React.FC = () => {
 
       const responseData = response as ApiResult;
       if (responseData?.code === 0) {
-        queryClient.invalidateQueries({ queryKey: ["albums"] });
+        await queryClient.invalidateQueries({ queryKey: ["albums"] });
         dispatch({ type: "CLOSE_CREATE_MODAL" });
         resetForm();
       }
@@ -160,11 +161,11 @@ const CreateAlbumModal: React.FC = () => {
 
   return (
     <div className="modal modal-open z-50">
-      <div className="modal-box max-w-4xl h-[85vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+      <div className="modal-box max-w-4xl h-[85vh] flex flex-col p-0 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 bg-base-100 z-30">
-          <div className="flex items-center gap-2 text-primary">
-            <FolderPlus size={24} />
+        <div className="flex items-center justify-between px-6 py-4 bg-base-200/50 border-b border-base-200 z-30">
+          <div className="flex items-center gap-3 text-base-content">
+            <FolderPlus size={24} className="text-primary" />
             <h3 className="font-bold text-lg">{t("collections.newAlbum")}</h3>
           </div>
           <button
@@ -175,109 +176,99 @@ const CreateAlbumModal: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-hidden relative bg-base-200/30">
+        <div className="flex-1 overflow-hidden relative bg-base-100">
           <form
             onSubmit={handleSubmit}
-            className="h-full flex flex-col p-8 space-y-8 overflow-y-auto"
+            className="h-full flex flex-col"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              {/* Left Column: Details */}
-              <div className="space-y-6">
-                <div className="form-control w-full">
-                  <label className="label">
-                    <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">
-                      {t("collections.createModal.fields.name.label")}
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={t("collections.createModal.fields.name.placeholder")}
-                    className="input input-bordered w-full focus:input-primary bg-base-100"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
+            <div className="flex-1 overflow-y-auto p-6 md:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 h-full">
+                {/* Left Column: Details */}
+                <div className="flex flex-col gap-6 h-full">
+                  <fieldset className="fieldset w-full">
+                    <legend className="fieldset-legend font-semibold">{t("collections.createModal.fields.name.label")}</legend>
+                    <input
+                      type="text"
+                      placeholder={t("collections.createModal.fields.name.placeholder")}
+                      className="input input-bordered w-full"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                  </fieldset>
+
+                  <fieldset className="fieldset w-full flex-1 h-full min-h-0">
+                    <legend className="fieldset-legend font-semibold">{t("collections.createModal.fields.description.label")}</legend>
+                    <textarea
+                      className="textarea textarea-bordered w-full h-full min-h-30 resize-none flex-1"
+                      placeholder={t("collections.createModal.fields.description.placeholder")}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    ></textarea>
+                  </fieldset>
                 </div>
 
-                <div className="form-control w-full">
-                  <label className="label">
-                    <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">
-                      {t("collections.createModal.fields.description.label")}
-                    </span>
-                  </label>
-                  <textarea
-                    className="textarea textarea-bordered h-40 focus:textarea-primary resize-none bg-base-100"
-                    placeholder={t(
-                      "collections.createModal.fields.description.placeholder",
+                {/* Right Column: Cover Selection Preview */}
+                <fieldset className="fieldset w-full h-full flex flex-col min-h-0">
+                  <legend className="fieldset-legend font-semibold">{t("collections.createModal.fields.cover.label")}</legend>
+
+                  <div
+                    className={`flex-1 w-full min-h-62.5 border-2 border-dashed rounded-box flex flex-col items-center justify-center gap-4 transition-all cursor-pointer overflow-hidden relative group
+                      ${selectedCoverId ? "border-primary bg-base-100 shadow-sm" : "border-base-300 bg-base-200/30 hover:border-primary/50 hover:bg-base-200/60"}
+                    `}
+                    onClick={() => setIsChoosingCover(true)}
+                  >
+                    {selectedCoverId ? (
+                      <>
+                        <img
+                          src={assetUrls.getThumbnailUrl(
+                            selectedCoverId,
+                            "medium",
+                          )}
+                          className="w-full h-full object-cover"
+                          alt={t("collections.createModal.fields.cover.selectedAlt")}
+                        />
+                        <div className="absolute inset-0 bg-base-300/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
+                          <span className="btn btn-primary btn-sm rounded-full shadow-lg">
+                            {t("collections.createModal.fields.cover.change")}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="p-4 bg-primary/10 rounded-full text-primary transition-transform group-hover:scale-110 duration-300">
+                          <ImageIcon size={32} />
+                        </div>
+                        <div className="text-center px-4">
+                          <span className="block text-sm font-bold text-base-content">
+                            {t("collections.createModal.fields.cover.choose")}
+                          </span>
+                          <span className="text-xs text-base-content/60 mt-1 block">
+                            {t("collections.createModal.fields.cover.requiredHint")}
+                          </span>
+                        </div>
+                      </>
                     )}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  ></textarea>
-                </div>
-              </div>
-
-              {/* Right Column: Cover Selection Preview */}
-              <div className="flex flex-col">
-                <label className="label">
-                  <span className="label-text font-bold text-base-content/70 uppercase tracking-wider text-xs">
-                    {t("collections.createModal.fields.cover.label")}
-                  </span>
-                </label>
-
-                <div
-                  className={`flex-1 min-h-[250px] border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 transition-all cursor-pointer overflow-hidden relative group
-                    ${selectedCoverId ? "border-primary bg-base-100 shadow-inner" : "border-base-300 bg-base-100 hover:border-primary/50 hover:bg-base-200/50"}
-                  `}
-                  onClick={() => setIsChoosingCover(true)}
-                >
-                  {selectedCoverId ? (
-                    <>
-                      <img
-                        src={assetUrls.getThumbnailUrl(
-                          selectedCoverId,
-                          "medium",
-                        )}
-                        className="w-full h-full object-cover"
-                        alt={t("collections.createModal.fields.cover.selectedAlt")}
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                        <span className="text-white text-sm font-bold bg-primary px-4 py-2 rounded-full shadow-lg">
-                          {t("collections.createModal.fields.cover.change")}
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="p-5 bg-primary/5 rounded-full text-primary transition-colors group-hover:scale-110 duration-300">
-                        <ImageIcon size={40} />
-                      </div>
-                      <div className="text-center">
-                        <span className="block text-sm font-bold text-base-content/70">
-                          {t("collections.createModal.fields.cover.choose")}
-                        </span>
-                        <span className="text-xs text-base-content/40 mt-1 block">
-                          {t("collections.createModal.fields.cover.requiredHint")}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
+                  </div>
+                </fieldset>
               </div>
             </div>
 
-            <div className="flex justify-end gap-4 pt-6 mt-auto">
+            {/* Footer */}
+            <div className="p-4 md:p-6 bg-base-200/50 border-t border-base-200 flex justify-end gap-3 mt-auto">
               <button
                 type="button"
-                className="btn btn-ghost px-8"
+                className="btn btn-ghost"
                 onClick={handleClose}
               >
                 {t("common.cancel")}
               </button>
               <button
                 type="submit"
-                className={`btn btn-primary px-12 shadow-lg shadow-primary/20 ${isSubmitting ? "loading" : ""}`}
+                className="btn btn-primary"
                 disabled={isSubmitting || !name.trim() || !selectedCoverId}
               >
+                {isSubmitting && <span className="loading loading-spinner loading-sm"></span>}
                 {isSubmitting
                   ? t("collections.createModal.actions.creating")
                   : t("collections.createModal.actions.create")}
@@ -288,10 +279,10 @@ const CreateAlbumModal: React.FC = () => {
           {/* Full Assets View Photo Picker Overlay */}
           {isChoosingCover && (
             <div className="absolute inset-0 bg-base-100 z-40 flex flex-col animate-in slide-in-from-bottom duration-300">
-              <div className="flex items-center justify-between p-4 bg-base-100 sticky top-0 z-50 shadow-sm">
+              <div className="flex items-center p-3 bg-base-100 border-b border-base-200 sticky top-0 z-50 shadow-sm">
                 <button
                   type="button"
-                  className="btn btn-sm btn-soft btn-accent w-full"
+                  className="btn btn-sm btn-ghost btn-circle"
                   onClick={() => setIsChoosingCover(false)}
                 >
                   <MoveLeft size={20} />
@@ -314,7 +305,7 @@ const CreateAlbumModal: React.FC = () => {
         </div>
       </div>
       <div
-        className="modal-backdrop bg-black/60 backdrop-blur-sm"
+        className="modal-backdrop bg-base-300/60 backdrop-blur-sm"
         onClick={handleClose}
       ></div>
     </div>

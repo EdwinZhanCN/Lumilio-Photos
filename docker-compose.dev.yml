@@ -83,8 +83,17 @@ services:
             LLM_MODEL_NAME: your-model-name
             LLM_BASE_URL: your-openai-compatiable-base-url
             TRANSCODE_HW_ACCEL: auto
-        devices:
-            - /dev/dri:/dev/dri
+        # Uncomment below to enable hardware-accelerated transcoding (Intel/AMD GPU):
+        # devices:
+        #     - /dev/dri:/dev/dri
+        # For NVIDIA GPU, use the following instead + nvidia-container-toolkit:
+        # deploy:
+        #     resources:
+        #         reservations:
+        #             devices:
+        #                 - driver: nvidia
+        #                   count: 1
+        #                   capabilities: [gpu]
         volumes:
             - server_storage:/data/storage
         ports:

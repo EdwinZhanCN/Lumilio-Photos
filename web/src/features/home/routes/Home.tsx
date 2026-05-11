@@ -61,13 +61,19 @@ function Home() {
     isMapLoading && mapLoadedPhotos === 0
       ? t("home.map.loading")
       : mapPoints.length > 0
-        ? t("home.map.loadedStatus", {
-            pointsCount: mapPoints.length,
-            loadedCount: mapLoadedPhotos,
-            totalCount: mapTotalPhotos ?? 0,
-            hasTotal: Boolean(mapTotalPhotos),
-            loadingMore: Boolean(isMapFetchingNextPage || mapHasNextPage),
-          })
+        ? (() => {
+            let base = t("home.map.loadedStatus", {
+              pointsCount: mapPoints.length,
+              loadedCount: mapLoadedPhotos,
+            });
+            if (mapTotalPhotos) {
+              base += t("home.map.loadedStatusTotal", { totalCount: mapTotalPhotos });
+            }
+            if (isMapFetchingNextPage || mapHasNextPage) {
+              base += t("home.map.loadedStatusMore");
+            }
+            return base;
+          })()
         : t("home.map.empty");
 
   return (

@@ -11,14 +11,14 @@ import {
   Trash2,
   FolderPlus,
   Heart,
-  Star,
   Download,
   AlertTriangle,
   X,
   Plus,
   RefreshCcwDot,
+  Ellipsis,
+  ArrowUpDown,
 } from "lucide-react";
-import SearchBar from "@/components/SearchBar";
 import FilterTool, {
   FilterDTO,
 } from "@/features/assets/components/page/FilterTool/FilterTool";
@@ -72,6 +72,7 @@ const AssetsPageHeader = ({
   const selection = useSelection();
   const bulkOps = useBulkAssetOperations();
   const showMessage = useMessage();
+
   const activeSortByLabel = useMemo(() => {
     switch (sortBy) {
       case "recently_added":
@@ -92,11 +93,8 @@ const AssetsPageHeader = ({
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
   const [isAddingToAlbum, setIsAddingToAlbum] = useState(false);
   const listAlbumsMutation = $api.useMutation("get", "/api/v1/albums");
-  const {
-    repositories,
-    selectedRepository,
-    scopeLabel,
-  } = useWorkingRepository();
+  const { repositories, selectedRepository, scopeLabel } =
+    useWorkingRepository();
   const { scanRepositories, isScanning } = useRepositoryScan();
 
   // Hydrate FilterTool from global filters (single source of truth)
@@ -361,6 +359,14 @@ const AssetsPageHeader = ({
     }
   };
 
+  // Close the parent dropdown menu when a menu item is clicked
+  const handleDropdownItemClick = () => {
+    const elem = document.activeElement;
+    if (elem instanceof HTMLElement) {
+      elem.blur();
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -368,7 +374,7 @@ const AssetsPageHeader = ({
         icon={icon ?? <TabIcon className="w-6 h-6 text-primary" />}
       >
         {selection.enabled && (
-          <div className="badge badge-lg badge-soft badge-neutral hidden gap-2 rounded-full px-3 py-3 text-xs font-medium sm:inline-flex">
+          <div className="badge badge-lg badge-neutral hidden gap-2 rounded-full px-3 py-3 text-xs font-medium sm:inline-flex shrink-0">
             <span
               className={`size-2 rounded-full ${
                 selection.selectedCount > 0
@@ -383,199 +389,363 @@ const AssetsPageHeader = ({
           </div>
         )}
 
-        {/* Sort By Dropdown */}
-        <div className="dropdown">
-          <div
-            tabIndex={0}
-            role="button"
-            className="btn btn-sm btn-soft btn-info"
-          >
-            <FunnelIcon className="size-4" />
-            {t("assets.assetsPageHeader.sortBy", { sortBy: activeSortByLabel })}
-          </div>
-          <ul
-            tabIndex={0}
-            className="dropdown-content menu bg-base-200 rounded-box z-[1] w-40 p-2 shadow"
-          >
-            <li>
-              <a
-                onClick={() => onSortByChange("date_captured")}
-                className={sortBy === "date_captured" ? "active" : ""}
-              >
-                {t("assets.assetsPageHeader.sortByOptions.dateCaptured")}
-              </a>
-            </li>
-            <li>
-              <a
-                onClick={() => onSortByChange("recently_added")}
-                className={sortBy === "recently_added" ? "active" : ""}
-              >
-                {t("assets.assetsPageHeader.sortByOptions.recentlyAdded")}
-              </a>
-            </li>
-          </ul>
-        </div>
-
-        {/* Filter Tool */}
-        <FilterTool
-          initial={inboundDTO}
-          onChange={handleFiltersChange}
-          autoApply={true}
-        />
-
-        <button
-          type="button"
-          className="btn btn-sm btn-soft btn-info gap-2 rounded-full"
-          onClick={handleScanCurrentLibrary}
-          disabled={isScanning || repositories.length === 0}
-          title={t("assets.assetsPageHeader.scan.title", {
-            scope: scopeLabel,
-          })}
-        >
-          {isScanning ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : (
-            <RefreshCcwDot className="h-4 w-4" />
-          )}
-          <span className="hidden md:inline text-xs font-medium">
-            {t("assets.assetsPageHeader.scan.label")}
-          </span>
-        </button>
-
-        {/* Selection Toggle Button */}
-        <button
-          type="button"
-          className={`btn btn-sm btn-soft btn-info gap-2 rounded-full ${
-            selection.enabled ? "btn-active" : ""
-          }`}
-          onClick={handleToggleSelection}
-          title={
-            selection.enabled
-              ? t("assets.assetsPageHeader.selectionMode.exit")
-              : t("assets.assetsPageHeader.selectionMode.enter")
-          }
-        >
-          <SquareMousePointer className="w-4 h-4" />
-          <span className="hidden md:inline text-xs font-medium">
-            {t("assets.assetsPageHeader.selectionMode.label", {
-              defaultValue: "Select",
-            })}
-          </span>
-        </button>
-        {/* Quick Actions Rocket Menu - Only in selection mode */}
-        {selection.enabled && (
-          <div className="dropdown dropdown-end">
+        {/*
+          FULL MODE ACTIONS
+          Visible on larger screens when search is NOT active
+        */}
+        <div className="items-center gap-2 hidden lg:flex">
+          {/* Sort By Dropdown */}
+          <div className="dropdown">
             <div
               tabIndex={0}
               role="button"
-              className={`btn btn-sm btn-soft btn-accent gap-2 rounded-full ${
-                selection.selectedCount === 0 ? "btn-disabled opacity-50" : ""
-              }`}
-              title={t("assets.assetsPageHeader.actions.title")}
+              className="btn btn-sm btn-soft btn-info rounded-full"
             >
-              <Rocket className="size-4" />
-              <span className="hidden md:inline">
-                {t("assets.assetsPageHeader.actions.title")}
-              </span>
-              <span className="rounded-full bg-base-100/90 px-2.5 py-1 text-[11px] font-semibold text-base-content/70">
-                {selection.selectedCount}
-              </span>
+              <FunnelIcon className="size-4" />
+              {t("assets.assetsPageHeader.sortBy", {
+                sortBy: activeSortByLabel,
+              })}
             </div>
             <ul
               tabIndex={0}
-              className="dropdown-content menu z-[100] mt-2 w-64 rounded-[1.25rem] border border-base-300/70 bg-base-100/95 p-3 shadow-[0_24px_60px_-30px_rgba(15,23,42,0.45)] backdrop-blur-xl"
+              className="dropdown-content menu bg-base-200 rounded-box z-[100] w-40 p-2 shadow-xl"
             >
-              <li className="menu-title px-3 py-2 text-xs uppercase tracking-[0.18em] text-base-content/45">
-                {t("assets.assetsPageHeader.actions.applyToItems", {
-                  count: selection.selectedCount,
-                })}
-              </li>
-              <li>
-                <div className="flex gap-1 px-4 py-2">
-                  <button
-                    type="button"
-                    className="btn btn-sm h-auto flex-1 justify-start gap-2 rounded-xl border-0 bg-base-200/70 px-3 py-2 shadow-none hover:bg-base-200"
-                    onClick={() => bulkOps.bulkSetLike(true)}
-                  >
-                    <Heart size={16} className="fill-error text-error" />
-                    {t("assets.assetsPageHeader.actions.like")}
-                  </button>
-                  <div className="divider divider-horizontal m-0"></div>
-                  <button
-                    type="button"
-                    className="btn btn-sm h-auto flex-1 justify-start gap-2 rounded-xl border-0 bg-base-200/70 px-3 py-2 shadow-none hover:bg-base-200"
-                    onClick={() => bulkOps.bulkSetLike(false)}
-                  >
-                    <Heart size={16} className="text-base-content" />
-                    {t("assets.assetsPageHeader.actions.unlike")}
-                  </button>
-                </div>
-              </li>
-              <li>
-                <div className="flex flex-col items-stretch p-0">
-                  <div className="px-4 py-2 flex items-center gap-2 text-sm">
-                    <Star size={16} className="text-warning" />
-                    {t("assets.assetsPageHeader.actions.setRating")}
-                  </div>
-                  <div className="flex justify-around p-2 pt-0">
-                    <button
-                      type="button"
-                      className="btn btn-xs btn-circle border-0 bg-base-200/70 text-base-content/50 shadow-none hover:bg-base-200"
-                      onClick={() => bulkOps.bulkUpdateRating(0)}
-                      title={t("assets.assetsPageHeader.actions.clearRating")}
-                    >
-                      <X size={12} />
-                    </button>
-                    {[1, 2, 3, 4, 5].map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        className="btn btn-xs min-h-8 rounded-full border-0 bg-base-200/70 px-3 shadow-none hover:bg-base-200"
-                        onClick={() => bulkOps.bulkUpdateRating(r)}
-                      >
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </li>
-              <div className="divider my-1"></div>
               <li>
                 <button
-                  type="button"
-                  className="rounded-xl text-info hover:bg-info/10"
-                  onClick={handleAddToAlbumClick}
+                  onClick={() => onSortByChange("date_captured")}
+                  className={sortBy === "date_captured" ? "active" : ""}
                 >
-                  <FolderPlus size={16} />
-                  {t("assets.assetsPageHeader.actions.addToAlbum")}
+                  {t("assets.assetsPageHeader.sortByOptions.dateCaptured")}
                 </button>
               </li>
               <li>
                 <button
-                  type="button"
-                  className="rounded-xl hover:bg-base-200/80"
-                  onClick={handleDownloadAll}
+                  onClick={() => onSortByChange("recently_added")}
+                  className={sortBy === "recently_added" ? "active" : ""}
                 >
-                  <Download size={16} />
-                  {t("assets.assetsPageHeader.actions.downloadAll")}
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  className="rounded-xl text-error hover:bg-error/10"
-                  onClick={handleDeleteClick}
-                >
-                  <Trash2 size={16} />
-                  {t("assets.assetsPageHeader.actions.deleteSelected")}
+                  {t("assets.assetsPageHeader.sortByOptions.recentlyAdded")}
                 </button>
               </li>
             </ul>
           </div>
-        )}
 
-        {/* Search Bar */}
-        <SearchBar />
+          <FilterTool
+            initial={inboundDTO}
+            onChange={handleFiltersChange}
+            autoApply={true}
+          />
+
+          <button
+            type="button"
+            className="btn btn-sm btn-soft btn-info gap-2 rounded-full"
+            onClick={handleScanCurrentLibrary}
+            disabled={isScanning || repositories.length === 0}
+            title={t("assets.assetsPageHeader.scan.title", {
+              scope: scopeLabel,
+            })}
+          >
+            {isScanning ? (
+              <span className="loading loading-spinner loading-xs" />
+            ) : (
+              <RefreshCcwDot className="h-4 w-4" />
+            )}
+            <span className="hidden xl:inline text-xs font-medium">
+              {t("assets.assetsPageHeader.scan.label")}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={`btn btn-sm btn-soft btn-info gap-2 rounded-full ${
+              selection.enabled ? "btn-active" : ""
+            }`}
+            onClick={handleToggleSelection}
+            title={
+              selection.enabled
+                ? t("assets.assetsPageHeader.selectionMode.exit")
+                : t("assets.assetsPageHeader.selectionMode.enter")
+            }
+          >
+            <SquareMousePointer className="w-4 h-4" />
+            <span className="hidden xl:inline text-xs font-medium">
+              {t("assets.assetsPageHeader.selectionMode.label", {
+                defaultValue: "Select",
+              })}
+            </span>
+          </button>
+
+          {/* Quick Actions Rocket Menu - Only in selection mode */}
+          {selection.enabled && (
+            <div className="dropdown dropdown-end">
+              <div
+                tabIndex={0}
+                role="button"
+                className={`btn btn-sm btn-soft btn-accent gap-2 rounded-full ${
+                  selection.selectedCount === 0 ? "btn-disabled opacity-50" : ""
+                }`}
+                title={t("assets.assetsPageHeader.actions.title")}
+              >
+                <Rocket className="size-4" />
+                <span className="hidden xl:inline">
+                  {t("assets.assetsPageHeader.actions.title")}
+                </span>
+                <span className="rounded-full bg-base-100/90 px-2.5 py-1 text-[11px] font-semibold text-base-content/70">
+                  {selection.selectedCount}
+                </span>
+              </div>
+              <ul
+                tabIndex={0}
+                className="dropdown-content menu z-[100] mt-2 w-64 rounded-box bg-base-100 p-3 shadow-xl border border-base-200"
+              >
+                <li className="menu-title px-3 py-2 text-xs uppercase tracking-[0.18em] text-base-content/45">
+                  {t("assets.assetsPageHeader.actions.applyToItems", {
+                    count: selection.selectedCount,
+                  })}
+                </li>
+                <li>
+                  <div className="flex gap-1 px-1">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ghost flex-1 justify-start gap-2 rounded-lg"
+                      onClick={() => bulkOps.bulkSetLike(true)}
+                    >
+                      <Heart size={16} className="fill-error text-error" />
+                      {t("assets.assetsPageHeader.actions.like")}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-ghost flex-1 justify-start gap-2 rounded-lg"
+                      onClick={() => bulkOps.bulkSetLike(false)}
+                    >
+                      <Heart size={16} />
+                      {t("assets.assetsPageHeader.actions.unlike")}
+                    </button>
+                  </div>
+                </li>
+                <div className="divider my-1"></div>
+                <li>
+                  <button
+                    type="button"
+                    className="text-info"
+                    onClick={() => {
+                      handleAddToAlbumClick();
+                      handleDropdownItemClick();
+                    }}
+                  >
+                    <FolderPlus size={16} />
+                    {t("assets.assetsPageHeader.actions.addToAlbum")}
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleDownloadAll();
+                      handleDropdownItemClick();
+                    }}
+                  >
+                    <Download size={16} />
+                    {t("assets.assetsPageHeader.actions.downloadAll")}
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    className="text-error"
+                    onClick={() => {
+                      handleDeleteClick();
+                      handleDropdownItemClick();
+                    }}
+                  >
+                    <Trash2 size={16} />
+                    {t("assets.assetsPageHeader.actions.deleteSelected")}
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/*
+          COMPACT MODE ACTIONS MENU
+          Visible on small screens
+        */}
+        <div className="dropdown dropdown-end shrink-0 lg:hidden block">
+          <div
+            tabIndex={0}
+            role="button"
+            className="btn btn-sm btn-circle btn-ghost"
+            title={t("assets.assetsPageHeader.moreActions")}
+          >
+            <Ellipsis className="w-4 h-4" />
+          </div>
+          <ul
+            tabIndex={0}
+            className="dropdown-content menu bg-base-100 rounded-box z-[100] w-56 p-2 shadow-xl border border-base-200 mt-2"
+          >
+            <li className="menu-title text-xs text-base-content/45">
+              {t("assets.assetsPageHeader.compactMenu.viewSort", {
+                defaultValue: "View & Sort",
+              })}
+            </li>
+            <li>
+              <details open>
+                <summary className="py-2">
+                  <ArrowUpDown size={16} />
+                  {t("assets.assetsPageHeader.sortBy", { sortBy: "" })}
+                </summary>
+                <ul>
+                  <li>
+                    <button
+                      onClick={() => {
+                        onSortByChange("date_captured");
+                        handleDropdownItemClick();
+                      }}
+                      className={sortBy === "date_captured" ? "active" : ""}
+                    >
+                      {t("assets.assetsPageHeader.sortByOptions.dateCaptured")}
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => {
+                        onSortByChange("recently_added");
+                        handleDropdownItemClick();
+                      }}
+                      className={sortBy === "recently_added" ? "active" : ""}
+                    >
+                      {t("assets.assetsPageHeader.sortByOptions.recentlyAdded")}
+                    </button>
+                  </li>
+                </ul>
+              </details>
+            </li>
+
+            <li className="menu-title mt-2 text-xs text-base-content/45">
+              {t("assets.assetsPageHeader.compactMenu.actions", {
+                defaultValue: "Actions",
+              })}
+            </li>
+            <li>
+              <button
+                onClick={() => {
+                  handleToggleSelection();
+                  handleDropdownItemClick();
+                }}
+                className={selection.enabled ? "text-primary font-medium" : ""}
+              >
+                <SquareMousePointer size={16} />
+                {selection.enabled
+                  ? t("assets.assetsPageHeader.selectionMode.exit")
+                  : t("assets.assetsPageHeader.selectionMode.enter")}
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={() => {
+                  handleScanCurrentLibrary();
+                  handleDropdownItemClick();
+                }}
+                disabled={isScanning || repositories.length === 0}
+              >
+                {isScanning ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <RefreshCcwDot size={16} />
+                )}
+                {t("assets.assetsPageHeader.scan.label")}
+              </button>
+            </li>
+
+            {selection.enabled && (
+              <>
+                <li className="menu-title mt-2 text-xs text-base-content/45">
+                  <span>
+                    {t("assets.assetsPageHeader.compactMenu.selectedItems", {
+                      defaultValue: "Selected Items",
+                    })}{" "}
+                    ({selection.selectedCount})
+                  </span>
+                </li>
+                <li>
+                  <details>
+                    <summary className="py-2 text-accent">
+                      <Rocket size={16} />
+                      {t("assets.assetsPageHeader.actions.title")}
+                    </summary>
+                    <ul className="w-full">
+                      <li>
+                        <button
+                          onClick={() => {
+                            bulkOps.bulkSetLike(true);
+                            handleDropdownItemClick();
+                          }}
+                        >
+                          <Heart size={16} className="text-error" />{" "}
+                          {t("assets.assetsPageHeader.actions.like")}
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          onClick={() => {
+                            bulkOps.bulkSetLike(false);
+                            handleDropdownItemClick();
+                          }}
+                        >
+                          <Heart size={16} />{" "}
+                          {t("assets.assetsPageHeader.actions.unlike")}
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          onClick={() => {
+                            handleAddToAlbumClick();
+                            handleDropdownItemClick();
+                          }}
+                        >
+                          <FolderPlus size={16} className="text-info" />{" "}
+                          {t("assets.assetsPageHeader.actions.addToAlbum")}
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          onClick={() => {
+                            handleDownloadAll();
+                            handleDropdownItemClick();
+                          }}
+                        >
+                          <Download size={16} />{" "}
+                          {t("assets.assetsPageHeader.actions.downloadAll")}
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          onClick={() => {
+                            handleDeleteClick();
+                            handleDropdownItemClick();
+                          }}
+                          className="text-error focus:bg-error/20"
+                        >
+                          <Trash2 size={16} />{" "}
+                          {t("assets.assetsPageHeader.actions.deleteSelected")}
+                        </button>
+                      </li>
+                    </ul>
+                  </details>
+                </li>
+              </>
+            )}
+          </ul>
+        </div>
+
+        {/* Filter Tool in Compact Mode (placed outside Ellipsis menu because it's a complex component) */}
+        <div className="shrink-0 ml-2 lg:hidden block">
+          <FilterTool
+            initial={inboundDTO}
+            onChange={handleFiltersChange}
+            autoApply={true}
+          />
+        </div>
       </PageHeader>
 
       {/* Delete Confirmation Modal */}
@@ -616,10 +786,11 @@ const AssetsPageHeader = ({
       {/* Add to Album Modal */}
       {isAlbumModalOpen && (
         <div className="modal modal-open">
-          <div className="modal-box max-w-md">
-            <div className="flex items-center justify-between mb-6">
+          <div className="modal-box max-w-md h-[80vh] flex flex-col p-0 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-base-200 shrink-0">
               <h3 className="font-bold text-lg flex items-center gap-2">
-                <FolderPlus className="text-primary" />
+                <FolderPlus className="text-primary" size={20} />
                 {t("assets.assetsPageHeader.addToAlbumModal.title")}
               </h3>
               <button
@@ -630,57 +801,67 @@ const AssetsPageHeader = ({
               </button>
             </div>
 
-            <p className="text-sm opacity-70 mb-4">
+            {/* Hint */}
+            <p className="text-sm opacity-70 px-5 py-2 shrink-0">
               {t("assets.assetsPageHeader.addToAlbumModal.message", {
                 count: selection.selectedCount,
               })}
             </p>
 
-            <div className="max-h-64 overflow-y-auto space-y-2 custom-scrollbar pr-1">
+            {/* Scrollable List */}
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-3">
               {isLoadingAlbums ? (
-                <div className="flex justify-center py-8">
+                <div className="flex justify-center py-12">
                   <span className="loading loading-spinner loading-md text-primary"></span>
-                  <span className="sr-only">
-                    {t("assets.assetsPageHeader.addToAlbumModal.loadingAlbums")}
-                  </span>
                 </div>
               ) : albums.length > 0 ? (
-                albums.map((album) => (
-                  <button
-                    key={album.album_id}
-                    className="btn btn-ghost btn-block justify-start gap-3 font-normal hover:bg-primary/10"
-                    onClick={() => handleSelectAlbum(album.album_id!)}
-                    disabled={isAddingToAlbum}
-                  >
-                    <div className="w-10 h-10 rounded bg-base-300 flex items-center justify-center overflow-hidden">
-                      {album.cover_asset_id ? (
-                        <img
-                          src={assetUrls.getThumbnailUrl(
-                            album.cover_asset_id,
-                            "small",
-                          )}
-                          className="w-full h-full object-cover"
-                          alt=""
-                        />
-                      ) : (
-                        <FolderPlus size={18} className="opacity-30" />
-                      )}
-                    </div>
-                    <div className="text-left">
-                      <div className="font-bold text-sm">
-                        {album.album_name}
-                      </div>
-                      <div className="text-[10px] opacity-50 uppercase tracking-wider">
-                        {t(
-                          "assets.assetsPageHeader.addToAlbumModal.itemCount",
-                          { count: album.asset_count || 0 },
+                <ul className="list bg-base-200/50 rounded-box">
+                  <li className="p-4 pb-2 text-xs opacity-60 tracking-wide">
+                    {t("assets.assetsPageHeader.addToAlbumModal.itemCount", {
+                      count: albums.length,
+                    })}
+                  </li>
+                  {albums.map((album) => (
+                    <li key={album.album_id} className="list-row">
+                      <div className="size-10 rounded-box overflow-hidden bg-base-300 flex-shrink-0">
+                        {album.cover_asset_id ? (
+                          <img
+                            src={assetUrls.getThumbnailUrl(
+                              album.cover_asset_id,
+                              "small",
+                            )}
+                            className="size-full object-cover"
+                            alt=""
+                          />
+                        ) : (
+                          <div className="size-full flex items-center justify-center opacity-30">
+                            <FolderPlus size={18} />
+                          </div>
                         )}
                       </div>
-                    </div>
-                  </button>
-                ))
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm truncate">
+                          {album.album_name}
+                        </div>
+                        <div className="text-xs opacity-50">
+                          {t(
+                            "assets.assetsPageHeader.addToAlbumModal.itemCount",
+                            { count: album.asset_count || 0 },
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-sm btn-ghost btn-square"
+                        onClick={() => handleSelectAlbum(album.album_id!)}
+                        disabled={isAddingToAlbum}
+                      >
+                        <Plus size={18} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               ) : (
-                <div className="text-center py-8 opacity-50">
+                <div className="text-center py-12 opacity-50">
                   <p>
                     {t("assets.assetsPageHeader.addToAlbumModal.noAlbumsFound")}
                   </p>
@@ -688,10 +869,13 @@ const AssetsPageHeader = ({
               )}
             </div>
 
-            <div className="modal-action border-t border-base-200 pt-4">
-              <button className="btn btn-primary btn-sm gap-2">
-                <Plus size={16} />
-                {t("assets.assetsPageHeader.addToAlbumModal.createNewAlbum")}
+            {/* Footer */}
+            <div className="border-t border-base-200 px-5 py-3 shrink-0">
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setIsAlbumModalOpen(false)}
+              >
+                {t("common.cancel")}
               </button>
             </div>
           </div>
