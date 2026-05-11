@@ -187,25 +187,36 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
                 return (
                   <div
                     key={`${groupKey}-${assetId || index}`}
-                    className="relative aspect-square"
+                    className="hover-3d relative aspect-square"
                     role="listitem"
                     data-asset-id={assetId}
                   >
-                    <MediaThumbnail
-                      asset={asset}
-                      thumbnailUrl={thumbnailUrl}
-                      onClick={(event) => handleAssetClick(asset, event)}
-                      isSelected={
-                        assetId ? selection.isSelected(assetId) : false
-                      }
-                      isSelectionMode={selection.enabled}
-                      className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
-                    />
-                    {caption && (
-                      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 rounded-b-[1.25rem] bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
-                        {caption}
-                      </div>
-                    )}
+                    <figure className="h-full w-full rounded-2xl">
+                      <MediaThumbnail
+                        asset={asset}
+                        thumbnailUrl={thumbnailUrl}
+                        onClick={(event) => handleAssetClick(asset, event)}
+                        isSelected={
+                          assetId ? selection.isSelected(assetId) : false
+                        }
+                        isSelectionMode={selection.enabled}
+                        className="rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                      />
+                      {caption && (
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 rounded-b-2xl bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
+                          {caption}
+                        </div>
+                      )}
+                    </figure>
+                    {/* 8 empty divs needed for the 3D effect */}
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
                   </div>
                 );
               })}
