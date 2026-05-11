@@ -281,7 +281,7 @@ func toRepositoryDTO(repository *repo.Repository) dto.RepositoryDTO {
 		ID:        id,
 		Name:      repository.Name,
 		Path:      repository.Path,
-		IsPrimary: isPrimaryRepository(repository.Name, repository.Path),
+		IsPrimary: repo.IsPrimaryRepository(repository.Name, repository.Path),
 	}
 }
 

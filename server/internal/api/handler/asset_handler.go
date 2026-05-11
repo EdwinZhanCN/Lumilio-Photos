@@ -146,13 +146,20 @@ func (h *AssetHandler) UploadAsset(c *gin.Context) {
 			return
 		}
 	} else {
-		// Use first available repository as default
+		// Use primary repository as default
 		repositories, err := h.queries.ListRepositories(ctx)
 		if err != nil || len(repositories) == 0 {
 			api.GinBadRequest(c, errors.New("no repository available"), "Please specify a repository_id or create a repository first")
 			return
 		}
+		// Find the primary repository; fall back to first if none marked primary
 		repository = repositories[0]
+		for _, r := range repositories {
+			if repo.IsPrimaryRepository(r.Name, r.Path) {
+				repository = r
+				break
+			}
+		}
 	}
 
 	clientHash := c.GetHeader("X-Content-Hash")
@@ -295,13 +302,20 @@ func (h *AssetHandler) BatchUploadAssets(c *gin.Context) {
 				return false
 			}
 		} else {
-			// Use first available repository as default
+			// Use primary repository as default
 			repositories, err := h.queries.ListRepositories(ctx)
 			if err != nil || len(repositories) == 0 {
 				api.GinBadRequest(c, errors.New("no repository available"), "Please specify a repository_id or create a repository first")
 				return false
 			}
+			// Find the primary repository; fall back to first if none marked primary
 			repository = repositories[0]
+			for _, r := range repositories {
+				if repo.IsPrimaryRepository(r.Name, r.Path) {
+					repository = r
+					break
+				}
+			}
 		}
 		repositoryResolved = true
 		return true
@@ -1302,22 +1316,13 @@ func toIndexingRepositoryListResponseDTO(repositories []*repo.Repository) dto.In
 			ID:        uuid.UUID(repository.RepoID.Bytes).String(),
 			Name:      repository.Name,
 			Path:      repository.Path,
-			IsPrimary: isPrimaryRepository(repository.Name, repository.Path),
+			IsPrimary: repo.IsPrimaryRepository(repository.Name, repository.Path),
 		})
 	}
 
 	return dto.IndexingRepositoryListResponseDTO{
 		Repositories: items,
 	}
-}
-
-func isPrimaryRepository(name string, path string) bool {
-	if strings.EqualFold(strings.TrimSpace(name), "primary") {
-		return true
-	}
-
-	base := filepath.Base(strings.TrimSpace(path))
-	return strings.EqualFold(base, "primary")
 }
 
 func normalizeAssetQuerySortBy(sortBy string) string {

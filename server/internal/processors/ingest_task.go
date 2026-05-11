@@ -261,7 +261,7 @@ func (ap *AssetProcessor) markAssetFailed(ctx context.Context, assetID pgtype.UU
 	return nil
 }
 
-// resolveRepository resolves repository by ID or fallback to first available.
+// resolveRepository resolves repository by ID or fallback to primary.
 func (ap *AssetProcessor) resolveRepository(ctx context.Context, repositoryID string) (repo.Repository, error) {
 	if repositoryID != "" {
 		repoUUID, err := uuid.Parse(repositoryID)
@@ -275,6 +275,12 @@ func (ap *AssetProcessor) resolveRepository(ctx context.Context, repositoryID st
 	repositories, err := ap.queries.ListRepositories(ctx)
 	if err != nil || len(repositories) == 0 {
 		return repo.Repository{}, fmt.Errorf("no repository available: %w", err)
+	}
+	// Find the primary repository; fall back to first if none marked primary
+	for _, r := range repositories {
+		if repo.IsPrimaryRepository(r.Name, r.Path) {
+			return r, nil
+		}
 	}
 	return repositories[0], nil
 }
