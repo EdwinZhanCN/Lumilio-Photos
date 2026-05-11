@@ -241,6 +241,19 @@ func (s *Scanner) ProcessScanRepository(ctx context.Context, args jobs.ScanRepos
 		zap.Int64("deleted", counters.deleted),
 		zap.Int64("skipped", counters.skipped),
 	)
+
+
+	// Trigger automatic RAW+JPEG stack detection after scan completion.
+	if _, insertErr := s.queue.Insert(ctx, jobs.DetectStacksArgs{
+		RepositoryID: args.RepositoryID,
+	}, &river.InsertOpts{Queue: "detect_stacks"}); insertErr != nil {
+		s.logger.Warn("failed to enqueue detect stacks job",
+			zap.String("repository_id", args.RepositoryID),
+			zap.Error(insertErr),
+		)
+	}
+
+
 	return nil
 }
 

@@ -46,6 +46,12 @@ type AssetControllerInterface interface {
 
 	// Reprocessing operations
 	ReprocessAsset(c *gin.Context) // POST /assets/:id/reprocess - Reprocess failed or warning assets
+
+	// Stack operations
+	GetAssetStack(c *gin.Context)     // GET /assets/:id/stack - Get stack containing this asset
+	CreateManualStack(c *gin.Context) // POST /assets/stacks - Manually create a stack from assets
+	UnstackAsset(c *gin.Context)      // DELETE /assets/:id/stack - Remove asset from its stack
+	AutoDetectStacks(c *gin.Context)  // POST /repositories/:repositoryId/stacks/detect - Auto-detect RAW+JPEG stacks
 }
 
 // AuthControllerInterface defines the interface for authentication controllers
@@ -246,6 +252,7 @@ func NewRouter(
 			repositories.POST("/:id/scan", repositoryScanController.QueueRepositoryScan)
 			repositories.GET("/:id/scans/latest", repositoryScanController.GetLatestRepositoryScan)
 			repositories.GET("/:id/scans", repositoryScanController.ListRepositoryScans)
+			repositories.POST("/:id/stacks/detect", assetController.AutoDetectStacks)
 		}
 
 		locations := v1.Group("/locations")
@@ -295,6 +302,11 @@ func NewRouter(
 			assets.GET("/rating/:rating", assetController.GetAssetsByRating)
 			assets.GET("/liked", assetController.GetLikedAssets)
 			assets.POST("/:id/reprocess", assetController.ReprocessAsset)
+
+			// Stack routes
+			assets.GET("/:id/stack", assetController.GetAssetStack)
+			assets.DELETE("/:id/stack", assetController.UnstackAsset)
+			assets.POST("/stacks", assetController.CreateManualStack)
 		}
 
 		// Album routes - with authentication required

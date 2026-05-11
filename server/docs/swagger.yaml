@@ -193,6 +193,8 @@ components:
           - $ref: '#/components/schemas/dbtypes.VideoSpecificMetadata'
           - $ref: '#/components/schemas/dbtypes.AudioSpecificMetadata'
           type: object
+        stack:
+          $ref: '#/components/schemas/dto.StackPreviewDTO'
         status:
           items:
             type: integer
@@ -413,6 +415,13 @@ components:
         user:
           $ref: '#/components/schemas/dto.UserDTO'
       type: object
+    dto.AutoDetectStacksResponseDTO:
+      properties:
+        repository_id:
+          type: string
+        stacks_created:
+          type: integer
+      type: object
     dto.BatchUploadResponseDTO:
       properties:
         results:
@@ -529,6 +538,17 @@ components:
           type: string
       required:
       - album_name
+      type: object
+    dto.CreateManualStackRequestDTO:
+      properties:
+        asset_ids:
+          example:
+          - 550e8400-e29b-41d4-a716-446655440000
+          - 550e8400-e29b-41d4-a716-446655440001
+          items:
+            type: string
+          type: array
+          uniqueItems: false
       type: object
     dto.CreateRepositoryRequestDTO:
       properties:
@@ -1449,6 +1469,55 @@ components:
         status:
           type: string
         total_chunks:
+          type: integer
+      type: object
+    dto.StackByAssetResponseDTO:
+      properties:
+        asset_id:
+          type: string
+        stack:
+          $ref: '#/components/schemas/dto.StackDTO'
+      type: object
+    dto.StackDTO:
+      properties:
+        member_count:
+          example: 3
+          type: integer
+        members:
+          items:
+            $ref: '#/components/schemas/dto.StackMemberDTO'
+          type: array
+          uniqueItems: false
+        stack_id:
+          example: 550e8400-e29b-41d4-a716-446655440000
+          type: string
+      type: object
+    dto.StackMemberDTO:
+      properties:
+        asset_id:
+          example: 550e8400-e29b-41d4-a716-446655440001
+          type: string
+        position:
+          example: 0
+          type: integer
+        relation:
+          description: raw_original, jpeg_original, edited_version, alternative
+          example: raw_original
+          type: string
+      type: object
+    dto.StackPreviewDTO:
+      description: Stack fields (populated when stack mode is enabled)
+      properties:
+        stack_cover:
+          description: Whether this asset is the cover of its stack
+          example: true
+          type: boolean
+        stack_id:
+          example: 550e8400-e29b-41d4-a716-446655440000
+          type: string
+        stack_size:
+          description: Number of members in the stack
+          example: 3
           type: integer
       type: object
     dto.SystemSettingsDTO:
@@ -3656,6 +3725,75 @@ paths:
       summary: Reprocess asset
       tags:
       - assets
+  /api/v1/assets/{id}/stack:
+    delete:
+      description: Removes an asset from its stack, making it standalone
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Remove asset from stack
+      tags:
+      - assets
+    get:
+      description: Returns the stack (group) that contains the specified asset
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Not Found
+      security:
+      - BearerAuth: []
+      summary: Get asset stack
+      tags:
+      - assets
   /api/v1/assets/{id}/thumbnail:
     get:
       description: Retrieve a specific thumbnail image for an asset by asset ID and
@@ -4488,6 +4626,64 @@ paths:
                 $ref: '#/components/schemas/api.Result'
           description: Internal server error
       summary: Search assets
+      tags:
+      - assets
+  /api/v1/assets/stacks:
+    post:
+      description: Manually groups the specified assets into a new stack
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - type: object
+              - $ref: '#/components/schemas/dto.CreateManualStackRequestDTO'
+                description: Asset IDs to stack
+                summary: request
+        description: Asset IDs to stack
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: Created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Bad Request
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Conflict
+      security:
+      - BearerAuth: []
+      summary: Create manual stack
       tags:
       - assets
   /api/v1/assets/types:
@@ -6630,6 +6826,48 @@ paths:
       security:
       - BearerAuth: []
       summary: Get latest repository scan
+      tags:
+      - repositories
+  /api/v1/repositories/{repositoryId}/stacks/detect:
+    post:
+      description: Scans a repository for RAW+JPEG pairs and creates stacks automatically
+      parameters:
+      - description: Repository ID
+        in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: OK
+      security:
+      - BearerAuth: []
+      summary: Auto-detect stacks
       tags:
       - repositories
   /api/v1/settings/system:
