@@ -55,7 +55,7 @@ export default function AlbumRail({
               <img
                 src={album.coverImages[0]}
                 alt={album.name}
-                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03] cursor-pointer"
                 loading="lazy"
               />
             ) : (

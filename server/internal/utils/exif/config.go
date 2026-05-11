@@ -27,6 +27,9 @@ type Config struct {
 
 	// FastMode use exiftool fast mode (skip scanning entire file)
 	FastMode bool
+
+	// IncludeRaw stores the full exiftool JSON object alongside parsed metadata.
+	IncludeRaw bool
 }
 
 // DefaultConfig returns a default configuration
@@ -40,6 +43,7 @@ func DefaultConfig() *Config {
 		EnableCaching: false, // Disable caching for large files to save memory
 		CacheSize:     100,   // Reduced cache size for large file processing
 		FastMode:      false, // Default to full scan for accuracy
+		IncludeRaw:    false,
 	}
 }
 

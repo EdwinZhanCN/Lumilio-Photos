@@ -7,6 +7,7 @@ package repo
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"server/internal/db/dbtypes"
@@ -129,7 +130,7 @@ func (q *Queries) GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAsse
 }
 
 const getAlbumAssets = `-- name: GetAlbumAssets :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = $1 AND a.is_deleted = false
@@ -163,6 +164,7 @@ type GetAlbumAssetsRow struct {
 	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
 	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              json.RawMessage          `db:"exif_raw" json:"exif_raw"`
 	Position             *int32                   `db:"position" json:"position"`
 	AddedTime            pgtype.Timestamptz       `db:"added_time" json:"added_time"`
 }
@@ -203,6 +205,7 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 			&i.GpsLongitude,
 			&i.GpsGeohash5,
 			&i.GpsGeohash7,
+			&i.ExifRaw,
 			&i.Position,
 			&i.AddedTime,
 		); err != nil {
@@ -217,7 +220,7 @@ func (q *Queries) GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbum
 }
 
 const getAlbumAssetsScoped = `-- name: GetAlbumAssetsScoped :many
-SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, aa.position, aa.added_time
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw, aa.position, aa.added_time
 FROM assets a
 JOIN album_assets aa ON a.asset_id = aa.asset_id
 WHERE aa.album_id = $1
@@ -261,6 +264,7 @@ type GetAlbumAssetsScopedRow struct {
 	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
 	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              json.RawMessage          `db:"exif_raw" json:"exif_raw"`
 	Position             *int32                   `db:"position" json:"position"`
 	AddedTime            pgtype.Timestamptz       `db:"added_time" json:"added_time"`
 }
@@ -301,6 +305,7 @@ func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsSc
 			&i.GpsLongitude,
 			&i.GpsGeohash5,
 			&i.GpsGeohash7,
+			&i.ExifRaw,
 			&i.Position,
 			&i.AddedTime,
 		); err != nil {

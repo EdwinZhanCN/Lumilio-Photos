@@ -372,6 +372,7 @@ const AssetsPageHeader = ({
       <PageHeader
         title={title ?? tabTitle}
         icon={icon ?? <TabIcon className="w-6 h-6 text-primary" />}
+        className="sticky top-0 z-50 bg-base-100 border-b border-base-200"
       >
         {selection.enabled && (
           <div className="badge badge-lg badge-neutral hidden gap-2 rounded-full px-3 py-3 text-xs font-medium sm:inline-flex shrink-0">
@@ -570,11 +571,11 @@ const AssetsPageHeader = ({
           COMPACT MODE ACTIONS MENU
           Visible on small screens
         */}
-        <div className="dropdown dropdown-end shrink-0 lg:hidden block">
+        <div className="dropdown dropdown-end m-0 shrink-0 lg:hidden block">
           <div
             tabIndex={0}
             role="button"
-            className="btn btn-sm btn-circle btn-ghost"
+            className="btn btn-sm btn-soft btn-circle btn-info m-0"
             title={t("assets.assetsPageHeader.moreActions")}
           >
             <Ellipsis className="w-4 h-4" />

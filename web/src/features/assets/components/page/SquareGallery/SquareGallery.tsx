@@ -52,8 +52,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
   );
 
   const totalAssetCount = useMemo(
-    () =>
-      groupEntries.reduce((count, group) => count + group.assets.length, 0),
+    () => groupEntries.reduce((count, group) => count + group.assets.length, 0),
     [groupEntries],
   );
 
@@ -141,7 +140,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
 
   return (
     <div
-      className={`w-full px-4 pb-8 transition-all ${className}`}
+      className={`w-full p-4 pb-8 transition-all ${className}`}
       aria-busy={isLoading || isLoadingMore}
       tabIndex={selection.enabled ? 0 : -1}
       onKeyDown={selection.enabled ? selection.handleKeyDown : undefined}

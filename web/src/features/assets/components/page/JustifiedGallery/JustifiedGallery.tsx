@@ -90,8 +90,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   );
 
   const totalAssetCount = useMemo(
-    () =>
-      groupEntries.reduce((count, group) => count + group.assets.length, 0),
+    () => groupEntries.reduce((count, group) => count + group.assets.length, 0),
     [groupEntries],
   );
 
@@ -317,7 +316,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`w-full px-4 pb-8 transition-all ${className}`}
+      className={`w-full p-4 pb-8 transition-all ${className}`}
       aria-busy={isLoading || isLoadingMore}
       tabIndex={selection.enabled ? 0 : -1}
       onKeyDown={selection.enabled ? selection.handleKeyDown : undefined}
@@ -334,26 +333,26 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
         </div>
       )}
 
-        {displayGroupEntries.map((group) => {
-          const groupKey = group.key;
-          const assets = group.assets;
-          const layout = layouts[groupKey];
-          const showHeader =
-            groupEntries.length > 1 || !DEFAULT_GROUP_KEYS.has(groupKey);
-          const groupLabel = formatAssetGroupLabel(
-            groupKey,
-            t,
-            i18n.resolvedLanguage || i18n.language,
-          );
+      {displayGroupEntries.map((group) => {
+        const groupKey = group.key;
+        const assets = group.assets;
+        const layout = layouts[groupKey];
+        const showHeader =
+          groupEntries.length > 1 || !DEFAULT_GROUP_KEYS.has(groupKey);
+        const groupLabel = formatAssetGroupLabel(
+          groupKey,
+          t,
+          i18n.resolvedLanguage || i18n.language,
+        );
 
-          return (
-            <section key={groupKey} className="mb-10 last:mb-0">
-              {showHeader && (
-                <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-widest text-base-content/60">
-                  <span className="font-semibold">{groupLabel}</span>
-                  <span>
-                    {t("assets.justifiedGallery.item_count", {
-                      count: assets.length,
+        return (
+          <section key={groupKey} className="mb-10 last:mb-0">
+            {showHeader && (
+              <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-widest text-base-content/60">
+                <span className="font-semibold">{groupLabel}</span>
+                <span>
+                  {t("assets.justifiedGallery.item_count", {
+                    count: assets.length,
                   })}
                 </span>
               </div>

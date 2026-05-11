@@ -46,7 +46,6 @@ export const MAIN_ASSETS_SCOPE_ID = "assets:main";
 interface AssetsNavigationContextValue {
   openCarousel: (assetId: string) => void;
   closeCarousel: () => void;
-  switchTab: (tab: TabType) => void;
 }
 
 export const AssetsNavigationContext = createContext<
@@ -201,7 +200,9 @@ function toCompleteLocationBBox(location?: AssetFilter["location"]) {
   };
 }
 
-function assetFilterToFiltersState(filter?: AssetFilter): Partial<FiltersState> {
+function assetFilterToFiltersState(
+  filter?: AssetFilter,
+): Partial<FiltersState> {
   if (!filter) return {};
 
   const filters: Partial<FiltersState> = {
@@ -293,8 +294,14 @@ export const AssetsProvider = ({
     })),
   );
 
-  const uiState = useStore(store, useShallow((state) => state.ui));
-  const filtersState = useStore(store, useShallow((state) => state.filters));
+  const uiState = useStore(
+    store,
+    useShallow((state) => state.ui),
+  );
+  const filtersState = useStore(
+    store,
+    useShallow((state) => state.filters),
+  );
   const selectionState = useStore(
     store,
     useShallow((state) => state.selection),
@@ -312,7 +319,7 @@ export const AssetsProvider = ({
     const initialSearchQuery =
       syncUrl && urlQuery !== null
         ? urlQuery
-        : persistedState.ui?.searchQuery ?? "";
+        : (persistedState.ui?.searchQuery ?? "");
     const routeState = location.state as AssetsRouteState;
     const routeFilter = assetFilterToFiltersState(
       routeState?.assetsInitialFilter,
@@ -338,7 +345,7 @@ export const AssetsProvider = ({
       sortBy: initialSortBy,
       searchQuery: syncUrl
         ? initialSearchQuery
-        : persistedState.ui?.searchQuery ?? uiState.searchQuery,
+        : (persistedState.ui?.searchQuery ?? uiState.searchQuery),
     });
 
     if (routeState?.assetsInitialFilter) {
@@ -374,7 +381,13 @@ export const AssetsProvider = ({
       ui: uiState,
       selection: selectionState,
     });
-  }, [filtersState, isHydrated, isMainPersistentScope, selectionState, uiState]);
+  }, [
+    filtersState,
+    isHydrated,
+    isMainPersistentScope,
+    selectionState,
+    uiState,
+  ]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -411,13 +424,7 @@ export const AssetsProvider = ({
     if (urlQuery !== null && resolvedQuery !== uiState.searchQuery) {
       hydrateUI({ searchQuery: resolvedQuery });
     }
-  }, [
-    hydrateUI,
-    isHydrated,
-    searchParams,
-    syncUrl,
-    uiState.searchQuery,
-  ]);
+  }, [hydrateUI, isHydrated, searchParams, syncUrl, uiState.searchQuery]);
 
   useEffect(() => {
     if (!syncUrl || !isHydrated) return;
@@ -433,13 +440,7 @@ export const AssetsProvider = ({
     if (nextParams.toString() !== liveSearchParams.toString()) {
       setSearchParams(nextParams, { replace: true });
     }
-  }, [
-    isHydrated,
-    searchParams,
-    setSearchParams,
-    syncUrl,
-    uiState.searchQuery,
-  ]);
+  }, [isHydrated, searchParams, setSearchParams, syncUrl, uiState.searchQuery]);
 
   const openCarousel = useCallback(
     (assetId: string) => {
@@ -460,23 +461,12 @@ export const AssetsProvider = ({
     navigate(`${path}${query ? `?${query}` : ""}`);
   }, [basePath, navigate, searchParams, syncUrl]);
 
-  const switchTab = useCallback(
-    (_tab: TabType) => {
-      const currentParams = syncUrl ? getLiveSearchParams(searchParams) : null;
-      const path = "/assets";
-      const query = currentParams?.toString();
-      navigate(`${path}${query ? `?${query}` : ""}`);
-    },
-    [navigate, searchParams, syncUrl],
-  );
-
   const contextValue = useMemo<AssetsNavigationContextValue>(
     () => ({
       openCarousel,
       closeCarousel,
-      switchTab,
     }),
-    [openCarousel, closeCarousel, switchTab],
+    [openCarousel, closeCarousel],
   );
 
   return (

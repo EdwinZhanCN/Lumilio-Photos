@@ -7,6 +7,7 @@ package repo
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"server/internal/db/dbtypes"
@@ -14,7 +15,7 @@ import (
 
 const getAssetWithRelations = `-- name: GetAssetWithRelations :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
     COALESCE(thumbnails_rel.thumbnails, '[]'::json) as thumbnails,
     COALESCE(tags_rel.tags, '[]'::json) as tags,
     COALESCE(albums_rel.albums, '[]'::json) as albums,
@@ -185,6 +186,7 @@ type GetAssetWithRelationsRow struct {
 	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
 	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              json.RawMessage          `db:"exif_raw" json:"exif_raw"`
 	Thumbnails           []byte                   `db:"thumbnails" json:"thumbnails"`
 	Tags                 []byte                   `db:"tags" json:"tags"`
 	Albums               []byte                   `db:"albums" json:"albums"`
@@ -224,6 +226,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 		&i.GpsLongitude,
 		&i.GpsGeohash5,
 		&i.GpsGeohash7,
+		&i.ExifRaw,
 		&i.Thumbnails,
 		&i.Tags,
 		&i.Albums,
@@ -237,7 +240,7 @@ func (q *Queries) GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID
 
 const getAssetWithTags = `-- name: GetAssetWithTags :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
     COALESCE((
         SELECT json_agg(
             json_build_object(
@@ -284,6 +287,7 @@ type GetAssetWithTagsRow struct {
 	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
 	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              json.RawMessage          `db:"exif_raw" json:"exif_raw"`
 	Tags                 interface{}              `db:"tags" json:"tags"`
 }
 
@@ -317,6 +321,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 		&i.GpsLongitude,
 		&i.GpsGeohash5,
 		&i.GpsGeohash7,
+		&i.ExifRaw,
 		&i.Tags,
 	)
 	return i, err
@@ -324,7 +329,7 @@ func (q *Queries) GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (Ge
 
 const getAssetWithThumbnails = `-- name: GetAssetWithThumbnails :one
 SELECT
-    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7,
+    a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw,
     COALESCE((
         SELECT json_agg(
             json_build_object(
@@ -374,6 +379,7 @@ type GetAssetWithThumbnailsRow struct {
 	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
 	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              json.RawMessage          `db:"exif_raw" json:"exif_raw"`
 	Thumbnails           interface{}              `db:"thumbnails" json:"thumbnails"`
 }
 
@@ -407,6 +413,7 @@ func (q *Queries) GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUI
 		&i.GpsLongitude,
 		&i.GpsGeohash5,
 		&i.GpsGeohash7,
+		&i.ExifRaw,
 		&i.Thumbnails,
 	)
 	return i, err

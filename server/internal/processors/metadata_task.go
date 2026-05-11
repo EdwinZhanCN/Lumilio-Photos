@@ -96,7 +96,7 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 
 		sm, err := dbtypes.MarshalMeta(meta)
 		if err == nil {
-			_ = ap.assetService.UpdateAssetMetadata(ctx, asset.AssetID.Bytes, sm)
+			_ = ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, res.Raw)
 			if hasValidLocationGPS(meta.GPSLatitude, meta.GPSLongitude) {
 				ap.enqueueLocationClusterRebuild(ctx, asset)
 			}

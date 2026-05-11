@@ -29,6 +29,7 @@ func (ap *AssetProcessor) createEXIFConfig() *exif.Config {
 		Timeout:     60 * time.Second,
 		BufferSize:  128 * 1024,
 		FastMode:    false, // Full EXIF for photos
+		IncludeRaw:  true,
 	}
 }
 

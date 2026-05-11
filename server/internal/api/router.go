@@ -13,6 +13,7 @@ type AssetControllerInterface interface {
 	// Legacy asset operations
 	UploadAsset(c *gin.Context)
 	GetAsset(c *gin.Context)
+	GetAssetExif(c *gin.Context)
 	GetOriginalFile(c *gin.Context)
 	GetWebVideo(c *gin.Context)
 	GetWebAudio(c *gin.Context)
@@ -272,6 +273,7 @@ func NewRouter(
 			assets.GET("/batch/config", assetController.GetUploadConfig)
 			assets.GET("/batch/progress", assetController.GetUploadProgress)
 			assets.GET("/:id", assetController.GetAsset)
+			assets.GET("/:id/exif", assetController.GetAssetExif)
 			assets.GET("/:id/original", assetController.GetOriginalFile)
 			assets.HEAD("/:id/original", assetController.GetOriginalFile)
 			assets.GET("/:id/video/web", assetController.GetWebVideo)
