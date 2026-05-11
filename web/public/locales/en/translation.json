@@ -96,7 +96,9 @@
         "map": {
             "title": "Spacetime Trail",
             "loading": "Loading map data...",
-            "loadedStatus": "Located {{pointsCount}} photos / Loaded {{loadedCount}}{{hasTotal, select, true { / Total {{totalCount}}} other {}}}{{loadingMore, select, true { (loading more)} other {}}}",
+            "loadedStatus": "Located {{pointsCount}} photos / Loaded {{loadedCount}}",
+            "loadedStatusTotal": " / Total {{totalCount}}",
+            "loadedStatusMore": " (loading more)",
             "placesCount": "{{count}} places",
             "empty": "No photos with location data yet."
         },
@@ -472,6 +474,12 @@
                 "addToAlbum": "Add to Album",
                 "downloadAll": "Download All",
                 "deleteSelected": "Delete Selected"
+            },
+            "moreActions": "More actions",
+            "compactMenu": {
+                "viewSort": "View & Sort",
+                "actions": "Actions",
+                "selectedItems": "Selected Items"
             },
             "deleteConfirmModal": {
                 "title": "Confirm Deletion",

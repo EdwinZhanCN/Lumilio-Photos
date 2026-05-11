@@ -222,7 +222,7 @@ const SectionShell = memo(function SectionShell({
           </span>
           <input
             type="checkbox"
-            className="toggle toggle-primary"
+            className="toggle toggle-primary toggle-sm"
             disabled={disabled}
             checked={enabled}
             onChange={(e) => onToggle(e.target.checked)}
@@ -259,10 +259,10 @@ const RawSection = memo(function RawSection({
       onToggle={onEnabledChange}
       disabled={filterDisabled}
     >
-      <div className="join">
+      <div className="join w-full">
         <button
           type="button"
-          className={`btn btn-xs join-item ${mode === "include" ? "btn-primary" : "btn-outline"}`}
+          className={`btn btn-xs join-item flex-1 ${mode === "include" ? "btn-primary" : "btn-outline"}`}
           disabled={filterDisabled || !enabled}
           onClick={() => onModeChange("include")}
         >
@@ -270,7 +270,7 @@ const RawSection = memo(function RawSection({
         </button>
         <button
           type="button"
-          className={`btn btn-xs join-item ${mode === "exclude" ? "btn-primary" : "btn-outline"}`}
+          className={`btn btn-xs join-item flex-1 ${mode === "exclude" ? "btn-primary" : "btn-outline"}`}
           disabled={filterDisabled || !enabled}
           onClick={() => onModeChange("exclude")}
         >
@@ -302,10 +302,10 @@ const TypeSection = memo(function TypeSection({
       onToggle={onEnabledChange}
       disabled={filterDisabled}
     >
-      <div className="join">
+      <div className="join w-full">
         <button
           type="button"
-          className={`btn btn-sm join-item ${value === "PHOTO" ? "btn-primary" : "btn-outline"}`}
+          className={`btn btn-xs join-item flex-1 ${value === "PHOTO" ? "btn-primary" : "btn-outline"}`}
           disabled={filterDisabled || !enabled}
           onClick={() => onValueChange("PHOTO")}
         >
@@ -313,7 +313,7 @@ const TypeSection = memo(function TypeSection({
         </button>
         <button
           type="button"
-          className={`btn btn-sm join-item ${value === "VIDEO" ? "btn-primary" : "btn-outline"}`}
+          className={`btn btn-xs join-item flex-1 ${value === "VIDEO" ? "btn-primary" : "btn-outline"}`}
           disabled={filterDisabled || !enabled}
           onClick={() => onValueChange("VIDEO")}
         >
@@ -345,12 +345,12 @@ const RatingSection = memo(function RatingSection({
       onToggle={onEnabledChange}
       disabled={filterDisabled}
     >
-      <div className="join">
+      <div className="join w-full flex">
         {[5, 4, 3, 2, 1].map((n) => (
           <button
             key={n}
             type="button"
-            className={`btn btn-xs join-item ${value === n ? "btn-primary" : "btn-outline"}`}
+            className={`btn btn-xs join-item flex-1 ${value === n ? "btn-primary" : "btn-outline"}`}
             disabled={filterDisabled || !enabled}
             onClick={() => onValueChange(n)}
             title={t("assets.filterTool.ratingSection.rating_n", { n })}
@@ -360,7 +360,7 @@ const RatingSection = memo(function RatingSection({
         ))}
         <button
           type="button"
-          className={`btn btn-xs join-item ${value === 0 ? "btn-primary" : "btn-outline"}`}
+          className={`btn btn-xs join-item flex-1 ${value === 0 ? "btn-primary" : "btn-outline"}`}
           disabled={filterDisabled || !enabled}
           onClick={() => onValueChange(0)}
           title={t("assets.filterTool.ratingSection.unrated_title")}
@@ -393,10 +393,10 @@ const LikeSection = memo(function LikeSection({
       onToggle={onEnabledChange}
       disabled={filterDisabled}
     >
-      <div className="join">
+      <div className="join w-full">
         <button
           type="button"
-          className={`btn btn-xs join-item ${value ? "btn-primary" : "btn-outline"}`}
+          className={`btn btn-xs join-item flex-1 ${value ? "btn-primary" : "btn-outline"}`}
           disabled={filterDisabled || !enabled}
           onClick={() => onValueChange(true)}
         >
@@ -404,7 +404,7 @@ const LikeSection = memo(function LikeSection({
         </button>
         <button
           type="button"
-          className={`btn btn-xs join-item ${!value ? "btn-primary" : "btn-outline"}`}
+          className={`btn btn-xs join-item flex-1 ${!value ? "btn-primary" : "btn-outline"}`}
           disabled={filterDisabled || !enabled}
           onClick={() => onValueChange(false)}
         >
@@ -440,9 +440,9 @@ const FilenameSection = memo(function FilenameSection({
       onToggle={onEnabledChange}
       disabled={filterDisabled}
     >
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2">
         <select
-          className="select select-bordered select-xs w-1/3"
+          className="select select-bordered select-xs w-full"
           disabled={filterDisabled || !enabled}
           value={operator}
           onChange={(e) => onOperatorChange(e.target.value as FilenameOperator)}
@@ -462,7 +462,7 @@ const FilenameSection = memo(function FilenameSection({
         </select>
         <input
           type="text"
-          className="input input-bordered input-xs w-2/3"
+          className="input input-bordered input-xs w-full"
           placeholder={t("assets.filterTool.filenameSection.placeholder")}
           disabled={filterDisabled || !enabled}
           value={value}
@@ -498,9 +498,9 @@ const DateSection = memo(function DateSection({
       onToggle={onEnabledChange}
       disabled={filterDisabled}
     >
-      <div className="flex gap-2">
-        <label className="input input-bordered input-xs flex-1 flex items-center gap-2">
-          <span className="text-xs opacity-70">
+      <div className="flex flex-col gap-2">
+        <label className="input input-bordered input-xs w-full flex items-center gap-2">
+          <span className="text-xs opacity-70 w-8">
             {t("assets.filterTool.dateSection.from")}
           </span>
           <input
@@ -511,8 +511,8 @@ const DateSection = memo(function DateSection({
             onChange={(e) => onFromChange(e.target.value)}
           />
         </label>
-        <label className="input input-bordered input-xs flex-1 flex items-center gap-2">
-          <span className="text-xs opacity-70">
+        <label className="input input-bordered input-xs w-full flex items-center gap-2">
+          <span className="text-xs opacity-70 w-8">
             {t("assets.filterTool.dateSection.to")}
           </span>
           <input
@@ -640,10 +640,10 @@ const LocationSection = memo(function LocationSection({
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mt-1">
             <button
               type="button"
-              className="btn btn-xs btn-outline"
+              className="btn btn-xs btn-outline flex-1"
               disabled={filterDisabled || !enabled}
               onClick={() => setMapModalOpen(true)}
             >
@@ -651,7 +651,7 @@ const LocationSection = memo(function LocationSection({
             </button>
             <button
               type="button"
-              className="btn btn-xs btn-ghost"
+              className="btn btn-xs btn-ghost flex-1"
               disabled={filterDisabled || !enabled}
               onClick={setCurrentLocationAsCenter}
             >
@@ -663,7 +663,7 @@ const LocationSection = memo(function LocationSection({
 
       {mapModalOpen && (
         <dialog className="modal modal-open">
-          <div className="modal-box">
+          <div className="modal-box max-w-sm">
             <h3 className="font-bold text-lg">
               {t("assets.filterTool.locationSection.modal_title")}
             </h3>
@@ -716,14 +716,14 @@ const LocationSection = memo(function LocationSection({
             <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
-                className="btn btn-sm btn-outline"
+                className="btn btn-sm btn-outline flex-1"
                 onClick={setCurrentLocationAsCenter}
               >
                 {t("assets.filterTool.locationSection.use_current_location")}
               </button>
               <button
                 type="button"
-                className="btn btn-sm"
+                className="btn btn-sm flex-1"
                 onClick={computeBBoxFromCenter}
               >
                 {t("assets.filterTool.locationSection.generate_bbox")}
@@ -734,7 +734,7 @@ const LocationSection = memo(function LocationSection({
               <div className="text-sm opacity-70 mb-2">
                 {t("assets.filterTool.locationSection.preview_map")}
               </div>
-              <div className="w-full h-48 rounded-box overflow-hidden border border-base-300">
+              <div className="w-full h-40 rounded-box overflow-hidden border border-base-300">
                 <MapComponent
                   center={previewCenter}
                   zoom={previewBounds ? 10 : 3}
@@ -756,14 +756,14 @@ const LocationSection = memo(function LocationSection({
             <div className="modal-action">
               <button
                 type="button"
-                className="btn btn-ghost"
+                className="btn btn-ghost btn-sm"
                 onClick={() => setMapModalOpen(false)}
               >
                 {t("assets.filterTool.locationSection.cancel")}
               </button>
               <button
                 type="button"
-                className="btn btn-primary"
+                className="btn btn-primary btn-sm"
                 onClick={() => {
                   setMapModalOpen(false);
                 }}
@@ -813,7 +813,7 @@ const CameraMakeSection = memo(function CameraMakeSection({
       disabled={filterDisabled}
     >
       <select
-        className="select select-bordered select-xs"
+        className="select select-bordered select-xs w-full"
         disabled={filterDisabled || !enabled || loading}
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
@@ -862,7 +862,7 @@ const LensSection = memo(function LensSection({
       disabled={filterDisabled}
     >
       <select
-        className="select select-bordered select-xs"
+        className="select select-bordered select-xs w-full"
         disabled={filterDisabled || !enabled || loading}
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
@@ -938,7 +938,9 @@ export default function FilterTool({
   const [likedEnabled, setLikedEnabled] = useState<boolean>(
     typeof initialDTO.liked === "boolean",
   );
-  const [likedValue, setLikedValue] = useState<boolean>(initialDTO.liked ?? true);
+  const [likedValue, setLikedValue] = useState<boolean>(
+    initialDTO.liked ?? true,
+  );
 
   // Filename: operator + value
   const [filenameEnabled, setFilenameEnabled] = useState<boolean>(
@@ -1200,145 +1202,149 @@ export default function FilterTool({
       >
         <ListFilterIcon className="w-4 h-4" />
         {enabledCount > 0 && (
-          <span className="badge badge-xs badge-primary absolute -right-1 -top-1">
+          <span className="badge badge-xs badge-primary absolute -right-1 -top-1 border-base-100">
             {enabledCount}
           </span>
         )}
       </button>
 
-      <div className="dropdown-content bg-base-100 rounded-box z-50 w-96 p-3 shadow">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="font-medium">
-              {t("assets.filterTool.main.filters_header")}
-            </span>
-            <span className="badge badge-ghost">
-              {t("assets.filterTool.main.active_filters_count", {
-                count: enabledCount,
-              })}
-            </span>
+      {open && (
+        <div className="dropdown-content bg-base-100 rounded-box z-50 w-80 p-0 shadow-xl border border-base-200 mt-2 overflow-hidden flex flex-col">
+          {/* Header (Sticky) */}
+          <div className="p-4 border-b border-base-200 bg-base-100 sticky top-0 z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-bold">
+                  {t("assets.filterTool.main.filters_header")}
+                </span>
+                {enabledCount > 0 && (
+                  <span className="badge badge-primary badge-sm">
+                    {t("assets.filterTool.main.active_filters_count", {
+                      count: enabledCount,
+                    })}
+                  </span>
+                )}
+              </div>
+              <label className="label cursor-pointer p-0 gap-2">
+                <span className="label-text text-xs opacity-70">
+                  {t("assets.filterTool.main.enable_toggle")}
+                </span>
+                <input
+                  type="checkbox"
+                  className="toggle toggle-primary toggle-sm"
+                  checked={filterEnabled}
+                  onChange={(e) => setFilterEnabled(e.target.checked)}
+                />
+              </label>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <label className="label cursor-pointer p-0 gap-2">
-              <span className="label-text">
-                {t("assets.filterTool.main.enable_toggle")}
-              </span>
-              <input
-                type="checkbox"
-                className="toggle toggle-primary"
-                checked={filterEnabled}
-                onChange={(e) => setFilterEnabled(e.target.checked)}
-              />
-            </label>
+
+          {/* Scrollable Content */}
+          <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+            {/* Sections */}
+            <TypeSection
+              filterDisabled={!filterEnabled}
+              enabled={typeEnabled}
+              onEnabledChange={setTypeEnabled}
+              value={typeValue}
+              onValueChange={setTypeValue}
+            />
+
+            <RawSection
+              filterDisabled={!filterEnabled}
+              enabled={rawEnabled}
+              onEnabledChange={setRawEnabled}
+              mode={rawMode}
+              onModeChange={setRawMode}
+            />
+
+            <RatingSection
+              filterDisabled={!filterEnabled}
+              enabled={ratingEnabled}
+              onEnabledChange={setRatingEnabled}
+              value={ratingValue}
+              onValueChange={setRatingValue}
+            />
+
+            <LikeSection
+              filterDisabled={!filterEnabled}
+              enabled={likedEnabled}
+              onEnabledChange={setLikedEnabled}
+              value={likedValue}
+              onValueChange={setLikedValue}
+            />
+
+            <FilenameSection
+              filterDisabled={!filterEnabled}
+              enabled={filenameEnabled}
+              onEnabledChange={setFilenameEnabled}
+              operator={filenameOperator}
+              onOperatorChange={setFilenameOperator}
+              value={filenameValue}
+              onValueChange={setFilenameValue}
+            />
+
+            <DateSection
+              filterDisabled={!filterEnabled}
+              enabled={dateEnabled}
+              onEnabledChange={setDateEnabled}
+              from={dateFrom}
+              onFromChange={setDateFrom}
+              to={dateTo}
+              onToChange={setDateTo}
+            />
+
+            <LocationSection
+              filterDisabled={!filterEnabled}
+              enabled={locationEnabled}
+              onEnabledChange={setLocationEnabled}
+              bbox={location}
+              onBBoxChange={setLocation}
+            />
+
+            <CameraMakeSection
+              filterDisabled={!filterEnabled}
+              enabled={cameraModelEnabled}
+              onEnabledChange={setCameraModelEnabled}
+              value={cameraModel}
+              onValueChange={setCameraModel}
+              items={cameraModelItems}
+              loading={loadingOptions}
+            />
+
+            <LensSection
+              filterDisabled={!filterEnabled}
+              enabled={lensEnabled}
+              onEnabledChange={setLensEnabled}
+              value={lens}
+              onValueChange={setLens}
+              items={lensItems}
+              loading={loadingOptions}
+            />
           </div>
-        </div>
 
-        <div className="divider my-2" />
-
-        {/* Sections */}
-        <TypeSection
-          filterDisabled={!filterEnabled}
-          enabled={typeEnabled}
-          onEnabledChange={setTypeEnabled}
-          value={typeValue}
-          onValueChange={setTypeValue}
-        />
-
-        <RawSection
-          filterDisabled={!filterEnabled}
-          enabled={rawEnabled}
-          onEnabledChange={setRawEnabled}
-          mode={rawMode}
-          onModeChange={setRawMode}
-        />
-
-        <RatingSection
-          filterDisabled={!filterEnabled}
-          enabled={ratingEnabled}
-          onEnabledChange={setRatingEnabled}
-          value={ratingValue}
-          onValueChange={setRatingValue}
-        />
-
-        <LikeSection
-          filterDisabled={!filterEnabled}
-          enabled={likedEnabled}
-          onEnabledChange={setLikedEnabled}
-          value={likedValue}
-          onValueChange={setLikedValue}
-        />
-
-        <FilenameSection
-          filterDisabled={!filterEnabled}
-          enabled={filenameEnabled}
-          onEnabledChange={setFilenameEnabled}
-          operator={filenameOperator}
-          onOperatorChange={setFilenameOperator}
-          value={filenameValue}
-          onValueChange={setFilenameValue}
-        />
-
-        <DateSection
-          filterDisabled={!filterEnabled}
-          enabled={dateEnabled}
-          onEnabledChange={setDateEnabled}
-          from={dateFrom}
-          onFromChange={setDateFrom}
-          to={dateTo}
-          onToChange={setDateTo}
-        />
-
-        <LocationSection
-          filterDisabled={!filterEnabled}
-          enabled={locationEnabled}
-          onEnabledChange={setLocationEnabled}
-          bbox={location}
-          onBBoxChange={setLocation}
-        />
-
-        <CameraMakeSection
-          filterDisabled={!filterEnabled}
-          enabled={cameraModelEnabled}
-          onEnabledChange={setCameraModelEnabled}
-          value={cameraModel}
-          onValueChange={setCameraModel}
-          items={cameraModelItems}
-          loading={loadingOptions}
-        />
-
-        <LensSection
-          filterDisabled={!filterEnabled}
-          enabled={lensEnabled}
-          onEnabledChange={setLensEnabled}
-          value={lens}
-          onValueChange={setLens}
-          items={lensItems}
-          loading={loadingOptions}
-        />
-
-        <div className="divider my-2" />
-
-        {/* Footer actions */}
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            className="btn btn-xs btn-outline"
-            onClick={resetAll}
-          >
-            {t("assets.filterTool.main.reset_button")}
-          </button>
-          {!autoApply && (
+          {/* Footer actions (Sticky) */}
+          <div className="p-3 border-t border-base-200 bg-base-50 sticky bottom-0 z-10 flex items-center justify-between">
             <button
               type="button"
-              className="btn btn-xs btn-primary"
-              onClick={applyNow}
+              className="btn btn-xs btn-ghost text-error"
+              onClick={resetAll}
+              disabled={!filterEnabled && enabledCount === 0}
             >
-              {t("assets.filterTool.main.apply_button")}
+              {t("assets.filterTool.main.reset_button")}
             </button>
-          )}
+            {!autoApply && (
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={applyNow}
+              >
+                {t("assets.filterTool.main.apply_button")}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

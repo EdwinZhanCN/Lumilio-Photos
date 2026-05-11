@@ -96,7 +96,9 @@
         "map": {
             "title": "时空轨迹",
             "loading": "正在加载地图数据...",
-            "loadedStatus": "定位照片 {{pointsCount}} 张 / 已加载 {{loadedCount}}{{hasTotal, select, true { / 总计 {{totalCount}}} other {}}}{{loadingMore, select, true {（继续加载中）} other {}}}",
+            "loadedStatus": "定位照片 {{pointsCount}} 张 / 已加载 {{loadedCount}}",
+            "loadedStatusTotal": " / 总计 {{totalCount}}",
+            "loadedStatusMore": "（继续加载中）",
             "placesCount": "{{count}} 个地点",
             "empty": "暂无带地理位置的照片。"
         },
@@ -471,6 +473,12 @@
                 "addToAlbum": "添加到相册",
                 "downloadAll": "下载全部",
                 "deleteSelected": "删除所选"
+            },
+            "moreActions": "更多操作",
+            "compactMenu": {
+                "viewSort": "查看 & 排序",
+                "actions": "操作",
+                "selectedItems": "已选择项目"
             },
             "deleteConfirmModal": {
                 "title": "确认删除",
