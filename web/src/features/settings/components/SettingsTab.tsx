@@ -135,7 +135,7 @@ export default function SettingsTab() {
       <div
         role="tablist"
         aria-label={t("settings.title")}
-        className="tabs tabs-box flex-wrap"
+        className="tabs tabs-box flex-wrap sticky top-0 z-50"
       >
         {tabs.map((tab) => (
           <button

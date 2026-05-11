@@ -14,6 +14,10 @@ export const initialState: LumilioChatState = {
   conversation: [],
   isGenerating: false,
   streamingBlock: null,
+  reasoningTiming: {
+    startTime: null,
+    duration: null,
+  },
   tools: {
     available: [],
     isLoading: false,
@@ -42,6 +46,7 @@ export const lumilioReducer = (
         connection: { status: "connecting" },
         isGenerating: true,
         streamingBlock: null,
+        reasoningTiming: { startTime: null, duration: null },
       };
 
     case "RESUME_START":
@@ -120,10 +125,13 @@ export const lumilioReducer = (
 
       let newContent = "";
       let newStreamingBlock = state.streamingBlock;
+      let newReasoningTiming = state.reasoningTiming;
 
       if (reasoning) {
         if (state.streamingBlock !== "reasoning") {
+          // Transitioning into reasoning - record start time
           newContent += "<think>" + reasoning;
+          newReasoningTiming = { startTime: Date.now(), duration: null };
         } else {
           newContent += reasoning;
         }
@@ -131,10 +139,13 @@ export const lumilioReducer = (
       }
 
       if (output) {
-        // Check newStreamingBlock to handle case where we just switched to reasoning in the same chunk
-        // or if we were already in reasoning from previous chunks
         if (newStreamingBlock === "reasoning") {
+          // Transitioning out of reasoning - calculate duration
+          const duration = newReasoningTiming.startTime
+            ? Math.round((Date.now() - newReasoningTiming.startTime) / 1000)
+            : null;
           newContent += "</think>" + output;
+          newReasoningTiming = { startTime: null, duration };
         } else {
           newContent += output;
         }
@@ -151,6 +162,7 @@ export const lumilioReducer = (
         ...state,
         conversation: newConversation,
         streamingBlock: newStreamingBlock,
+        reasoningTiming: newReasoningTiming,
       };
     }
 
@@ -158,6 +170,7 @@ export const lumilioReducer = (
       const lastMsgIndex = state.conversation.length - 1;
       const lastMsg = state.conversation[lastMsgIndex];
       let finalConversation = state.conversation;
+      let finalReasoningTiming = state.reasoningTiming;
 
       if (
         state.streamingBlock === "reasoning" &&
@@ -169,11 +182,17 @@ export const lumilioReducer = (
           content: lastMsg.content + "</think>",
         };
         finalConversation = newConversation;
+        // Calculate final reasoning duration
+        const duration = state.reasoningTiming.startTime
+          ? Math.round((Date.now() - state.reasoningTiming.startTime) / 1000)
+          : null;
+        finalReasoningTiming = { startTime: null, duration };
       }
       return {
         ...state,
         isGenerating: false,
         streamingBlock: null,
+        reasoningTiming: finalReasoningTiming,
         conversation: finalConversation,
       };
     }
@@ -199,6 +218,7 @@ export const lumilioReducer = (
         let newSideEvents;
         let newContent = lastAsstMsg.content;
         let newStreamingBlock = state.streamingBlock;
+        let newReasoningTiming = state.reasoningTiming;
 
         if (existingEventIndex !== -1) {
           newSideEvents = [...lastAsstMsg.sideEvents];
@@ -210,6 +230,13 @@ export const lumilioReducer = (
           if (state.streamingBlock === "reasoning") {
             newContent += "</think>";
             newStreamingBlock = null; // Reset block state so next reasoning chunk re-opens it
+            // Calculate reasoning duration
+            const duration = state.reasoningTiming.startTime
+              ? Math.round(
+                  (Date.now() - state.reasoningTiming.startTime) / 1000,
+                )
+              : null;
+            newReasoningTiming = { startTime: null, duration };
             if (import.meta.env.DEV) {
               console.log("[DEBUG] Closed think block for tool insertion");
             }
@@ -229,6 +256,7 @@ export const lumilioReducer = (
           ...state,
           conversation: newConversation,
           streamingBlock: newStreamingBlock,
+          reasoningTiming: newReasoningTiming,
         };
       }
       return state;

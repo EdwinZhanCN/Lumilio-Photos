@@ -36,6 +36,10 @@ export interface LumilioChatState {
   conversation: ChatMessage[];
   isGenerating: boolean; // True if waiting for any part of an agent response.
   streamingBlock: "reasoning" | "output" | null; // Track current streaming block type
+  reasoningTiming: {
+    startTime: number | null; // timestamp when reasoning started
+    duration: number | null; // duration in seconds once reasoning completes
+  };
 
   tools: {
     available: MentionEntity[]; // For the '/' command menu

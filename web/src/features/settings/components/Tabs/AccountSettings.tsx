@@ -48,43 +48,43 @@ type FeedbackState = {
 
 const ALL_KNOWN_PERMISSIONS: {
   key: string;
-  label: string;
-  description: string;
+  labelKey: string;
+  descKey: string;
 }[] = [
   {
     key: "manage_users",
-    label: "Manage Users",
-    description: "Create, edit, and delete user accounts",
+    labelKey: "settings.account.permissions.manage_users.label",
+    descKey: "settings.account.permissions.manage_users.description",
   },
   {
     key: "manage_settings",
-    label: "Manage Settings",
-    description: "Modify server and application settings",
+    labelKey: "settings.account.permissions.manage_settings.label",
+    descKey: "settings.account.permissions.manage_settings.description",
   },
   {
     key: "view_all_assets",
-    label: "View All Assets",
-    description: "Browse and view all assets in the library",
+    labelKey: "settings.account.permissions.view_all_assets.label",
+    descKey: "settings.account.permissions.view_all_assets.description",
   },
   {
     key: "manage_all_assets",
-    label: "Manage All Assets",
-    description: "Upload, edit, and delete all assets",
+    labelKey: "settings.account.permissions.manage_all_assets.label",
+    descKey: "settings.account.permissions.manage_all_assets.description",
   },
   {
     key: "view_own_assets",
-    label: "View Own Assets",
-    description: "Browse and view own uploaded assets",
+    labelKey: "settings.account.permissions.view_own_assets.label",
+    descKey: "settings.account.permissions.view_own_assets.description",
   },
   {
     key: "manage_own_assets",
-    label: "Manage Own Assets",
-    description: "Upload, edit, and delete own assets",
+    labelKey: "settings.account.permissions.manage_own_assets.label",
+    descKey: "settings.account.permissions.manage_own_assets.description",
   },
   {
     key: "manage_own_profile",
-    label: "Manage Own Profile",
-    description: "Update own profile information",
+    labelKey: "settings.account.permissions.manage_own_profile.label",
+    descKey: "settings.account.permissions.manage_own_profile.description",
   },
 ];
 
@@ -182,10 +182,14 @@ function PermissionsModal({
                       granted ? "text-base-content" : "text-base-content/50"
                     }`}
                   >
-                    {perm.label}
+                    {t(perm.labelKey, {
+                      defaultValue: perm.key
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (c: string) => c.toUpperCase()),
+                    })}
                   </div>
                   <div className="text-xs text-base-content/60">
-                    {perm.description}
+                    {t(perm.descKey, { defaultValue: "" })}
                   </div>
                 </div>
               </div>
@@ -205,7 +209,9 @@ function PermissionsModal({
                     .replace(/\b\w/g, (c) => c.toUpperCase())}
                 </div>
                 <div className="text-xs text-base-content/60">
-                  Custom permission
+                  {t("settings.account.permissions.customPermission", {
+                    defaultValue: "Custom permission",
+                  })}
                 </div>
               </div>
             </div>

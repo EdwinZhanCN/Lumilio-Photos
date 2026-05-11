@@ -937,7 +937,71 @@
             "unsavedChanges": "You have unsaved changes"
         },
         "account": {
+            "title": "Account",
+            "saved": "Profile updated successfully.",
+            "saveError": "Failed to update profile.",
+            "viewPermissions": "View permissions",
+            "profileInfo": "Profile Information",
+            "profileInfoHint": "Update your display name and avatar. Username and role are managed by administrators.",
+            "displayName": "Display name",
+            "displayNameHint": "Display names support multiple languages and stay under 64 characters.",
+            "avatarUrl": "Avatar URL",
+            "avatarHint": "Use an image URL. Leave empty to fall back to initials.",
+            "username": "Username",
+            "role": "Role",
+            "save": "Save profile",
+            "securityTitle": "Security",
+            "securityDescription": "Manage your password, authentication methods, and sign-in factors.",
+            "passwordTitle": "Password",
+            "passwordDescription": "Change your account password. You will be signed out afterwards.",
+            "permissionsTitle": "Account Permissions",
+            "permissionsSubtitle": "Permissions assigned to your account based on your role.",
+            "permissions": {
+                "manage_users": {
+                    "label": "Manage Users",
+                    "description": "Create, edit, and delete user accounts"
+                },
+                "manage_settings": {
+                    "label": "Manage Settings",
+                    "description": "Modify server and application settings"
+                },
+                "view_all_assets": {
+                    "label": "View All Assets",
+                    "description": "Browse and view all assets in the library"
+                },
+                "manage_all_assets": {
+                    "label": "Manage All Assets",
+                    "description": "Upload, edit, and delete all assets"
+                },
+                "view_own_assets": {
+                    "label": "View Own Assets",
+                    "description": "Browse and view own uploaded assets"
+                },
+                "manage_own_assets": {
+                    "label": "Manage Own Assets",
+                    "description": "Upload, edit, and delete own assets"
+                },
+                "manage_own_profile": {
+                    "label": "Manage Own Profile",
+                    "description": "Update own profile information"
+                },
+                "customPermission": "Custom permission"
+            },
             "mfa": {
+                "authenticatorAppTitle": "Authenticator App",
+                "recoveryRemaining": "recovery codes remaining",
+                "notConfigured": "Not configured yet. Secure your account with TOTP.",
+                "passkeyTitle": "Passkeys",
+                "passkeyDescription": "Use your device's native passkey flow for sign-in.",
+                "enrolled": "enrolled",
+                "notEnrolled": "Not enrolled",
+                "enrolledPasskeys": "Passkeys",
+                "enrolledPasskeysHint": "Manage the passkey credentials registered to this account.",
+                "noPasskeys": "No passkeys enrolled yet",
+                "addPasskeyPrompt": "Add a passkey to sign in with your device's biometrics or security key.",
+                "passkeyCreated": "Created",
+                "passkeyLastUsed": "Last used",
+                "addPasskey": "Add Passkey",
                 "setupError": "Failed to start authenticator setup.",
                 "enabled": "Two-factor authentication has been enabled.",
                 "enableError": "Failed to enable two-factor authentication.",
@@ -980,6 +1044,42 @@
                 "recoveryCodesTitle": "Recovery codes",
                 "recoveryCodesHint": "Store these one-time codes securely. Each code can be used only once."
             }
+        },
+        "users": {
+            "title": "Users",
+            "adminOnly": "Only administrators can manage users.",
+            "loadError": "Failed to load users.",
+            "active": "Active",
+            "inactive": "Inactive",
+            "assetCount": "{{count}} assets",
+            "albumCount": "{{count}} albums",
+            "saved": "User updated successfully.",
+            "saveError": "Failed to update user.",
+            "resetAccessSuccess": "Temporary access issued. Share it securely once.",
+            "resetAccessError": "Failed to reset access.",
+            "resetAccessPanelTitle": "Temporary password",
+            "resetAccessPanelBody": "Share this once through a secure channel. Passkeys, TOTP, and recovery codes were cleared.",
+            "clearedPasskeys": "Passkeys cleared",
+            "clearedTotp": "Authenticator App cleared",
+            "createdAt": "Created",
+            "lastLogin": "Last login",
+            "neverLoggedIn": "Never",
+            "editTitle": "Profile Information",
+            "editHint": "Update this user's profile, role, and account status.",
+            "username": "Username",
+            "usernameHint": "3\u201332 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
+            "displayName": "Display name",
+            "displayNameHint": "Display names support multiple languages and stay under 64 characters.",
+            "avatarUrl": "Avatar URL",
+            "avatarUrlHint": "Use an image URL. Leave empty to fall back to initials.",
+            "role": "Role",
+            "status": "Status",
+            "save": "Save user",
+            "resetAccessTitle": "Reset access",
+            "resetAccessSelfHint": "Use Change password in Account settings for your own account.",
+            "resetAccessHint": "Generate a temporary password and clear every MFA factor for this user.",
+            "resetAccess": "Reset access",
+            "empty": "Select a user to edit."
         }
     },
     "map": {
@@ -1325,6 +1425,8 @@
                 "copied": "Copied"
             },
             "think": {
+                "thinking": "Thinking...",
+                "thoughtFor": "Thought for {{time}}s",
                 "details": "Details",
                 "defaultSummary": "Think about this..."
             }

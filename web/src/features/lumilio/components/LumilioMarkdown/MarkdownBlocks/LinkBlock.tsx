@@ -20,7 +20,6 @@ export const Link: React.FC<LinkBlockProps> = ({
   const isEmail = href && href.startsWith("mailto:");
   const isPhone = href && href.startsWith("tel:");
 
-  // Get favicon URL from Google's API
   const getFaviconUrl = () => {
     if (isExternal && href) {
       try {
@@ -33,7 +32,6 @@ export const Link: React.FC<LinkBlockProps> = ({
     return null;
   };
 
-  // Truncate text after 8 characters
   const truncateText = (text: string) => {
     if (text.length > 8) {
       return text.substring(0, 8) + "...";
@@ -41,7 +39,6 @@ export const Link: React.FC<LinkBlockProps> = ({
     return text;
   };
 
-  // Get full text for tooltip
   const getFullText = () => {
     if (typeof children === "string") {
       return children;
@@ -49,7 +46,6 @@ export const Link: React.FC<LinkBlockProps> = ({
     return href || "";
   };
 
-  // Handle different link types for icons
   const getLinkIcon = () => {
     const faviconUrl = getFaviconUrl();
 
@@ -60,7 +56,6 @@ export const Link: React.FC<LinkBlockProps> = ({
           alt=""
           className="w-3 h-3 ml-1.5 inline-block"
           onError={(e) => {
-            // Fallback to external link icon if favicon fails
             e.currentTarget.style.display = "none";
             e.currentTarget.nextElementSibling?.classList.remove("hidden");
           }}
@@ -123,7 +118,7 @@ export const Link: React.FC<LinkBlockProps> = ({
   };
 
   const capsuleStyles =
-    "inline-flex items-center bg-gray-200 hover:bg-gray-300 text-gray-800/60 px-1 py-1 m-0.5 rounded-full text-xs font-medium transition-all duration-200 hover:shadow-sm no-underline";
+    "inline-flex items-center bg-base-200 hover:bg-base-300 text-base-content/60 px-1 py-1 m-0.5 rounded-full text-xs font-medium transition-all duration-200 no-underline";
 
   const displayText =
     typeof children === "string" ? truncateText(children) : children;
@@ -133,8 +128,8 @@ export const Link: React.FC<LinkBlockProps> = ({
   if (!href) {
     return (
       <span
-        className={`tooltip inline-flex items-center bg-gray-100 text-gray-500 px-2 py-1 rounded-full text-xs font-medium ${className}`}
-        data-tip={fullText}
+        className={`inline-flex items-center bg-base-200 text-base-content/50 px-2 py-1 rounded-full text-xs font-medium ${className}`}
+        title={fullText}
         {...props}
       >
         {displayText}
@@ -145,9 +140,8 @@ export const Link: React.FC<LinkBlockProps> = ({
   return (
     <a
       href={href}
-      title={title}
-      className={`tooltip ${capsuleStyles} ${className}`}
-      data-tip={fullText}
+      title={title || fullText}
+      className={`${capsuleStyles} ${className}`}
       target={isExternal ? "_blank" : undefined}
       rel={isExternal ? "noopener noreferrer" : undefined}
       {...props}

@@ -629,69 +629,67 @@ export default function UsersSettings() {
                   </fieldset>
 
                   {/* Role + Status row */}
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <fieldset className="fieldset">
-                      <legend className="fieldset-legend text-sm font-medium text-base-content/80">
-                        {t("settings.users.role", {
-                          defaultValue: "Role",
-                        })}
-                      </legend>
-                      <select
-                        className="select select-bordered w-full bg-base-100"
-                        value={form.role}
+                  <fieldset className="fieldset">
+                    <legend className="fieldset-legend text-sm font-medium text-base-content/80">
+                      {t("settings.users.role", {
+                        defaultValue: "Role",
+                      })}
+                    </legend>
+                    <select
+                      className="select select-bordered w-full bg-base-100"
+                      value={form.role}
+                      onChange={(event) =>
+                        setForm((current) =>
+                          current
+                            ? {
+                                ...current,
+                                role:
+                                  event.target.value === "admin"
+                                    ? "admin"
+                                    : "user",
+                              }
+                            : current,
+                        )
+                      }
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </fieldset>
+
+                  <fieldset className="fieldset">
+                    <legend className="fieldset-legend text-sm font-medium text-base-content/80">
+                      {t("settings.users.status", {
+                        defaultValue: "Status",
+                      })}
+                    </legend>
+                    <label className="label cursor-pointer justify-start gap-3 rounded-xl border border-base-300 bg-base-100 px-4 py-3">
+                      <input
+                        type="checkbox"
+                        className="toggle toggle-primary"
+                        checked={form.isActive}
                         onChange={(event) =>
                           setForm((current) =>
                             current
                               ? {
                                   ...current,
-                                  role:
-                                    event.target.value === "admin"
-                                      ? "admin"
-                                      : "user",
+                                  isActive: event.target.checked,
                                 }
                               : current,
                           )
                         }
-                      >
-                        <option value="user">User</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </fieldset>
-
-                    <fieldset className="fieldset">
-                      <legend className="fieldset-legend text-sm font-medium text-base-content/80">
-                        {t("settings.users.status", {
-                          defaultValue: "Status",
-                        })}
-                      </legend>
-                      <label className="label cursor-pointer justify-start gap-3 rounded-xl border border-base-300 bg-base-100 px-4 py-3">
-                        <input
-                          type="checkbox"
-                          className="toggle toggle-primary"
-                          checked={form.isActive}
-                          onChange={(event) =>
-                            setForm((current) =>
-                              current
-                                ? {
-                                    ...current,
-                                    isActive: event.target.checked,
-                                  }
-                                : current,
-                            )
-                          }
-                        />
-                        <span className="text-base-content">
-                          {form.isActive
-                            ? t("settings.users.active", {
-                                defaultValue: "Active",
-                              })
-                            : t("settings.users.inactive", {
-                                defaultValue: "Inactive",
-                              })}
-                        </span>
-                      </label>
-                    </fieldset>
-                  </div>
+                      />
+                      <span className="text-base-content">
+                        {form.isActive
+                          ? t("settings.users.active", {
+                              defaultValue: "Active",
+                            })
+                          : t("settings.users.inactive", {
+                              defaultValue: "Inactive",
+                            })}
+                      </span>
+                    </label>
+                  </fieldset>
 
                   {/* Save */}
                   <div className="flex justify-end pt-1">

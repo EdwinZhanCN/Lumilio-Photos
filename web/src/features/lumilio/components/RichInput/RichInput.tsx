@@ -10,21 +10,13 @@ import {
 } from "./utils";
 
 export interface RichInputProps {
-  /** Placeholder text for the input field. */
   placeholder?: string;
-  /** Available mention types (e.g., album, tag, camera, etc.). */
   mentionTypes?: MentionTypeOption[];
-  /** Function to get entity list based on mention type. */
   getEntitiesByType?: (type: MentionType) => MentionEntity[];
-  /** Available command list. */
   commands?: MentionEntity[];
-  /** Callback function for submission. */
   onSubmit?: (payload: string) => void;
-  /** Whether submission is disabled. */
   isSubmitting?: boolean;
-  /** Whether the input is read-only. */
   isDisabled?: boolean;
-  /** Custom CSS class name. */
   className?: string;
 }
 
@@ -41,11 +33,6 @@ export const RichInput: React.FC<RichInputProps> = ({
   const editorRef = useRef<HTMLDivElement>(null);
   const { state, dispatch } = useRichInput();
 
-  /** Updates the payload preview by parsing the editor content.
-   *
-   * Parses the current content of the editor and dispatches an action to update
-   * the payload state with the parsed result.
-   */
   const updatePayloadPreview = useCallback(() => {
     if (editorRef.current) {
       dispatch({
@@ -55,11 +42,6 @@ export const RichInput: React.FC<RichInputProps> = ({
     }
   }, [dispatch]);
 
-  /** Handles the submit button click event.
-   *
-   * Validates the payload, submits it if valid and not already submitting,
-   * clears the editor, and resets the payload state.
-   */
   const handleSubmitClick = useCallback(() => {
     if (state.payload.trim() && !isSubmitting && !isDisabled && onSubmit) {
       onSubmit(state.payload);
@@ -68,14 +50,6 @@ export const RichInput: React.FC<RichInputProps> = ({
     }
   }, [state.payload, isSubmitting, isDisabled, onSubmit, dispatch]);
 
-  /** Handles keyboard events in the rich input editor.
-   *
-   * Manages keyboard navigation for the mention/menu system, including arrow key
-   * navigation, selection with Enter/Tab, escape to cancel, and Enter to submit
-   * when no menu is active.
-   *
-   * @param e - The keyboard event object.
-   */
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (isDisabled) {
@@ -128,12 +102,6 @@ export const RichInput: React.FC<RichInputProps> = ({
     [isDisabled, state, dispatch, updatePayloadPreview, handleSubmitClick],
   );
 
-  /** Handles input events in the rich content editable editor.
-   *
-   * Monitors user input to detect trigger characters (@ or /) for opening the
-   * mention/command menu, calculates menu position, and resets the menu state
-   * when a space is detected.
-   */
   const handleInput = useCallback(() => {
     if (isDisabled) {
       return;
@@ -167,13 +135,6 @@ export const RichInput: React.FC<RichInputProps> = ({
     }
   }, [isDisabled, updatePayloadPreview, state.phase, dispatch]);
 
-  /** Handles clicking on a menu option (mention type, entity, or command).
-   *
-   * Performs different actions based on the current phase: selects a mention type
-   * to filter entities, or inserts the selected entity/command as a pill element.
-   *
-   * @param option - The selected MentionEntity to process.
-   */
   const handleOptionClick = useCallback(
     (option: MentionEntity) => {
       if (isDisabled) {
@@ -205,13 +166,6 @@ export const RichInput: React.FC<RichInputProps> = ({
     [isDisabled, state.phase, dispatch, updatePayloadPreview],
   );
 
-  /** Handles mouse enter event on a menu option.
-   *
-   * Updates the selected index to the hovered option, allowing for mouse-based
-   * navigation of the mention/command menu.
-   *
-   * @param idx - The index of the option being hovered.
-   */
   const handleOptionMouseEnter = useCallback(
     (idx: number) => {
       dispatch({
@@ -254,13 +208,12 @@ export const RichInput: React.FC<RichInputProps> = ({
       {/* Input container */}
       <div
         className={[
-          "relative rounded-xl border border-base-300 transition-all",
+          "relative rounded-xl border transition-all",
           isDisabled
-            ? "bg-base-200/60 opacity-70"
-            : "bg-base-200 focus-within:ring-2 focus-within:ring-primary focus-within:bg-base-100",
+            ? "border-base-300 bg-base-200/60 opacity-70"
+            : "border-base-300 bg-base-200 focus-within:ring-2 focus-within:ring-primary focus-within:bg-base-100",
         ].join(" ")}
       >
-        {/* ContentEditable Input */}
         <div
           ref={editorRef}
           contentEditable={!isDisabled}
@@ -268,7 +221,8 @@ export const RichInput: React.FC<RichInputProps> = ({
           onKeyDown={handleKeyDown}
           aria-disabled={isDisabled}
           className={[
-            "w-full max-h-40 overflow-y-auto p-4 pr-14 focus:outline-none text-base leading-relaxed empty:before:content-[attr(data-placeholder)] empty:before:text-base-content/50",
+            "w-full max-h-40 overflow-y-auto p-4 pr-14 focus:outline-none text-base leading-relaxed",
+            "empty:before:content-[attr(data-placeholder)] empty:before:text-base-content/50",
             isDisabled ? "cursor-not-allowed select-none" : "",
           ].join(" ")}
           data-placeholder={placeholder}
@@ -280,10 +234,10 @@ export const RichInput: React.FC<RichInputProps> = ({
           <button
             onClick={handleSubmitClick}
             disabled={isDisabled || isSubmitting || !state.payload.trim()}
-            className="btn btn-primary btn-square btn-sm"
+            className="w-9 h-9 rounded-lg bg-primary text-primary-content hover:brightness-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-all"
           >
             {isSubmitting ? (
-              <span className="loading loading-spinner loading-xs"></span>
+              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
             ) : (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -310,7 +264,7 @@ export const RichInput: React.FC<RichInputProps> = ({
         >
           <div className="bg-base-200 px-3 py-2 text-xs font-semibold text-base-content/70 uppercase tracking-wider border-b border-base-300 flex justify-between">
             <span>{state.phase === "COMMAND" ? "Commands" : "Mention"}</span>
-            <span className="font-mono">Tab ↹</span>
+            <span className="font-mono">Tab</span>
           </div>
           <div className="overflow-y-auto max-h-48 py-1">
             {state.options.map((option, idx) => (

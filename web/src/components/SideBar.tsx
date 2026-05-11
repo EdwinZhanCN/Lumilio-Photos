@@ -7,7 +7,7 @@ import {
   PaintBrushIcon,
 } from "@heroicons/react/24/outline/index.js";
 
-import { Album, Activity, Folders } from "lucide-react";
+import { Activity, Folders, LibraryBig } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useGlobal } from "@/contexts/GlobalContext";
 import { useAuth } from "@/features/auth";
@@ -45,7 +45,7 @@ function SideBar() {
               location.pathname.startsWith("/collections") ? "active" : ""
             }
           >
-            <Album size={20} strokeWidth={1.5} />
+            <LibraryBig size={20} strokeWidth={1.5} />
             {t("sidebar.collections")}
           </Link>
         </li>

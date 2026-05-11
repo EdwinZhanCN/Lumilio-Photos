@@ -1,5 +1,5 @@
 // 只剩最小核心组件
-import ReactMarkdown,{Components} from "react-markdown";
+import ReactMarkdown, { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -7,7 +7,6 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import { CodeBlock, Img, Link, ThinkBlock } from "./MarkdownBlocks";
 import { MarkdownToolBlock } from "./MarkdownBlocks/ToolBlock.tsx";
-
 
 interface CustomComponents extends Partial<Components> {
   "lumilio-tool"?: React.ComponentType<any>;
@@ -83,14 +82,13 @@ const components: CustomComponents = {
   a: Link,
   details: ThinkBlock,
   "lumilio-tool": MarkdownToolBlock,
-  p: ({ node: _node, ...props }) => <div {...props} />
+  p: (props: any) => <div {...props} />,
 };
 
 export const Markdown = ({
   content = "",
-  className = "text-base leading-relaxed text-base-content",
+  className = "text-base leading-relaxed",
 }) => (
-
   <div className={className}>
     <ReactMarkdown
       remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]}
