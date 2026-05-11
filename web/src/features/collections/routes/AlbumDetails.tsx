@@ -13,7 +13,7 @@ import FullScreenCarousel from "@/features/assets/components/page/FullScreen/Ful
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import { AssetViewDefinition, JustifiedGallery } from "@/features/assets";
-import { FolderIcon } from "lucide-react";
+import { AlbumIcon } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult } from "@/lib/albums/types";
 import { useWorkingRepository } from "@/features/settings";
@@ -144,8 +144,10 @@ const AlbumAssetsContent = () => {
         <AssetsPageHeader
           sortBy={sortBy}
           onSortByChange={setSortBy}
-          title={album?.album_name || t("collections.albumDetails.fallbackName")}
-          icon={<FolderIcon className="w-6 h-6 text-primary" />}
+          title={
+            album?.album_name || t("collections.albumDetails.fallbackName")
+          }
+          icon={<AlbumIcon className="w-6 h-6 text-primary" />}
         />
 
         <div
@@ -237,11 +239,11 @@ const AlbumAssetsContent = () => {
           {isInitialLoading ? (
             <PhotosLoadingSkeleton />
           ) : (
-              <JustifiedGallery
-                groups={groupedPhotos}
-                openCarousel={openCarousel}
-                onLoadMore={handleLoadMore}
-                hasMore={hasMore}
+            <JustifiedGallery
+              groups={groupedPhotos}
+              openCarousel={openCarousel}
+              onLoadMore={handleLoadMore}
+              hasMore={hasMore}
               isLoadingMore={isLoadingMore}
             />
           )}

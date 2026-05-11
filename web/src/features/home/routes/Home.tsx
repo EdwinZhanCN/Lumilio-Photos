@@ -13,7 +13,7 @@ import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { useLocationClusters } from "../hooks/useLocationClusters";
 import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
 import { useWorkingRepository } from "@/features/settings";
-import {HomeIcon} from "@heroicons/react/24/outline/index.js";
+import { HomeIcon } from "@heroicons/react/24/outline/index.js";
 
 function Home() {
   const { t } = useI18n();
@@ -52,10 +52,9 @@ function Home() {
     isFetchingNextPage: isMapFetchingNextPage,
     hasNextPage: mapHasNextPage,
   } = useMapPhotoAssets({ repositoryId: scopedRepositoryId });
-  const {
-    loadedClusters,
-    totalClusters,
-  } = useLocationClusters({ repositoryId: scopedRepositoryId });
+  const { loadedClusters, totalClusters } = useLocationClusters({
+    repositoryId: scopedRepositoryId,
+  });
 
   const mapSubtitle =
     isMapLoading && mapLoadedPhotos === 0
@@ -67,7 +66,9 @@ function Home() {
               loadedCount: mapLoadedPhotos,
             });
             if (mapTotalPhotos) {
-              base += t("home.map.loadedStatusTotal", { totalCount: mapTotalPhotos });
+              base += t("home.map.loadedStatusTotal", {
+                totalCount: mapTotalPhotos,
+              });
             }
             if (isMapFetchingNextPage || mapHasNextPage) {
               base += t("home.map.loadedStatusMore");
@@ -131,14 +132,7 @@ function Home() {
               </div>
             )}
 
-            <GalleryGrid
-              assets={featuredAssets}
-              placeholderCount={8}
-              onItemClick={(asset) => {
-                if (!asset?.asset_id) return;
-                navigate(`/assets/${asset.asset_id}`);
-              }}
-            />
+            <GalleryGrid assets={featuredAssets} placeholderCount={8} />
           </div>
         )}
 

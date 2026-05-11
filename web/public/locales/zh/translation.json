@@ -43,7 +43,7 @@
     },
     "sidebar": {
         "home": "首页",
-        "assets": "素材",
+        "assets": "资源库",
         "collections": "合集",
         "studio": "工作室",
         "portfolio": "作品集",
@@ -62,7 +62,7 @@
     },
     "routes": {
         "home": "首页",
-        "assets": "资产",
+        "assets": "资源库",
         "collections": "合集",
         "people": "人物",
         "studio": "工作室",
@@ -223,20 +223,20 @@
             "something_went_wrong": "出了些问题"
         },
         "all": {
-            "title": "资产",
+            "title": "资源库",
             "end_of_results": "已无更多结果。",
-            "locating_asset": "正在定位资产...",
-            "loading_more_data": "正在加载更多数据以查找资产...",
-            "asset_not_available": "资产可能在当前视图中不可用。",
-            "loading_assets": "正在加载资产..."
+            "locating_asset": "正在定位资源...",
+            "loading_more_data": "正在加载更多数据以查找资源...",
+            "asset_not_available": "资源可能在当前视图中不可用。",
+            "loading_assets": "正在加载资源..."
         },
         "photos": {
             "title": "照片",
             "end_of_results": "已无更多结果。",
-            "locating_asset": "正在定位资产...",
-            "loading_more_data": "正在加载更多数据以查找资产...",
-            "asset_not_available": "资产可能在当前视图中不可用。",
-            "loading_assets": "正在加载资产...",
+            "locating_asset": "正在定位资源...",
+            "loading_more_data": "正在加载更多数据以查找资源...",
+            "asset_not_available": "资源可能在当前视图中不可用。",
+            "loading_assets": "正在加载资源...",
             "fullscreen": {
                 "info": {
                     "title": "元数据",
@@ -272,20 +272,20 @@
         "videos": {
             "title": "视频",
             "end_of_results": "已无更多结果。",
-            "locating_asset": "正在定位资产...",
-            "loading_more_data": "正在加载更多数据以查找资产...",
-            "asset_not_available": "资产可能在当前视图中不可用。",
-            "loading_assets": "正在加载资产..."
+            "locating_asset": "正在定位资源...",
+            "loading_more_data": "正在加载更多数据以查找资源...",
+            "asset_not_available": "资源可能在当前视图中不可用。",
+            "loading_assets": "正在加载资源..."
         },
         "audios": {
             "title": "音频",
             "end_of_results": "已无更多结果。",
-            "locating_asset": "正在定位资产...",
-            "loading_more_data": "正在加载更多数据以查找资产...",
-            "asset_not_available": "资产可能在当前视图中不可用。",
-            "loading_assets": "正在加载资产..."
+            "locating_asset": "正在定位资源...",
+            "loading_more_data": "正在加载更多数据以查找资源...",
+            "asset_not_available": "资源可能在当前视图中不可用。",
+            "loading_assets": "正在加载资源..."
         },
-        "empty": "暂无可用资产。",
+        "empty": "暂无可用资源。",
         "basicInfo": {
             "title": "基本信息",
             "location": "位置",
@@ -418,25 +418,25 @@
         "mediaViewer": {
             "video_title": "视频",
             "audio_title": "音频",
-            "asset_alt_text": "资产",
+            "asset_alt_text": "资源",
             "media_not_available": "媒体不可用",
             "unknown_file": "未知文件",
             "unknown_type": "未知类型"
         },
         "mediaThumbnail": {
-            "asset_alt_text": "资产",
+            "asset_alt_text": "资源",
             "video_sr_only": "视频",
             "audio_sr_only": "音频",
             "audio_file_fallback": "音频文件",
-            "asset_aria_label_prefix": "资产",
+            "asset_aria_label_prefix": "资源",
             "unknown_file_fallback": "未知文件",
             "no_preview": "无预览",
             "unknown_mime_fallback": "未知类型"
         },
         "assetsPageHeader": {
             "messages": {
-                "deleteSuccess": "已成功删除 {{count}} 个资产",
-                "deleteError": "删除资产失败",
+                "deleteSuccess": "已成功删除 {{count}} 个资源",
+                "deleteError": "删除资源失败",
                 "downloadStart": "下载已开始",
                 "downloadError": "启动下载失败",
                 "loadAlbumsError": "加载相册失败",
@@ -482,9 +482,9 @@
             },
             "deleteConfirmModal": {
                 "title": "确认删除",
-                "message": "确定要删除选中的 {{count}} 个资产吗？此操作会将它们标记为已删除，且不会再出现在你的资源库中。",
+                "message": "确定要删除选中的 {{count}} 个资源吗？此操作会将它们标记为已删除，且不会再出现在你的资源库中。",
                 "cancelButton": "取消",
-                "deleteButton": "删除资产"
+                "deleteButton": "删除资源"
             },
             "addToAlbumModal": {
                 "title": "添加到相册",
@@ -511,7 +511,7 @@
             "title": "资源库",
             "description": "当前接入的仓库，可用于上传、筛选和文件系统扫描。",
             "primaryBadge": "主仓库",
-            "assetCount": "资产数量",
+            "assetCount": "资源数量",
             "createAction": "添加资源库",
             "createTitle": "添加资源库",
             "createDescription": "在已挂载的存储根目录中创建一个资源库文件夹。",
@@ -538,7 +538,7 @@
             "processing_files": "正在处理 {{count}} 个文件...",
             "files_ready_to_upload": "已有 {{count}} 个文件可上传",
             "no_files_selected": "未选择文件",
-            "page_title": "上传资产",
+            "page_title": "上传资源",
             "supported_formats_button": "支持的格式",
             "error_boundary_title": "上传区域错误！",
             "error_boundary_message": "上传区域加载失败或在操作过程中发生错误。"
@@ -970,7 +970,71 @@
             "unsavedChanges": "您有未保存的更改"
         },
         "account": {
+            "title": "账户",
+            "saved": "个人资料已更新。",
+            "saveError": "更新个人资料失败。",
+            "viewPermissions": "查看权限",
+            "profileInfo": "个人信息",
+            "profileInfoHint": "更新你的显示名称和头像。用户名和角色由管理员管理。",
+            "displayName": "显示名称",
+            "displayNameHint": "显示名称支持多种语言，且不超过 64 个字符。",
+            "avatarUrl": "头像 URL",
+            "avatarHint": "使用图片 URL。留空则显示首字母缩写。",
+            "username": "用户名",
+            "role": "角色",
+            "save": "保存资料",
+            "securityTitle": "安全设置",
+            "securityDescription": "管理你的密码、认证方式和登录验证因子。",
+            "passwordTitle": "密码",
+            "passwordDescription": "修改你的账户密码。修改后需重新登录。",
+            "permissionsTitle": "账户权限",
+            "permissionsSubtitle": "根据你的角色分配给账户的权限。",
+            "permissions": {
+                "manage_users": {
+                    "label": "管理用户",
+                    "description": "创建、编辑和删除用户账户"
+                },
+                "manage_settings": {
+                    "label": "管理设置",
+                    "description": "修改服务器和应用设置"
+                },
+                "view_all_assets": {
+                    "label": "查看所有资源",
+                    "description": "浏览和查看库中所有资源"
+                },
+                "manage_all_assets": {
+                    "label": "管理所有资源",
+                    "description": "上传、编辑和删除所有资源"
+                },
+                "view_own_assets": {
+                    "label": "查看自己的资源",
+                    "description": "浏览和查看自己上传的资源"
+                },
+                "manage_own_assets": {
+                    "label": "管理自己的资源",
+                    "description": "上传、编辑和删除自己的资源"
+                },
+                "manage_own_profile": {
+                    "label": "管理个人资料",
+                    "description": "更新自己的个人资料信息"
+                },
+                "customPermission": "自定义权限"
+            },
             "mfa": {
+                "authenticatorAppTitle": "身份验证器应用",
+                "recoveryRemaining": "个恢复码剩余",
+                "notConfigured": "尚未配置。使用 TOTP 保护你的账户安全。",
+                "passkeyTitle": "通行密钥",
+                "passkeyDescription": "使用设备原生的通行密钥流程进行登录。",
+                "enrolled": "个已注册",
+                "notEnrolled": "未注册",
+                "enrolledPasskeys": "通行密钥",
+                "enrolledPasskeysHint": "管理此账户已注册的通行密钥凭证。",
+                "noPasskeys": "尚未注册通行密钥",
+                "addPasskeyPrompt": "添加通行密钥后，即可使用设备的生物识别或安全密钥登录。",
+                "passkeyCreated": "创建于",
+                "passkeyLastUsed": "上次使用",
+                "addPasskey": "添加通行密钥",
                 "setupError": "启动身份验证器设置失败。",
                 "enabled": "双重验证已启用。",
                 "enableError": "启用双重验证失败。",
@@ -1013,6 +1077,42 @@
                 "recoveryCodesTitle": "恢复码",
                 "recoveryCodesHint": "请妥善保管这些一次性恢复码。每个恢复码仅可使用一次。"
             }
+        },
+        "users": {
+            "title": "用户管理",
+            "adminOnly": "只有管理员可以管理用户。",
+            "loadError": "加载用户列表失败。",
+            "active": "活跃",
+            "inactive": "非活跃",
+            "assetCount": "{{count}} 个资源",
+            "albumCount": "{{count}} 个相册",
+            "saved": "用户信息已更新。",
+            "saveError": "更新用户信息失败。",
+            "resetAccessSuccess": "临时访问凭证已生成，请通过安全渠道一次性分享。",
+            "resetAccessError": "重置访问权限失败。",
+            "resetAccessPanelTitle": "临时密码",
+            "resetAccessPanelBody": "请通过安全渠道一次性分享此密码。通行密钥、TOTP 和恢复码已被清除。",
+            "clearedPasskeys": "通行密钥已清除",
+            "clearedTotp": "身份验证器已清除",
+            "createdAt": "创建时间",
+            "lastLogin": "最后登录",
+            "neverLoggedIn": "从未登录",
+            "editTitle": "个人信息",
+            "editHint": "更新此用户的资料、角色和账户状态。",
+            "username": "用户名",
+            "usernameHint": "3\u201332 个字符，以字母开头。允许小写字母、数字、点、下划线和连字符。",
+            "displayName": "显示名称",
+            "displayNameHint": "显示名称支持多种语言，且不超过 64 个字符。",
+            "avatarUrl": "头像 URL",
+            "avatarUrlHint": "使用图片 URL。留空则显示首字母缩写。",
+            "role": "角色",
+            "status": "状态",
+            "save": "保存用户",
+            "resetAccessTitle": "重置访问权限",
+            "resetAccessSelfHint": "请前往账户设置中的修改密码功能操作你自己的账户。",
+            "resetAccessHint": "生成临时密码并清除此用户的所有 MFA 验证因子。",
+            "resetAccess": "重置访问权限",
+            "empty": "请选择一个用户进行编辑。"
         }
     },
     "map": {
@@ -1171,14 +1271,14 @@
         "updateError": "更新失败"
     },
     "delete": {
-        "confirmTitle": "删除资产",
+        "confirmTitle": "删除资源",
         "confirmMessage": "确定要删除 \"{{filename}}\" 吗？",
         "thisAsset": "这张照片",
         "softDeleteNote": "这将标记照片为已删除。文件不会被永久删除。",
-        "confirm": "删除资产",
+        "confirm": "删除资源",
         "deleting": "删除中...",
-        "success": "资产删除成功",
-        "error": "删除资产失败"
+        "success": "资源删除成功",
+        "error": "删除资源失败"
     },
     "lumen": {
         "title": "Lumen"
@@ -1358,6 +1458,8 @@
                 "copied": "已复制"
             },
             "think": {
+                "thinking": "思考中...",
+                "thoughtFor": "思考用时 {{time}} 秒",
                 "details": "详情",
                 "defaultSummary": "思考过程..."
             }

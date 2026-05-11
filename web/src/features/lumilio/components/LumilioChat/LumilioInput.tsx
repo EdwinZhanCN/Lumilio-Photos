@@ -44,7 +44,7 @@ export function LumilioInput({
 
   return (
     <RichInputProvider>
-      <div className="p-4 border-t border-base-300">
+      <div className="p-4">
         <RichInput
           placeholder={
             disabled

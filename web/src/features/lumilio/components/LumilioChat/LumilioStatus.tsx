@@ -18,7 +18,7 @@ export function LumilioStatus({
 
   return (
     <div className="p-2 bg-info text-info-content">
-      <span className="loading loading-spinner loading-sm my-2" />
+      <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin my-2" />
       {t("lumilio.status.loading", { status: progress.initStatus })}
     </div>
   );

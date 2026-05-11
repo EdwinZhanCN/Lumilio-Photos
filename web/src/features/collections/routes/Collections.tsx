@@ -1,6 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
-import { Album, AlertTriangle, ArrowRight, Users } from "lucide-react";
+import {
+  Album,
+  AlertTriangle,
+  ArrowRight,
+  LibraryBig,
+  Users,
+} from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
@@ -36,7 +42,7 @@ function CollectionsContent() {
     <div className="flex h-full flex-col">
       <PageHeader
         title={t("routes.collections")}
-        icon={<Album className="h-6 w-6 text-primary" strokeWidth={1.5} />}
+        icon={<LibraryBig className="h-6 w-6 text-primary" strokeWidth={1.5} />}
       />
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-8 pt-4">
