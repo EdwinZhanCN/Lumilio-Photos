@@ -5,6 +5,8 @@
 package repo
 
 import (
+	"encoding/json"
+
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pgvector/pgvector-go"
 	"server/internal/db/dbtypes"
@@ -61,6 +63,7 @@ type Asset struct {
 	GpsLongitude         *float64                 `db:"gps_longitude" json:"gps_longitude"`
 	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
+	ExifRaw              json.RawMessage          `db:"exif_raw" json:"exif_raw"`
 }
 
 type AssetTag struct {

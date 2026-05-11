@@ -57,39 +57,34 @@ const ALL_KNOWN_PERMISSIONS: {
     description: "Create, edit, and delete user accounts",
   },
   {
-    key: "manage_assets",
-    label: "Manage Assets",
-    description: "Upload, edit, and delete all assets",
-  },
-  {
-    key: "manage_albums",
-    label: "Manage Albums",
-    description: "Create, edit, and delete albums and collections",
-  },
-  {
     key: "manage_settings",
     label: "Manage Settings",
     description: "Modify server and application settings",
   },
   {
-    key: "view_assets",
-    label: "View Assets",
-    description: "Browse and view assets in the library",
+    key: "view_all_assets",
+    label: "View All Assets",
+    description: "Browse and view all assets in the library",
   },
   {
-    key: "upload_assets",
-    label: "Upload Assets",
-    description: "Upload new photos, videos, and files",
+    key: "manage_all_assets",
+    label: "Manage All Assets",
+    description: "Upload, edit, and delete all assets",
   },
   {
-    key: "manage_plugins",
-    label: "Manage Plugins",
-    description: "Install, configure, and remove plugins",
+    key: "view_own_assets",
+    label: "View Own Assets",
+    description: "Browse and view own uploaded assets",
   },
   {
-    key: "manage_server",
-    label: "Manage Server",
-    description: "Access server monitoring and administration",
+    key: "manage_own_assets",
+    label: "Manage Own Assets",
+    description: "Upload, edit, and delete own assets",
+  },
+  {
+    key: "manage_own_profile",
+    label: "Manage Own Profile",
+    description: "Update own profile information",
   },
 ];
 

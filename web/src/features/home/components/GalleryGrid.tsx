@@ -14,7 +14,7 @@ const PlaceholderGrid: React.FC<{
   count: number;
   className?: string;
 }> = ({ count, className = "" }) => (
-  <section className={`w-full px-4 pb-8 transition-all ${className}`}>
+  <section className={`w-full p-4 pb-8 transition-all ${className}`}>
     <div className="grid grid-cols-2 gap-1 md:grid-cols-3 lg:grid-cols-4">
       {Array.from({ length: count }).map((_, index) => (
         <div

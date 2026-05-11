@@ -2,9 +2,9 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"io"
 	"log"
 	"mime/multipart"
@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
@@ -697,6 +698,51 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 	}
 
 	api.GinSuccess(c, asset)
+}
+
+// GetAssetExif retrieves the raw EXIF JSON captured during metadata processing.
+// @Summary Get raw asset EXIF
+// @Description Retrieve the full exiftool JSON object stored for an asset during metadata processing.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {object} api.Result{data=dto.AssetExifResponseDTO} "Raw EXIF JSON"
+// @Failure 400 {object} api.Result "Invalid asset ID"
+// @Failure 404 {object} api.Result "Asset or EXIF not found"
+// @Router /api/v1/assets/{id}/exif [get]
+func (h *AssetHandler) GetAssetExif(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	if _, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this asset", "You don't have permission to access this asset"); !ok {
+		return
+	}
+
+	exifRaw, err := h.assetService.GetAssetExifRaw(c.Request.Context(), id)
+	if err != nil {
+		api.GinNotFound(c, err, "Asset not found")
+		return
+	}
+	if len(exifRaw) == 0 {
+		api.GinNotFound(c, errors.New("raw EXIF has not been extracted for this asset"), "EXIF not found")
+		return
+	}
+
+	var exifRawObject map[string]any
+	if err := json.Unmarshal(exifRaw, &exifRawObject); err != nil {
+		api.GinInternalError(c, err, "Failed to decode EXIF")
+		return
+	}
+
+	api.GinSuccess(c, dto.AssetExifResponseDTO{
+		AssetID: id.String(),
+		ExifRaw: exifRawObject,
+	})
 }
 
 // GetAssetThumbnail retrieves a thumbnail for a specific asset by asset ID and size

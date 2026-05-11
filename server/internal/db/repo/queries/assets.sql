@@ -9,6 +9,10 @@ RETURNING *;
 SELECT * FROM assets
 WHERE asset_id = $1 AND is_deleted = false;
 
+-- name: GetAssetExifRaw :one
+SELECT exif_raw FROM assets
+WHERE asset_id = $1 AND is_deleted = false;
+
 -- name: GetAssetsByOwner :many
 SELECT * FROM assets
 WHERE owner_id = $1 AND is_deleted = false
@@ -35,6 +39,7 @@ WHERE asset_id = $1;
 -- name: UpdateAssetMetadataWithTakenTime :exec
 UPDATE assets
 SET specific_metadata = sqlc.arg('specific_metadata'),
+    exif_raw = COALESCE(sqlc.narg('exif_raw')::jsonb, exif_raw),
     taken_time = CASE
         WHEN sqlc.arg('taken_time')::timestamptz IS NOT NULL THEN sqlc.arg('taken_time')::timestamptz
         ELSE COALESCE(taken_time, upload_time)

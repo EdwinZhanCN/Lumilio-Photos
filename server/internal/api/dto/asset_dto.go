@@ -172,6 +172,11 @@ type AssetDTO struct {
 	Status               []byte                   `json:"status"`
 }
 
+type AssetExifResponseDTO struct {
+	AssetID string         `json:"asset_id"`
+	ExifRaw map[string]any `json:"exif_raw" swaggertype:"object"`
+}
+
 type AssetGroupDTO struct {
 	Key    string     `json:"key" example:"date:today"`
 	Assets []AssetDTO `json:"assets"`

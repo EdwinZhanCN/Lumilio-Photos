@@ -45,6 +45,7 @@ var (
 type AssetService interface {
 	GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error)
 	GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies, includeOCR, includeFaces, includeCaptions bool) (interface{}, error)
+	GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.RawMessage, error)
 	GetAssetsByType(ctx context.Context, assetType string, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwner(ctx context.Context, ownerID int, limit, offset int) ([]repo.Asset, error)
 	GetAssetsByOwnerSorted(ctx context.Context, ownerID int, sortOrder string, limit, offset int) ([]repo.Asset, error)
@@ -53,6 +54,7 @@ type AssetService interface {
 	DeleteAsset(ctx context.Context, id uuid.UUID) error
 
 	UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error
+	UpdateAssetMetadataWithExifRaw(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, exifRaw json.RawMessage) error
 
 	// Rating management methods
 	UpdateAssetRating(ctx context.Context, id uuid.UUID, rating int) error
@@ -216,6 +218,20 @@ func (s *assetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset,
 	}
 
 	return &dbAsset, nil
+}
+
+func (s *assetService) GetAssetExifRaw(ctx context.Context, id uuid.UUID) (json.RawMessage, error) {
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(id.String()); err != nil {
+		return nil, fmt.Errorf("invalid UUID: %w", err)
+	}
+
+	exifRaw, err := s.queries.GetAssetExifRaw(ctx, pgUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get asset exif: %w", err)
+	}
+
+	return exifRaw, nil
 }
 
 func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, includeThumbnails, includeTags, includeAlbums, includeSpecies, includeOCR, includeFaces, includeCaptions bool) (interface{}, error) {
@@ -427,6 +443,10 @@ func (s *assetService) DetectDuplicates(ctx context.Context, hash string) ([]rep
 
 // UpdateAssetMetadata updates the specific metadata of an asset and extracts taken_time
 func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata) error {
+	return s.UpdateAssetMetadataWithExifRaw(ctx, id, metadata, nil)
+}
+
+func (s *assetService) UpdateAssetMetadataWithExifRaw(ctx context.Context, id uuid.UUID, metadata dbtypes.SpecificMetadata, exifRaw json.RawMessage) error {
 	pgUUID := pgtype.UUID{}
 	if err := pgUUID.Scan(id.String()); err != nil {
 		return fmt.Errorf("invalid UUID: %w", err)
@@ -475,6 +495,7 @@ func (s *assetService) UpdateAssetMetadata(ctx context.Context, id uuid.UUID, me
 	params := repo.UpdateAssetMetadataWithTakenTimeParams{
 		AssetID:              pgUUID,
 		SpecificMetadata:     metadata,
+		ExifRaw:              []byte(exifRaw),
 		TakenTime:            takenTimeParam,
 		CaptureOffsetMinutes: captureOffsetMinutes,
 		GpsLatitude:          gpsLatitude,

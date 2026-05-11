@@ -209,6 +209,13 @@ components:
         width:
           type: integer
       type: object
+    dto.AssetExifResponseDTO:
+      properties:
+        asset_id:
+          type: string
+        exif_raw:
+          type: object
+      type: object
     dto.AssetFilterDTO:
       description: Unified filter options
       properties:
@@ -3285,6 +3292,65 @@ paths:
                 $ref: '#/components/schemas/api.Result'
           description: Internal server error
       summary: Update asset description
+      tags:
+      - assets
+  /api/v1/assets/{id}/exif:
+    get:
+      description: Retrieve the full exiftool JSON object stored for an asset during
+        metadata processing.
+      parameters:
+      - description: Asset ID (UUID format)
+        example: '"550e8400-e29b-41d4-a716-446655440000"'
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/data'
+                description: Standard API response wrapper
+                properties:
+                  code:
+                    description: Business status code (0 for success, non-zero for
+                      errors)
+                    example: 0
+                    type: integer
+                  data:
+                    description: Business data, ignore empty values
+                    type: object
+                  error:
+                    description: Debug error message, ignore empty values
+                    example: error details
+                    type: string
+                  message:
+                    description: User readable message
+                    example: success
+                    type: string
+                type: object
+          description: Raw EXIF JSON
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Invalid asset ID
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.Result'
+          description: Asset or EXIF not found
+      summary: Get raw asset EXIF
       tags:
       - assets
   /api/v1/assets/{id}/like:

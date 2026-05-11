@@ -49,6 +49,7 @@ type MetadataResult struct {
 	Metadata interface{}
 	Error    error
 	Type     dbtypes.AssetType
+	Raw      json.RawMessage
 }
 
 // StreamingExtractRequest represents a request for streaming metadata extraction
@@ -85,7 +86,7 @@ func (e *Extractor) ExtractFromStream(ctx context.Context, req *StreamingExtract
 
 	// Extract metadata directly from stream without loading entire file into memory
 	result := &MetadataResult{Type: req.AssetType}
-	result.Metadata, result.Error = e.extractMetadataFromStream(ctx, req.Reader, req.AssetType)
+	result.Metadata, result.Raw, result.Error = e.extractMetadataFromStream(ctx, req.Reader, req.AssetType)
 
 	return result, nil
 }
@@ -161,7 +162,7 @@ func (e *Extractor) validateRequest(req *StreamingExtractRequest) error {
 }
 
 // extractMetadataFromStream extracts metadata directly from stream without buffering entire file
-func (e *Extractor) extractMetadataFromStream(ctx context.Context, reader io.Reader, assetType dbtypes.AssetType) (interface{}, error) {
+func (e *Extractor) extractMetadataFromStream(ctx context.Context, reader io.Reader, assetType dbtypes.AssetType) (interface{}, json.RawMessage, error) {
 	var tags []string
 
 	switch assetType {
@@ -172,15 +173,23 @@ func (e *Extractor) extractMetadataFromStream(ctx context.Context, reader io.Rea
 	case dbtypes.AssetTypeAudio:
 		tags = e.tagConfig.AudioTags
 	default:
-		return nil, fmt.Errorf("unsupported asset type: %s", assetType)
+		return nil, nil, fmt.Errorf("unsupported asset type: %s", assetType)
 	}
 
-	rawData, err := e.runExifToolFromStream(ctx, reader, tags)
+	if e.config.IncludeRaw {
+		tags = nil
+	}
+
+	rawData, rawJSON, err := e.runExifToolFromStream(ctx, reader, tags)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return e.parseMetadata(rawData, assetType), nil
+	if !e.config.IncludeRaw {
+		rawJSON = nil
+	}
+
+	return e.parseMetadata(rawData, assetType), rawJSON, nil
 }
 
 // parseMetadata parses raw metadata based on asset type
@@ -198,7 +207,7 @@ func (e *Extractor) parseMetadata(rawData map[string]string, assetType dbtypes.A
 }
 
 // runExifToolFromStream executes exiftool with true streaming input (no memory buffering)
-func (e *Extractor) runExifToolFromStream(ctx context.Context, reader io.Reader, tags []string) (map[string]string, error) {
+func (e *Extractor) runExifToolFromStream(ctx context.Context, reader io.Reader, tags []string) (map[string]string, json.RawMessage, error) {
 	// Create context with timeout
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, e.config.Timeout)
 	defer cancel()
@@ -212,24 +221,24 @@ func (e *Extractor) runExifToolFromStream(ctx context.Context, reader io.Reader,
 	// Set up pipes
 	stdin, stdout, stderr, err := e.setupPipes(cmd)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Start the command
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start exiftool: %w", err)
+		return nil, nil, fmt.Errorf("failed to start exiftool: %w", err)
 	}
 
 	// Handle I/O concurrently with true streaming
 	outputBuffer, err := e.handleStreamingIO(stdin, stdout, stderr, reader)
 	if err != nil {
 		cmd.Process.Kill()
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Wait for command completion
 	if err := cmd.Wait(); err != nil {
-		return nil, fmt.Errorf("exiftool command failed: %w", err)
+		return nil, nil, fmt.Errorf("exiftool command failed: %w", err)
 	}
 
 	return e.parseExifToolOutput(outputBuffer.Bytes())
@@ -358,18 +367,23 @@ func contains(s, substr string) bool {
 }
 
 // parseExifToolOutput parses JSON output from exiftool
-func (e *Extractor) parseExifToolOutput(output []byte) (map[string]string, error) {
+func (e *Extractor) parseExifToolOutput(output []byte) (map[string]string, json.RawMessage, error) {
 	if len(output) == 0 {
-		return make(map[string]string), nil
+		return make(map[string]string), nil, nil
 	}
 
 	var result []map[string]interface{}
 	if err := json.Unmarshal(output, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse exiftool JSON output: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse exiftool JSON output: %w", err)
 	}
 
 	if len(result) == 0 {
-		return make(map[string]string), nil
+		return make(map[string]string), nil, nil
+	}
+
+	rawJSON, err := json.Marshal(result[0])
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal exiftool JSON object: %w", err)
 	}
 
 	// Convert to string map
@@ -380,7 +394,7 @@ func (e *Extractor) parseExifToolOutput(output []byte) (map[string]string, error
 		}
 	}
 
-	return stringMap, nil
+	return stringMap, rawJSON, nil
 }
 
 // Close cleans up resources

@@ -131,7 +131,7 @@ export default function SettingsTab() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-4">
       <div
         role="tablist"
         aria-label={t("settings.title")}

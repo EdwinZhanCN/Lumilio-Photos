@@ -42,6 +42,7 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 		Timeout:     60 * time.Second,        // 60s
 		BufferSize:  128 * 1024,
 		FastMode:    true,
+		IncludeRaw:  true,
 	}
 	extractor := exif.NewExtractor(config)
 	defer extractor.Close()
@@ -69,7 +70,7 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 		if err != nil {
 			return fmt.Errorf("marshal metadata: %w", err)
 		}
-		if err := ap.assetService.UpdateAssetMetadata(ctx, asset.AssetID.Bytes, sm); err != nil {
+		if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, result.Raw); err != nil {
 			return fmt.Errorf("save metadata: %w", err)
 		}
 	}
