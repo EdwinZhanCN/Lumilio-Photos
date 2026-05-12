@@ -67,6 +67,13 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset) 
 		return fmt.Errorf("load ML settings: %w", err)
 	}
 
+	// pHash: always enabled, pure image processing, no ML dependencies.
+	if _, err = ap.queueClient.Insert(ctx, jobs.ProcessPHashArgs{
+		AssetID: asset.AssetID,
+	}, &river.InsertOpts{Queue: "process_phash"}); err != nil {
+		return fmt.Errorf("enqueue pHash: %w", err)
+	}
+
 	// Early return if no ML services are enabled by runtime config.
 	if !mlConfig.CLIPEnabled && !mlConfig.BioCLIPEnabled && !mlConfig.OCREnabled && !mlConfig.CaptionEnabled && !mlConfig.FaceEnabled {
 		return nil
