@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
+import StackedThumbnail from "@/features/assets/components/shared/StackedThumbnail";
 import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useJustifiedLayoutService } from "@/hooks/util-hooks/useJustifiedLayoutService";
@@ -390,16 +391,30 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                       }}
                       data-asset-id={assetId}
                     >
-                      <MediaThumbnail
-                        asset={asset}
-                        thumbnailUrl={thumbnailUrl}
-                        onClick={(event) => handleAssetClick(asset, event)}
-                        isSelected={
-                          assetId ? selection.isSelected(assetId) : false
-                        }
-                        isSelectionMode={selection.enabled}
-                        className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
-                      />
+                      {asset.stack?.stack_cover && asset.stack?.stack_size && asset.stack.stack_size > 1 ? (
+                        <StackedThumbnail
+                          asset={asset}
+                          thumbnailUrl={thumbnailUrl}
+                          stackInfo={asset.stack}
+                          onClick={(event) => handleAssetClick(asset, event)}
+                          isSelected={
+                            assetId ? selection.isSelected(assetId) : false
+                          }
+                          isSelectionMode={selection.enabled}
+                          className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                        />
+                      ) : (
+                        <MediaThumbnail
+                          asset={asset}
+                          thumbnailUrl={thumbnailUrl}
+                          onClick={(event) => handleAssetClick(asset, event)}
+                          isSelected={
+                            assetId ? selection.isSelected(assetId) : false
+                          }
+                          isSelectionMode={selection.enabled}
+                          className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                        />
+                      )}
                     </div>
                   );
                 })}

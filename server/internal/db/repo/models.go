@@ -5,13 +5,59 @@
 package repo
 
 import (
+	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pgvector/pgvector-go"
 	"server/internal/db/dbtypes"
 	"server/internal/storage/repocfg"
 )
+
+type StackRelation string
+
+const (
+	StackRelationRawOriginal   StackRelation = "raw_original"
+	StackRelationJpegOriginal  StackRelation = "jpeg_original"
+	StackRelationEditedVersion StackRelation = "edited_version"
+	StackRelationAlternative   StackRelation = "alternative"
+)
+
+func (e *StackRelation) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = StackRelation(s)
+	case string:
+		*e = StackRelation(s)
+	default:
+		return fmt.Errorf("unsupported scan type for StackRelation: %T", src)
+	}
+	return nil
+}
+
+type NullStackRelation struct {
+	StackRelation StackRelation `json:"stack_relation"`
+	Valid         bool          `json:"valid"` // Valid is true if StackRelation is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullStackRelation) Scan(value interface{}) error {
+	if value == nil {
+		ns.StackRelation, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.StackRelation.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullStackRelation) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.StackRelation), nil
+}
 
 type AgentCheckpoint struct {
 	ID        string             `db:"id" json:"id"`
@@ -64,6 +110,20 @@ type Asset struct {
 	GpsGeohash5          *string                  `db:"gps_geohash_5" json:"gps_geohash_5"`
 	GpsGeohash7          *string                  `db:"gps_geohash_7" json:"gps_geohash_7"`
 	ExifRaw              json.RawMessage          `db:"exif_raw" json:"exif_raw"`
+}
+
+type AssetStack struct {
+	StackID   pgtype.UUID        `db:"stack_id" json:"stack_id"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type AssetStackMember struct {
+	AssetID   pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	StackID   pgtype.UUID        `db:"stack_id" json:"stack_id"`
+	Relation  StackRelation      `db:"relation" json:"relation"`
+	Position  *int32             `db:"position" json:"position"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type AssetTag struct {

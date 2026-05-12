@@ -20,6 +20,16 @@ export type UpdateDescriptionRequest =
   Schemas["dto.UpdateDescriptionRequestDTO"];
 export type ReprocessAssetRequest = Schemas["dto.ReprocessAssetRequestDTO"];
 export type ReprocessAssetResponse = Schemas["dto.ReprocessAssetResponseDTO"];
-export type GetAssetByIdParams =
-  NonNullable<Paths["/api/v1/assets/{id}"]["get"]["parameters"]["query"]>;
+export type GetAssetByIdParams = NonNullable<
+  Paths["/api/v1/assets/{id}"]["get"]["parameters"]["query"]
+>;
 
+// ===== Stack Types =====
+export type StackPreview = Schemas["dto.StackPreviewDTO"];
+export type StackDTO = Schemas["dto.StackDTO"];
+export type StackMemberDTO = Schemas["dto.StackMemberDTO"];
+export type StackByAssetResponse = Schemas["dto.StackByAssetResponseDTO"];
+export type AutoDetectStacksResponse =
+  Schemas["dto.AutoDetectStacksResponseDTO"];
+export type CreateManualStackRequest =
+  Schemas["dto.CreateManualStackRequestDTO"];

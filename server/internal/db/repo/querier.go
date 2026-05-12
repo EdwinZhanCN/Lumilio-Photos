@@ -14,6 +14,7 @@ import (
 
 type Querier interface {
 	AddAssetToAlbum(ctx context.Context, arg AddAssetToAlbumParams) error
+	AddStackMember(ctx context.Context, arg AddStackMemberParams) error
 	AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) error
 	AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams) (User, error)
 	BulkToggleAssetLiked(ctx context.Context, assetIds []pgtype.UUID) error
@@ -61,6 +62,7 @@ type Querier interface {
 	CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error)
 	CreateRepositoryScanRun(ctx context.Context, arg CreateRepositoryScanRunParams) (RepositoryScanRun, error)
 	CreateSpeciesPrediction(ctx context.Context, arg CreateSpeciesPredictionParams) (SpeciesPrediction, error)
+	CreateStack(ctx context.Context) (AssetStack, error)
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
 	CreateThumbnail(ctx context.Context, arg CreateThumbnailParams) (Thumbnail, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
@@ -84,6 +86,7 @@ type Querier interface {
 	DeleteRepositories(ctx context.Context, dollar_1 []pgtype.UUID) error
 	DeleteRepository(ctx context.Context, repoID pgtype.UUID) error
 	DeleteSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteStack(ctx context.Context, stackID pgtype.UUID) error
 	DeleteTag(ctx context.Context, tagID int32) error
 	DeleteUser(ctx context.Context, userID int32) error
 	DeleteUserRecoveryCodes(ctx context.Context, userID int32) error
@@ -91,6 +94,14 @@ type Querier interface {
 	DeleteUserWebAuthnCredential(ctx context.Context, arg DeleteUserWebAuthnCredentialParams) (int64, error)
 	DeleteUserWebAuthnCredentials(ctx context.Context, userID int32) error
 	FailRepositoryScanRun(ctx context.Context, arg FailRepositoryScanRunParams) (RepositoryScanRun, error)
+	// Find all assets sharing the same base filename (without extension and without iteration suffix)
+	FindAssetsByBaseName(ctx context.Context, arg FindAssetsByBaseNameParams) ([]FindAssetsByBaseNameRow, error)
+	// Find assets in the same repository that share a base filename pattern
+	// This is used for auto-detecting RAW+JPEG stacks
+	FindCandidatesForStacking(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingRow, error)
+	// Find assets that share base names but are not yet in any stack.
+	// Includes taken_time and upload_time for time-based clustering.
+	FindCandidatesForStackingByName(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingByNameRow, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAssetCountScopedParams) (int64, error)
 	GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error)
@@ -195,6 +206,11 @@ type Querier interface {
 	GetSpeciesPredictionsByAsset(ctx context.Context, assetID pgtype.UUID) ([]SpeciesPrediction, error)
 	GetSpeciesPredictionsByLabel(ctx context.Context, arg GetSpeciesPredictionsByLabelParams) ([]SpeciesPrediction, error)
 	GetSpeciesStats(ctx context.Context) (GetSpeciesStatsRow, error)
+	GetStackByAssetID(ctx context.Context, assetID pgtype.UUID) (GetStackByAssetIDRow, error)
+	GetStackByID(ctx context.Context, stackID pgtype.UUID) (AssetStack, error)
+	GetStackMemberCount(ctx context.Context, stackID pgtype.UUID) (int64, error)
+	GetStackMembers(ctx context.Context, stackID pgtype.UUID) ([]AssetStackMember, error)
+	GetStacksByAssetIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetStacksByAssetIDsRow, error)
 	GetTagByID(ctx context.Context, tagID int32) (Tag, error)
 	GetTagByName(ctx context.Context, tagName string) (Tag, error)
 	GetTagsByCategory(ctx context.Context, category *string) ([]Tag, error)
@@ -242,6 +258,7 @@ type Querier interface {
 	PromoteEmbeddingSpaceAsDefaultIfNone(ctx context.Context, arg PromoteEmbeddingSpaceAsDefaultIfNoneParams) (EmbeddingSpace, error)
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
 	RemoveAssetTagsBySources(ctx context.Context, arg RemoveAssetTagsBySourcesParams) error
+	RemoveStackMember(ctx context.Context, assetID pgtype.UUID) error
 	RemoveTagFromAsset(ctx context.Context, arg RemoveTagFromAssetParams) error
 	RenameFaceCluster(ctx context.Context, arg RenameFaceClusterParams) (FaceCluster, error)
 	RepositoryExists(ctx context.Context, path string) (bool, error)
