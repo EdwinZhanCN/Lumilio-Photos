@@ -125,7 +125,8 @@ const AlbumAssetsContent = () => {
   }, [hasMore, isLoadingMore, fetchMore]);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    setIsScrolled(e.currentTarget.scrollTop > 60);
+    const top = e.currentTarget.scrollTop;
+    setIsScrolled((prev) => (prev ? top > 20 : top > 60));
   }, []);
 
   if (error)

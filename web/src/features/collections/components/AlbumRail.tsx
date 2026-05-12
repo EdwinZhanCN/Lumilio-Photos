@@ -48,9 +48,9 @@ export default function AlbumRail({
           key={album.id}
           type="button"
           onClick={() => onAlbumClick?.(album)}
-          className="group w-48 shrink-0 text-left"
+          className="group w-48 shrink-0 cursor-pointer text-left"
         >
-          <div className="relative aspect-square overflow-hidden rounded-[1.75rem] bg-base-200 shadow-[0_18px_48px_-32px_rgba(15,23,42,0.45)] transition duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[0_24px_56px_-32px_rgba(15,23,42,0.55)]">
+          <div className="relative aspect-square overflow-hidden rounded-[1.75rem] bg-base-200 transition duration-300">
             {album.coverImages?.[0] ? (
               <img
                 src={album.coverImages[0]}
