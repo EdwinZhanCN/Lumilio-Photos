@@ -8,6 +8,8 @@ import Manage from "@/features/manage/routes/Manage";
 import Collections from "@/features/collections/routes/Collections";
 import Albums from "@/features/collections/routes/Albums";
 import AlbumDetails from "@/features/collections/routes/AlbumDetails";
+import MapView from "@/features/collections/routes/MapView";
+import TripDetails from "@/features/collections/routes/TripDetails";
 import People from "@/features/collections/routes/People";
 import PersonDetails from "@/features/people/routes/PersonDetails";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
@@ -65,6 +67,18 @@ export const appRoutes = [
   {
     path: "/collections/albums",
     element: <Albums />,
+  },
+  {
+    path: "/collections/map",
+    element: <MapView />,
+  },
+  {
+    path: "/collections/places/:tripId",
+    element: <TripDetails />,
+  },
+  {
+    path: "/collections/places/:tripId/:assetId",
+    element: <TripDetails />,
   },
   {
     path: "/collections/people",

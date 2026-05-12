@@ -150,8 +150,16 @@
         "coverAlt": "相册封面图",
         "coverAltWithName": "相册 {{albumName}} 的封面图",
         "sections": {
+            "places": "地点",
             "albums": "相册",
             "people": "人物"
+        },
+        "places": {
+            "mapView": "地图",
+            "mapViewTitle": "地点地图",
+            "exploreAll": "探索所有地点",
+            "empty": "暂无带地理位置的旅行记录。",
+            "loadError": "加载旅行记录失败：{{error}}"
         },
         "messages": {
             "deleteSuccess": "相册删除成功",

@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowRight,
   LibraryBig,
+  MapPin,
   Users,
 } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
@@ -13,8 +14,10 @@ import { useI18n } from "@/lib/i18n.tsx";
 import { useWorkingRepository } from "@/features/settings";
 import { usePeople } from "@/features/people/hooks/usePeople";
 import AlbumRail from "../components/AlbumRail";
+import MapRail from "../components/MapRail";
 import PeopleRail from "../components/PeopleRail";
 import { useAlbums } from "../hooks/useAlbums";
+import { useCityTrips } from "../hooks/useCityTrips";
 
 function CollectionsContent() {
   const { t } = useI18n();
@@ -37,6 +40,10 @@ function CollectionsContent() {
   });
 
   const albums = data?.pages.flatMap((page) => page.albums) ?? [];
+  const {
+    trips,
+    isLoading: isTripsLoading,
+  } = useCityTrips({ repositoryId: scopedRepositoryId });
 
   return (
     <div className="flex h-full flex-col">
@@ -74,6 +81,38 @@ function CollectionsContent() {
               </span>
             </div>
           )}
+
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-base-200 p-3 text-primary">
+                  <MapPin className="size-5" strokeWidth={1.75} />
+                </div>
+                <h2 className="text-2xl font-black tracking-tight">
+                  {t("collections.sections.places")}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm rounded-full"
+                onClick={() => navigate("/collections/map")}
+              >
+                {t("common.viewAll")}
+                <ArrowRight className="size-4" />
+              </button>
+            </div>
+
+            <MapRail
+              trips={trips.slice(0, 12)}
+              loading={isTripsLoading}
+              onMapClick={() => navigate("/collections/map")}
+              onTripClick={(trip) =>
+                navigate(`/collections/places/${trip.id}`, {
+                  state: { trip },
+                })
+              }
+            />
+          </section>
 
           <section className="space-y-4">
             <div className="flex items-center justify-between gap-4">

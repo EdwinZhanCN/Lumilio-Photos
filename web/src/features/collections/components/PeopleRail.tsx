@@ -55,9 +55,9 @@ export default function PeopleRail({
             key={personId}
             type="button"
             onClick={() => onPersonClick?.(person)}
-            className="group w-36 shrink-0 text-left"
+            className="group w-36 shrink-0 cursor-pointer text-left"
           >
-            <div className="relative aspect-[4/5] overflow-hidden rounded-[1.75rem] bg-base-200 shadow-[0_18px_48px_-32px_rgba(15,23,42,0.45)] transition duration-300 group-hover:-translate-y-0.5 group-hover:shadow-[0_24px_56px_-32px_rgba(15,23,42,0.55)]">
+            <div className="relative aspect-[4/5] overflow-hidden rounded-[1.75rem] bg-base-200 transition duration-300">
               {person.cover_face_image_path ? (
                 <img
                   src={coverUrl}

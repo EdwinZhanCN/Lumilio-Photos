@@ -150,8 +150,16 @@
         "coverAlt": "Album cover image",
         "coverAltWithName": "Cover image for album {{albumName}}",
         "sections": {
+            "places": "Places",
             "albums": "Albums",
             "people": "People"
+        },
+        "places": {
+            "mapView": "Map",
+            "mapViewTitle": "Places Map",
+            "exploreAll": "Explore all locations",
+            "empty": "No trips with location data yet.",
+            "loadError": "Failed to load trip: {{error}}"
         },
         "messages": {
             "deleteSuccess": "Albums deleted successfully",
