@@ -137,6 +137,13 @@ func (DetectStacksArgs) InsertOpts() river.InsertOpts {
 	}}
 }
 
+// ProcessPHashArgs triggers perceptual hash computation for duplicate detection.
+type ProcessPHashArgs struct {
+	AssetID pgtype.UUID `json:"assetId"`
+}
+
+func (ProcessPHashArgs) Kind() string { return "process_phash" }
+
 // IngestAssetArgs handles initial staging ingestion and asset creation.
 type IngestAssetArgs struct {
 	ClientHash   string    `json:"clientHash" river:"unique"`

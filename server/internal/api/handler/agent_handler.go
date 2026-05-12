@@ -146,15 +146,23 @@ func (h *AgentHandler) prepareSSE(c *gin.Context) (http.Flusher, error) {
 // streamAgentEvents handles the main loop for streaming agent and side-channel events via SSE.
 func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, iter *adk.AsyncIterator[*adk.AgentEvent], sideChannel chan *core.SideChannelEvent) {
 	done := make(chan struct{})
-	defer close(done)
 
 	// Goroutine to handle side-channel events from tools.
+	// When the main loop finishes, we signal via done and then drain any
+	// remaining buffered events so the frontend receives all tool outputs.
 	go func() {
-		defer close(sideChannel)
 		for {
 			select {
 			case <-done:
-				return
+				// Drain remaining buffered events before exiting.
+				for {
+					select {
+					case event := <-sideChannel:
+						h.sendSSE(c, flusher, "side_event", event)
+					default:
+						return
+					}
+				}
 			case <-c.Request.Context().Done():
 				return
 			case event, ok := <-sideChannel:
@@ -165,6 +173,10 @@ func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, i
 			}
 		}
 	}()
+
+	// Ensure done is signaled when we leave this function so the
+	// side-channel goroutine can drain and exit.
+	defer close(done)
 
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
