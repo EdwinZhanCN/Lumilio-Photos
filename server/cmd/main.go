@@ -191,6 +191,7 @@ func main() {
 	}
 	locationService := service.NewLocationService(queries, pgxPool)
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool, indexingLogger, repoAuditProvider)
+	stackService := service.NewStackService(queries, pgxPool, appLogger.Named("stack"), repoAuditProvider)
 	authService := service.NewAuthService(queries, pgxPool)
 	albumService := service.NewAlbumService(queries)
 	userService := service.NewUserService(queries, pgxPool)
@@ -215,6 +216,7 @@ func main() {
 	river.AddWorker[queue.ReindexAssetsArgs](workers, &queue.ReindexAssetsWorker{IndexingService: indexingService})
 	river.AddWorker[queue.RebuildLocationClustersArgs](workers, &queue.RebuildLocationClustersWorker{LocationService: locationService})
 	river.AddWorker[queue.ScanRepositoryArgs](workers, &queue.ScanRepositoryWorker{ProcessScan: repositoryScanner.ProcessScanRepository})
+	river.AddWorker[queue.DetectStacksArgs](workers, &queue.DetectStacksWorker{StackService: stackService})
 
 	go func() {
 		if err := queueClient.Start(context.Background()); err != nil {
@@ -231,7 +233,7 @@ func main() {
 	defer repositoryScanScheduler.Stop()
 
 	// Initialize controllers with new storage system
-	assetController := handler.NewAssetHandler(assetService, authService, indexingService, queries, repoManager, stagingManager, queueClient)
+	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient)
 	authController := handler.NewAuthHandler(authService)
 	albumController := handler.NewAlbumHandler(&albumService, queries)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)

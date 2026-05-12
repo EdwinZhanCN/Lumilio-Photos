@@ -2361,6 +2361,101 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/{id}/stack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get asset stack
+         * @description Returns the stack (group) that contains the specified asset
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Asset ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Remove asset from stack
+         * @description Removes an asset from its stack, making it standalone
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Asset ID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/{id}/thumbnail": {
         parameters: {
             query?: never;
@@ -3508,6 +3603,86 @@ export interface paths {
                 };
                 /** @description Internal server error */
                 500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/stacks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create manual stack
+         * @description Manually groups the specified assets into a new stack
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Asset IDs to stack */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.CreateManualStackRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Created */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6556,6 +6731,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/repositories/{repositoryId}/stacks/detect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Auto-detect stacks
+         * @description Scans a repository for RAW+JPEG pairs and creates stacks automatically
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository ID */
+                    repositoryId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/system": {
         parameters: {
             query?: never;
@@ -7800,6 +8035,7 @@ export interface components {
             rating?: number;
             repository_id?: string;
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
+            stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
             storage_path?: string;
             taken_time?: string;
@@ -7933,6 +8169,10 @@ export interface components {
             token?: string;
             user?: components["schemas"]["dto.UserDTO"];
         };
+        "dto.AutoDetectStacksResponseDTO": {
+            repository_id?: string;
+            stacks_created?: number;
+        };
         "dto.BatchUploadResponseDTO": {
             results?: components["schemas"]["dto.BatchUploadResultDTO"][];
         };
@@ -8014,6 +8254,15 @@ export interface components {
             album_name: string;
             cover_asset_id?: string;
             description?: string;
+        };
+        "dto.CreateManualStackRequestDTO": {
+            /**
+             * @example [
+             *       "550e8400-e29b-41d4-a716-446655440000",
+             *       "550e8400-e29b-41d4-a716-446655440001"
+             *     ]
+             */
+            asset_ids?: string[];
         };
         "dto.CreateRepositoryRequestDTO": {
             /** @example Family Photos */
@@ -8523,6 +8772,43 @@ export interface components {
             session_id?: string;
             status?: string;
             total_chunks?: number;
+        };
+        "dto.StackByAssetResponseDTO": {
+            asset_id?: string;
+            stack?: components["schemas"]["dto.StackDTO"];
+        };
+        "dto.StackDTO": {
+            /** @example 3 */
+            member_count?: number;
+            members?: components["schemas"]["dto.StackMemberDTO"][];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            stack_id?: string;
+        };
+        "dto.StackMemberDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440001 */
+            asset_id?: string;
+            /** @example 0 */
+            position?: number;
+            /**
+             * @description raw_original, jpeg_original, edited_version, alternative
+             * @example raw_original
+             */
+            relation?: string;
+        };
+        /** @description Stack fields (populated when stack mode is enabled) */
+        "dto.StackPreviewDTO": {
+            /**
+             * @description Whether this asset is the cover of its stack
+             * @example true
+             */
+            stack_cover?: boolean;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            stack_id?: string;
+            /**
+             * @description Number of members in the stack
+             * @example 3
+             */
+            stack_size?: number;
         };
         "dto.SystemSettingsDTO": {
             llm?: components["schemas"]["dto.LLMSettingsDTO"];

@@ -123,6 +123,20 @@ func (ScanRepositoryArgs) InsertOpts() river.InsertOpts {
 	}}
 }
 
+// DetectStacksArgs triggers automatic RAW+JPEG stack detection for a repository.
+type DetectStacksArgs struct {
+	RepositoryID string `json:"repositoryId" river:"unique"`
+}
+
+func (DetectStacksArgs) Kind() string { return "detect_stacks" }
+
+func (DetectStacksArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{UniqueOpts: river.UniqueOpts{
+		ByArgs:   true,
+		ByPeriod: 1 * time.Minute,
+	}}
+}
+
 // IngestAssetArgs handles initial staging ingestion and asset creation.
 type IngestAssetArgs struct {
 	ClientHash   string    `json:"clientHash" river:"unique"`

@@ -170,6 +170,8 @@ type AssetDTO struct {
 	DeletedAt            *time.Time               `json:"deleted_at,omitempty"`
 	Metadata             dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object" oneOf:"dbtypes.PhotoSpecificMetadata,dbtypes.VideoSpecificMetadata,dbtypes.AudioSpecificMetadata"`
 	Status               []byte                   `json:"status"`
+	// Stack fields (populated when stack mode is enabled)
+	Stack *StackPreviewDTO `json:"stack,omitempty"`
 }
 
 type AssetExifResponseDTO struct {
