@@ -47,15 +47,19 @@ export default defineConfig({
   server: {
     port: 3000,
     headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'credentialless'
-    }
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "credentialless",
+    },
   },
   plugins: [react(), tailwindcss(), wasm(), topLevelAwait()],
 
+  build: {
+    target: 'esnext',
+  },
+
   worker: {
-    format: 'es',
-    plugins: () => [wasm(), topLevelAwait()]
+    format: "es",
+    plugins: () => [wasm(), topLevelAwait()],
   },
 
   test: {
