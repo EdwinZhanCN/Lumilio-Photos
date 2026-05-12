@@ -33,8 +33,9 @@ type embeddingService struct {
 type EmbeddingType string
 
 const (
-	EmbeddingTypeCLIP EmbeddingType = "clip"
-	EmbeddingTypeFace EmbeddingType = "face"
+	EmbeddingTypeCLIP  EmbeddingType = "clip"
+	EmbeddingTypeFace  EmbeddingType = "face"
+	EmbeddingTypePHash EmbeddingType = "phash"
 )
 
 type EmbeddingInfo struct {
