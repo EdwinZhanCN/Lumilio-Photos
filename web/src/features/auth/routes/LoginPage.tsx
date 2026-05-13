@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
-  ArrowLeft,
   Info,
   KeyRound,
   LogIn,
@@ -20,10 +19,7 @@ import type {
   PasskeyOptionsResponse,
   User as UserType,
 } from "../auth.type.ts";
-import {
-  getPasskeyCredential,
-  getPasskeySupport,
-} from "../lib/webauthn.ts";
+import { getPasskeyCredential, getPasskeySupport } from "../lib/webauthn.ts";
 import {
   USERNAME_HINT,
   USERNAME_MAX_LENGTH,
@@ -150,12 +146,12 @@ const LoginPage: React.FC = () => {
       const optionsResponse = await passkeyOptionsMutation.mutateAsync({
         body: { username },
       });
-      const optionsData =
-        optionsResponse as ApiResult<PasskeyOptionsResponse> | undefined;
+      const optionsData = optionsResponse as
+        | ApiResult<PasskeyOptionsResponse>
+        | undefined;
       if (!optionsData?.data) {
         throw new Error(
-          optionsData?.message ||
-            t("auth.login.passkeyStartError"),
+          optionsData?.message || t("auth.login.passkeyStartError"),
         );
       }
 
@@ -166,20 +162,18 @@ const LoginPage: React.FC = () => {
           credential,
         },
       });
-      const verifyData =
-        verifyResponse as ApiResult<AuthResponse> | undefined;
+      const verifyData = verifyResponse as ApiResult<AuthResponse> | undefined;
       if (!verifyData?.data) {
-        throw new Error(verifyData?.message || t("auth.login.passkeyVerifyError"));
+        throw new Error(
+          verifyData?.message || t("auth.login.passkeyVerifyError"),
+        );
       }
 
       await completeAuth(verifyData.data);
       navigate(redirectTo, { replace: true });
     } catch (passkeyAuthError) {
       setPasskeyError(
-        getApiMessage(
-          passkeyAuthError,
-          t("auth.login.passkeyUnavailable"),
-        ),
+        getApiMessage(passkeyAuthError, t("auth.login.passkeyUnavailable")),
       );
     }
   };
@@ -392,9 +386,7 @@ const LoginPage: React.FC = () => {
                     className="btn btn-ghost btn-square"
                     onClick={handleBack}
                     title={t("auth.login.back", { defaultValue: "Back" })}
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                  </button>
+                  ></button>
                   <button
                     type="submit"
                     className={`btn btn-primary flex-1 ${isLoading ? "loading" : ""}`}
@@ -507,9 +499,7 @@ const LoginPage: React.FC = () => {
                       className="btn btn-ghost btn-square"
                       onClick={handleBack}
                       title={t("auth.login.back", { defaultValue: "Back" })}
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </button>
+                    ></button>
                   )}
 
                   {showPasswordStep || !passkeySupport.supported ? (

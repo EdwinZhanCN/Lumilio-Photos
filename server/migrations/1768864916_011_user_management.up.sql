@@ -1,6 +1,6 @@
 ALTER TABLE users
     ADD COLUMN display_name VARCHAR(100) NOT NULL DEFAULT '',
-    ADD COLUMN avatar_url TEXT,
+    ADD COLUMN avatar_asset_id UUID REFERENCES assets(asset_id) ON DELETE SET NULL,
     ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'
         CHECK (role IN ('admin', 'user'));
 

@@ -23,7 +23,7 @@ func NewUserHandler(userService service.UserService) *UserHandler {
 
 // UpdateMyProfile updates the authenticated user's profile.
 // @Summary Update my profile
-// @Description Update the current user's profile fields such as display name and avatar URL.
+// @Description Update the current user's profile fields such as display name and avatar photo.
 // @Tags users
 // @Accept json
 // @Produce json
@@ -47,11 +47,13 @@ func (h *UserHandler) UpdateMyProfile(c *gin.Context) {
 	}
 
 	updated, err := h.userService.UpdateOwnProfile(c.Request.Context(), user.UserID, service.UpdateOwnProfileInput{
-		DisplayName: req.DisplayName,
-		AvatarURL:   req.AvatarURL,
+		DisplayName:   req.DisplayName,
+		AvatarAssetID: req.AvatarAssetID,
 	})
 	if err != nil {
-		if errors.Is(err, service.ErrInvalidDisplayName) {
+		if errors.Is(err, service.ErrInvalidDisplayName) ||
+			errors.Is(err, service.ErrInvalidAvatarAsset) ||
+			errors.Is(err, service.ErrAvatarAssetMustBePhoto) {
 			api.GinBadRequest(c, err, err.Error())
 			return
 		}
@@ -158,11 +160,11 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	}
 
 	updated, err := h.userService.AdminUpdateUser(c.Request.Context(), admin.UserID, userID, service.AdminUpdateUserInput{
-		Username:    req.Username,
-		DisplayName: req.DisplayName,
-		AvatarURL:   req.AvatarURL,
-		Role:        role,
-		IsActive:    req.IsActive,
+		Username:      req.Username,
+		DisplayName:   req.DisplayName,
+		AvatarAssetID: req.AvatarAssetID,
+		Role:          role,
+		IsActive:      req.IsActive,
 	})
 	if err != nil {
 		switch {

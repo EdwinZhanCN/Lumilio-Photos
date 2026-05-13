@@ -19,16 +19,16 @@ type RefreshTokenRequestDTO struct {
 
 // UserDTO represents user information
 type UserDTO struct {
-	UserID      int        `json:"user_id"`
-	Username    string     `json:"username"`
-	DisplayName string     `json:"display_name"`
-	AvatarURL   *string    `json:"avatar_url,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	IsActive    bool       `json:"is_active"`
-	LastLogin   *time.Time `json:"last_login,omitempty"`
-	Role        string     `json:"role"`
-	Permissions []string   `json:"permissions"`
+	UserID        int        `json:"user_id"`
+	Username      string     `json:"username"`
+	DisplayName   string     `json:"display_name"`
+	AvatarAssetID *string    `json:"avatar_asset_id,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	IsActive      bool       `json:"is_active"`
+	LastLogin     *time.Time `json:"last_login,omitempty"`
+	Role          string     `json:"role"`
+	Permissions   []string   `json:"permissions"`
 }
 
 // AuthResponseDTO represents the response structure for authentication operations

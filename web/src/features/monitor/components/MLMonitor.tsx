@@ -1,11 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Cpu,
-  Database,
-  Loader2,
-  RefreshCcw,
-  Workflow,
-} from "lucide-react";
+import { Cpu, Database, Loader2, RefreshCcw, Workflow } from "lucide-react";
 import {
   useAssetIndexingStats,
   useRebuildAssetIndexes,
@@ -48,6 +42,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
     (sum, task) => sum + (task.stats?.queuedJobs ?? 0),
     0,
   );
+  const rebuildingTasks = rebuildMutation.variables?.body?.tasks ?? [];
 
   if (statsQuery.isLoading && !stats) {
     return (
@@ -177,14 +172,12 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
                     setReindexModal({ taskKey: key, taskLabel: label });
                   }}
                   disabled={
-                    rebuildMutation.isPending &&
-                    rebuildMutation.variables?.tasks?.includes(key)
+                    rebuildMutation.isPending && rebuildingTasks.includes(key)
                   }
                 >
                   <RefreshCcw
                     className={`w-4 h-4 ${
-                      rebuildMutation.isPending &&
-                      rebuildMutation.variables?.tasks?.includes(key)
+                      rebuildMutation.isPending && rebuildingTasks.includes(key)
                         ? "animate-spin"
                         : ""
                     }`}

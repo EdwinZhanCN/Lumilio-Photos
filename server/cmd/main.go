@@ -192,6 +192,7 @@ func main() {
 	locationService := service.NewLocationService(queries, pgxPool)
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool, indexingLogger, repoAuditProvider)
 	stackService := service.NewStackService(queries, pgxPool, appLogger.Named("stack"), repoAuditProvider)
+	duplicateService := service.NewDuplicateService(queries, pgxPool, appLogger.Named("duplicate"), assetService)
 	authService := service.NewAuthService(queries, pgxPool)
 	albumService := service.NewAlbumService(queries)
 	userService := service.NewUserService(queries, pgxPool)
@@ -249,6 +250,7 @@ func main() {
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
 	settingsController := handler.NewSettingsHandler(settingsService)
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, os.Getenv("STORAGE_PATH"))
+	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
@@ -271,6 +273,7 @@ func main() {
 		settingsController,
 		userController,
 		repositoryScanController,
+		duplicateController,
 		handler.RequireLLMAgentEnabled(settingsService),
 	)
 

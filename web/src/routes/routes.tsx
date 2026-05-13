@@ -11,6 +11,7 @@ import AlbumDetails from "@/features/collections/routes/AlbumDetails";
 import MapView from "@/features/collections/routes/MapView";
 import TripDetails from "@/features/collections/routes/TripDetails";
 import People from "@/features/collections/routes/People";
+import Duplicates from "@/features/collections/routes/Duplicates";
 import PersonDetails from "@/features/people/routes/PersonDetails";
 import LumilioChatPage from "@/features/lumilio/routes/LumilioChat";
 import { AssetsProvider } from "@/features/assets";
@@ -83,6 +84,10 @@ export const appRoutes = [
   {
     path: "/collections/people",
     element: <People />,
+  },
+  {
+    path: "/collections/utilities/duplicates",
+    element: <Duplicates />,
   },
   {
     path: "/collections/:albumId",

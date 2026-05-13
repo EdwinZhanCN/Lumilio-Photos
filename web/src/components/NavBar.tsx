@@ -30,7 +30,7 @@ function NavBar() {
   return (
     <div className="navbar bg-base-100 px-4 py-2 gap-3 z-99">
       <div className="flex flex-1 items-center gap-3 min-w-0">
-        <Link className="btn btn-ghost text-xl flex-shrink-0" to="/">
+        <Link className="btn btn-ghost text-xl shrink-0" to="/">
           <img
             src={"/logo.png"}
             className="size-6 bg-contain object-contain"
@@ -138,7 +138,7 @@ function NavBar() {
                 className="btn btn-ghost h-auto min-h-0 rounded-full px-2 py-1"
               >
                 <UserAvatar
-                  src={user.avatar_url}
+                  assetId={user.avatar_asset_id}
                   name={displayName}
                   size="size-10"
                   textSize="text-sm"

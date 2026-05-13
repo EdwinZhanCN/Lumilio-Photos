@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
-  ArrowLeft,
   CheckCircle2,
   ChevronDown,
   ClipboardCopy,
@@ -919,7 +918,6 @@ export default function MFAPage(): React.ReactNode {
                 })}
               </p>
               <Link to={backTo} className="btn btn-link btn-sm mt-1 gap-1.5">
-                <ArrowLeft className="h-3.5 w-3.5" />
                 {isBootstrapOnboarding
                   ? t("auth.mfa.continueToApp", {
                       defaultValue: "Continue to Lumilio",

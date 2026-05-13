@@ -10,7 +10,9 @@ import (
 
 	"server/internal/db/repo"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -18,6 +20,8 @@ import (
 var (
 	ErrInsufficientPermissions = errors.New("insufficient permissions")
 	ErrCannotDisableLastAdmin  = errors.New("cannot disable the last active admin")
+	ErrInvalidAvatarAsset      = errors.New("invalid avatar asset")
+	ErrAvatarAssetMustBePhoto  = errors.New("avatar asset must be a photo")
 )
 
 type ManagedUser struct {
@@ -34,16 +38,16 @@ type UserListResult struct {
 }
 
 type UpdateOwnProfileInput struct {
-	DisplayName *string
-	AvatarURL   *string
+	DisplayName   *string
+	AvatarAssetID *string
 }
 
 type AdminUpdateUserInput struct {
-	Username    *string
-	DisplayName *string
-	AvatarURL   *string
-	Role        *UserRole
-	IsActive    *bool
+	Username      *string
+	DisplayName   *string
+	AvatarAssetID *string
+	Role          *UserRole
+	IsActive      *bool
 }
 
 type ChangePasswordInput struct {
@@ -116,7 +120,7 @@ func (s *userService) ListUsers(ctx context.Context, limit, offset int) (UserLis
 				IsActive:           row.IsActive,
 				LastLogin:          row.LastLogin,
 				DisplayName:        row.DisplayName,
-				AvatarUrl:          row.AvatarUrl,
+				AvatarAssetID:      row.AvatarAssetID,
 				Role:               row.Role,
 				WebauthnUserHandle: row.WebauthnUserHandle,
 			}),
@@ -151,15 +155,24 @@ func (s *userService) UpdateOwnProfile(ctx context.Context, userID int, input Up
 		displayName = normalizedDisplayName
 	}
 
-	avatarURL := cloneOptionalString(user.AvatarUrl)
-	if input.AvatarURL != nil {
-		avatarURL = normalizeOptionalString(*input.AvatarURL)
+	avatarAssetID := uuidToOptionalString(user.AvatarAssetID)
+	if input.AvatarAssetID != nil {
+		normalizedAvatarAssetID, err := s.normalizeAvatarAssetID(ctx, *input.AvatarAssetID)
+		if err != nil {
+			return UserResponse{}, err
+		}
+		avatarAssetID = normalizedAvatarAssetID
+	}
+
+	avatarAssetUUID, err := optionalStringToUUID(avatarAssetID)
+	if err != nil {
+		return UserResponse{}, ErrInvalidAvatarAsset
 	}
 
 	updated, err := s.queries.UpdateUserProfile(ctx, repo.UpdateUserProfileParams{
-		UserID:      user.UserID,
-		DisplayName: displayName,
-		AvatarUrl:   avatarURL,
+		UserID:        user.UserID,
+		DisplayName:   displayName,
+		AvatarAssetID: avatarAssetUUID,
 	})
 	if err != nil {
 		return UserResponse{}, fmt.Errorf("update user profile: %w", err)
@@ -204,9 +217,17 @@ func (s *userService) AdminUpdateUser(ctx context.Context, actorUserID, targetUs
 		}
 		displayName = normalizedDisplayName
 	}
-	avatarURL := cloneOptionalString(target.AvatarUrl)
-	if input.AvatarURL != nil {
-		avatarURL = normalizeOptionalString(*input.AvatarURL)
+	avatarAssetID := uuidToOptionalString(target.AvatarAssetID)
+	if input.AvatarAssetID != nil {
+		normalizedAvatarAssetID, err := s.normalizeAvatarAssetID(ctx, *input.AvatarAssetID)
+		if err != nil {
+			return UserResponse{}, err
+		}
+		avatarAssetID = normalizedAvatarAssetID
+	}
+	avatarAssetUUID, err := optionalStringToUUID(avatarAssetID)
+	if err != nil {
+		return UserResponse{}, ErrInvalidAvatarAsset
 	}
 	role := normalizeUserRole(target.Role)
 	if input.Role != nil {
@@ -238,18 +259,50 @@ func (s *userService) AdminUpdateUser(ctx context.Context, actorUserID, targetUs
 	}
 
 	updated, err := s.queries.AdminUpdateUser(ctx, repo.AdminUpdateUserParams{
-		UserID:      target.UserID,
-		Username:    username,
-		DisplayName: displayName,
-		AvatarUrl:   avatarURL,
-		Role:        string(role),
-		IsActive:    &isActive,
+		UserID:        target.UserID,
+		Username:      username,
+		DisplayName:   displayName,
+		AvatarAssetID: avatarAssetUUID,
+		Role:          string(role),
+		IsActive:      &isActive,
 	})
 	if err != nil {
 		return UserResponse{}, fmt.Errorf("admin update user: %w", err)
 	}
 
 	return ConvertUserToResponse(updated), nil
+}
+
+func (s *userService) normalizeAvatarAssetID(ctx context.Context, raw string) (*string, error) {
+	normalized := normalizeOptionalString(raw)
+	if normalized == nil {
+		return nil, nil
+	}
+
+	parsed, err := uuid.Parse(*normalized)
+	if err != nil {
+		return nil, ErrInvalidAvatarAsset
+	}
+
+	pgUUID := pgtype.UUID{}
+	if err := pgUUID.Scan(parsed.String()); err != nil {
+		return nil, ErrInvalidAvatarAsset
+	}
+
+	asset, err := s.queries.GetAssetByID(ctx, pgUUID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrInvalidAvatarAsset
+		}
+		return nil, fmt.Errorf("load avatar asset: %w", err)
+	}
+
+	if !strings.EqualFold(asset.Type, "PHOTO") {
+		return nil, ErrAvatarAssetMustBePhoto
+	}
+
+	value := parsed.String()
+	return &value, nil
 }
 
 func (s *userService) ChangePassword(ctx context.Context, userID int, input ChangePasswordInput) error {

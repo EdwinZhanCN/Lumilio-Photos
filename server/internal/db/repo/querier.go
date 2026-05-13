@@ -17,6 +17,10 @@ type Querier interface {
 	AddStackMember(ctx context.Context, arg AddStackMemberParams) error
 	AddTagToAsset(ctx context.Context, arg AddTagToAssetParams) error
 	AdminUpdateUser(ctx context.Context, arg AdminUpdateUserParams) (User, error)
+	// Applies merged rating/liked/description on top of the existing keeper values.
+	// Rating uses MAX, liked is OR'd, description is set only when keeper currently
+	// has no description (or the field is empty).
+	ApplyMergedKeeperPreferences(ctx context.Context, arg ApplyMergedKeeperPreferencesParams) error
 	BulkToggleAssetLiked(ctx context.Context, assetIds []pgtype.UUID) error
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
@@ -32,6 +36,7 @@ type Querier interface {
 	// Count query matching GetAssetsUnified WHERE clause
 	// Returns total count of assets matching the filters (for pagination)
 	CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error)
+	CountDuplicateGroups(ctx context.Context, arg CountDuplicateGroupsParams) (int64, error)
 	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountLocationClusters(ctx context.Context, arg CountLocationClustersParams) (int64, error)
@@ -51,6 +56,7 @@ type Querier interface {
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
 	CreateCaption(ctx context.Context, arg CreateCaptionParams) (Caption, error)
+	CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (pgtype.UUID, error)
 	CreateFaceCluster(ctx context.Context, arg CreateFaceClusterParams) (FaceCluster, error)
 	CreateFaceClusterMember(ctx context.Context, arg CreateFaceClusterMemberParams) (FaceClusterMember, error)
 	CreateFaceItem(ctx context.Context, arg CreateFaceItemParams) (FaceItem, error)
@@ -81,6 +87,12 @@ type Querier interface {
 	DeleteLocationClustersForScope(ctx context.Context, arg DeleteLocationClustersForScopeParams) error
 	DeleteOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUID) error
+	// ============================================================================
+	// Duplicate group lifecycle
+	// ============================================================================
+	// Removes the pending detection state for a repository. Merged and dismissed
+	// groups are preserved so the user retains an audit trail of resolved sets.
+	DeletePendingDuplicateGroupsByRepository(ctx context.Context, repositoryID pgtype.UUID) error
 	DeleteRegistrationSession(ctx context.Context, sessionID pgtype.UUID) error
 	DeleteRegistrationSessionsByUsername(ctx context.Context, username string) error
 	DeleteRepositories(ctx context.Context, dollar_1 []pgtype.UUID) error
@@ -158,10 +170,24 @@ type Querier interface {
 	GetDefaultEmbeddingSpaceByType(ctx context.Context, embeddingType string) (EmbeddingSpace, error)
 	GetDistinctCameraModels(ctx context.Context) ([]interface{}, error)
 	GetDistinctLenses(ctx context.Context) ([]interface{}, error)
+	GetDuplicateGroupAssets(ctx context.Context, groupID pgtype.UUID) ([]DuplicateGroupAsset, error)
+	// Bulk variant used for the list endpoint to enrich many groups in one query.
+	GetDuplicateGroupAssetsBatch(ctx context.Context, groupIds []pgtype.UUID) ([]DuplicateGroupAsset, error)
+	GetDuplicateGroupByID(ctx context.Context, groupID pgtype.UUID) (DuplicateGroup, error)
+	GetDuplicateGroupEdges(ctx context.Context, groupID pgtype.UUID) ([]DuplicateGroupEdge, error)
+	// Top-level metrics for the Utilities rail card.
+	GetDuplicateSummary(ctx context.Context, repositoryID pgtype.UUID) (GetDuplicateSummaryRow, error)
 	GetEmbedding(ctx context.Context, arg GetEmbeddingParams) (GetEmbeddingRow, error)
 	GetEmbeddingByType(ctx context.Context, arg GetEmbeddingByTypeParams) (GetEmbeddingByTypeRow, error)
 	GetEmbeddingModels(ctx context.Context, embeddingType string) ([]GetEmbeddingModelsRow, error)
 	GetEmbeddingSpaceByAttributes(ctx context.Context, arg GetEmbeddingSpaceByAttributesParams) (EmbeddingSpace, error)
+	// ============================================================================
+	// Duplicate detection candidate queries
+	// ============================================================================
+	// Returns assets in a repository that share the exact same (hash, file_size).
+	// Only photos are considered, and only non-deleted assets. Results are ordered
+	// so members of the same duplicate set are adjacent.
+	GetExactDuplicateCandidates(ctx context.Context, repositoryID pgtype.UUID) ([]GetExactDuplicateCandidatesRow, error)
 	GetFaceClusterByFaceID(ctx context.Context, faceID int32) (FaceCluster, error)
 	GetFaceClusterByID(ctx context.Context, clusterID int32) (FaceCluster, error)
 	GetFaceClusterByRepresentative(ctx context.Context, representativeFaceID *int32) (FaceCluster, error)
@@ -231,12 +257,21 @@ type Querier interface {
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMFAStatusRow, error)
 	GetUserTOTPCredential(ctx context.Context, userID int32) (UserMfaTotpCredential, error)
+	InsertDuplicateGroupAsset(ctx context.Context, arg InsertDuplicateGroupAssetParams) error
+	// Stores pair-level evidence. Callers must order endpoints so asset_id_a < asset_id_b.
+	InsertDuplicateGroupEdge(ctx context.Context, arg InsertDuplicateGroupEdgeParams) error
 	InsertLocationClusterAssetsForScope(ctx context.Context, arg InsertLocationClusterAssetsForScopeParams) error
 	InsertLocationClustersForScope(ctx context.Context, arg InsertLocationClustersForScopeParams) ([]LocationCluster, error)
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
 	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
 	ListAssetsByRepositoryAny(ctx context.Context, repositoryID pgtype.UUID) ([]Asset, error)
+	// Paginated list of duplicate groups for the given repository and status.
+	// Pending groups are returned newest-first; resolved groups by resolution time.
+	ListDuplicateGroups(ctx context.Context, arg ListDuplicateGroupsParams) ([]DuplicateGroup, error)
 	ListLocationClusters(ctx context.Context, arg ListLocationClustersParams) ([]LocationCluster, error)
+	// Loads pHash embeddings for every non-deleted photo in a repository so the
+	// service layer can build a similarity graph in-memory.
+	ListPHashEmbeddingsForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]ListPHashEmbeddingsForRepositoryRow, error)
 	ListPendingLocationClusters(ctx context.Context, arg ListPendingLocationClustersParams) ([]LocationCluster, error)
 	ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error)
 	ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error)
@@ -252,8 +287,23 @@ type Querier interface {
 	ListUserWebAuthnCredentials(ctx context.Context, userID int32) ([]UserWebauthnCredential, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error)
+	MarkDuplicateGroupDismissed(ctx context.Context, groupID pgtype.UUID) error
+	MarkDuplicateGroupMerged(ctx context.Context, arg MarkDuplicateGroupMergedParams) error
 	MarkLocationClustersGeocodeDisabled(ctx context.Context, arg MarkLocationClustersGeocodeDisabledParams) error
+	// ============================================================================
+	// Metadata merge helpers (used inside merge transactions)
+	// ============================================================================
+	// Copies a duplicate asset's album memberships onto the keeper asset.
+	// Existing keeper memberships are preserved (the conflict clause is a no-op).
+	MergeAlbumAssetsForDuplicate(ctx context.Context, arg MergeAlbumAssetsForDuplicateParams) error
+	// Copies duplicate tags onto the keeper, choosing the higher confidence and
+	// preferring user-provided tags over AI-generated ones on conflict.
+	MergeAssetTagsForDuplicate(ctx context.Context, arg MergeAssetTagsForDuplicateParams) error
 	MergeFaceClusters(ctx context.Context, arg MergeFaceClustersParams) error
+	// Re-parents the duplicate asset's face_items onto the keeper so cluster
+	// memberships (and thus person assignments) follow the keeper after merge.
+	// Used only for exact duplicates where bounding boxes match by construction.
+	MergeFaceClustersForDuplicate(ctx context.Context, arg MergeFaceClustersForDuplicateParams) error
 	MoveAssetWithinRepository(ctx context.Context, arg MoveAssetWithinRepositoryParams) (Asset, error)
 	PromoteEmbeddingSpaceAsDefaultIfNone(ctx context.Context, arg PromoteEmbeddingSpaceAsDefaultIfNoneParams) (EmbeddingSpace, error)
 	RemoveAssetFromAlbum(ctx context.Context, arg RemoveAssetFromAlbumParams) error
@@ -294,6 +344,8 @@ type Querier interface {
 	UpdateCaption(ctx context.Context, arg UpdateCaptionParams) (Caption, error)
 	UpdateCaptionStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateDiscoveredAssetByID(ctx context.Context, arg UpdateDiscoveredAssetByIDParams) (Asset, error)
+	// Resets all asset roles in a group, then flags the chosen keeper.
+	UpdateDuplicateGroupKeeperRole(ctx context.Context, arg UpdateDuplicateGroupKeeperRoleParams) error
 	UpdateFaceCluster(ctx context.Context, arg UpdateFaceClusterParams) (FaceCluster, error)
 	UpdateFaceClusterRepresentative(ctx context.Context, arg UpdateFaceClusterRepresentativeParams) (FaceCluster, error)
 	UpdateFaceItemEmbedding(ctx context.Context, arg UpdateFaceItemEmbeddingParams) (FaceItem, error)

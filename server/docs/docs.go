@@ -204,8 +204,8 @@ const docTemplate = `{
             },
             "dto.AdminUpdateUserRequestDTO": {
                 "properties": {
-                    "avatar_url": {
-                        "example": "https://example.com/avatar.jpg",
+                    "avatar_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
                     "display_name": {
@@ -827,6 +827,47 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.DetectDuplicatesRequestDTO": {
+                "properties": {
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "repository_id"
+                ],
+                "type": "object"
+            },
+            "dto.DetectDuplicatesResponseDTO": {
+                "properties": {
+                    "assets_affected": {
+                        "example": 18,
+                        "type": "integer"
+                    },
+                    "exact_groups": {
+                        "example": 4,
+                        "type": "integer"
+                    },
+                    "generated_at": {
+                        "example": "2026-05-12T08:23:45Z",
+                        "type": "string"
+                    },
+                    "groups": {
+                        "example": 7,
+                        "type": "integer"
+                    },
+                    "mixed_groups": {
+                        "example": 1,
+                        "type": "integer"
+                    },
+                    "phash_groups": {
+                        "example": 2,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
             "dto.DisableTOTPRequestDTO": {
                 "properties": {
                     "current_password": {
@@ -836,6 +877,166 @@ const docTemplate = `{
                 "required": [
                     "current_password"
                 ],
+                "type": "object"
+            },
+            "dto.DuplicateAssetDTO": {
+                "properties": {
+                    "asset": {
+                        "$ref": "#/components/schemas/dto.AssetDTO"
+                    },
+                    "file_size": {
+                        "example": 6291456,
+                        "type": "integer"
+                    },
+                    "role": {
+                        "enum": [
+                            "keeper",
+                            "duplicate",
+                            "candidate"
+                        ],
+                        "example": "keeper",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.DuplicateEdgeDTO": {
+                "properties": {
+                    "asset_id_a": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "asset_id_b": {
+                        "example": "660e8400-e29b-41d4-a716-446655440001",
+                        "type": "string"
+                    },
+                    "confidence": {
+                        "example": 1,
+                        "type": "number"
+                    },
+                    "distance": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "method": {
+                        "enum": [
+                            "exact",
+                            "phash"
+                        ],
+                        "example": "exact",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.DuplicateGroupDTO": {
+                "properties": {
+                    "asset_count": {
+                        "example": 3,
+                        "type": "integer"
+                    },
+                    "assets": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.DuplicateAssetDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "detected_at": {
+                        "example": "2026-05-12T08:23:45Z",
+                        "type": "string"
+                    },
+                    "detection_version": {
+                        "example": "duplicates-v1",
+                        "type": "string"
+                    },
+                    "edges": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.DuplicateEdgeDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "group_id": {
+                        "example": "7c0a4220-1f15-4eb5-94e1-1f4b1d3e4f12",
+                        "type": "string"
+                    },
+                    "keeper_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "method": {
+                        "enum": [
+                            "exact",
+                            "phash",
+                            "mixed"
+                        ],
+                        "example": "mixed",
+                        "type": "string"
+                    },
+                    "recommended_keeper_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "recoverable_bytes": {
+                        "example": 10485760,
+                        "type": "integer"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "resolved_at": {
+                        "example": "2026-05-12T08:25:00Z",
+                        "type": "string"
+                    },
+                    "status": {
+                        "enum": [
+                            "pending",
+                            "merged",
+                            "dismissed"
+                        ],
+                        "example": "pending",
+                        "type": "string"
+                    },
+                    "total_size": {
+                        "example": 15728640,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.DuplicateSummaryDTO": {
+                "properties": {
+                    "dismissed_groups": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "last_detected_at": {
+                        "example": "2026-05-12T08:23:45Z",
+                        "type": "string"
+                    },
+                    "merged_groups": {
+                        "example": 2,
+                        "type": "integer"
+                    },
+                    "pending_assets": {
+                        "example": 18,
+                        "type": "integer"
+                    },
+                    "pending_groups": {
+                        "example": 7,
+                        "type": "integer"
+                    },
+                    "recoverable_assets": {
+                        "example": 11,
+                        "type": "integer"
+                    },
+                    "recoverable_bytes": {
+                        "example": 68157440,
+                        "type": "integer"
+                    }
+                },
                 "type": "object"
             },
             "dto.EnableTOTPRequestDTO": {
@@ -1027,6 +1228,30 @@ const docTemplate = `{
                         "type": "integer"
                     },
                     "total": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.ListDuplicateGroupsResponseDTO": {
+                "properties": {
+                    "groups": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.DuplicateGroupDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "limit": {
+                        "example": 20,
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "total": {
+                        "example": 7,
                         "type": "integer"
                     }
                 },
@@ -1297,7 +1522,7 @@ const docTemplate = `{
                     "asset_count": {
                         "type": "integer"
                     },
-                    "avatar_url": {
+                    "avatar_asset_id": {
                         "type": "string"
                     },
                     "created_at": {
@@ -1341,6 +1566,88 @@ const docTemplate = `{
                     },
                     "token": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MergeDuplicateGroupRequestDTO": {
+                "properties": {
+                    "duplicate_asset_ids": {
+                        "example": [
+                            "660e8400-e29b-41d4-a716-446655440001"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "keeper_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "policy": {
+                        "$ref": "#/components/schemas/dto.MergeDuplicatePolicyDTO"
+                    }
+                },
+                "required": [
+                    "keeper_asset_id"
+                ],
+                "type": "object"
+            },
+            "dto.MergeDuplicateGroupResponseDTO": {
+                "properties": {
+                    "group_id": {
+                        "example": "7c0a4220-1f15-4eb5-94e1-1f4b1d3e4f12",
+                        "type": "string"
+                    },
+                    "keeper_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "merged_duplicates": {
+                        "example": [
+                            "660e8400-e29b-41d4-a716-446655440001"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "recovered_bytes": {
+                        "example": 10485760,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.MergeDuplicatePolicyDTO": {
+                "properties": {
+                    "albums": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "description": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "faces": {
+                        "description": "Faces re-parents face_items onto the keeper. Only applied for exact\nduplicate groups (the service enforces this constraint).",
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "liked": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "rating": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "tags": {
+                        "example": true,
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
@@ -2352,8 +2659,8 @@ const docTemplate = `{
             },
             "dto.UpdateOwnProfileRequestDTO": {
                 "properties": {
-                    "avatar_url": {
-                        "example": "https://example.com/avatar.jpg",
+                    "avatar_asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
                     },
                     "display_name": {
@@ -2477,7 +2784,7 @@ const docTemplate = `{
             },
             "dto.UserDTO": {
                 "properties": {
-                    "avatar_url": {
+                    "avatar_asset_id": {
                         "type": "string"
                     },
                     "created_at": {
@@ -9322,6 +9629,579 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/duplicates/detect": {
+            "post": {
+                "description": "Rebuilds the pending duplicate graph for a repository by combining exact-hash and pHash edges.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.DetectDuplicatesRequestDTO",
+                                        "summary": "request",
+                                        "description": "Repository to scan"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Repository to scan",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "Detect duplicates for a repository",
+                "tags": [
+                    "duplicates"
+                ]
+            }
+        },
+        "/api/v1/duplicates/groups": {
+            "get": {
+                "description": "Paginated list of duplicate groups, scoped by repository and status (default pending).",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "pending | merged | dismissed (defaults to pending)",
+                        "in": "query",
+                        "name": "status",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Page size",
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "default": 20,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Page offset",
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "default": 0,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "List duplicate groups",
+                "tags": [
+                    "duplicates"
+                ]
+            }
+        },
+        "/api/v1/duplicates/groups/{id}": {
+            "get": {
+                "description": "Returns one duplicate group with all assets and evidence edges.",
+                "parameters": [
+                    {
+                        "description": "Duplicate group UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    }
+                },
+                "summary": "Get a duplicate group",
+                "tags": [
+                    "duplicates"
+                ]
+            }
+        },
+        "/api/v1/duplicates/groups/{id}/dismiss": {
+            "post": {
+                "description": "Marks a duplicate group as dismissed without merging any assets.",
+                "parameters": [
+                    {
+                        "description": "Duplicate group UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    }
+                },
+                "summary": "Dismiss a duplicate group",
+                "tags": [
+                    "duplicates"
+                ]
+            }
+        },
+        "/api/v1/duplicates/groups/{id}/merge": {
+            "post": {
+                "description": "Keeps the chosen asset, unions metadata from duplicates, and soft-deletes the remaining members.",
+                "parameters": [
+                    {
+                        "description": "Duplicate group UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.MergeDuplicateGroupRequestDTO",
+                                        "summary": "request",
+                                        "description": "Merge configuration"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Merge configuration",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Not Found"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Conflict"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "Merge a duplicate group",
+                "tags": [
+                    "duplicates"
+                ]
+            }
+        },
+        "/api/v1/duplicates/summary": {
+            "get": {
+                "description": "Returns counts and recoverable space for pending duplicate groups, scoped by optional repository_id.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID to scope the summary",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "OK"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Bad Request"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal Server Error"
+                    }
+                },
+                "summary": "Get duplicate detection summary",
+                "tags": [
+                    "duplicates"
+                ]
+            }
+        },
         "/api/v1/health": {
             "get": {
                 "description": "Check if the server is healthy",
@@ -11446,7 +12326,7 @@ const docTemplate = `{
         },
         "/api/v1/users/me/profile": {
             "patch": {
-                "description": "Update the current user's profile fields such as display name and avatar URL.",
+                "description": "Update the current user's profile fields such as display name and avatar photo.",
                 "requestBody": {
                     "content": {
                         "application/json": {

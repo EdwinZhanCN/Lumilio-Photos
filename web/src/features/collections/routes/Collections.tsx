@@ -7,6 +7,7 @@ import {
   LibraryBig,
   MapPin,
   Users,
+  Wrench,
 } from "lucide-react";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
@@ -16,6 +17,7 @@ import { usePeople } from "@/features/people/hooks/usePeople";
 import AlbumRail from "../components/AlbumRail";
 import MapRail from "../components/MapRail";
 import PeopleRail from "../components/PeopleRail";
+import UtilitiesRail from "../components/UtilitiesRail";
 import { useAlbums } from "../hooks/useAlbums";
 import { useCityTrips } from "../hooks/useCityTrips";
 
@@ -81,6 +83,21 @@ function CollectionsContent() {
               </span>
             </div>
           )}
+
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-base-200 p-3 text-primary">
+                  <Wrench className="size-5" strokeWidth={1.75} />
+                </div>
+                <h2 className="text-2xl font-black tracking-tight">
+                  {t("collections.sections.utilities")}
+                </h2>
+              </div>
+            </div>
+
+            <UtilitiesRail />
+          </section>
 
           <section className="space-y-4">
             <div className="flex items-center justify-between gap-4">

@@ -7,16 +7,16 @@ import (
 )
 
 type UpdateOwnProfileRequestDTO struct {
-	DisplayName *string `json:"display_name,omitempty" example:"Alex Chen"`
-	AvatarURL   *string `json:"avatar_url,omitempty" example:"https://example.com/avatar.jpg"`
+	DisplayName   *string `json:"display_name,omitempty" example:"Alex Chen"`
+	AvatarAssetID *string `json:"avatar_asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
 type AdminUpdateUserRequestDTO struct {
-	Username    *string `json:"username,omitempty" example:"alex"`
-	DisplayName *string `json:"display_name,omitempty" example:"Alex Chen"`
-	AvatarURL   *string `json:"avatar_url,omitempty" example:"https://example.com/avatar.jpg"`
-	Role        *string `json:"role,omitempty" enums:"admin,user" example:"admin"`
-	IsActive    *bool   `json:"is_active,omitempty" example:"true"`
+	Username      *string `json:"username,omitempty" example:"alex"`
+	DisplayName   *string `json:"display_name,omitempty" example:"Alex Chen"`
+	AvatarAssetID *string `json:"avatar_asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Role          *string `json:"role,omitempty" enums:"admin,user" example:"admin"`
+	IsActive      *bool   `json:"is_active,omitempty" example:"true"`
 }
 
 type ChangePasswordRequestDTO struct {
@@ -50,16 +50,16 @@ func ToUserDTO(user service.UserResponse) UserDTO {
 	}
 
 	return UserDTO{
-		UserID:      user.UserID,
-		Username:    user.Username,
-		DisplayName: displayName,
-		AvatarURL:   user.AvatarURL,
-		CreatedAt:   user.CreatedAt,
-		UpdatedAt:   user.UpdatedAt,
-		IsActive:    user.IsActive,
-		LastLogin:   user.LastLogin,
-		Role:        user.Role,
-		Permissions: append([]string(nil), user.Permissions...),
+		UserID:        user.UserID,
+		Username:      user.Username,
+		DisplayName:   displayName,
+		AvatarAssetID: user.AvatarAssetID,
+		CreatedAt:     user.CreatedAt,
+		UpdatedAt:     user.UpdatedAt,
+		IsActive:      user.IsActive,
+		LastLogin:     user.LastLogin,
+		Role:          user.Role,
+		Permissions:   append([]string(nil), user.Permissions...),
 	}
 }
 

@@ -3,8 +3,10 @@ import {
   ExclamationTriangleIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
+import { MoveLeft } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import UserAvatar from "@/components/UserAvatar";
+import PhotoPicker from "@/components/PhotoPicker";
 import { useAuth } from "@/features/auth";
 import {
   useAdminUpdateUser,
@@ -31,7 +33,7 @@ type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
 type UserEditorState = {
   username: string;
   displayName: string;
-  avatarURL: string;
+  avatarAssetId: string;
   role: "admin" | "user";
   isActive: boolean;
 };
@@ -63,7 +65,7 @@ function createEditorState(user: ManagedUserDTO): UserEditorState {
   return {
     username: user.username ?? "",
     displayName: user.display_name ?? "",
-    avatarURL: user.avatar_url ?? "",
+    avatarAssetId: user.avatar_asset_id ?? "",
     role: user.role === "admin" ? "admin" : "user",
     isActive: user.is_active ?? true,
   };
@@ -85,6 +87,7 @@ export default function UsersSettings() {
   const [resetAccessState, setResetAccessState] =
     useState<ResetAccessState>(null);
   const [copiedTemporaryPassword, setCopiedTemporaryPassword] = useState(false);
+  const [isChoosingAvatar, setIsChoosingAvatar] = useState(false);
 
   const users = usersQuery.users;
   const selectedUser =
@@ -103,7 +106,7 @@ export default function UsersSettings() {
     return (
       form.username !== original.username ||
       form.displayName !== original.displayName ||
-      form.avatarURL !== original.avatarURL ||
+      form.avatarAssetId !== original.avatarAssetId ||
       form.role !== original.role ||
       form.isActive !== original.isActive
     );
@@ -125,11 +128,12 @@ export default function UsersSettings() {
     setFeedback(null);
     setResetAccessState(null);
     setCopiedTemporaryPassword(false);
+    setIsChoosingAvatar(false);
   }, [
     selectedUser?.user_id,
     selectedUser?.username,
     selectedUser?.display_name,
-    selectedUser?.avatar_url,
+    selectedUser?.avatar_asset_id,
     selectedUser?.role,
     selectedUser?.is_active,
   ]);
@@ -161,7 +165,7 @@ export default function UsersSettings() {
         body: {
           username: form.username,
           display_name: form.displayName,
-          avatar_url: form.avatarURL,
+          avatar_asset_id: form.avatarAssetId || undefined,
           role: form.role,
           is_active: form.isActive,
         },
@@ -252,6 +256,31 @@ export default function UsersSettings() {
     } catch {
       setCopiedTemporaryPassword(false);
     }
+  };
+
+  const effectiveAvatarAssetId = form?.avatarAssetId || undefined;
+
+  const handleAvatarSelect = (assetId: string) => {
+    setForm((current) =>
+      current
+        ? {
+            ...current,
+            avatarAssetId: assetId,
+          }
+        : current,
+    );
+    setIsChoosingAvatar(false);
+  };
+
+  const handleAvatarClear = () => {
+    setForm((current) =>
+      current
+        ? {
+            ...current,
+            avatarAssetId: "",
+          }
+        : current,
+    );
   };
 
   return (
@@ -426,7 +455,7 @@ export default function UsersSettings() {
               <div className="rounded-3xl border border-base-300 bg-base-100 p-6 shadow-sm">
                 <div className="flex flex-col items-center gap-4 text-center">
                   <UserAvatar
-                    src={selectedUser.avatar_url}
+                    assetId={effectiveAvatarAssetId}
                     name={resolvedName}
                   />
 
@@ -601,29 +630,68 @@ export default function UsersSettings() {
                     </p>
                   </fieldset>
 
-                  {/* Avatar URL */}
+                  {/* Avatar Photo */}
                   <fieldset className="fieldset">
                     <legend className="fieldset-legend text-sm font-medium text-base-content/80">
-                      {t("settings.users.avatarUrl", {
-                        defaultValue: "Avatar URL",
+                      {t("settings.users.avatarPhoto", {
+                        defaultValue: "Avatar photo",
                       })}
                     </legend>
-                    <input
-                      className="input input-bordered w-full bg-base-100"
-                      value={form.avatarURL}
-                      onChange={(event) =>
-                        setForm((current) =>
-                          current
-                            ? { ...current, avatarURL: event.target.value }
-                            : current,
-                        )
-                      }
-                      placeholder="https://example.com/avatar.jpg"
-                    />
+
+                    <div className="flex items-start gap-4 rounded-2xl border border-base-300 bg-base-100 p-4">
+                      <UserAvatar
+                        assetId={effectiveAvatarAssetId}
+                        name={resolvedName}
+                        size="size-16"
+                        textSize="text-lg"
+                      />
+
+                      <div className="flex-1 space-y-3">
+                        <div className="text-sm text-base-content/70">
+                          {effectiveAvatarAssetId
+                            ? t("settings.users.avatarSelected", {
+                                defaultValue:
+                                  "A photo is selected for this user's avatar.",
+                              })
+                            : t("settings.users.avatarEmpty", {
+                                defaultValue:
+                                  "Choose a photo from the library, or leave empty to fall back to initials.",
+                              })}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            onClick={() => setIsChoosingAvatar(true)}
+                          >
+                            {effectiveAvatarAssetId
+                              ? t("settings.users.changeAvatar", {
+                                  defaultValue: "Change photo",
+                                })
+                              : t("settings.users.chooseAvatar", {
+                                  defaultValue: "Choose photo",
+                                })}
+                          </button>
+                          {effectiveAvatarAssetId && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={handleAvatarClear}
+                            >
+                              {t("settings.users.removeAvatar", {
+                                defaultValue: "Remove photo",
+                              })}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <p className="mt-1 text-xs text-base-content/60">
-                      {t("settings.users.avatarUrlHint", {
+                      {t("settings.users.avatarAssetIdHint", {
                         defaultValue:
-                          "Use an image URL. Leave empty to fall back to initials.",
+                          "Pick a photo asset to use as this user's avatar. Only photo assets are supported.",
                       })}
                     </p>
                   </fieldset>
@@ -707,6 +775,30 @@ export default function UsersSettings() {
                 </div>
               </div>
             </div>
+
+            {isChoosingAvatar && (
+              <div className="fixed inset-0 z-100 flex flex-col bg-base-100 animate-in slide-in-from-bottom duration-300">
+                <div className="sticky top-0 z-10 flex items-center border-b border-base-200 bg-base-100 p-3 shadow-sm">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost btn-circle"
+                    onClick={() => setIsChoosingAvatar(false)}
+                  >
+                    <MoveLeft size={20} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-hidden">
+                  <PhotoPicker
+                    scopeId={`photo-picker:user-avatar:${selectedUser.user_id ?? "unknown"}`}
+                    onSelect={handleAvatarSelect}
+                    title={t("settings.users.avatarPhoto", {
+                      defaultValue: "Avatar photo",
+                    })}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* ── Reset access section ──────────────────────────────── */}
             <div className="flex flex-col gap-3 rounded-3xl border border-base-300 bg-base-100 p-6 shadow-sm md:flex-row md:items-center md:justify-between">
