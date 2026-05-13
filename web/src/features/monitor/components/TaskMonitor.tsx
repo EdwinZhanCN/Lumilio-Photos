@@ -32,13 +32,20 @@ function formatRelativeTime(
   const now = new Date();
   const secondsAgo = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (secondsAgo < 60) return t("monitor.jobs.timeAgoSeconds", { count: secondsAgo });
+  if (secondsAgo < 60)
+    return t("monitor.jobs.timeAgoSeconds", { count: secondsAgo });
   if (secondsAgo < 3600)
-    return t("monitor.jobs.timeAgoMinutes", { count: Math.floor(secondsAgo / 60) });
+    return t("monitor.jobs.timeAgoMinutes", {
+      count: Math.floor(secondsAgo / 60),
+    });
   if (secondsAgo < 86400)
-    return t("monitor.jobs.timeAgoHours", { count: Math.floor(secondsAgo / 3600) });
+    return t("monitor.jobs.timeAgoHours", {
+      count: Math.floor(secondsAgo / 3600),
+    });
   if (secondsAgo < 604800)
-    return t("monitor.jobs.timeAgoDays", { count: Math.floor(secondsAgo / 86400) });
+    return t("monitor.jobs.timeAgoDays", {
+      count: Math.floor(secondsAgo / 86400),
+    });
   return date.toLocaleDateString(language);
 }
 
@@ -316,14 +323,30 @@ export function TaskMonitor() {
                 setTotalPages(null);
               }}
             >
-              <option value="all">{t("monitor.jobs.filters.states.all")}</option>
-              <option value="running">{t("monitor.jobs.filters.states.running")}</option>
-              <option value="available">{t("monitor.jobs.filters.states.available")}</option>
-              <option value="scheduled">{t("monitor.jobs.filters.states.scheduled")}</option>
-              <option value="retryable">{t("monitor.jobs.filters.states.retryable")}</option>
-              <option value="completed">{t("monitor.jobs.filters.states.completed")}</option>
-              <option value="cancelled">{t("monitor.jobs.filters.states.cancelled")}</option>
-              <option value="discarded">{t("monitor.jobs.filters.states.discarded")}</option>
+              <option value="all">
+                {t("monitor.jobs.filters.states.all")}
+              </option>
+              <option value="running">
+                {t("monitor.jobs.filters.states.running")}
+              </option>
+              <option value="available">
+                {t("monitor.jobs.filters.states.available")}
+              </option>
+              <option value="scheduled">
+                {t("monitor.jobs.filters.states.scheduled")}
+              </option>
+              <option value="retryable">
+                {t("monitor.jobs.filters.states.retryable")}
+              </option>
+              <option value="completed">
+                {t("monitor.jobs.filters.states.completed")}
+              </option>
+              <option value="cancelled">
+                {t("monitor.jobs.filters.states.cancelled")}
+              </option>
+              <option value="discarded">
+                {t("monitor.jobs.filters.states.discarded")}
+              </option>
             </select>
           </div>
 
@@ -399,7 +422,9 @@ export function TaskMonitor() {
 
           <div className="text-xs opacity-60">
             {totalCount !== null ? (
-              <span>{t("monitor.jobs.pagination.totalJobs", { count: totalCount })}</span>
+              <span>
+                {t("monitor.jobs.pagination.totalJobs", { count: totalCount })}
+              </span>
             ) : nextCursor ? (
               <span>{t("monitor.jobs.pagination.moreResults")}</span>
             ) : null}
@@ -425,7 +450,9 @@ export function TaskMonitor() {
               const job = jobs[virtualRow.index];
               const duration = getJobDuration(job);
               const hasErrors = job.errors && job.errors.length > 0;
-              const badgeClass = getStateBadgeClass((job.state || 'available') as JobState);
+              const badgeClass = getStateBadgeClass(
+                (job.state || "available") as JobState,
+              );
               const timestamp = getRelevantTimestamp(job, t);
               const relativeTime = formatRelativeTime(
                 timestamp.time,
@@ -446,9 +473,11 @@ export function TaskMonitor() {
                   <div
                     className={`badge ${badgeClass} badge-sm flex-shrink-0 font-mono flex items-center`}
                   >
-                    {getStateIcon((job.state || 'available') as JobState)}
+                    {getStateIcon((job.state || "available") as JobState)}
                     <span className="hidden sm:inline sm:ml-1">
-                      {t(`monitor.jobs.filters.states.${job.state || "available"}`)}
+                      {t(
+                        `monitor.jobs.filters.states.${job.state || "available"}`,
+                      )}
                     </span>
                   </div>
 

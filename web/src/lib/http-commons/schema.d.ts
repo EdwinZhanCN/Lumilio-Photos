@@ -5745,6 +5745,512 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/duplicates/detect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detect duplicates for a repository
+         * @description Rebuilds the pending duplicate graph for a repository by combining exact-hash and pHash edges.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Repository to scan */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.DetectDuplicatesRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/duplicates/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List duplicate groups
+         * @description Paginated list of duplicate groups, scoped by repository and status (default pending).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Repository UUID */
+                    repository_id?: string;
+                    /** @description pending | merged | dismissed (defaults to pending) */
+                    status?: string;
+                    /** @description Page size */
+                    limit?: number;
+                    /** @description Page offset */
+                    offset?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/duplicates/groups/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a duplicate group
+         * @description Returns one duplicate group with all assets and evidence edges.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Duplicate group UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/duplicates/groups/{id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss a duplicate group
+         * @description Marks a duplicate group as dismissed without merging any assets.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Duplicate group UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/duplicates/groups/{id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge a duplicate group
+         * @description Keeps the chosen asset, unions metadata from duplicates, and soft-deletes the remaining members.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Duplicate group UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Merge configuration */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.MergeDuplicateGroupRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/duplicates/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get duplicate detection summary
+         * @description Returns counts and recoverable space for pending duplicate groups, scoped by optional repository_id.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Repository UUID to scope the summary */
+                    repository_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -7840,7 +8346,7 @@ export interface paths {
         head?: never;
         /**
          * Update my profile
-         * @description Update the current user's profile fields such as display name and avatar URL.
+         * @description Update the current user's profile fields such as display name and avatar photo.
          */
         patch: {
             parameters: {
@@ -8005,8 +8511,8 @@ export interface components {
             position?: number;
         };
         "dto.AdminUpdateUserRequestDTO": {
-            /** @example https://example.com/avatar.jpg */
-            avatar_url?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            avatar_asset_id?: string;
             /** @example Alex Chen */
             display_name?: string;
             /** @example true */
@@ -8275,8 +8781,101 @@ export interface components {
             from?: string;
             to?: string;
         };
+        "dto.DetectDuplicatesRequestDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id: string;
+        };
+        "dto.DetectDuplicatesResponseDTO": {
+            /** @example 18 */
+            assets_affected?: number;
+            /** @example 4 */
+            exact_groups?: number;
+            /** @example 2026-05-12T08:23:45Z */
+            generated_at?: string;
+            /** @example 7 */
+            groups?: number;
+            /** @example 1 */
+            mixed_groups?: number;
+            /** @example 2 */
+            phash_groups?: number;
+        };
         "dto.DisableTOTPRequestDTO": {
             current_password: string;
+        };
+        "dto.DuplicateAssetDTO": {
+            asset?: components["schemas"]["dto.AssetDTO"];
+            /** @example 6291456 */
+            file_size?: number;
+            /**
+             * @example keeper
+             * @enum {string}
+             */
+            role?: "keeper" | "duplicate" | "candidate";
+        };
+        "dto.DuplicateEdgeDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            asset_id_a?: string;
+            /** @example 660e8400-e29b-41d4-a716-446655440001 */
+            asset_id_b?: string;
+            /** @example 1 */
+            confidence?: number;
+            /** @example 0 */
+            distance?: number;
+            /**
+             * @example exact
+             * @enum {string}
+             */
+            method?: "exact" | "phash";
+        };
+        "dto.DuplicateGroupDTO": {
+            /** @example 3 */
+            asset_count?: number;
+            assets?: components["schemas"]["dto.DuplicateAssetDTO"][];
+            /** @example 2026-05-12T08:23:45Z */
+            detected_at?: string;
+            /** @example duplicates-v1 */
+            detection_version?: string;
+            edges?: components["schemas"]["dto.DuplicateEdgeDTO"][];
+            /** @example 7c0a4220-1f15-4eb5-94e1-1f4b1d3e4f12 */
+            group_id?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            keeper_asset_id?: string;
+            /**
+             * @example mixed
+             * @enum {string}
+             */
+            method?: "exact" | "phash" | "mixed";
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            recommended_keeper_asset_id?: string;
+            /** @example 10485760 */
+            recoverable_bytes?: number;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            /** @example 2026-05-12T08:25:00Z */
+            resolved_at?: string;
+            /**
+             * @example pending
+             * @enum {string}
+             */
+            status?: "pending" | "merged" | "dismissed";
+            /** @example 15728640 */
+            total_size?: number;
+        };
+        "dto.DuplicateSummaryDTO": {
+            /** @example 0 */
+            dismissed_groups?: number;
+            /** @example 2026-05-12T08:23:45Z */
+            last_detected_at?: string;
+            /** @example 2 */
+            merged_groups?: number;
+            /** @example 18 */
+            pending_assets?: number;
+            /** @example 7 */
+            pending_groups?: number;
+            /** @example 11 */
+            recoverable_assets?: number;
+            /** @example 68157440 */
+            recoverable_bytes?: number;
         };
         "dto.EnableTOTPRequestDTO": {
             code: string;
@@ -8350,6 +8949,15 @@ export interface components {
             albums?: components["schemas"]["dto.GetAlbumResponseDTO"][];
             limit?: number;
             offset?: number;
+            total?: number;
+        };
+        "dto.ListDuplicateGroupsResponseDTO": {
+            groups?: components["schemas"]["dto.DuplicateGroupDTO"][];
+            /** @example 20 */
+            limit?: number;
+            /** @example 0 */
+            offset?: number;
+            /** @example 7 */
             total?: number;
         };
         "dto.ListPeopleResponseDTO": {
@@ -8453,7 +9061,7 @@ export interface components {
         "dto.ManagedUserDTO": {
             album_count?: number;
             asset_count?: number;
-            avatar_url?: string;
+            avatar_asset_id?: string;
             created_at?: string;
             display_name?: string;
             is_active?: boolean;
@@ -8467,6 +9075,49 @@ export interface components {
         "dto.MediaTokenDTO": {
             expires_at?: string;
             token?: string;
+        };
+        "dto.MergeDuplicateGroupRequestDTO": {
+            /**
+             * @example [
+             *       "660e8400-e29b-41d4-a716-446655440001"
+             *     ]
+             */
+            duplicate_asset_ids?: string[];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            keeper_asset_id: string;
+            policy?: components["schemas"]["dto.MergeDuplicatePolicyDTO"];
+        };
+        "dto.MergeDuplicateGroupResponseDTO": {
+            /** @example 7c0a4220-1f15-4eb5-94e1-1f4b1d3e4f12 */
+            group_id?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            keeper_asset_id?: string;
+            /**
+             * @example [
+             *       "660e8400-e29b-41d4-a716-446655440001"
+             *     ]
+             */
+            merged_duplicates?: string[];
+            /** @example 10485760 */
+            recovered_bytes?: number;
+        };
+        "dto.MergeDuplicatePolicyDTO": {
+            /** @example true */
+            albums?: boolean;
+            /** @example true */
+            description?: boolean;
+            /**
+             * @description Faces re-parents face_items onto the keeper. Only applied for exact
+             *     duplicate groups (the service enforces this constraint).
+             * @example false
+             */
+            faces?: boolean;
+            /** @example true */
+            liked?: boolean;
+            /** @example true */
+            rating?: boolean;
+            /** @example true */
+            tags?: boolean;
         };
         "dto.MessageResponseDTO": {
             /** @example Operation completed successfully */
@@ -8858,8 +9509,8 @@ export interface components {
             ocr_enabled?: boolean;
         };
         "dto.UpdateOwnProfileRequestDTO": {
-            /** @example https://example.com/avatar.jpg */
-            avatar_url?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            avatar_asset_id?: string;
             /** @example Alex Chen */
             display_name?: string;
         };
@@ -8906,7 +9557,7 @@ export interface components {
             task_id?: number;
         };
         "dto.UserDTO": {
-            avatar_url?: string;
+            avatar_asset_id?: string;
             created_at?: string;
             display_name?: string;
             is_active?: boolean;

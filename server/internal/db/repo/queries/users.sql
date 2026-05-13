@@ -32,7 +32,7 @@ WHERE user_id = $1;
 -- name: UpdateUserProfile :one
 UPDATE users
 SET display_name = $2,
-    avatar_url = $3,
+    avatar_asset_id = $3,
     updated_at = CURRENT_TIMESTAMP
 WHERE user_id = $1
 RETURNING *;
@@ -41,7 +41,7 @@ RETURNING *;
 UPDATE users
 SET username = $2,
     display_name = $3,
-    avatar_url = $4,
+    avatar_asset_id = $4,
     role = $5,
     is_active = $6,
     updated_at = CURRENT_TIMESTAMP

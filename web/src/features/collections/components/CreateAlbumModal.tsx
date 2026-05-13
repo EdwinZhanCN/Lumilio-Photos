@@ -1,106 +1,12 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback } from "react";
 import { useCollections } from "../CollectionsProvider";
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n.tsx";
 import { X, FolderPlus, Image as ImageIcon, MoveLeft } from "lucide-react";
-import { AssetsProvider } from "@/features/assets/AssetsProvider";
-import {
-  useSortBy,
-  useUIActions,
-  useFilterActions,
-  useSelectionActions,
-} from "@/features/assets/selectors";
-import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
-import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
-import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
-import { useSelection } from "@/features/assets/hooks/useSelection";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { ApiResult } from "@/lib/albums/types";
-import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { assetUrls } from "@/lib/assets/assetUrls";
-import { flattenAssetGroups } from "@/features/assets/utils/assetGroups";
-
-const PhotoPicker: React.FC<{ onSelect: (id: string) => void }> = ({
-  onSelect,
-}) => {
-  const { t } = useI18n();
-  const sortBy = useSortBy();
-  const { setSortBy, setSearchQuery } = useUIActions();
-  const { resetFilters } = useFilterActions();
-  const { clear: clearSelection, setEnabled: setSelectionEnabled } =
-    useSelectionActions();
-  const selection = useSelection();
-
-  const {
-    assets: allAssets,
-    groups: groupedAssets,
-    isLoading,
-    isLoadingMore,
-    fetchMore,
-    hasMore,
-    viewKey,
-  } = useCurrentTabAssets({
-    withGroups: true,
-    sortBy,
-  });
-
-  const flatAssets = useMemo(() => {
-    if (groupedAssets && groupedAssets.length > 0) {
-      return flattenAssetGroups(groupedAssets);
-    }
-    return allAssets;
-  }, [groupedAssets, allAssets]);
-
-  const layoutKey = useMemo(() => {
-    const assetIds = flatAssets
-      .map((asset) => asset.asset_id)
-      .filter((id): id is string => Boolean(id));
-    return `${viewKey}:${assetIds.join(",")}`;
-  }, [viewKey, flatAssets]);
-
-  // Initialize picker state
-  useEffect(() => {
-    // Force clear everything on mount
-    clearSelection();
-    resetFilters();
-    setSearchQuery("");
-
-    setSelectionEnabled(true);
-  }, []);
-
-  // Sync selection with parent
-  useEffect(() => {
-    if (selection.enabled && selection.selectedCount > 0) {
-      const id = Array.from(selection.selectedIds)[0];
-      if (id) {
-        onSelect(id as string);
-      }
-    }
-  }, [selection.selectedIds, selection.enabled, onSelect]);
-
-  return (
-    <div className="flex flex-col h-full bg-base-100 overflow-hidden">
-      <AssetsPageHeader
-        sortBy={sortBy}
-        onSortByChange={setSortBy}
-        title={t("collections.createModal.coverPicker.title")}
-        icon={<ImageIcon className="w-6 h-6 text-primary" />}
-      />
-      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
-        <SquareGallery
-          groups={groupedAssets || []}
-          key={layoutKey}
-          openCarousel={() => {}}
-          onLoadMore={fetchMore}
-          hasMore={hasMore}
-          isLoadingMore={isLoadingMore}
-          isLoading={isLoading && allAssets.length === 0}
-          columns={5}
-        />
-      </div>
-    </div>
-  );
-};
+import PhotoPicker from "@/components/PhotoPicker";
 
 const CreateAlbumModal: React.FC = () => {
   const { t } = useI18n();
@@ -177,19 +83,20 @@ const CreateAlbumModal: React.FC = () => {
         </div>
 
         <div className="flex-1 overflow-hidden relative bg-base-100">
-          <form
-            onSubmit={handleSubmit}
-            className="h-full flex flex-col"
-          >
+          <form onSubmit={handleSubmit} className="h-full flex flex-col">
             <div className="flex-1 overflow-y-auto p-6 md:p-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 h-full">
                 {/* Left Column: Details */}
                 <div className="flex flex-col gap-6 h-full">
                   <fieldset className="fieldset w-full">
-                    <legend className="fieldset-legend font-semibold">{t("collections.createModal.fields.name.label")}</legend>
+                    <legend className="fieldset-legend font-semibold">
+                      {t("collections.createModal.fields.name.label")}
+                    </legend>
                     <input
                       type="text"
-                      placeholder={t("collections.createModal.fields.name.placeholder")}
+                      placeholder={t(
+                        "collections.createModal.fields.name.placeholder",
+                      )}
                       className="input input-bordered w-full"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -198,10 +105,14 @@ const CreateAlbumModal: React.FC = () => {
                   </fieldset>
 
                   <fieldset className="fieldset w-full flex-1 h-full min-h-0">
-                    <legend className="fieldset-legend font-semibold">{t("collections.createModal.fields.description.label")}</legend>
+                    <legend className="fieldset-legend font-semibold">
+                      {t("collections.createModal.fields.description.label")}
+                    </legend>
                     <textarea
                       className="textarea textarea-bordered w-full h-full min-h-30 resize-none flex-1"
-                      placeholder={t("collections.createModal.fields.description.placeholder")}
+                      placeholder={t(
+                        "collections.createModal.fields.description.placeholder",
+                      )}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                     ></textarea>
@@ -210,7 +121,9 @@ const CreateAlbumModal: React.FC = () => {
 
                 {/* Right Column: Cover Selection Preview */}
                 <fieldset className="fieldset w-full h-full flex flex-col min-h-0">
-                  <legend className="fieldset-legend font-semibold">{t("collections.createModal.fields.cover.label")}</legend>
+                  <legend className="fieldset-legend font-semibold">
+                    {t("collections.createModal.fields.cover.label")}
+                  </legend>
 
                   <div
                     className={`flex-1 w-full min-h-62.5 border-2 border-dashed rounded-box flex flex-col items-center justify-center gap-4 transition-all cursor-pointer overflow-hidden relative group
@@ -226,7 +139,9 @@ const CreateAlbumModal: React.FC = () => {
                             "medium",
                           )}
                           className="w-full h-full object-cover"
-                          alt={t("collections.createModal.fields.cover.selectedAlt")}
+                          alt={t(
+                            "collections.createModal.fields.cover.selectedAlt",
+                          )}
                         />
                         <div className="absolute inset-0 bg-base-300/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
                           <span className="btn btn-primary btn-sm rounded-full shadow-lg">
@@ -244,7 +159,9 @@ const CreateAlbumModal: React.FC = () => {
                             {t("collections.createModal.fields.cover.choose")}
                           </span>
                           <span className="text-xs text-base-content/60 mt-1 block">
-                            {t("collections.createModal.fields.cover.requiredHint")}
+                            {t(
+                              "collections.createModal.fields.cover.requiredHint",
+                            )}
                           </span>
                         </div>
                       </>
@@ -268,7 +185,9 @@ const CreateAlbumModal: React.FC = () => {
                 className="btn btn-primary"
                 disabled={isSubmitting || !name.trim() || !selectedCoverId}
               >
-                {isSubmitting && <span className="loading loading-spinner loading-sm"></span>}
+                {isSubmitting && (
+                  <span className="loading loading-spinner loading-sm"></span>
+                )}
                 {isSubmitting
                   ? t("collections.createModal.actions.creating")
                   : t("collections.createModal.actions.create")}
@@ -290,15 +209,10 @@ const CreateAlbumModal: React.FC = () => {
               </div>
 
               <div className="flex-1 overflow-hidden">
-                <WorkerProvider preload={["justified"]}>
-                  <AssetsProvider
-                    scopeId="photo-picker"
-                    persist={false}
-                    defaultSelectionMode="single"
-                  >
-                    <PhotoPicker onSelect={handlePhotoSelect} />
-                  </AssetsProvider>
-                </WorkerProvider>
+                <PhotoPicker
+                  scopeId="photo-picker:album-cover"
+                  onSelect={handlePhotoSelect}
+                />
               </div>
             </div>
           )}

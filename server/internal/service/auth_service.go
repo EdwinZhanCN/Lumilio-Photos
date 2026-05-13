@@ -15,6 +15,7 @@ import (
 	"server/internal/db/repo"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,16 +44,16 @@ type RefreshTokenRequest struct {
 }
 
 type UserResponse struct {
-	UserID      int        `json:"user_id"`
-	Username    string     `json:"username"`
-	DisplayName string     `json:"display_name"`
-	AvatarURL   *string    `json:"avatar_url,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	IsActive    bool       `json:"is_active"`
-	LastLogin   *time.Time `json:"last_login,omitempty"`
-	Role        string     `json:"role"`
-	Permissions []string   `json:"permissions"`
+	UserID        int        `json:"user_id"`
+	Username      string     `json:"username"`
+	DisplayName   string     `json:"display_name"`
+	AvatarAssetID *string    `json:"avatar_asset_id,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	IsActive      bool       `json:"is_active"`
+	LastLogin     *time.Time `json:"last_login,omitempty"`
+	Role          string     `json:"role"`
+	Permissions   []string   `json:"permissions"`
 }
 
 type AuthResponse struct {
@@ -464,17 +465,39 @@ func ConvertUserToResponse(user repo.User) UserResponse {
 	}
 
 	return UserResponse{
-		UserID:      int(user.UserID),
-		Username:    user.Username,
-		DisplayName: displayName,
-		AvatarURL:   cloneOptionalString(user.AvatarUrl),
-		CreatedAt:   user.CreatedAt.Time,
-		UpdatedAt:   user.UpdatedAt.Time,
-		IsActive:    user.IsActive != nil && *user.IsActive,
-		LastLogin:   lastLogin,
-		Role:        string(role),
-		Permissions: PermissionsForRole(role),
+		UserID:        int(user.UserID),
+		Username:      user.Username,
+		DisplayName:   displayName,
+		AvatarAssetID: uuidToOptionalString(user.AvatarAssetID),
+		CreatedAt:     user.CreatedAt.Time,
+		UpdatedAt:     user.UpdatedAt.Time,
+		IsActive:      user.IsActive != nil && *user.IsActive,
+		LastLogin:     lastLogin,
+		Role:          string(role),
+		Permissions:   PermissionsForRole(role),
 	}
+}
+
+func uuidToOptionalString(value pgtype.UUID) *string {
+	if !value.Valid {
+		return nil
+	}
+
+	id := uuid.UUID(value.Bytes).String()
+	return &id
+}
+
+func optionalStringToUUID(value *string) (pgtype.UUID, error) {
+	if value == nil {
+		return pgtype.UUID{}, nil
+	}
+
+	parsed, err := uuid.Parse(*value)
+	if err != nil {
+		return pgtype.UUID{}, err
+	}
+
+	return pgtype.UUID{Bytes: parsed, Valid: true}, nil
 }
 
 func (s *AuthService) updateUserLastLogin(ctx context.Context, userID int32) (pgtype.Timestamptz, error) {

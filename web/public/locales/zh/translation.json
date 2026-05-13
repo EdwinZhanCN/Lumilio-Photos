@@ -138,6 +138,58 @@
             "itemCount": "AI 识别到 {{count}} 个相关项目"
         }
     },
+    "duplicates": {
+        "pageTitle": "重复照片",
+        "scan": "立即扫描",
+        "scanning": "扫描中...",
+        "scanError": "扫描失败：{{message}}",
+        "scanSuccess": "共发现 {{groups}} 个重复合集（精确 {{exact}}、相似 {{phash}}、混合 {{mixed}}）",
+        "loadError": "加载重复照片失败：{{message}}",
+        "summaryLoadError": "加载重复照片摘要失败：{{message}}",
+        "emptyTitle": "没有需要处理的重复项",
+        "emptyDescription": "看起来你的资料库里每张照片都是独一无二的。",
+        "noScanYet": "运行一次扫描以查找资料库中的重复照片。",
+        "summary": {
+            "pendingGroups": "待处理合集",
+            "recoverableAssets": "可回收照片",
+            "recoverableBytes": "可回收空间",
+            "lastDetected": "上次扫描",
+            "neverDetected": "尚未扫描"
+        },
+        "method": {
+            "exact": "完全重复",
+            "phash": "视觉相似",
+            "mixed": "混合（精确 + 相似）"
+        },
+        "group": {
+            "membersCount_one": "{{count}} 张照片",
+            "membersCount_other": "{{count}} 张照片",
+            "totalSize": "共 {{size}}",
+            "saveSize": "回收 {{size}}",
+            "keeperLabel": "保留",
+            "duplicateLabel": "将移入废纸篓",
+            "dismissedLabel": "已忽略",
+            "candidateLabel": "候选",
+            "setKeeper": "保留这张",
+            "merge": "合并",
+            "merging": "合并中...",
+            "dismiss": "不是重复",
+            "dismissing": "处理中...",
+            "mergeError": "合并失败：{{message}}",
+            "dismissError": "标记失败：{{message}}",
+            "mergeSuccess": "已合并，释放 {{size}}。",
+            "dismissSuccess": "已标记为不是重复。"
+        },
+        "filters": {
+            "status": "状态",
+            "pending": "待处理",
+            "merged": "已合并",
+            "dismissed": "已忽略"
+        },
+        "errors": {
+            "noRepository": "未选择仓库"
+        }
+    },
     "collections": {
         "untitled": "未命名相册",
         "createSuccess": "相册创建成功",
@@ -152,13 +204,28 @@
         "sections": {
             "places": "地点",
             "albums": "相册",
-            "people": "人物"
+            "people": "人物",
+            "utilities": "工具"
+        },
+        "utilities": {
+            "duplicates": {
+                "title": "重复照片",
+                "description": "查找并合并重复的照片",
+                "emptyTitle": "尚未发现重复照片",
+                "emptyDescription": "运行一次扫描以查找完全相同和视觉相似的重复项。",
+                "pendingGroups_one": "{{count}} 个重复合集",
+                "pendingGroups_other": "{{count}} 个重复合集",
+                "recoverable": "可释放 {{size}}",
+                "noRecoverable": "暂无可回收空间",
+                "lastDetected": "上次扫描 {{when}}",
+                "neverDetected": "尚未扫描"
+            }
         },
         "places": {
             "mapView": "地图",
             "mapViewTitle": "地点地图",
             "exploreAll": "探索所有地点",
-            "empty": "暂无带地理位置的旅行记录。",
+            "empty": "暂无旅行记录。",
             "loadError": "加载旅行记录失败：{{error}}"
         },
         "messages": {
@@ -1150,7 +1217,7 @@
         "viewAll": "查看全部",
         "emptyState": {
             "title": "这里还没有内容",
-            "description": "有内容时会显示在这里。"
+            "description": "去管理页面上传资源吧！"
         },
         "copy": "复制",
         "or": "或"

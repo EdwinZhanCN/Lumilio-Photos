@@ -156,6 +156,38 @@ type Caption struct {
 	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type DuplicateGroup struct {
+	GroupID                  pgtype.UUID        `db:"group_id" json:"group_id"`
+	RepositoryID             pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	Method                   string             `db:"method" json:"method"`
+	Status                   string             `db:"status" json:"status"`
+	AssetCount               int32              `db:"asset_count" json:"asset_count"`
+	TotalSize                int64              `db:"total_size" json:"total_size"`
+	RecommendedKeeperAssetID pgtype.UUID        `db:"recommended_keeper_asset_id" json:"recommended_keeper_asset_id"`
+	KeeperAssetID            pgtype.UUID        `db:"keeper_asset_id" json:"keeper_asset_id"`
+	DetectionVersion         string             `db:"detection_version" json:"detection_version"`
+	DetectedAt               pgtype.Timestamptz `db:"detected_at" json:"detected_at"`
+	ResolvedAt               pgtype.Timestamptz `db:"resolved_at" json:"resolved_at"`
+	CreatedAt                pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type DuplicateGroupAsset struct {
+	GroupID  pgtype.UUID `db:"group_id" json:"group_id"`
+	AssetID  pgtype.UUID `db:"asset_id" json:"asset_id"`
+	Role     string      `db:"role" json:"role"`
+	FileSize int64       `db:"file_size" json:"file_size"`
+}
+
+type DuplicateGroupEdge struct {
+	GroupID    pgtype.UUID `db:"group_id" json:"group_id"`
+	AssetIDA   pgtype.UUID `db:"asset_id_a" json:"asset_id_a"`
+	AssetIDB   pgtype.UUID `db:"asset_id_b" json:"asset_id_b"`
+	Method     string      `db:"method" json:"method"`
+	Distance   float64     `db:"distance" json:"distance"`
+	Confidence float64     `db:"confidence" json:"confidence"`
+}
+
 type Embedding struct {
 	ID                  int32              `db:"id" json:"id"`
 	AssetID             pgtype.UUID        `db:"asset_id" json:"asset_id"`
@@ -427,7 +459,7 @@ type User struct {
 	IsActive           *bool              `db:"is_active" json:"is_active"`
 	LastLogin          pgtype.Timestamptz `db:"last_login" json:"last_login"`
 	DisplayName        string             `db:"display_name" json:"display_name"`
-	AvatarUrl          *string            `db:"avatar_url" json:"avatar_url"`
+	AvatarAssetID      pgtype.UUID        `db:"avatar_asset_id" json:"avatar_asset_id"`
 	Role               string             `db:"role" json:"role"`
 	WebauthnUserHandle []byte             `db:"webauthn_user_handle" json:"webauthn_user_handle"`
 }

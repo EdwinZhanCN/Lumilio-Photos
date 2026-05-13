@@ -162,6 +162,16 @@ type RepositoryScanControllerInterface interface {
 	ListRepositoryScans(c *gin.Context)
 }
 
+// DuplicateControllerInterface defines the Utilities Rail "Duplicates" endpoints.
+type DuplicateControllerInterface interface {
+	GetDuplicateSummary(c *gin.Context)    // GET    /duplicates/summary
+	ListDuplicateGroups(c *gin.Context)    // GET    /duplicates/groups
+	GetDuplicateGroup(c *gin.Context)      // GET    /duplicates/groups/:id
+	DetectDuplicates(c *gin.Context)       // POST   /duplicates/detect
+	MergeDuplicateGroup(c *gin.Context)    // POST   /duplicates/groups/:id/merge
+	DismissDuplicateGroup(c *gin.Context)  // POST   /duplicates/groups/:id/dismiss
+}
+
 func NewRouter(
 	assetController AssetControllerInterface,
 	authController AuthControllerInterface,
@@ -175,6 +185,7 @@ func NewRouter(
 	settingsController SettingsControllerInterface,
 	userController UserControllerInterface,
 	repositoryScanController RepositoryScanControllerInterface,
+	duplicateController DuplicateControllerInterface,
 	agentAvailabilityMiddleware gin.HandlerFunc,
 ) *gin.Engine {
 	r := gin.Default()
@@ -332,6 +343,19 @@ func NewRouter(
 			people.GET("/:id/cover", peopleController.GetPersonCover)
 			people.PATCH("/:id", authController.AuthMiddleware(), peopleController.UpdatePerson)
 			people.POST("/:id/assets/list", peopleController.ListPersonAssets)
+		}
+
+		// Duplicate detection routes (Utilities Rail). Auth is required for
+		// mutating actions (detect/merge/dismiss); reads are open to authed users.
+		duplicates := v1.Group("/duplicates")
+		duplicates.Use(authController.AuthMiddleware())
+		{
+			duplicates.GET("/summary", duplicateController.GetDuplicateSummary)
+			duplicates.GET("/groups", duplicateController.ListDuplicateGroups)
+			duplicates.GET("/groups/:id", duplicateController.GetDuplicateGroup)
+			duplicates.POST("/detect", duplicateController.DetectDuplicates)
+			duplicates.POST("/groups/:id/merge", duplicateController.MergeDuplicateGroup)
+			duplicates.POST("/groups/:id/dismiss", duplicateController.DismissDuplicateGroup)
 		}
 
 		// Admin routes for queue monitoring (read-only)

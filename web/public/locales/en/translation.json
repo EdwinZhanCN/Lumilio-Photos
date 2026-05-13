@@ -138,6 +138,58 @@
             "itemCount": "AI detected {{count}} related items"
         }
     },
+    "duplicates": {
+        "pageTitle": "Duplicates",
+        "scan": "Scan",
+        "scanning": "Scanning...",
+        "scanError": "Failed to scan: {{message}}",
+        "scanSuccess": "Found {{groups}} duplicate sets ({{exact}} exact, {{phash}} similar, {{mixed}} mixed)",
+        "loadError": "Failed to load duplicates: {{message}}",
+        "summaryLoadError": "Failed to load duplicate summary: {{message}}",
+        "emptyTitle": "No duplicates to review",
+        "emptyDescription": "Looks like every photo in this library is one of a kind.",
+        "noScanYet": "Run a scan to find duplicate photos across your library.",
+        "summary": {
+            "pendingGroups": "Pending sets",
+            "recoverableAssets": "Reclaimable photos",
+            "recoverableBytes": "Reclaimable space",
+            "lastDetected": "Last scan",
+            "neverDetected": "Not scanned yet"
+        },
+        "method": {
+            "exact": "Exact duplicate",
+            "phash": "Visually similar",
+            "mixed": "Mixed (exact + similar)"
+        },
+        "group": {
+            "membersCount_one": "{{count}} photo",
+            "membersCount_other": "{{count}} photos",
+            "totalSize": "Total {{size}}",
+            "saveSize": "Recover {{size}}",
+            "keeperLabel": "Keeping",
+            "duplicateLabel": "Will be moved to Trash",
+            "dismissedLabel": "Dismissed",
+            "candidateLabel": "Candidate",
+            "setKeeper": "Keep this one",
+            "merge": "Merge",
+            "merging": "Merging...",
+            "dismiss": "Not a duplicate",
+            "dismissing": "Dismissing...",
+            "mergeError": "Failed to merge: {{message}}",
+            "dismissError": "Failed to dismiss: {{message}}",
+            "mergeSuccess": "Merged. Recovered {{size}}.",
+            "dismissSuccess": "Marked as not a duplicate."
+        },
+        "filters": {
+            "status": "Status",
+            "pending": "Pending",
+            "merged": "Merged",
+            "dismissed": "Dismissed"
+        },
+        "errors": {
+            "noRepository": "No repository selected"
+        }
+    },
     "collections": {
         "untitled": "Untitled Album",
         "createSuccess": "Album created successfully",
@@ -152,7 +204,22 @@
         "sections": {
             "places": "Places",
             "albums": "Albums",
-            "people": "People"
+            "people": "People",
+            "utilities": "Utilities"
+        },
+        "utilities": {
+            "duplicates": {
+                "title": "Duplicates",
+                "description": "Find and merge duplicate photos",
+                "emptyTitle": "No duplicates yet",
+                "emptyDescription": "Run a scan to look for exact and visually similar duplicates.",
+                "pendingGroups_one": "{{count}} duplicate set",
+                "pendingGroups_other": "{{count}} duplicate sets",
+                "recoverable": "Free up {{size}}",
+                "noRecoverable": "No reclaimable space",
+                "lastDetected": "Last scanned {{when}}",
+                "neverDetected": "Not scanned yet"
+            }
         },
         "places": {
             "mapView": "Map",
@@ -1117,7 +1184,7 @@
         "viewAll": "View All",
         "emptyState": {
             "title": "Nothing here yet",
-            "description": "Items will appear here when available."
+            "description": "Upload some assets from the Manage page!"
         },
         "copy": "Copy",
         "or": "OR"
