@@ -51,7 +51,7 @@ type AssetControllerInterface interface {
 	GetAssetStack(c *gin.Context)     // GET /assets/:id/stack - Get stack containing this asset
 	CreateManualStack(c *gin.Context) // POST /assets/stacks - Manually create a stack from assets
 	UnstackAsset(c *gin.Context)      // DELETE /assets/:id/stack - Remove asset from its stack
-	AutoDetectStacks(c *gin.Context)  // POST /repositories/:repositoryId/stacks/detect - Auto-detect RAW+JPEG stacks
+	AutoDetectStacks(c *gin.Context)  // POST /repositories/:id/stacks/detect - Auto-detect RAW+JPEG stacks
 }
 
 // AuthControllerInterface defines the interface for authentication controllers
@@ -164,12 +164,12 @@ type RepositoryScanControllerInterface interface {
 
 // DuplicateControllerInterface defines the Utilities Rail "Duplicates" endpoints.
 type DuplicateControllerInterface interface {
-	GetDuplicateSummary(c *gin.Context)    // GET    /duplicates/summary
-	ListDuplicateGroups(c *gin.Context)    // GET    /duplicates/groups
-	GetDuplicateGroup(c *gin.Context)      // GET    /duplicates/groups/:id
-	DetectDuplicates(c *gin.Context)       // POST   /duplicates/detect
-	MergeDuplicateGroup(c *gin.Context)    // POST   /duplicates/groups/:id/merge
-	DismissDuplicateGroup(c *gin.Context)  // POST   /duplicates/groups/:id/dismiss
+	GetDuplicateSummary(c *gin.Context)   // GET    /duplicates/summary
+	ListDuplicateGroups(c *gin.Context)   // GET    /duplicates/groups
+	GetDuplicateGroup(c *gin.Context)     // GET    /duplicates/groups/:id
+	DetectDuplicates(c *gin.Context)      // POST   /duplicates/detect
+	MergeDuplicateGroup(c *gin.Context)   // POST   /duplicates/groups/:id/merge
+	DismissDuplicateGroup(c *gin.Context) // POST   /duplicates/groups/:id/dismiss
 }
 
 func NewRouter(

@@ -8,17 +8,17 @@ import { useI18n } from "@/lib/i18n"; // Import useI18n
 
 /**
  * Provider component that manages upload state and operations.
- * 
+ *
  * This component wraps the application with upload functionality, providing:
  * - File upload state management using useReducer
  * - Drag and drop event handling
  * - File processing and upload orchestration
  * - Progress tracking and error handling
  * - Integration with settings and internationalization
- * 
+ *
  * @param props - Component props
  * @param props.children - Child components that will have access to upload context
- * 
+ *
  * @example
  * ```typescript
  * function App() {
@@ -28,15 +28,15 @@ import { useI18n } from "@/lib/i18n"; // Import useI18n
  *     </UploadProvider>
  *   );
  * }
- * 
+ *
  * function UploadComponent() {
  *   const { addFiles, uploadFiles, isProcessing } = useUploadContext();
- *   
+ *
  *   const handleUpload = async (files: File[]) => {
  *     await addFiles(files);
  *     await uploadFiles();
  *   };
- *   
+ *
  *   return <YourUploadUI onUpload={handleUpload} />;
  * }
  * ```
@@ -84,7 +84,12 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       // Check total files limit
       const availableSlots = maxTotalFiles - state.files.length;
       if (availableSlots <= 0) {
-        showMessage("error", t('upload.UploadProvider.max_files_allowed', { count: maxTotalFiles }));
+        showMessage(
+          "error",
+          t("upload.UploadProvider.max_files_allowed", {
+            count: maxTotalFiles,
+          }),
+        );
         return;
       }
 
@@ -92,7 +97,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       if (files.length > availableSlots) {
         showMessage(
           "hint",
-          t('upload.UploadProvider.files_exceeded_limit', { count: files.length - availableSlots }),
+          t("upload.UploadProvider.files_exceeded_limit", {
+            count: files.length - availableSlots,
+          }),
         );
       }
 
@@ -114,17 +121,21 @@ export function UploadProvider({ children }: { children: ReactNode }) {
 
   const uploadFiles = useCallback(async () => {
     if (!state.files.length) {
-      showMessage("info", t('upload.UploadProvider.no_files_selected_for_upload_message'));
+      showMessage(
+        "info",
+        t("upload.UploadProvider.no_files_selected_for_upload_message"),
+      );
       return;
     }
 
     try {
       await uploadProcess.processFiles(state.files);
       dispatch({ type: "CLEAR_FILES" });
-      showMessage("success", t('upload.UploadProvider.upload_completed_success'));
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : t('upload.UploadProvider.upload_failed_generic');
+        error instanceof Error
+          ? error.message
+          : t("upload.UploadProvider.upload_failed_generic");
       showMessage("error", errorMessage);
     }
   }, [state.files, uploadProcess, showMessage, t]);

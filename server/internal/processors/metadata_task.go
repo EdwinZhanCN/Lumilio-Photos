@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"go.uber.org/zap"
@@ -100,6 +101,7 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 			if hasValidLocationGPS(meta.GPSLatitude, meta.GPSLongitude) {
 				ap.enqueueLocationClusterRebuild(ctx, asset)
 			}
+			ap.enqueueDetectStacks(ctx, asset)
 		}
 	}
 
@@ -119,6 +121,26 @@ func (ap *AssetProcessor) enqueueLocationClusterRebuild(ctx context.Context, ass
 	opts.Queue = "rebuild_location_clusters"
 	if _, err := ap.queueClient.Insert(ctx, args, &opts); err != nil && ap.logger != nil {
 		ap.logger.Warn("failed to enqueue location cluster rebuild", zap.Error(err))
+	}
+}
+
+func (ap *AssetProcessor) enqueueDetectStacks(ctx context.Context, asset *repo.Asset) {
+	if ap == nil || ap.queueClient == nil || asset == nil || !asset.RepositoryID.Valid {
+		return
+	}
+
+	repositoryID := uuid.UUID(asset.RepositoryID.Bytes).String()
+	args := jobs.DetectStacksArgs{
+		RepositoryID: repositoryID,
+	}
+	opts := args.InsertOpts()
+	opts.Queue = "detect_stacks"
+
+	if _, err := ap.queueClient.Insert(ctx, args, &opts); err != nil && ap.logger != nil {
+		ap.logger.Warn("failed to enqueue detect stacks after metadata extraction",
+			zap.String("repository_id", repositoryID),
+			zap.Error(err),
+		)
 	}
 }
 

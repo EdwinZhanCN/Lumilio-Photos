@@ -599,9 +599,14 @@
             "createFailed": "Failed to create library.",
             "scanAll": "Scan all libraries",
             "scanRepository": "Scan {{name}}",
+            "rescanRepository": "Rescan",
             "scanQueued": "Scan queued for {{name}}.",
             "scanAllQueued": "Scans queued for {{count}} libraries.",
             "scanFailed": "Failed to queue scan.",
+            "actionsMenu": "Library actions for {{name}}",
+            "detectStacks": "Detect stacks",
+            "detectStacksCompleted": "Stack detection finished for {{name}}. {{count}} stacks created.",
+            "detectStacksFailed": "Failed to detect stacks.",
             "empty": "No repositories are available.",
             "unavailable": "Repository options are temporarily unavailable."
         }
@@ -683,6 +688,24 @@
             "no_files_selected_for_upload_message": "No files selected for upload",
             "upload_completed_success": "Upload completed successfully",
             "upload_failed_generic": "Upload failed"
+        },
+        "UploadProcess": {
+            "summarySuccess_one": "Successfully uploaded {{count}} file.",
+            "summarySuccess_other": "Successfully uploaded {{count}} files.",
+            "summaryPartial": "Upload complete: {{succeeded}} succeeded, {{failed}} failed.",
+            "processFailed": "Upload process failed",
+            "uploadFailed": "Upload failed",
+            "noResult": "No result returned"
+        },
+        "NavbarQueue": {
+            "title": "Upload Queue",
+            "previewBadge": "Preview",
+            "active_one": "{{count}} active",
+            "active_other": "{{count}} active",
+            "failed_one": "{{count}} failed",
+            "failed_other": "{{count}} failed",
+            "backgroundHint": "Uploads keep running while you browse.",
+            "openPage": "Open upload page"
         }
     },
     "updates": {

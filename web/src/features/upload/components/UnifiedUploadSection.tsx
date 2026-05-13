@@ -2,10 +2,7 @@ import React, { useRef, ChangeEvent, useMemo } from "react";
 import FileDropZone from "./FileDropZone";
 
 import { useUploadContext } from "@/features/upload";
-import {
-  useUploadConfig,
-  useUploadProgress,
-} from "@/features/upload/hooks/useUploadQueries";
+import { useUploadConfig } from "@/features/upload/hooks/useUploadQueries";
 import {
   validateFile,
   getValidationErrorMessage,
@@ -21,16 +18,6 @@ import { FolderUp, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 import { useWorkingRepository } from "@/features/settings";
 
-type UploadQueueRow = {
-  key: string;
-  fileName: string;
-  size?: number;
-  status: "pending" | "uploading" | "completed" | "failed";
-  progress: number;
-  error?: string;
-  isChunked: boolean;
-};
-
 function UnifiedUploadSection(): React.JSX.Element {
   const { t } = useI18n(); // Initialize useI18n
   const {
@@ -38,9 +25,7 @@ function UnifiedUploadSection(): React.JSX.Element {
     addFiles,
     clearFiles,
     uploadFiles,
-    uploadProgress,
     isProcessing,
-    fileProgress,
     maxTotalFiles,
   } = useUploadContext();
 
@@ -50,25 +35,9 @@ function UnifiedUploadSection(): React.JSX.Element {
   const showMessage = useMessage();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const activeSessionIds = useMemo(() => {
-    const ids = fileProgress
-      .filter((file) => file.status === "uploading" && file.sessionId)
-      .map((file) => file.sessionId);
-    return Array.from(new Set(ids));
-  }, [fileProgress]);
-
-  const sessionIds =
-    activeSessionIds.length > 0 ? activeSessionIds.join(",") : undefined;
   const uploadConfigQuery = useUploadConfig();
-  const uploadProgressQuery = useUploadProgress(sessionIds, {
-    enabled: activeSessionIds.length > 0,
-    refetchInterval: activeSessionIds.length > 0 ? 2000 : false,
-  });
 
   const uploadConfig = uploadConfigQuery.data?.data;
-  const serverProgress = uploadProgressQuery.data?.data;
-  const serverSummary = serverProgress?.summary;
-  const serverSessions = serverProgress?.sessions ?? [];
   const {
     repositories,
     repositoriesQuery,
@@ -100,101 +69,6 @@ function UnifiedUploadSection(): React.JSX.Element {
     const mb = value / (1024 * 1024);
     return `${mb.toFixed(1)} MB`;
   };
-
-  const getStatusText = (
-    status: "pending" | "uploading" | "completed" | "failed",
-  ) => {
-    switch (status) {
-      case "completed":
-        return t("upload.FileUploadProgress.status_completed");
-      case "uploading":
-        return t("upload.FileUploadProgress.status_uploading");
-      case "failed":
-        return t("upload.FileUploadProgress.status_failed");
-      case "pending":
-      default:
-        return t("upload.FileUploadProgress.status_pending");
-    }
-  };
-
-  const getStatusBadgeClass = (
-    status: "pending" | "uploading" | "completed" | "failed",
-  ) => {
-    switch (status) {
-      case "completed":
-        return "badge-success";
-      case "uploading":
-        return "badge-primary";
-      case "failed":
-        return "badge-error";
-      case "pending":
-      default:
-        return "badge-ghost";
-    }
-  };
-
-  const getProgressClass = (
-    status: "pending" | "uploading" | "completed" | "failed",
-  ) => {
-    switch (status) {
-      case "completed":
-        return "progress-success";
-      case "uploading":
-        return "progress-primary";
-      case "failed":
-        return "progress-error";
-      case "pending":
-      default:
-        return "progress-base-300";
-    }
-  };
-
-  const queueRows = useMemo(() => {
-    const progressBuckets = new Map<string, typeof fileProgress>();
-    fileProgress.forEach((item) => {
-      const bucket = progressBuckets.get(item.fileName);
-      if (bucket) {
-        bucket.push(item);
-      } else {
-        progressBuckets.set(item.fileName, [item]);
-      }
-    });
-
-    const consumedCount = new Map<string, number>();
-
-    const rows: UploadQueueRow[] = files.map((file, index) => {
-      const consumed = consumedCount.get(file.name) ?? 0;
-      const match = progressBuckets.get(file.name)?.[consumed];
-      consumedCount.set(file.name, consumed + 1);
-
-      return {
-        key: `file-${index}-${file.name}`,
-        fileName: file.name,
-        size: file.size,
-        status: match?.status ?? "pending",
-        progress: match?.progress ?? 0,
-        error: match?.error,
-        isChunked: match?.isChunked ?? false,
-      };
-    });
-
-    progressBuckets.forEach((bucket, fileName) => {
-      const consumed = consumedCount.get(fileName) ?? 0;
-      bucket.slice(consumed).forEach((item, index) => {
-        rows.push({
-          key: `progress-${fileName}-${index}`,
-          fileName: item.fileName,
-          size: undefined,
-          status: item.status,
-          progress: item.progress,
-          error: item.error,
-          isChunked: item.isChunked,
-        });
-      });
-    });
-
-    return rows;
-  }, [files, fileProgress]);
 
   /**
    * Handle file selection and validation.
@@ -406,184 +280,6 @@ function UnifiedUploadSection(): React.JSX.Element {
           </button>
         </div>
       </div>
-
-      {/* Unified Queue Table */}
-      {queueRows.length > 0 && (
-        <div className="mt-6">
-          <div className="card bg-base-200 shadow-xl">
-            <div className="card-body p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="card-title text-base">
-                  {t("upload.UnifiedUploadSection.queue_title")}
-                </h3>
-                <div className="badge badge-primary badge-sm">
-                  {queueRows.length}
-                </div>
-              </div>
-
-              <div className="overflow-x-auto max-h-96 custom-scrollbar">
-                <table className="table table-zebra table-sm">
-                  <thead>
-                    <tr>
-                      <th>{t("upload.UnifiedUploadSection.table.file")}</th>
-                      <th>{t("upload.UnifiedUploadSection.table.size")}</th>
-                      <th>{t("upload.UnifiedUploadSection.table.status")}</th>
-                      <th className="w-56">
-                        {t("upload.UnifiedUploadSection.table.progress")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {queueRows.map((row) => (
-                      <tr key={row.key}>
-                        <td>
-                          <div className="max-w-md">
-                            <div
-                              className="font-medium truncate"
-                              title={row.fileName}
-                            >
-                              {row.fileName}
-                            </div>
-                            <div className="flex items-center gap-2 mt-1">
-                              {row.isChunked && (
-                                <span className="badge badge-xs badge-outline">
-                                  {t("upload.FileUploadProgress.chunked_badge")}
-                                </span>
-                              )}
-                              {row.error && (
-                                <span
-                                  className="text-xs text-error truncate"
-                                  title={row.error}
-                                >
-                                  {row.error}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap">
-                          {typeof row.size === "number"
-                            ? formatBytes(row.size)
-                            : "-"}
-                        </td>
-                        <td>
-                          <span
-                            className={`badge badge-sm ${getStatusBadgeClass(row.status)}`}
-                          >
-                            {getStatusText(row.status)}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <progress
-                              className={`progress w-full h-2 ${getProgressClass(row.status)}`}
-                              value={row.progress}
-                              max="100"
-                            />
-                            <span className="text-xs font-medium tabular-nums min-w-10 text-right">
-                              {row.progress.toFixed(0)}%
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Overall Upload Progress */}
-      {uploadProgress > 0 && (
-        <div className="mt-6 card bg-base-200 shadow-lg">
-          <div className="card-body p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">
-                {t("upload.UnifiedUploadSection.overall_progress_label")}
-              </span>
-              <span className="text-sm font-bold text-primary">
-                {uploadProgress.toFixed(1)}%
-              </span>
-            </div>
-            <progress
-              className="progress progress-primary w-full"
-              value={uploadProgress}
-              max="100"
-            />
-          </div>
-        </div>
-      )}
-
-      {(serverSummary || serverSessions.length > 0) && (
-        <div className="mt-6 card bg-base-200 shadow-lg">
-          <div className="card-body p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">
-                {t("upload.UnifiedUploadSection.server_progress_label")}
-              </span>
-              {typeof serverSummary?.overall_progress === "number" && (
-                <span className="text-sm font-bold text-primary">
-                  {serverSummary.overall_progress.toFixed(1)}%
-                </span>
-              )}
-            </div>
-
-            {typeof serverSummary?.overall_progress === "number" && (
-              <progress
-                className="progress progress-primary w-full"
-                value={serverSummary.overall_progress}
-                max="100"
-              />
-            )}
-
-            {serverSummary && (
-              <div className="mt-2 flex flex-wrap gap-4 text-xs text-base-content/70">
-                <span>
-                  {t("upload.UnifiedUploadSection.server_active_sessions")}
-                  : {serverSummary.active_sessions ?? 0}
-                </span>
-                <span>
-                  {t("upload.UnifiedUploadSection.server_completed_files")}
-                  : {serverSummary.completed_files ?? 0}
-                </span>
-                <span>
-                  {t("upload.UnifiedUploadSection.server_failed_sessions")}
-                  : {serverSummary.failed_sessions ?? 0}
-                </span>
-              </div>
-            )}
-
-            {serverSessions.length > 0 && (
-              <div className="mt-3 space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                {serverSessions.map((session, index) => (
-                  <div
-                    key={session.session_id || index}
-                    className="rounded bg-base-100 px-3 py-2"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="truncate max-w-[70%]">
-                        {session.filename || session.session_id}
-                      </span>
-                      <span className="font-medium">
-                        {typeof session.progress === "number"
-                          ? `${session.progress.toFixed(1)}%`
-                          : "-"}
-                      </span>
-                    </div>
-                    <progress
-                      className="progress progress-primary w-full mt-1"
-                      value={session.progress ?? 0}
-                      max="100"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Custom scrollbar styles */}
       <style>{`

@@ -11353,14 +11353,14 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/repositories/{repositoryId}/stacks/detect": {
+        "/api/v1/repositories/{id}/stacks/detect": {
             "post": {
                 "description": "Scans a repository for RAW+JPEG pairs and creates stacks automatically",
                 "parameters": [
                     {
                         "description": "Repository ID",
                         "in": "path",
-                        "name": "repositoryId",
+                        "name": "id",
                         "required": true,
                         "schema": {
                             "type": "string"

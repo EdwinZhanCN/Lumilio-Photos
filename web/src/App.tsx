@@ -16,6 +16,8 @@ import { SettingsProvider, useSettingsContext } from "./features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
 import { AuthProvider, ProtectedRoute } from "./features/auth";
+import { WorkerProvider } from "@/contexts/WorkerProvider";
+import { UploadProvider } from "@/features/upload";
 
 const queryClient = new QueryClient();
 
@@ -110,7 +112,11 @@ function App(): React.ReactNode {
                 <Route
                   element={
                     <ProtectedRoute>
-                      <AppShellLayout />
+                      <WorkerProvider preload={["hash"]}>
+                        <UploadProvider>
+                          <AppShellLayout />
+                        </UploadProvider>
+                      </WorkerProvider>
                     </ProtectedRoute>
                   }
                 >

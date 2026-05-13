@@ -4,9 +4,8 @@ import { Folders } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
-import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { useI18n } from "@/lib/i18n";
-import { UploadProvider, useUploadContext } from "@/features/upload";
+import { useUploadContext } from "@/features/upload";
 import UnifiedUploadSection from "@/features/upload/components/UnifiedUploadSection";
 import SupportedFormatsModal from "@/features/upload/components/SupportedFormatsModal";
 import RepositoryGrid from "@/features/manage/components/RepositoryGrid";
@@ -53,26 +52,22 @@ const Manage = () => {
   const { t } = useI18n();
 
   return (
-    <WorkerProvider preload={["hash"]}>
-      <UploadProvider>
-        <div className="min-h-screen bg-base-100">
-          <ManageHeader />
-          <ErrorBoundary
-            FallbackComponent={(props) => (
-              <ErrorFallBack
-                code="500"
-                title={t("manage.errorBoundaryTitle")}
-                message={t("manage.errorBoundaryMessage")}
-                {...props}
-              />
-            )}
-          >
-            <UnifiedUploadSection />
-            <RepositoryGrid />
-          </ErrorBoundary>
-        </div>
-      </UploadProvider>
-    </WorkerProvider>
+    <div className="min-h-screen bg-base-100">
+      <ManageHeader />
+      <ErrorBoundary
+        FallbackComponent={(props) => (
+          <ErrorFallBack
+            code="500"
+            title={t("manage.errorBoundaryTitle")}
+            message={t("manage.errorBoundaryMessage")}
+            {...props}
+          />
+        )}
+      >
+        <UnifiedUploadSection />
+        <RepositoryGrid />
+      </ErrorBoundary>
+    </div>
   );
 };
 
