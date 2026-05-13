@@ -8,6 +8,7 @@ import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/Lumil
 import { useSettingsContext, useWorkingRepository } from "@/features/settings";
 import UserAvatar from "@/components/UserAvatar";
 import MessageCenter from "@/components/MessageCenter";
+import NavbarUploadQueue from "@/features/upload/components/NavbarUploadQueue";
 
 function NavBar() {
   const [isLumilioHovered, setIsLumilioHovered] = useState(false);
@@ -104,6 +105,7 @@ function NavBar() {
       <div className="flex flex-1 justify-end">
         <div className="flex items-center gap-3">
           <MessageCenter />
+          <NavbarUploadQueue />
           <label
             className={`swap swap-rotate ${isFollowingSystem ? "cursor-not-allowed opacity-60" : ""}`}
             title={

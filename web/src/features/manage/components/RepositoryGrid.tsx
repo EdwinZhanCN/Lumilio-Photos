@@ -1,8 +1,17 @@
-import { useCallback, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  Ellipsis,
   Folder,
   FolderPlus,
+  Layers,
   Plus,
   RefreshCcw,
   RefreshCcwDot,
@@ -68,15 +77,35 @@ function useRepositoryAssetCount(repositoryId: string) {
 function RepositoryCard({
   repository,
   isScanning,
+  isDetecting,
   onScan,
+  onDetectStacks,
 }: {
   repository: IndexingRepositoryOption;
   isScanning: boolean;
+  isDetecting: boolean;
   onScan: (repository: IndexingRepositoryOption) => void;
+  onDetectStacks: (repository: IndexingRepositoryOption) => void;
 }) {
   const { t } = useI18n();
   const countQuery = useRepositoryAssetCount(repository.id);
   const name = getRepositoryDisplayName(repository, t);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const isBusy = isScanning || isDetecting;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [menuOpen]);
 
   return (
     <article className="rounded-lg border border-base-300 bg-base-100 p-4 shadow-sm transition hover:border-primary/30">
@@ -102,24 +131,68 @@ function RepositoryCard({
           </div>
         </div>
 
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm btn-circle"
-          onClick={() => onScan(repository)}
-          disabled={isScanning}
-          title={t("manage.repositories.scanRepository", {
-            name,
-          })}
-          aria-label={t("manage.repositories.scanRepository", {
-            name,
-          })}
-        >
-          {isScanning ? (
-            <span className="loading loading-spinner loading-xs" />
-          ) : (
-            <RefreshCcw size={16} />
+        <div className="relative shrink-0" ref={menuRef}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm btn-circle"
+            onClick={() => setMenuOpen((current) => !current)}
+            title={t("manage.repositories.actionsMenu", {
+              name,
+            })}
+            aria-label={t("manage.repositories.actionsMenu", {
+              name,
+            })}
+            aria-expanded={menuOpen}
+          >
+            <Ellipsis size={16} />
+          </button>
+
+          {menuOpen && (
+            <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-2xl border border-base-300 bg-base-100 p-2 shadow-xl">
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onScan(repository);
+                }}
+                disabled={isBusy}
+              >
+                {isScanning ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <RefreshCcw size={16} className="text-base-content/70" />
+                )}
+                <span>
+                  {t("manage.repositories.rescanRepository", {
+                    name,
+                  })}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDetectStacks(repository);
+                }}
+                disabled={isBusy}
+              >
+                {isDetecting ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <Layers size={16} className="text-base-content/70" />
+                )}
+                <span>
+                  {t("manage.repositories.detectStacks", {
+                    name,
+                  })}
+                </span>
+              </button>
+            </div>
           )}
-        </button>
+        </div>
       </div>
 
       <div className="mt-4 flex items-end justify-between gap-3 border-t border-base-200 pt-3">
@@ -293,7 +366,14 @@ export default function RepositoryGrid() {
   const showMessage = useMessage();
   const repositoriesQuery = useIndexingRepositories();
   const repositories = repositoriesQuery.repositories;
-  const { scanRepository, scanRepositories, scanningIds, isScanning } =
+  const {
+    scanRepository,
+    scanRepositories,
+    scanningIds,
+    detectStacks,
+    detectingIds,
+    isScanning,
+  } =
     useRepositoryScan();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
@@ -322,6 +402,29 @@ export default function RepositoryGrid() {
       }
     },
     [scanRepository, showMessage, t],
+  );
+
+  const handleDetectStacks = useCallback(
+    async (repository: IndexingRepositoryOption) => {
+      try {
+        const created = await detectStacks(repository.id);
+        showMessage(
+          "success",
+          t("manage.repositories.detectStacksCompleted", {
+            name: getRepositoryDisplayName(repository, t),
+            count: created,
+          }),
+        );
+      } catch (error) {
+        showMessage(
+          "error",
+          error instanceof Error
+            ? error.message
+            : t("manage.repositories.detectStacksFailed"),
+        );
+      }
+    },
+    [detectStacks, showMessage, t],
   );
 
   const handleScanAll = useCallback(async () => {
@@ -404,7 +507,9 @@ export default function RepositoryGrid() {
               key={repository.id}
               repository={repository}
               isScanning={scanningIds.has(repository.id)}
+              isDetecting={detectingIds.has(repository.id)}
               onScan={handleScanRepository}
+              onDetectStacks={handleDetectStacks}
             />
           ))}
         </div>

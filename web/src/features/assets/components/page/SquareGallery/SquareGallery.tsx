@@ -10,6 +10,7 @@ import {
   DEFAULT_GROUP_KEYS,
   formatAssetGroupLabel,
 } from "@/features/assets/utils/assetGroups";
+import { collapseStackedAssetGroups } from "@/features/assets/utils/collapseStackedAssets";
 import EmptyState from "@/components/EmptyState";
 
 interface SquareGalleryProps extends AssetGalleryProps {
@@ -48,7 +49,10 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const groupEntries = useMemo(
-    () => groups.filter((group) => group.assets && group.assets.length > 0),
+    () =>
+      collapseStackedAssetGroups(groups).filter(
+        (group) => group.assets && group.assets.length > 0,
+      ),
     [groups],
   );
 
@@ -193,7 +197,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
                     data-asset-id={assetId}
                   >
                     <figure className="h-full w-full rounded-2xl">
-                      {asset.stack?.stack_cover && asset.stack?.stack_size && asset.stack.stack_size > 1 ? (
+                      {asset.stack?.stack_size && asset.stack.stack_size > 1 ? (
                         <StackedThumbnail
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}

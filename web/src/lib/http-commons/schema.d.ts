@@ -7237,7 +7237,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/repositories/{repositoryId}/stacks/detect": {
+    "/api/v1/repositories/{id}/stacks/detect": {
         parameters: {
             query?: never;
             header?: never;
@@ -7256,7 +7256,7 @@ export interface paths {
                 header?: never;
                 path: {
                     /** @description Repository ID */
-                    repositoryId: string;
+                    id: string;
                 };
                 cookie?: never;
             };

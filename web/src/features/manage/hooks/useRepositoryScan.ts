@@ -2,6 +2,15 @@ import { useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { $api } from "@/lib/http-commons/queryClient";
 
+type AutoDetectStacksResponse = {
+  repository_id?: string;
+  stacks_created?: number;
+};
+
+type ApiResult<T = unknown> = {
+  data?: T;
+};
+
 const invalidateRepositoryAwareQueries = async (
   queryClient: ReturnType<typeof useQueryClient>,
 ) => {
@@ -18,10 +27,41 @@ const invalidateRepositoryAwareQueries = async (
   ]);
 };
 
+const unwrapAutoDetectStacksResponse = (
+  response: unknown,
+): AutoDetectStacksResponse | undefined => {
+  if (!response || typeof response !== "object") {
+    return undefined;
+  }
+
+  const record = response as Record<string, unknown>;
+  if (typeof record.stacks_created === "number") {
+    return response as AutoDetectStacksResponse;
+  }
+
+  const wrapped = response as ApiResult<unknown>;
+  if (
+    wrapped.data &&
+    typeof wrapped.data === "object" &&
+    typeof (wrapped.data as Record<string, unknown>).stacks_created === "number"
+  ) {
+    return wrapped.data as AutoDetectStacksResponse;
+  }
+
+  return undefined;
+};
+
 export function useRepositoryScan() {
   const queryClient = useQueryClient();
   const scanMutation = $api.useMutation("post", "/api/v1/repositories/{id}/scan");
+  const detectStacksMutation = $api.useMutation(
+    "post",
+    "/api/v1/repositories/{id}/stacks/detect",
+  );
   const [scanningIds, setScanningIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [detectingIds, setDetectingIds] = useState<Set<string>>(
     () => new Set(),
   );
 
@@ -49,6 +89,30 @@ export function useRepositoryScan() {
       }
     },
     [queryClient, scanMutation],
+  );
+
+  const detectStacks = useCallback(
+    async (repositoryId: string) => {
+      setDetectingIds((current) => new Set(current).add(repositoryId));
+      try {
+        const response = await detectStacksMutation.mutateAsync({
+          params: {
+            path: {
+              id: repositoryId,
+            },
+          },
+        });
+        await invalidateRepositoryAwareQueries(queryClient);
+        return unwrapAutoDetectStacksResponse(response)?.stacks_created ?? 0;
+      } finally {
+        setDetectingIds((current) => {
+          const next = new Set(current);
+          next.delete(repositoryId);
+          return next;
+        });
+      }
+    },
+    [detectStacksMutation, queryClient],
   );
 
   const scanRepositories = useCallback(
@@ -94,9 +158,15 @@ export function useRepositoryScan() {
       scanRepository,
       scanRepositories,
       scanningIds,
+      detectStacks,
+      detectingIds,
       isScanning: scanningIds.size > 0 || scanMutation.isPending,
+      isDetecting: detectingIds.size > 0 || detectStacksMutation.isPending,
     }),
     [
+      detectStacks,
+      detectStacksMutation.isPending,
+      detectingIds,
       scanMutation.isPending,
       scanRepositories,
       scanRepository,

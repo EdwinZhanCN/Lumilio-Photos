@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useSettingsContext, useWorkingRepository } from "@/features/settings";
+import { useI18n } from "@/lib/i18n";
 import {
   HashcodeProgress,
   useGenerateHashcode,
@@ -67,6 +68,7 @@ export interface useUploadProcessReturn {
 export function useUploadProcess(): useUploadProcessReturn {
   const queryClient = useQueryClient();
   const showMessage = useMessage();
+  const { t } = useI18n();
   const { state: settings } = useSettingsContext();
   const { scopedRepositoryId } = useWorkingRepository();
   const [isUploading, setIsUploading] = useState(false);
@@ -85,15 +87,30 @@ export function useUploadProcess(): useUploadProcessReturn {
   } = useGenerateHashcode();
 
   const updateFileProgress = useCallback(
-    (fileName: string, updates: Partial<FileUploadProgress>) => {
+    (sessionId: string, updates: Partial<FileUploadProgress>) => {
       setFileProgress((prev) =>
         prev.map((item) =>
-          item.fileName === fileName ? { ...item, ...updates } : item,
+          item.sessionId === sessionId ? { ...item, ...updates } : item,
         ),
       );
     },
     [],
   );
+
+  const invalidateAssetQueries = useCallback(() => {
+    return queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = query.queryKey;
+        if (Array.isArray(key)) {
+          const path = key[1];
+          return (
+            path === "/api/v1/assets/list" || path === "/api/v1/assets/search"
+          );
+        }
+        return false;
+      },
+    });
+  }, [queryClient]);
 
   const toPositiveInt = (
     value: number | undefined,
@@ -180,14 +197,20 @@ export function useUploadProcess(): useUploadProcessReturn {
       },
     };
 
-    // Initialize progress state for all files
+    const plannedSessions = fileArray.map((file) => ({
+      file,
+      sessionId: generateSessionId(),
+      shouldUseChunks: shouldUseChunks(file),
+    }));
+
+    // Initialize progress state for all files with stable session identifiers.
     setFileProgress(
-      fileArray.map((file) => ({
-        fileName: file.name,
+      plannedSessions.map((session) => ({
+        fileName: session.file.name,
         progress: 0,
         status: "pending",
-        sessionId: "",
-        isChunked: shouldUseChunks(file),
+        sessionId: session.sessionId,
+        isChunked: session.shouldUseChunks,
       })),
     );
 
@@ -195,9 +218,8 @@ export function useUploadProcess(): useUploadProcessReturn {
       await semaphore.acquire();
       try {
         sessions.forEach((s) =>
-          updateFileProgress(s.file.name, {
+          updateFileProgress(s.sessionId, {
             status: "uploading",
-            sessionId: s.sessionId,
           }),
         );
 
@@ -212,7 +234,7 @@ export function useUploadProcess(): useUploadProcessReturn {
               const p = e.total ? Math.round((e.loaded * 100) / e.total) : 0;
               setUploadProgress(p);
               sessions.forEach((s) =>
-                updateFileProgress(s.file.name, { progress: p }),
+                updateFileProgress(s.sessionId, { progress: p }),
               );
             },
           },
@@ -221,8 +243,23 @@ export function useUploadProcess(): useUploadProcessReturn {
         const batchResults = response.data?.results || [];
         results.push(...batchResults);
 
+        const sessionsByFileName = new Map<string, FileUploadSession[]>();
+        sessions.forEach((session) => {
+          const bucket = sessionsByFileName.get(session.file.name);
+          if (bucket) {
+            bucket.push(session);
+          } else {
+            sessionsByFileName.set(session.file.name, [session]);
+          }
+        });
+
         batchResults.forEach((r) => {
-          updateFileProgress(r.file_name || "", {
+          const fileName = r.file_name || "";
+          const match = sessionsByFileName.get(fileName)?.shift();
+          if (!match) {
+            return;
+          }
+          updateFileProgress(match.sessionId, {
             status: r.success ? "completed" : "failed",
             progress: r.success ? 100 : 0,
             error: r.success ? undefined : r.message || r.error,
@@ -235,7 +272,7 @@ export function useUploadProcess(): useUploadProcessReturn {
             file_name: s.file.name,
             error: err.message,
           });
-          updateFileProgress(s.file.name, {
+          updateFileProgress(s.sessionId, {
             status: "failed",
             error: err.message,
           });
@@ -248,9 +285,8 @@ export function useUploadProcess(): useUploadProcessReturn {
     const uploadChunked = async (session: FileUploadSession) => {
       await semaphore.acquire();
       try {
-        updateFileProgress(session.file.name, {
+        updateFileProgress(session.sessionId, {
           status: "uploading",
-          sessionId: session.sessionId,
         });
 
         const resp = await chunkedUploadMutation.mutateAsync({
@@ -260,7 +296,7 @@ export function useUploadProcess(): useUploadProcessReturn {
           repositoryId: scopedRepositoryId,
           onProgress: (p) => {
             setUploadProgress(p);
-            updateFileProgress(session.file.name, { progress: p });
+            updateFileProgress(session.sessionId, { progress: p });
           },
           options: {
             maxConcurrent: effectiveChunkConcurrency,
@@ -271,12 +307,13 @@ export function useUploadProcess(): useUploadProcessReturn {
         const result = resp.data?.results?.[0] || {
           success: false,
           file_name: session.file.name,
-          error: "No result",
+          error: t("upload.UploadProcess.noResult"),
         };
         results.push(result);
-        updateFileProgress(session.file.name, {
+        updateFileProgress(session.sessionId, {
           status: result.success ? "completed" : "failed",
           progress: result.success ? 100 : 0,
+          error: result.success ? undefined : result.message || result.error,
         });
       } catch (err: any) {
         results.push({
@@ -284,7 +321,7 @@ export function useUploadProcess(): useUploadProcessReturn {
           file_name: session.file.name,
           error: err.message,
         });
-        updateFileProgress(session.file.name, {
+        updateFileProgress(session.sessionId, {
           status: "failed",
           error: err.message,
         });
@@ -303,20 +340,18 @@ export function useUploadProcess(): useUploadProcessReturn {
 
       // Start hashing and pipeline the uploads
       await generateHashCodes(files, (hashResult) => {
-        const file = fileArray[hashResult.index];
-        totalBytesHashed += file.size;
+        const session = plannedSessions[hashResult.index];
+        totalBytesHashed += session.file.size;
 
-        const session: FileUploadSession = {
-          file,
+        const sessionWithHash: FileUploadSession = {
+          ...session,
           hash: hashResult.hash,
-          sessionId: generateSessionId(),
-          shouldUseChunks: shouldUseChunks(file),
         };
 
-        if (session.shouldUseChunks) {
-          uploadTasks.push(uploadChunked(session));
+        if (sessionWithHash.shouldUseChunks) {
+          uploadTasks.push(uploadChunked(sessionWithHash));
         } else {
-          smallFileBuffer.push(session);
+          smallFileBuffer.push(sessionWithHash);
           if (smallFileBuffer.length >= optimalBatchSize) {
             uploadTasks.push(uploadBatch([...smallFileBuffer]));
             smallFileBuffer.length = 0;
@@ -337,7 +372,7 @@ export function useUploadProcess(): useUploadProcessReturn {
       }
 
       await Promise.all(uploadTasks);
-      await queryClient.invalidateQueries({ queryKey: ["userAssets"] });
+      await invalidateAssetQueries();
 
       const uploaded = results
         .filter((r) => r.success)
@@ -346,28 +381,35 @@ export function useUploadProcess(): useUploadProcessReturn {
         .filter((r) => !r.success)
         .map((r) => ({
           name: r.file_name || "Unknown",
-          error: r.message || r.error || "Upload failed",
+          error: r.message || r.error || t("upload.UploadProcess.uploadFailed"),
         }));
 
-      if (failed.length === 0 && uploaded.length > 0)
+      if (failed.length === 0 && uploaded.length > 0) {
         showMessage(
           "success",
-          `Successfully uploaded ${uploaded.length} files.`,
+          t("upload.UploadProcess.summarySuccess", { count: uploaded.length }),
         );
-      else if (uploaded.length > 0 || failed.length > 0)
+      } else if (uploaded.length > 0 || failed.length > 0) {
         showMessage(
-          "error",
-          `Upload complete: ${uploaded.length} succeeded, ${failed.length} failed.`,
+          failed.length > 0 ? "error" : "success",
+          t("upload.UploadProcess.summaryPartial", {
+            succeeded: uploaded.length,
+            failed: failed.length,
+          }),
         );
+      }
 
       return { uploaded, failed };
     } catch (error: any) {
-      showMessage("error", error.message || "Upload process failed");
+      showMessage(
+        "error",
+        error.message || t("upload.UploadProcess.processFailed"),
+      );
       return {
         uploaded: [],
         failed: fileArray.map((f) => ({
           name: f.name,
-          error: "Process failed",
+          error: t("upload.UploadProcess.processFailed"),
         })),
       };
     } finally {

@@ -8,6 +8,7 @@ require (
 	github.com/cloudwego/eino-ext/components/model/deepseek v0.1.2
 	github.com/cloudwego/eino-ext/components/model/ollama v0.1.8
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.8
+	github.com/corona10/goimagehash v1.1.0
 	github.com/edwinzhancn/lumen-sdk v1.1.3
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-webauthn/webauthn v0.16.0
@@ -38,7 +39,6 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.13 // indirect
 	github.com/cohesion-org/deepseek-go v1.3.2 // indirect
-	github.com/corona10/goimagehash v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eino-contrib/jsonschema v1.0.3 // indirect

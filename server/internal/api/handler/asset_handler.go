@@ -3315,12 +3315,12 @@ func (h *AssetHandler) UnstackAsset(c *gin.Context) {
 // @Description Scans a repository for RAW+JPEG pairs and creates stacks automatically
 // @Tags repositories
 // @Produce json
-// @Param repositoryId path string true "Repository ID"
+// @Param id path string true "Repository ID"
 // @Success 200 {object} api.Result{data=dto.AutoDetectStacksResponseDTO}
-// @Router /api/v1/repositories/{repositoryId}/stacks/detect [post]
+// @Router /api/v1/repositories/{id}/stacks/detect [post]
 // @Security BearerAuth
 func (h *AssetHandler) AutoDetectStacks(c *gin.Context) {
-	repoIDStr := c.Param("repositoryId")
+	repoIDStr := c.Param("id")
 	repoID, err := uuid.Parse(repoIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid repository ID"})

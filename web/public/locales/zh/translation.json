@@ -598,9 +598,14 @@
             "createFailed": "创建资源库失败。",
             "scanAll": "扫描全部资源库",
             "scanRepository": "扫描 {{name}}",
+            "rescanRepository": "重新扫描",
             "scanQueued": "已为 {{name}} 加入扫描队列。",
             "scanAllQueued": "已为 {{count}} 个资源库加入扫描队列。",
             "scanFailed": "加入扫描队列失败。",
+            "actionsMenu": "{{name}} 的资源库操作",
+            "detectStacks": "检测堆叠",
+            "detectStacksCompleted": "{{name}} 的堆叠检测已完成，共创建 {{count}} 个堆叠。",
+            "detectStacksFailed": "堆叠检测失败。",
             "empty": "暂无可用仓库。",
             "unavailable": "仓库选项暂时不可用。"
         }
@@ -682,6 +687,24 @@
             "no_files_selected_for_upload_message": "未选择要上传的文件",
             "upload_completed_success": "上传成功完成",
             "upload_failed_generic": "上传失败"
+        },
+        "UploadProcess": {
+            "summarySuccess_one": "成功上传 {{count}} 个文件。",
+            "summarySuccess_other": "成功上传 {{count}} 个文件。",
+            "summaryPartial": "上传完成：成功 {{succeeded}} 个，失败 {{failed}} 个。",
+            "processFailed": "上传流程失败",
+            "uploadFailed": "上传失败",
+            "noResult": "未返回结果"
+        },
+        "NavbarQueue": {
+            "title": "上传队列",
+            "previewBadge": "预览",
+            "active_one": "{{count}} 个进行中",
+            "active_other": "{{count}} 个进行中",
+            "failed_one": "{{count}} 个失败",
+            "failed_other": "{{count}} 个失败",
+            "backgroundHint": "浏览其他页面时上传仍会继续。",
+            "openPage": "打开上传页面"
         }
     },
     "updates": {
