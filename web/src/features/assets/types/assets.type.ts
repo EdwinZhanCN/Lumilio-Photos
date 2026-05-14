@@ -11,6 +11,28 @@ export interface AssetGroup {
   key: string;
   assets: Asset[];
 }
+export type BrowseItemId = `asset:${string}` | `stack:${string}`;
+
+export interface BrowseAssetItem {
+  type: "asset";
+  id: `asset:${string}`;
+  asset: Asset;
+}
+
+export interface BrowseStackItem {
+  type: "stack";
+  id: `stack:${string}`;
+  stackId: string;
+  representative: Asset;
+  assets: Asset[];
+}
+
+export type BrowseItem = BrowseAssetItem | BrowseStackItem;
+
+export interface BrowseGroup {
+  key: string;
+  items: BrowseItem[];
+}
 
 // ===== Asset View Definition =====
 export interface AssetViewDefinition {
