@@ -2,6 +2,15 @@
 -- Duplicate detection candidate queries
 -- ============================================================================
 
+-- name: GetStackMembershipForRepository :many
+-- Each stacked asset in the repository mapped to its stack. Used to skip
+-- duplicate edges between intentional stack members (e.g. bursts, RAW+JPEG).
+SELECT asm.asset_id, asm.stack_id
+FROM asset_stack_members asm
+INNER JOIN assets a ON a.asset_id = asm.asset_id
+WHERE a.repository_id = sqlc.arg('repository_id')
+  AND a.is_deleted = false;
+
 -- name: GetExactDuplicateCandidates :many
 -- Returns assets in a repository that share the exact same (hash, file_size).
 -- Only photos are considered, and only non-deleted assets. Results are ordered

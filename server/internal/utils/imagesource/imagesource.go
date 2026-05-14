@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/h2non/bimg"
+	"github.com/davidbyttow/govips/v2/vips"
 
 	"server/internal/utils/imaging"
 	"server/internal/utils/raw"
@@ -24,29 +24,13 @@ const (
 	PurposeFace    Purpose = "face"
 )
 
-// OpenPhoto returns a decodable image source for a photo. RAW files are resolved
-// to their embedded preview first, falling back to the RAW processor's full render.
-func OpenPhoto(ctx context.Context, fullPath string, originalFilename string) (io.ReadCloser, error) {
-	if !raw.IsRAWFile(originalFilename) {
-		f, err := os.Open(fullPath)
-		if err != nil {
-			return nil, fmt.Errorf("open photo: %w", err)
-		}
-		return f, nil
-	}
-
-	f, err := os.Open(fullPath)
-	if err != nil {
-		return nil, fmt.Errorf("open RAW file: %w", err)
-	}
-	defer f.Close()
-
+func openRAWPhoto(ctx context.Context, fullPath string, originalFilename string) (io.ReadCloser, error) {
 	opts := raw.DefaultProcessingOptions()
 	opts.FullRenderTimeout = 30 * time.Second
 	opts.PreferEmbedded = true
 	opts.Quality = 90
 
-	result, err := raw.NewProcessor(opts).ProcessRAW(ctx, f, originalFilename)
+	result, err := raw.NewProcessor(opts).ProcessRAWFromPath(ctx, fullPath, originalFilename)
 	if err != nil {
 		return nil, fmt.Errorf("process RAW: %w", err)
 	}
@@ -58,6 +42,20 @@ func OpenPhoto(ctx context.Context, fullPath string, originalFilename string) (i
 	}
 
 	return io.NopCloser(bytes.NewReader(result.PreviewData)), nil
+}
+
+// OpenPhoto returns a decodable image source for a photo. RAW files are resolved
+// to their embedded preview first, falling back to the RAW processor's full render.
+func OpenPhoto(ctx context.Context, fullPath string, originalFilename string) (io.ReadCloser, error) {
+	if raw.IsRAWFile(originalFilename) {
+		return openRAWPhoto(ctx, fullPath, originalFilename)
+	}
+
+	f, err := os.Open(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("open photo: %w", err)
+	}
+	return f, nil
 }
 
 func ProcessMLImage(ctx context.Context, fullPath string, originalFilename string, purpose Purpose) ([]byte, error) {
@@ -75,35 +73,35 @@ func ProcessMLImage(ctx context.Context, fullPath string, originalFilename strin
 	return imaging.ProcessImageStream(reader, opts)
 }
 
-func mlOptions(purpose Purpose) (bimg.Options, error) {
+func mlOptions(purpose Purpose) (imaging.ProcessOptions, error) {
 	switch purpose {
 	case PurposeClip, PurposeBioClip:
-		return bimg.Options{
+		return imaging.ProcessOptions{
 			Width:     224,
 			Height:    224,
 			Crop:      true,
-			Gravity:   bimg.GravitySmart,
+			Smart:     true,
 			Quality:   90,
-			Type:      bimg.WEBP,
+			Format:    vips.ImageTypeWEBP,
 			NoProfile: true,
 		}, nil
 	case PurposeOCR, PurposeFace:
-		return bimg.Options{
+		return imaging.ProcessOptions{
 			Width:     1920,
 			Height:    1920,
 			Quality:   90,
-			Type:      bimg.WEBP,
+			Format:    vips.ImageTypeWEBP,
 			NoProfile: true,
 		}, nil
 	case PurposeCaption:
-		return bimg.Options{
+		return imaging.ProcessOptions{
 			Width:     1024,
 			Height:    1024,
 			Quality:   90,
-			Type:      bimg.WEBP,
+			Format:    vips.ImageTypeWEBP,
 			NoProfile: true,
 		}, nil
 	default:
-		return bimg.Options{}, fmt.Errorf("unsupported image purpose: %s", purpose)
+		return imaging.ProcessOptions{}, fmt.Errorf("unsupported image purpose: %s", purpose)
 	}
 }

@@ -32,7 +32,7 @@ type DuplicateGroupDTO struct {
 	RecoverableBytes         int64               `json:"recoverable_bytes" example:"10485760"`
 	RecommendedKeeperAssetID *string             `json:"recommended_keeper_asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 	KeeperAssetID            *string             `json:"keeper_asset_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
-	DetectionVersion         string              `json:"detection_version" example:"duplicates-v1"`
+	DetectionVersion         string              `json:"detection_version" example:"duplicates-v2"`
 	DetectedAt               time.Time           `json:"detected_at" example:"2026-05-12T08:23:45Z"`
 	ResolvedAt               *time.Time          `json:"resolved_at,omitempty" example:"2026-05-12T08:25:00Z"`
 	Assets                   []DuplicateAssetDTO `json:"assets"`

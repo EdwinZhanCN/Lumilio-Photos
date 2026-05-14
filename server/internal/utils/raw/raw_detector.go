@@ -8,7 +8,7 @@ import (
 	"server/internal/utils/file"
 	"strings"
 
-	"github.com/h2non/bimg"
+	"github.com/davidbyttow/govips/v2/vips"
 )
 
 // RAWFormat represents different RAW file formats
@@ -368,14 +368,14 @@ func (d *Detector) IsPreviewAcceptable(previewData []byte, minWidth, minHeight i
 		return false, nil
 	}
 
-	// Check dimensions using bimg
-	img := bimg.NewImage(previewData)
-	size, err := img.Size()
+	// Check dimensions using libvips
+	img, err := vips.NewImageFromBuffer(previewData)
 	if err != nil {
 		return false, nil
 	}
+	defer img.Close()
 
-	if size.Width < minWidth || size.Height < minHeight {
+	if img.Width() < minWidth || img.Height() < minHeight {
 		return false, nil
 	}
 

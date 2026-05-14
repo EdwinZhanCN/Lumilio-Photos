@@ -22,7 +22,7 @@ import (
 
 const (
 	// DuplicateDetectionVersion is bumped whenever detection semantics change.
-	DuplicateDetectionVersion = "duplicates-v1"
+	DuplicateDetectionVersion = "duplicates-v2"
 
 	// PHashDuplicateThreshold is the maximum Hamming distance (bits) between two
 	// 64-bit perceptual hashes that we still consider visually duplicate.
@@ -151,10 +151,10 @@ func DefaultMergePolicy() MergeMetadataPolicy {
 
 // MergeGroupParams is the input for MergeGroup.
 type MergeGroupParams struct {
-	GroupID          uuid.UUID
-	KeeperAssetID    uuid.UUID
+	GroupID           uuid.UUID
+	KeeperAssetID     uuid.UUID
 	DuplicateAssetIDs []uuid.UUID // optional; defaults to all non-keeper members
-	Policy           MergeMetadataPolicy
+	Policy            MergeMetadataPolicy
 }
 
 // MergeGroupResult summarizes a merge for the API caller.
@@ -222,7 +222,7 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 	logger := s.logger.With(zap.String("repository_id", repositoryID.String()))
 	pgRepoID := uuidToPG(repositoryID)
 
-	// 1. Gather exact-hash candidates and pHash embeddings in parallel.
+	// 1. Gather exact-hash candidates, pHash embeddings, and stack membership.
 	exactRows, err := s.queries.GetExactDuplicateCandidates(ctx, pgRepoID)
 	if err != nil {
 		return DuplicateDetectionResult{}, fmt.Errorf("load exact candidates: %w", err)
@@ -230,6 +230,15 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 	phashRows, err := s.queries.ListPHashEmbeddingsForRepository(ctx, pgRepoID)
 	if err != nil {
 		return DuplicateDetectionResult{}, fmt.Errorf("load phash embeddings: %w", err)
+	}
+	stackRows, err := s.queries.GetStackMembershipForRepository(ctx, pgRepoID)
+	if err != nil {
+		return DuplicateDetectionResult{}, fmt.Errorf("load stack membership: %w", err)
+	}
+
+	stackOf := make(map[uuid.UUID]uuid.UUID, len(stackRows))
+	for _, row := range stackRows {
+		stackOf[pgToUUID(row.AssetID)] = pgToUUID(row.StackID)
 	}
 
 	// 2. Index every photo we saw, regardless of which edge introduced it,
@@ -280,8 +289,8 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 	// union-find treats both methods uniformly and exact/pHash edges naturally
 	// merge into a single connected component when they share an asset.
 	edges := make([]duplicateEdge, 0)
-	edges = append(edges, buildExactEdges(exactRows)...)
-	edges = append(edges, buildPHashEdges(phashRows)...)
+	edges = append(edges, buildExactEdges(exactRows, stackOf)...)
+	edges = append(edges, buildPHashEdges(phashRows, stackOf)...)
 
 	if len(edges) == 0 {
 		// No duplicates: clear out any previous pending state and exit.
@@ -426,8 +435,8 @@ func (s *duplicateService) DetectForRepository(ctx context.Context, repositoryID
 
 // buildExactEdges turns rows sharing (hash, file_size) into edges. To keep the
 // edge set linear we connect each non-first row to the first row in the run;
-// union-find handles full connectivity.
-func buildExactEdges(rows []repo.GetExactDuplicateCandidatesRow) []duplicateEdge {
+// union-find handles full connectivity. Pairs in the same photo stack are skipped.
+func buildExactEdges(rows []repo.GetExactDuplicateCandidatesRow, stackOf map[uuid.UUID]uuid.UUID) []duplicateEdge {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -448,6 +457,9 @@ func buildExactEdges(rows []repo.GetExactDuplicateCandidatesRow) []duplicateEdge
 			have = true
 			continue
 		}
+		if sameStackPair(anchor, id, stackOf) {
+			continue
+		}
 		edges = append(edges, duplicateEdge{
 			a: anchor, b: id,
 			method:   DuplicateMethodExact,
@@ -463,8 +475,8 @@ func buildExactEdges(rows []repo.GetExactDuplicateCandidatesRow) []duplicateEdge
 // prefix bucket as a cheap candidate filter: any two 64-bit hashes within k
 // bits must share at least one 16-bit chunk identical when k <= 6 (pigeonhole
 // on 4 chunks of 16 bits). For larger thresholds this filter degrades, which
-// is fine — we still verify distance below.
-func buildPHashEdges(rows []repo.ListPHashEmbeddingsForRepositoryRow) []duplicateEdge {
+// is fine — we still verify distance below. Pairs in the same photo stack are skipped.
+func buildPHashEdges(rows []repo.ListPHashEmbeddingsForRepositoryRow, stackOf map[uuid.UUID]uuid.UUID) []duplicateEdge {
 	type item struct {
 		id   uuid.UUID
 		hash uint64
@@ -531,6 +543,9 @@ func buildPHashEdges(rows []repo.ListPHashEmbeddingsForRepositoryRow) []duplicat
 		if dist > PHashDuplicateThreshold {
 			continue
 		}
+		if sameStackPair(pk.a, pk.b, stackOf) {
+			continue
+		}
 		conf := 1.0 - float64(dist)/64.0
 		edges = append(edges, duplicateEdge{
 			a: pk.a, b: pk.b,
@@ -540,6 +555,19 @@ func buildPHashEdges(rows []repo.ListPHashEmbeddingsForRepositoryRow) []duplicat
 		})
 	}
 	return edges
+}
+
+// sameStackPair reports whether both assets belong to the same non-empty stack.
+func sameStackPair(a, b uuid.UUID, stackOf map[uuid.UUID]uuid.UUID) bool {
+	if len(stackOf) == 0 {
+		return false
+	}
+	sa, okA := stackOf[a]
+	sb, okB := stackOf[b]
+	if !okA || !okB {
+		return false
+	}
+	return sa == sb
 }
 
 // pickRecommendedKeeper picks the member most likely to be the user's

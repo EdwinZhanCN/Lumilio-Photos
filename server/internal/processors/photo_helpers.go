@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 
 	"server/internal/db/repo"
@@ -59,19 +60,22 @@ func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Read
 	return nil
 }
 
+func (ap *AssetProcessor) enqueuePHashJob(ctx context.Context, assetID pgtype.UUID) error {
+	if _, err := ap.queueClient.Insert(ctx, jobs.ProcessPHashArgs{
+		AssetID: assetID,
+	}, &river.InsertOpts{Queue: "process_phash"}); err != nil {
+		return fmt.Errorf("enqueue pHash: %w", err)
+	}
+
+	return nil
+}
+
 // enqueueMLJobs enqueues enabled ML jobs based on runtime settings.
-// This is called during ingestion for photos to enqueue ML processing tasks.
+// This is called during ingestion/discovery for photos to enqueue ML processing tasks.
 func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset) error {
 	mlConfig, err := ap.settingsService.GetEffectiveMLConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("load ML settings: %w", err)
-	}
-
-	// pHash: always enabled, pure image processing, no ML dependencies.
-	if _, err = ap.queueClient.Insert(ctx, jobs.ProcessPHashArgs{
-		AssetID: asset.AssetID,
-	}, &river.InsertOpts{Queue: "process_phash"}); err != nil {
-		return fmt.Errorf("enqueue pHash: %w", err)
 	}
 
 	// Early return if no ML services are enabled by runtime config.

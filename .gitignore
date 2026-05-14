@@ -97,3 +97,5 @@ server/main
 # agent
 .claude/
 .codex/
+
+notes/

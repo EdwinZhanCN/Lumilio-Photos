@@ -144,6 +144,13 @@ type ProcessPHashArgs struct {
 
 func (ProcessPHashArgs) Kind() string { return "process_phash" }
 
+func (args ProcessPHashArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{UniqueOpts: river.UniqueOpts{
+		ByArgs:   true,
+		ByPeriod: 10 * time.Minute,
+	}}
+}
+
 // IngestAssetArgs handles initial staging ingestion and asset creation.
 type IngestAssetArgs struct {
 	ClientHash   string    `json:"clientHash" river:"unique"`

@@ -15,9 +15,9 @@ import (
 	"server/internal/db/repo"
 	"server/internal/storage"
 
+	"github.com/davidbyttow/govips/v2/vips"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/google/uuid"
-	"github.com/h2non/bimg"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pgvector/pgvector-go"
@@ -457,31 +457,37 @@ func (s *faceService) persistFaceCrop(repoPath string, assetID pgtype.UUID, inde
 		return nil, fmt.Errorf("face crop source image is empty")
 	}
 
-	image := bimg.NewImage(imageData)
-	size, err := image.Size()
+	img, err := vips.NewImageFromBuffer(imageData)
 	if err != nil {
-		return nil, fmt.Errorf("read face crop source size: %w", err)
+		return nil, fmt.Errorf("decode face crop source: %w", err)
 	}
-	if size.Width <= 0 || size.Height <= 0 {
+	defer img.Close()
+
+	if err := img.AutoRotate(); err != nil {
+		return nil, fmt.Errorf("autorotate face crop source: %w", err)
+	}
+
+	srcW := img.Width()
+	srcH := img.Height()
+	if srcW <= 0 || srcH <= 0 {
 		return nil, fmt.Errorf("invalid face crop source image dimensions")
 	}
 
-	left, top, width, height := clampFaceCropBounds(bbox, size.Width, size.Height)
+	left, top, width, height := clampFaceCropBounds(bbox, srcW, srcH)
 	if width <= 0 || height <= 0 {
 		return nil, fmt.Errorf("invalid face crop bounds")
 	}
 
-	cropBytes, err := image.Process(bimg.Options{
-		Top:           top,
-		Left:          left,
-		AreaWidth:     width,
-		AreaHeight:    height,
-		Type:          bimg.WEBP,
-		Quality:       faceCropQuality,
-		StripMetadata: true,
-	})
-	if err != nil {
+	if err := img.ExtractArea(left, top, width, height); err != nil {
 		return nil, fmt.Errorf("crop face image: %w", err)
+	}
+
+	exportParams := vips.NewWebpExportParams()
+	exportParams.Quality = faceCropQuality
+	exportParams.StripMetadata = true
+	cropBytes, _, err := img.ExportWebp(exportParams)
+	if err != nil {
+		return nil, fmt.Errorf("encode face crop: %w", err)
 	}
 
 	filename := fmt.Sprintf("%s_%d.webp", pgUUIDToString(assetID), index)

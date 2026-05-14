@@ -34,16 +34,6 @@ RUN pnpm run build
 # Production stage
 FROM nginx:alpine
 
-# Install openssl for self-signed cert generation
-RUN apk add --no-cache openssl
-
-# Create certs directory and generate self-signed certificate
-RUN mkdir -p /etc/nginx/certs && \
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout /etc/nginx/certs/selfsigned.key \
-    -out /etc/nginx/certs/selfsigned.crt \
-    -subj "/C=US/ST=Dev/L=Local/O=Dev/CN=localhost"
-
 # Copy built files from build stage to nginx
 COPY --from=build /app/dist /usr/share/nginx/html
 
@@ -54,10 +44,11 @@ COPY web/nginx.conf /etc/nginx/conf.d/default.conf
 RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
     echo 'API_URL=${API_URL-}' >> /docker-entrypoint.sh && \
     echo 'find /usr/share/nginx/html -name "*.js" -exec sed -i "s|RUNTIME_API_URL|$API_URL|g" {} \;' >> /docker-entrypoint.sh && \
-    echo 'nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
+    echo 'exec nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
 
-# Expose ports (80 for HTTP, 443 for HTTPS)
-EXPOSE 80 443
+# Expose HTTP. TLS/HTTP2 should be handled by an external reverse proxy.
+EXPOSE 80
 
+ENTRYPOINT []
 CMD ["/docker-entrypoint.sh"]

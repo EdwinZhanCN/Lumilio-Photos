@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"time"
 
-	"github.com/h2non/bimg"
+	"github.com/davidbyttow/govips/v2/vips"
+
+	"server/internal/utils/imaging"
 )
 
 // ProcessingStrategy defines how to handle RAW files
@@ -32,7 +35,7 @@ type ProcessingOptions struct {
 	FullRenderTimeout time.Duration
 	PreferEmbedded    bool // Prefer embedded preview over full render
 	Quality           int  // JPEG quality for output (1-100)
-	OutputFormat      bimg.ImageType
+	OutputFormat      vips.ImageType
 }
 
 // DefaultProcessingOptions returns sensible defaults
@@ -45,7 +48,7 @@ func DefaultProcessingOptions() ProcessingOptions {
 		FullRenderTimeout: 30 * time.Second,
 		PreferEmbedded:    true,
 		Quality:           90,
-		OutputFormat:      bimg.JPEG,
+		OutputFormat:      vips.ImageTypeJPEG,
 	}
 }
 
@@ -77,6 +80,90 @@ type ProcessingResult struct {
 	Width          int
 	Height         int
 	Error          error
+}
+
+// ProcessRAWFromPath processes a RAW file directly from disk, avoiding the
+// extra read-all and temp-file rewrite used by the generic reader-based path.
+func (p *Processor) ProcessRAWFromPath(ctx context.Context, fullPath, filename string) (*ProcessingResult, error) {
+	start := time.Now()
+	result := &ProcessingResult{
+		Strategy: p.options.Strategy,
+	}
+
+	file, err := os.Open(fullPath)
+	if err != nil {
+		result.Error = fmt.Errorf("open RAW file: %w", err)
+		return result, result.Error
+	}
+	defer file.Close()
+
+	detection, err := p.detector.DetectRAW(file, filename)
+	if err != nil {
+		result.Error = fmt.Errorf("failed to detect RAW: %w", err)
+		return result, result.Error
+	}
+
+	result.IsRAW = detection.IsRAW
+	result.Format = detection.Format
+
+	if !detection.IsRAW {
+		result.Error = fmt.Errorf("file is not a RAW format")
+		return result, result.Error
+	}
+
+	if preview, err := p.librawProcessor.ExtractEmbeddedWithLibRawPath(ctx, fullPath); err == nil && len(preview) > 0 {
+		valid, err := p.detector.IsPreviewAcceptable(preview, p.options.MinPreviewWidth, p.options.MinPreviewHeight)
+		if err == nil && valid {
+			preview, err = p.normalizeEmbeddedPreview(preview)
+			if err != nil {
+				log.Printf("LibRaw embedded preview normalization failed, falling back to other strategies: %v", err)
+			} else {
+				result.Strategy = StrategyEmbeddedPreview
+				result.UsedEmbedded = true
+				result.PreviewData = preview
+				result.ProcessingTime = time.Since(start)
+				p.populatePreviewDimensions(result, preview)
+				return result, nil
+			}
+		} else {
+			log.Printf("LibRaw embedded preview invalid or truncated, falling back to other strategies")
+		}
+	}
+
+	strategy := p.chooseStrategy(detection)
+	result.Strategy = strategy
+
+	var previewData []byte
+
+	switch strategy {
+	case StrategyEmbeddedPreview:
+		previewData, err = p.processEmbeddedPreviewFromPath(fullPath, detection)
+		if err != nil {
+			log.Printf("Embedded preview failed, falling back to full render: %v", err)
+			previewData, err = p.processFullRenderFromPath(ctx, fullPath)
+			result.UsedEmbedded = false
+		} else {
+			result.Strategy = StrategyEmbeddedPreview
+			result.UsedEmbedded = true
+		}
+	case StrategyFullRender:
+		previewData, err = p.processFullRenderFromPath(ctx, fullPath)
+		result.UsedEmbedded = false
+	default:
+		result.Error = fmt.Errorf("unknown processing strategy: %d", strategy)
+		return result, result.Error
+	}
+
+	if err != nil {
+		result.Error = fmt.Errorf("failed to process RAW: %w", err)
+		return result, result.Error
+	}
+
+	result.PreviewData = previewData
+	result.ProcessingTime = time.Since(start)
+	p.populatePreviewDimensions(result, previewData)
+
+	return result, nil
 }
 
 // ProcessRAW processes a RAW file and returns preview/thumbnail data
@@ -117,19 +204,20 @@ func (p *Processor) ProcessRAW(ctx context.Context, reader io.ReadSeeker, filena
 		// Validate preview quality and completeness
 		valid, err := p.detector.IsPreviewAcceptable(preview, p.options.MinPreviewWidth, p.options.MinPreviewHeight)
 		if err == nil && valid {
-			result.Strategy = StrategyEmbeddedPreview
-			result.UsedEmbedded = true
-			result.PreviewData = preview
-			result.ProcessingTime = time.Since(start)
-			if img := bimg.NewImage(preview); img != nil {
-				if size, err := img.Size(); err == nil {
-					result.Width = size.Width
-					result.Height = size.Height
-				}
+			preview, err = p.normalizeEmbeddedPreview(preview)
+			if err != nil {
+				log.Printf("LibRaw embedded preview normalization failed, falling back to other strategies: %v", err)
+			} else {
+				result.Strategy = StrategyEmbeddedPreview
+				result.UsedEmbedded = true
+				result.PreviewData = preview
+				result.ProcessingTime = time.Since(start)
+				p.populatePreviewDimensions(result, preview)
+				return result, nil
 			}
-			return result, nil
+		} else {
+			log.Printf("LibRaw embedded preview invalid or truncated, falling back to other strategies")
 		}
-		log.Printf("LibRaw embedded preview invalid or truncated, falling back to other strategies")
 	}
 
 	// Fallback to full LibRaw rendering
@@ -166,16 +254,7 @@ func (p *Processor) ProcessRAW(ctx context.Context, reader io.ReadSeeker, filena
 
 	result.PreviewData = previewData
 	result.ProcessingTime = time.Since(start)
-
-	// Get image dimensions
-	if len(previewData) > 0 {
-		if img := bimg.NewImage(previewData); img != nil {
-			if size, err := img.Size(); err == nil {
-				result.Width = size.Width
-				result.Height = size.Height
-			}
-		}
-	}
+	p.populatePreviewDimensions(result, previewData)
 
 	return result, nil
 }
@@ -220,21 +299,62 @@ func (p *Processor) processEmbeddedPreview(rawData []byte, detection *DetectionR
 		return nil, fmt.Errorf("embedded preview does not meet quality requirements")
 	}
 
-	// Optionally re-compress to standardize quality
-	if p.options.Quality < 100 {
-		img := bimg.NewImage(previewData)
-		processed, err := img.Process(bimg.Options{
-			Quality: p.options.Quality,
-			Type:    p.options.OutputFormat,
-		})
-		if err != nil {
-			log.Printf("Failed to reprocess embedded preview, using original: %v", err)
-			return previewData, nil
-		}
-		return processed, nil
+	processed, err := p.normalizeEmbeddedPreview(previewData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to normalize embedded preview: %w", err)
 	}
 
-	return previewData, nil
+	return processed, nil
+}
+
+func (p *Processor) processEmbeddedPreviewFromPath(fullPath string, detection *DetectionResult) ([]byte, error) {
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("open RAW file: %w", err)
+	}
+	defer file.Close()
+
+	previewData, err := p.detector.ExtractEmbeddedPreview(file, detection)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract embedded preview: %w", err)
+	}
+
+	acceptable, err := p.detector.IsPreviewAcceptable(previewData, p.options.MinPreviewWidth, p.options.MinPreviewHeight)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate preview: %w", err)
+	}
+
+	if !acceptable {
+		return nil, fmt.Errorf("embedded preview does not meet quality requirements")
+	}
+
+	processed, err := p.normalizeEmbeddedPreview(previewData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to normalize embedded preview: %w", err)
+	}
+
+	return processed, nil
+}
+
+func (p *Processor) normalizeEmbeddedPreview(previewData []byte) ([]byte, error) {
+	if p.options.Quality >= 100 && p.options.OutputFormat == 0 {
+		return previewData, nil
+	}
+
+	processed, err := imaging.ProcessImageBytes(previewData, imaging.ProcessOptions{
+		Format:        p.options.OutputFormat,
+		Quality:       p.options.Quality,
+		StripMetadata: true,
+		NoProfile:     true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(processed) == 0 {
+		return nil, fmt.Errorf("normalized embedded preview is empty")
+	}
+
+	return processed, nil
 }
 
 // processFullRender performs full RAW decoding using LibRaw
@@ -256,6 +376,35 @@ func (p *Processor) processFullRender(ctx context.Context, rawData []byte, filen
 	return previewData, nil
 }
 
+func (p *Processor) processFullRenderFromPath(ctx context.Context, fullPath string) ([]byte, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, p.options.FullRenderTimeout)
+	defer cancel()
+
+	previewData, err := p.librawProcessor.ProcessFileWithLibRaw(timeoutCtx, fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("LibRaw processing failed: %w", err)
+	}
+
+	if len(previewData) == 0 {
+		return nil, fmt.Errorf("LibRaw produced no output")
+	}
+
+	return previewData, nil
+}
+
+func (p *Processor) populatePreviewDimensions(result *ProcessingResult, previewData []byte) {
+	if len(previewData) == 0 {
+		return
+	}
+	img, err := vips.NewImageFromBuffer(previewData)
+	if err != nil {
+		return
+	}
+	defer img.Close()
+	result.Width = img.Width()
+	result.Height = img.Height()
+}
+
 // GenerateThumbnails creates various sized thumbnails from the processed preview
 func (p *Processor) GenerateThumbnails(previewData []byte, sizes map[string][2]int) (map[string][]byte, error) {
 	if len(previewData) == 0 {
@@ -267,17 +416,14 @@ func (p *Processor) GenerateThumbnails(previewData []byte, sizes map[string][2]i
 	for sizeName, dimensions := range sizes {
 		width, height := dimensions[0], dimensions[1]
 
-		// Create a new bimg instance for each size to avoid libvips state issues
-		img := bimg.NewImage(previewData)
-
-		thumbnail, err := img.Process(bimg.Options{
+		thumbnail, err := imaging.ProcessImageBytes(previewData, imaging.ProcessOptions{
 			Width:         width,
 			Height:        height,
 			Crop:          true,
-			Gravity:       bimg.GravitySmart,
+			Smart:         true,
+			Format:        p.options.OutputFormat,
 			Quality:       p.options.Quality,
-			Type:          p.options.OutputFormat,
-			StripMetadata: true, // Prevent color space issues from cached metadata
+			StripMetadata: true,
 		})
 		if err != nil {
 			log.Printf("Failed to generate %s thumbnail: %v", sizeName, err)

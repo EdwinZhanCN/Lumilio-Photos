@@ -606,6 +606,8 @@
             "detectStacks": "检测堆叠",
             "detectStacksCompleted": "{{name}} 的堆叠检测已完成，共创建 {{count}} 个堆叠。",
             "detectStacksFailed": "堆叠检测失败。",
+            "duplicateScan": "扫描重复项",
+            "duplicateScanFailed": "重复项扫描失败。",
             "empty": "暂无可用仓库。",
             "unavailable": "仓库选项暂时不可用。"
         }

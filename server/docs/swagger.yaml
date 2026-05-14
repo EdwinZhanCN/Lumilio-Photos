@@ -656,7 +656,7 @@ components:
           example: "2026-05-12T08:23:45Z"
           type: string
         detection_version:
-          example: duplicates-v1
+          example: duplicates-v2
           type: string
         edges:
           items:

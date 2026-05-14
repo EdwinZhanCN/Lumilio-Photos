@@ -947,7 +947,7 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "detection_version": {
-                        "example": "duplicates-v1",
+                        "example": "duplicates-v2",
                         "type": "string"
                     },
                     "edges": {

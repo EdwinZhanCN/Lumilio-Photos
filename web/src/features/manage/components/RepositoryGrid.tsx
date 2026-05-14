@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  Copy,
   Ellipsis,
   Folder,
   FolderPlus,
@@ -26,6 +27,7 @@ import {
 } from "@/features/settings/hooks/useAssetIndexing";
 import { getRepositoryDisplayName } from "@/features/settings/hooks/useWorkingRepository";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
+import { useDetectDuplicates } from "@/features/collections/hooks/useDuplicates";
 
 type AssetListResponse = {
   data?: {
@@ -78,21 +80,25 @@ function RepositoryCard({
   repository,
   isScanning,
   isDetecting,
+  isDuplicateScanning,
   onScan,
   onDetectStacks,
+  onDuplicateScan,
 }: {
   repository: IndexingRepositoryOption;
   isScanning: boolean;
   isDetecting: boolean;
+  isDuplicateScanning: boolean;
   onScan: (repository: IndexingRepositoryOption) => void;
   onDetectStacks: (repository: IndexingRepositoryOption) => void;
+  onDuplicateScan: (repository: IndexingRepositoryOption) => void;
 }) {
   const { t } = useI18n();
   const countQuery = useRepositoryAssetCount(repository.id);
   const name = getRepositoryDisplayName(repository, t);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const isBusy = isScanning || isDetecting;
+  const isBusy = isScanning || isDetecting || isDuplicateScanning;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -189,6 +195,23 @@ function RepositoryCard({
                     name,
                   })}
                 </span>
+              </button>
+
+              <button
+                type="button"
+                className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDuplicateScan(repository);
+                }}
+                disabled={isBusy}
+              >
+                {isDuplicateScanning ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <Copy size={16} className="text-base-content/70" />
+                )}
+                <span>{t("manage.repositories.duplicateScan")}</span>
               </button>
             </div>
           )}
@@ -375,6 +398,12 @@ export default function RepositoryGrid() {
     isScanning,
   } =
     useRepositoryScan();
+  const detectDuplicatesMutation = useDetectDuplicates();
+  const duplicateScanningRepositoryId =
+    detectDuplicatesMutation.isPending &&
+    detectDuplicatesMutation.variables
+      ? detectDuplicatesMutation.variables.repositoryId
+      : undefined;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const repositoryIds = useMemo(
@@ -425,6 +454,36 @@ export default function RepositoryGrid() {
       }
     },
     [detectStacks, showMessage, t],
+  );
+
+  const handleDuplicateScan = useCallback(
+    async (repository: IndexingRepositoryOption) => {
+      try {
+        const result = await detectDuplicatesMutation.mutateAsync({
+          repositoryId: repository.id,
+        });
+        showMessage(
+          "success",
+          t("duplicates.scanSuccess", {
+            groups: result.groups ?? 0,
+            exact: result.exact_groups ?? 0,
+            phash: result.phash_groups ?? 0,
+            mixed: result.mixed_groups ?? 0,
+          }),
+        );
+      } catch (error) {
+        showMessage(
+          "error",
+          t("duplicates.scanError", {
+            message:
+              error instanceof Error
+                ? error.message
+                : t("manage.repositories.duplicateScanFailed"),
+          }),
+        );
+      }
+    },
+    [detectDuplicatesMutation, showMessage, t],
   );
 
   const handleScanAll = useCallback(async () => {
@@ -508,8 +567,12 @@ export default function RepositoryGrid() {
               repository={repository}
               isScanning={scanningIds.has(repository.id)}
               isDetecting={detectingIds.has(repository.id)}
+              isDuplicateScanning={
+                duplicateScanningRepositoryId === repository.id
+              }
               onScan={handleScanRepository}
               onDetectStacks={handleDetectStacks}
+              onDuplicateScan={handleDuplicateScan}
             />
           ))}
         </div>

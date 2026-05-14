@@ -1,9 +1,7 @@
 package raw
 
 /*
-#cgo pkg-config: libraw
-#cgo CFLAGS: -I/usr/include/libraw
-#cgo LDFLAGS: -lraw -lstdc++
+#cgo pkg-config: libraw_r
 
 #include <libraw/libraw.h>
 #include <stdlib.h>
@@ -129,6 +127,11 @@ func NewLibRawProcessor(opts ProcessingOptions) *LibRawProcessor {
 	}
 }
 
+// ProcessFileWithLibRaw processes a RAW file from disk using libraw directly.
+func (p *LibRawProcessor) ProcessFileWithLibRaw(ctx context.Context, fullPath string) ([]byte, error) {
+	return p.processFile(ctx, fullPath)
+}
+
 // ProcessWithLibRaw processes RAW file using libraw
 func (p *LibRawProcessor) ProcessWithLibRaw(ctx context.Context, rawData []byte, filename string) ([]byte, error) {
 	ext := ""
@@ -179,6 +182,11 @@ func (p *LibRawProcessor) ProcessWithLibRaw(ctx context.Context, rawData []byte,
 	return goData, nil
 }
 
+// ExtractEmbeddedWithLibRawPath extracts an embedded preview directly from the source file.
+func (p *LibRawProcessor) ExtractEmbeddedWithLibRawPath(ctx context.Context, fullPath string) ([]byte, error) {
+	return p.extractEmbeddedFile(ctx, fullPath)
+}
+
 // ExtractEmbeddedWithLibRaw extracts embedded preview using libraw
 func (p *LibRawProcessor) ExtractEmbeddedWithLibRaw(ctx context.Context, rawData []byte, filename string) ([]byte, error) {
 	ext := ""
@@ -227,6 +235,46 @@ func (p *LibRawProcessor) ExtractEmbeddedWithLibRaw(ctx context.Context, rawData
 	goData := C.GoBytes(unsafe.Pointer(outData), C.int(outSize))
 
 	return goData, nil
+}
+
+func (p *LibRawProcessor) processFile(_ context.Context, fullPath string) ([]byte, error) {
+	cFilename := C.CString(fullPath)
+	defer C.free(unsafe.Pointer(cFilename))
+
+	var outData *C.uchar
+	var outSize C.size_t
+
+	ret := C.process_raw_to_jpeg(cFilename, &outData, &outSize, C.int(p.options.Quality))
+	if ret != 0 {
+		return nil, fmt.Errorf("libraw failed with code %d", ret)
+	}
+	defer C.free(unsafe.Pointer(outData))
+
+	if outSize == 0 {
+		return nil, fmt.Errorf("libraw produced no output")
+	}
+
+	return C.GoBytes(unsafe.Pointer(outData), C.int(outSize)), nil
+}
+
+func (p *LibRawProcessor) extractEmbeddedFile(_ context.Context, fullPath string) ([]byte, error) {
+	cFilename := C.CString(fullPath)
+	defer C.free(unsafe.Pointer(cFilename))
+
+	var outData *C.uchar
+	var outSize C.size_t
+
+	ret := C.extract_embedded_preview(cFilename, &outData, &outSize)
+	if ret != 0 {
+		return nil, fmt.Errorf("libraw extract preview failed with code %d", ret)
+	}
+	defer C.free(unsafe.Pointer(outData))
+
+	if outSize == 0 {
+		return nil, fmt.Errorf("libraw produced no preview")
+	}
+
+	return C.GoBytes(unsafe.Pointer(outData), C.int(outSize)), nil
 }
 
 // getFileExtension returns the file extension including the dot

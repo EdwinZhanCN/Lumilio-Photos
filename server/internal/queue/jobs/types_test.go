@@ -58,6 +58,22 @@ func TestScanRepositoryArgsKindAndInsertOpts(t *testing.T) {
 	}
 }
 
+func TestProcessPHashArgsInsertOpts(t *testing.T) {
+	args := ProcessPHashArgs{}
+
+	if args.Kind() != "process_phash" {
+		t.Fatalf("unexpected kind: %s", args.Kind())
+	}
+
+	opts := args.InsertOpts()
+	if !opts.UniqueOpts.ByArgs {
+		t.Fatalf("expected process pHash jobs to be unique by args")
+	}
+	if opts.UniqueOpts.ByPeriod == 0 {
+		t.Fatalf("expected process pHash jobs to use uniqueness by period")
+	}
+}
+
 func TestDiscoverAssetArgsInsertOptsAreUniqueByPath(t *testing.T) {
 	args := DiscoverAssetArgs{
 		RepositoryID: "11111111-1111-1111-1111-111111111111",

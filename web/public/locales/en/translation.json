@@ -607,6 +607,8 @@
             "detectStacks": "Detect stacks",
             "detectStacksCompleted": "Stack detection finished for {{name}}. {{count}} stacks created.",
             "detectStacksFailed": "Failed to detect stacks.",
+            "duplicateScan": "Scan for duplicates",
+            "duplicateScanFailed": "Duplicate scan failed.",
             "empty": "No repositories are available.",
             "unavailable": "Repository options are temporarily unavailable."
         }

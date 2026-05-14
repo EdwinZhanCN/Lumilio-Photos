@@ -181,9 +181,6 @@ type Querier interface {
 	GetEmbeddingByType(ctx context.Context, arg GetEmbeddingByTypeParams) (GetEmbeddingByTypeRow, error)
 	GetEmbeddingModels(ctx context.Context, embeddingType string) ([]GetEmbeddingModelsRow, error)
 	GetEmbeddingSpaceByAttributes(ctx context.Context, arg GetEmbeddingSpaceByAttributesParams) (EmbeddingSpace, error)
-	// ============================================================================
-	// Duplicate detection candidate queries
-	// ============================================================================
 	// Returns assets in a repository that share the exact same (hash, file_size).
 	// Only photos are considered, and only non-deleted assets. Results are ordered
 	// so members of the same duplicate set are adjacent.
@@ -236,6 +233,12 @@ type Querier interface {
 	GetStackByID(ctx context.Context, stackID pgtype.UUID) (AssetStack, error)
 	GetStackMemberCount(ctx context.Context, stackID pgtype.UUID) (int64, error)
 	GetStackMembers(ctx context.Context, stackID pgtype.UUID) ([]AssetStackMember, error)
+	// ============================================================================
+	// Duplicate detection candidate queries
+	// ============================================================================
+	// Each stacked asset in the repository mapped to its stack. Used to skip
+	// duplicate edges between intentional stack members (e.g. bursts, RAW+JPEG).
+	GetStackMembershipForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]GetStackMembershipForRepositoryRow, error)
 	GetStacksByAssetIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetStacksByAssetIDsRow, error)
 	GetTagByID(ctx context.Context, tagID int32) (Tag, error)
 	GetTagByName(ctx context.Context, tagName string) (Tag, error)
