@@ -10,8 +10,12 @@ import {
   DEFAULT_GROUP_KEYS,
   formatAssetGroupLabel,
 } from "@/features/assets/utils/assetGroups";
-import { collapseStackedAssetGroups } from "@/features/assets/utils/collapseStackedAssets";
 import EmptyState from "@/components/EmptyState";
+import {
+  createBrowseGroupsFromAssetGroups,
+  getBrowseItemAsset,
+  getBrowseItemAssetId,
+} from "@/features/assets/utils/browseItems";
 
 interface SquareGalleryProps extends AssetGalleryProps {
   renderTileCaption?: (
@@ -36,6 +40,7 @@ const getScrollParent = (element: HTMLElement | null): HTMLElement | null => {
 
 const SquareGallery: React.FC<SquareGalleryProps> = ({
   groups,
+  browseGroups,
   openCarousel,
   onLoadMore,
   hasMore,
@@ -50,21 +55,21 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
 
   const groupEntries = useMemo(
     () =>
-      collapseStackedAssetGroups(groups).filter(
-        (group) => group.assets && group.assets.length > 0,
+      (browseGroups ?? createBrowseGroupsFromAssetGroups(groups)).filter(
+        (group) => group.items.length > 0,
       ),
-    [groups],
+    [browseGroups, groups],
   );
 
   const totalAssetCount = useMemo(
-    () => groupEntries.reduce((count, group) => count + group.assets.length, 0),
+    () => groupEntries.reduce((count, group) => count + group.items.length, 0),
     [groupEntries],
   );
 
   const flatAssetIds = useMemo(
     () =>
       groupEntries
-        .flatMap((group) => group.assets.map((asset) => asset.asset_id))
+        .flatMap((group) => group.items.map(getBrowseItemAssetId))
         .filter((id): id is string => Boolean(id)),
     [groupEntries],
   );
@@ -122,7 +127,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
         const entry = entries[0];
         if (!entry || !entry.isIntersecting) return;
         const now = Date.now();
-        if (now - lastLoad < 400) return;
+        if (now - lastLoad < 600) return;
         if (!hasMoreRef.current) return;
         if (isLoadingRef.current || isLoadingMoreRef.current) return;
         lastLoad = now;
@@ -152,7 +157,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
     >
       {groupEntries.map((group) => {
         const groupKey = group.key;
-        const assets = group.assets;
+        const items = group.items;
         const showHeader =
           groupEntries.length > 1 || !DEFAULT_GROUP_KEYS.has(groupKey);
         const groupLabel = formatAssetGroupLabel(
@@ -168,7 +173,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
                 <span className="font-semibold">{groupLabel}</span>
                 <span>
                   {t("assets.justifiedGallery.item_count", {
-                    count: assets.length,
+                    count: items.length,
                   })}
                 </span>
               </div>
@@ -182,7 +187,8 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
                 } as React.CSSProperties
               }
             >
-              {assets.map((asset, index) => {
+              {items.map((item, index) => {
+                const asset = getBrowseItemAsset(item);
                 const assetId = asset.asset_id;
                 const thumbnailUrl = assetId
                   ? assetUrls.getThumbnailUrl(assetId, "medium")
@@ -191,7 +197,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
 
                 return (
                   <div
-                    key={`${groupKey}-${assetId || index}`}
+                    key={`${groupKey}-${item.id}`}
                     className="hover-3d relative aspect-square"
                     role="listitem"
                     data-asset-id={assetId}

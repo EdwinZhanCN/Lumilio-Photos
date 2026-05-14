@@ -22,14 +22,20 @@ import {
   DEFAULT_GROUP_KEYS,
   formatAssetGroupLabel,
 } from "@/features/assets/utils/assetGroups";
-import { collapseStackedAssetGroups } from "@/features/assets/utils/collapseStackedAssets";
 import EmptyState from "@/components/EmptyState";
-import type { AssetGroup } from "@/features/assets/types/assets.type";
+import type {
+  BrowseGroup,
+} from "@/features/assets/types/assets.type";
+import {
+  createBrowseGroupsFromAssetGroups,
+  getBrowseItemAsset,
+  getBrowseItemAssetId,
+} from "@/features/assets/utils/browseItems";
 
 type LayoutState = {
   signature: string;
   layouts: Record<string, LayoutResult>;
-  groups: AssetGroup[];
+  groups: BrowseGroup[];
 };
 
 const getThumbnailSize = (width: number) => {
@@ -64,6 +70,7 @@ const readContainerWidth = (element: HTMLElement | null): number => {
 
 const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   groups,
+  browseGroups,
   openCarousel,
   onLoadMore,
   hasMore,
@@ -88,21 +95,21 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
 
   const groupEntries = useMemo(
     () =>
-      collapseStackedAssetGroups(groups).filter(
-        (group) => group.assets && group.assets.length > 0,
+      (browseGroups ?? createBrowseGroupsFromAssetGroups(groups)).filter(
+        (group) => group.items.length > 0,
       ),
-    [groups],
+    [browseGroups, groups],
   );
 
   const totalAssetCount = useMemo(
-    () => groupEntries.reduce((count, group) => count + group.assets.length, 0),
+    () => groupEntries.reduce((count, group) => count + group.items.length, 0),
     [groupEntries],
   );
 
   const flatAssetIds = useMemo(
     () =>
       groupEntries
-        .flatMap((group) => group.assets.map((asset) => asset.asset_id))
+        .flatMap((group) => group.items.map(getBrowseItemAssetId))
         .filter((id): id is string => Boolean(id)),
     [groupEntries],
   );
@@ -112,7 +119,9 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   const layoutInputs = useMemo(() => {
     const inputs: Record<string, ReturnType<typeof assetsToLayoutBoxes>> = {};
     groupEntries.forEach((group) => {
-      inputs[group.key] = assetsToLayoutBoxes(group.assets);
+      inputs[group.key] = assetsToLayoutBoxes(
+        group.items.map(getBrowseItemAsset),
+      );
     });
     return inputs;
   }, [groupEntries]);
@@ -129,8 +138,8 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
       config: layoutConfig,
       groups: groupEntries.map((group) => ({
         key: group.key,
-        assets: group.assets.map((asset, index) => ({
-          id: asset.asset_id,
+        items: group.items.map((item, index) => ({
+          id: item.id,
           box: layoutInputs[group.key]?.[index],
         })),
       })),
@@ -297,7 +306,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
         const entry = entries[0];
         if (!entry || !entry.isIntersecting) return;
         const now = Date.now();
-        if (now - lastLoad < 400) return;
+        if (now - lastLoad < 600) return;
         if (!hasMoreRef.current) return;
         if (isLoadingRef.current || isLoadingMoreRef.current) return;
         lastLoad = now;
@@ -340,7 +349,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
 
       {displayGroupEntries.map((group) => {
         const groupKey = group.key;
-        const assets = group.assets;
+        const items = group.items;
         const layout = layouts[groupKey];
         const showHeader =
           groupEntries.length > 1 || !DEFAULT_GROUP_KEYS.has(groupKey);
@@ -357,7 +366,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                 <span className="font-semibold">{groupLabel}</span>
                 <span>
                   {t("assets.justifiedGallery.item_count", {
-                    count: assets.length,
+                    count: items.length,
                   })}
                 </span>
               </div>
@@ -369,11 +378,12 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                 role="list"
                 style={{ height: layout.containerHeight }}
               >
-                {assets.map((asset, index) => {
+                {items.map((item, index) => {
                   const position = layout.positions[index];
                   if (!position) return null;
                   const width = Math.max(1, position.width);
                   const height = Math.max(1, position.height);
+                  const asset = getBrowseItemAsset(item);
                   const assetId = asset.asset_id;
                   const thumbnailUrl = assetId
                     ? assetUrls.getThumbnailUrl(
@@ -384,7 +394,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
 
                   return (
                     <div
-                      key={`${groupKey}-${assetId || index}`}
+                      key={`${groupKey}-${item.id}`}
                       className="absolute"
                       role="listitem"
                       style={{

@@ -18,12 +18,15 @@ import {
 } from "@/features/assets/selectors";
 import { useI18n } from "@/lib/i18n";
 import { useSettingsContext } from "@/features/settings";
-import type { AssetGroup } from "@/features/assets";
+import type { AssetGroup, BrowseGroup } from "@/features/assets";
 import type { AssetGalleryProps } from "./gallery.types";
 import {
-  findAssetIndex,
-  flattenAssetGroups,
-} from "@/features/assets/utils/assetGroups";
+  createBrowseGroupsFromAssetGroups,
+  dedupeBrowseItemsById,
+  findBrowseItemIndexByAssetId,
+  flattenBrowseGroups,
+  getBrowseItemAsset,
+} from "@/features/assets/utils/browseItems";
 
 export type AssetCategory = "all" | "photos" | "videos" | "audios";
 
@@ -66,7 +69,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     withGroups: false,
     sortBy,
   });
-  const [lastBrowseGroups, setLastBrowseGroups] = useState<AssetGroup[] | null>(
+  const [lastBrowseGroups, setLastBrowseGroups] = useState<BrowseGroup[] | null>(
     null,
   );
 
@@ -94,19 +97,39 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     () => (isPhotoSearchActive ? undefined : groupedAssets ?? []),
     [groupedAssets, isPhotoSearchActive],
   );
+  const browseGroups = useMemo(
+    () => createBrowseGroupsFromAssetGroups(finalGroupedAssets ?? []),
+    [finalGroupedAssets],
+  );
+  const topResultsBrowseGroups = useMemo(
+    () => createBrowseGroupsFromAssetGroups(topResultsGroup),
+    [topResultsGroup],
+  );
+  const searchResultBrowseGroups = useMemo(
+    () => createBrowseGroupsFromAssetGroups(photoSearchView.resultGroups),
+    [photoSearchView.resultGroups],
+  );
 
   const flatAssets = useMemo(() => {
     if (isPhotoSearchActive) {
-      return allAssets;
+      return dedupeBrowseItemsById([
+        ...flattenBrowseGroups(topResultsBrowseGroups),
+        ...flattenBrowseGroups(searchResultBrowseGroups),
+      ]).map(getBrowseItemAsset);
     }
-    return flattenAssetGroups(finalGroupedAssets ?? []);
-  }, [allAssets, finalGroupedAssets, isPhotoSearchActive]);
+    return flattenBrowseGroups(browseGroups).map(getBrowseItemAsset);
+  }, [
+    browseGroups,
+    isPhotoSearchActive,
+    searchResultBrowseGroups,
+    topResultsBrowseGroups,
+  ]);
 
   useEffect(() => {
-    if (!isPhotoSearchActive && finalGroupedAssets && finalGroupedAssets.length > 0) {
-      setLastBrowseGroups(finalGroupedAssets);
+    if (!isPhotoSearchActive && browseGroups.length > 0) {
+      setLastBrowseGroups(browseGroups);
     }
-  }, [finalGroupedAssets, isPhotoSearchActive]);
+  }, [browseGroups, isPhotoSearchActive]);
 
   const showSearchTransitionOverlay =
     isPhotoSearchActive &&
@@ -121,7 +144,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
         <div className="relative">
           <GalleryComponent
             key={`search-transition:${currentLayout}:${compactColumns}`}
-            groups={lastBrowseGroups}
+            browseGroups={lastBrowseGroups}
             openCarousel={openCarousel}
             onLoadMore={() => {}}
             hasMore={false}
@@ -178,7 +201,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
         {photoSearchView.topResults.length > 0 && (
           <GalleryComponent
             key={`search-top:${currentLayout}`}
-            groups={topResultsGroup}
+            browseGroups={topResultsBrowseGroups}
             openCarousel={openCarousel}
             onLoadMore={() => {}}
             hasMore={false}
@@ -190,7 +213,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
         {(!error || photoSearchView.resultAssets.length > 0) && (
           <GalleryComponent
             key={`search-results:${currentLayout}`}
-            groups={photoSearchView.resultGroups}
+            browseGroups={searchResultBrowseGroups}
             openCarousel={openCarousel}
             onLoadMore={handleLoadMore}
             hasMore={hasNextPage}
@@ -210,7 +233,13 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
   useEffect(() => {
     if (!isCarouselOpen) return;
     if (assetId && hasFetchedOnce) {
-      const index = findAssetIndex(flatAssets, assetId);
+      const browseItems = isPhotoSearchActive
+        ? dedupeBrowseItemsById([
+            ...flattenBrowseGroups(topResultsBrowseGroups),
+            ...flattenBrowseGroups(searchResultBrowseGroups),
+          ])
+        : flattenBrowseGroups(browseGroups);
+      const index = findBrowseItemIndexByAssetId(browseItems, assetId);
       if (index >= 0) {
         setSlideIndex(index);
         setIsLocatingAsset(false);
@@ -240,13 +269,26 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
 
   useEffect(() => {
     if (assetId && flatAssets.length > 0) {
-      const index = findAssetIndex(flatAssets, assetId);
+      const browseItems = isPhotoSearchActive
+        ? dedupeBrowseItemsById([
+            ...flattenBrowseGroups(topResultsBrowseGroups),
+            ...flattenBrowseGroups(searchResultBrowseGroups),
+          ])
+        : flattenBrowseGroups(browseGroups);
+      const index = findBrowseItemIndexByAssetId(browseItems, assetId);
       if (index >= 0) {
         setSlideIndex(index);
         setIsLocatingAsset(false);
       }
     }
-  }, [assetId, flatAssets]);
+  }, [
+    assetId,
+    browseGroups,
+    flatAssets.length,
+    isPhotoSearchActive,
+    searchResultBrowseGroups,
+    topResultsBrowseGroups,
+  ]);
 
   if (error && !isPhotoSearchActive) throw new Error(error);
 
@@ -257,7 +299,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
       : allAssets.length > 0);
 
   const browseGalleryProps: AssetGalleryProps = {
-    groups: finalGroupedAssets ?? [],
+    browseGroups,
     openCarousel,
     onLoadMore: handleLoadMore,
     hasMore: hasNextPage,

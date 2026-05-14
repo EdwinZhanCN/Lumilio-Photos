@@ -38,6 +38,9 @@ export type {
   TabType,
   SortByType,
   AssetGroup,
+  BrowseItem,
+  BrowseGroup,
+  BrowseItemId,
   ViewDefinitionOptions,
 } from "./types/assets.type";
 
@@ -52,6 +55,14 @@ export type { AssetGalleryProps } from "./components/page/gallery.types";
 
 // Export utilities and selectors from slices
 export { generateViewKey } from "./utils/viewKey";
+export {
+  createBrowseGroupsFromAssetGroups,
+  dedupeBrowseItemsById,
+  findBrowseItemIndexByAssetId,
+  flattenBrowseGroups,
+  getBrowseItemAsset,
+  getBrowseItemAssetId,
+} from "./utils/browseItems";
 export {
   selectActiveFilterCount,
   selectHasActiveFilters,
