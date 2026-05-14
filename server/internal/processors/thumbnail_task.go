@@ -19,6 +19,7 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 		return err
 	}
 
+	needsPHashFallback := false
 	if err := ap.runTrackedAssetTask(
 		ctx,
 		args.AssetID,
@@ -29,7 +30,9 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 			fullPath := filepath.Join(args.RepoPath, args.StoragePath)
 			switch args.AssetType {
 			case dbtypes.AssetTypePhoto:
-				return ap.generatePhotoThumbnails(ctx, fullPath, asset.OriginalFilename, repository, asset)
+				fallback, err := ap.generatePhotoThumbnails(ctx, fullPath, asset.OriginalFilename, repository, asset)
+				needsPHashFallback = fallback
+				return err
 			case dbtypes.AssetTypeVideo:
 				info, err := ap.getVideoInfo(fullPath)
 				if err != nil {
@@ -49,8 +52,14 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 	}
 
 	if args.AssetType == dbtypes.AssetTypePhoto {
-		if err := ap.enqueuePHashJob(ctx, args.AssetID); err != nil {
-			return err
+		if needsPHashFallback {
+			if err := ap.enqueuePHashJob(ctx, args.AssetID); err != nil {
+				return err
+			}
+		}
+
+		if err := ap.enqueueMLJobs(ctx, asset); err != nil {
+			return fmt.Errorf("enqueue ML jobs: %w", err)
 		}
 	}
 
@@ -58,10 +67,10 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 }
 
 // generatePhotoThumbnails handles photo thumbnail generation with RAW support.
-func (ap *AssetProcessor) generatePhotoThumbnails(ctx context.Context, fullPath, originalFilename string, repository repo.Repository, asset *repo.Asset) error {
+func (ap *AssetProcessor) generatePhotoThumbnails(ctx context.Context, fullPath, originalFilename string, repository repo.Repository, asset *repo.Asset) (bool, error) {
 	reader, err := imagesource.OpenPhoto(ctx, fullPath, originalFilename)
 	if err != nil {
-		return fmt.Errorf("open photo source: %w", err)
+		return false, fmt.Errorf("open photo source: %w", err)
 	}
 	defer reader.Close()
 

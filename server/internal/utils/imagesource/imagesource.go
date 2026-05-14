@@ -65,6 +65,10 @@ func ProcessMLImage(ctx context.Context, fullPath string, originalFilename strin
 	}
 	defer reader.Close()
 
+	return ProcessMLImageFromReader(reader, purpose)
+}
+
+func ProcessMLImageFromReader(reader io.Reader, purpose Purpose) ([]byte, error) {
 	opts, err := mlOptions(purpose)
 	if err != nil {
 		return nil, err
@@ -95,8 +99,12 @@ func mlOptions(purpose Purpose) (imaging.ProcessOptions, error) {
 		}, nil
 	case PurposeCaption:
 		return imaging.ProcessOptions{
-			Width:     1024,
-			Height:    1024,
+			Width:     448,
+			Height:    448,
+			Enlarge:   true,
+			PadWidth:  448,
+			PadHeight: 448,
+			PadColor:  &vips.Color{R: 128, G: 128, B: 128},
 			Quality:   90,
 			Format:    vips.ImageTypeWEBP,
 			NoProfile: true,
