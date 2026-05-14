@@ -24,6 +24,20 @@ const (
 	PurposeFace    Purpose = "face"
 )
 
+// MLImage is the server-side image tensor payload handed to ML workers. Data is
+// HWC RGB uint8; EncodedSource keeps the processed source container around for
+// call sites that still need a decodable image, such as face crop persistence.
+type MLImage struct {
+	Data          []byte
+	EncodedSource []byte
+	Width         int
+	Height        int
+	Channels      int
+	Layout        string
+	DType         string
+	ColorSpace    string
+}
+
 func openRAWPhoto(ctx context.Context, fullPath string, originalFilename string) (io.ReadCloser, error) {
 	opts := raw.DefaultProcessingOptions()
 	opts.FullRenderTimeout = 30 * time.Second
@@ -58,7 +72,7 @@ func OpenPhoto(ctx context.Context, fullPath string, originalFilename string) (i
 	return f, nil
 }
 
-func ProcessMLImage(ctx context.Context, fullPath string, originalFilename string, purpose Purpose) ([]byte, error) {
+func ProcessMLImage(ctx context.Context, fullPath string, originalFilename string, purpose Purpose) (*MLImage, error) {
 	reader, err := OpenPhoto(ctx, fullPath, originalFilename)
 	if err != nil {
 		return nil, err
@@ -68,13 +82,39 @@ func ProcessMLImage(ctx context.Context, fullPath string, originalFilename strin
 	return ProcessMLImageFromReader(reader, purpose)
 }
 
-func ProcessMLImageFromReader(reader io.Reader, purpose Purpose) ([]byte, error) {
+func ProcessMLImageFromReader(reader io.Reader, purpose Purpose) (*MLImage, error) {
+	return ProcessMLImageTensorFromReader(reader, purpose)
+}
+
+func ProcessMLImageTensorFromReader(reader io.Reader, purpose Purpose) (*MLImage, error) {
+	source, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("read ml image source: %w", err)
+	}
+	return ProcessMLImageTensorBytes(source, purpose)
+}
+
+func ProcessMLImageTensorBytes(source []byte, purpose Purpose) (*MLImage, error) {
 	opts, err := mlOptions(purpose)
 	if err != nil {
 		return nil, err
 	}
 
-	return imaging.ProcessImageStream(reader, opts)
+	rgb, err := imaging.ProcessImageRGBBytes(source, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &MLImage{
+		Data:          rgb.Data,
+		EncodedSource: append([]byte(nil), source...),
+		Width:         rgb.Width,
+		Height:        rgb.Height,
+		Channels:      rgb.Channels,
+		Layout:        rgb.Layout,
+		DType:         rgb.DType,
+		ColorSpace:    rgb.ColorSpace,
+	}, nil
 }
 
 func mlOptions(purpose Purpose) (imaging.ProcessOptions, error) {
@@ -84,7 +124,6 @@ func mlOptions(purpose Purpose) (imaging.ProcessOptions, error) {
 			Width:     224,
 			Height:    224,
 			Crop:      true,
-			Smart:     true,
 			Quality:   90,
 			Format:    vips.ImageTypeWEBP,
 			NoProfile: true,

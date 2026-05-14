@@ -10,7 +10,7 @@ require (
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.8
 	github.com/corona10/goimagehash v1.1.0
 	github.com/davidbyttow/govips/v2 v2.18.0
-	github.com/edwinzhancn/lumen-sdk v1.1.3
+	github.com/edwinzhancn/lumen-sdk v1.1.4
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-webauthn/webauthn v0.16.0
 	github.com/golang-jwt/jwt/v5 v5.3.1

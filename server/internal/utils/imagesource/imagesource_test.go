@@ -7,32 +7,47 @@ import (
 	"image/jpeg"
 	"testing"
 
-	_ "golang.org/x/image/webp"
-
 	"server/internal/utils/imaging"
 )
 
-func TestProcessMLImageFromReaderCaptionPadsTo448Square(t *testing.T) {
+func TestProcessMLImageTensorFromReaderCaptionPadsTo448Square(t *testing.T) {
 	imaging.StartVips()
 
-	out, err := ProcessMLImageFromReader(bytes.NewReader(synthJPEG(t, 1200, 800)), PurposeCaption)
+	out, err := ProcessMLImageTensorFromReader(bytes.NewReader(synthJPEG(t, 1200, 800)), PurposeCaption)
 	if err != nil {
-		t.Fatalf("ProcessMLImageFromReader: %v", err)
+		t.Fatalf("ProcessMLImageTensorFromReader: %v", err)
 	}
 
-	img, _, err := image.Decode(bytes.NewReader(out))
+	if out.Width != 448 || out.Height != 448 || out.Channels != 3 {
+		t.Fatalf("caption tensor shape = %dx%dx%d, want 448x448x3", out.Width, out.Height, out.Channels)
+	}
+	if out.Layout != "HWC" || out.DType != "uint8" || out.ColorSpace != "RGB" {
+		t.Fatalf("caption tensor metadata = %s/%s/%s, want HWC/uint8/RGB", out.Layout, out.DType, out.ColorSpace)
+	}
+	if len(out.Data) != 448*448*3 {
+		t.Fatalf("caption tensor len = %d, want %d", len(out.Data), 448*448*3)
+	}
+
+	padOffset := (224 * 3)
+	padPixel := out.Data[padOffset : padOffset+3]
+	if padPixel[0] != 128 || padPixel[1] != 128 || padPixel[2] != 128 {
+		t.Fatalf("top padding pixel = [%d %d %d], want [128 128 128]", padPixel[0], padPixel[1], padPixel[2])
+	}
+}
+
+func TestProcessMLImageTensorFromReaderClipReturns224RGB(t *testing.T) {
+	imaging.StartVips()
+
+	out, err := ProcessMLImageTensorFromReader(bytes.NewReader(synthJPEG(t, 1200, 800)), PurposeClip)
 	if err != nil {
-		t.Fatalf("decode output: %v", err)
+		t.Fatalf("ProcessMLImageTensorFromReader: %v", err)
 	}
 
-	bounds := img.Bounds()
-	if bounds.Dx() != 448 || bounds.Dy() != 448 {
-		t.Fatalf("caption image bounds = %dx%d, want 448x448", bounds.Dx(), bounds.Dy())
+	if out.Width != 224 || out.Height != 224 || out.Channels != 3 {
+		t.Fatalf("clip tensor shape = %dx%dx%d, want 224x224x3", out.Width, out.Height, out.Channels)
 	}
-
-	padPixel := color.RGBAModel.Convert(img.At(224, 0)).(color.RGBA)
-	if padPixel.R < 120 || padPixel.R > 136 || padPixel.G < 120 || padPixel.G > 136 || padPixel.B < 120 || padPixel.B > 136 {
-		t.Fatalf("top padding pixel = [%d %d %d], want near [128 128 128]", padPixel.R, padPixel.G, padPixel.B)
+	if len(out.Data) != 224*224*3 {
+		t.Fatalf("clip tensor len = %d, want %d", len(out.Data), 224*224*3)
 	}
 }
 

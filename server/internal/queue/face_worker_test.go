@@ -6,8 +6,9 @@ import (
 
 	"server/config"
 	"server/internal/service"
+	"server/internal/utils/imagesource"
 
-	"github.com/edwinzhancn/lumen-sdk/pkg/client"
+	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
@@ -26,35 +27,35 @@ func (s *faceWorkerLumenStub) ClipTextEmbedFast(context.Context, []byte) (*types
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) ClipImageEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
+func (s *faceWorkerLumenStub) ClipImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) BioClipClassify(context.Context, []byte, int) ([]types.Label, error) {
+func (s *faceWorkerLumenStub) BioClipClassify(context.Context, *imagesource.MLImage, int) ([]types.Label, error) {
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) FaceDetectEmbed(context.Context, []byte) (*types.FaceV1, error) {
+func (s *faceWorkerLumenStub) FaceDetectEmbed(context.Context, *imagesource.MLImage) (*types.FaceV1, error) {
 	return s.result, nil
 }
 
-func (s *faceWorkerLumenStub) OCR(context.Context, []byte) (*types.OCRV1, error) {
+func (s *faceWorkerLumenStub) OCR(context.Context, *imagesource.MLImage) (*types.OCRV1, error) {
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) VLMCaption(context.Context, []byte) (string, error) {
+func (s *faceWorkerLumenStub) VLMCaption(context.Context, *imagesource.MLImage) (string, error) {
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) VLMCaptionWithPrompt(context.Context, []byte, string) (string, error) {
+func (s *faceWorkerLumenStub) VLMCaptionWithPrompt(context.Context, *imagesource.MLImage, string) (string, error) {
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) VLMCaptionWithMetadata(context.Context, []byte, string) (*types.TextGenerationV1, error) {
+func (s *faceWorkerLumenStub) VLMCaptionWithMetadata(context.Context, *imagesource.MLImage, string) (*types.TextGenerationV1, error) {
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) GetAvailableModels(context.Context) ([]*client.NodeInfo, error) {
+func (s *faceWorkerLumenStub) GetAvailableModels(context.Context) ([]*discovery.NodeInfo, error) {
 	panic("not implemented")
 }
 
@@ -123,10 +124,9 @@ func TestProcessFaceWorkerPassesImageDataToFaceService(t *testing.T) {
 			},
 		},
 		ConfigProvider: faceWorkerConfigStub{},
-		ImageLoader:    &workerImageLoaderStub{data: []byte("face-image")},
+		ImageLoader:    &workerImageLoaderStub{data: []byte("face-rgb"), encodedSource: []byte("face-source")},
 	}
 
-	imageData := []byte("face-image")
 	if err := worker.Work(context.Background(), &river.Job[ProcessFaceArgs]{
 		Args: ProcessFaceArgs{
 			AssetID: assetID,
@@ -135,8 +135,8 @@ func TestProcessFaceWorkerPassesImageDataToFaceService(t *testing.T) {
 		t.Fatalf("worker returned error: %v", err)
 	}
 
-	if string(faceService.savedImage) != string(imageData) {
-		t.Fatalf("expected image data to be forwarded")
+	if string(faceService.savedImage) != "face-source" {
+		t.Fatalf("expected encoded source image to be forwarded")
 	}
 	if faceService.savedFaces == nil || faceService.savedFaces.ModelID != "face-model" {
 		t.Fatalf("expected face result to be forwarded")
