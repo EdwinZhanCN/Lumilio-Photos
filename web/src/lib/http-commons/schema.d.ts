@@ -8833,7 +8833,7 @@ export interface components {
             assets?: components["schemas"]["dto.DuplicateAssetDTO"][];
             /** @example 2026-05-12T08:23:45Z */
             detected_at?: string;
-            /** @example duplicates-v1 */
+            /** @example duplicates-v2 */
             detection_version?: string;
             edges?: components["schemas"]["dto.DuplicateEdgeDTO"][];
             /** @example 7c0a4220-1f15-4eb5-94e1-1f4b1d3e4f12 */

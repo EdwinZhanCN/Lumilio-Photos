@@ -3,12 +3,12 @@
 ############################################
 # Builder
 ############################################
-FROM golang:1.24.5-bookworm AS builder
+FROM golang:1.25.0-bookworm AS builder
 
 ENV CGO_ENABLED=1 \
     GO111MODULE=on
 
-# System deps for CGO & libvips (used by bimg) & libraw (for modern RAW support)
+# System deps for CGO & libvips (used by govips) & libraw (for modern RAW support)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
@@ -36,18 +36,25 @@ RUN go build -o /out/server ./cmd
 ############################################
 FROM debian:bookworm-slim AS runtime
 
+ARG TARGETARCH
+
 # Runtime dependencies: ffmpeg stack, exiftool, libvips runtime, libraw runtime
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    ffmpeg \
-    exiftool \
-    libvips42 \
-    libraw20 \
-    intel-media-va-driver \
-    libva-drm2 \
-    libva2 \
-    tzdata \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        ffmpeg \
+        exiftool \
+        libvips42 \
+        libraw20 \
+        tzdata; \
+    if [ "${TARGETARCH}" = "amd64" ]; then \
+        apt-get install -y --no-install-recommends \
+            intel-media-va-driver \
+            libva-drm2 \
+            libva2; \
+    fi; \
+    rm -rf /var/lib/apt/lists/*
 
 ENV STORAGE_PATH=/data/storage/primary \
     SERVER_PORT=8080 \

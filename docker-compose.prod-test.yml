@@ -19,27 +19,6 @@ services:
             timeout: 5s
             retries: 5
 
-    naturalearth-import:
-        build:
-            context: .
-            dockerfile: server/geodata.Dockerfile
-        image: lumilio-geodata-import:latest
-        profiles:
-            - geodata
-        depends_on:
-            db:
-                condition: service_healthy
-        environment:
-            PGHOST: db
-            PGPORT: 5432
-            PGDATABASE: lumiliophotos
-            PGUSER: postgres
-            PGPASSWORD: postgres
-        volumes:
-            - naturalearth_data:/data/naturalearth
-            - ./server/scripts/import-natural-earth.sh:/import-natural-earth.sh:ro
-        command: ["/bin/bash", "/import-natural-earth.sh"]
-
     server:
         build:
             context: .
@@ -49,8 +28,8 @@ services:
                 condition: service_healthy
         environment:
             SERVER_PORT: 8080
-            SERVER_ENV: development
-            SERVER_LOG_LEVEL: debug
+            SERVER_ENV: production
+            SERVER_LOG_LEVEL: info
             DB_HOST: db
             DB_PORT: 5432
             DB_USER: postgres
@@ -83,17 +62,6 @@ services:
             LLM_MODEL_NAME: your-model-name
             LLM_BASE_URL: your-openai-compatiable-base-url
             TRANSCODE_HW_ACCEL: auto
-        # Uncomment below to enable hardware-accelerated transcoding (Intel/AMD GPU):
-        # devices:
-        #     - /dev/dri:/dev/dri
-        # For NVIDIA GPU, use the following instead + nvidia-container-toolkit:
-        # deploy:
-        #     resources:
-        #         reservations:
-        #             devices:
-        #                 - driver: nvidia
-        #                   count: 1
-        #                   capabilities: [gpu]
         volumes:
             - server_storage:/data/storage
         ports:
@@ -116,5 +84,4 @@ services:
 
 volumes:
     db_data:
-    naturalearth_data:
     server_storage:

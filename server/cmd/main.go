@@ -24,6 +24,7 @@ import (
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/scanner"
+	"server/internal/utils/imaging"
 
 	lumenconfig "github.com/edwinzhancn/lumen-sdk/pkg/config"
 	"github.com/google/uuid"
@@ -94,6 +95,11 @@ func main() {
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Initialize libvips runtime once. ConcurrencyLevel=1 keeps libvips internal
+	// thread pool disabled; outer parallelism is governed by River worker counts.
+	imaging.StartVips()
+	defer imaging.ShutdownVips()
 
 	// Run database migrations
 	if err := db.AutoMigrate(ctx, dbConfig); err != nil {

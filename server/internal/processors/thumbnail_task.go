@@ -19,7 +19,7 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 		return err
 	}
 
-	return ap.runTrackedAssetTask(
+	if err := ap.runTrackedAssetTask(
 		ctx,
 		args.AssetID,
 		taskThumbnail,
@@ -44,7 +44,17 @@ func (ap *AssetProcessor) ProcessThumbnailTask(ctx context.Context, args jobs.Th
 				return fmt.Errorf("unsupported asset type for thumbnails: %s", args.AssetType)
 			}
 		},
-	)
+	); err != nil {
+		return err
+	}
+
+	if args.AssetType == dbtypes.AssetTypePhoto {
+		if err := ap.enqueuePHashJob(ctx, args.AssetID); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // generatePhotoThumbnails handles photo thumbnail generation with RAW support.

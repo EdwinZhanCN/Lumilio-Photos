@@ -2,6 +2,8 @@
 .fullscreen-swiper {
     --swiper-navigation-size: 20px;      /* 箭头 SVG 本身的大小 */
     --swiper-navigation-color: #ffffff; /* 箭头颜色 */
+    /* Reduce browser back/forward gesture stealing horizontal swipes (esp. Safari). */
+    overscroll-behavior-x: contain;
 }
 
 /* 2. 导航按钮外圈 */

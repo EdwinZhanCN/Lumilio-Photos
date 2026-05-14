@@ -93,7 +93,6 @@ services:
             API_URL: ""
         ports:
             - "6680:80"
-            - "6657:443"
 
 volumes:
     db_data:

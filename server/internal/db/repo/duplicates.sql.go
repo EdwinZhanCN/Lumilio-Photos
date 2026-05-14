@@ -338,7 +338,6 @@ func (q *Queries) GetDuplicateSummary(ctx context.Context, repositoryID pgtype.U
 }
 
 const getExactDuplicateCandidates = `-- name: GetExactDuplicateCandidates :many
-
 SELECT a.asset_id, a.hash, a.file_size, a.original_filename, a.taken_time, a.upload_time, a.rating
 FROM assets a
 WHERE a.is_deleted = false
@@ -368,9 +367,6 @@ type GetExactDuplicateCandidatesRow struct {
 	Rating           *int32             `db:"rating" json:"rating"`
 }
 
-// ============================================================================
-// Duplicate detection candidate queries
-// ============================================================================
 // Returns assets in a repository that share the exact same (hash, file_size).
 // Only photos are considered, and only non-deleted assets. Results are ordered
 // so members of the same duplicate set are adjacent.
@@ -392,6 +388,45 @@ func (q *Queries) GetExactDuplicateCandidates(ctx context.Context, repositoryID 
 			&i.UploadTime,
 			&i.Rating,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStackMembershipForRepository = `-- name: GetStackMembershipForRepository :many
+
+SELECT asm.asset_id, asm.stack_id
+FROM asset_stack_members asm
+INNER JOIN assets a ON a.asset_id = asm.asset_id
+WHERE a.repository_id = $1
+  AND a.is_deleted = false
+`
+
+type GetStackMembershipForRepositoryRow struct {
+	AssetID pgtype.UUID `db:"asset_id" json:"asset_id"`
+	StackID pgtype.UUID `db:"stack_id" json:"stack_id"`
+}
+
+// ============================================================================
+// Duplicate detection candidate queries
+// ============================================================================
+// Each stacked asset in the repository mapped to its stack. Used to skip
+// duplicate edges between intentional stack members (e.g. bursts, RAW+JPEG).
+func (q *Queries) GetStackMembershipForRepository(ctx context.Context, repositoryID pgtype.UUID) ([]GetStackMembershipForRepositoryRow, error) {
+	rows, err := q.db.Query(ctx, getStackMembershipForRepository, repositoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetStackMembershipForRepositoryRow
+	for rows.Next() {
+		var i GetStackMembershipForRepositoryRow
+		if err := rows.Scan(&i.AssetID, &i.StackID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
