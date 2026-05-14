@@ -201,12 +201,6 @@ func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*
 			return nil, fmt.Errorf("enqueue thumbnails: %w", err)
 		}
 
-		// Enqueue ML pointer jobs directly for photos (decoupled from metadata).
-		err = ap.enqueueMLJobs(ctx, asset)
-		if err != nil {
-			return nil, fmt.Errorf("enqueue ML jobs: %w", err)
-		}
-
 	case dbtypes.AssetTypeVideo:
 		_, err = ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
 		if err != nil {

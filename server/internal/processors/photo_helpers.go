@@ -9,11 +9,14 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
+	"go.uber.org/zap"
 
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
+	"server/internal/service"
 	"server/internal/utils/exif"
 	"server/internal/utils/imaging"
+	"server/internal/utils/phash"
 )
 
 // Thumbnail target sizes reused across photo and video thumbnail generation.
@@ -34,8 +37,9 @@ func (ap *AssetProcessor) createEXIFConfig() *exif.Config {
 	}
 }
 
-// generateThumbnails builds all configured thumbnail sizes from the provided image stream.
-func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Reader, repository repo.Repository, asset *repo.Asset) error {
+// generateThumbnails builds all configured thumbnail sizes from the provided
+// image stream and opportunistically stores pHash from the generated small WebP.
+func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Reader, repository repo.Repository, asset *repo.Asset) (bool, error) {
 	outputs := make(map[string]io.Writer, len(thumbnailSizes))
 	buffers := make(map[string]*bytes.Buffer, len(thumbnailSizes))
 
@@ -46,7 +50,12 @@ func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Read
 	}
 
 	if err := imaging.StreamThumbnails(reader, thumbnailSizes, outputs); err != nil {
-		return fmt.Errorf("generate_thumbnails: %w", err)
+		return false, fmt.Errorf("generate_thumbnails: %w", err)
+	}
+
+	var smallBytes []byte
+	if small, ok := buffers["small"]; ok && small.Len() > 0 {
+		smallBytes = append([]byte(nil), small.Bytes()...)
 	}
 
 	for name, buf := range buffers {
@@ -54,10 +63,24 @@ func (ap *AssetProcessor) generateThumbnails(ctx context.Context, reader io.Read
 			continue
 		}
 		if err := ap.assetService.SaveNewThumbnail(ctx, repository.Path, buf, asset, name); err != nil {
-			return fmt.Errorf("save_thumbnails: %w", err)
+			return false, fmt.Errorf("save_thumbnails: %w", err)
 		}
 	}
-	return nil
+
+	if len(smallBytes) == 0 {
+		return true, nil
+	}
+	if err := ap.savePHashEmbeddingFromReader(ctx, asset.AssetID, bytes.NewReader(smallBytes)); err != nil {
+		if ap.logger != nil {
+			ap.logger.Warn("inline pHash failed; falling back to process_phash",
+				zap.String("asset_id", fmt.Sprintf("%x", asset.AssetID.Bytes)),
+				zap.Error(err),
+			)
+		}
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (ap *AssetProcessor) enqueuePHashJob(ctx context.Context, assetID pgtype.UUID) error {
@@ -67,6 +90,22 @@ func (ap *AssetProcessor) enqueuePHashJob(ctx context.Context, assetID pgtype.UU
 		return fmt.Errorf("enqueue pHash: %w", err)
 	}
 
+	return nil
+}
+
+func (ap *AssetProcessor) savePHashEmbeddingFromReader(ctx context.Context, assetID pgtype.UUID, reader io.Reader) error {
+	if ap.embeddingService == nil {
+		return fmt.Errorf("embedding service is not configured")
+	}
+
+	hash, err := phash.ComputeFromReader(reader)
+	if err != nil {
+		return err
+	}
+
+	if err := ap.embeddingService.SaveEmbedding(ctx, assetID, service.EmbeddingTypePHash, phash.ModelDCTPHashV1, phash.ToVector(hash), true); err != nil {
+		return fmt.Errorf("save phash embedding: %w", err)
+	}
 	return nil
 }
 

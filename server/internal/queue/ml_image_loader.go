@@ -3,8 +3,8 @@ package queue
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
-	"strings"
 
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
@@ -41,9 +41,6 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID pgtype.UUID, 
 	if dbtypes.AssetType(asset.Type) != dbtypes.AssetTypePhoto {
 		return nil, fmt.Errorf("asset %s is not a photo: %s", asset.AssetID.String(), asset.Type)
 	}
-	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		return nil, fmt.Errorf("asset %s has no storage path", asset.AssetID.String())
-	}
 	if !asset.RepositoryID.Valid {
 		return nil, fmt.Errorf("asset %s has no repository", asset.AssetID.String())
 	}
@@ -53,10 +50,25 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID pgtype.UUID, 
 		return nil, fmt.Errorf("get repository: %w", err)
 	}
 
-	fullPath := filepath.Join(repository.Path, filepath.FromSlash(*asset.StoragePath))
-	imageData, err := imagesource.ProcessMLImage(ctx, fullPath, asset.OriginalFilename, purpose)
+	thumbnail, err := l.Queries.GetThumbnailByAssetAndSize(ctx, repo.GetThumbnailByAssetAndSizeParams{
+		AssetID: assetID,
+		Size:    "large",
+	})
 	if err != nil {
-		return nil, fmt.Errorf("process ml image source: %w", err)
+		return nil, fmt.Errorf("get large thumbnail: %w", err)
 	}
+
+	thumbnailPath := filepath.Join(repository.Path, filepath.FromSlash(thumbnail.StoragePath))
+	file, err := os.Open(thumbnailPath)
+	if err != nil {
+		return nil, fmt.Errorf("open large thumbnail: %w", err)
+	}
+	defer file.Close()
+
+	imageData, err := imagesource.ProcessMLImageFromReader(file, purpose)
+	if err != nil {
+		return nil, fmt.Errorf("process large thumbnail for ml: %w", err)
+	}
+
 	return imageData, nil
 }

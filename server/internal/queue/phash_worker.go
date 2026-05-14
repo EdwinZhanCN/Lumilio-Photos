@@ -3,19 +3,15 @@ package queue
 import (
 	"context"
 	"fmt"
-	"image"
-	_ "image/jpeg"
-	_ "image/png"
+	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/corona10/goimagehash"
 	"github.com/riverqueue/river"
 
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/service"
-	"server/internal/utils/imagesource"
+	"server/internal/utils/phash"
 )
 
 // ProcessPHashArgs is the job payload alias to avoid import cycles.
@@ -35,9 +31,6 @@ func (w *ProcessPHashWorker) Work(ctx context.Context, job *river.Job[ProcessPHa
 	if err != nil {
 		return fmt.Errorf("get asset: %w", err)
 	}
-	if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
-		return fmt.Errorf("asset %s has no storage path", asset.AssetID.String())
-	}
 	if !asset.RepositoryID.Valid {
 		return fmt.Errorf("asset %s has no repository", asset.AssetID.String())
 	}
@@ -47,46 +40,33 @@ func (w *ProcessPHashWorker) Work(ctx context.Context, job *river.Job[ProcessPHa
 		return fmt.Errorf("get repository: %w", err)
 	}
 
-	fullPath := filepath.Join(repository.Path, filepath.FromSlash(*asset.StoragePath))
-
-	reader, err := imagesource.OpenPhoto(ctx, fullPath, asset.OriginalFilename)
+	thumbnail, err := w.Queries.GetThumbnailByAssetAndSize(ctx, repo.GetThumbnailByAssetAndSizeParams{
+		AssetID: job.Args.AssetID,
+		Size:    "small",
+	})
 	if err != nil {
-		return fmt.Errorf("open photo: %w", err)
-	}
-	defer reader.Close()
-
-	img, _, err := image.Decode(reader)
-	if err != nil {
-		return fmt.Errorf("decode image: %w", err)
+		return fmt.Errorf("get small thumbnail: %w", err)
 	}
 
-	phash, err := goimagehash.PerceptionHash(img)
+	thumbnailPath := filepath.Join(repository.Path, filepath.FromSlash(thumbnail.StoragePath))
+	file, err := os.Open(thumbnailPath)
 	if err != nil {
-		return fmt.Errorf("compute perceptual hash: %w", err)
+		return fmt.Errorf("open small thumbnail: %w", err)
+	}
+	defer file.Close()
+
+	hash, err := phash.ComputeFromReader(file)
+	if err != nil {
+		return err
 	}
 
-	vector := phashToVector(phash)
+	vector := phash.ToVector(hash)
 
 	// Convert asset_id to pgtype.UUID (GetAssetByID returns it directly)
 	if err := w.EmbeddingService.SaveEmbedding(ctx, job.Args.AssetID,
-		service.EmbeddingTypePHash, "dct-phash-v1", vector, true); err != nil {
+		service.EmbeddingTypePHash, phash.ModelDCTPHashV1, vector, true); err != nil {
 		return fmt.Errorf("save phash embedding: %w", err)
 	}
 
 	return nil
-}
-
-// phashToVector converts a 64-bit perceptual hash into a 64-element float32 vector
-// suitable for pgvector storage and HNSW similarity search.
-func phashToVector(h *goimagehash.ImageHash) []float32 {
-	hashBits := h.GetHash()
-	vector := make([]float32, 64)
-	for i := range 64 {
-		if (hashBits>>i)&1 == 1 {
-			vector[i] = 1.0
-		} else {
-			vector[i] = 0.0
-		}
-	}
-	return vector
 }

@@ -215,10 +215,6 @@ func (ap *AssetProcessor) enqueueDiscoveredDownstream(
 			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskThumbnail}, fmt.Errorf("enqueue thumbnails: %w", err))
 			return fmt.Errorf("enqueue thumbnails: %w", err)
 		}
-
-		if err = ap.enqueueMLJobs(ctx, asset); err != nil {
-			return fmt.Errorf("enqueue ML jobs: %w", err)
-		}
 	case dbtypes.AssetTypeVideo:
 		_, err = ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
 		if err != nil {

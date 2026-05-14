@@ -24,6 +24,11 @@ type ProcessOptions struct {
 	Smart bool
 	// Enlarge allows upscaling. Default false (libvips SizeDown).
 	Enlarge bool
+	// PadWidth and PadHeight embed the resized image into a fixed canvas. When
+	// set, the image is centered and padded with PadColor.
+	PadWidth  int
+	PadHeight int
+	PadColor  *vips.Color
 
 	// Format selects the encoder. If unset, defaults to WebP.
 	Format vips.ImageType
@@ -112,6 +117,21 @@ func ProcessImageBytes(buf []byte, opts ProcessOptions) ([]byte, error) {
 		}
 	}
 	defer img.Close()
+
+	if opts.PadWidth > 0 && opts.PadHeight > 0 {
+		padColor := opts.PadColor
+		if padColor == nil {
+			padColor = &vips.Color{R: 0, G: 0, B: 0}
+		}
+		left := (opts.PadWidth - img.Width()) / 2
+		top := (opts.PadHeight - img.Height()) / 2
+		if left < 0 || top < 0 {
+			return nil, fmt.Errorf("image %dx%d exceeds pad canvas %dx%d", img.Width(), img.Height(), opts.PadWidth, opts.PadHeight)
+		}
+		if err := img.EmbedBackground(left, top, opts.PadWidth, opts.PadHeight, padColor); err != nil {
+			return nil, fmt.Errorf("pad image: %w", err)
+		}
+	}
 
 	return encode(img, opts)
 }

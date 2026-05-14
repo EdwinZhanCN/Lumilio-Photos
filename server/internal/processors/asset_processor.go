@@ -26,14 +26,15 @@ type AssetPayload struct {
 
 // AssetProcessor holds shared dependencies for per-task processors.
 type AssetProcessor struct {
-	assetService    service.AssetService
-	queries         *repo.Queries
-	repoManager     storage.RepositoryManager
-	stagingManager  storage.StagingManager
-	queueClient     *river.Client[pgx.Tx]
-	settingsService service.SettingsService
-	logger          *zap.Logger
-	auditProvider   logging.RepositoryAuditProvider
+	assetService     service.AssetService
+	queries          *repo.Queries
+	repoManager      storage.RepositoryManager
+	stagingManager   storage.StagingManager
+	queueClient      *river.Client[pgx.Tx]
+	settingsService  service.SettingsService
+	embeddingService service.EmbeddingService
+	logger           *zap.Logger
+	auditProvider    logging.RepositoryAuditProvider
 }
 
 // NewAssetProcessor constructs the processor with required dependencies.
@@ -44,6 +45,7 @@ func NewAssetProcessor(
 	stagingManager storage.StagingManager,
 	queueClient *river.Client[pgx.Tx],
 	settingsService service.SettingsService,
+	embeddingService service.EmbeddingService,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
 ) *AssetProcessor {
@@ -54,14 +56,15 @@ func NewAssetProcessor(
 		auditProvider = logging.NewRepositoryAuditProvider(logger)
 	}
 	return &AssetProcessor{
-		assetService:    assetService,
-		queries:         queries,
-		repoManager:     repoManager,
-		stagingManager:  stagingManager,
-		queueClient:     queueClient,
-		settingsService: settingsService,
-		logger:          logger.With(zap.String("component", "processor")),
-		auditProvider:   auditProvider,
+		assetService:     assetService,
+		queries:          queries,
+		repoManager:      repoManager,
+		stagingManager:   stagingManager,
+		queueClient:      queueClient,
+		settingsService:  settingsService,
+		embeddingService: embeddingService,
+		logger:           logger.With(zap.String("component", "processor")),
+		auditProvider:    auditProvider,
 	}
 }
 
