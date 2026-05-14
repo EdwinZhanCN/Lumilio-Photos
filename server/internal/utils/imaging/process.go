@@ -2,10 +2,22 @@ package imaging
 
 import (
 	"fmt"
+	"image"
 	"io"
 
 	"github.com/davidbyttow/govips/v2/vips"
 )
+
+// RGBImage is a row-major, interleaved RGB uint8 tensor payload.
+type RGBImage struct {
+	Data       []byte
+	Width      int
+	Height     int
+	Channels   int
+	Layout     string
+	DType      string
+	ColorSpace string
+}
 
 // ProcessOptions describes a single image-processing pass: resize/crop target
 // dimensions, encode format, and quality knobs. It is the package-local option
@@ -60,6 +72,16 @@ func ProcessImageStream(r io.Reader, opts ProcessOptions) ([]byte, error) {
 	return ProcessImageBytes(buf, opts)
 }
 
+// ProcessImageRGBStream reads an image from r, applies opts, and returns raw
+// HWC RGB uint8 bytes instead of an encoded image container.
+func ProcessImageRGBStream(r io.Reader, opts ProcessOptions) (*RGBImage, error) {
+	buf, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("read image: %w", err)
+	}
+	return ProcessImageRGBBytes(buf, opts)
+}
+
 // ProcessImageBytes is the buffer-input counterpart of ProcessImageStream.
 //
 // The hot path uses libvips' "thumbnail_buffer" op (via LoadThumbnailFromBuffer)
@@ -71,6 +93,27 @@ func ProcessImageStream(r io.Reader, opts ProcessOptions) ([]byte, error) {
 // When no resize is requested (Width=Height=0) we fall back to a plain
 // NewImageFromBuffer + AutoRotate so encode-only callers still work.
 func ProcessImageBytes(buf []byte, opts ProcessOptions) ([]byte, error) {
+	img, err := processImageRefFromBytes(buf, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer img.Close()
+
+	return encode(img, opts)
+}
+
+// ProcessImageRGBBytes is the buffer-input counterpart of ProcessImageRGBStream.
+func ProcessImageRGBBytes(buf []byte, opts ProcessOptions) (*RGBImage, error) {
+	img, err := processImageRefFromBytes(buf, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer img.Close()
+
+	return exportRGB(img)
+}
+
+func processImageRefFromBytes(buf []byte, opts ProcessOptions) (*vips.ImageRef, error) {
 	if len(buf) == 0 {
 		return nil, fmt.Errorf("empty image buffer")
 	}
@@ -116,8 +159,6 @@ func ProcessImageBytes(buf []byte, opts ProcessOptions) ([]byte, error) {
 			return nil, fmt.Errorf("autorotate: %w", err)
 		}
 	}
-	defer img.Close()
-
 	if opts.PadWidth > 0 && opts.PadHeight > 0 {
 		padColor := opts.PadColor
 		if padColor == nil {
@@ -126,14 +167,16 @@ func ProcessImageBytes(buf []byte, opts ProcessOptions) ([]byte, error) {
 		left := (opts.PadWidth - img.Width()) / 2
 		top := (opts.PadHeight - img.Height()) / 2
 		if left < 0 || top < 0 {
+			img.Close()
 			return nil, fmt.Errorf("image %dx%d exceeds pad canvas %dx%d", img.Width(), img.Height(), opts.PadWidth, opts.PadHeight)
 		}
 		if err := img.EmbedBackground(left, top, opts.PadWidth, opts.PadHeight, padColor); err != nil {
+			img.Close()
 			return nil, fmt.Errorf("pad image: %w", err)
 		}
 	}
 
-	return encode(img, opts)
+	return img, nil
 }
 
 // StreamThumbnails reads a single source image from r and encodes one
@@ -244,4 +287,62 @@ func encode(img *vips.ImageRef, opts ProcessOptions) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unsupported output format: %v", format)
 	}
+}
+
+func exportRGB(img *vips.ImageRef) (*RGBImage, error) {
+	goImg, err := img.ToGoImage()
+	if err != nil {
+		return nil, fmt.Errorf("export rgb image: %w", err)
+	}
+
+	bounds := goImg.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	data := make([]byte, width*height*3)
+	write := 0
+
+	switch src := goImg.(type) {
+	case *image.NRGBA:
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			row := (y - bounds.Min.Y) * src.Stride
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				i := row + (x-bounds.Min.X)*4
+				data[write] = src.Pix[i]
+				data[write+1] = src.Pix[i+1]
+				data[write+2] = src.Pix[i+2]
+				write += 3
+			}
+		}
+	case *image.Gray:
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			row := (y - bounds.Min.Y) * src.Stride
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				v := src.Pix[row+(x-bounds.Min.X)]
+				data[write] = v
+				data[write+1] = v
+				data[write+2] = v
+				write += 3
+			}
+		}
+	default:
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				r, g, b, _ := goImg.At(x, y).RGBA()
+				data[write] = uint8(r >> 8)
+				data[write+1] = uint8(g >> 8)
+				data[write+2] = uint8(b >> 8)
+				write += 3
+			}
+		}
+	}
+
+	return &RGBImage{
+		Data:       data,
+		Width:      width,
+		Height:     height,
+		Channels:   3,
+		Layout:     "HWC",
+		DType:      "uint8",
+		ColorSpace: "RGB",
+	}, nil
 }

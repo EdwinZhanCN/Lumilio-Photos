@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	"server/internal/utils/imagesource"
 	"strings"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 
 // CaptionService defines caption related operations interface
 type CaptionService interface {
-	GenerateAndSaveCaption(ctx context.Context, assetID pgtype.UUID, imageData []byte, customPrompt string) (*dbtypes.CaptionResponse, error)
+	GenerateAndSaveCaption(ctx context.Context, assetID pgtype.UUID, imageData *imagesource.MLImage, customPrompt string) (*dbtypes.CaptionResponse, error)
 	GetCaption(ctx context.Context, assetID pgtype.UUID) (*repo.Caption, error)
 	SearchAssetsByCaption(ctx context.Context, searchText string, limit, offset int, minConfidence float64) ([]repo.Asset, error)
 	DeleteCaption(ctx context.Context, assetID pgtype.UUID) error
@@ -35,7 +36,7 @@ func NewCaptionService(queries *repo.Queries, lumenService LumenService) Caption
 }
 
 // GenerateAndSaveCaption generates caption and saves it to database
-func (s *captionService) GenerateAndSaveCaption(ctx context.Context, assetID pgtype.UUID, imageData []byte, customPrompt string) (*dbtypes.CaptionResponse, error) {
+func (s *captionService) GenerateAndSaveCaption(ctx context.Context, assetID pgtype.UUID, imageData *imagesource.MLImage, customPrompt string) (*dbtypes.CaptionResponse, error) {
 	startTime := time.Now()
 
 	// Prepare prompt
@@ -249,7 +250,7 @@ func (s *captionService) GetLongCaptions(ctx context.Context, minLength int, lim
 }
 
 // RegenerateCaption regenerates caption for an asset
-func (s *captionService) RegenerateCaption(ctx context.Context, assetID pgtype.UUID, imageData []byte, customPrompt string) (*dbtypes.CaptionResponse, error) {
+func (s *captionService) RegenerateCaption(ctx context.Context, assetID pgtype.UUID, imageData *imagesource.MLImage, customPrompt string) (*dbtypes.CaptionResponse, error) {
 	// Delete existing description
 	if err := s.queries.DeleteCaptionByAsset(ctx, assetID); err != nil {
 		return nil, fmt.Errorf("failed to delete existing description: %w", err)

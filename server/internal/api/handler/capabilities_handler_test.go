@@ -11,7 +11,7 @@ import (
 	"server/internal/api/dto"
 	"server/internal/service"
 
-	"github.com/edwinzhancn/lumen-sdk/pkg/client"
+	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -32,11 +32,11 @@ func (s stubSettingsService) GetEffectiveMLConfig(ctx context.Context) (config.M
 
 type stubLumenService struct {
 	service.LumenService
-	getAvailableModelsFn func(ctx context.Context) ([]*client.NodeInfo, error)
+	getAvailableModelsFn func(ctx context.Context) ([]*discovery.NodeInfo, error)
 	isTaskAvailableFn    func(taskName string) bool
 }
 
-func (s stubLumenService) GetAvailableModels(ctx context.Context) ([]*client.NodeInfo, error) {
+func (s stubLumenService) GetAvailableModels(ctx context.Context) ([]*discovery.NodeInfo, error) {
 	return s.getAvailableModelsFn(ctx)
 }
 
@@ -71,8 +71,8 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesClipCapabilities(t *testing.
 			},
 		},
 		stubLumenService{
-			getAvailableModelsFn: func(ctx context.Context) ([]*client.NodeInfo, error) {
-				return []*client.NodeInfo{}, nil
+			getAvailableModelsFn: func(ctx context.Context) ([]*discovery.NodeInfo, error) {
+				return []*discovery.NodeInfo{}, nil
 			},
 			isTaskAvailableFn: func(taskName string) bool {
 				return taskName == "clip_image_embed" ||

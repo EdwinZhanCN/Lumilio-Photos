@@ -8,7 +8,7 @@ import (
 	"server/internal/service"
 	"server/internal/utils/imagesource"
 
-	"github.com/edwinzhancn/lumen-sdk/pkg/client"
+	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
@@ -27,35 +27,35 @@ func (s *clipWorkerLumenStub) ClipTextEmbedFast(context.Context, []byte) (*types
 	panic("not implemented")
 }
 
-func (s *clipWorkerLumenStub) ClipImageEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
+func (s *clipWorkerLumenStub) ClipImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
 	return &types.EmbeddingV1{ModelID: "clip-image", Vector: []float32{0.1, 0.2}}, nil
 }
 
-func (s *clipWorkerLumenStub) BioClipClassify(context.Context, []byte, int) ([]types.Label, error) {
+func (s *clipWorkerLumenStub) BioClipClassify(context.Context, *imagesource.MLImage, int) ([]types.Label, error) {
 	return s.bioLabels, nil
 }
 
-func (s *clipWorkerLumenStub) FaceDetectEmbed(context.Context, []byte) (*types.FaceV1, error) {
+func (s *clipWorkerLumenStub) FaceDetectEmbed(context.Context, *imagesource.MLImage) (*types.FaceV1, error) {
 	panic("not implemented")
 }
 
-func (s *clipWorkerLumenStub) OCR(context.Context, []byte) (*types.OCRV1, error) {
+func (s *clipWorkerLumenStub) OCR(context.Context, *imagesource.MLImage) (*types.OCRV1, error) {
 	panic("not implemented")
 }
 
-func (s *clipWorkerLumenStub) VLMCaption(context.Context, []byte) (string, error) {
+func (s *clipWorkerLumenStub) VLMCaption(context.Context, *imagesource.MLImage) (string, error) {
 	panic("not implemented")
 }
 
-func (s *clipWorkerLumenStub) VLMCaptionWithPrompt(context.Context, []byte, string) (string, error) {
+func (s *clipWorkerLumenStub) VLMCaptionWithPrompt(context.Context, *imagesource.MLImage, string) (string, error) {
 	panic("not implemented")
 }
 
-func (s *clipWorkerLumenStub) VLMCaptionWithMetadata(context.Context, []byte, string) (*types.TextGenerationV1, error) {
+func (s *clipWorkerLumenStub) VLMCaptionWithMetadata(context.Context, *imagesource.MLImage, string) (*types.TextGenerationV1, error) {
 	panic("not implemented")
 }
 
-func (s *clipWorkerLumenStub) GetAvailableModels(context.Context) ([]*client.NodeInfo, error) {
+func (s *clipWorkerLumenStub) GetAvailableModels(context.Context) ([]*discovery.NodeInfo, error) {
 	panic("not implemented")
 }
 
@@ -116,17 +116,31 @@ func (s *clipWorkerTagStub) ReplaceAssetAIGeneratedTags(_ context.Context, _ pgt
 }
 
 type workerImageLoaderStub struct {
-	data    []byte
-	called  int
-	purpose imagesource.Purpose
-	version string
+	data          []byte
+	encodedSource []byte
+	called        int
+	purpose       imagesource.Purpose
+	version       string
 }
 
-func (s *workerImageLoaderStub) LoadMLImage(_ context.Context, _ pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) ([]byte, error) {
+func (s *workerImageLoaderStub) LoadMLImage(_ context.Context, _ pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error) {
 	s.called++
 	s.purpose = purpose
 	s.version = preprocessVersion
-	return append([]byte(nil), s.data...), nil
+	encodedSource := s.encodedSource
+	if encodedSource == nil {
+		encodedSource = s.data
+	}
+	return &imagesource.MLImage{
+		Data:          append([]byte(nil), s.data...),
+		EncodedSource: append([]byte(nil), encodedSource...),
+		Width:         1,
+		Height:        1,
+		Channels:      3,
+		Layout:        "HWC",
+		DType:         "uint8",
+		ColorSpace:    "RGB",
+	}, nil
 }
 
 func TestProcessClipWorkerSavesImageEmbedding(t *testing.T) {

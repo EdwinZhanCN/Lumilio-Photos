@@ -15,7 +15,7 @@ import (
 )
 
 type MLImageLoader interface {
-	LoadMLImage(ctx context.Context, assetID pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) ([]byte, error)
+	LoadMLImage(ctx context.Context, assetID pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error)
 }
 
 type DBMLImageLoader struct {
@@ -26,7 +26,7 @@ func NewDBMLImageLoader(queries *repo.Queries) *DBMLImageLoader {
 	return &DBMLImageLoader{Queries: queries}
 }
 
-func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) ([]byte, error) {
+func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error) {
 	if l == nil || l.Queries == nil {
 		return nil, fmt.Errorf("ml image loader unavailable")
 	}
@@ -65,7 +65,7 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID pgtype.UUID, 
 	}
 	defer file.Close()
 
-	imageData, err := imagesource.ProcessMLImageFromReader(file, purpose)
+	imageData, err := imagesource.ProcessMLImageTensorFromReader(file, purpose)
 	if err != nil {
 		return nil, fmt.Errorf("process large thumbnail for ml: %w", err)
 	}

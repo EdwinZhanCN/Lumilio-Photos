@@ -72,7 +72,7 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	processingTimeMs := int(time.Since(startTime).Milliseconds())
 
 	// Save face results using FaceService (conversion, crops, clustering, and cleanup happen there).
-	err = w.FaceService.SaveFaceResults(ctx, pgUUID, faceV1, imageData, processingTimeMs)
+	err = w.FaceService.SaveFaceResults(ctx, pgUUID, faceV1, imageData.EncodedSource, processingTimeMs)
 	if err != nil {
 		return fmt.Errorf("failed to save face results: %w", err)
 	}

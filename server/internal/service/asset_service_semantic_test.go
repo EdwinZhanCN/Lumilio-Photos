@@ -7,8 +7,9 @@ import (
 	"testing"
 
 	"server/internal/db/repo"
+	"server/internal/utils/imagesource"
 
-	"github.com/edwinzhancn/lumen-sdk/pkg/client"
+	"github.com/edwinzhancn/lumen-sdk/pkg/discovery"
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/pgvector/pgvector-go"
@@ -32,35 +33,35 @@ func (s *semanticTestLumenStub) ClipTextEmbedFast(context.Context, []byte) (*typ
 	return &types.EmbeddingV1{ModelID: s.modelID, Vector: append([]float32(nil), s.vector...)}, nil
 }
 
-func (s *semanticTestLumenStub) ClipImageEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
+func (s *semanticTestLumenStub) ClipImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
 	panic("not implemented")
 }
 
-func (s *semanticTestLumenStub) BioClipClassify(context.Context, []byte, int) ([]types.Label, error) {
+func (s *semanticTestLumenStub) BioClipClassify(context.Context, *imagesource.MLImage, int) ([]types.Label, error) {
 	panic("not implemented")
 }
 
-func (s *semanticTestLumenStub) FaceDetectEmbed(context.Context, []byte) (*types.FaceV1, error) {
+func (s *semanticTestLumenStub) FaceDetectEmbed(context.Context, *imagesource.MLImage) (*types.FaceV1, error) {
 	panic("not implemented")
 }
 
-func (s *semanticTestLumenStub) OCR(context.Context, []byte) (*types.OCRV1, error) {
+func (s *semanticTestLumenStub) OCR(context.Context, *imagesource.MLImage) (*types.OCRV1, error) {
 	panic("not implemented")
 }
 
-func (s *semanticTestLumenStub) VLMCaption(context.Context, []byte) (string, error) {
+func (s *semanticTestLumenStub) VLMCaption(context.Context, *imagesource.MLImage) (string, error) {
 	panic("not implemented")
 }
 
-func (s *semanticTestLumenStub) VLMCaptionWithPrompt(context.Context, []byte, string) (string, error) {
+func (s *semanticTestLumenStub) VLMCaptionWithPrompt(context.Context, *imagesource.MLImage, string) (string, error) {
 	panic("not implemented")
 }
 
-func (s *semanticTestLumenStub) VLMCaptionWithMetadata(context.Context, []byte, string) (*types.TextGenerationV1, error) {
+func (s *semanticTestLumenStub) VLMCaptionWithMetadata(context.Context, *imagesource.MLImage, string) (*types.TextGenerationV1, error) {
 	panic("not implemented")
 }
 
-func (s *semanticTestLumenStub) GetAvailableModels(context.Context) ([]*client.NodeInfo, error) {
+func (s *semanticTestLumenStub) GetAvailableModels(context.Context) ([]*discovery.NodeInfo, error) {
 	panic("not implemented")
 }
 
