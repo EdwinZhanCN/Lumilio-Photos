@@ -1272,6 +1272,15 @@ func validateSearchEnhancementMode(mode string) error {
 	}
 }
 
+func validateStackMode(mode string) error {
+	switch strings.ToLower(strings.TrimSpace(mode)) {
+	case "", service.StackModeCollapsed, service.StackModeExpanded:
+		return nil
+	default:
+		return errors.New("invalid stack mode")
+	}
+}
+
 func normalizeRebuildIndexLimit(limit int) int {
 	switch {
 	case limit <= 0:
@@ -1388,7 +1397,7 @@ func assetQueryDateLocation(viewerTimeZone string) *time.Location {
 	return location
 }
 
-func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone string, filter dto.AssetFilterDTO, pagination dto.PaginationDTO) service.QueryAssetsParams {
+func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone, stackMode string, filter dto.AssetFilterDTO, pagination dto.PaginationDTO) service.QueryAssetsParams {
 	var dateFrom, dateTo *time.Time
 	if filter.Date != nil {
 		dateFrom = filter.Date.From
@@ -1455,6 +1464,7 @@ func buildQueryAssetsParams(query, searchType, sortBy, viewerTimeZone string, fi
 		LocationEast:     locationEast,
 		LocationWest:     locationWest,
 		SortBy:           normalizeAssetQuerySortBy(sortBy),
+		StackMode:        strings.ToLower(strings.TrimSpace(stackMode)),
 		Limit:            pagination.Limit,
 		Offset:           pagination.Offset,
 	}
@@ -1558,6 +1568,111 @@ func toSearchAssetsResponseDTO(result service.SearchAssetsResult, limit, offset 
 	}
 }
 
+func uuidStrings(values []uuid.UUID) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	items := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == uuid.Nil {
+			continue
+		}
+		items = append(items, value.String())
+	}
+	return items
+}
+
+func toBrowseItemDTOs(items []service.BrowseItem) []dto.BrowseItemDTO {
+	dtos := make([]dto.BrowseItemDTO, 0, len(items))
+	for _, item := range items {
+		assetDTO := dto.ToAssetDTO(item.Asset)
+		if item.Type == "stack" && item.Stack != nil {
+			stackSize := len(item.Stack.MemberAssetIDs)
+			assetDTO.Stack = &dto.StackPreviewDTO{
+				StackID:    item.Stack.StackID.String(),
+				StackCover: true,
+				StackSize:  &stackSize,
+			}
+			dtos = append(dtos, dto.BrowseItemDTO{
+				Type: item.Type,
+				ID:   item.ID,
+				Stack: &dto.BrowseStackDTO{
+					StackID:          item.Stack.StackID.String(),
+					CoverAssetID:     item.Stack.CoverAssetID.String(),
+					CoverAsset:       assetDTO,
+					StackSize:        stackSize,
+					MemberAssetIDs:   uuidStrings(item.Stack.MemberAssetIDs),
+					MatchedMemberIDs: uuidStrings(item.Stack.MatchedMemberIDs),
+				},
+			})
+			continue
+		}
+
+		dtos = append(dtos, dto.BrowseItemDTO{
+			Type:  "asset",
+			ID:    item.ID,
+			Asset: &assetDTO,
+		})
+	}
+	return dtos
+}
+
+func legacyAssetDTOsFromBrowseItemDTOs(items []dto.BrowseItemDTO) []dto.AssetDTO {
+	assets := make([]dto.AssetDTO, 0, len(items))
+	for _, item := range items {
+		if item.Type == "stack" && item.Stack != nil {
+			assets = append(assets, item.Stack.CoverAsset)
+			continue
+		}
+		if item.Asset != nil {
+			assets = append(assets, *item.Asset)
+		}
+	}
+	return assets
+}
+
+func toQueryBrowseResponseDTO(result service.BrowseQueryResult, limit, offset int) dto.QueryAssetsResponseDTO {
+	totalVisible := int(result.TotalVisible)
+	totalAssets := int(result.TotalAssets)
+	itemDTOs := toBrowseItemDTOs(result.Items)
+	return dto.QueryAssetsResponseDTO{
+		Assets:       legacyAssetDTOsFromBrowseItemDTOs(itemDTOs),
+		Items:        itemDTOs,
+		Total:        &totalVisible,
+		TotalVisible: &totalVisible,
+		TotalAssets:  &totalAssets,
+		StackMode:    result.StackMode,
+		Limit:        limit,
+		Offset:       offset,
+	}
+}
+
+func toSearchBrowseResponseDTO(result service.SearchBrowseResult, limit, offset int) dto.SearchAssetsResponseDTO {
+	resultsTotalVisible := int(result.ResultsTotalVisible)
+	resultsTotalAssets := int(result.ResultsTotalAssets)
+	topItemDTOs := toBrowseItemDTOs(result.TopResults)
+	resultItemDTOs := toBrowseItemDTOs(result.Results)
+	return dto.SearchAssetsResponseDTO{
+		TopResults: legacyAssetDTOsFromBrowseItemDTOs(topItemDTOs),
+		TopItems:   topItemDTOs,
+		TopResultsMeta: dto.SearchTopResultsMetaDTO{
+			Enabled:     result.TopResultsMeta.Enabled,
+			Degraded:    result.TopResultsMeta.Degraded,
+			Reason:      result.TopResultsMeta.Reason,
+			SourceTypes: append([]string{}, result.TopResultsMeta.SourceTypes...),
+		},
+		Results:             legacyAssetDTOsFromBrowseItemDTOs(resultItemDTOs),
+		ResultItems:         resultItemDTOs,
+		ResultsTotal:        &resultsTotalVisible,
+		ResultsTotalVisible: &resultsTotalVisible,
+		ResultsTotalAssets:  &resultsTotalAssets,
+		StackMode:           result.StackMode,
+		Limit:               limit,
+		Offset:              offset,
+	}
+}
+
 // QueryAssets handles unified asset listing, filtering, and searching
 // @Summary Query assets (unified endpoint)
 // @Description Unified endpoint for listing, filtering, and searching assets. Replaces separate /filter and /search endpoints.
@@ -1587,16 +1702,20 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
 		return
 	}
+	if err := validateStackMode(req.StackMode); err != nil {
+		api.GinBadRequest(c, err, "stack_mode must be 'collapsed' or 'expanded'")
+		return
+	}
 
 	// Default to filename search if not specified
 	if req.SearchType == "" {
 		req.SearchType = "filename"
 	}
 
-	params := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.Filter, req.Pagination)
+	params := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
 	params = applyAssetOwnershipScope(c, params)
 
-	assets, total, err := h.assetService.QueryAssets(c.Request.Context(), params)
+	browseResult, err := h.assetService.QueryBrowseItems(c.Request.Context(), params)
 	if err != nil {
 		// Check for semantic search unavailable error
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
@@ -1608,19 +1727,11 @@ func (h *AssetHandler) QueryAssets(c *gin.Context) {
 		return
 	}
 
-	assetDTOs := toAssetDTOs(assets)
-	if err := h.enrichAssetDTOsWithStackInfo(c.Request.Context(), assetDTOs); err != nil {
-		log.Printf("Failed to enrich assets with stack info: %v", err)
-		// Non-fatal: continue without stack info
-	}
-
-	totalInt := int(total)
-	response := dto.QueryAssetsResponseDTO{
-		Assets: assetDTOs,
-		Total:  &totalInt,
-		Limit:  req.Pagination.Limit,
-		Offset: req.Pagination.Offset,
-	}
+	response := toQueryBrowseResponseDTO(
+		browseResult,
+		req.Pagination.Limit,
+		req.Pagination.Offset,
+	)
 	api.GinSuccess(c, response)
 }
 
@@ -1647,6 +1758,10 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
 		return
 	}
+	if err := validateStackMode(req.StackMode); err != nil {
+		api.GinBadRequest(c, err, "stack_mode must be 'collapsed' or 'expanded'")
+		return
+	}
 
 	if err := validateSearchEnhancementMode(req.EnhancementMode); err != nil {
 		api.GinBadRequest(c, err, "Enhancement mode must be 'auto', 'off', or 'only'")
@@ -1656,10 +1771,10 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		req.EnhancementMode = string(service.SearchEnhancementModeAuto)
 	}
 
-	params := buildQueryAssetsParams(req.Query, "filename", req.SortBy, req.ViewerTimezone, req.Filter, req.Pagination)
+	params := buildQueryAssetsParams(req.Query, "filename", req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
 	params = applyAssetOwnershipScope(c, params)
 
-	result, err := h.assetService.SearchAssets(c.Request.Context(), service.SearchAssetsParams{
+	result, err := h.assetService.SearchBrowseItems(c.Request.Context(), service.SearchAssetsParams{
 		QueryAssetsParams: params,
 		EnhancementMode:   service.SearchEnhancementMode(req.EnhancementMode),
 		TopResultsLimit:   req.TopResultsLimit,
@@ -1670,15 +1785,7 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		return
 	}
 
-	searchResponse := toSearchAssetsResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset)
-
-	// Enrich with stack info (non-fatal)
-	if err := h.enrichAssetDTOsWithStackInfo(c.Request.Context(), searchResponse.TopResults); err != nil {
-		log.Printf("Failed to enrich top results with stack info: %v", err)
-	}
-	if err := h.enrichAssetDTOsWithStackInfo(c.Request.Context(), searchResponse.Results); err != nil {
-		log.Printf("Failed to enrich search results with stack info: %v", err)
-	}
+	searchResponse := toSearchBrowseResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset)
 
 	api.GinSuccess(c, searchResponse)
 }

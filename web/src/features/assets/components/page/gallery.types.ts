@@ -1,11 +1,7 @@
-import {
-  AssetGroup,
-  BrowseGroup,
-} from "@/features/assets/types/assets.type";
+import type { BrowseGroup } from "@/features/assets/types/assets.type";
 
 export interface AssetGalleryProps {
-  groups?: AssetGroup[];
-  browseGroups?: BrowseGroup[];
+  browseGroups: BrowseGroup[];
   openCarousel: (assetId: string) => void;
   onLoadMore: () => void;
   hasMore: boolean;

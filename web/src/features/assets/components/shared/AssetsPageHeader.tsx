@@ -1,9 +1,5 @@
 import PageHeader from "@/components/PageHeader";
-import {
-  PhotoIcon,
-  VideoCameraIcon,
-  MusicalNoteIcon,
-} from "@heroicons/react/24/outline";
+import { PhotoIcon } from "@heroicons/react/24/outline";
 import {
   SquareMousePointer,
   FunnelIcon,
@@ -30,7 +26,10 @@ import {
   useSelection,
   useBulkAssetOperations,
 } from "@/features/assets/hooks/useSelection";
-import { SortByType } from "@/features/assets/types/assets.type";
+import {
+  BrowseItem,
+  SortByType,
+} from "@/features/assets/types/assets.type";
 import {
   useCallback,
   useMemo,
@@ -45,13 +44,15 @@ import { useI18n } from "@/lib/i18n";
 import {
   useFilterState,
   useFilterActions,
-  useCurrentTab,
 } from "@/features/assets/selectors";
-import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult, ListAlbumsResponse } from "@/lib/albums/types";
 import { useWorkingRepository } from "@/features/settings";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
+import {
+  getBrowseItemAsset,
+  resolveSelectedBrowseItems,
+} from "@/features/assets/utils/browseItems";
 
 interface AssetsPageHeaderProps {
   sortBy: SortByType;
@@ -59,6 +60,7 @@ interface AssetsPageHeaderProps {
   onFiltersChange?: (filters: FilterDTO) => void;
   title?: string;
   icon?: ReactNode;
+  browseItems?: BrowseItem[];
 }
 
 const AssetsPageHeader = ({
@@ -67,10 +69,10 @@ const AssetsPageHeader = ({
   onFiltersChange,
   title,
   icon,
+  browseItems,
 }: AssetsPageHeaderProps) => {
   const { t } = useI18n();
   const selection = useSelection();
-  const bulkOps = useBulkAssetOperations();
   const showMessage = useMessage();
 
   const activeSortByLabel = useMemo(() => {
@@ -85,7 +87,6 @@ const AssetsPageHeader = ({
   // Selectors & Actions
   const filters = useFilterState();
   const { batchUpdateFilters } = useFilterActions();
-  const currentTab = useCurrentTab();
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
@@ -127,31 +128,8 @@ const AssetsPageHeader = ({
   );
 
   const tabTitle = useMemo(() => {
-    switch (currentTab) {
-      case "all":
-        return t("assets.all.title");
-      case "videos":
-        return t("assets.videos.title");
-      case "audios":
-        return t("assets.audios.title");
-      default:
-        return t("assets.photos.title");
-    }
-  }, [currentTab, t]);
-
-  // Get appropriate icon for current tab
-  const TabIcon = useMemo(() => {
-    switch (currentTab) {
-      case "all":
-        return PhotoIcon;
-      case "videos":
-        return VideoCameraIcon;
-      case "audios":
-        return MusicalNoteIcon;
-      default:
-        return PhotoIcon;
-    }
-  }, [currentTab]);
+    return t("assets.all.title");
+  }, [t]);
 
   // Use ref to store the latest onFiltersChange callback to avoid dependency issues
   const onFiltersChangeRef = useRef(onFiltersChange);
@@ -288,18 +266,32 @@ const AssetsPageHeader = ({
     }
   };
 
-  const { assets } = useCurrentTabAssets();
+  const effectiveBrowseItems = browseItems ?? [];
+
+  const selectedBrowseItems = useMemo(() => {
+    if (!effectiveBrowseItems || effectiveBrowseItems.length === 0) return [];
+    return resolveSelectedBrowseItems(selection.selectedIds, effectiveBrowseItems);
+  }, [effectiveBrowseItems, selection.selectedIds]);
+
+  const resolvedSelectedAssetIds = useMemo(
+    () => selectedBrowseItems.flatMap((item) => {
+      const assetId = getBrowseItemAsset(item).asset_id;
+      return assetId ? [assetId] : [];
+    }),
+    [selectedBrowseItems],
+  );
+
+  const bulkOps = useBulkAssetOperations(resolvedSelectedAssetIds);
 
   // Compute selected assets for operations that need the object (e.g. download filename)
   // We use useMemo to avoid re-calculation on every render
   const selectedAssets = useMemo(() => {
     if (!selection.enabled || selection.selectedCount === 0) return [];
-    return assets.filter((a) => selection.selectedIds.has(a.asset_id!));
+    return selectedBrowseItems.map(getBrowseItemAsset);
   }, [
-    assets,
     selection.enabled,
     selection.selectedCount,
-    selection.selectedIds,
+    selectedBrowseItems,
   ]);
 
   const handleDownloadAll = async () => {
@@ -371,8 +363,8 @@ const AssetsPageHeader = ({
     <>
       <PageHeader
         title={title ?? tabTitle}
-        icon={icon ?? <TabIcon className="w-6 h-6 text-primary" />}
-        className="sticky top-0 z-50 bg-base-100 border-b border-base-200"
+        icon={icon ?? <PhotoIcon className="w-6 h-6 text-primary" />}
+        className="sticky top-0 z-40 bg-base-100 border-b border-base-200"
       >
         {selection.enabled && (
           <div className="badge badge-lg badge-neutral hidden gap-2 rounded-full px-3 py-3 text-xs font-medium sm:inline-flex shrink-0">

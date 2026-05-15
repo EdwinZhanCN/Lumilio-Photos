@@ -19,7 +19,6 @@ import {
   AssetFilter,
   FiltersState,
   SelectionState,
-  TabType,
   UIState,
 } from "./types/assets.type";
 import {
@@ -171,16 +170,6 @@ function getLiveSearchParams(fallback: URLSearchParams): URLSearchParams {
   return new URLSearchParams(window.location.search);
 }
 
-function resolveTabFromPathname(
-  pathname: string,
-  fallbackTab: TabType = "photos",
-): TabType {
-  if (pathname.includes("/photos")) return "photos";
-  if (pathname.includes("/videos")) return "videos";
-  if (pathname.includes("/audios")) return "audios";
-  return fallbackTab;
-}
-
 function toCompleteLocationBBox(location?: AssetFilter["location"]) {
   if (
     !location ||
@@ -261,8 +250,6 @@ export const AssetsProvider = ({
   const [isHydrated, setIsHydrated] = useState(false);
   const storeRef = useRef<AssetsStoreApi | null>(null);
   const isMainPersistentScope = persist && scopeId === MAIN_ASSETS_SCOPE_ID;
-  const defaultTab: TabType =
-    scopeId === MAIN_ASSETS_SCOPE_ID && !basePath ? "all" : "photos";
 
   if (storeRef.current === null) {
     storeRef.current = createAssetsStore({
@@ -276,7 +263,6 @@ export const AssetsProvider = ({
 
   const store = storeRef.current;
   const {
-    setCurrentTab,
     setCarouselOpen,
     setActiveAssetId,
     hydrateUI,
@@ -285,7 +271,6 @@ export const AssetsProvider = ({
   } = useStore(
     store,
     useShallow((state) => ({
-      setCurrentTab: state.setCurrentTab,
       setCarouselOpen: state.setCarouselOpen,
       setActiveAssetId: state.setActiveAssetId,
       hydrateUI: state.hydrateUI,
@@ -325,8 +310,6 @@ export const AssetsProvider = ({
       routeState?.assetsInitialFilter,
     );
 
-    setCurrentTab(resolveTabFromPathname(location.pathname, defaultTab));
-
     if (persistedState.filters) {
       batchUpdateFilters(persistedState.filters);
     }
@@ -359,7 +342,6 @@ export const AssetsProvider = ({
   }, [
     batchUpdateFilters,
     defaultSelectionMode,
-    defaultTab,
     hydrateUI,
     isMainPersistentScope,
     location.pathname,
@@ -367,7 +349,6 @@ export const AssetsProvider = ({
     location.state,
     navigate,
     searchParams,
-    setCurrentTab,
     setSelectionMode,
     syncUrl,
     uiState.searchQuery,
@@ -387,21 +368,6 @@ export const AssetsProvider = ({
     isMainPersistentScope,
     selectionState,
     uiState,
-  ]);
-
-  useEffect(() => {
-    if (!isHydrated) return;
-
-    const currentTab = resolveTabFromPathname(location.pathname, defaultTab);
-    if (currentTab !== uiState.currentTab) {
-      setCurrentTab(currentTab);
-    }
-  }, [
-    isHydrated,
-    location.pathname,
-    defaultTab,
-    setCurrentTab,
-    uiState.currentTab,
   ]);
 
   useEffect(() => {

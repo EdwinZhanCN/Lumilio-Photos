@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useMemo, useRef } from "react";
 import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
 import StackedThumbnail from "@/features/assets/components/shared/StackedThumbnail";
 import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
@@ -11,11 +11,10 @@ import {
   formatAssetGroupLabel,
 } from "@/features/assets/utils/assetGroups";
 import EmptyState from "@/components/EmptyState";
-import {
-  createBrowseGroupsFromAssetGroups,
-  getBrowseItemAsset,
-  getBrowseItemAssetId,
-} from "@/features/assets/utils/browseItems";
+import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
+import type { BrowseItem } from "@/features/assets/types/assets.type";
+
+import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfiniteScroll";
 
 interface SquareGalleryProps extends AssetGalleryProps {
   renderTileCaption?: (
@@ -23,23 +22,10 @@ interface SquareGalleryProps extends AssetGalleryProps {
     index: number,
     groupKey: string,
   ) => React.ReactNode;
+  render3DCard?: boolean;
 }
 
-const getScrollParent = (element: HTMLElement | null): HTMLElement | null => {
-  if (!element || typeof window === "undefined") return null;
-  let current = element.parentElement;
-  while (current) {
-    const style = window.getComputedStyle(current);
-    if (/(auto|scroll|overlay)/.test(style.overflowY)) {
-      return current;
-    }
-    current = current.parentElement;
-  }
-  return null;
-};
-
 const SquareGallery: React.FC<SquareGalleryProps> = ({
-  groups,
   browseGroups,
   openCarousel,
   onLoadMore,
@@ -49,16 +35,14 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
   columns = 4,
   className = "",
   renderTileCaption,
+  render3DCard = false,
 }) => {
   const { t, i18n } = useI18n();
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const groupEntries = useMemo(
-    () =>
-      (browseGroups ?? createBrowseGroupsFromAssetGroups(groups)).filter(
-        (group) => group.items.length > 0,
-      ),
-    [browseGroups, groups],
+    () => browseGroups.filter((group) => group.items.length > 0),
+    [browseGroups],
   );
 
   const totalAssetCount = useMemo(
@@ -67,20 +51,17 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
   );
 
   const flatAssetIds = useMemo(
-    () =>
-      groupEntries
-        .flatMap((group) => group.items.map(getBrowseItemAssetId))
-        .filter((id): id is string => Boolean(id)),
+    () => groupEntries.flatMap((group) => group.items.map((item) => item.id)),
     [groupEntries],
   );
 
   const selection = useOptionalKeyboardSelection(flatAssetIds);
 
   const handleAssetClick = useCallback(
-    (asset: Asset, event: React.MouseEvent | React.KeyboardEvent) => {
+    (item: BrowseItem, asset: Asset, event: React.MouseEvent | React.KeyboardEvent) => {
       if (!asset.asset_id) return;
       if (selection.enabled) {
-        selection.handleClick(asset.asset_id, event as any);
+        selection.handleClick(item.id, event as any);
         return;
       }
       openCarousel(asset.asset_id);
@@ -88,61 +69,14 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
     [openCarousel, selection],
   );
 
-  const supportsIntersectionObserver = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return "IntersectionObserver" in window;
-  }, []);
-
-  const onLoadMoreRef = useRef(onLoadMore);
-  const hasMoreRef = useRef(hasMore);
-  const isLoadingMoreRef = useRef(isLoadingMore);
-  const isLoadingRef = useRef(isLoading);
-
-  useEffect(() => {
-    onLoadMoreRef.current = onLoadMore;
-  }, [onLoadMore]);
-
-  useEffect(() => {
-    hasMoreRef.current = hasMore;
-  }, [hasMore]);
-
-  useEffect(() => {
-    isLoadingMoreRef.current = isLoadingMore;
-  }, [isLoadingMore]);
-
-  useEffect(() => {
-    isLoadingRef.current = isLoading;
-  }, [isLoading]);
-
-  useEffect(() => {
-    if (!supportsIntersectionObserver) return;
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-
-    const root = getScrollParent(sentinel);
-    let lastLoad = 0;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (!entry || !entry.isIntersecting) return;
-        const now = Date.now();
-        if (now - lastLoad < 600) return;
-        if (!hasMoreRef.current) return;
-        if (isLoadingRef.current || isLoadingMoreRef.current) return;
-        lastLoad = now;
-        onLoadMoreRef.current();
-      },
-      {
-        root,
-        rootMargin: "600px 0px",
-        threshold: 0.01,
-      },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [supportsIntersectionObserver]);
+  const { supportsIntersectionObserver } = useGalleryInfiniteScroll({
+    sentinelRef,
+    hasMore: Boolean(hasMore),
+    isLoadingMore: Boolean(isLoadingMore),
+    isLoading: Boolean(isLoading),
+    onLoadMore,
+    totalAssetCount,
+  });
 
   if (!isLoading && totalAssetCount === 0) {
     return <EmptyState className={className} />;
@@ -198,33 +132,29 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
                 return (
                   <div
                     key={`${groupKey}-${item.id}`}
-                    className="hover-3d relative aspect-square"
+                    className={render3DCard ? "hover-3d relative aspect-square" : "relative aspect-square"}
                     role="listitem"
                     data-asset-id={assetId}
                   >
-                    <figure className="h-full w-full rounded-2xl">
+                    <figure className="h-full w-full rounded-[1.25rem]">
                       {asset.stack?.stack_size && asset.stack.stack_size > 1 ? (
                         <StackedThumbnail
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}
                           stackInfo={asset.stack}
-                          onClick={(event) => handleAssetClick(asset, event)}
-                          isSelected={
-                            assetId ? selection.isSelected(assetId) : false
-                          }
+                          onClick={(event) => handleAssetClick(item, asset, event)}
+                          isSelected={selection.isSelected(item.id)}
                           isSelectionMode={selection.enabled}
-                          className="rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                          className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                         />
                       ) : (
                         <MediaThumbnail
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}
-                          onClick={(event) => handleAssetClick(asset, event)}
-                          isSelected={
-                            assetId ? selection.isSelected(assetId) : false
-                          }
+                          onClick={(event) => handleAssetClick(item, asset, event)}
+                          isSelected={selection.isSelected(item.id)}
                           isSelectionMode={selection.enabled}
-                          className="rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                          className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                         />
                       )}
                       {caption && (
@@ -233,15 +163,19 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
                         </div>
                       )}
                     </figure>
-                    {/* 8 empty divs needed for the 3D effect */}
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
+                    {render3DCard && (
+                      <>
+                        {/* 8 empty divs needed for the 3D hover effect */}
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                      </>
+                    )}
                   </div>
                 );
               })}
