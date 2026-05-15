@@ -36,6 +36,7 @@ type Querier interface {
 	// Count query matching GetAssetsUnified WHERE clause
 	// Returns total count of assets matching the filters (for pagination)
 	CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error)
+	CountCollapsedBrowseItemsUnified(ctx context.Context, arg CountCollapsedBrowseItemsUnifiedParams) (int64, error)
 	CountDuplicateGroups(ctx context.Context, arg CountDuplicateGroupsParams) (int64, error)
 	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
@@ -134,6 +135,7 @@ type Querier interface {
 	GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error)
 	GetAssetWithThumbnails(ctx context.Context, assetID pgtype.UUID) (GetAssetWithThumbnailsRow, error)
 	GetAssetsByHash(ctx context.Context, hash *string) ([]Asset, error)
+	GetAssetsByIDs(ctx context.Context, assetIds []pgtype.UUID) ([]Asset, error)
 	GetAssetsByOwner(ctx context.Context, arg GetAssetsByOwnerParams) ([]Asset, error)
 	GetAssetsByOwnerAndTypesSorted(ctx context.Context, arg GetAssetsByOwnerAndTypesSortedParams) ([]Asset, error)
 	GetAssetsByOwnerSorted(ctx context.Context, arg GetAssetsByOwnerSortedParams) ([]Asset, error)
@@ -164,6 +166,7 @@ type Querier interface {
 	GetCaptionsByModel(ctx context.Context, arg GetCaptionsByModelParams) ([]Caption, error)
 	GetCheckpoint(ctx context.Context, id string) ([]byte, error)
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
+	GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCollapsedBrowseItemsUnifiedParams) ([]GetCollapsedBrowseItemsUnifiedRow, error)
 	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
 	// 获取每日拍摄活跃度热力图数据
 	GetDailyActivityHeatmap(ctx context.Context, arg GetDailyActivityHeatmapParams) ([]GetDailyActivityHeatmapRow, error)

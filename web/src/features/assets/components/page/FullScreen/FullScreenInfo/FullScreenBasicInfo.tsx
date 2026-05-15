@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { useExtractExifdata } from "@/hooks/util-hooks/useExtractExifdata";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n.tsx";
+import { $api } from "@/lib/http-commons/queryClient";
+import type { components } from "@/lib/http-commons/schema.d.ts";
 import { ExifDataDisplay } from "@/features/studio/components/panels/ExifDataDisplay";
 import type { Asset } from "@/lib/http-commons";
 import {
@@ -15,6 +15,12 @@ import PhotoInfoView from "./PhotoInfoView";
 import VideoInfoView from "./VideoInfoView";
 import AudioInfoView from "./AudioInfoView";
 
+type Schemas = components["schemas"];
+type AssetExifResponse = Schemas["dto.AssetExifResponseDTO"];
+type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
+  data?: T;
+};
+
 interface FullScreenBasicInfoProps {
   asset?: Asset;
   onAssetUpdate?: (updatedAsset: Asset) => void;
@@ -24,63 +30,79 @@ export default function FullScreenBasicInfo({
   asset,
   onAssetUpdate,
 }: FullScreenBasicInfoProps) {
-  const [detailedExif, setDetailedExif] = useState<any>(null);
-  const [isLoadingFile, setIsLoadingFile] = useState(false);
   const showMessage = useMessage();
-  const { isExtracting, exifData, extractExifData } = useExtractExifdata();
   const { t } = useI18n();
+
+  const exifQuery = $api.useQuery(
+    "get",
+    "/api/v1/assets/{id}/exif",
+    {
+      params: { path: { id: asset?.asset_id ?? "" } },
+    },
+    {
+      enabled: false,
+      retry: 1,
+    },
+  ) as UseQueryResult<ApiResult<AssetExifResponse>, unknown>;
+
+  const rawExif =
+    (exifQuery.data?.data?.exif_raw as Record<string, unknown> | undefined) ??
+    null;
+  const rawExifForDisplay =
+    rawExif && Object.keys(rawExif).length > 0
+      ? (rawExif as Record<string, any>)
+      : null;
 
   const closeInfo = () => {
     window.dispatchEvent(new CustomEvent("fullscreen:toggleInfo"));
   };
 
-  const handleExtractExif = async () => {
+  const handleViewExif = async () => {
     if (!asset?.asset_id) {
       showMessage("error", t("assets.basicInfo.errors.noAssetId"));
       return;
     }
 
-    try {
-      setIsLoadingFile(true);
-      setDetailedExif(null);
+    (
+      document.getElementById("exif_modal") as HTMLDialogElement | null
+    )?.showModal();
 
-      // Fetch the original file using the URL helper
-      const url = assetUrls.getOriginalFileUrl(asset.asset_id);
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const file = new File([blob], asset.original_filename || "image", {
-        type: asset.mime_type || "image/jpeg",
-      });
+    const result = await exifQuery.refetch();
 
-      setIsLoadingFile(false);
+    if (result.isError) {
+      const message =
+        result.error instanceof Error
+          ? result.error.message
+          : t("assets.basicInfo.errors.extractFailed", {
+              message: String(result.error),
+            });
+      showMessage("error", message);
+      return;
+    }
 
-      // Extract EXIF data
-      await extractExifData([file]);
+    const payload = result.data as ApiResult<AssetExifResponse> | undefined;
 
-      // Show EXIF modal
-      (
-        document.getElementById("exif_modal") as HTMLDialogElement | null
-      )?.showModal();
-    } catch (error) {
-      setIsLoadingFile(false);
-
-      // Handle error - fetch doesn't throw on HTTP errors, so we just show the message
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    if (payload && typeof payload.code === "number" && payload.code !== 0) {
       showMessage(
         "error",
-        t("assets.basicInfo.errors.extractFailed", {
-          message: errorMessage,
-        }),
+        payload.message ||
+          t("assets.basicInfo.errors.extractFailed", {
+            message: payload.error || "",
+          }),
       );
+      return;
+    }
+
+    const exifRaw = payload?.data?.exif_raw as
+      | Record<string, unknown>
+      | undefined;
+    if (!exifRaw || Object.keys(exifRaw).length === 0) {
+      showMessage("info", t("assets.basicInfo.exifNotAvailable"));
     }
   };
 
-  // Watch for exifData changes and update detailedExif
-  useEffect(() => {
-    if (exifData && Object.keys(exifData).length > 0) {
-      setDetailedExif(exifData[0]);
-    }
-  }, [exifData]);
+  const isLoadingExif =
+    exifQuery.isFetching && !rawExifForDisplay;
 
   // Return null if no asset
   if (!asset) {
@@ -90,7 +112,6 @@ export default function FullScreenBasicInfo({
   // Determine asset type and render appropriate view
   const assetType = asset.type;
   const metadata = asset.specific_metadata;
-  const isLoadingExif = isLoadingFile || isExtracting;
 
   // Render PhotoInfoView for photos
   if (isPhotoMetadata(assetType, metadata)) {
@@ -100,7 +121,7 @@ export default function FullScreenBasicInfo({
           asset={asset}
           onAssetUpdate={onAssetUpdate}
           onClose={closeInfo}
-          onExtractExif={handleExtractExif}
+          onExtractExif={handleViewExif}
           isLoadingExif={isLoadingExif}
         />
         <dialog id="exif_modal" className="modal">
@@ -111,7 +132,7 @@ export default function FullScreenBasicInfo({
               </button>
             </form>
             <ExifDataDisplay
-              exifData={detailedExif}
+              exifData={rawExifForDisplay}
               isLoading={isLoadingExif}
             />
           </div>

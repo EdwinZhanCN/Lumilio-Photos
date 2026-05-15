@@ -1,5 +1,5 @@
 export { AssetsProvider } from "./AssetsProvider";
-export { useAssetsView, useCurrentTabAssets } from "./hooks/useAssetsView";
+export { useAssetsView, useCurrentAssetsView } from "./hooks/useAssetsView";
 // Export removed: useAsset and related hooks are deleted
 export {
   useAssetActions,
@@ -35,9 +35,12 @@ export type {
   AssetsViewResult,
   AssetActionsResult,
   SelectionResult,
-  TabType,
+  AssetMediaType,
   SortByType,
   AssetGroup,
+  BrowseItem,
+  BrowseGroup,
+  BrowseItemId,
   ViewDefinitionOptions,
 } from "./types/assets.type";
 
@@ -53,12 +56,21 @@ export type { AssetGalleryProps } from "./components/page/gallery.types";
 // Export utilities and selectors from slices
 export { generateViewKey } from "./utils/viewKey";
 export {
+  createBrowseGroupsFromAssets,
+  createBrowseGroupsFromAssetGroups,
+  createBrowseItemsFromApiItems,
+  dedupeBrowseItemsById,
+  findBrowseItemById,
+  findBrowseItemIndexByAssetId,
+  flattenBrowseGroups,
+  flattenBrowseGroupsToAssets,
+  getBrowseItemAsset,
+  getBrowseItemAssetId,
+  resolveBrowseSelectedAssetIds,
+  resolveSelectedBrowseItems,
+} from "./utils/browseItems";
+export {
   selectActiveFilterCount,
   selectHasActiveFilters,
   selectFilterAsAssetFilter,
 } from "./slices/filters.slice";
-export {
-  selectTabTitle,
-  selectTabSupportsSemanticSearch,
-  selectTabAssetTypes,
-} from "./slices/ui.slice";

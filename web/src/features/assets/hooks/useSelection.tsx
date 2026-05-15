@@ -348,7 +348,7 @@ export const useSelectionState = () => {
 /**
  * Hook for bulk operations on selected assets.
  */
-export const useBulkAssetOperations = () => {
+export const useBulkAssetOperations = (resolvedAssetIds?: string[]) => {
   const selection = useSelection();
   const { deleteAsset, batchUpdateAssets } = useAssetActions();
   const { mutateAsync: addAssetToAlbum } = $api.useMutation(
@@ -358,7 +358,8 @@ export const useBulkAssetOperations = () => {
 
   const bulkUpdateRating = useCallback(
     async (rating: number): Promise<void> => {
-      const updates = Array.from(selection.selectedIds).map((assetId) => ({
+      const targetIds = resolvedAssetIds ?? Array.from(selection.selectedIds);
+      const updates = targetIds.map((assetId) => ({
         assetId,
         updates: {
           rating,
@@ -366,10 +367,11 @@ export const useBulkAssetOperations = () => {
       }));
 
       await batchUpdateAssets(updates);
-    }, [selection.selectedIds, batchUpdateAssets]);
+    }, [resolvedAssetIds, selection.selectedIds, batchUpdateAssets]);
 
   const bulkSetLike = useCallback(async (liked: boolean): Promise<void> => {
-    const updates = Array.from(selection.selectedIds).map((assetId) => ({
+    const targetIds = resolvedAssetIds ?? Array.from(selection.selectedIds);
+    const updates = targetIds.map((assetId) => ({
       assetId,
       updates: {
         liked,
@@ -377,17 +379,18 @@ export const useBulkAssetOperations = () => {
     }));
 
     await batchUpdateAssets(updates);
-  }, [selection.selectedIds, batchUpdateAssets]);
+  }, [resolvedAssetIds, selection.selectedIds, batchUpdateAssets]);
 
   const bulkDelete = useCallback(async (): Promise<void> => {
+    const targetIds = resolvedAssetIds ?? Array.from(selection.selectedIds);
     await Promise.all(
-      Array.from(selection.selectedIds).map((assetId) => deleteAsset(assetId)),
+      targetIds.map((assetId) => deleteAsset(assetId)),
     );
     selection.clear();
-  }, [selection.selectedIds, selection.clear, deleteAsset]);
+  }, [resolvedAssetIds, selection.selectedIds, selection.clear, deleteAsset]);
 
   const bulkDownload = useCallback(async (assets?: Asset[]): Promise<void> => {
-    const ids = Array.from(selection.selectedIds);
+    const ids = resolvedAssetIds ?? Array.from(selection.selectedIds);
     if (ids.length === 0) return;
 
     for (const id of ids) {
@@ -430,10 +433,10 @@ export const useBulkAssetOperations = () => {
       // Small delay to prevent browser from blocking multiple downloads
       await new Promise(resolve => setTimeout(resolve, 300));
     }
-  }, [selection.selectedIds]);
+  }, [resolvedAssetIds, selection.selectedIds]);
 
   const bulkAddToAlbum = useCallback(async (albumId: number): Promise<void> => {
-    const ids = Array.from(selection.selectedIds);
+    const ids = resolvedAssetIds ?? Array.from(selection.selectedIds);
     await Promise.all(
       ids.map((assetId) =>
         addAssetToAlbum({
@@ -442,7 +445,7 @@ export const useBulkAssetOperations = () => {
         }),
       ),
     );
-  }, [selection.selectedIds, addAssetToAlbum]);
+  }, [resolvedAssetIds, selection.selectedIds, addAssetToAlbum]);
 
   return {
     bulkUpdateRating,

@@ -96,8 +96,8 @@ export default function PhotoMapView({
         <div className="absolute top-4 left-4 bg-base-100 px-3 py-1 rounded-full shadow-md text-sm font-medium">
           {photoLocations.length}{" "}
           {photoLocations.length === 1
-            ? t("assets.photos.title", { count: 1 })
-            : t("assets.photos.title", { count: 2 })}
+            ? t("assets.all.title", { count: 1 })
+            : t("assets.all.title", { count: 2 })}
         </div>
       )}
     </div>

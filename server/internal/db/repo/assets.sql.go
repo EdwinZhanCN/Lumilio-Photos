@@ -336,6 +336,150 @@ func (q *Queries) CountAssetsUnified(ctx context.Context, arg CountAssetsUnified
 	return count, err
 }
 
+const countCollapsedBrowseItemsUnified = `-- name: CountCollapsedBrowseItemsUnified :one
+WITH filtered AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    asm.stack_id
+  FROM assets a
+  LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
+  WHERE a.is_deleted = false
+    AND ($1::text IS NULL OR a.original_filename ILIKE '%' || $1 || '%')
+    AND ($2::text IS NULL OR a.type = $2)
+    AND ($3::text[] IS NULL OR a.type = ANY($3::text[]))
+    AND ($4::integer IS NULL OR a.owner_id = $4)
+    AND ($5::uuid IS NULL OR a.repository_id = $5)
+    AND (
+      $6::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = $6
+          AND fi_person.asset_id = a.asset_id
+      )
+    )
+    AND (
+      $7::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = $7
+      )
+    )
+    AND ($8::text IS NULL OR
+      CASE COALESCE($9::text, 'contains')
+        WHEN 'matches' THEN a.original_filename ILIKE $8
+        WHEN 'starts_with' THEN a.original_filename ILIKE $8 || '%'
+        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $8
+        ELSE a.original_filename ILIKE '%' || $8 || '%'
+      END
+    )
+    AND ($10::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $10)
+    AND ($11::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $11)
+    AND ($12::boolean IS NULL OR
+      CASE
+        WHEN $12 = true THEN a.specific_metadata->>'is_raw' = 'true'
+        ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
+      END
+    )
+    AND ($13::integer IS NULL OR
+      CASE
+        WHEN $13 = 0 THEN a.rating IS NULL OR a.rating = 0
+        ELSE a.rating = $13
+      END
+    )
+    AND ($14::boolean IS NULL OR
+      CASE
+        WHEN $14 = false THEN a.liked IS NULL OR a.liked = false
+        ELSE a.liked = true
+      END
+    )
+    AND ($15::text IS NULL OR a.specific_metadata->>'camera_model' = $15)
+    AND ($16::text IS NULL OR a.specific_metadata->>'lens_model' = $16)
+    AND (
+      $17::float8 IS NULL
+      OR $18::float8 IS NULL
+      OR $19::float8 IS NULL
+      OR $20::float8 IS NULL
+      OR (
+        a.gps_latitude IS NOT NULL
+        AND a.gps_longitude IS NOT NULL
+        AND a.gps_latitude
+          BETWEEN LEAST($18::float8, $17::float8)
+          AND GREATEST($18::float8, $17::float8)
+        AND (
+          CASE
+            WHEN $20::float8 <= $19::float8 THEN
+              a.gps_longitude BETWEEN $20::float8 AND $19::float8
+            ELSE
+              a.gps_longitude >= $20::float8
+              OR a.gps_longitude <= $19::float8
+          END
+        )
+      )
+    )
+)
+SELECT COUNT(*)::bigint
+FROM (
+  SELECT CASE WHEN stack_id IS NULL THEN asset_id::text ELSE stack_id::text END AS browse_id
+  FROM filtered
+  GROUP BY 1
+) browse_items
+`
+
+type CountCollapsedBrowseItemsUnifiedParams struct {
+	Query            *string            `db:"query" json:"query"`
+	AssetType        *string            `db:"asset_type" json:"asset_type"`
+	AssetTypes       []string           `db:"asset_types" json:"asset_types"`
+	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID     pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	PersonID         *int32             `db:"person_id" json:"person_id"`
+	AlbumID          *int32             `db:"album_id" json:"album_id"`
+	FilenameVal      *string            `db:"filename_val" json:"filename_val"`
+	FilenameOperator *string            `db:"filename_operator" json:"filename_operator"`
+	DateFrom         pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo           pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw            *bool              `db:"is_raw" json:"is_raw"`
+	Rating           *int32             `db:"rating" json:"rating"`
+	Liked            *bool              `db:"liked" json:"liked"`
+	CameraModel      *string            `db:"camera_model" json:"camera_model"`
+	LensModel        *string            `db:"lens_model" json:"lens_model"`
+	LocationNorth    *float64           `db:"location_north" json:"location_north"`
+	LocationSouth    *float64           `db:"location_south" json:"location_south"`
+	LocationEast     *float64           `db:"location_east" json:"location_east"`
+	LocationWest     *float64           `db:"location_west" json:"location_west"`
+}
+
+func (q *Queries) CountCollapsedBrowseItemsUnified(ctx context.Context, arg CountCollapsedBrowseItemsUnifiedParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countCollapsedBrowseItemsUnified,
+		arg.Query,
+		arg.AssetType,
+		arg.AssetTypes,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.PersonID,
+		arg.AlbumID,
+		arg.FilenameVal,
+		arg.FilenameOperator,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.LocationNorth,
+		arg.LocationSouth,
+		arg.LocationEast,
+		arg.LocationWest,
+	)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countLikedAssets = `-- name: CountLikedAssets :one
 SELECT COUNT(*) as count
 FROM assets
@@ -687,6 +831,60 @@ WHERE hash = $1 AND is_deleted = false
 
 func (q *Queries) GetAssetsByHash(ctx context.Context, hash *string) ([]Asset, error) {
 	rows, err := q.db.Query(ctx, getAssetsByHash, hash)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.CaptureOffsetMinutes,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
+			&i.ExifRaw,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAssetsByIDs = `-- name: GetAssetsByIDs :many
+SELECT asset_id, owner_id, type, original_filename, storage_path, mime_type, file_size, hash, width, height, duration, upload_time, taken_time, capture_offset_minutes, is_deleted, deleted_at, specific_metadata, rating, liked, repository_id, status, updated_at, gps_latitude, gps_longitude, gps_geohash_5, gps_geohash_7, exif_raw FROM assets
+WHERE asset_id = ANY($1::uuid[])
+  AND is_deleted = false
+`
+
+func (q *Queries) GetAssetsByIDs(ctx context.Context, assetIds []pgtype.UUID) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, getAssetsByIDs, assetIds)
 	if err != nil {
 		return nil, err
 	}
@@ -1863,6 +2061,268 @@ func (q *Queries) GetAssetsWithWarnings(ctx context.Context, arg GetAssetsWithWa
 			&i.GpsGeohash5,
 			&i.GpsGeohash7,
 			&i.ExifRaw,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCollapsedBrowseItemsUnified = `-- name: GetCollapsedBrowseItemsUnified :many
+WITH filtered AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    a.upload_time,
+    COALESCE(a.taken_time, a.upload_time) AS captured_time,
+    asm.stack_id,
+    asm.position
+  FROM assets a
+  LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
+  WHERE a.is_deleted = false
+    AND ($1::text IS NULL OR a.original_filename ILIKE '%' || $1 || '%')
+    AND ($2::text IS NULL OR a.type = $2)
+    AND ($3::text[] IS NULL OR a.type = ANY($3::text[]))
+    AND ($4::integer IS NULL OR a.owner_id = $4)
+    AND ($5::uuid IS NULL OR a.repository_id = $5)
+    AND (
+      $6::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = $6
+          AND fi_person.asset_id = a.asset_id
+      )
+    )
+    AND (
+      $7::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = $7
+      )
+    )
+    AND ($8::text IS NULL OR
+      CASE COALESCE($9::text, 'contains')
+        WHEN 'matches' THEN a.original_filename ILIKE $8
+        WHEN 'starts_with' THEN a.original_filename ILIKE $8 || '%'
+        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || $8
+        ELSE a.original_filename ILIKE '%' || $8 || '%'
+      END
+    )
+    AND ($10::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= $10)
+    AND ($11::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= $11)
+    AND ($12::boolean IS NULL OR
+      CASE
+        WHEN $12 = true THEN a.specific_metadata->>'is_raw' = 'true'
+        ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
+      END
+    )
+    AND ($13::integer IS NULL OR
+      CASE
+        WHEN $13 = 0 THEN a.rating IS NULL OR a.rating = 0
+        ELSE a.rating = $13
+      END
+    )
+    AND ($14::boolean IS NULL OR
+      CASE
+        WHEN $14 = false THEN a.liked IS NULL OR a.liked = false
+        ELSE a.liked = true
+      END
+    )
+    AND ($15::text IS NULL OR a.specific_metadata->>'camera_model' = $15)
+    AND ($16::text IS NULL OR a.specific_metadata->>'lens_model' = $16)
+    AND (
+      $17::float8 IS NULL
+      OR $18::float8 IS NULL
+      OR $19::float8 IS NULL
+      OR $20::float8 IS NULL
+      OR (
+        a.gps_latitude IS NOT NULL
+        AND a.gps_longitude IS NOT NULL
+        AND a.gps_latitude
+          BETWEEN LEAST($18::float8, $17::float8)
+          AND GREATEST($18::float8, $17::float8)
+        AND (
+          CASE
+            WHEN $20::float8 <= $19::float8 THEN
+              a.gps_longitude BETWEEN $20::float8 AND $19::float8
+            ELSE
+              a.gps_longitude >= $20::float8
+              OR a.gps_longitude <= $19::float8
+          END
+        )
+      )
+    )
+),
+stack_covers AS MATERIALIZED (
+  SELECT DISTINCT ON (asm.stack_id)
+    asm.stack_id,
+    asm.asset_id AS cover_asset_id
+  FROM asset_stack_members asm
+  JOIN assets a ON a.asset_id = asm.asset_id
+  WHERE a.is_deleted = false
+  ORDER BY asm.stack_id, asm.position ASC NULLS LAST, asm.asset_id ASC
+),
+stack_members_all AS MATERIALIZED (
+  SELECT
+    asm.stack_id,
+    ARRAY_AGG(asm.asset_id ORDER BY asm.position ASC NULLS LAST, asm.asset_id ASC)::uuid[] AS member_asset_ids
+  FROM asset_stack_members asm
+  JOIN assets a ON a.asset_id = asm.asset_id
+  WHERE a.is_deleted = false
+  GROUP BY asm.stack_id
+),
+browse_items AS MATERIALIZED (
+  SELECT
+    CASE WHEN f.stack_id IS NULL THEN 'asset'::text ELSE 'stack'::text END AS item_type,
+    f.stack_id,
+    CASE WHEN f.stack_id IS NULL THEN f.asset_id ELSE sc.cover_asset_id END AS cover_asset_id,
+    sma.member_asset_ids,
+    ARRAY_AGG(f.asset_id ORDER BY f.position ASC NULLS LAST, f.asset_id ASC)::uuid[] AS matched_asset_ids
+  FROM filtered f
+  LEFT JOIN stack_covers sc ON sc.stack_id = f.stack_id
+  LEFT JOIN stack_members_all sma ON sma.stack_id = f.stack_id
+  GROUP BY
+    CASE WHEN f.stack_id IS NULL THEN 'asset'::text ELSE 'stack'::text END,
+    f.stack_id,
+    CASE WHEN f.stack_id IS NULL THEN f.asset_id ELSE sc.cover_asset_id END,
+    sma.member_asset_ids
+),
+paged AS (
+  SELECT
+    bi.item_type,
+    bi.stack_id,
+    bi.cover_asset_id,
+    bi.member_asset_ids,
+    bi.matched_asset_ids,
+    CASE
+      WHEN $21::text = 'recently_added' THEN cover.upload_time
+      ELSE COALESCE(cover.taken_time, cover.upload_time)
+    END AS sort_time
+  FROM browse_items bi
+  JOIN assets cover ON cover.asset_id = bi.cover_asset_id
+  ORDER BY sort_time DESC, cover.asset_id DESC
+  LIMIT $23 OFFSET $22
+)
+SELECT
+  p.item_type,
+  p.stack_id,
+  p.cover_asset_id,
+  p.member_asset_ids,
+  p.matched_asset_ids,
+  cover.asset_id, cover.owner_id, cover.type, cover.original_filename, cover.storage_path, cover.mime_type, cover.file_size, cover.hash, cover.width, cover.height, cover.duration, cover.upload_time, cover.taken_time, cover.capture_offset_minutes, cover.is_deleted, cover.deleted_at, cover.specific_metadata, cover.rating, cover.liked, cover.repository_id, cover.status, cover.updated_at, cover.gps_latitude, cover.gps_longitude, cover.gps_geohash_5, cover.gps_geohash_7, cover.exif_raw
+FROM paged p
+JOIN assets cover ON cover.asset_id = p.cover_asset_id
+ORDER BY p.sort_time DESC, p.cover_asset_id DESC
+`
+
+type GetCollapsedBrowseItemsUnifiedParams struct {
+	Query            *string            `db:"query" json:"query"`
+	AssetType        *string            `db:"asset_type" json:"asset_type"`
+	AssetTypes       []string           `db:"asset_types" json:"asset_types"`
+	OwnerID          *int32             `db:"owner_id" json:"owner_id"`
+	RepositoryID     pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	PersonID         *int32             `db:"person_id" json:"person_id"`
+	AlbumID          *int32             `db:"album_id" json:"album_id"`
+	FilenameVal      *string            `db:"filename_val" json:"filename_val"`
+	FilenameOperator *string            `db:"filename_operator" json:"filename_operator"`
+	DateFrom         pgtype.Timestamptz `db:"date_from" json:"date_from"`
+	DateTo           pgtype.Timestamptz `db:"date_to" json:"date_to"`
+	IsRaw            *bool              `db:"is_raw" json:"is_raw"`
+	Rating           *int32             `db:"rating" json:"rating"`
+	Liked            *bool              `db:"liked" json:"liked"`
+	CameraModel      *string            `db:"camera_model" json:"camera_model"`
+	LensModel        *string            `db:"lens_model" json:"lens_model"`
+	LocationNorth    *float64           `db:"location_north" json:"location_north"`
+	LocationSouth    *float64           `db:"location_south" json:"location_south"`
+	LocationEast     *float64           `db:"location_east" json:"location_east"`
+	LocationWest     *float64           `db:"location_west" json:"location_west"`
+	SortBy           *string            `db:"sort_by" json:"sort_by"`
+	Offset           int32              `db:"offset" json:"offset"`
+	Limit            int32              `db:"limit" json:"limit"`
+}
+
+type GetCollapsedBrowseItemsUnifiedRow struct {
+	ItemType        string        `db:"item_type" json:"item_type"`
+	StackID         pgtype.UUID   `db:"stack_id" json:"stack_id"`
+	CoverAssetID    interface{}   `db:"cover_asset_id" json:"cover_asset_id"`
+	MemberAssetIds  []pgtype.UUID `db:"member_asset_ids" json:"member_asset_ids"`
+	MatchedAssetIds []pgtype.UUID `db:"matched_asset_ids" json:"matched_asset_ids"`
+	Asset           Asset         `db:"asset" json:"asset"`
+}
+
+func (q *Queries) GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCollapsedBrowseItemsUnifiedParams) ([]GetCollapsedBrowseItemsUnifiedRow, error) {
+	rows, err := q.db.Query(ctx, getCollapsedBrowseItemsUnified,
+		arg.Query,
+		arg.AssetType,
+		arg.AssetTypes,
+		arg.OwnerID,
+		arg.RepositoryID,
+		arg.PersonID,
+		arg.AlbumID,
+		arg.FilenameVal,
+		arg.FilenameOperator,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.IsRaw,
+		arg.Rating,
+		arg.Liked,
+		arg.CameraModel,
+		arg.LensModel,
+		arg.LocationNorth,
+		arg.LocationSouth,
+		arg.LocationEast,
+		arg.LocationWest,
+		arg.SortBy,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCollapsedBrowseItemsUnifiedRow
+	for rows.Next() {
+		var i GetCollapsedBrowseItemsUnifiedRow
+		if err := rows.Scan(
+			&i.ItemType,
+			&i.StackID,
+			&i.CoverAssetID,
+			&i.MemberAssetIds,
+			&i.MatchedAssetIds,
+			&i.Asset.AssetID,
+			&i.Asset.OwnerID,
+			&i.Asset.Type,
+			&i.Asset.OriginalFilename,
+			&i.Asset.StoragePath,
+			&i.Asset.MimeType,
+			&i.Asset.FileSize,
+			&i.Asset.Hash,
+			&i.Asset.Width,
+			&i.Asset.Height,
+			&i.Asset.Duration,
+			&i.Asset.UploadTime,
+			&i.Asset.TakenTime,
+			&i.Asset.CaptureOffsetMinutes,
+			&i.Asset.IsDeleted,
+			&i.Asset.DeletedAt,
+			&i.Asset.SpecificMetadata,
+			&i.Asset.Rating,
+			&i.Asset.Liked,
+			&i.Asset.RepositoryID,
+			&i.Asset.Status,
+			&i.Asset.UpdatedAt,
+			&i.Asset.GpsLatitude,
+			&i.Asset.GpsLongitude,
+			&i.Asset.GpsGeohash5,
+			&i.Asset.GpsGeohash7,
+			&i.Asset.ExifRaw,
 		); err != nil {
 			return nil, err
 		}

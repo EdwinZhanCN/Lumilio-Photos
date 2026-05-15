@@ -8,7 +8,6 @@ import { useSortBy } from "@/features/assets/selectors";
 import {
   AssetsViewResult,
   SortByType,
-  TabType,
   ViewDefinitionOptions,
 } from "@/features/assets/types/assets.type";
 import { generateViewKey } from "@/features/assets/utils/viewKey";
@@ -18,7 +17,6 @@ import {
 } from "@/features/assets/slices/filters.slice";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components, paths } from "@/lib/http-commons/schema.d.ts";
-import type { Asset } from "@/lib/assets/types";
 import { useWorkingRepository } from "@/features/settings";
 import {
   flattenAssetGroups,
@@ -26,41 +24,26 @@ import {
   getViewerTimeZone,
   mergeAdjacentAssetGroups,
 } from "@/features/assets/utils/assetGroups";
+import {
+  browseGroupsFromQueryLikePage,
+  countLoadedBrowseRowsFromPage,
+  flattenBrowseGroups,
+  flattenBrowseGroupsToAssets,
+  mergeAdjacentBrowseGroups,
+  normalizeVisibleLegacyAssets,
+} from "@/features/assets/utils/browseItems";
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
 type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
-type QueryAssetsResponse = components["schemas"]["dto.QueryAssetsResponseDTO"];
-type PersonAssetsApiResult = Omit<
+type QueryAssetsResponseDTO =
+  components["schemas"]["dto.QueryAssetsResponseDTO"];
+
+type PersonAssetsApiEnvelope = Omit<
   paths["/api/v1/people/{id}/assets/list"]["post"]["responses"][200]["content"]["application/json"],
   "data"
 > & {
-  data?: QueryAssetsResponse;
+  data?: QueryAssetsResponseDTO;
 };
-
-const countAssets = (assets: Asset[]) => assets.length;
-
-const getApiMimeTypes = (
-  tabTypes: TabType[],
-): ("PHOTO" | "VIDEO" | "AUDIO")[] => {
-  const mimeTypes: ("PHOTO" | "VIDEO" | "AUDIO")[] = [];
-  tabTypes.forEach((type) => {
-    switch (type) {
-      case "photos":
-        mimeTypes.push("PHOTO");
-        break;
-      case "videos":
-        mimeTypes.push("VIDEO");
-        break;
-      case "audios":
-        mimeTypes.push("AUDIO");
-        break;
-    }
-  });
-  return mimeTypes;
-};
-
-const normalizeVisibleAssets = (assets: Asset[]): Asset[] =>
-  assets.filter((asset) => !asset.is_deleted && !asset.deleted_at);
 
 const normalizeSearchSortBy = (
   sortBy?: SortByType,
@@ -82,7 +65,6 @@ export function usePersonAssetsView(
 ): AssetsViewResult {
   const { scopedRepositoryId } = useWorkingRepository();
   const filtersState = useAssetsStore((state) => state.filters);
-  const currentTab = useAssetsStore((state) => state.ui.currentTab);
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
   const uiSortBy = useSortBy();
   const { autoFetch = true, disabled = false, withGroups = false } = options;
@@ -103,15 +85,8 @@ export function usePersonAssetsView(
       filter.repository_id = scopedRepositoryId;
     }
 
-    const mimeTypes = getApiMimeTypes([currentTab]);
-    if (mimeTypes.length === 1) {
-      filter.type = mimeTypes[0];
-    } else if (mimeTypes.length > 1) {
-      filter.types = mimeTypes;
-    }
-
     return filter;
-  }, [currentTab, filtersState, scopedRepositoryId]);
+  }, [filtersState, scopedRepositoryId]);
 
   const requestBody = useMemo<AssetQueryRequest>(() => {
     const request: AssetQueryRequest = {
@@ -121,6 +96,7 @@ export function usePersonAssetsView(
         offset: 0,
       },
       sort_by: normalizeSearchSortBy(sortBy),
+      stack_mode: "collapsed",
       viewer_timezone: viewerTimeZone,
     };
 
@@ -134,13 +110,12 @@ export function usePersonAssetsView(
   const viewKey = useMemo(
     () =>
       `person:${personId}:${generateViewKey({
-        types: [currentTab],
         filter: effectiveFilter,
         sortBy,
         search: searchQuery.trim() ? { query: searchQuery.trim() } : undefined,
         pageSize,
       })}`,
-    [currentTab, effectiveFilter, pageSize, personId, searchQuery, sortBy],
+    [effectiveFilter, pageSize, personId, searchQuery, sortBy],
   );
 
   const query = $api.useInfiniteQuery(
@@ -159,11 +134,14 @@ export function usePersonAssetsView(
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = (lastPage as PersonAssetsApiResult | undefined)?.data;
-        const pageAssets = normalizeVisibleAssets(responseData?.assets ?? []);
-        const total = responseData?.total;
+        const responseData = (lastPage as PersonAssetsApiEnvelope | undefined)?.data;
+        const legacyAssets = normalizeVisibleLegacyAssets(responseData?.assets);
+        const total = responseData?.total_visible ?? responseData?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = countAssets(pageAssets);
+        const loadedCount = countLoadedBrowseRowsFromPage({
+          items: responseData?.items,
+          legacyAssets,
+        });
         const hasMore =
           typeof total === "number"
             ? offset + loadedCount < total
@@ -172,25 +150,33 @@ export function usePersonAssetsView(
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<PersonAssetsApiResult>, unknown>;
+  ) as UseInfiniteQueryResult<InfiniteData<PersonAssetsApiEnvelope>, unknown>;
 
   const pages = useMemo(() => {
-    const responsePages = (query.data?.pages ?? []) as PersonAssetsApiResult[];
+    const responsePages = (query.data?.pages ?? []) as PersonAssetsApiEnvelope[];
     const pageParams = query.data?.pageParams ?? [];
 
     return responsePages.map((page, index) => {
       const offset = Number(pageParams[index] ?? 0) || 0;
       const responseData = page?.data;
-      const assets = normalizeVisibleAssets(responseData?.assets ?? []);
-      const groups = groupAssetsBySort(assets, sortBy);
-      const total = responseData?.total;
-      const loadedCount = countAssets(assets);
+      const legacyAssets = normalizeVisibleLegacyAssets(responseData?.assets);
+      const groups = groupAssetsBySort(legacyAssets, sortBy);
+      const browseGroups = browseGroupsFromQueryLikePage({
+        items: responseData?.items,
+        legacyAssets,
+        sortBy,
+      });
+      const total = responseData?.total_visible ?? responseData?.total;
+      const loadedCount = countLoadedBrowseRowsFromPage({
+        items: responseData?.items,
+        legacyAssets,
+      });
       const hasMore =
         typeof total === "number"
           ? offset + loadedCount < total
           : loadedCount >= pageSize;
 
-      return { assets, groups, offset, total, hasMore };
+      return { groups, browseGroups, offset, total, hasMore };
     });
   }, [pageSize, query.data?.pageParams, query.dataUpdatedAt, sortBy]);
 
@@ -199,6 +185,18 @@ export function usePersonAssetsView(
     [pages],
   );
   const assets = useMemo(() => flattenAssetGroups(groups), [groups]);
+  const browseGroups = useMemo(
+    () => mergeAdjacentBrowseGroups(...pages.map((page) => page.browseGroups)),
+    [pages],
+  );
+  const browseItems = useMemo(
+    () => flattenBrowseGroups(browseGroups),
+    [browseGroups],
+  );
+  const browseAssets = useMemo(
+    () => flattenBrowseGroupsToAssets(browseGroups),
+    [browseGroups],
+  );
   const lastPage = pages.length > 0 ? pages[pages.length - 1] : undefined;
   const pageInfo = useMemo(
     () => ({
@@ -225,8 +223,11 @@ export function usePersonAssetsView(
   }, [query]);
 
   return {
-    assets: normalizeVisibleAssets(assets),
+    assets: normalizeVisibleLegacyAssets(assets),
     groups: withGroups ? groups : undefined,
+    browseGroups,
+    browseItems,
+    browseAssets,
     isLoading: query.isLoading,
     isLoadingMore: query.isFetchingNextPage,
     error,

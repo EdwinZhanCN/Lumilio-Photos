@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Layers, X } from "lucide-react";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import type { Asset } from "@/lib/assets/types";
@@ -119,7 +119,9 @@ export default function StackDetailModal({
                   {t("assets.stackDetail.memberCount", {
                     count: memberCount,
                     defaultValue:
-                      memberCount === 1 ? "1 asset in stack" : `${memberCount} assets in stack`,
+                      memberCount === 1
+                        ? "1 asset in stack"
+                        : `${memberCount} assets in stack`,
                   })}
                 </p>
               </div>
@@ -160,24 +162,28 @@ export default function StackDetailModal({
               <div className="alert border border-base-300 bg-base-200/70 text-base-content/70">
                 <span>
                   {t("assets.stackDetail.empty", {
-                    defaultValue: "No related assets were returned for this stack.",
+                    defaultValue:
+                      "No related assets were returned for this stack.",
                   })}
                 </span>
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {members.map((member) => {
+                  const relation = member.relation ?? "alternative";
+                  const position = member.position ?? 0;
+                  const memberAssetId = member.asset_id ?? asset.asset_id ?? "";
                   const thumbnailUrl = assetUrls.getThumbnailUrl(
-                    member.asset_id,
+                    memberAssetId,
                     "medium",
                   );
                   const badgeClass =
-                    RELATION_STYLES[member.relation] ??
+                    RELATION_STYLES[relation] ??
                     RELATION_STYLES.alternative;
 
                   return (
                     <article
-                      key={member.asset_id}
+                      key={memberAssetId}
                       className={memberCardClasses(member.isCurrent)}
                     >
                       <div className="relative aspect-[4/3] overflow-hidden bg-base-200">
@@ -208,7 +214,7 @@ export default function StackDetailModal({
                         </div>
 
                         <div className="absolute bottom-3 right-3 rounded-full border border-white/10 bg-black/60 px-2.5 py-1 text-[11px] font-medium text-white shadow-lg backdrop-blur-sm">
-                          #{member.position + 1}
+                          #{position + 1}
                         </div>
                       </div>
 
@@ -216,16 +222,16 @@ export default function StackDetailModal({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-base-content">
-                              {relationLabel(member.relation, t)}
+                              {relationLabel(relation, t)}
                             </p>
                             <p className="mt-1 font-mono text-xs text-base-content/50">
-                              {truncateAssetId(member.asset_id)}
+                              {truncateAssetId(memberAssetId)}
                             </p>
                           </div>
                           <span
                             className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium ${badgeClass}`}
                           >
-                            {member.relation}
+                            {relation}
                           </span>
                         </div>
                       </div>

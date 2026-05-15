@@ -22,33 +22,25 @@ import {
   DEFAULT_GROUP_KEYS,
   formatAssetGroupLabel,
 } from "@/features/assets/utils/assetGroups";
-import { collapseStackedAssetGroups } from "@/features/assets/utils/collapseStackedAssets";
 import EmptyState from "@/components/EmptyState";
-import type { AssetGroup } from "@/features/assets/types/assets.type";
+import type {
+  BrowseGroup,
+  BrowseItem,
+} from "@/features/assets/types/assets.type";
+import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
+
+import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfiniteScroll";
 
 type LayoutState = {
   signature: string;
   layouts: Record<string, LayoutResult>;
-  groups: AssetGroup[];
+  groups: BrowseGroup[];
 };
 
 const getThumbnailSize = (width: number) => {
   if (width >= 520) return "large";
   if (width >= 260) return "medium";
   return "small";
-};
-
-const getScrollParent = (element: HTMLElement | null): HTMLElement | null => {
-  if (!element || typeof window === "undefined") return null;
-  let current = element.parentElement;
-  while (current) {
-    const style = window.getComputedStyle(current);
-    if (/(auto|scroll|overlay)/.test(style.overflowY)) {
-      return current;
-    }
-    current = current.parentElement;
-  }
-  return null;
 };
 
 const readContainerWidth = (element: HTMLElement | null): number => {
@@ -63,7 +55,7 @@ const readContainerWidth = (element: HTMLElement | null): number => {
 };
 
 const JustifiedGallery: React.FC<AssetGalleryProps> = ({
-  groups,
+  browseGroups,
   openCarousel,
   onLoadMore,
   hasMore,
@@ -87,23 +79,17 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     useJustifiedLayoutService();
 
   const groupEntries = useMemo(
-    () =>
-      collapseStackedAssetGroups(groups).filter(
-        (group) => group.assets && group.assets.length > 0,
-      ),
-    [groups],
+    () => browseGroups.filter((group) => group.items.length > 0),
+    [browseGroups],
   );
 
   const totalAssetCount = useMemo(
-    () => groupEntries.reduce((count, group) => count + group.assets.length, 0),
+    () => groupEntries.reduce((count, group) => count + group.items.length, 0),
     [groupEntries],
   );
 
   const flatAssetIds = useMemo(
-    () =>
-      groupEntries
-        .flatMap((group) => group.assets.map((asset) => asset.asset_id))
-        .filter((id): id is string => Boolean(id)),
+    () => groupEntries.flatMap((group) => group.items.map((item) => item.id)),
     [groupEntries],
   );
 
@@ -112,7 +98,9 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   const layoutInputs = useMemo(() => {
     const inputs: Record<string, ReturnType<typeof assetsToLayoutBoxes>> = {};
     groupEntries.forEach((group) => {
-      inputs[group.key] = assetsToLayoutBoxes(group.assets);
+      inputs[group.key] = assetsToLayoutBoxes(
+        group.items.map(getBrowseItemAsset),
+      );
     });
     return inputs;
   }, [groupEntries]);
@@ -129,8 +117,8 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
       config: layoutConfig,
       groups: groupEntries.map((group) => ({
         key: group.key,
-        assets: group.assets.map((asset, index) => ({
-          id: asset.asset_id,
+        items: group.items.map((item, index) => ({
+          id: item.id,
           box: layoutInputs[group.key]?.[index],
         })),
       })),
@@ -242,10 +230,10 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
   ]);
 
   const handleAssetClick = useCallback(
-    (asset: Asset, event: React.MouseEvent | React.KeyboardEvent) => {
+    (item: BrowseItem, asset: Asset, event: React.MouseEvent | React.KeyboardEvent) => {
       if (!asset.asset_id) return;
       if (selection.enabled) {
-        selection.handleClick(asset.asset_id, event as any);
+        selection.handleClick(item.id, event as any);
         return;
       }
       openCarousel(asset.asset_id);
@@ -258,61 +246,14 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
     layoutConfig !== null &&
     displayGroupEntries.some((group) => !layouts[group.key]);
 
-  const supportsIntersectionObserver = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return "IntersectionObserver" in window;
-  }, []);
-
-  const onLoadMoreRef = useRef(onLoadMore);
-  const hasMoreRef = useRef(hasMore);
-  const isLoadingMoreRef = useRef(isLoadingMore);
-  const isLoadingRef = useRef(isLoading);
-
-  useEffect(() => {
-    onLoadMoreRef.current = onLoadMore;
-  }, [onLoadMore]);
-
-  useEffect(() => {
-    hasMoreRef.current = hasMore;
-  }, [hasMore]);
-
-  useEffect(() => {
-    isLoadingMoreRef.current = isLoadingMore;
-  }, [isLoadingMore]);
-
-  useEffect(() => {
-    isLoadingRef.current = isLoading;
-  }, [isLoading]);
-
-  useEffect(() => {
-    if (!supportsIntersectionObserver) return;
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-
-    const root = getScrollParent(sentinel);
-    let lastLoad = 0;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (!entry || !entry.isIntersecting) return;
-        const now = Date.now();
-        if (now - lastLoad < 400) return;
-        if (!hasMoreRef.current) return;
-        if (isLoadingRef.current || isLoadingMoreRef.current) return;
-        lastLoad = now;
-        onLoadMoreRef.current();
-      },
-      {
-        root,
-        rootMargin: "600px 0px",
-        threshold: 0.01,
-      },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [supportsIntersectionObserver]);
+  const { supportsIntersectionObserver } = useGalleryInfiniteScroll({
+    sentinelRef,
+    hasMore: Boolean(hasMore),
+    isLoadingMore: Boolean(isLoadingMore),
+    isLoading: Boolean(isLoading),
+    onLoadMore,
+    totalAssetCount,
+  });
 
   if (!isLoading && totalAssetCount === 0) {
     return <EmptyState className={className} />;
@@ -340,7 +281,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
 
       {displayGroupEntries.map((group) => {
         const groupKey = group.key;
-        const assets = group.assets;
+        const items = group.items;
         const layout = layouts[groupKey];
         const showHeader =
           groupEntries.length > 1 || !DEFAULT_GROUP_KEYS.has(groupKey);
@@ -357,7 +298,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                 <span className="font-semibold">{groupLabel}</span>
                 <span>
                   {t("assets.justifiedGallery.item_count", {
-                    count: assets.length,
+                    count: items.length,
                   })}
                 </span>
               </div>
@@ -369,11 +310,12 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                 role="list"
                 style={{ height: layout.containerHeight }}
               >
-                {assets.map((asset, index) => {
+                {items.map((item, index) => {
                   const position = layout.positions[index];
                   if (!position) return null;
                   const width = Math.max(1, position.width);
                   const height = Math.max(1, position.height);
+                  const asset = getBrowseItemAsset(item);
                   const assetId = asset.asset_id;
                   const thumbnailUrl = assetId
                     ? assetUrls.getThumbnailUrl(
@@ -384,7 +326,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
 
                   return (
                     <div
-                      key={`${groupKey}-${assetId || index}`}
+                      key={`${groupKey}-${item.id}`}
                       className="absolute"
                       role="listitem"
                       style={{
@@ -400,10 +342,8 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}
                           stackInfo={asset.stack}
-                          onClick={(event) => handleAssetClick(asset, event)}
-                          isSelected={
-                            assetId ? selection.isSelected(assetId) : false
-                          }
+                          onClick={(event) => handleAssetClick(item, asset, event)}
+                          isSelected={selection.isSelected(item.id)}
                           isSelectionMode={selection.enabled}
                           className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                         />
@@ -411,10 +351,8 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                         <MediaThumbnail
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}
-                          onClick={(event) => handleAssetClick(asset, event)}
-                          isSelected={
-                            assetId ? selection.isSelected(assetId) : false
-                          }
+                          onClick={(event) => handleAssetClick(item, asset, event)}
+                          isSelected={selection.isSelected(item.id)}
                           isSelectionMode={selection.enabled}
                           className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                         />

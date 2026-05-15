@@ -246,27 +246,24 @@ const LoginPage: React.FC = () => {
                           })}
                 </h1>
 
-                <p className="text-sm text-base-content/80">
-                  {challenge
-                    ? t("auth.login.verifySubtitle", {
-                        defaultValue:
-                          "Complete sign in with your authenticator app or a recovery code.",
-                      })
-                    : showPasswordStep
-                      ? t("auth.login.passwordSubtitle", {
+                {(challenge || showPasswordStep || isBootstrapMode) && (
+                  <p className="text-sm text-base-content/80">
+                    {challenge
+                      ? t("auth.login.verifySubtitle", {
                           defaultValue:
-                            "Use your password if you prefer not to use a passkey on this device.",
+                            "Complete sign in with your authenticator app or a recovery code.",
                         })
-                      : isBootstrapMode
-                        ? t("auth.login.bootstrapSubtitle", {
+                      : showPasswordStep
+                        ? t("auth.login.passwordSubtitle", {
+                            defaultValue:
+                              "Use your password if you prefer not to use a passkey on this device.",
+                          })
+                        : t("auth.login.bootstrapSubtitle", {
                             defaultValue:
                               "No users exist yet. Create the first account to claim Admin access.",
-                          })
-                        : t("auth.login.usernameSubtitle", {
-                            defaultValue:
-                              "Passkey is the primary sign-in path. Password remains available as fallback.",
                           })}
-                </p>
+                  </p>
+                )}
               </div>
             </div>
 
@@ -518,10 +515,10 @@ const LoginPage: React.FC = () => {
                           })}
                     </button>
                   ) : (
-                    <>
+                    <div className="flex w-full flex-col gap-2.5">
                       <button
                         type="submit"
-                        className={`btn btn-primary flex-1 ${passkeyBusy ? "loading" : ""}`}
+                        className={`btn btn-primary w-full ${passkeyBusy ? "loading" : ""}`}
                         disabled={passkeyBusy}
                       >
                         {!passkeyBusy && <ShieldCheck className="h-4 w-4" />}
@@ -535,7 +532,7 @@ const LoginPage: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        className="btn btn-outline flex-1"
+                        className="btn btn-outline w-full"
                         onClick={() => {
                           setShowPasswordStep(true);
                           setPasskeyError(null);
@@ -545,7 +542,7 @@ const LoginPage: React.FC = () => {
                           defaultValue: "Use password instead",
                         })}
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
               </form>
@@ -556,15 +553,10 @@ const LoginPage: React.FC = () => {
             </div>
 
             <div className="text-center">
-              <p className="text-xs text-base-content/70">
-                {t("auth.login.needAccount", {
-                  defaultValue: "Need an account?",
-                })}
-              </p>
               <Link
                 to="/register"
                 state={location.state}
-                className="btn btn-link btn-sm mt-1"
+                className="btn btn-link btn-sm"
               >
                 {t("auth.login.register", {
                   defaultValue: "Create an account",

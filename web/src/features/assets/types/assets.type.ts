@@ -5,17 +5,41 @@ import type { components } from "@/lib/http-commons";
 
 // ===== Core Types =====
 export type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
-export type TabType = "all" | "photos" | "videos" | "audios";
+export type AssetMediaType = "photos" | "videos" | "audios";
 export type SortByType = "date_captured" | "recently_added";
 export interface AssetGroup {
   key: string;
   assets: Asset[];
 }
+export type BrowseItemId = `asset:${string}` | `stack:${string}`;
+
+export interface BrowseAssetItem {
+  type: "asset";
+  id: `asset:${string}`;
+  asset: Asset;
+}
+
+export interface BrowseStackItem {
+  type: "stack";
+  id: `stack:${string}`;
+  stackId: string;
+  representative: Asset;
+  assets: Asset[];
+  memberAssetIds?: string[];
+  matchedMemberIds?: string[];
+}
+
+export type BrowseItem = BrowseAssetItem | BrowseStackItem;
+
+export interface BrowseGroup {
+  key: string;
+  items: BrowseItem[];
+}
 
 // ===== Asset View Definition =====
 export interface AssetViewDefinition {
   /** Asset types to include */
-  types?: TabType[];
+  types?: AssetMediaType[];
   /** Filter conditions */
   filter?: AssetFilter;
   /** @deprecated Filters are scoped explicitly by the caller. */
@@ -56,7 +80,6 @@ export interface AssetsPageInfo {
 
 // ===== UI State =====
 export interface UIState {
-  currentTab: TabType;
   sortBy: SortByType;
   searchQuery: string;
   isCarouselOpen: boolean;
@@ -108,6 +131,9 @@ export interface AssetsState extends SelectionState {
 export interface AssetsViewResult {
   assets: Asset[];
   groups?: AssetGroup[];
+  browseGroups: BrowseGroup[];
+  browseItems: BrowseItem[];
+  browseAssets: Asset[];
   isLoading: boolean;
   isLoadingMore: boolean;
   isFetched: boolean;
@@ -180,7 +206,6 @@ export interface AssetsContextValue {
   // Navigation helpers
   openCarousel: (assetId: string) => void;
   closeCarousel: () => void;
-  switchTab: (tab: TabType) => void;
 }
 
 // ===== Utility Types =====

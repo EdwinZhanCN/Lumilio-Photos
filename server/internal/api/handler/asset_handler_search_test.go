@@ -14,14 +14,17 @@ import (
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
 
 type stubAssetService struct {
 	service.AssetService
-	queryFn  func(ctx context.Context, params service.QueryAssetsParams) ([]repo.Asset, int64, error)
-	searchFn func(ctx context.Context, params service.SearchAssetsParams) (service.SearchAssetsResult, error)
+	queryFn        func(ctx context.Context, params service.QueryAssetsParams) ([]repo.Asset, int64, error)
+	searchFn       func(ctx context.Context, params service.SearchAssetsParams) (service.SearchAssetsResult, error)
+	queryBrowseFn  func(ctx context.Context, params service.QueryAssetsParams) (service.BrowseQueryResult, error)
+	searchBrowseFn func(ctx context.Context, params service.SearchAssetsParams) (service.SearchBrowseResult, error)
 }
 
 func (s stubAssetService) QueryAssets(ctx context.Context, params service.QueryAssetsParams) ([]repo.Asset, int64, error) {
@@ -30,6 +33,67 @@ func (s stubAssetService) QueryAssets(ctx context.Context, params service.QueryA
 
 func (s stubAssetService) SearchAssets(ctx context.Context, params service.SearchAssetsParams) (service.SearchAssetsResult, error) {
 	return s.searchFn(ctx, params)
+}
+
+func (s stubAssetService) QueryBrowseItems(ctx context.Context, params service.QueryAssetsParams) (service.BrowseQueryResult, error) {
+	if s.queryBrowseFn != nil {
+		return s.queryBrowseFn(ctx, params)
+	}
+	assets, total, err := s.queryFn(ctx, params)
+	if err != nil {
+		return service.BrowseQueryResult{}, err
+	}
+	items := make([]service.BrowseItem, 0, len(assets))
+	for _, asset := range assets {
+		if !asset.AssetID.Valid {
+			continue
+		}
+		items = append(items, service.BrowseItem{
+			Type:  "asset",
+			ID:    "asset:" + uuid.UUID(asset.AssetID.Bytes).String(),
+			Asset: asset,
+		})
+	}
+	return service.BrowseQueryResult{
+		Items:        items,
+		TotalVisible: total,
+		TotalAssets:  total,
+		StackMode:    service.StackModeCollapsed,
+	}, nil
+}
+
+func (s stubAssetService) SearchBrowseItems(ctx context.Context, params service.SearchAssetsParams) (service.SearchBrowseResult, error) {
+	if s.searchBrowseFn != nil {
+		return s.searchBrowseFn(ctx, params)
+	}
+	result, err := s.searchFn(ctx, params)
+	if err != nil {
+		return service.SearchBrowseResult{}, err
+	}
+
+	toBrowseItems := func(assets []repo.Asset) []service.BrowseItem {
+		items := make([]service.BrowseItem, 0, len(assets))
+		for _, asset := range assets {
+			if !asset.AssetID.Valid {
+				continue
+			}
+			items = append(items, service.BrowseItem{
+				Type:  "asset",
+				ID:    "asset:" + uuid.UUID(asset.AssetID.Bytes).String(),
+				Asset: asset,
+			})
+		}
+		return items
+	}
+
+	return service.SearchBrowseResult{
+		TopResults:          toBrowseItems(result.TopResults),
+		TopResultsMeta:      result.TopResultsMeta,
+		Results:             toBrowseItems(result.Results),
+		ResultsTotalVisible: result.ResultsTotal,
+		ResultsTotalAssets:  result.ResultsTotal,
+		StackMode:           service.StackModeCollapsed,
+	}, nil
 }
 
 func testHandlerAsset(t *testing.T, rawID string, filename string) repo.Asset {
