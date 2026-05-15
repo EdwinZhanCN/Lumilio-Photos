@@ -81,6 +81,18 @@ func TestRepositoryAuditProviderCachesLoggersAndNoopsOutsideRepo(t *testing.T) {
 	repoPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(repoPath, repositoryLogsDir), 0755))
 
+	t.Run("operations log quiet without REPO_AUDIT_VERBOSE", func(t *testing.T) {
+		p := NewRepositoryAuditProvider(zap.NewNop())
+		quietRepo := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(quietRepo, repositoryLogsDir), 0755))
+		p.ForPath(quietRepo).Operation("asset.ingest", zap.String("asset_id", "quiet"))
+		opsBytes, err := os.ReadFile(filepath.Join(quietRepo, repositoryLogsDir, repositoryOpsLogName))
+		require.NoError(t, err)
+		assert.Empty(t, strings.TrimSpace(string(opsBytes)))
+	})
+
+	t.Setenv("REPO_AUDIT_VERBOSE", "1")
+
 	first := provider.ForPath(repoPath)
 	second := provider.ForPath(repoPath)
 	firstConcrete, ok := first.(*repositoryAuditLogger)

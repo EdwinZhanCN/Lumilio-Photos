@@ -8659,6 +8659,11 @@ export interface components {
              * @enum {string}
              */
             sort_by?: "recently_added" | "date_captured";
+            /**
+             * @example collapsed
+             * @enum {string}
+             */
+            stack_mode?: "collapsed" | "expanded";
             /** @example America/New_York */
             viewer_timezone?: string;
         };
@@ -8696,6 +8701,28 @@ export interface components {
             has_users?: boolean;
             is_bootstrap_mode?: boolean;
             next_registration_role?: string;
+        };
+        "dto.BrowseItemDTO": {
+            asset?: components["schemas"]["dto.AssetDTO"];
+            /** @example stack:550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            stack?: components["schemas"]["dto.BrowseStackDTO"];
+            /**
+             * @example stack
+             * @enum {string}
+             */
+            type?: "asset" | "stack";
+        };
+        "dto.BrowseStackDTO": {
+            cover_asset?: components["schemas"]["dto.AssetDTO"];
+            /** @example 550e8400-e29b-41d4-a716-446655440001 */
+            cover_asset_id?: string;
+            matched_member_ids?: string[];
+            member_asset_ids?: string[];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            stack_id?: string;
+            /** @example 3 */
+            stack_size?: number;
         };
         "dto.BulkLikeUpdateDTO": {
             /**
@@ -9187,12 +9214,22 @@ export interface components {
         };
         "dto.QueryAssetsResponseDTO": {
             assets?: components["schemas"]["dto.AssetDTO"][];
+            items?: components["schemas"]["dto.BrowseItemDTO"][];
             /** @example 20 */
             limit?: number;
             /** @example 0 */
             offset?: number;
+            /**
+             * @example collapsed
+             * @enum {string}
+             */
+            stack_mode?: "collapsed" | "expanded";
             /** @example 150 */
             total?: number;
+            /** @example 150 */
+            total_assets?: number;
+            /** @example 120 */
+            total_visible?: number;
         };
         "dto.RebuildAssetIndexesRequestDTO": {
             /** @example 200 */
@@ -9385,6 +9422,11 @@ export interface components {
              * @enum {string}
              */
             sort_by?: "recently_added" | "date_captured";
+            /**
+             * @example collapsed
+             * @enum {string}
+             */
+            stack_mode?: "collapsed" | "expanded";
             /** @example 12 */
             top_results_limit?: number;
             /** @example America/New_York */
@@ -9395,9 +9437,20 @@ export interface components {
             limit?: number;
             /** @example 0 */
             offset?: number;
+            result_items?: components["schemas"]["dto.BrowseItemDTO"][];
             results?: components["schemas"]["dto.AssetDTO"][];
             /** @example 150 */
             results_total?: number;
+            /** @example 150 */
+            results_total_assets?: number;
+            /** @example 120 */
+            results_total_visible?: number;
+            /**
+             * @example collapsed
+             * @enum {string}
+             */
+            stack_mode?: "collapsed" | "expanded";
+            top_items?: components["schemas"]["dto.BrowseItemDTO"][];
             top_results?: components["schemas"]["dto.AssetDTO"][];
             top_results_meta?: components["schemas"]["dto.SearchTopResultsMetaDTO"];
         };

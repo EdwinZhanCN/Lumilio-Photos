@@ -29,7 +29,7 @@ function NavBar() {
   const displayName = user?.display_name || user?.username || "User";
 
   return (
-    <div className="navbar bg-base-100 px-4 py-2 gap-3 z-99">
+    <div className="navbar bg-base-100 px-4 py-2 gap-3 z-49">
       <div className="flex flex-1 items-center gap-3 min-w-0">
         <Link className="btn btn-ghost text-xl shrink-0" to="/">
           <img

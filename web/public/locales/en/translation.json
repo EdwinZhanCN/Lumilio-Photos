@@ -376,6 +376,7 @@
             "viewExif": "View EXIF",
             "loadingFile": "Loading file...",
             "extracting": "Extracting...",
+            "exifNotAvailable": "No raw EXIF is stored for this photo yet.",
             "latitude": "Lat",
             "longitude": "Lng",
             "errors": {
@@ -1384,7 +1385,6 @@
             "verifySubtitle": "Complete sign-in with your authenticator app or a recovery code.",
             "passwordSubtitle": "Use your password if you prefer not to use a passkey on this device.",
             "bootstrapSubtitle": "No users exist yet. Create the first account to claim administrator access.",
-            "usernameSubtitle": "Passkey is the primary sign-in method. Password remains available as fallback.",
             "bootstrapPromptTitle": "Initial setup required",
             "bootstrapPromptBody": "The first registration becomes administrator and will guide you through passkey or authenticator setup.",
             "createAdmin": "Create the first administrator account",
@@ -1408,7 +1408,6 @@
             "passkeyLoading": "Opening passkey…",
             "passkeySubmit": "Continue with passkey",
             "usePasswordInstead": "Use password instead",
-            "needAccount": "Need an account?",
             "register": "Create one now"
         },
         "register": {
@@ -1453,7 +1452,6 @@
             "recoveryReadyTitle": "Account secured successfully",
             "recoveryReadyBody": "Store these recovery codes in a safe place before continuing.",
             "finish": "Continue to Lumilio",
-            "haveAccount": "Already have an account?",
             "login": "Sign in"
         },
         "mfa": {

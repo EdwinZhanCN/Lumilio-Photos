@@ -10,6 +10,17 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// When REPO_AUDIT_VERBOSE is 1/true, per-operation success lines are written to operations.log
+// (Debug level). Default is off so high-volume worker success (ingest, discover) does not
+// flood the audit log; errors are still written to error.log at Warn+.
+func auditOperationsMinLevel() zapcore.Level {
+	v := strings.TrimSpace(os.Getenv("REPO_AUDIT_VERBOSE"))
+	if v == "1" || strings.EqualFold(v, "true") {
+		return zapcore.DebugLevel
+	}
+	return zapcore.InfoLevel
+}
+
 const (
 	repositoryLogsDir    = ".lumilio/logs"
 	repositoryOpsLogName = "operations.log"
@@ -90,7 +101,9 @@ func (p *repositoryAuditProvider) ForPath(repoPath string) RepositoryAuditLogger
 	opsLogger := zap.New(zapcore.NewCore(
 		zapcore.NewJSONEncoder(p.enc),
 		zapcore.AddSync(newRollingWriter(opsPath)),
-		zapcore.InfoLevel,
+		zap.LevelEnablerFunc(func(l zapcore.Level) bool {
+			return l >= auditOperationsMinLevel()
+		}),
 	))
 	errLogger := zap.New(zapcore.NewCore(
 		zapcore.NewJSONEncoder(p.enc),
@@ -116,7 +129,7 @@ func (l *repositoryAuditLogger) Operation(operation string, fields ...zap.Field)
 		zap.String("operation", strings.TrimSpace(operation)),
 		zap.String("result", "ok"),
 	}, fields...)
-	l.operations.Info(operation, allFields...)
+	l.operations.Debug(operation, allFields...)
 }
 
 func (l *repositoryAuditLogger) Error(operation string, err error, fields ...zap.Field) {

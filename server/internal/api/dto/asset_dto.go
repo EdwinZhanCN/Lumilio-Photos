@@ -247,10 +247,14 @@ type AssetListResponseDTO struct {
 }
 
 type QueryAssetsResponseDTO struct {
-	Assets []AssetDTO `json:"assets"`
-	Total  *int       `json:"total,omitempty" example:"150"`
-	Limit  int        `json:"limit" example:"20"`
-	Offset int        `json:"offset" example:"0"`
+	Assets       []AssetDTO      `json:"assets"`
+	Items        []BrowseItemDTO `json:"items,omitempty"`
+	Total        *int            `json:"total,omitempty" example:"150"`
+	TotalVisible *int            `json:"total_visible,omitempty" example:"120"`
+	TotalAssets  *int            `json:"total_assets,omitempty" example:"150"`
+	StackMode    string          `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
+	Limit        int             `json:"limit" example:"20"`
+	Offset       int             `json:"offset" example:"0"`
 }
 
 // FeaturedAssetsResponseDTO represents curated featured photos for home/gallery use.
@@ -432,6 +436,7 @@ type SearchAssetsRequestDTO struct {
 	Pagination      PaginationDTO  `json:"pagination"`
 	EnhancementMode string         `json:"enhancement_mode,omitempty" example:"auto" enums:"auto,off,only"`
 	TopResultsLimit int            `json:"top_results_limit,omitempty" example:"12" minimum:"1" maximum:"50"`
+	StackMode       string         `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
 }
 
 type SearchTopResultsMetaDTO struct {
@@ -442,12 +447,17 @@ type SearchTopResultsMetaDTO struct {
 }
 
 type SearchAssetsResponseDTO struct {
-	TopResults     []AssetDTO              `json:"top_results"`
-	TopResultsMeta SearchTopResultsMetaDTO `json:"top_results_meta"`
-	Results        []AssetDTO              `json:"results"`
-	ResultsTotal   *int                    `json:"results_total,omitempty" example:"150"`
-	Limit          int                     `json:"limit" example:"20"`
-	Offset         int                     `json:"offset" example:"0"`
+	TopResults          []AssetDTO              `json:"top_results"`
+	TopItems            []BrowseItemDTO         `json:"top_items,omitempty"`
+	TopResultsMeta      SearchTopResultsMetaDTO `json:"top_results_meta"`
+	Results             []AssetDTO              `json:"results"`
+	ResultItems         []BrowseItemDTO         `json:"result_items,omitempty"`
+	ResultsTotal        *int                    `json:"results_total,omitempty" example:"150"`
+	ResultsTotalVisible *int                    `json:"results_total_visible,omitempty" example:"120"`
+	ResultsTotalAssets  *int                    `json:"results_total_assets,omitempty" example:"150"`
+	StackMode           string                  `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
+	Limit               int                     `json:"limit" example:"20"`
+	Offset              int                     `json:"offset" example:"0"`
 }
 
 // OptionsResponseDTO represents the response for filter options
@@ -502,5 +512,22 @@ type AssetQueryRequestDTO struct {
 	Filter         AssetFilterDTO `json:"filter,omitempty"`                                                   // Unified filter options
 	SortBy         string         `json:"sort_by,omitempty" example:"date_captured" enums:"recently_added,date_captured"`
 	ViewerTimezone string         `json:"viewer_timezone,omitempty" example:"America/New_York"`
+	StackMode      string         `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
 	Pagination     PaginationDTO  `json:"pagination"` // limit, offset
+}
+
+type BrowseStackDTO struct {
+	StackID          string   `json:"stack_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	CoverAssetID     string   `json:"cover_asset_id" example:"550e8400-e29b-41d4-a716-446655440001"`
+	CoverAsset       AssetDTO `json:"cover_asset"`
+	StackSize        int      `json:"stack_size" example:"3"`
+	MemberAssetIDs   []string `json:"member_asset_ids"`
+	MatchedMemberIDs []string `json:"matched_member_ids,omitempty"`
+}
+
+type BrowseItemDTO struct {
+	Type  string          `json:"type" example:"stack" enums:"asset,stack"`
+	ID    string          `json:"id" example:"stack:550e8400-e29b-41d4-a716-446655440000"`
+	Asset *AssetDTO       `json:"asset,omitempty"`
+	Stack *BrowseStackDTO `json:"stack,omitempty"`
 }

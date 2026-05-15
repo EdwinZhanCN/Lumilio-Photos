@@ -449,7 +449,7 @@ func (s *Scanner) reconcileMovedEntries(
 		delete(candidates, key)
 		moved++
 
-		s.logger.Info("repository scan reconciled moved asset",
+		s.logger.Debug("repository scan reconciled moved asset",
 			zap.String("repository_id", repository.RepoID.String()),
 			zap.String("asset_id", asset.AssetID.String()),
 			zap.String("old_storage_path", oldPath),

@@ -16,7 +16,7 @@ const Assets = () => {
     >
       <AssetsProvider scopeId="assets:main" persist>
         <WorkerProvider preload={["exif", "export"]}>
-          <AssetsGalleryPage category="all" />
+          <AssetsGalleryPage />
         </WorkerProvider>
       </AssetsProvider>
     </ErrorBoundary>

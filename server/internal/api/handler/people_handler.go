@@ -219,6 +219,10 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 		api.GinBadRequest(c, err, "sort_by must be 'recently_added' or 'date_captured'")
 		return
 	}
+	if err := validateStackMode(req.StackMode); err != nil {
+		api.GinBadRequest(c, err, "stack_mode must be 'collapsed' or 'expanded'")
+		return
+	}
 	if req.SearchType == "" {
 		req.SearchType = "filename"
 	}
@@ -239,11 +243,11 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 		return
 	}
 
-	params := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.Filter, req.Pagination)
+	params := buildQueryAssetsParams(req.Query, req.SearchType, req.SortBy, req.ViewerTimezone, req.StackMode, req.Filter, req.Pagination)
 	params.PersonID = &personID
 	params = applyAssetOwnershipScope(c, params)
 
-	assets, total, err := h.assetService.QueryAssets(c.Request.Context(), params)
+	result, err := h.assetService.QueryBrowseItems(c.Request.Context(), params)
 	if err != nil {
 		if errors.Is(err, service.ErrSemanticSearchUnavailable) {
 			api.GinError(c, 503, err, 503, "Semantic search is currently unavailable")
@@ -254,13 +258,7 @@ func (h *PeopleHandler) ListPersonAssets(c *gin.Context) {
 		return
 	}
 
-	totalInt := int(total)
-	api.GinSuccess(c, dto.QueryAssetsResponseDTO{
-		Assets:  toAssetDTOs(assets),
-		Total:   &totalInt,
-		Limit:   req.Pagination.Limit,
-		Offset:  req.Pagination.Offset,
-	})
+	api.GinSuccess(c, toQueryBrowseResponseDTO(result, req.Pagination.Limit, req.Pagination.Offset))
 }
 
 // GetPersonCover serves the representative face crop for a person.

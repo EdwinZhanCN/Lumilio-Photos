@@ -729,12 +729,7 @@ const RegisterPage: React.FC = () => {
             </div>
 
             <div className="text-center">
-              <p className="text-xs text-base-content/70">
-                {t("auth.register.haveAccount", {
-                  defaultValue: "Already have an account?",
-                })}
-              </p>
-              <Link to="/login" state={location.state} className="btn btn-link btn-sm mt-1">
+              <Link to="/login" state={location.state} className="btn btn-link btn-sm">
                 {t("auth.register.login", {
                   defaultValue: "Go to login",
                 })}

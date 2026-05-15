@@ -375,6 +375,7 @@
             "viewExif": "查看 EXIF",
             "loadingFile": "正在加载文件...",
             "extracting": "提取中...",
+            "exifNotAvailable": "该照片尚未保存原始 EXIF 数据。",
             "latitude": "纬度",
             "longitude": "经度",
             "errors": {
@@ -1417,7 +1418,6 @@
             "verifySubtitle": "请使用身份验证器应用或恢复码完成登录验证。",
             "passwordSubtitle": "若当前设备不便使用 Passkey，可改用密码登录。",
             "bootstrapSubtitle": "系统尚无用户。请创建首个账户以获得管理员权限。",
-            "usernameSubtitle": "Passkey 为首选登录方式，密码仍可作为备用方案。",
             "bootstrapPromptTitle": "需要完成首次初始化",
             "bootstrapPromptBody": "首个注册账户将成为管理员，并引导您完成 Passkey 或身份验证器设置。",
             "createAdmin": "创建首个管理员账户",
@@ -1441,7 +1441,6 @@
             "passkeyLoading": "正在唤起 Passkey…",
             "passkeySubmit": "使用 Passkey 继续",
             "usePasswordInstead": "改用密码",
-            "needAccount": "还没有账户？",
             "register": "立即注册"
         },
         "register": {
@@ -1486,7 +1485,6 @@
             "recoveryReadyTitle": "账户安全设置已完成",
             "recoveryReadyBody": "继续前，请先将这些恢复码妥善保存。",
             "finish": "继续使用 Lumilio",
-            "haveAccount": "已有账户？",
             "login": "立即登录"
         },
         "mfa": {

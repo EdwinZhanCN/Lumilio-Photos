@@ -27,9 +27,11 @@ import (
 
 // Asset type constants
 const (
-	AssetTypePhoto = "PHOTO"
-	AssetTypeVideo = "VIDEO"
-	AssetTypeAudio = "AUDIO"
+	AssetTypePhoto     = "PHOTO"
+	AssetTypeVideo     = "VIDEO"
+	AssetTypeAudio     = "AUDIO"
+	StackModeCollapsed = "collapsed"
+	StackModeExpanded  = "expanded"
 )
 
 // Error constants for asset service
@@ -92,7 +94,9 @@ type AssetService interface {
 
 	// Unified query API
 	QueryAssets(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
+	QueryBrowseItems(ctx context.Context, params QueryAssetsParams) (BrowseQueryResult, error)
 	SearchAssets(ctx context.Context, params SearchAssetsParams) (SearchAssetsResult, error)
+	SearchBrowseItems(ctx context.Context, params SearchAssetsParams) (SearchBrowseResult, error)
 	QueryPhotoMapPoints(ctx context.Context, params QueryPhotoMapPointsParams) ([]PhotoMapPoint, int64, error)
 }
 
@@ -121,6 +125,7 @@ type QueryAssetsParams struct {
 	LocationEast     *float64
 	LocationWest     *float64
 	SortBy           string
+	StackMode        string
 	Limit            int
 	Offset           int
 }

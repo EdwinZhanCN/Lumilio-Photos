@@ -29,14 +29,12 @@ classDiagram
     class UISlice {
         <<Slice>>
         %% State
-        +TabType currentTab
         +SortByType sortBy
         +string searchQuery
         +boolean isCarouselOpen
         +string activeAssetId
         
         %% Actions
-        +setCurrentTab(tab)
         +setSortBy(sortBy)
         +setSearchQuery(query)
         +setCarouselOpen(isOpen)
@@ -100,7 +98,6 @@ classDiagram
         +useSelectionMode()
         
         %% UI
-        +useCurrentTab()
         +useSortBy()
         +useSearchQuery()
         +useIsCarouselOpen()

@@ -12,10 +12,7 @@ import PageHeader from "@/components/PageHeader.tsx";
 import { WorkerProvider } from "@/contexts/WorkerProvider.tsx";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
-import {
-  findAssetIndex,
-  flattenAssetGroups,
-} from "@/features/assets/utils/assetGroups";
+import { findBrowseItemIndexByAssetId } from "@/features/assets/utils/browseItems";
 import { useI18n } from "@/lib/i18n.tsx";
 
 interface AssetGalleryRendererProps {
@@ -127,7 +124,9 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
 
   const {
     assets,
-    groups,
+    browseGroups,
+    browseItems,
+    browseAssets: flatAssets,
     isLoading,
     isLoadingMore,
     hasMore,
@@ -138,19 +137,11 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
     autoFetch: true,
   });
 
-  // Use flat assets from grouped to ensure order consistency with gallery
-  const flatAssets = useMemo(() => {
-    if (groups && groups.length > 0) {
-      return flattenAssetGroups(groups);
-    }
-    return assets;
-  }, [groups, assets]);
-
   // Carousel logic
   const slideIndex = useMemo(() => {
     if (!carouselAssetId) return -1;
-    return findAssetIndex(flatAssets, carouselAssetId);
-  }, [flatAssets, carouselAssetId]);
+    return findBrowseItemIndexByAssetId(browseItems, carouselAssetId);
+  }, [browseItems, carouselAssetId]);
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !isLoadingMore) {
@@ -172,7 +163,7 @@ const AgentGallery = ({ filter }: { filter: AssetFilter }) => {
         <PhotosLoadingSkeleton />
       ) : (
         <JustifiedGallery
-          groups={groups || []}
+          browseGroups={browseGroups}
           openCarousel={setCarouselAssetId}
           isLoading={isLoading}
           isLoadingMore={isLoadingMore}

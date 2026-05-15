@@ -17,10 +17,7 @@ import { AlbumIcon } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult } from "@/lib/albums/types";
 import { useWorkingRepository } from "@/features/settings";
-import {
-  findAssetIndex,
-  flattenAssetGroups,
-} from "@/features/assets/utils/assetGroups";
+import { findBrowseItemIndexByAssetId } from "@/features/assets/utils/browseItems";
 import { useI18n } from "@/lib/i18n.tsx";
 
 const AlbumAssetsContent = () => {
@@ -71,7 +68,9 @@ const AlbumAssetsContent = () => {
   // Fetch album assets using the assets view hook
   const {
     assets,
-    groups,
+    browseGroups,
+    browseItems,
+    browseAssets: flatAssets,
     isLoading,
     isLoadingMore,
     fetchMore,
@@ -79,26 +78,20 @@ const AlbumAssetsContent = () => {
     error,
   } = useAssetsView(viewDefinition, { withGroups: true });
 
-  const groupedPhotos = groups ?? [];
-  const flatAssets = useMemo(
-    () => flattenAssetGroups(groupedPhotos),
-    [groupedPhotos],
-  );
-
   // Calculate slide index from URL assetId
   const slideIndex = useMemo(() => {
     if (assetId && flatAssets.length > 0) {
-      return findAssetIndex(flatAssets, assetId);
+      return findBrowseItemIndexByAssetId(browseItems, assetId);
     }
     return -1;
-  }, [assetId, flatAssets]);
+  }, [assetId, browseItems, flatAssets.length]);
 
   // Handle auto-fetching if asset is not in current page
   const [isLocatingAsset, setIsLocatingAsset] = useState(false);
 
   useEffect(() => {
     if (isCarouselOpen && assetId && flatAssets.length > 0) {
-      const index = findAssetIndex(flatAssets, assetId);
+      const index = findBrowseItemIndexByAssetId(browseItems, assetId);
       if (index < 0) {
         if (hasMore && !isLoading && !isLoadingMore) {
           setIsLocatingAsset(true);
@@ -111,6 +104,7 @@ const AlbumAssetsContent = () => {
   }, [
     assetId,
     flatAssets,
+    browseItems,
     isCarouselOpen,
     hasMore,
     isLoading,
@@ -149,6 +143,7 @@ const AlbumAssetsContent = () => {
             album?.album_name || t("collections.albumDetails.fallbackName")
           }
           icon={<AlbumIcon className="w-6 h-6 text-primary" />}
+          browseItems={browseItems}
         />
 
         <div
@@ -241,7 +236,7 @@ const AlbumAssetsContent = () => {
             <PhotosLoadingSkeleton />
           ) : (
             <JustifiedGallery
-              groups={groupedPhotos}
+              browseGroups={browseGroups}
               openCarousel={openCarousel}
               onLoadMore={handleLoadMore}
               hasMore={hasMore}
@@ -265,10 +260,10 @@ const AlbumAssetsContent = () => {
               <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
                 <div className="loading loading-spinner loading-lg mb-4"></div>
                 <p className="text-lg font-medium mb-2">
-                  {t("assets.photos.locating_asset")}
+                  {t("assets.all.locating_asset")}
                 </p>
                 <p className="text-sm text-gray-300">
-                  {t("assets.photos.loading_more_data")}
+                  {t("assets.all.loading_more_data")}
                 </p>
               </div>
             </div>

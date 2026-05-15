@@ -6,11 +6,13 @@ import type {
 import { useAssetsStore } from "../assets.store";
 import { useFilterState, useSortBy } from "../selectors";
 import {
+  AssetMediaType,
+  BrowseGroup,
+  BrowseItem,
   AssetGroup,
   AssetViewDefinition,
   AssetsViewResult,
   SortByType,
-  TabType,
   ViewDefinitionOptions,
 } from "@/features/assets/types/assets.type";
 import { generateViewKey } from "../utils/viewKey";
@@ -28,24 +30,39 @@ import {
   getViewerTimeZone,
   mergeAdjacentAssetGroups,
 } from "@/features/assets/utils/assetGroups";
+import {
+  browseGroupsFromQueryLikePage,
+  browseGroupsFromSearchResultsPage,
+  browseGroupsFromSearchTop,
+  countLoadedBrowseRowsFromPage,
+  dedupeBrowseItemsById,
+  flattenBrowseGroups,
+  flattenBrowseGroupsToAssets,
+  getBrowseItemAsset,
+  mergeAdjacentBrowseGroups,
+  normalizeVisibleLegacyAssets,
+} from "@/features/assets/utils/browseItems";
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
 type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
-type QueryAssetsResponse = components["schemas"]["dto.QueryAssetsResponseDTO"];
-type SearchAssetsRequest = components["schemas"]["dto.SearchAssetsRequestDTO"];
-type SearchAssetsResponse =
+type QueryAssetsResponseDTO =
+  components["schemas"]["dto.QueryAssetsResponseDTO"];
+type SearchAssetsRequestDTO =
+  components["schemas"]["dto.SearchAssetsRequestDTO"];
+type SearchAssetsResponseDTO =
   components["schemas"]["dto.SearchAssetsResponseDTO"];
-type QueryAssetsApiResult = Omit<
+
+type QueryAssetsApiEnvelope = Omit<
   paths["/api/v1/assets/list"]["post"]["responses"][200]["content"]["application/json"],
   "data"
 > & {
-  data?: QueryAssetsResponse;
+  data?: QueryAssetsResponseDTO;
 };
-type SearchAssetsApiResult = Omit<
+type SearchAssetsApiEnvelope = Omit<
   paths["/api/v1/assets/search"]["post"]["responses"][200]["content"]["application/json"],
   "data"
 > & {
-  data?: SearchAssetsResponse;
+  data?: SearchAssetsResponseDTO;
 };
 
 type SearchTopResultsMeta = {
@@ -58,6 +75,9 @@ type SearchTopResultsMeta = {
 type AssetsViewQueryResult = {
   assets: Asset[];
   groups: AssetGroup[];
+  browseGroups: BrowseGroup[];
+  browseItems: BrowseItem[];
+  browseAssets: Asset[];
   isLoading: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
@@ -73,6 +93,8 @@ type PhotoSearchViewResult = AssetsViewResult & {
   topResults: Asset[];
   resultAssets: Asset[];
   resultGroups: AssetGroup[];
+  topResultsBrowseGroups: BrowseGroup[];
+  resultBrowseGroups: BrowseGroup[];
   topResultsMeta: SearchTopResultsMeta;
 };
 
@@ -85,6 +107,9 @@ const DEFAULT_TOP_RESULTS_META: SearchTopResultsMeta = {
 const EMPTY_ASSETS_VIEW_RESULT: AssetsViewResult = {
   assets: [],
   groups: undefined,
+  browseGroups: [],
+  browseItems: [],
+  browseAssets: [],
   isLoading: false,
   isLoadingMore: false,
   isFetched: false,
@@ -101,20 +126,20 @@ const EMPTY_PHOTO_SEARCH_VIEW_RESULT: PhotoSearchViewResult = {
   topResults: [],
   resultAssets: [],
   resultGroups: [],
+  topResultsBrowseGroups: [],
+  resultBrowseGroups: [],
   topResultsMeta: DEFAULT_TOP_RESULTS_META,
 };
 
 const TOP_RESULTS_LIMIT = 12;
+const DEFAULT_ASSET_TYPES: AssetMediaType[] = ["photos", "videos"];
 
 const getApiMimeTypes = (
-  tabTypes: TabType[],
+  mediaTypes: AssetMediaType[],
 ): ("PHOTO" | "VIDEO" | "AUDIO")[] => {
   const mimeTypes: ("PHOTO" | "VIDEO" | "AUDIO")[] = [];
-  tabTypes.forEach((type) => {
+  mediaTypes.forEach((type) => {
     switch (type) {
-      case "all":
-        mimeTypes.push("PHOTO", "VIDEO");
-        break;
       case "photos":
         mimeTypes.push("PHOTO");
         break;
@@ -128,9 +153,6 @@ const getApiMimeTypes = (
   });
   return mimeTypes;
 };
-
-const normalizeVisibleAssets = (assets: Asset[]): Asset[] =>
-  assets.filter((asset) => !asset.is_deleted && !asset.deleted_at);
 
 const mergeUniqueAssets = (...assetCollections: Asset[][]): Asset[] => {
   const seen = new Set<string>();
@@ -151,7 +173,7 @@ const mergeUniqueAssets = (...assetCollections: Asset[][]): Asset[] => {
 };
 
 const normalizeTopResultsMeta = (
-  meta?: SearchAssetsResponse["top_results_meta"],
+  meta?: SearchAssetsResponseDTO["top_results_meta"],
 ): SearchTopResultsMeta => ({
   enabled: Boolean(meta?.enabled),
   degraded: Boolean(meta?.degraded),
@@ -161,7 +183,7 @@ const normalizeTopResultsMeta = (
 
 const normalizeSearchSortBy = (
   sortBy?: AssetViewDefinition["sortBy"],
-): SearchAssetsRequest["sort_by"] => {
+): SearchAssetsRequestDTO["sort_by"] => {
   switch (sortBy) {
     case "recently_added":
     case "date_captured":
@@ -212,57 +234,6 @@ const buildApiFilter = (
   return filter;
 };
 
-const stripAssetTypeConstraints = (filter: AssetFilter): AssetFilter => {
-  const nextFilter = { ...filter };
-  delete nextFilter.type;
-  delete nextFilter.types;
-  return nextFilter;
-};
-
-const resolveCurrentTabTypes = (
-  currentTab: TabType,
-  filter: AssetFilter,
-): TabType[] => {
-  if (currentTab !== "all") {
-    return [currentTab];
-  }
-
-  if (filter.type === "PHOTO") {
-    return ["photos"];
-  }
-
-  if (filter.type === "VIDEO") {
-    return ["videos"];
-  }
-
-  if (Array.isArray(filter.types) && filter.types.length > 0) {
-    const normalized = filter.types
-      .map((type) => {
-        switch (type) {
-          case "PHOTO":
-            return "photos";
-          case "VIDEO":
-            return "videos";
-          case "AUDIO":
-            return "audios";
-          default:
-            return null;
-        }
-      })
-      .filter(
-        (type): type is "photos" | "videos" | "audios" => type !== null,
-      );
-
-    if (normalized.length > 0) {
-      return normalized;
-    }
-  }
-
-  return ["photos", "videos"];
-};
-
-const countAssets = (assets: Asset[]) => assets.length;
-
 export const useAssetsViewQuery = (
   definition: AssetViewDefinition,
   options: ViewDefinitionOptions = {},
@@ -283,6 +254,7 @@ export const useAssetsViewQuery = (
   );
   const pageSize = definition.pageSize || 50;
   const viewerTimeZone = useMemo(() => getViewerTimeZone(), []);
+  const sortBy = definition.sortBy ?? "date_captured";
 
   const createUnifiedRequest = useCallback((): AssetQueryRequest => {
     const request: AssetQueryRequest = {
@@ -292,6 +264,7 @@ export const useAssetsViewQuery = (
         offset: 0,
       },
       sort_by: normalizeSearchSortBy(definition.sortBy),
+      stack_mode: "collapsed",
       viewer_timezone: viewerTimeZone,
     };
 
@@ -313,11 +286,14 @@ export const useAssetsViewQuery = (
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = (lastPage as QueryAssetsApiResult | undefined)?.data;
-        const pageAssets = normalizeVisibleAssets(responseData?.assets ?? []);
-        const total = responseData?.total;
+        const responseData = (lastPage as QueryAssetsApiEnvelope | undefined)?.data;
+        const legacyAssets = normalizeVisibleLegacyAssets(responseData?.assets);
+        const total = responseData?.total_visible ?? responseData?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = countAssets(pageAssets);
+        const loadedCount = countLoadedBrowseRowsFromPage({
+          items: responseData?.items,
+          legacyAssets,
+        });
         const hasMore =
           typeof total === "number"
             ? offset + loadedCount < total
@@ -326,36 +302,54 @@ export const useAssetsViewQuery = (
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<QueryAssetsApiResult>, unknown>;
+  ) as UseInfiniteQueryResult<InfiniteData<QueryAssetsApiEnvelope>, unknown>;
 
   const assetsPages = useMemo(() => {
-    const pages = (query.data?.pages ?? []) as QueryAssetsApiResult[];
+    const pages = (query.data?.pages ?? []) as QueryAssetsApiEnvelope[];
     const pageParams = query.data?.pageParams ?? [];
 
     return pages.map((page, index) => {
       const offset = Number(pageParams[index] ?? 0) || 0;
       const responseData = page?.data;
-      const assets = normalizeVisibleAssets(responseData?.assets ?? []);
-      const groups = groupAssetsBySort(
-        assets,
-        definition.sortBy ?? "date_captured",
-      );
+      const legacyAssets = normalizeVisibleLegacyAssets(responseData?.assets);
+      const groups = groupAssetsBySort(legacyAssets, sortBy);
+      const browseGroups = browseGroupsFromQueryLikePage({
+        items: responseData?.items,
+        legacyAssets,
+        sortBy,
+      });
       const total = responseData?.total;
-      const loadedCount = countAssets(assets);
+      const visibleTotal = responseData?.total_visible ?? total;
+      const loadedCount = countLoadedBrowseRowsFromPage({
+        items: responseData?.items,
+        legacyAssets,
+      });
       const hasMore =
-        typeof total === "number"
-          ? offset + loadedCount < total
+        typeof visibleTotal === "number"
+          ? offset + loadedCount < visibleTotal
           : loadedCount >= pageSize;
 
-      return { groups, offset, total, hasMore };
+      return { groups, browseGroups, offset, total: visibleTotal, hasMore };
     });
-  }, [query.data?.pageParams, query.dataUpdatedAt, pageSize]);
+  }, [query.data?.pageParams, query.dataUpdatedAt, pageSize, sortBy]);
 
   const groups = useMemo(
     () => mergeAdjacentAssetGroups(...assetsPages.map((page) => page.groups)),
     [assetsPages],
   );
   const assets = useMemo(() => flattenAssetGroups(groups), [groups]);
+  const browseGroups = useMemo(
+    () => mergeAdjacentBrowseGroups(...assetsPages.map((page) => page.browseGroups)),
+    [assetsPages],
+  );
+  const browseProjection = useMemo(
+    () => ({
+      browseGroups,
+      browseItems: flattenBrowseGroups(browseGroups),
+      browseAssets: flattenBrowseGroupsToAssets(browseGroups),
+    }),
+    [browseGroups],
+  );
 
   const lastPage =
     assetsPages.length > 0 ? assetsPages[assetsPages.length - 1] : undefined;
@@ -378,6 +372,9 @@ export const useAssetsViewQuery = (
   return {
     assets,
     groups,
+    browseGroups: browseProjection.browseGroups,
+    browseItems: browseProjection.browseItems,
+    browseAssets: browseProjection.browseAssets,
     isLoading: query.isLoading,
     isLoadingMore: query.isFetchingNextPage,
     hasMore: query.hasNextPage ?? true,
@@ -401,13 +398,16 @@ export const useAssetsView = (
   const { withGroups = false } = options;
   const queryResult = useAssetsViewQuery(definition, options);
   const assets = useMemo(
-    () => normalizeVisibleAssets(queryResult.assets),
+    () => normalizeVisibleLegacyAssets(queryResult.assets),
     [queryResult.assets],
   );
 
   return {
     assets,
     groups: withGroups ? queryResult.groups : undefined,
+    browseGroups: queryResult.browseGroups,
+    browseItems: queryResult.browseItems,
+    browseAssets: queryResult.browseAssets,
     isLoading: queryResult.isLoading,
     isLoadingMore: queryResult.isLoadingMore,
     error: queryResult.error,
@@ -433,6 +433,7 @@ export const usePhotoSearchView = (
   const pageSize = definition.pageSize || 50;
   const queryText = definition.search?.query?.trim() ?? "";
   const viewerTimeZone = useMemo(() => getViewerTimeZone(), []);
+  const sortBy = definition.sortBy ?? "date_captured";
   const viewKey = useMemo(
     () =>
       `${generateViewKey({
@@ -443,7 +444,7 @@ export const usePhotoSearchView = (
   );
 
   const createSearchRequest = useCallback(
-    (): SearchAssetsRequest => ({
+    (): SearchAssetsRequestDTO => ({
       query: queryText,
       filter: apiFilter,
       pagination: {
@@ -453,9 +454,10 @@ export const usePhotoSearchView = (
       enhancement_mode: "auto",
       top_results_limit: TOP_RESULTS_LIMIT,
       sort_by: normalizeSearchSortBy(definition.sortBy),
+      stack_mode: "collapsed",
       viewer_timezone: viewerTimeZone,
     }),
-    [apiFilter, pageSize, queryText, viewerTimeZone],
+    [apiFilter, definition.sortBy, pageSize, queryText, viewerTimeZone],
   );
 
   const query = $api.useInfiniteQuery(
@@ -469,11 +471,15 @@ export const usePhotoSearchView = (
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = (lastPage as SearchAssetsApiResult | undefined)?.data;
-        const pageAssets = normalizeVisibleAssets(responseData?.results ?? []);
-        const total = responseData?.results_total;
+        const responseData = (lastPage as SearchAssetsApiEnvelope | undefined)?.data;
+        const legacyResults = normalizeVisibleLegacyAssets(responseData?.results);
+        const total =
+          responseData?.results_total_visible ?? responseData?.results_total;
         const offset = Number(lastPageParam ?? 0) || 0;
-        const loadedCount = countAssets(pageAssets);
+        const loadedCount = countLoadedBrowseRowsFromPage({
+          items: responseData?.result_items,
+          legacyAssets: legacyResults,
+        });
         const hasMore =
           typeof total === "number"
             ? offset + loadedCount < total
@@ -482,31 +488,33 @@ export const usePhotoSearchView = (
         return hasMore ? offset + pageSize : undefined;
       },
     },
-  ) as UseInfiniteQueryResult<InfiniteData<SearchAssetsApiResult>, unknown>;
+  ) as UseInfiniteQueryResult<InfiniteData<SearchAssetsApiEnvelope>, unknown>;
 
   const searchPages = useMemo(() => {
-    const pages = (query.data?.pages ?? []) as SearchAssetsApiResult[];
+    const pages = (query.data?.pages ?? []) as SearchAssetsApiEnvelope[];
     const pageParams = query.data?.pageParams ?? [];
 
     return pages.map((page, index) => {
       const responseData = page?.data;
       const offset = Number(pageParams[index] ?? 0) || 0;
-      const results = normalizeVisibleAssets(responseData?.results ?? []);
-      const resultGroups = groupAssetsBySort(
-        results,
-        definition.sortBy ?? "date_captured",
-      );
-      const total = responseData?.results_total;
-      const loadedCount = countAssets(results);
+      const legacyResults = normalizeVisibleLegacyAssets(responseData?.results);
+      const total =
+        responseData?.results_total_visible ?? responseData?.results_total;
+      const loadedCount = countLoadedBrowseRowsFromPage({
+        items: responseData?.result_items,
+        legacyAssets: legacyResults,
+      });
       const hasMore =
         typeof total === "number"
           ? offset + loadedCount < total
           : loadedCount >= pageSize;
 
       return {
-        topResults: responseData?.top_results ?? [],
+        topResultsRaw: responseData?.top_results ?? [],
+        topItems: responseData?.top_items,
         topResultsMeta: normalizeTopResultsMeta(responseData?.top_results_meta),
-        resultGroups,
+        legacyResults,
+        resultItems: responseData?.result_items,
         total,
         offset,
         hasMore,
@@ -515,18 +523,55 @@ export const usePhotoSearchView = (
   }, [pageSize, query.data?.pageParams, query.dataUpdatedAt]);
 
   const firstPage = searchPages[0];
-  const topResults = useMemo(
-    () => normalizeVisibleAssets(firstPage?.topResults ?? []),
-    [firstPage?.topResults],
+  const topResultsBrowseGroups = useMemo(
+    () =>
+      browseGroupsFromSearchTop({
+        topItems: firstPage?.topItems,
+        legacyTopAssets: normalizeVisibleLegacyAssets(firstPage?.topResultsRaw),
+        sortBy,
+      }),
+    [firstPage?.topItems, firstPage?.topResultsRaw, sortBy],
   );
+  const resultBrowseGroups = useMemo(() => {
+    const perPage = searchPages.map((page) =>
+      browseGroupsFromSearchResultsPage({
+        resultItems: page.resultItems,
+        legacyResultAssets: page.legacyResults,
+        sortBy,
+      }),
+    );
+    return mergeAdjacentBrowseGroups(...perPage);
+  }, [searchPages, sortBy]);
+
   const resultGroups = useMemo(
     () =>
-      mergeAdjacentAssetGroups(...searchPages.map((page) => page.resultGroups)),
-    [searchPages],
+      mergeAdjacentAssetGroups(
+        ...searchPages.map((page) =>
+          groupAssetsBySort(page.legacyResults, sortBy),
+        ),
+      ),
+    [searchPages, sortBy],
+  );
+
+  const topResults = useMemo(
+    () => flattenBrowseGroupsToAssets(topResultsBrowseGroups),
+    [topResultsBrowseGroups],
   );
   const resultAssets = useMemo(
-    () => flattenAssetGroups(resultGroups),
-    [resultGroups],
+    () => flattenBrowseGroupsToAssets(resultBrowseGroups),
+    [resultBrowseGroups],
+  );
+  const browseItems = useMemo(
+    () =>
+      dedupeBrowseItemsById([
+        ...flattenBrowseGroups(topResultsBrowseGroups),
+        ...flattenBrowseGroups(resultBrowseGroups),
+      ]),
+    [resultBrowseGroups, topResultsBrowseGroups],
+  );
+  const browseAssets = useMemo(
+    () => browseItems.map(getBrowseItemAsset),
+    [browseItems],
   );
   const assets = useMemo(
     () => mergeUniqueAssets(topResults, resultAssets),
@@ -560,9 +605,14 @@ export const usePhotoSearchView = (
 
   return {
     assets,
+    browseGroups: resultBrowseGroups,
+    browseItems,
+    browseAssets,
     topResults,
     resultAssets,
     resultGroups,
+    topResultsBrowseGroups,
+    resultBrowseGroups,
     topResultsMeta: firstPage?.topResultsMeta ?? DEFAULT_TOP_RESULTS_META,
     groups: withGroups ? resultGroups : undefined,
     isLoading: query.isLoading,
@@ -581,13 +631,12 @@ export const usePhotoSearchView = (
   };
 };
 
-export const useCurrentTabPhotoSearchView = (
+export const useCurrentAssetsSearchView = (
   options: ViewDefinitionOptions & {
     sortBy?: SortByType;
     pageSize?: number;
   } = {},
 ): PhotoSearchViewResult => {
-  const currentTab = useAssetsStore((state) => state.ui.currentTab);
   const uiSortBy = useSortBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
   const filtersState = useFilterState();
@@ -599,22 +648,11 @@ export const useCurrentTabPhotoSearchView = (
         : {},
     [filtersState],
   );
-  const scopedFilter = useMemo(
-    () =>
-      currentTab === "all"
-        ? stripAssetTypeConstraints(rawScopedFilter)
-        : rawScopedFilter,
-    [currentTab, rawScopedFilter],
-  );
-  const resolvedTypes = useMemo(
-    () => resolveCurrentTabTypes(currentTab, rawScopedFilter),
-    [currentTab, rawScopedFilter],
-  );
 
   const definition: AssetViewDefinition = useMemo(
     () => ({
-      types: resolvedTypes,
-      filter: scopedFilter,
+      types: DEFAULT_ASSET_TYPES,
+      filter: rawScopedFilter,
       sortBy: sortBy || uiSortBy,
       pageSize: pageSize || 50,
       search: searchQuery.trim()
@@ -623,10 +661,10 @@ export const useCurrentTabPhotoSearchView = (
           }
         : undefined,
     }),
-    [resolvedTypes, scopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
+    [rawScopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
   );
 
-  const enabled = currentTab === "photos" && searchQuery.trim().length > 0;
+  const enabled = searchQuery.trim().length > 0;
   return usePhotoSearchView(definition, {
     ...viewOptions,
     withGroups: viewOptions.withGroups ?? true,
@@ -634,13 +672,12 @@ export const useCurrentTabPhotoSearchView = (
   });
 };
 
-export const useCurrentTabAssets = (
+export const useCurrentAssetsView = (
   options: ViewDefinitionOptions & {
     sortBy?: SortByType;
     pageSize?: number;
   } = {},
 ): AssetsViewResult => {
-  const currentTab = useAssetsStore((state) => state.ui.currentTab);
   const uiSortBy = useSortBy();
   const searchQuery = useAssetsStore((state) => state.ui.searchQuery);
   const filtersState = useFilterState();
@@ -653,22 +690,11 @@ export const useCurrentTabAssets = (
         : {},
     [filtersState],
   );
-  const scopedFilter = useMemo(
-    () =>
-      currentTab === "all"
-        ? stripAssetTypeConstraints(rawScopedFilter)
-        : rawScopedFilter,
-    [currentTab, rawScopedFilter],
-  );
-  const resolvedTypes = useMemo(
-    () => resolveCurrentTabTypes(currentTab, rawScopedFilter),
-    [currentTab, rawScopedFilter],
-  );
 
   const definition: AssetViewDefinition = useMemo(
     () => ({
-      types: resolvedTypes,
-      filter: scopedFilter,
+      types: DEFAULT_ASSET_TYPES,
+      filter: rawScopedFilter,
       sortBy: sortBy || uiSortBy,
       pageSize: pageSize || 50,
       search: searchQuery.trim()
@@ -677,16 +703,16 @@ export const useCurrentTabAssets = (
           }
         : undefined,
     }),
-    [resolvedTypes, scopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
+    [rawScopedFilter, uiSortBy, searchQuery, sortBy, pageSize],
   );
 
   const standardView = useAssetsView(definition, {
     ...viewOptions,
     withGroups: true,
   });
-  const photoSearchView = useCurrentTabPhotoSearchView(options);
+  const photoSearchView = useCurrentAssetsSearchView(options);
 
-  if (currentTab === "photos" && searchQuery.trim()) {
+  if (searchQuery.trim()) {
     return photoSearchView;
   }
 

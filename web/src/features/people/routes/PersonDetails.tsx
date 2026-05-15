@@ -14,10 +14,7 @@ import { WorkerProvider } from "@/contexts/WorkerProvider";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import { JustifiedGallery } from "@/features/assets";
 import { useWorkingRepository } from "@/features/settings";
-import {
-  findAssetIndex,
-  flattenAssetGroups,
-} from "@/features/assets/utils/assetGroups";
+import { findBrowseItemIndexByAssetId } from "@/features/assets/utils/browseItems";
 import { useI18n } from "@/lib/i18n.tsx";
 import { usePersonAssetsView } from "../hooks/usePersonAssetsView";
 import { usePersonDetails } from "../hooks/usePeople";
@@ -53,7 +50,9 @@ const PersonAssetsContent = () => {
 
   const {
     assets,
-    groups,
+    browseGroups,
+    browseItems,
+    browseAssets: flatAssets,
     isLoading,
     isLoadingMore,
     fetchMore,
@@ -61,24 +60,18 @@ const PersonAssetsContent = () => {
     error,
   } = usePersonAssetsView(personIdNumber, { withGroups: true });
 
-  const groupedPhotos = groups ?? [];
-  const flatAssets = useMemo(
-    () => flattenAssetGroups(groupedPhotos),
-    [groupedPhotos],
-  );
-
   const slideIndex = useMemo(() => {
     if (assetId && flatAssets.length > 0) {
-      return findAssetIndex(flatAssets, assetId);
+      return findBrowseItemIndexByAssetId(browseItems, assetId);
     }
     return -1;
-  }, [assetId, flatAssets]);
+  }, [assetId, browseItems, flatAssets.length]);
 
   const [isLocatingAsset, setIsLocatingAsset] = useState(false);
 
   useEffect(() => {
     if (isCarouselOpen && assetId && flatAssets.length > 0) {
-      const index = findAssetIndex(flatAssets, assetId);
+      const index = findBrowseItemIndexByAssetId(browseItems, assetId);
       if (index < 0) {
         if (hasMore && !isLoading && !isLoadingMore) {
           setIsLocatingAsset(true);
@@ -91,6 +84,7 @@ const PersonAssetsContent = () => {
   }, [
     assetId,
     flatAssets,
+    browseItems,
     isCarouselOpen,
     hasMore,
     isLoading,
@@ -142,6 +136,7 @@ const PersonAssetsContent = () => {
           onSortByChange={setSortBy}
           title={displayName}
           icon={<Users className="w-6 h-6 text-primary" />}
+          browseItems={browseItems}
         />
 
         <div
@@ -257,7 +252,7 @@ const PersonAssetsContent = () => {
             <PhotosLoadingSkeleton />
           ) : (
             <JustifiedGallery
-              groups={groupedPhotos}
+              browseGroups={browseGroups}
               openCarousel={openCarousel}
               onLoadMore={handleLoadMore}
               hasMore={hasMore}
@@ -281,10 +276,10 @@ const PersonAssetsContent = () => {
               <div className="max-w-md rounded-2xl bg-black/50 p-8 text-center text-white backdrop-blur-sm">
                 <div className="loading loading-spinner loading-lg mb-4"></div>
                 <p className="mb-2 text-lg font-medium">
-                  {t("assets.photos.locating_asset")}
+                  {t("assets.all.locating_asset")}
                 </p>
                 <p className="text-sm text-gray-300">
-                  {t("assets.photos.loading_more_data")}
+                  {t("assets.all.loading_more_data")}
                 </p>
               </div>
             </div>
