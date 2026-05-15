@@ -8,11 +8,11 @@ import {
   useFilterActions,
   useSelectionActions,
 } from "@/features/assets/selectors";
-import { useCurrentTabAssets } from "@/features/assets/hooks/useAssetsView";
+import { useCurrentAssetsView } from "@/features/assets/hooks/useAssetsView";
 import { useSelection } from "@/features/assets/hooks/useSelection";
 import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
-import { flattenAssetGroups } from "@/features/assets/utils/assetGroups";
+import { resolveBrowseSelectedAssetIds } from "@/features/assets/utils/browseItems";
 import { useI18n } from "@/lib/i18n";
 
 type PhotoPickerContentProps = {
@@ -37,31 +37,22 @@ function PhotoPickerContent({
   const selection = useSelection();
 
   const {
-    assets: allAssets,
-    groups: groupedAssets,
+    browseGroups,
+    browseItems,
     isLoading,
     isLoadingMore,
     fetchMore,
     hasMore,
     viewKey,
-  } = useCurrentTabAssets({
+  } = useCurrentAssetsView({
     withGroups: true,
     sortBy,
   });
 
-  const flatAssets = useMemo(() => {
-    if (groupedAssets && groupedAssets.length > 0) {
-      return flattenAssetGroups(groupedAssets);
-    }
-    return allAssets;
-  }, [groupedAssets, allAssets]);
-
   const layoutKey = useMemo(() => {
-    const assetIds = flatAssets
-      .map((asset) => asset.asset_id)
-      .filter((id): id is string => Boolean(id));
-    return `${viewKey}:${assetIds.join(",")}`;
-  }, [viewKey, flatAssets]);
+    const itemIds = (browseItems ?? []).map((item) => item.id);
+    return `${viewKey}:${itemIds.join(",")}`;
+  }, [viewKey, browseItems]);
 
   useEffect(() => {
     clearSelection();
@@ -82,18 +73,25 @@ function PhotoPickerContent({
 
   useEffect(() => {
     if (selection.enabled && selection.selectedCount > 0) {
-      const id = Array.from(selection.selectedIds)[0];
+      const id = resolveBrowseSelectedAssetIds(selection.selectedIds, browseItems)[0];
       if (id) {
-        onSelect(id as string);
+        onSelect(id);
       }
     }
-  }, [selection.selectedIds, selection.selectedCount, selection.enabled, onSelect]);
+  }, [
+    browseItems,
+    selection.selectedIds,
+    selection.selectedCount,
+    selection.enabled,
+    onSelect,
+  ]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-base-100">
       <AssetsPageHeader
         sortBy={sortBy}
         onSortByChange={setSortBy}
+        browseItems={browseItems}
         title={
           title ??
           t("collections.createModal.coverPicker.title", {
@@ -104,14 +102,15 @@ function PhotoPickerContent({
       />
       <div className="custom-scrollbar flex-1 overflow-x-hidden overflow-y-auto">
         <SquareGallery
-          groups={groupedAssets || []}
+          browseGroups={browseGroups}
           key={layoutKey}
           openCarousel={() => {}}
           onLoadMore={fetchMore}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
-          isLoading={isLoading && allAssets.length === 0}
+          isLoading={isLoading && browseItems.length === 0}
           columns={5}
+          render3DCard={false}
         />
       </div>
     </div>

@@ -82,6 +82,7 @@
         "eslint-plugin-react-refresh": "^0.4.18",
         "globals": "^17.0.0",
         "happy-dom": "^20.3.4",
+        "openapi-typescript": "^7.13.0",
         "oxlint": "^1.39.0",
         "rolldown-vite": "^7.0.12",
         "typedoc": "^0.28.7",

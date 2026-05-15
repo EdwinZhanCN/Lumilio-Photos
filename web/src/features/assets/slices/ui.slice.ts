@@ -1,9 +1,8 @@
 import { StateCreator } from "zustand";
-import { SortByType, TabType, UIState } from "../types/assets.type";
+import { SortByType, UIState } from "../types/assets.type";
 
 export interface UISlice {
   ui: UIState;
-  setCurrentTab: (tab: TabType) => void;
   setSortBy: (sortBy: SortByType) => void;
   setSearchQuery: (query: string) => void;
   setCarouselOpen: (isOpen: boolean) => void;
@@ -20,18 +19,11 @@ export const createUISlice: StateCreator<
   UISlice
 > = (set) => ({
   ui: {
-    currentTab: "all",
     sortBy: "date_captured",
     searchQuery: "",
     isCarouselOpen: false,
     activeAssetId: undefined,
   },
-
-  setCurrentTab: (tab) =>
-    set((state) => {
-      if (state.ui.currentTab === tab) return;
-      state.ui.currentTab = tab;
-    }),
 
   setSortBy: (sortBy) =>
     set((state) => {
@@ -87,10 +79,6 @@ export const createUISlice: StateCreator<
     }),
 });
 
-// Selectors
-export const selectCurrentTab = (state: UISlice): TabType =>
-  state.ui.currentTab;
-
 export const selectSortBy = (state: UISlice): SortByType => state.ui.sortBy;
 
 export const selectSearchQuery = (state: UISlice): string =>
@@ -104,40 +92,4 @@ export const selectActiveAssetId = (state: UISlice): string | undefined =>
 
 export const selectIsSearchActive = (state: UISlice): boolean => {
   return state.ui.searchQuery.trim().length > 0;
-};
-
-// Utility selectors (Static helpers)
-export const selectTabAssetTypes = (tab: TabType): TabType[] => {
-  switch (tab) {
-    case "all":
-      return ["photos", "videos"];
-    case "photos":
-      return ["photos"];
-    case "videos":
-      return ["videos"];
-    case "audios":
-      return ["audios"];
-    default:
-      return ["photos"];
-  }
-};
-
-export const selectTabTitle = (tab: TabType): string => {
-  switch (tab) {
-    case "all":
-      return "Assets";
-    case "photos":
-      return "Photos";
-    case "videos":
-      return "Videos";
-    case "audios":
-      return "Audios";
-    default:
-      return "Photos";
-  }
-};
-
-export const selectTabSupportsSemanticSearch = (tab: TabType): boolean => {
-  // Only photos support semantic search currently
-  return tab === "photos";
 };

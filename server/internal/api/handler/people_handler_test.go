@@ -14,6 +14,7 @@ import (
 	"server/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/require"
 )
@@ -197,4 +198,137 @@ func TestPeopleHandlerListPersonAssetsInjectsPersonScope(t *testing.T) {
 
 func strPtr(value string) *string {
 	return &value
+}
+
+func TestPeopleHandlerListPersonAssets_StackModeCollapsed_ReturnsBrowseContract(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	stackID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	coverUUID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	memberUUID := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+	coverAsset := testHandlerAsset(t, coverUUID.String(), "person-cover.jpg")
+
+	handler := NewPeopleHandler(
+		stubAssetService{
+			queryBrowseFn: func(_ context.Context, params service.QueryAssetsParams) (service.BrowseQueryResult, error) {
+				require.NotNil(t, params.PersonID)
+				require.Equal(t, int32(12), *params.PersonID)
+				require.Equal(t, service.StackModeCollapsed, params.StackMode)
+				return service.BrowseQueryResult{
+					Items: []service.BrowseItem{
+						{
+							Type:  "stack",
+							ID:    "stack:" + stackID.String(),
+							Asset: coverAsset,
+							Stack: &service.BrowseStack{
+								StackID:          stackID,
+								CoverAssetID:     coverUUID,
+								MemberAssetIDs:   []uuid.UUID{coverUUID, memberUUID},
+								MatchedMemberIDs: []uuid.UUID{memberUUID},
+							},
+						},
+					},
+					TotalVisible: 1,
+					TotalAssets:  2,
+					StackMode:    service.StackModeCollapsed,
+				}, nil
+			},
+		},
+		stubPeopleFaceService{
+			getFn: func(_ context.Context, clusterID int32, repositoryID pgtype.UUID, _ *int32) (*service.Person, error) {
+				require.Equal(t, int32(12), clusterID)
+				require.True(t, repositoryID.Valid)
+				return &service.Person{
+					PersonID:    12,
+					Name:        strPtr("Kai"),
+					IsConfirmed: true,
+					MemberCount: 1,
+					AssetCount:  1,
+					CreatedAt:   time.Unix(1700000000, 0),
+					UpdatedAt:   time.Unix(1700003600, 0),
+				}, nil
+			},
+		},
+		nil,
+		nil,
+	)
+
+	body, err := json.Marshal(dto.AssetQueryRequestDTO{
+		Filter: dto.AssetFilterDTO{
+			RepositoryID: strPtr("550e8400-e29b-41d4-a716-446655440000"),
+		},
+		Pagination: dto.PaginationDTO{Limit: 20, Offset: 0},
+		SortBy:     "date_captured",
+		StackMode:  service.StackModeCollapsed,
+	})
+	require.NoError(t, err)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/people/12/assets/list", bytes.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Params = gin.Params{{Key: "id", Value: "12"}}
+
+	handler.ListPersonAssets(ctx)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	var response struct {
+		Code int                        `json:"code"`
+		Data dto.QueryAssetsResponseDTO `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Len(t, response.Data.Items, 1)
+	require.Len(t, response.Data.Assets, 1)
+	require.Equal(t, coverUUID.String(), response.Data.Assets[0].AssetID)
+	require.NotNil(t, response.Data.TotalVisible)
+	require.Equal(t, 1, *response.Data.TotalVisible)
+	require.NotNil(t, response.Data.TotalAssets)
+	require.Equal(t, 2, *response.Data.TotalAssets)
+}
+
+func TestPeopleHandlerListPersonAssets_InvalidStackModeReturnsBadRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewPeopleHandler(
+		stubAssetService{},
+		stubPeopleFaceService{
+			getFn: func(_ context.Context, clusterID int32, repositoryID pgtype.UUID, _ *int32) (*service.Person, error) {
+				require.Equal(t, int32(12), clusterID)
+				require.True(t, repositoryID.Valid)
+				return &service.Person{
+					PersonID:    12,
+					Name:        strPtr("Kai"),
+					IsConfirmed: true,
+					MemberCount: 1,
+					AssetCount:  1,
+					CreatedAt:   time.Unix(1700000000, 0),
+					UpdatedAt:   time.Unix(1700003600, 0),
+				}, nil
+			},
+		},
+		nil,
+		nil,
+	)
+
+	body, err := json.Marshal(dto.AssetQueryRequestDTO{
+		Filter: dto.AssetFilterDTO{
+			RepositoryID: strPtr("550e8400-e29b-41d4-a716-446655440000"),
+		},
+		Pagination: dto.PaginationDTO{Limit: 20, Offset: 0},
+		SortBy:     "date_captured",
+		StackMode:  "fancy",
+	})
+	require.NoError(t, err)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/people/12/assets/list", bytes.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	ctx.Params = gin.Params{{Key: "id", Value: "12"}}
+
+	handler.ListPersonAssets(ctx)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
 }

@@ -226,7 +226,7 @@ dto:
 	@echo "==> Step 1: Generating OpenAPI spec from Go code..."
 	cd $(SERVER_DIR) && swag init --v3.1 -g cmd/main.go -o docs/
 	@echo "==> Step 2: Generating TypeScript types from OpenAPI spec..."
-	cd $(WEB_DIR) && npx openapi-typescript ../server/docs/swagger.yaml -o ./src/lib/http-commons/schema.d.ts
+	cd $(WEB_DIR) && ./node_modules/.bin/openapi-typescript ../server/docs/swagger.yaml -o ./src/lib/http-commons/schema.d.ts
 	@echo "==> DTO synchronization complete!"
 	@echo "==> Backend: $(SERVER_DIR)/docs/swagger.yaml"
 	@echo "==> Frontend: $(WEB_DIR)/src/lib/http-commons/schema.d.ts"

@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+.pnpm-store/
 /vendor/
 package-lock.json
 yarn.lock

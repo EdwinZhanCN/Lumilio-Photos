@@ -12,12 +12,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
-	"go.uber.org/zap"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
 	"server/internal/utils/exif"
 	"server/internal/utils/file"
+
+	"go.uber.org/zap"
 )
 
 // ProcessMetadataTask handles EXIF/ffprobe metadata extraction only.

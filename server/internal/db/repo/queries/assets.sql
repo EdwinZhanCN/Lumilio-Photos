@@ -9,6 +9,11 @@ RETURNING *;
 SELECT * FROM assets
 WHERE asset_id = $1 AND is_deleted = false;
 
+-- name: GetAssetsByIDs :many
+SELECT * FROM assets
+WHERE asset_id = ANY(sqlc.arg('asset_ids')::uuid[])
+  AND is_deleted = false;
+
 -- name: GetAssetExifRaw :one
 SELECT exif_raw FROM assets
 WHERE asset_id = $1 AND is_deleted = false;
@@ -667,6 +672,247 @@ WHERE a.is_deleted = false
     )
     )
   );
+
+-- name: GetCollapsedBrowseItemsUnified :many
+WITH filtered AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    a.upload_time,
+    COALESCE(a.taken_time, a.upload_time) AS captured_time,
+    asm.stack_id,
+    asm.position
+  FROM assets a
+  LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
+  WHERE a.is_deleted = false
+    AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
+    AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
+    AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
+    AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (
+      sqlc.narg('person_id')::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = sqlc.narg('person_id')
+          AND fi_person.asset_id = a.asset_id
+      )
+    )
+    AND (
+      sqlc.narg('album_id')::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = sqlc.narg('album_id')
+      )
+    )
+    AND (sqlc.narg('filename_val')::text IS NULL OR
+      CASE COALESCE(sqlc.narg('filename_operator')::text, 'contains')
+        WHEN 'matches' THEN a.original_filename ILIKE sqlc.narg('filename_val')
+        WHEN 'starts_with' THEN a.original_filename ILIKE sqlc.narg('filename_val') || '%'
+        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val')
+        ELSE a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
+      END
+    )
+    AND (sqlc.narg('date_from')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= sqlc.narg('date_from'))
+    AND (sqlc.narg('date_to')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= sqlc.narg('date_to'))
+    AND (sqlc.narg('is_raw')::boolean IS NULL OR
+      CASE
+        WHEN sqlc.narg('is_raw') = true THEN a.specific_metadata->>'is_raw' = 'true'
+        ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
+      END
+    )
+    AND (sqlc.narg('rating')::integer IS NULL OR
+      CASE
+        WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL OR a.rating = 0
+        ELSE a.rating = sqlc.narg('rating')
+      END
+    )
+    AND (sqlc.narg('liked')::boolean IS NULL OR
+      CASE
+        WHEN sqlc.narg('liked') = false THEN a.liked IS NULL OR a.liked = false
+        ELSE a.liked = true
+      END
+    )
+    AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
+    AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
+    AND (
+      sqlc.narg('location_north')::float8 IS NULL
+      OR sqlc.narg('location_south')::float8 IS NULL
+      OR sqlc.narg('location_east')::float8 IS NULL
+      OR sqlc.narg('location_west')::float8 IS NULL
+      OR (
+        a.gps_latitude IS NOT NULL
+        AND a.gps_longitude IS NOT NULL
+        AND a.gps_latitude
+          BETWEEN LEAST(sqlc.narg('location_south')::float8, sqlc.narg('location_north')::float8)
+          AND GREATEST(sqlc.narg('location_south')::float8, sqlc.narg('location_north')::float8)
+        AND (
+          CASE
+            WHEN sqlc.narg('location_west')::float8 <= sqlc.narg('location_east')::float8 THEN
+              a.gps_longitude BETWEEN sqlc.narg('location_west')::float8 AND sqlc.narg('location_east')::float8
+            ELSE
+              a.gps_longitude >= sqlc.narg('location_west')::float8
+              OR a.gps_longitude <= sqlc.narg('location_east')::float8
+          END
+        )
+      )
+    )
+),
+stack_covers AS MATERIALIZED (
+  SELECT DISTINCT ON (asm.stack_id)
+    asm.stack_id,
+    asm.asset_id AS cover_asset_id
+  FROM asset_stack_members asm
+  JOIN assets a ON a.asset_id = asm.asset_id
+  WHERE a.is_deleted = false
+  ORDER BY asm.stack_id, asm.position ASC NULLS LAST, asm.asset_id ASC
+),
+stack_members_all AS MATERIALIZED (
+  SELECT
+    asm.stack_id,
+    ARRAY_AGG(asm.asset_id ORDER BY asm.position ASC NULLS LAST, asm.asset_id ASC)::uuid[] AS member_asset_ids
+  FROM asset_stack_members asm
+  JOIN assets a ON a.asset_id = asm.asset_id
+  WHERE a.is_deleted = false
+  GROUP BY asm.stack_id
+),
+browse_items AS MATERIALIZED (
+  SELECT
+    CASE WHEN f.stack_id IS NULL THEN 'asset'::text ELSE 'stack'::text END AS item_type,
+    f.stack_id,
+    CASE WHEN f.stack_id IS NULL THEN f.asset_id ELSE sc.cover_asset_id END AS cover_asset_id,
+    sma.member_asset_ids,
+    ARRAY_AGG(f.asset_id ORDER BY f.position ASC NULLS LAST, f.asset_id ASC)::uuid[] AS matched_asset_ids
+  FROM filtered f
+  LEFT JOIN stack_covers sc ON sc.stack_id = f.stack_id
+  LEFT JOIN stack_members_all sma ON sma.stack_id = f.stack_id
+  GROUP BY
+    CASE WHEN f.stack_id IS NULL THEN 'asset'::text ELSE 'stack'::text END,
+    f.stack_id,
+    CASE WHEN f.stack_id IS NULL THEN f.asset_id ELSE sc.cover_asset_id END,
+    sma.member_asset_ids
+),
+paged AS (
+  SELECT
+    bi.item_type,
+    bi.stack_id,
+    bi.cover_asset_id,
+    bi.member_asset_ids,
+    bi.matched_asset_ids,
+    CASE
+      WHEN sqlc.narg('sort_by')::text = 'recently_added' THEN cover.upload_time
+      ELSE COALESCE(cover.taken_time, cover.upload_time)
+    END AS sort_time
+  FROM browse_items bi
+  JOIN assets cover ON cover.asset_id = bi.cover_asset_id
+  ORDER BY sort_time DESC, cover.asset_id DESC
+  LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset')
+)
+SELECT
+  p.item_type,
+  p.stack_id,
+  p.cover_asset_id,
+  p.member_asset_ids,
+  p.matched_asset_ids,
+  sqlc.embed(cover)
+FROM paged p
+JOIN assets cover ON cover.asset_id = p.cover_asset_id
+ORDER BY p.sort_time DESC, p.cover_asset_id DESC;
+
+-- name: CountCollapsedBrowseItemsUnified :one
+WITH filtered AS MATERIALIZED (
+  SELECT
+    a.asset_id,
+    asm.stack_id
+  FROM assets a
+  LEFT JOIN asset_stack_members asm ON asm.asset_id = a.asset_id
+  WHERE a.is_deleted = false
+    AND (sqlc.narg('query')::text IS NULL OR a.original_filename ILIKE '%' || sqlc.narg('query') || '%')
+    AND (sqlc.narg('asset_type')::text IS NULL OR a.type = sqlc.narg('asset_type'))
+    AND (sqlc.narg('asset_types')::text[] IS NULL OR a.type = ANY(sqlc.narg('asset_types')::text[]))
+    AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id'))
+    AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
+    AND (
+      sqlc.narg('person_id')::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM face_cluster_members fcm
+        JOIN face_items fi_person ON fi_person.id = fcm.face_id
+        WHERE fcm.cluster_id = sqlc.narg('person_id')
+          AND fi_person.asset_id = a.asset_id
+      )
+    )
+    AND (
+      sqlc.narg('album_id')::integer IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM album_assets aa
+        WHERE aa.asset_id = a.asset_id
+          AND aa.album_id = sqlc.narg('album_id')
+      )
+    )
+    AND (sqlc.narg('filename_val')::text IS NULL OR
+      CASE COALESCE(sqlc.narg('filename_operator')::text, 'contains')
+        WHEN 'matches' THEN a.original_filename ILIKE sqlc.narg('filename_val')
+        WHEN 'starts_with' THEN a.original_filename ILIKE sqlc.narg('filename_val') || '%'
+        WHEN 'ends_with' THEN a.original_filename ILIKE '%' || sqlc.narg('filename_val')
+        ELSE a.original_filename ILIKE '%' || sqlc.narg('filename_val') || '%'
+      END
+    )
+    AND (sqlc.narg('date_from')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) >= sqlc.narg('date_from'))
+    AND (sqlc.narg('date_to')::timestamptz IS NULL OR COALESCE(a.taken_time, a.upload_time) <= sqlc.narg('date_to'))
+    AND (sqlc.narg('is_raw')::boolean IS NULL OR
+      CASE
+        WHEN sqlc.narg('is_raw') = true THEN a.specific_metadata->>'is_raw' = 'true'
+        ELSE a.specific_metadata->>'is_raw' = 'false' OR a.specific_metadata->>'is_raw' IS NULL
+      END
+    )
+    AND (sqlc.narg('rating')::integer IS NULL OR
+      CASE
+        WHEN sqlc.narg('rating') = 0 THEN a.rating IS NULL OR a.rating = 0
+        ELSE a.rating = sqlc.narg('rating')
+      END
+    )
+    AND (sqlc.narg('liked')::boolean IS NULL OR
+      CASE
+        WHEN sqlc.narg('liked') = false THEN a.liked IS NULL OR a.liked = false
+        ELSE a.liked = true
+      END
+    )
+    AND (sqlc.narg('camera_model')::text IS NULL OR a.specific_metadata->>'camera_model' = sqlc.narg('camera_model'))
+    AND (sqlc.narg('lens_model')::text IS NULL OR a.specific_metadata->>'lens_model' = sqlc.narg('lens_model'))
+    AND (
+      sqlc.narg('location_north')::float8 IS NULL
+      OR sqlc.narg('location_south')::float8 IS NULL
+      OR sqlc.narg('location_east')::float8 IS NULL
+      OR sqlc.narg('location_west')::float8 IS NULL
+      OR (
+        a.gps_latitude IS NOT NULL
+        AND a.gps_longitude IS NOT NULL
+        AND a.gps_latitude
+          BETWEEN LEAST(sqlc.narg('location_south')::float8, sqlc.narg('location_north')::float8)
+          AND GREATEST(sqlc.narg('location_south')::float8, sqlc.narg('location_north')::float8)
+        AND (
+          CASE
+            WHEN sqlc.narg('location_west')::float8 <= sqlc.narg('location_east')::float8 THEN
+              a.gps_longitude BETWEEN sqlc.narg('location_west')::float8 AND sqlc.narg('location_east')::float8
+            ELSE
+              a.gps_longitude >= sqlc.narg('location_west')::float8
+              OR a.gps_longitude <= sqlc.narg('location_east')::float8
+          END
+        )
+      )
+    )
+)
+SELECT COUNT(*)::bigint
+FROM (
+  SELECT CASE WHEN stack_id IS NULL THEN asset_id::text ELSE stack_id::text END AS browse_id
+  FROM filtered
+  GROUP BY 1
+) browse_items;
 
 -- name: GetPhotoMapPoints :many
 -- Lightweight photo locations for map clustering/rendering.

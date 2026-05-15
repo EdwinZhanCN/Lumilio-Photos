@@ -20,9 +20,6 @@ export const useIsAssetSelected = (assetId: string) =>
 export const useSelectionMode = () =>
   useAssetsStore((s) => s.selection.selectionMode);
 
-// ===== UI Selectors =====
-export const useCurrentTab = () => useAssetsStore((s) => s.ui.currentTab);
-
 export const useSortBy = (): SortByType => useAssetsStore((s) => s.ui.sortBy);
 
 export const useSearchQuery = () => useAssetsStore((s) => s.ui.searchQuery);
@@ -58,7 +55,6 @@ export const useSelectionActions = () =>
 export const useUIActions = () => {
   const store = useAssetsStore(
     useShallow((s) => ({
-      setTab: s.setCurrentTab,
       setSearchQueryState: s.setSearchQuery,
       setSortByState: s.setSortBy,
     })),

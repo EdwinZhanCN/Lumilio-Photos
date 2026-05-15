@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
@@ -7,8 +7,8 @@ import SquareGallery from "@/features/assets/components/page/SquareGallery/Squar
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
 import {
-  useCurrentTabAssets,
-  useCurrentTabPhotoSearchView,
+  useCurrentAssetsView,
+  useCurrentAssetsSearchView,
 } from "@/features/assets/hooks/useAssetsView";
 import {
   useSortBy,
@@ -18,23 +18,13 @@ import {
 } from "@/features/assets/selectors";
 import { useI18n } from "@/lib/i18n";
 import { useSettingsContext } from "@/features/settings";
-import type { AssetGroup, BrowseGroup } from "@/features/assets";
+import type { BrowseGroup } from "@/features/assets";
 import type { AssetGalleryProps } from "./gallery.types";
 import {
-  createBrowseGroupsFromAssetGroups,
-  dedupeBrowseItemsById,
   findBrowseItemIndexByAssetId,
-  flattenBrowseGroups,
-  getBrowseItemAsset,
 } from "@/features/assets/utils/browseItems";
 
-export type AssetCategory = "all" | "photos" | "videos" | "audios";
-
-interface AssetsGalleryPageProps {
-  category: AssetCategory;
-}
-
-export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
+export function AssetsGalleryPage() {
   const { assetId } = useParams<{ assetId: string }>();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const { t } = useI18n();
@@ -45,8 +35,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
   const searchQuery = useSearchQuery();
   const isCarouselOpen = useIsCarouselOpen();
   const { setSortBy } = useUIActions();
-  const isPhotoSearchActive =
-    category === "photos" && searchQuery.trim().length > 0;
+  const isSearchActive = searchQuery.trim().length > 0;
   const currentLayout = settingsState.ui.asset_page?.layout ?? "full";
   const compactColumns = settingsState.ui.asset_page?.columns ?? 6;
   const GalleryComponent =
@@ -54,18 +43,20 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
 
   const {
     assets: allAssets,
-    groups: groupedAssets,
+    browseGroups,
+    browseItems: flatBrowseItems,
+    browseAssets: flatAssets,
     isLoading: isFetching,
     isLoadingMore: isFetchingNextPage,
     fetchMore: fetchNextPage,
     hasMore: hasNextPage,
     isFetched,
     error,
-  } = useCurrentTabAssets({
+  } = useCurrentAssetsView({
     withGroups: true,
     sortBy,
   });
-  const photoSearchView = useCurrentTabPhotoSearchView({
+  const photoSearchView = useCurrentAssetsSearchView({
     withGroups: false,
     sortBy,
   });
@@ -81,58 +72,24 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const topResultsGroup = useMemo<AssetGroup[]>(
-    () =>
-      photoSearchView.topResults.length > 0
-        ? [
-            {
-              key: "search:top_results",
-              assets: photoSearchView.topResults,
-            },
-          ]
-        : [],
-    [photoSearchView.topResults],
-  );
-  const finalGroupedAssets = useMemo(
-    () => (isPhotoSearchActive ? undefined : groupedAssets ?? []),
-    [groupedAssets, isPhotoSearchActive],
-  );
-  const browseGroups = useMemo(
-    () => createBrowseGroupsFromAssetGroups(finalGroupedAssets ?? []),
-    [finalGroupedAssets],
-  );
-  const topResultsBrowseGroups = useMemo(
-    () => createBrowseGroupsFromAssetGroups(topResultsGroup),
-    [topResultsGroup],
-  );
-  const searchResultBrowseGroups = useMemo(
-    () => createBrowseGroupsFromAssetGroups(photoSearchView.resultGroups),
-    [photoSearchView.resultGroups],
-  );
-
-  const flatAssets = useMemo(() => {
-    if (isPhotoSearchActive) {
-      return dedupeBrowseItemsById([
-        ...flattenBrowseGroups(topResultsBrowseGroups),
-        ...flattenBrowseGroups(searchResultBrowseGroups),
-      ]).map(getBrowseItemAsset);
-    }
-    return flattenBrowseGroups(browseGroups).map(getBrowseItemAsset);
-  }, [
-    browseGroups,
-    isPhotoSearchActive,
-    searchResultBrowseGroups,
-    topResultsBrowseGroups,
-  ]);
+  const topResultsBrowseGroups = photoSearchView.topResultsBrowseGroups;
+  const searchResultBrowseGroups = photoSearchView.resultBrowseGroups;
+  const activeBrowseGroups = isSearchActive ? [] : browseGroups;
+  const activeBrowseItems = isSearchActive
+    ? photoSearchView.browseItems
+    : flatBrowseItems;
+  const activeBrowseAssets = isSearchActive
+    ? photoSearchView.browseAssets
+    : flatAssets;
 
   useEffect(() => {
-    if (!isPhotoSearchActive && browseGroups.length > 0) {
-      setLastBrowseGroups(browseGroups);
+    if (!isSearchActive && activeBrowseGroups.length > 0) {
+      setLastBrowseGroups(activeBrowseGroups);
     }
-  }, [browseGroups, isPhotoSearchActive]);
+  }, [activeBrowseGroups, isSearchActive]);
 
   const showSearchTransitionOverlay =
-    isPhotoSearchActive &&
+    isSearchActive &&
     isFetching &&
     allAssets.length === 0 &&
     lastBrowseGroups !== null &&
@@ -233,13 +190,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
   useEffect(() => {
     if (!isCarouselOpen) return;
     if (assetId && hasFetchedOnce) {
-      const browseItems = isPhotoSearchActive
-        ? dedupeBrowseItemsById([
-            ...flattenBrowseGroups(topResultsBrowseGroups),
-            ...flattenBrowseGroups(searchResultBrowseGroups),
-          ])
-        : flattenBrowseGroups(browseGroups);
-      const index = findBrowseItemIndexByAssetId(browseItems, assetId);
+      const index = findBrowseItemIndexByAssetId(activeBrowseItems, assetId);
       if (index >= 0) {
         setSlideIndex(index);
         setIsLocatingAsset(false);
@@ -257,7 +208,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     }
   }, [
     assetId,
-    flatAssets,
+    activeBrowseItems,
     isCarouselOpen,
     hasFetchedOnce,
     hasNextPage,
@@ -268,14 +219,8 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
   ]);
 
   useEffect(() => {
-    if (assetId && flatAssets.length > 0) {
-      const browseItems = isPhotoSearchActive
-        ? dedupeBrowseItemsById([
-            ...flattenBrowseGroups(topResultsBrowseGroups),
-            ...flattenBrowseGroups(searchResultBrowseGroups),
-          ])
-        : flattenBrowseGroups(browseGroups);
-      const index = findBrowseItemIndexByAssetId(browseItems, assetId);
+    if (assetId && activeBrowseAssets.length > 0) {
+      const index = findBrowseItemIndexByAssetId(activeBrowseItems, assetId);
       if (index >= 0) {
         setSlideIndex(index);
         setIsLocatingAsset(false);
@@ -283,23 +228,20 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
     }
   }, [
     assetId,
-    browseGroups,
-    flatAssets.length,
-    isPhotoSearchActive,
-    searchResultBrowseGroups,
-    topResultsBrowseGroups,
+    activeBrowseAssets.length,
+    activeBrowseItems,
   ]);
 
-  if (error && !isPhotoSearchActive) throw new Error(error);
+  if (error && !isSearchActive) throw new Error(error);
 
   const showEndOfResults =
     !hasNextPage &&
-    (isPhotoSearchActive
+    (isSearchActive
       ? photoSearchView.resultAssets.length > 0
       : allAssets.length > 0);
 
   const browseGalleryProps: AssetGalleryProps = {
-    browseGroups,
+    browseGroups: activeBrowseGroups,
     openCarousel,
     onLoadMore: handleLoadMore,
     hasMore: hasNextPage,
@@ -313,9 +255,10 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
         sortBy={sortBy}
         onSortByChange={setSortBy}
         onFiltersChange={() => {}}
+        browseItems={activeBrowseItems}
       />
 
-      {isPhotoSearchActive ? (
+      {isSearchActive ? (
         renderSearchSections()
       ) : isFetching && allAssets.length === 0 ? (
         <PhotosLoadingSkeleton />
@@ -328,15 +271,15 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
 
       {showEndOfResults && (
         <div className="text-center p-4 text-gray-500">
-          {t(`assets.${category}.end_of_results`)}
+          {t("assets.all.end_of_results")}
         </div>
       )}
 
       {isCarouselOpen &&
-        (flatAssets.length > 0 ? (
+        (activeBrowseAssets.length > 0 ? (
           <>
             <FullScreenCarousel
-              photos={flatAssets}
+              photos={activeBrowseAssets}
               initialSlide={slideIndex >= 0 ? slideIndex : 0}
               slideIndex={slideIndex >= 0 ? slideIndex : undefined}
               onClose={closeCarousel}
@@ -347,15 +290,15 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
                 <div className="text-white text-center bg-black/50 backdrop-blur-sm rounded-2xl p-8 max-w-md">
                   <div className="loading loading-spinner loading-lg mb-4"></div>
                   <p className="text-lg font-medium mb-2">
-                    {t(`assets.${category}.locating_asset`)}
+                    {t("assets.all.locating_asset")}
                   </p>
                   {hasNextPage && !isFetching && !isFetchingNextPage ? (
                     <p className="text-sm text-gray-300">
-                      {t(`assets.${category}.loading_more_data`)}
+                      {t("assets.all.loading_more_data")}
                     </p>
                   ) : (
                     <p className="text-sm text-gray-300">
-                      {t(`assets.${category}.asset_not_available`)}
+                      {t("assets.all.asset_not_available")}
                     </p>
                   )}
                 </div>
@@ -366,7 +309,7 @@ export function AssetsGalleryPage({ category }: AssetsGalleryPageProps) {
           <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
             <div className="text-white text-center">
               <div className="loading loading-spinner loading-lg mb-4"></div>
-              <p>{t(`assets.${category}.loading_assets`)}</p>
+              <p>{t("assets.all.loading_assets")}</p>
             </div>
           </div>
         ))}

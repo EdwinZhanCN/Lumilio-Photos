@@ -2,14 +2,12 @@ import { MagnifyingGlassIcon } from "@heroicons/react/24/outline/index.js";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
 import {
-  useCurrentTab,
   useSearchQuery,
   useUIActions,
 } from "@/features/assets/selectors";
 
 export default function SearchBar() {
   const { t } = useI18n();
-  const currentTab = useCurrentTab();
   const searchQuery = useSearchQuery();
   const { setSearchQuery, applySearch } = useUIActions();
   const normalizedSearchQuery = searchQuery.trim();
@@ -110,15 +108,9 @@ export default function SearchBar() {
                   id="search-input"
                   name="search"
                   type="text"
-                  placeholder={
-                    currentTab === "photos"
-                      ? t("search.placeholderai", {
-                          defaultValue: "Search photos, scenes, and text...",
-                        })
-                      : t("search.placeholder", {
-                          defaultValue: "Search by filename...",
-                        })
-                  }
+                  placeholder={t("search.placeholderai", {
+                    defaultValue: "Search photos, videos, scenes, and text...",
+                  })}
                   value={searchText}
                   className="input input-sm input-bordered search-input pr-8"
                   onChange={handleInputChange}
