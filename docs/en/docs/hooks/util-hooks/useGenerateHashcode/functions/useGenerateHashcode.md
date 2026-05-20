@@ -4,7 +4,7 @@
 
 > **useGenerateHashcode**(): [`useGenerateHashcodeReturn`](../interfaces/useGenerateHashcodeReturn.md)
 
-Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:35](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ed2e8c20d69132750b532b7a00ad39e7d914ba1e/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L35)
+Defined in: [hooks/util-hooks/useGenerateHashcode.tsx:35](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/hooks/util-hooks/useGenerateHashcode.tsx#L35)
 
 Custom hook for generating file hashcodes using a Web Worker.
 Manages its own state for progress and generation status.
