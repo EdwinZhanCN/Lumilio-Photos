@@ -53,10 +53,12 @@
           "ui.semanticTokens": true
         },
         "go.testFlags": ["-v", "-count=1"],
+
         // Rust
         "rust-analyzer.checkOnSave": true,
         "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
         "rust-analyzer.server.path": "/usr/local/cargo/bin/rust-analyzer",
+
         // ESLint
         "eslint.workingDirectories": ["./web"],
         "eslint.validate": [
@@ -65,6 +67,7 @@
           "javascriptreact",
           "typescriptreact"
         ],
+
         // Files
         "files.watcherExclude": {
           "**/target/**": true,
@@ -75,10 +78,16 @@
         "files.exclude": {
           "**/target/**": true
         },
+
         // Terminal
-        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.defaultProfile.linux": "zsh",
         "terminal.integrated.profiles.linux": {
-          "bash": { "path": "/bin/bash" }
+          "zsh": {
+            "path": "/usr/bin/zsh"
+          },
+          "bash": {
+            "path": "/bin/bash"
+          }
         }
       }
     }
