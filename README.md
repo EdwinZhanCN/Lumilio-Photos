@@ -44,8 +44,8 @@ docker compose up -d
 
 Access:
 - Web UI: http://localhost:6657
-- API: http://localhost:8080
-- API Docs: http://localhost:8080/swagger/index.html
+- API: http://localhost:6680
+- API Docs: http://localhost:6680/swagger/index.html
 
 Security key behavior:
 - `LUMILIO_SECRET_KEY` is treated as a key file path (not raw key text).
@@ -68,12 +68,21 @@ make dev
 
 Access:
 - Web UI: http://localhost:6657
-- API: http://localhost:8080/api/v1/health
-- API Docs: http://localhost:8080/swagger/index.html
+- API: http://localhost:6680/api/v1/health
+- API Docs: http://localhost:6680/swagger/index.html
 
-**Note:** Database runs on port 5433
-Development database uses the standalone image defined in `server/db.Dockerfile`; it is not started via `docker compose`.
+**Note:** Database runs on port 5433. Outside Dev Containers, `make db-up` starts it from `server/db.Dockerfile`.
 `LUMILIO_SECRET_KEY` defaults to `./data/storage/.secrets/lumilio_secret_key` in local dev templates.
+
+#### Dev Container
+
+Open the repo in a Dev Container (`.devcontainer/`). Compose starts PostgreSQL (`5433`) and the dev image; run `make dev` inside the container for API (`6680`) and Vite (`6657`).
+
+Optional Natural Earth import:
+
+```bash
+cd .devcontainer && docker compose --profile geodata run --rm naturalearth-import
+```
 
 ### Make Commands
 

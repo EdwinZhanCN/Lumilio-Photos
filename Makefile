@@ -7,7 +7,7 @@ GO := go
 NPM := npm
 DOCKER := docker
 
-API_URL ?= http://localhost:8080
+API_URL ?= http://localhost:6680
 VITE_API_URL ?= $(API_URL)
 
 DEV_DB_IMAGE ?= lumilio-db:latest
@@ -31,6 +31,8 @@ setup:
 	@command -v wasm-pack >/dev/null 2>&1 || { curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh; }
 	@echo "==> Ensuring river CLI is installed"
 	@command -v river >/dev/null 2>&1 || { cd $(SERVER_DIR) && $(GO) install github.com/riverqueue/river/cmd/river@v0.24.0; }
+	@echo "==> Ensuring swag CLI is installed"
+	@command -v swag >/dev/null 2>&1 || { $(GO) install github.com/swaggo/swag/v2/cmd/swag@v2.0.0-rc5; }
 	@echo "==> Setup complete"
 
 env-dev:
@@ -39,7 +41,7 @@ env-dev:
 		echo "==> Creating $(SERVER_DIR)/.env.development"; \
 		printf '%s\n' \
 		"SERVER_ENV=development" \
-		"SERVER_PORT=8080" \
+		"SERVER_PORT=6680" \
 		"SERVER_LOG_LEVEL=debug" \
 		"SERVER_CORS_ALLOWED_ORIGINS=http://localhost:6657,https://localhost:6657" \
 		"" \
