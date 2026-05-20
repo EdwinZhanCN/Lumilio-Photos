@@ -54,7 +54,7 @@ Security key behavior:
 
 ### Development
 
-**Prerequisites:** Go 1.24+, Node.js 23+, Docker, Make
+**Prerequisites:** Go 1.25+, Node.js 23+, Docker, Make
 
 ```bash
 # Clone and setup

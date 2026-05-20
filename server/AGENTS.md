@@ -7,7 +7,7 @@
   - `make server-dev`
 - Full integration (DB + server + web): `make dev`.
 - Compatibility matrix:
-  - Go `1.24.x`
+  - Go `1.25.x`
   - PostgreSQL `16` with `pgvector` (Docker service `db`)
   - River CLI `0.24.x` (`river --version` must work)
   - Media tools on PATH: `exiftool`, `ffmpeg`, `ffprobe`, `dcraw`
@@ -36,7 +36,7 @@
 - Browser API blocked in dev: origin must match current CORS config (`http://localhost:6657`) -> `internal/api/router.go`.
 
 ## Lumen SDK: How We Use It (`go doc` First)
-- SDK pin: `github.com/edwinzhancn/lumen-sdk v1.1.3` (`server/go.mod`).
+- SDK pin: `github.com/edwinzhancn/lumen-sdk v1.1.4` (`server/go.mod`).
 - Inspect docs quickly:
   - `cd server && go doc github.com/edwinzhancn/lumen-sdk/pkg/client LumenClient`
   - `cd server && go doc github.com/edwinzhancn/lumen-sdk/pkg/config`
