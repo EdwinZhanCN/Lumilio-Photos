@@ -80,10 +80,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: /bin/sh -c "while sleep 1000; do :; done"
+    command: /bin/bash -c "while sleep 1000; do :; done"
     ports:
-      - "6680:6680"   # Go API server (make server-dev)
-      - "6657:6657"   # Vite dev server (make web-dev)
+      - "6680:6680" # Go API server (make server-dev)
+      - "6657:6657" # Vite dev server (make web-dev)
 
 volumes:
   db_data:

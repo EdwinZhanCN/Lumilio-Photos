@@ -10,12 +10,145 @@
 FROM golang:1.25.0-bookworm
 
 # ---------------------------------------------------------------
+# Base system dependencies
+# ---------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libvips-dev \
+    libraw-dev \
+    ffmpeg \
+    exiftool \
+    ca-certificates \
+    git \
+    unzip \
+    curl \
+    zsh \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# ---------------------------------------------------------------
+# Better terminal: zsh + Starship
+# ---------------------------------------------------------------
+RUN curl -sS https://starship.rs/install.sh | sh -s -- -y
+
+RUN mkdir -p /root/.config && cat > /root/.config/starship.toml <<'EOF'
+add_newline = false
+command_timeout = 1000
+
+format = """
+$username\
+$hostname\
+$directory\
+$git_branch\
+$git_status\
+$nodejs\
+$golang\
+$rust\
+$docker_context\
+$cmd_duration\
+$line_break\
+$character"""
+
+[username]
+show_always = false
+
+[hostname]
+ssh_only = true
+
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+
+[git_branch]
+symbol = "git: "
+format = "[$symbol$branch]($style) "
+
+[git_status]
+format = "([$all_status$ahead_behind]($style) )"
+
+[nodejs]
+symbol = "node: "
+format = "[$symbol($version)]($style) "
+
+[golang]
+symbol = "go: "
+format = "[$symbol($version)]($style) "
+
+[rust]
+symbol = "rs: "
+format = "[$symbol($version)]($style) "
+
+[docker_context]
+symbol = "docker: "
+format = "[$symbol$context]($style) "
+
+[cmd_duration]
+min_time = 1000
+format = "took [$duration]($style) "
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+EOF
+
+RUN cat > /root/.zshrc <<'EOF'
+# zsh configuration for the dev container.
+
+export PATH="/root/go/bin:/usr/local/cargo/bin:/usr/local/go/bin:$PATH"
+
+# Enable Starship prompt.
+eval "$(starship init zsh)"
+
+# History
+HISTFILE=/root/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt HIST_IGNORE_DUPS
+setopt HIST_IGNORE_SPACE
+setopt SHARE_HISTORY
+
+# Quality-of-life options
+setopt AUTO_CD
+setopt CORRECT
+setopt PROMPT_SUBST
+
+# Completion
+autoload -Uz compinit
+compinit
+
+# Aliases
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+
+alias gs='git status'
+alias gd='git diff'
+alias gl='git log --oneline --graph --decorate'
+alias gco='git checkout'
+alias gb='git branch'
+
+alias pn='pnpm'
+alias pni='pnpm install'
+alias pnd='pnpm dev'
+alias pnb='pnpm build'
+alias pnt='pnpm test'
+alias pnl='pnpm lint'
+
+alias dc='docker compose'
+alias dps='docker ps'
+EOF
+
+RUN chsh -s /usr/bin/zsh root
+
+# ---------------------------------------------------------------
 # Node.js 23.x + pnpm (matches web/.nvmrc)
 # ---------------------------------------------------------------
 RUN curl -fsSL https://deb.nodesource.com/setup_23.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g pnpm@latest && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # ---------------------------------------------------------------
 # Rust toolchain (nightly + wasm target for WASM crates)
@@ -33,23 +166,6 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && rustup target add wasm32-unknown-unknown \
     && curl -fsSL https://rustwasm.github.io/wasm-pack/installer/init.sh | sh \
     && rm -rf /usr/local/cargo/registry /usr/local/cargo/git
-
-# ---------------------------------------------------------------
-# System dependencies for Go CGO (libvips, libraw) + media tools
-# ---------------------------------------------------------------
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    pkg-config \
-    libvips-dev \
-    libraw-dev \
-    ffmpeg \
-    exiftool \
-    ca-certificates \
-    git \
-    unzip \
-    curl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Go CLI tools (river, swag) are installed in postCreateCommand via
 # `make setup` so they land on the mounted /root/go volume instead of
