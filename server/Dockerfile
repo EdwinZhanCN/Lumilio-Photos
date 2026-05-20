@@ -57,7 +57,7 @@ RUN set -eux; \
     rm -rf /var/lib/apt/lists/*
 
 ENV STORAGE_PATH=/data/storage/primary \
-    SERVER_PORT=8080 \
+    SERVER_PORT=6680 \
     SERVER_ENV=production \
     PATH="/usr/local/bin:${PATH}"
 
@@ -80,6 +80,6 @@ RUN mkdir -p "${STORAGE_PATH}" && chown -R app:app /data /app
 
 USER app
 
-EXPOSE 8080
+EXPOSE 6680
 
 ENTRYPOINT ["server"]

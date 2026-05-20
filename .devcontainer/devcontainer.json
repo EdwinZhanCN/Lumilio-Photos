@@ -1,9 +1,6 @@
 {
   "name": "Lumilio Photos Development",
-  "dockerComposeFile": [
-    "../docker-compose.dev.yml",
-    "docker-compose.yml"
-  ],
+  "dockerComposeFile": "docker-compose.yml",
   "service": "devcontainer",
   "workspaceFolder": "/workspace",
 
@@ -13,9 +10,9 @@
   "remoteUser": "root",
 
   // ---- Port forwarding ----
-  "forwardPorts": [8080, 6657],
+  "forwardPorts": [6680, 6657],
   "portsAttributes": {
-    "8080": {
+    "6680": {
       "label": "Go API Server",
       "onAutoForward": "notify"
     },
@@ -93,11 +90,5 @@
 
   // Run after postCreateCommand, each time the container starts.
   // Ensures env files exist and storage directories are ready.
-  "postStartCommand": "cd /workspace && make env-dev && make env-web-dev && mkdir -p server/data/storage/primary",
-
-  // ---- Features (additional OCI-based add-ons) ----
-  "features": {
-    // GitHub CLI
-    "ghcr.io/devcontainers/features/github-cli:1": {}
-  }
+  "postStartCommand": "cd /workspace && make env-dev && make env-web-dev && mkdir -p server/data/storage/primary"
 }

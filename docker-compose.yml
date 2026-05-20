@@ -27,7 +27,7 @@ services:
             db:
                 condition: service_healthy
         environment:
-            SERVER_PORT: 8080
+            SERVER_PORT: 6680
             SERVER_ENV: development
             SERVER_LOG_LEVEL: debug
             DB_HOST: db
@@ -51,6 +51,7 @@ services:
             GEOCODING_USER_AGENT: Lumilio-Photos/1.0
             GEOCODING_NATURALEARTH_CITY_RADIUS_METERS: "50000"
             ML_CLIP_ENABLED: "false"
+            ML_BIOCLIP_ENABLED: "false"
             ML_OCR_ENABLED: "false"
             ML_CAPTION_ENABLED: "false"
             ML_FACE_ENABLED: "false"
@@ -60,11 +61,23 @@ services:
             LLM_API_KEY: your-api-key-here
             LLM_MODEL_NAME: your-model-name
             LLM_BASE_URL: your-openai-compatiable-base-url
+            TRANSCODE_HW_ACCEL: auto
+        # Uncomment below to enable hardware-accelerated transcoding (Intel/AMD GPU):
+        # devices:
+        #     - /dev/dri:/dev/dri
+        # For NVIDIA GPU, use the following instead + nvidia-container-toolkit:
+        # deploy:
+        #     resources:
+        #         reservations:
+        #             devices:
+        #                 - driver: nvidia
+        #                   count: 1
+        #                   capabilities: [gpu]
         volumes:
             # Replace /PATH/TO/YOUR/ASSETS with your host storage root directory.
             - /PATH/TO/YOUR/ASSETS:/data/storage
         ports:
-            - "8080:8080"
+            - "6680:6680"
 
     web:
         build:
@@ -79,7 +92,7 @@ services:
         environment:
             API_URL: ""
         ports:
-            - "6680:80"
+            - "6657:80"
 
 volumes:
     db_data:
