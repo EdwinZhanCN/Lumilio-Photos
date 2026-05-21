@@ -4,4 +4,4 @@
 
 > **GlobalMessageType** = `"success"` \| `"error"` \| `"hint"` \| `"info"`
 
-Defined in: [contexts/GlobalContext.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/contexts/GlobalContext.tsx#L11)
+Defined in: [contexts/GlobalContext.tsx:11](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/contexts/GlobalContext.tsx#L11)
