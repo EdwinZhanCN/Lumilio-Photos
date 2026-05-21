@@ -2,7 +2,7 @@
 
 # Interface: SingleHashPayload
 
-Defined in: [workers/hash.worker.ts:19](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ed2e8c20d69132750b532b7a00ad39e7d914ba1e/web/src/workers/hash.worker.ts#L19)
+Defined in: [workers/hash.worker.ts:19](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/workers/hash.worker.ts#L19)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [workers/hash.worker.ts:19](https://github.com/EdwinZhanCN/Lumilio-P
 
 > `optional` **error?**: `string`
 
-Defined in: [workers/hash.worker.ts:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ed2e8c20d69132750b532b7a00ad39e7d914ba1e/web/src/workers/hash.worker.ts#L22)
+Defined in: [workers/hash.worker.ts:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/workers/hash.worker.ts#L22)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [workers/hash.worker.ts:22](https://github.com/EdwinZhanCN/Lumilio-P
 
 > **hash**: `string`
 
-Defined in: [workers/hash.worker.ts:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ed2e8c20d69132750b532b7a00ad39e7d914ba1e/web/src/workers/hash.worker.ts#L21)
+Defined in: [workers/hash.worker.ts:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/workers/hash.worker.ts#L21)
 
 ***
 
@@ -26,4 +26,4 @@ Defined in: [workers/hash.worker.ts:21](https://github.com/EdwinZhanCN/Lumilio-P
 
 > **index**: `number`
 
-Defined in: [workers/hash.worker.ts:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ed2e8c20d69132750b532b7a00ad39e7d914ba1e/web/src/workers/hash.worker.ts#L20)
+Defined in: [workers/hash.worker.ts:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/workers/hash.worker.ts#L20)
