@@ -2,7 +2,7 @@
 
 # Interface: useExportImageReturn
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/hooks/util-hooks/useExportImage.tsx#L27)
+Defined in: [hooks/util-hooks/useExportImage.tsx:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L27)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:27](https://github.com/EdwinZha
 
 > **cancelExport**: () => `void`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:37](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/hooks/util-hooks/useExportImage.tsx#L37)
+Defined in: [hooks/util-hooks/useExportImage.tsx:37](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L37)
 
 #### Returns
 
@@ -22,7 +22,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:37](https://github.com/EdwinZha
 
 > **downloadOriginal**: (`asset`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/hooks/util-hooks/useExportImage.tsx#L30)
+Defined in: [hooks/util-hooks/useExportImage.tsx:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L30)
 
 #### Parameters
 
@@ -164,7 +164,7 @@ Number of members in the stack
 
 > **exportImage**: (`asset`, `options`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/hooks/util-hooks/useExportImage.tsx#L31)
+Defined in: [hooks/util-hooks/useExportImage.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L31)
 
 #### Parameters
 
@@ -310,7 +310,7 @@ Number of members in the stack
 
 > **exportMultiple**: (`assets`, `options`, `priority?`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/hooks/util-hooks/useExportImage.tsx#L32)
+Defined in: [hooks/util-hooks/useExportImage.tsx:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L32)
 
 #### Parameters
 
@@ -336,7 +336,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:32](https://github.com/EdwinZha
 
 > **exportProgress**: [`ExportProgress`](ExportProgress.md) \| `null`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/hooks/util-hooks/useExportImage.tsx#L29)
+Defined in: [hooks/util-hooks/useExportImage.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L29)
 
 ***
 
@@ -344,4 +344,4 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:29](https://github.com/EdwinZha
 
 > **isExporting**: `boolean`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/ffac30fd390112d58d7880cbf90dd25c7f3bf55b/web/src/hooks/util-hooks/useExportImage.tsx#L28)
+Defined in: [hooks/util-hooks/useExportImage.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L28)
