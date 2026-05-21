@@ -10,7 +10,7 @@ import (
 	"server/internal/utils/imaging"
 )
 
-func TestProcessMLImageTensorFromReaderCaptionPadsTo448Square(t *testing.T) {
+func TestProcessMLImageTensorFromReaderCaptionPadsTo1024Square(t *testing.T) {
 	imaging.StartVips()
 
 	out, err := ProcessMLImageTensorFromReader(bytes.NewReader(synthJPEG(t, 1200, 800)), PurposeCaption)
@@ -18,17 +18,17 @@ func TestProcessMLImageTensorFromReaderCaptionPadsTo448Square(t *testing.T) {
 		t.Fatalf("ProcessMLImageTensorFromReader: %v", err)
 	}
 
-	if out.Width != 448 || out.Height != 448 || out.Channels != 3 {
-		t.Fatalf("caption tensor shape = %dx%dx%d, want 448x448x3", out.Width, out.Height, out.Channels)
+	if out.Width != 1024 || out.Height != 1024 || out.Channels != 3 {
+		t.Fatalf("caption tensor shape = %dx%dx%d, want 1024x1024x3", out.Width, out.Height, out.Channels)
 	}
 	if out.Layout != "HWC" || out.DType != "uint8" || out.ColorSpace != "RGB" {
 		t.Fatalf("caption tensor metadata = %s/%s/%s, want HWC/uint8/RGB", out.Layout, out.DType, out.ColorSpace)
 	}
-	if len(out.Data) != 448*448*3 {
-		t.Fatalf("caption tensor len = %d, want %d", len(out.Data), 448*448*3)
+	if len(out.Data) != 1024*1024*3 {
+		t.Fatalf("caption tensor len = %d, want %d", len(out.Data), 1024*1024*3)
 	}
 
-	padOffset := (224 * 3)
+	padOffset := 512 * 3
 	padPixel := out.Data[padOffset : padOffset+3]
 	if padPixel[0] != 128 || padPixel[1] != 128 || padPixel[2] != 128 {
 		t.Fatalf("top padding pixel = [%d %d %d], want [128 128 128]", padPixel[0], padPixel[1], padPixel[2])

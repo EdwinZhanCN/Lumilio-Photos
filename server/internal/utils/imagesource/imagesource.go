@@ -138,11 +138,11 @@ func mlOptions(purpose Purpose) (imaging.ProcessOptions, error) {
 		}, nil
 	case PurposeCaption:
 		return imaging.ProcessOptions{
-			Width:     448,
-			Height:    448,
+			Width:     1024,
+			Height:    1024,
 			Enlarge:   true,
-			PadWidth:  448,
-			PadHeight: 448,
+			PadWidth:  1024,
+			PadHeight: 1024,
 			PadColor:  &vips.Color{R: 128, G: 128, B: 128},
 			Quality:   90,
 			Format:    vips.ImageTypeWEBP,

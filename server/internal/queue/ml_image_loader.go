@@ -26,6 +26,15 @@ func NewDBMLImageLoader(queries *repo.Queries) *DBMLImageLoader {
 	return &DBMLImageLoader{Queries: queries}
 }
 
+func mlThumbnailSize(purpose imagesource.Purpose) string {
+	switch purpose {
+	case imagesource.PurposeOCR, imagesource.PurposeFace:
+		return "medium"
+	default:
+		return "large"
+	}
+}
+
 func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID pgtype.UUID, purpose imagesource.Purpose, preprocessVersion string) (*imagesource.MLImage, error) {
 	if l == nil || l.Queries == nil {
 		return nil, fmt.Errorf("ml image loader unavailable")
@@ -50,24 +59,25 @@ func (l *DBMLImageLoader) LoadMLImage(ctx context.Context, assetID pgtype.UUID, 
 		return nil, fmt.Errorf("get repository: %w", err)
 	}
 
+	thumbnailSize := mlThumbnailSize(purpose)
 	thumbnail, err := l.Queries.GetThumbnailByAssetAndSize(ctx, repo.GetThumbnailByAssetAndSizeParams{
 		AssetID: assetID,
-		Size:    "large",
+		Size:    thumbnailSize,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("get large thumbnail: %w", err)
+		return nil, fmt.Errorf("get %s thumbnail: %w", thumbnailSize, err)
 	}
 
 	thumbnailPath := filepath.Join(repository.Path, filepath.FromSlash(thumbnail.StoragePath))
 	file, err := os.Open(thumbnailPath)
 	if err != nil {
-		return nil, fmt.Errorf("open large thumbnail: %w", err)
+		return nil, fmt.Errorf("open %s thumbnail: %w", thumbnailSize, err)
 	}
 	defer file.Close()
 
 	imageData, err := imagesource.ProcessMLImageTensorFromReader(file, purpose)
 	if err != nil {
-		return nil, fmt.Errorf("process large thumbnail for ml: %w", err)
+		return nil, fmt.Errorf("process %s thumbnail for ml: %w", thumbnailSize, err)
 	}
 
 	return imageData, nil
