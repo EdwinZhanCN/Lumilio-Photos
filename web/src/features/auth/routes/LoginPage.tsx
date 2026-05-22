@@ -11,7 +11,6 @@ import {
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../hooks/useAuth.ts";
-import { useBootstrapStatus } from "../hooks/useBootstrapStatus.ts";
 import type {
   ApiResult,
   AuthResponse,
@@ -58,7 +57,6 @@ function getApiMessage(error: unknown, fallback: string): string {
 
 const LoginPage: React.FC = () => {
   const { t } = useI18n();
-  const bootstrapQuery = useBootstrapStatus();
   const {
     login,
     verifyMFA,
@@ -93,8 +91,6 @@ const LoginPage: React.FC = () => {
     return `${from.pathname}${from.search ?? ""}${from.hash ?? ""}`;
   }, [location.state]);
 
-  const bootstrapStatus = bootstrapQuery.data?.data;
-  const isBootstrapMode = bootstrapStatus?.is_bootstrap_mode ?? false;
   const passkeySupport = useMemo(() => getPasskeySupport(), []);
   const displayName =
     challenge?.user?.display_name || challenge?.user?.username || username;
@@ -237,31 +233,22 @@ const LoginPage: React.FC = () => {
                       ? t("auth.login.passwordTitle", {
                           defaultValue: "Enter your password",
                         })
-                      : isBootstrapMode
-                        ? t("auth.login.bootstrapTitle", {
-                            defaultValue: "Set up your Admin account",
-                          })
-                        : t("auth.login.usernameTitle", {
-                            defaultValue: "Continue with your username",
-                          })}
+                      : t("auth.login.usernameTitle", {
+                          defaultValue: "Continue with your username",
+                        })}
                 </h1>
 
-                {(challenge || showPasswordStep || isBootstrapMode) && (
+                {(challenge || showPasswordStep) && (
                   <p className="text-sm text-base-content/80">
                     {challenge
                       ? t("auth.login.verifySubtitle", {
                           defaultValue:
                             "Complete sign in with your authenticator app or a recovery code.",
                         })
-                      : showPasswordStep
-                        ? t("auth.login.passwordSubtitle", {
-                            defaultValue:
-                              "Use your password if you prefer not to use a passkey on this device.",
-                          })
-                        : t("auth.login.bootstrapSubtitle", {
-                            defaultValue:
-                              "No users exist yet. Create the first account to claim Admin access.",
-                          })}
+                      : t("auth.login.passwordSubtitle", {
+                          defaultValue:
+                            "Use your password if you prefer not to use a passkey on this device.",
+                        })}
                   </p>
                 )}
               </div>
@@ -274,30 +261,7 @@ const LoginPage: React.FC = () => {
               </div>
             )}
 
-            {!challenge && isBootstrapMode ? (
-              <div className="rounded-xl border border-warning/40 bg-warning/10 p-4">
-                <p className="text-sm font-semibold text-warning">
-                  {t("auth.login.bootstrapPromptTitle", {
-                    defaultValue: "First-time setup required",
-                  })}
-                </p>
-                <p className="mt-1.5 text-xs text-base-content/80">
-                  {t("auth.login.bootstrapPromptBody", {
-                    defaultValue:
-                      "The first registration becomes Admin and will guide you through passkey or authenticator setup.",
-                  })}
-                </p>
-                <Link
-                  to="/register"
-                  state={location.state}
-                  className="btn btn-warning btn-sm mt-4 w-full"
-                >
-                  {t("auth.login.createAdmin", {
-                    defaultValue: "Create the first Admin account",
-                  })}
-                </Link>
-              </div>
-            ) : challenge ? (
+            {challenge ? (
               <form className="flex flex-col gap-5" onSubmit={handleVerifyMFA}>
                 <div className="flex items-start gap-3 rounded-xl border border-base-300 bg-base-200/70 p-4">
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15">

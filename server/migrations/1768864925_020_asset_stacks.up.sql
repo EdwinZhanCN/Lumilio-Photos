@@ -1,14 +1,18 @@
--- Asset Stacks for RAW+JPEG grouping
+-- Asset Stacks for extensible photo grouping
 
 CREATE TYPE stack_relation AS ENUM (
     'raw_original',
     'jpeg_original',
     'edited_version',
-    'alternative'
+    'alternative',
+    'live_photo_still',
+    'live_photo_video'
 );
 
 CREATE TABLE asset_stacks (
     stack_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stack_kind TEXT NOT NULL DEFAULT 'manual',
+    group_key TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (stack_id)

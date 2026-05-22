@@ -20,7 +20,6 @@ const (
 	PurposeClip    Purpose = "clip"
 	PurposeBioClip Purpose = "bioclip"
 	PurposeOCR     Purpose = "ocr"
-
 	PurposeFace    Purpose = "face"
 )
 

@@ -373,6 +373,8 @@ func parsePhotoMetadata(rawData map[string]string) *dbtypes.PhotoSpecificMetadat
 		}
 	}
 
+	metadata.ContentIdentifier = extractContentIdentifier(rawData)
+
 	return metadata
 }
 
@@ -520,7 +522,20 @@ func parseVideoMetadata(rawData map[string]string) *dbtypes.VideoSpecificMetadat
 		}
 	}
 
+	metadata.ContentIdentifier = extractContentIdentifier(rawData)
+
 	return metadata
+}
+
+func extractContentIdentifier(rawData map[string]string) string {
+	if value, exists := rawData["ContentIdentifier"]; exists {
+		trimmed := strings.TrimRight(value, "\x00")
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+
+	return ""
 }
 
 // parseAudioMetadata parses raw EXIF data into AudioSpecificMetadata

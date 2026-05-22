@@ -19,6 +19,8 @@ import LoginPage from "@/features/auth/routes/LoginPage.tsx";
 import MFAPage from "@/features/auth/routes/MFAPage.tsx";
 import ChangePasswordPage from "@/features/auth/routes/ChangePasswordPage.tsx";
 import RegisterPage from "@/features/auth/routes/RegisterPage.tsx";
+import BootstrapLandingPage from "@/features/auth/routes/BootstrapLandingPage.tsx";
+import BootstrapRegisterPage from "@/features/auth/routes/BootstrapRegisterPage.tsx";
 import { Navigate } from "react-router-dom";
 
 export const publicRoutes = [
@@ -29,6 +31,17 @@ export const publicRoutes = [
   {
     path: "/register",
     element: <RegisterPage />,
+  },
+];
+
+export const bootstrapRoutes = [
+  {
+    path: "/bootstrap",
+    element: <BootstrapLandingPage />,
+  },
+  {
+    path: "/bootstrap/register",
+    element: <BootstrapRegisterPage />,
   },
 ];
 

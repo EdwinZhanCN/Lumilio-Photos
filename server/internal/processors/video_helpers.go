@@ -73,6 +73,7 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 		if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, result.Raw); err != nil {
 			return fmt.Errorf("save metadata: %w", err)
 		}
+		ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)
 	}
 
 	return nil

@@ -72,11 +72,6 @@ export function CapabilitiesMonitor() {
       capability: capabilities.ml.tasks.ocr,
     },
     {
-      key: "vlm",
-      label: t("settings.serverSettings.taskNames.vlmGenerate"),
-      capability: capabilities.ml.tasks.vlmGenerate,
-    },
-    {
       key: "face",
       label: t("settings.serverSettings.taskNames.faceDetectAndEmbed"),
       capability: capabilities.ml.tasks.faceDetectAndEmbed,
