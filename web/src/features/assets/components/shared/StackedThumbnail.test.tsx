@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Asset } from "@/lib/assets/types";
 import StackedThumbnail from "./StackedThumbnail";
 
@@ -22,12 +22,22 @@ vi.mock("./MediaThumbnail", () => ({
   ),
 }));
 
+let lastOverlayProps: {
+  open: boolean;
+  focusAssetId?: string;
+} | null = null;
+
 vi.mock("./StackCarouselOverlay", () => ({
   default: ({
     open,
+    focusAssetId,
   }: {
     open: boolean;
-  }) => (open ? <div>stack-carousel-overlay</div> : null),
+    focusAssetId?: string;
+  }) => {
+    lastOverlayProps = { open, focusAssetId };
+    return open ? <div>stack-carousel-overlay</div> : null;
+  },
 }));
 
 afterEach(() => {
@@ -42,9 +52,25 @@ const asset = {
     stack_size: 3,
     stack_cover: true,
   },
+  } as Asset;
+
+const matchedAsset = {
+  asset_id: "stack-cover",
+  original_filename: "stack-cover.jpg",
+  stack: {
+    stack_id: "stack-1",
+    stack_size: 3,
+    stack_cover: true,
+    cover_asset_id: "stack-cover",
+    matched_member_ids: ["stack-member"],
+  },
 } as Asset;
 
 describe("StackedThumbnail", () => {
+  beforeEach(() => {
+    lastOverlayProps = null;
+  });
+
   it("opens the stack carousel overlay without triggering tile click", () => {
     const handleClick = vi.fn();
 
@@ -60,6 +86,8 @@ describe("StackedThumbnail", () => {
 
     expect(handleClick).not.toHaveBeenCalled();
     expect(screen.getByText("stack-carousel-overlay")).toBeInTheDocument();
+    expect(lastOverlayProps?.open).toBe(true);
+    expect(lastOverlayProps?.focusAssetId).toBe("stack-cover");
   });
 
   it("keeps thumbnail click behavior unchanged", () => {
@@ -76,5 +104,22 @@ describe("StackedThumbnail", () => {
     fireEvent.click(screen.getByRole("button", { name: "thumbnail" }));
 
     expect(handleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a matched hint badge when the stack has matched members", () => {
+    render(<StackedThumbnail asset={matchedAsset} stackInfo={matchedAsset.stack!} />);
+
+    expect(screen.getByText(/matched/i)).toBeInTheDocument();
+  });
+
+  it("passes the matched member as carousel focus when the stack has a match", () => {
+    render(
+      <StackedThumbnail asset={matchedAsset} stackInfo={matchedAsset.stack!} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /view 3 related assets/i }));
+
+    expect(lastOverlayProps?.open).toBe(true);
+    expect(lastOverlayProps?.focusAssetId).toBe("stack-member");
   });
 });
