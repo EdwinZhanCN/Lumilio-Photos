@@ -412,9 +412,6 @@
                     "bioclip": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     },
-                    "caption": {
-                        "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
-                    },
                     "clip": {
                         "$ref": "#/components/schemas/dto.AssetIndexingTaskStatsDTO"
                     },
@@ -1523,9 +1520,6 @@
                     "bioclip_enabled": {
                         "type": "boolean"
                     },
-                    "caption_enabled": {
-                        "type": "boolean"
-                    },
                     "clip_enabled": {
                         "type": "boolean"
                     },
@@ -1564,9 +1558,6 @@
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     },
                     "ocr": {
-                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
-                    },
-                    "vlm_generate": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     }
                 },
@@ -2759,9 +2750,6 @@
             "dto.UpdateMLSettingsDTO": {
                 "properties": {
                     "bioclip_enabled": {
-                        "type": "boolean"
-                    },
-                    "caption_enabled": {
                         "type": "boolean"
                     },
                     "clip_enabled": {
@@ -6261,15 +6249,6 @@
                         "description": "Include face recognition",
                         "in": "query",
                         "name": "include_faces",
-                        "schema": {
-                            "default": false,
-                            "type": "boolean"
-                        }
-                    },
-                    {
-                        "description": "Include captions",
-                        "in": "query",
-                        "name": "include_captions",
                         "schema": {
                             "default": false,
                             "type": "boolean"

@@ -73,7 +73,6 @@ type AssetIndexingTaskSetStatsDTO struct {
 	Clip    AssetIndexingTaskStatsDTO `json:"clip"`
 	BioCLIP AssetIndexingTaskStatsDTO `json:"bioclip"`
 	OCR     AssetIndexingTaskStatsDTO `json:"ocr"`
-	Caption AssetIndexingTaskStatsDTO `json:"caption"`
 	Face    AssetIndexingTaskStatsDTO `json:"face"`
 }
 

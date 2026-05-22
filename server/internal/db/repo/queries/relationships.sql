@@ -51,8 +51,7 @@ SELECT
     COALESCE(albums_rel.albums, '[]'::json) as albums,
     COALESCE(species_rel.species_predictions, '[]'::json) as species_predictions,
     ocr_rel.ocr_result,
-    face_rel.face_result,
-    caption_rel.caption
+    face_rel.face_result
 FROM assets a
 LEFT JOIN LATERAL (
     SELECT json_agg(
@@ -170,20 +169,4 @@ LEFT JOIN LATERAL (
     FROM face_results fr
     WHERE fr.asset_id = a.asset_id
 ) face_rel ON true
-LEFT JOIN LATERAL (
-    SELECT jsonb_build_object(
-        'model_id', cap.model_id,
-        'description', cap.description,
-        'summary', cap.summary,
-        'confidence', cap.confidence,
-        'tokens_generated', cap.tokens_generated,
-        'processing_time_ms', cap.processing_time_ms,
-        'prompt_used', cap.prompt_used,
-        'finish_reason', cap.finish_reason,
-        'created_at', cap.created_at,
-        'updated_at', cap.updated_at
-    ) AS caption
-    FROM captions cap
-    WHERE cap.asset_id = a.asset_id
-) caption_rel ON true
 WHERE a.asset_id = $1 AND a.is_deleted = false;

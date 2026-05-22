@@ -43,18 +43,6 @@ func (s *clipWorkerLumenStub) OCR(context.Context, *imagesource.MLImage) (*types
 	panic("not implemented")
 }
 
-func (s *clipWorkerLumenStub) VLMCaption(context.Context, *imagesource.MLImage) (string, error) {
-	panic("not implemented")
-}
-
-func (s *clipWorkerLumenStub) VLMCaptionWithPrompt(context.Context, *imagesource.MLImage, string) (string, error) {
-	panic("not implemented")
-}
-
-func (s *clipWorkerLumenStub) VLMCaptionWithMetadata(context.Context, *imagesource.MLImage, string) (*types.TextGenerationV1, error) {
-	panic("not implemented")
-}
-
 func (s *clipWorkerLumenStub) GetAvailableModels(context.Context) ([]*discovery.NodeInfo, error) {
 	panic("not implemented")
 }

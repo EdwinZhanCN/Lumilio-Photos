@@ -695,7 +695,6 @@ func (h *AssetHandler) GetUploadProgress(c *gin.Context) {
 // @Param include_species query bool false "Include species predictions" default(true)
 // @Param include_ocr query bool false "Include OCR results" default(false)
 // @Param include_faces query bool false "Include face recognition" default(false)
-// @Param include_captions query bool false "Include captions" default(false)
 // @Success 200 {object} api.Result{data=dto.AssetDTO} "Asset details with optional relationships"
 // @Failure 400 {object} api.Result "Invalid asset ID"
 // @Failure 404 {object} api.Result "Asset not found"
@@ -721,7 +720,6 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 	// New AI includes - default to false to avoid performance impact
 	includeOCR := c.DefaultQuery("include_ocr", "false") == "true"
 	includeFaces := c.DefaultQuery("include_faces", "false") == "true"
-	includeCaptions := c.DefaultQuery("include_captions", "false") == "true"
 
 	asset, err := h.assetService.GetAssetWithOptions(
 		c.Request.Context(),
@@ -732,7 +730,6 @@ func (h *AssetHandler) GetAsset(c *gin.Context) {
 		includeSpecies,
 		includeOCR,
 		includeFaces,
-		includeCaptions,
 	)
 	if err != nil {
 		api.GinNotFound(c, err, "Asset not found")
@@ -1304,7 +1301,6 @@ func parseIndexingTasks(tasks []string) ([]service.AssetIndexingTask, error) {
 		case service.AssetIndexingTaskClip,
 			service.AssetIndexingTaskBioCLIP,
 			service.AssetIndexingTaskOCR,
-			service.AssetIndexingTaskCaption,
 			service.AssetIndexingTaskFace:
 			result = append(result, task)
 		default:
@@ -1330,10 +1326,6 @@ func toIndexingStatsResponseDTO(stats service.AssetIndexingStats) dto.AssetIndex
 			OCR: dto.AssetIndexingTaskStatsDTO{
 				IndexedCount: int(stats.Tasks.OCR.IndexedCount),
 				QueuedJobs:   int(stats.Tasks.OCR.QueuedJobs),
-			},
-			Caption: dto.AssetIndexingTaskStatsDTO{
-				IndexedCount: int(stats.Tasks.Caption.IndexedCount),
-				QueuedJobs:   int(stats.Tasks.Caption.QueuedJobs),
 			},
 			Face: dto.AssetIndexingTaskStatsDTO{
 				IndexedCount: int(stats.Tasks.Face.IndexedCount),
@@ -3091,7 +3083,6 @@ func (h *AssetHandler) ReprocessAsset(c *gin.Context) {
 			"process_clip":    true,
 			"process_bioclip": true,
 			"process_ocr":     true,
-			"process_caption": true,
 			"process_face":    true,
 		}
 

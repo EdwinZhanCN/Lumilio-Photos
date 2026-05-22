@@ -136,7 +136,6 @@ func main() {
 			zap.Bool("clip_enabled", currentMLConfig.CLIPEnabled),
 			zap.Bool("bioclip_enabled", currentMLConfig.BioCLIPEnabled),
 			zap.Bool("ocr_enabled", currentMLConfig.OCREnabled),
-			zap.Bool("caption_enabled", currentMLConfig.CaptionEnabled),
 			zap.Bool("face_enabled", currentMLConfig.FaceEnabled),
 		)
 	}
@@ -167,7 +166,7 @@ func main() {
 	}
 
 	if lumenService != nil {
-		warmupTasks := []string{"clip_image_embed", "bioclip_classify", "ocr", "vlm_generate", "face_detect_and_embed"}
+		warmupTasks := []string{"clip_image_embed", "bioclip_classify", "ocr", "face_detect_and_embed"}
 		lumenService.WarmupTasks(ctx, warmupTasks)
 		go func() {
 			ticker := time.NewTicker(30 * time.Second)
@@ -328,7 +327,6 @@ func initMLServices(
 
 	embeddingService := service.NewEmbeddingService(queries, pgxPool)
 	tagService := service.NewAIGeneratedTagService(queries)
-	captionService := service.NewCaptionService(queries, lumenService)
 	ocrService := service.NewOCRService(queries)
 	imageLoader := queue.NewDBMLImageLoader(queries)
 
@@ -347,14 +345,6 @@ func initMLServices(
 		ImageLoader:    imageLoader,
 	})
 	appLogger.Info("BioCLIP service and worker registered", zap.String("operation", "ml.init"))
-
-	river.AddWorker[queue.ProcessCaptionArgs](workers, &queue.ProcessCaptionWorker{
-		CaptionService: captionService,
-		LumenService:   lumenService,
-		ConfigProvider: settingsService,
-		ImageLoader:    imageLoader,
-	})
-	appLogger.Info("caption service and worker registered", zap.String("operation", "ml.init"))
 
 	river.AddWorker[queue.ProcessOcrArgs](workers, &queue.ProcessOcrWorker{
 		OCRService:     ocrService,

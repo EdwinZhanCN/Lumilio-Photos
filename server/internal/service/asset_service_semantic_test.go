@@ -49,18 +49,6 @@ func (s *semanticTestLumenStub) OCR(context.Context, *imagesource.MLImage) (*typ
 	panic("not implemented")
 }
 
-func (s *semanticTestLumenStub) VLMCaption(context.Context, *imagesource.MLImage) (string, error) {
-	panic("not implemented")
-}
-
-func (s *semanticTestLumenStub) VLMCaptionWithPrompt(context.Context, *imagesource.MLImage, string) (string, error) {
-	panic("not implemented")
-}
-
-func (s *semanticTestLumenStub) VLMCaptionWithMetadata(context.Context, *imagesource.MLImage, string) (*types.TextGenerationV1, error) {
-	panic("not implemented")
-}
-
 func (s *semanticTestLumenStub) GetAvailableModels(context.Context) ([]*discovery.NodeInfo, error) {
 	panic("not implemented")
 }

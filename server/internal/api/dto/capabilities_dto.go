@@ -19,7 +19,6 @@ type MLTaskSetDTO struct {
 	ClipTextEmbed      MLTaskCapabilityDTO `json:"clip_text_embed"`
 	BioClipClassify    MLTaskCapabilityDTO `json:"bioclip_classify"`
 	OCR                MLTaskCapabilityDTO `json:"ocr"`
-	VLMGenerate        MLTaskCapabilityDTO `json:"vlm_generate"`
 	FaceDetectAndEmbed MLTaskCapabilityDTO `json:"face_detect_and_embed"`
 }
 

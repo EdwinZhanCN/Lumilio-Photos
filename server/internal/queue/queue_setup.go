@@ -59,7 +59,6 @@ func New(dbpool *pgxpool.Pool, workers *river.Workers, logger *slog.Logger) (*ri
 		"process_clip":              {MaxWorkers: 2},
 		"process_bioclip":           {MaxWorkers: 2},
 		"process_ocr":               {MaxWorkers: 3},
-		"process_caption":           {MaxWorkers: 1},
 		"process_face":              {MaxWorkers: 2},
 		"process_phash":             {MaxWorkers: phashWorkers},
 	}

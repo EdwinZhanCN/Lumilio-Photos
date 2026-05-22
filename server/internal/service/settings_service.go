@@ -59,7 +59,6 @@ type MLSettings struct {
 	CLIPEnabled    bool
 	BioCLIPEnabled bool
 	OCREnabled     bool
-	CaptionEnabled bool
 	FaceEnabled    bool
 }
 
@@ -81,7 +80,6 @@ type UpdateMLSettingsInput struct {
 	CLIPEnabled    *bool
 	BioCLIPEnabled *bool
 	OCREnabled     *bool
-	CaptionEnabled *bool
 	FaceEnabled    *bool
 }
 
@@ -148,7 +146,6 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		MlClipEnabled:       row.MlClipEnabled,
 		MlBioclipEnabled:    row.MlBioclipEnabled,
 		MlOcrEnabled:        row.MlOcrEnabled,
-		MlCaptionEnabled:    row.MlCaptionEnabled,
 		MlFaceEnabled:       row.MlFaceEnabled,
 		UpdatedBy:           input.UpdatedBy,
 	}
@@ -191,9 +188,6 @@ func (s *settingsService) UpdateSystemSettings(ctx context.Context, input Update
 		}
 		if input.ML.OCREnabled != nil {
 			params.MlOcrEnabled = *input.ML.OCREnabled
-		}
-		if input.ML.CaptionEnabled != nil {
-			params.MlCaptionEnabled = *input.ML.CaptionEnabled
 		}
 		if input.ML.FaceEnabled != nil {
 			params.MlFaceEnabled = *input.ML.FaceEnabled
@@ -241,7 +235,6 @@ func (s *settingsService) GetMLConfig(ctx context.Context) (config.MLConfig, err
 		CLIPEnabled:    row.MlClipEnabled,
 		BioCLIPEnabled: row.MlBioclipEnabled,
 		OCREnabled:     row.MlOcrEnabled,
-		CaptionEnabled: row.MlCaptionEnabled,
 		FaceEnabled:    row.MlFaceEnabled,
 	}, nil
 }
@@ -280,7 +273,6 @@ func (s *settingsService) seedFromEnv(ctx context.Context) error {
 		MlClipEnabled:       mlCfg.CLIPEnabled,
 		MlBioclipEnabled:    mlCfg.BioCLIPEnabled,
 		MlOcrEnabled:        mlCfg.OCREnabled,
-		MlCaptionEnabled:    mlCfg.CaptionEnabled,
 		MlFaceEnabled:       mlCfg.FaceEnabled,
 	}
 
@@ -330,7 +322,6 @@ func mapSystemSettings(row repo.Setting) SystemSettings {
 			CLIPEnabled:    row.MlClipEnabled,
 			BioCLIPEnabled: row.MlBioclipEnabled,
 			OCREnabled:     row.MlOcrEnabled,
-			CaptionEnabled: row.MlCaptionEnabled,
 			FaceEnabled:    row.MlFaceEnabled,
 		},
 		UpdatedAt: updatedAt,

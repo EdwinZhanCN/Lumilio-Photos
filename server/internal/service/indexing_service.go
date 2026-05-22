@@ -27,7 +27,6 @@ const (
 	AssetIndexingTaskClip    AssetIndexingTask = "clip"
 	AssetIndexingTaskBioCLIP AssetIndexingTask = "bioclip"
 	AssetIndexingTaskOCR     AssetIndexingTask = "ocr"
-	AssetIndexingTaskCaption AssetIndexingTask = "caption"
 	AssetIndexingTaskFace    AssetIndexingTask = "face"
 )
 
@@ -48,7 +47,6 @@ type AssetIndexingStats struct {
 		Clip    AssetIndexingTaskStats
 		BioCLIP AssetIndexingTaskStats
 		OCR     AssetIndexingTaskStats
-		Caption AssetIndexingTaskStats
 		Face    AssetIndexingTaskStats
 	}
 }
@@ -137,7 +135,6 @@ func normalizeRequestedIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingT
 			AssetIndexingTaskClip,
 			AssetIndexingTaskBioCLIP,
 			AssetIndexingTaskOCR,
-			AssetIndexingTaskCaption,
 			AssetIndexingTaskFace,
 		}
 	}
@@ -146,7 +143,7 @@ func normalizeRequestedIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingT
 	result := make([]AssetIndexingTask, 0, len(tasks))
 	for _, task := range tasks {
 		switch task {
-		case AssetIndexingTaskClip, AssetIndexingTaskBioCLIP, AssetIndexingTaskOCR, AssetIndexingTaskCaption, AssetIndexingTaskFace:
+		case AssetIndexingTaskClip, AssetIndexingTaskBioCLIP, AssetIndexingTaskOCR, AssetIndexingTaskFace:
 			if seen[task] {
 				continue
 			}
@@ -207,11 +204,6 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 		return AssetIndexingStats{}, fmt.Errorf("count ocr coverage: %w", err)
 	}
 
-	stats.Tasks.Caption.IndexedCount, err = s.queries.CountPhotoAssetsWithCaptions(ctx, repositoryUUID)
-	if err != nil {
-		return AssetIndexingStats{}, fmt.Errorf("count caption coverage: %w", err)
-	}
-
 	stats.Tasks.Face.IndexedCount, err = s.queries.CountPhotoAssetsWithFaceResults(ctx, repositoryUUID)
 	if err != nil {
 		return AssetIndexingStats{}, fmt.Errorf("count face coverage: %w", err)
@@ -220,7 +212,6 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 	stats.Tasks.Clip.QueuedJobs = s.countPendingQueueJobs(ctx, "process_clip")
 	stats.Tasks.BioCLIP.QueuedJobs = s.countPendingQueueJobs(ctx, "process_bioclip")
 	stats.Tasks.OCR.QueuedJobs = s.countPendingQueueJobs(ctx, "process_ocr")
-	stats.Tasks.Caption.QueuedJobs = s.countPendingQueueJobs(ctx, "process_caption")
 	stats.Tasks.Face.QueuedJobs = s.countPendingQueueJobs(ctx, "process_face")
 	stats.ReindexJobs = s.countPendingQueueJobs(ctx, "reindex_assets")
 
@@ -427,12 +418,6 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 			Limit:        int32(limit),
 			Offset:       0,
 		})
-	case AssetIndexingTaskCaption:
-		return s.queries.ListPhotoAssetsMissingCaptions(ctx, repo.ListPhotoAssetsMissingCaptionsParams{
-			RepositoryID: repositoryUUID,
-			Limit:        int32(limit),
-			Offset:       0,
-		})
 	case AssetIndexingTaskFace:
 		return s.queries.ListPhotoAssetsMissingFaceResults(ctx, repo.ListPhotoAssetsMissingFaceResultsParams{
 			RepositoryID: repositoryUUID,
@@ -491,12 +476,6 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 		}
 		queued++
 	}
-	if candidate.tasks[AssetIndexingTaskCaption] {
-		if err := s.enqueueCaptionTask(ctx, candidate.asset.AssetID); err != nil {
-			return queued, err
-		}
-		queued++
-	}
 	if candidate.tasks[AssetIndexingTaskFace] {
 		if err := s.enqueueFaceTask(ctx, candidate.asset.AssetID); err != nil {
 			return queued, err
@@ -545,20 +524,6 @@ func (s *assetIndexingService) enqueueOCRTask(
 	}, &river.InsertOpts{Queue: "process_ocr"})
 	if err != nil {
 		return fmt.Errorf("enqueue OCR job: %w", err)
-	}
-	return nil
-}
-
-func (s *assetIndexingService) enqueueCaptionTask(
-	ctx context.Context,
-	assetID pgtype.UUID,
-) error {
-	_, err := s.queueClient.Insert(ctx, jobs.ProcessCaptionArgs{
-		AssetID:           assetID,
-		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, &river.InsertOpts{Queue: "process_caption"})
-	if err != nil {
-		return fmt.Errorf("enqueue caption job: %w", err)
 	}
 	return nil
 }
@@ -637,10 +602,6 @@ func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg config.MLConfig) 
 			}
 		case AssetIndexingTaskOCR:
 			if cfg.OCREnabled {
-				enabled = append(enabled, task)
-			}
-		case AssetIndexingTaskCaption:
-			if cfg.CaptionEnabled {
 				enabled = append(enabled, task)
 			}
 		case AssetIndexingTaskFace:

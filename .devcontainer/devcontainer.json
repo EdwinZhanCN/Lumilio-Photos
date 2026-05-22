@@ -1,103 +1,103 @@
 {
-  "name": "Lumilio Photos Development",
-  "dockerComposeFile": "docker-compose.yml",
-  "service": "devcontainer",
-  "workspaceFolder": "/workspace",
+    "name": "Lumilio Photos Development",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "devcontainer",
+    "workspaceFolder": "/workspace",
 
-  // Use `root` so file ownership matches the host (mounted volume).
-  // If you prefer a non-root user, change this to "vscode" and set
-  // USER_UID / USER_GID build args in the Dockerfile.
-  "remoteUser": "root",
+    // Use `root` so file ownership matches the host (mounted volume).
+    // If you prefer a non-root user, change this to "vscode" and set
+    // USER_UID / USER_GID build args in the Dockerfile.
+    "remoteUser": "root",
 
-  // ---- Port forwarding ----
-  "forwardPorts": [6680, 6657],
-  "portsAttributes": {
-    "6680": {
-      "label": "Go API Server",
-      "onAutoForward": "notify"
-    },
-    "6657": {
-      "label": "Vite Dev Server (Web)",
-      "onAutoForward": "openBrowserOnce"
-    }
-  },
-
-  // ---- VS Code customizations ----
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        // Go
-        "golang.go",
-        // Rust
-        "rust-lang.rust-analyzer",
-        "tamasfe.even-better-toml",
-        // Web
-        "dbaeumer.vscode-eslint",
-        "bradlc.vscode-tailwindcss",
-        "esbenp.prettier-vscode",
-        // Docker
-        "ms-azuretools.vscode-docker",
-        // PostgreSQL
-        "cweijan.vscode-postgresql-client2",
-        // YAML / docs
-        "redhat.vscode-yaml",
-        "yzhang.markdown-all-in-one"
-      ],
-      "settings": {
-        // Go
-        "go.useLanguageServer": true,
-        "go.gopath": "/root/go",
-        "go.goroot": "/usr/local/go",
-        "gopls": {
-          "build.buildFlags": ["-tags=development"],
-          "ui.semanticTokens": true
+    // ---- Port forwarding ----
+    "forwardPorts": [6680, 6657],
+    "portsAttributes": {
+        "6680": {
+            "label": "Go API Server",
+            "onAutoForward": "notify"
         },
-        "go.testFlags": ["-v", "-count=1"],
-
-        // Rust
-        "rust-analyzer.checkOnSave": true,
-        "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
-        "rust-analyzer.server.path": "/usr/local/cargo/bin/rust-analyzer",
-
-        // ESLint
-        "eslint.workingDirectories": ["./web"],
-        "eslint.validate": [
-          "javascript",
-          "typescript",
-          "javascriptreact",
-          "typescriptreact"
-        ],
-
-        // Files
-        "files.watcherExclude": {
-          "**/target/**": true,
-          "**/node_modules/**": true,
-          "**/.pnpm-store/**": true,
-          "**/pkg/**": true
-        },
-        "files.exclude": {
-          "**/target/**": true
-        },
-
-        // Terminal
-        "terminal.integrated.defaultProfile.linux": "zsh",
-        "terminal.integrated.profiles.linux": {
-          "zsh": {
-            "path": "/usr/bin/zsh"
-          },
-          "bash": {
-            "path": "/bin/bash"
-          }
+        "6657": {
+            "label": "Vite Dev Server (Web)",
+            "onAutoForward": "openBrowserOnce"
         }
-      }
-    }
-  },
+    },
 
-  // ---- Lifecycle hooks ----
-  // Run after the container is created. Installs all project dependencies.
-  "postCreateCommand": "echo '==> Installing project dependencies...' && cd /workspace && make setup",
+    // ---- VS Code customizations ----
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                // Go
+                "golang.go",
+                // Rust
+                "rust-lang.rust-analyzer",
+                "tamasfe.even-better-toml",
+                // Web
+                "dbaeumer.vscode-eslint",
+                "bradlc.vscode-tailwindcss",
+                "esbenp.prettier-vscode",
+                // Docker
+                "ms-azuretools.vscode-docker",
+                // PostgreSQL
+                "cweijan.vscode-postgresql-client2",
+                // YAML / docs
+                "redhat.vscode-yaml",
+                "yzhang.markdown-all-in-one"
+            ],
+            "settings": {
+                // Go
+                "go.useLanguageServer": true,
+                "go.gopath": "/root/go",
+                "go.goroot": "/usr/local/go",
+                "gopls": {
+                    "build.buildFlags": ["-tags=development"],
+                    "ui.semanticTokens": true
+                },
+                "go.testFlags": ["-v", "-count=1"],
 
-  // Run after postCreateCommand, each time the container starts.
-  // Ensures env files exist and storage directories are ready.
-  "postStartCommand": "cd /workspace && make env-dev && make env-web-dev && mkdir -p server/data/storage/primary"
+                // Rust
+                "rust-analyzer.checkOnSave": true,
+                "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+                "rust-analyzer.server.path": "/usr/local/cargo/bin/rust-analyzer",
+
+                // ESLint
+                "eslint.workingDirectories": ["./web"],
+                "eslint.validate": [
+                    "javascript",
+                    "typescript",
+                    "javascriptreact",
+                    "typescriptreact"
+                ],
+
+                // Files
+                "files.watcherExclude": {
+                    "**/target/**": true,
+                    "**/node_modules/**": true,
+                    "**/.pnpm-store/**": true,
+                    "**/pkg/**": true
+                },
+                "files.exclude": {
+                    "**/target/**": true
+                },
+
+                // Terminal
+                "terminal.integrated.defaultProfile.linux": "zsh",
+                "terminal.integrated.profiles.linux": {
+                    "zsh": {
+                        "path": "/usr/bin/zsh"
+                    },
+                    "bash": {
+                        "path": "/bin/bash"
+                    }
+                }
+            }
+        }
+    },
+
+    // ---- Lifecycle hooks ----
+    // Run after the container is created. Installs all project dependencies.
+    "postCreateCommand": "echo '==> Installing project dependencies...' && cd /workspace && make setup",
+
+    // Run after postCreateCommand, each time the container starts.
+    // Ensures env files exist and storage directories are ready.
+    "postStartCommand": "cd /workspace && make env-dev && make env-web-dev && mkdir -p server/data/storage/primary"
 }

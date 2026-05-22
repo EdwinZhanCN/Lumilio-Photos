@@ -43,7 +43,6 @@ type Querier interface {
 	CountLocationClusters(ctx context.Context, arg CountLocationClustersParams) (int64, error)
 	CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error)
 	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
-	CountPhotoAssetsWithCaptions(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountPhotoAssetsWithEmbeddingType(ctx context.Context, arg CountPhotoAssetsWithEmbeddingTypeParams) (int64, error)
 	CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountPhotoAssetsWithGeneratedTagSource(ctx context.Context, arg CountPhotoAssetsWithGeneratedTagSourceParams) (int64, error)
@@ -56,7 +55,6 @@ type Querier interface {
 	CountUsers(ctx context.Context) (int64, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
-	CreateCaption(ctx context.Context, arg CreateCaptionParams) (Caption, error)
 	CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (pgtype.UUID, error)
 	CreateFaceCluster(ctx context.Context, arg CreateFaceClusterParams) (FaceCluster, error)
 	CreateFaceClusterMember(ctx context.Context, arg CreateFaceClusterMemberParams) (FaceClusterMember, error)
@@ -78,7 +76,6 @@ type Querier interface {
 	DeleteAlbum(ctx context.Context, albumID int32) error
 	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
-	DeleteCaptionByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
 	DeleteExpiredRegistrationSessions(ctx context.Context) error
 	DeleteFaceCluster(ctx context.Context, clusterID int32) error
@@ -161,9 +158,6 @@ type Querier interface {
 	GetAvailableYears(ctx context.Context, repositoryID pgtype.UUID) ([]int32, error)
 	// 获取相机+镜头组合统计
 	GetCameraLensStats(ctx context.Context, arg GetCameraLensStatsParams) ([]GetCameraLensStatsRow, error)
-	GetCaptionByAsset(ctx context.Context, assetID pgtype.UUID) (Caption, error)
-	GetCaptionStatsByModel(ctx context.Context) ([]GetCaptionStatsByModelRow, error)
-	GetCaptionsByModel(ctx context.Context, arg GetCaptionsByModelParams) ([]Caption, error)
 	GetCheckpoint(ctx context.Context, id string) ([]byte, error)
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
 	GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCollapsedBrowseItemsUnifiedParams) ([]GetCollapsedBrowseItemsUnifiedRow, error)
@@ -208,7 +202,6 @@ type Querier interface {
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
 	GetLikedAssetsByType(ctx context.Context, arg GetLikedAssetsByTypeParams) ([]Asset, error)
-	GetLongCaptions(ctx context.Context, arg GetLongCaptionsParams) ([]Caption, error)
 	GetOCRResultByAsset(ctx context.Context, assetID pgtype.UUID) (OcrResult, error)
 	GetOCRStatsByModel(ctx context.Context) ([]GetOCRStatsByModelRow, error)
 	GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype.UUID) (GetOCRTextItemStatsByAssetRow, error)
@@ -253,7 +246,6 @@ type Querier interface {
 	GetTimeDistributionHourly(ctx context.Context, repositoryID pgtype.UUID) ([]GetTimeDistributionHourlyRow, error)
 	// 获取按月的拍摄时间分布
 	GetTimeDistributionMonthly(ctx context.Context, repositoryID pgtype.UUID) ([]GetTimeDistributionMonthlyRow, error)
-	GetTopCaptionsByTokens(ctx context.Context, limit int32) ([]Caption, error)
 	GetTopFacesByQuality(ctx context.Context, arg GetTopFacesByQualityParams) ([]FaceItem, error)
 	GetTopRatedAssets(ctx context.Context, arg GetTopRatedAssetsParams) ([]Asset, error)
 	GetTopSpeciesForAsset(ctx context.Context, arg GetTopSpeciesForAssetParams) ([]SpeciesPrediction, error)
@@ -281,7 +273,6 @@ type Querier interface {
 	ListPendingLocationClusters(ctx context.Context, arg ListPendingLocationClustersParams) ([]LocationCluster, error)
 	ListPeopleScoped(ctx context.Context, arg ListPeopleScopedParams) ([]ListPeopleScopedRow, error)
 	ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error)
-	ListPhotoAssetsMissingCaptions(ctx context.Context, arg ListPhotoAssetsMissingCaptionsParams) ([]Asset, error)
 	ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg ListPhotoAssetsMissingEmbeddingTypeParams) ([]Asset, error)
 	ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error)
 	ListPhotoAssetsMissingGeneratedTagSource(ctx context.Context, arg ListPhotoAssetsMissingGeneratedTagSourceParams) ([]Asset, error)
@@ -322,9 +313,6 @@ type Querier interface {
 	RevokeRefreshToken(ctx context.Context, tokenID int32) error
 	RevokeUserRefreshTokens(ctx context.Context, userID int32) error
 	SearchAssets(ctx context.Context, arg SearchAssetsParams) ([]Asset, error)
-	SearchAssetsByCaption(ctx context.Context, arg SearchAssetsByCaptionParams) ([]Asset, error)
-	SearchAssetsByCaptionSummary(ctx context.Context, arg SearchAssetsByCaptionSummaryParams) ([]Asset, error)
-	SearchAssetsByCaptionWithConfidence(ctx context.Context, arg SearchAssetsByCaptionWithConfidenceParams) ([]Asset, error)
 	SearchAssetsByFaceCluster(ctx context.Context, arg SearchAssetsByFaceClusterParams) ([]Asset, error)
 	SearchAssetsByFaceID(ctx context.Context, arg SearchAssetsByFaceIDParams) ([]Asset, error)
 	SearchAssetsByOCRText(ctx context.Context, arg SearchAssetsByOCRTextParams) ([]Asset, error)
@@ -347,8 +335,6 @@ type Querier interface {
 	UpdateAssetStatus(ctx context.Context, arg UpdateAssetStatusParams) (Asset, error)
 	UpdateAssetStatusWithErrors(ctx context.Context, arg UpdateAssetStatusWithErrorsParams) (Asset, error)
 	UpdateAssetStoragePathAndStatus(ctx context.Context, arg UpdateAssetStoragePathAndStatusParams) (Asset, error)
-	UpdateCaption(ctx context.Context, arg UpdateCaptionParams) (Caption, error)
-	UpdateCaptionStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateDiscoveredAssetByID(ctx context.Context, arg UpdateDiscoveredAssetByIDParams) (Asset, error)
 	// Resets all asset roles in a group, then flags the chosen keeper.
 	UpdateDuplicateGroupKeeperRole(ctx context.Context, arg UpdateDuplicateGroupKeeperRoleParams) error

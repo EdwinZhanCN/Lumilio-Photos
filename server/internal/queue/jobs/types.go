@@ -57,16 +57,6 @@ type ProcessOcrArgs struct {
 
 func (ProcessOcrArgs) Kind() string { return "process_ocr" }
 
-// ProcessCaptionArgs is the River job payload for AI image captioning.
-// Duplicated here (instead of importing processors) to avoid import cycles.
-type ProcessCaptionArgs struct {
-	AssetID           pgtype.UUID `json:"assetId"`
-	PreprocessVersion string      `json:"preprocessVersion,omitempty"`
-	CustomPrompt      string      `json:"customPrompt,omitempty"`
-}
-
-func (ProcessCaptionArgs) Kind() string { return "process_caption" }
-
 // ProcessFaceArgs is the River job payload for face detection and recognition.
 // Duplicated here (instead of importing processors) to avoid import cycles.
 type ProcessFaceArgs struct {
