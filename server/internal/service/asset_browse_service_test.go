@@ -94,3 +94,31 @@ func TestBrowseQueryResultFromItemsPaginatesVisibleItemsSeparatelyFromRawAssets(
 		t.Fatalf("expected second visible page to contain asset item, got %#v", secondPage.Items)
 	}
 }
+
+func TestPreferredStackFocusAssetIDPrefersMatchedMemberOverCover(t *testing.T) {
+	matchedID := uuid.New()
+	coverID := uuid.New()
+
+	stack := &BrowseStack{
+		CoverAssetID:     coverID,
+		MemberAssetIDs:   []uuid.UUID{coverID, matchedID},
+		MatchedMemberIDs: []uuid.UUID{matchedID},
+	}
+
+	if got := preferredStackFocusAssetID(stack); got != matchedID {
+		t.Fatalf("expected matched member focus, got %s", got)
+	}
+}
+
+func TestPreferredStackFocusAssetIDFallsBackToCover(t *testing.T) {
+	coverID := uuid.New()
+
+	stack := &BrowseStack{
+		CoverAssetID:   coverID,
+		MemberAssetIDs: []uuid.UUID{coverID, uuid.New()},
+	}
+
+	if got := preferredStackFocusAssetID(stack); got != coverID {
+		t.Fatalf("expected cover fallback, got %s", got)
+	}
+}

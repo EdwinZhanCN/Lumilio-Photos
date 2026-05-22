@@ -7,6 +7,7 @@ import { useStackCarouselAssets } from "@/features/assets/hooks/useStackCarousel
 
 interface StackCarouselOverlayProps {
   asset: Asset;
+  focusAssetId?: string;
   open: boolean;
   onClose: () => void;
 }
@@ -16,19 +17,20 @@ const overlayMessageClasses =
 
 export default function StackCarouselOverlay({
   asset,
+  focusAssetId,
   open,
   onClose,
 }: StackCarouselOverlayProps) {
   const { t } = useI18n();
   const { assets, isLoading, error } = useStackCarouselAssets(asset, open);
   const [activeAssetId, setActiveAssetId] = useState<string | undefined>(
-    asset.asset_id,
+    focusAssetId ?? asset.asset_id,
   );
 
   useEffect(() => {
     if (!open) return;
-    setActiveAssetId(asset.asset_id);
-  }, [asset.asset_id, open]);
+    setActiveAssetId(focusAssetId ?? asset.asset_id);
+  }, [asset.asset_id, focusAssetId, open]);
 
   const slideIndex = useMemo(() => {
     if (!activeAssetId) return -1;

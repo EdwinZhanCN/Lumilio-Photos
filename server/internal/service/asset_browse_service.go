@@ -22,6 +22,33 @@ type BrowseStack struct {
 	MatchedMemberIDs []uuid.UUID
 }
 
+// preferredStackFocusAssetID returns the asset that should be focused first
+// for semantic stack interactions. Matched members win; otherwise fall back to
+// the canonical cover asset.
+func preferredStackFocusAssetID(stack *BrowseStack) uuid.UUID {
+	if stack == nil {
+		return uuid.Nil
+	}
+
+	for _, assetID := range stack.MatchedMemberIDs {
+		if assetID != uuid.Nil {
+			return assetID
+		}
+	}
+
+	if stack.CoverAssetID != uuid.Nil {
+		return stack.CoverAssetID
+	}
+
+	for _, assetID := range stack.MemberAssetIDs {
+		if assetID != uuid.Nil {
+			return assetID
+		}
+	}
+
+	return uuid.Nil
+}
+
 // BrowseItem is one gallery row: Type is "asset" or "stack", ID is a stable prefixed key ("asset:..." / "stack:...").
 // Asset always carries the thumbnail row payload (cover for stacks). Stack is set only when Type is "stack".
 type BrowseItem struct {

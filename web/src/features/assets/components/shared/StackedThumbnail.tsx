@@ -4,6 +4,7 @@ import { Asset, StackPreview } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
 import MediaThumbnail from "./MediaThumbnail";
 import StackCarouselOverlay from "./StackCarouselOverlay";
+import { resolveStackFocusAssetId } from "@/features/assets/utils/browseItems";
 
 interface StackedThumbnailProps {
   asset: Asset;
@@ -33,6 +34,8 @@ const StackedThumbnail: React.FC<StackedThumbnailProps> = ({
   const [stackCarouselOpen, setStackCarouselOpen] = useState(false);
   const stackCount = stackInfo.stack_size ?? 0;
   const hasStack = Boolean(stackInfo.stack_id) && stackCount > 1;
+  const hasMatchedMember = (stackInfo.matched_member_ids?.length ?? 0) > 0;
+  const focusAssetId = resolveStackFocusAssetId(asset);
 
   return (
     <>
@@ -81,11 +84,20 @@ const StackedThumbnail: React.FC<StackedThumbnailProps> = ({
             </div>
           </button>
         )}
+
+        {hasStack && hasMatchedMember && !isSelectionMode && (
+          <div className="absolute left-3 top-3 z-10 rounded-full border border-white/15 bg-black/65 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-white shadow-lg backdrop-blur-sm">
+            {t("assets.stackDetail.matched", {
+              defaultValue: "Matched",
+            })}
+          </div>
+        )}
       </div>
 
       {hasStack && (
         <StackCarouselOverlay
           asset={asset}
+          focusAssetId={focusAssetId}
           open={stackCarouselOpen}
           onClose={() => setStackCarouselOpen(false)}
         />

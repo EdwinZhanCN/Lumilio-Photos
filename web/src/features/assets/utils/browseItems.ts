@@ -27,6 +27,16 @@ const preferRepresentative = (current: Asset, candidate: Asset): Asset => {
   return current;
 };
 
+export const resolveStackFocusAssetId = (
+  asset: Asset,
+): string | undefined => {
+  const matchedMemberId = asset.stack?.matched_member_ids?.find(
+    (id) => Boolean(id),
+  );
+
+  return matchedMemberId ?? asset.stack?.cover_asset_id ?? asset.asset_id;
+};
+
 const toAssetItem = (asset: Asset): BrowseItem | null => {
   const assetId = asset.asset_id;
   if (!assetId) return null;
