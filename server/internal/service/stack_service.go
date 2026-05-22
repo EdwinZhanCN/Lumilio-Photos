@@ -10,11 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/logging"
 	"server/internal/utils/file"
 	"server/internal/utils/raw"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -63,6 +65,9 @@ type StackService interface {
 
 	// DeleteStack deletes an entire stack, releasing all members.
 	DeleteStack(ctx context.Context, stackID uuid.UUID) error
+
+	// MatchLivePhotoStack attempts to build a Live Photo stack for the asset.
+	MatchLivePhotoStack(ctx context.Context, assetID uuid.UUID) error
 }
 
 type stackService struct {
@@ -257,7 +262,7 @@ func (s *stackService) AutoDetectStacks(ctx context.Context, repositoryID uuid.U
 		}
 
 		// Create the stack
-		stack, err := s.queries.CreateStack(ctx)
+		stackID, err := createStackRecord(ctx, s.pool, dbtypes.StackKindRawJpeg, nil)
 		if err != nil {
 			logger.Error("failed to create stack",
 				zap.String("base_name", cluster.BaseName),
@@ -265,8 +270,6 @@ func (s *stackService) AutoDetectStacks(ctx context.Context, repositoryID uuid.U
 			)
 			continue
 		}
-
-		stackID := stack.StackID
 
 		for i, a := range cluster.Members {
 			pos := int32(i)
@@ -318,12 +321,11 @@ func (s *stackService) CreateManualStack(ctx context.Context, assetIDs []uuid.UU
 		return nil, ErrAssetAlreadyStacked
 	}
 
-	stack, err := s.queries.CreateStack(ctx)
+	stackID, err := createStackRecord(ctx, s.pool, dbtypes.StackKindManual, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create stack: %w", err)
 	}
 
-	stackID := stack.StackID
 	for i, id := range assetIDs {
 		pos := int32(i)
 		err := s.queries.AddStackMember(ctx, repo.AddStackMemberParams{
@@ -413,6 +415,118 @@ func (s *stackService) DeleteStack(ctx context.Context, stackID uuid.UUID) error
 	return s.queries.DeleteStack(ctx, pgtype.UUID{Bytes: stackID, Valid: true})
 }
 
+func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUID) error {
+	asset, err := s.queries.GetAssetByID(ctx, pgtype.UUID{Bytes: assetID, Valid: true})
+	if err != nil {
+		return fmt.Errorf("get asset for live photo matching: %w", err)
+	}
+
+	if asset.OwnerID == nil {
+		return nil
+	}
+
+	contentIdentifier := normalizeLivePhotoContentIdentifier(livePhotoContentIdentifier(asset))
+	if contentIdentifier == "" {
+		return nil
+	}
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin live photo matching transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	lockKey := fmt.Sprintf("%d:%s", *asset.OwnerID, contentIdentifier)
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, lockKey); err != nil {
+		return fmt.Errorf("acquire live photo advisory lock: %w", err)
+	}
+
+	// Exact Apple Live Photo matching: one PHOTO + one VIDEO for the same owner and content identifier.
+	const exactMatchQuery = `WITH candidate_group AS (
+		SELECT
+			a.owner_id,
+			a.specific_metadata->>'content_identifier' AS content_identifier,
+			MIN(a.asset_id) FILTER (WHERE a.type = 'PHOTO') AS photo_asset_id,
+			MIN(a.asset_id) FILTER (WHERE a.type = 'VIDEO') AS video_asset_id,
+			COUNT(*) FILTER (WHERE a.type = 'PHOTO') AS photo_count,
+			COUNT(*) FILTER (WHERE a.type = 'VIDEO') AS video_count
+		FROM assets a
+		WHERE a.owner_id = $1
+		  AND a.is_deleted = false
+		  AND a.type IN ('PHOTO', 'VIDEO')
+		  AND a.specific_metadata->>'content_identifier' = $2
+		GROUP BY a.owner_id, a.specific_metadata->>'content_identifier'
+	)
+	SELECT photo_asset_id, video_asset_id
+	FROM candidate_group
+	WHERE photo_count = 1
+	  AND video_count = 1`
+
+	var photoID, videoID pgtype.UUID
+	if err := tx.QueryRow(ctx, exactMatchQuery, *asset.OwnerID, contentIdentifier).Scan(&photoID, &videoID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return tx.Commit(ctx)
+		}
+		return fmt.Errorf("query live photo candidates: %w", err)
+	}
+
+	photoUUID, ok := uuidFromPgUUID(photoID)
+	if !ok {
+		return fmt.Errorf("live photo match returned invalid photo asset id")
+	}
+	videoUUID, ok := uuidFromPgUUID(videoID)
+	if !ok {
+		return fmt.Errorf("live photo match returned invalid video asset id")
+	}
+
+	// Idempotency: if either asset is already in a live photo stack, stop.
+	const existingLivePhotoMembershipQuery = `SELECT 1
+	FROM asset_stack_members m
+	JOIN asset_stacks s ON s.stack_id = m.stack_id
+	WHERE s.stack_kind = 'live_photo'
+	  AND m.asset_id = ANY($1::uuid[])
+	LIMIT 1`
+	var sentinel int
+	if err := tx.QueryRow(ctx, existingLivePhotoMembershipQuery, []uuid.UUID{photoUUID, videoUUID}).Scan(&sentinel); err == nil {
+		return tx.Commit(ctx)
+	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("check existing live photo membership: %w", err)
+	}
+
+	// Safety guard: do not move assets out of any other existing stack.
+	const existingAnyMembershipQuery = `SELECT 1
+	FROM asset_stack_members
+	WHERE asset_id = ANY($1::uuid[])
+	LIMIT 1`
+	if err := tx.QueryRow(ctx, existingAnyMembershipQuery, []uuid.UUID{photoUUID, videoUUID}).Scan(&sentinel); err == nil {
+		return tx.Commit(ctx)
+	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("check existing stack membership: %w", err)
+	}
+
+	stackID, err := createStackRecord(ctx, tx, dbtypes.StackKindLivePhoto, &contentIdentifier)
+	if err != nil {
+		return fmt.Errorf("create live photo stack: %w", err)
+	}
+
+	const insertMemberSQL = `INSERT INTO asset_stack_members (asset_id, stack_id, relation, position) VALUES ($1, $2, $3, $4)`
+	photoPos := int32(0)
+	if _, err := tx.Exec(ctx, insertMemberSQL, photoID, stackID, "live_photo_still", photoPos); err != nil {
+		return fmt.Errorf("add live photo still member: %w", err)
+	}
+
+	videoPos := int32(1)
+	if _, err := tx.Exec(ctx, insertMemberSQL, videoID, stackID, "live_photo_video", videoPos); err != nil {
+		return fmt.Errorf("add live photo video member: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit live photo stack: %w", err)
+	}
+
+	return nil
+}
+
 // buildStackInfo constructs a StackInfo from a stack ID.
 func (s *stackService) buildStackInfo(ctx context.Context, stackID pgtype.UUID) (*StackInfo, error) {
 	members, err := s.queries.GetStackMembers(ctx, stackID)
@@ -453,4 +567,54 @@ func (s *stackService) buildStackInfo(ctx context.Context, stackID pgtype.UUID) 
 	}
 
 	return info, nil
+}
+
+func createStackRecord(ctx context.Context, q stackRowQuerier, kind dbtypes.StackKind, groupKey *string) (pgtype.UUID, error) {
+	var stackID pgtype.UUID
+	if q == nil {
+		return stackID, fmt.Errorf("stack inserter is nil")
+	}
+
+	query := `INSERT INTO asset_stacks (stack_kind, group_key) VALUES ($1, $2) RETURNING stack_id`
+	if err := q.QueryRow(ctx, query, string(kind), groupKey).Scan(&stackID); err != nil {
+		return stackID, err
+	}
+
+	return stackID, nil
+}
+
+type stackRowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func normalizeLivePhotoContentIdentifier(value string) string {
+	return strings.TrimRight(value, "\x00")
+}
+
+func livePhotoContentIdentifier(asset repo.Asset) string {
+	switch strings.ToUpper(strings.TrimSpace(asset.Type)) {
+	case "PHOTO":
+		meta, err := asset.SpecificMetadata.UnmarshalPhoto()
+		if err != nil {
+			return ""
+		}
+		return normalizeLivePhotoContentIdentifier(meta.ContentIdentifier)
+	case "VIDEO":
+		meta, err := asset.SpecificMetadata.UnmarshalVideo()
+		if err != nil {
+			return ""
+		}
+		return normalizeLivePhotoContentIdentifier(meta.ContentIdentifier)
+	default:
+		return ""
+	}
+}
+
+func uuidPtr(value pgtype.UUID) *uuid.UUID {
+	if !value.Valid {
+		return nil
+	}
+	converted := value.Bytes
+	result := uuid.UUID(converted)
+	return &result
 }

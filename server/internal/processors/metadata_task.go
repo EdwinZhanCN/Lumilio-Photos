@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -103,6 +104,7 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 				ap.enqueueLocationClusterRebuild(ctx, asset)
 			}
 			ap.enqueueDetectStacks(ctx, asset)
+			ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)
 		}
 	}
 
@@ -140,6 +142,26 @@ func (ap *AssetProcessor) enqueueDetectStacks(ctx context.Context, asset *repo.A
 	if _, err := ap.queueClient.Insert(ctx, args, &opts); err != nil && ap.logger != nil {
 		ap.logger.Warn("failed to enqueue detect stacks after metadata extraction",
 			zap.String("repository_id", repositoryID),
+			zap.Error(err),
+		)
+	}
+}
+
+func (ap *AssetProcessor) enqueueLivePhotoMatcher(ctx context.Context, asset *repo.Asset, contentIdentifier string) {
+	if ap == nil || ap.queueClient == nil || asset == nil || !asset.AssetID.Valid {
+		return
+	}
+	if strings.TrimSpace(contentIdentifier) == "" {
+		return
+	}
+
+	args := jobs.LivePhotoMatchArgs{AssetID: asset.AssetID}
+	opts := args.InsertOpts()
+	opts.Queue = "match_live_photo"
+
+	if _, err := ap.queueClient.Insert(ctx, args, &opts); err != nil && ap.logger != nil {
+		ap.logger.Warn("failed to enqueue live photo matcher after metadata extraction",
+			zap.String("asset_id", uuid.UUID(asset.AssetID.Bytes).String()),
 			zap.Error(err),
 		)
 	}

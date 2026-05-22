@@ -199,5 +199,6 @@ func ignorableSyncError(err error) bool {
 	}
 	message := strings.ToLower(err.Error())
 	return strings.Contains(message, "bad file descriptor") ||
-		strings.Contains(message, "inappropriate ioctl for device")
+		strings.Contains(message, "inappropriate ioctl for device") ||
+		strings.Contains(message, "invalid argument")
 }

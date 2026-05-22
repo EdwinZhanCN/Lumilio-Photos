@@ -24,7 +24,6 @@ type AIFormState = {
     clipEnabled: boolean;
     bioclipEnabled: boolean;
     ocrEnabled: boolean;
-    captionEnabled: boolean;
     faceEnabled: boolean;
   };
 };
@@ -48,7 +47,6 @@ function createFormState(settings: SystemSettings): AIFormState {
       clipEnabled: settings.ml.clipEnabled,
       bioclipEnabled: settings.ml.bioclipEnabled,
       ocrEnabled: settings.ml.ocrEnabled,
-      captionEnabled: settings.ml.captionEnabled,
       faceEnabled: settings.ml.faceEnabled,
     },
   };
@@ -65,7 +63,6 @@ function buildPayload(form: AIFormState): UpdateSystemSettingsPayload {
       clip_enabled: form.ml.clipEnabled,
       bioclip_enabled: form.ml.bioclipEnabled,
       ocr_enabled: form.ml.ocrEnabled,
-      caption_enabled: form.ml.captionEnabled,
       face_enabled: form.ml.faceEnabled,
     },
   };
@@ -129,7 +126,6 @@ export default function AISettings() {
     settings?.ml.clipEnabled,
     settings?.ml.bioclipEnabled,
     settings?.ml.ocrEnabled,
-    settings?.ml.captionEnabled,
     settings?.ml.faceEnabled,
   ]);
 
@@ -148,7 +144,6 @@ export default function AISettings() {
       form.ml.clipEnabled !== settings.ml.clipEnabled ||
       form.ml.bioclipEnabled !== settings.ml.bioclipEnabled ||
       form.ml.ocrEnabled !== settings.ml.ocrEnabled ||
-      form.ml.captionEnabled !== settings.ml.captionEnabled ||
       form.ml.faceEnabled !== settings.ml.faceEnabled
     );
   }, [form, settings]);
@@ -170,11 +165,6 @@ export default function AISettings() {
       key: "ocrEnabled",
       label: t("settings.aiSettings.taskNames.ocr"),
       description: t("settings.aiSettings.taskDescriptions.ocr"),
-    },
-    {
-      key: "captionEnabled",
-      label: t("settings.aiSettings.taskNames.caption"),
-      description: t("settings.aiSettings.taskDescriptions.caption"),
     },
     {
       key: "faceEnabled",

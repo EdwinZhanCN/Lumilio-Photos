@@ -103,6 +103,7 @@ func DefaultTagConfig() *TagConfig {
 			"FileType",
 			"FileTypeExtension",
 			"MIMEType",
+			"ContentIdentifier",
 		},
 		VideoTags: []string{
 			"CreationDate",
@@ -140,6 +141,7 @@ func DefaultTagConfig() *TagConfig {
 			"FileType",
 			"FileTypeExtension",
 			"MIMEType",
+			"ContentIdentifier",
 		},
 		AudioTags: []string{
 			"AudioCodec",

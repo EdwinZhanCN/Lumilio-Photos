@@ -991,14 +991,12 @@
                 "clip": "语义搜索",
                 "bioclip": "生物图鉴",
                 "ocr": "文字识别",
-                "caption": "图片描述",
                 "face": "人脸识别"
             },
             "taskDescriptions": {
                 "clip": "让照片可以按画面语义被找到。",
                 "bioclip": "识别植物、动物等生物主题。",
                 "ocr": "读取照片画面中的可见文字。",
-                "caption": "生成简短自然语言描述。",
                 "face": "检测并归类可识别的人脸。"
             },
             "runtimeTaskNames": {
@@ -1006,7 +1004,6 @@
                 "clipText": "CLIP 文本嵌入",
                 "bioclip": "BioCLIP 分类",
                 "ocr": "OCR",
-                "vlm": "VLM 生成",
                 "face": "人脸检测与嵌入"
             }
         },
@@ -1048,7 +1045,6 @@
                 "clipTextEmbed": "CLIP 文本嵌入",
                 "bioClipClassify": "BioCLIP 分类",
                 "ocr": "OCR",
-                "vlmGenerate": "VLM 描述",
                 "faceDetectAndEmbed": "人脸检测与嵌入"
             }
         },
@@ -1404,6 +1400,29 @@
             "operationCancelled": "Passkey 操作已取消。",
             "unsupportedResponse": "设备返回了不受支持的 Passkey 响应。"
         },
+        "bootstrap": {
+            "gate": {
+                "loading": "正在准备初始化...",
+                "statusError": "无法验证初始化状态。"
+            },
+            "landing": {
+                "title": "设置管理员账户",
+                "promptTitle": "需要完成首次初始化",
+                "promptBody": "首个注册账户将成为管理员，并引导您完成 Passkey 或身份验证器设置。",
+                "cta": "创建首个管理员账户"
+            },
+            "register": {
+                "title": "创建首个管理员账户",
+                "subtitle": "请先创建用户名，然后完成 Passkey 或身份验证器设置，以完成管理员初始化。",
+                "promptTitle": "您正在注册首个管理员用户",
+                "promptBody": "Lumilio 将创建首个管理员账户，并要求在完成初始化前启用 Passkey 或身份验证器。",
+                "submit": "以管理员身份继续"
+            },
+            "mfa": {
+                "title": "保护首个管理员账户",
+                "subtitle": "请立即完成身份验证器设置，确保首个 Lumilio 管理员账户在继续前已受到保护。"
+            }
+        },
         "login": {
             "usernamePlaceholder": "请输入用户名",
             "authenticatorCodePlaceholder": "请输入 6 位验证码",
@@ -1413,14 +1432,9 @@
             "passkeyUnavailable": "当前设备上该账户暂不可使用 Passkey 登录。",
             "verifyTitle": "双重验证",
             "passwordTitle": "请输入密码",
-            "bootstrapTitle": "设置管理员账户",
             "usernameTitle": "使用用户名继续",
             "verifySubtitle": "请使用身份验证器应用或恢复码完成登录验证。",
             "passwordSubtitle": "若当前设备不便使用 Passkey，可改用密码登录。",
-            "bootstrapSubtitle": "系统尚无用户。请创建首个账户以获得管理员权限。",
-            "bootstrapPromptTitle": "需要完成首次初始化",
-            "bootstrapPromptBody": "首个注册账户将成为管理员，并引导您完成 Passkey 或身份验证器设置。",
-            "createAdmin": "创建首个管理员账户",
             "verifyPrompt": "当前登录账户：{{name}}",
             "recoveryHint": "请输入一次性恢复码中的任意一组。",
             "totpHint": "请输入身份验证器应用中的 6 位验证码。",
@@ -1453,17 +1467,13 @@
             "totpSetupCompleteError": "完成身份验证器设置失败。",
             "passkeyUnavailableUseTotp": "当前环境暂不支持 Passkey，请使用身份验证器应用继续。",
             "title": "创建账户",
-            "bootstrapTitle": "创建首个管理员账户",
             "securityChoiceTitle": "选择登录方式",
             "totpTitle": "设置身份验证器应用",
             "recoveryTitle": "保存恢复码",
             "subtitle": "请先创建用户名和密码，然后完成账户安全设置。",
-            "bootstrapSubtitle": "请先创建用户名，然后完成 Passkey 或身份验证器设置，以完成管理员初始化。",
             "securityChoiceSubtitle": "当设备与来源环境支持时，建议优先使用 Passkey。",
             "totpSubtitle": "请使用 Duo、1Password 或其他身份验证器应用扫描二维码，并完成一次验证码校验。",
             "recoverySubtitle": "若您失去身份验证器访问权限，这些一次性恢复码是唯一备用方式。",
-            "bootstrapPromptTitle": "您正在注册首个管理员用户",
-            "bootstrapPromptBody": "Lumilio 将创建首个管理员账户，并要求在完成初始化前启用 Passkey 或身份验证器。",
             "username": "用户名",
             "usernameHint": "长度 3-32 位，需以字母开头。仅支持小写字母、数字、点号、下划线和连字符。",
             "password": "密码",
@@ -1471,7 +1481,6 @@
             "confirmPassword": "确认密码",
             "confirmPasswordHint": "两次输入的密码必须完全一致。",
             "loading": "正在准备账户…",
-            "submitBootstrap": "以管理员身份继续",
             "submit": "继续",
             "passkeyCardTitle": "创建 Passkey",
             "passkeyCardBody": "使用当前设备的原生 Passkey 流程，可获得更高效且更安全的登录体验。",
@@ -1490,8 +1499,6 @@
         "mfa": {
             "pageTitle": "管理身份验证器设置",
             "pageSubtitle": "在同一页面集中管理验证、恢复码及账户安全设置。",
-            "bootstrapTitle": "保护首个管理员账户",
-            "bootstrapSubtitle": "请立即完成身份验证器设置，确保首个 Lumilio 管理员账户在继续前已受到保护。",
             "doneHere": "已完成当前操作？",
             "continueToApp": "继续使用应用",
             "backToSettings": "返回设置"

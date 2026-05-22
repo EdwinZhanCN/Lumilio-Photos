@@ -958,14 +958,12 @@
                 "clip": "Semantic search",
                 "bioclip": "Field guide",
                 "ocr": "Text recognition",
-                "caption": "Captions",
                 "face": "Face recognition"
             },
             "taskDescriptions": {
                 "clip": "Find photos by visual meaning, not only filenames.",
                 "bioclip": "Identify plants, animals, and other biological subjects.",
                 "ocr": "Read visible text inside photos.",
-                "caption": "Generate short natural-language descriptions.",
                 "face": "Detect and group recognizable faces."
             },
             "runtimeTaskNames": {
@@ -973,7 +971,6 @@
                 "clipText": "CLIP text embedding",
                 "bioclip": "BioCLIP classification",
                 "ocr": "OCR",
-                "vlm": "VLM generation",
                 "face": "Face detect & embed"
             }
         },
@@ -1015,7 +1012,6 @@
                 "clipTextEmbed": "CLIP text embed",
                 "bioClipClassify": "BioCLIP classify",
                 "ocr": "OCR",
-                "vlmGenerate": "VLM caption",
                 "faceDetectAndEmbed": "Face detect & embed"
             }
         },
@@ -1371,6 +1367,29 @@
             "operationCancelled": "Passkey operation was canceled.",
             "unsupportedResponse": "Unsupported passkey response was returned by this device."
         },
+        "bootstrap": {
+            "gate": {
+                "loading": "Preparing setup...",
+                "statusError": "Unable to verify bootstrap status."
+            },
+            "landing": {
+                "title": "Set up your administrator account",
+                "promptTitle": "Initial setup required",
+                "promptBody": "The first registration becomes administrator and will guide you through passkey or authenticator setup.",
+                "cta": "Create the first administrator account"
+            },
+            "register": {
+                "title": "Create the first administrator account",
+                "subtitle": "Create your username first, then complete passkey or authenticator setup to finish administrator onboarding.",
+                "promptTitle": "You are registering the initial administrator user",
+                "promptBody": "Lumilio will create the first administrator account and require passkey or authenticator enrollment before setup is complete.",
+                "submit": "Continue as administrator"
+            },
+            "mfa": {
+                "title": "Protect the first administrator account",
+                "subtitle": "Complete authenticator setup now so the first Lumilio administrator account is protected before you continue."
+            }
+        },
         "login": {
             "usernamePlaceholder": "Enter username",
             "authenticatorCodePlaceholder": "Enter 6-digit code",
@@ -1380,14 +1399,9 @@
             "passkeyUnavailable": "Passkey sign-in is unavailable for this account on this device.",
             "verifyTitle": "Two-factor verification",
             "passwordTitle": "Enter your password",
-            "bootstrapTitle": "Set up your administrator account",
             "usernameTitle": "Continue with your username",
             "verifySubtitle": "Complete sign-in with your authenticator app or a recovery code.",
             "passwordSubtitle": "Use your password if you prefer not to use a passkey on this device.",
-            "bootstrapSubtitle": "No users exist yet. Create the first account to claim administrator access.",
-            "bootstrapPromptTitle": "Initial setup required",
-            "bootstrapPromptBody": "The first registration becomes administrator and will guide you through passkey or authenticator setup.",
-            "createAdmin": "Create the first administrator account",
             "verifyPrompt": "Continuing as {{name}}",
             "recoveryHint": "Enter one of your one-time recovery codes.",
             "totpHint": "Enter the 6-digit code from your authenticator app.",
@@ -1420,17 +1434,13 @@
             "totpSetupCompleteError": "Failed to complete authenticator setup.",
             "passkeyUnavailableUseTotp": "Passkeys are unavailable in the current environment. Please continue with an authenticator app.",
             "title": "Create an account",
-            "bootstrapTitle": "Create the first administrator account",
             "securityChoiceTitle": "Choose your sign-in method",
             "totpTitle": "Set up authenticator app",
             "recoveryTitle": "Save your recovery codes",
             "subtitle": "Create your username and password first, then secure your account.",
-            "bootstrapSubtitle": "Create your username first, then complete passkey or authenticator setup to finish administrator onboarding.",
             "securityChoiceSubtitle": "Passkey is recommended when the current device and origin support it.",
             "totpSubtitle": "Scan the QR code with Duo, 1Password, or any authenticator app, then verify once.",
             "recoverySubtitle": "These one-time codes are the only fallback if you lose access to your authenticator.",
-            "bootstrapPromptTitle": "You are registering the initial administrator user",
-            "bootstrapPromptBody": "Lumilio will create the first administrator account and require passkey or authenticator enrollment before setup is complete.",
             "username": "Username",
             "usernameHint": "3-32 characters, starting with a letter. Lowercase letters, numbers, dots, underscores, and hyphens are allowed.",
             "password": "Password",
@@ -1438,7 +1448,6 @@
             "confirmPassword": "Confirm password",
             "confirmPasswordHint": "Passwords must match exactly.",
             "loading": "Preparing account…",
-            "submitBootstrap": "Continue as administrator",
             "submit": "Continue",
             "passkeyCardTitle": "Create passkey",
             "passkeyCardBody": "Use this device's native passkey flow for the fastest and strongest sign-in.",
@@ -1457,8 +1466,6 @@
         "mfa": {
             "pageTitle": "Manage authenticator setup",
             "pageSubtitle": "Manage verification, recovery codes, and security settings for your account in one place.",
-            "bootstrapTitle": "Protect the first administrator account",
-            "bootstrapSubtitle": "Complete authenticator setup now so the first Lumilio administrator account is protected before you continue.",
             "doneHere": "Finished here?",
             "continueToApp": "Continue to application",
             "backToSettings": "Back to settings"

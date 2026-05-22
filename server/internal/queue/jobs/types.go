@@ -127,6 +127,20 @@ func (DetectStacksArgs) InsertOpts() river.InsertOpts {
 	}}
 }
 
+// LivePhotoMatchArgs triggers exact Apple Live Photo matching for a single asset.
+type LivePhotoMatchArgs struct {
+	AssetID pgtype.UUID `json:"assetId" river:"unique"`
+}
+
+func (LivePhotoMatchArgs) Kind() string { return "match_live_photo" }
+
+func (LivePhotoMatchArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{UniqueOpts: river.UniqueOpts{
+		ByArgs:   true,
+		ByPeriod: 1 * time.Minute,
+	}}
+}
+
 // ProcessPHashArgs triggers perceptual hash computation for duplicate detection.
 type ProcessPHashArgs struct {
 	AssetID pgtype.UUID `json:"assetId"`

@@ -57,13 +57,6 @@ export const RETRY_TASK_OPTIONS: RetryTaskOption[] = [
     supportedAssetTypes: ["PHOTO"],
   },
   {
-    key: "process_caption",
-    label: "AI Image Captioning",
-    description: "Generate AI-powered image descriptions",
-    category: "ml",
-    supportedAssetTypes: ["PHOTO"],
-  },
-  {
     key: "process_face",
     label: "Face Detection",
     description: "Detect and recognize faces in images",

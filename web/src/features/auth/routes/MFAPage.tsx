@@ -415,7 +415,7 @@ export default function MFAPage(): React.ReactNode {
               <div className="space-y-1.5">
                 <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
                   {isBootstrapOnboarding
-                    ? t("auth.mfa.bootstrapTitle", {
+                    ? t("auth.bootstrap.mfa.title", {
                         defaultValue: "Protect the first Admin account",
                       })
                     : t("auth.mfa.pageTitle", {
@@ -425,7 +425,7 @@ export default function MFAPage(): React.ReactNode {
 
                 <p className="text-sm text-base-content/80">
                   {isBootstrapOnboarding
-                    ? t("auth.mfa.bootstrapSubtitle", {
+                    ? t("auth.bootstrap.mfa.subtitle", {
                         defaultValue:
                           "Finish TOTP setup now so the first Lumilio Admin account is protected before you continue.",
                       })

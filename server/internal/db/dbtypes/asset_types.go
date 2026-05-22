@@ -62,6 +62,7 @@ type PhotoSpecificMetadata struct {
 	GPSLongitude         *float64   `json:"gps_longitude,omitempty"`
 	Description          string     `json:"description,omitempty"`
 	IsRAW                bool       `json:"is_raw,omitempty"`
+	ContentIdentifier    string     `json:"content_identifier,omitempty"`
 }
 
 type VideoSpecificMetadata struct {
@@ -74,6 +75,7 @@ type VideoSpecificMetadata struct {
 	GPSLatitude          *float64   `json:"gps_latitude,omitempty" example:"37.7749"`
 	GPSLongitude         *float64   `json:"gps_longitude,omitempty" example:"-122.4194"`
 	Description          string     `json:"description,omitempty" example:"A beautiful sunset over the ocean"`
+	ContentIdentifier    string     `json:"content_identifier,omitempty"`
 }
 
 type AudioSpecificMetadata struct {

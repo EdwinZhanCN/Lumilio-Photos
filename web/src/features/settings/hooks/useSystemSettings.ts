@@ -23,7 +23,6 @@ export type SystemSettings = {
     clipEnabled: boolean;
     bioclipEnabled: boolean;
     ocrEnabled: boolean;
-    captionEnabled: boolean;
     faceEnabled: boolean;
   };
   updatedAt: string;
@@ -64,7 +63,6 @@ function normalizeSystemSettings(
       clipEnabled: Boolean(data.ml?.clip_enabled),
       bioclipEnabled: Boolean(data.ml?.bioclip_enabled),
       ocrEnabled: Boolean(data.ml?.ocr_enabled),
-      captionEnabled: Boolean(data.ml?.caption_enabled),
       faceEnabled: Boolean(data.ml?.face_enabled),
     },
     updatedAt: data.updated_at ?? "",

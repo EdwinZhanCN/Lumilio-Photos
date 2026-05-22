@@ -14,7 +14,7 @@ function formatCoveragePercent(coverage: number): string {
   return `${Math.round(coverage * 100)}%`;
 }
 
-const ML_TASK_KEYS = ["clip", "bioclip", "ocr", "caption", "face"] as const;
+const ML_TASK_KEYS = ["clip", "bioclip", "ocr", "face"] as const;
 
 export function MLMonitor({ localRepoId }: MLMonitorProps) {
   const { t } = useI18n();

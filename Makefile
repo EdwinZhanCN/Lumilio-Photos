@@ -202,7 +202,7 @@ server-build:
 
 web-dev: env-web-dev
 	@echo "==> Starting web development server..."
-	cd $(WEB_DIR) && $(PNPM) run dev -- --host --port 6657
+	cd $(WEB_DIR) && $(PNPM) run dev --host --port 6657
 
 dev: db-wait
 	@echo "==> Starting development environment..."

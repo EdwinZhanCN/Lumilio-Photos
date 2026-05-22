@@ -26,7 +26,6 @@ export type Capabilities = {
       clipTextEmbed: MLTaskCapability;
       bioClipClassify: MLTaskCapability;
       ocr: MLTaskCapability;
-      vlmGenerate: MLTaskCapability;
       faceDetectAndEmbed: MLTaskCapability;
     };
   };
@@ -72,7 +71,6 @@ function normalizeCapabilities(
           data.ml?.tasks?.bioclip_classify,
         ),
         ocr: normalizeTaskCapability(data.ml?.tasks?.ocr),
-        vlmGenerate: normalizeTaskCapability(data.ml?.tasks?.vlm_generate),
         faceDetectAndEmbed: normalizeTaskCapability(
           data.ml?.tasks?.face_detect_and_embed,
         ),
