@@ -1,92 +1,97 @@
 # Dev container compose: infrastructure (db, optional geodata) + devcontainer.
 # API and Vite run inside the devcontainer via `make dev` (not as compose services).
 
+name: lumilio-photos-devcontainer
+
 services:
-  db:
-    build:
-      context: ..
-      dockerfile: server/db.Dockerfile
-    image: lumilio-db:latest
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: lumiliophotos
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5433:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-  naturalearth-import:
-    build:
-      context: ..
-      dockerfile: server/geodata.Dockerfile
-    image: lumilio-geodata-import:latest
-    profiles:
-      - geodata
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      PGHOST: db
-      PGPORT: 5432
-      PGDATABASE: lumiliophotos
-      PGUSER: postgres
-      PGPASSWORD: postgres
-    volumes:
-      - naturalearth_data:/data/naturalearth
-      - ../server/scripts/import-natural-earth.sh:/import-natural-earth.sh:ro
-    command: ["/bin/bash", "/import-natural-earth.sh"]
+    db:
+        build:
+            context: ..
+            dockerfile: server/db.Dockerfile
+        image: lumilio-db:latest
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: lumiliophotos
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+        ports:
+            - "5433:5432"
+        volumes:
+            - db_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+    naturalearth-import:
+        build:
+            context: ..
+            dockerfile: server/geodata.Dockerfile
+        image: lumilio-geodata-import:latest
+        profiles:
+            - geodata
+        depends_on:
+            db:
+                condition: service_healthy
+        environment:
+            PGHOST: db
+            PGPORT: 5432
+            PGDATABASE: lumiliophotos
+            PGUSER: postgres
+            PGPASSWORD: postgres
+        volumes:
+            - naturalearth_data:/data/naturalearth
+            - ../server/scripts/import-natural-earth.sh:/import-natural-earth.sh:ro
+        command: ["/bin/bash", "/import-natural-earth.sh"]
 
-  devcontainer:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - ..:/workspace:cached
-      - /var/run/docker.sock:/var/run/docker.sock
-      - go-mod-cache:/root/go
-      - pnpm-store:/root/.local/share/pnpm
-      - cargo-cache:/usr/local/cargo/registry
-    environment:
-      DB_HOST: db
-      DB_PORT: "5432"
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: lumiliophotos
-      DB_SSL: disable
+    devcontainer:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        dns:
+            - 1.1.1.1
+            - 8.8.8.8
+        volumes:
+            - ..:/workspace:cached
+            - /var/run/docker.sock:/var/run/docker.sock
+            - go-mod-cache:/root/go
+            - pnpm-store:/root/.local/share/pnpm
+            - cargo-cache:/usr/local/cargo/registry
+        environment:
+            DB_HOST: db
+            DB_PORT: "5432"
+            DB_USER: postgres
+            DB_PASSWORD: postgres
+            DB_NAME: lumiliophotos
+            DB_SSL: disable
 
-      CGO_ENABLED: "1"
-      GOFLAGS: -buildvcs=false
+            CGO_ENABLED: "1"
+            GOFLAGS: -buildvcs=false
 
-      RUSTUP_HOME: /usr/local/rustup
-      CARGO_HOME: /usr/local/cargo
+            RUSTUP_HOME: /usr/local/rustup
+            CARGO_HOME: /usr/local/cargo
 
-      SERVER_ENV: development
-      SERVER_PORT: "6680"
-      SERVER_LOG_LEVEL: debug
-      STORAGE_PATH: /workspace/server/data/storage
-      STORAGE_STRATEGY: date
-      STORAGE_PRESERVE_FILENAME: "true"
-      STORAGE_DUPLICATE_HANDLING: rename
-      REPOSITORY_SCAN_ENABLED: "false"
+            SERVER_ENV: development
+            SERVER_PORT: "6680"
+            SERVER_LOG_LEVEL: debug
+            STORAGE_PATH: /workspace/server/data/storage
+            STORAGE_STRATEGY: date
+            STORAGE_PRESERVE_FILENAME: "true"
+            STORAGE_DUPLICATE_HANDLING: rename
+            REPOSITORY_SCAN_ENABLED: "false"
 
-      VITE_API_URL: http://localhost:6680
-    depends_on:
-      db:
-        condition: service_healthy
-    command: /bin/bash -c "while sleep 1000; do :; done"
-    ports:
-      - "6680:6680" # Go API server (make server-dev)
-      - "6657:6657" # Vite dev server (make web-dev)
+            VITE_API_URL: http://localhost:6680
+        depends_on:
+            db:
+                condition: service_healthy
+        command: /bin/bash -c "while sleep 1000; do :; done"
+        ports:
+            - "6680:6680" # Go API server (make server-dev)
+            - "6657:6657" # Vite dev server (make web-dev)
 
 volumes:
-  db_data:
-  naturalearth_data:
-  go-mod-cache:
-  pnpm-store:
-  cargo-cache:
+    db_data:
+    naturalearth_data:
+    go-mod-cache:
+    pnpm-store:
+    cargo-cache:

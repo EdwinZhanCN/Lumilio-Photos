@@ -24,9 +24,8 @@ type LLMSettingsDTO struct {
 type MLSettingsDTO struct {
 	CLIPEnabled    bool `json:"clip_enabled"`
 	BioCLIPEnabled bool `json:"bioclip_enabled"`
-	OCREnabled     bool `json:"ocr_enabled"`
-	CaptionEnabled bool `json:"caption_enabled"`
-	FaceEnabled    bool `json:"face_enabled"`
+	OCREnabled  bool `json:"ocr_enabled"`
+	FaceEnabled bool `json:"face_enabled"`
 }
 
 type UpdateSystemSettingsDTO struct {
@@ -45,9 +44,8 @@ type UpdateLLMSettingsDTO struct {
 type UpdateMLSettingsDTO struct {
 	CLIPEnabled    *bool `json:"clip_enabled,omitempty"`
 	BioCLIPEnabled *bool `json:"bioclip_enabled,omitempty"`
-	OCREnabled     *bool `json:"ocr_enabled,omitempty"`
-	CaptionEnabled *bool `json:"caption_enabled,omitempty"`
-	FaceEnabled    *bool `json:"face_enabled,omitempty"`
+	OCREnabled  *bool `json:"ocr_enabled,omitempty"`
+	FaceEnabled *bool `json:"face_enabled,omitempty"`
 }
 
 type ValidateLLMSettingsResponseDTO struct {
@@ -66,9 +64,8 @@ func ToSystemSettingsDTO(settings service.SystemSettings) SystemSettingsDTO {
 		ML: MLSettingsDTO{
 			CLIPEnabled:    settings.ML.CLIPEnabled,
 			BioCLIPEnabled: settings.ML.BioCLIPEnabled,
-			OCREnabled:     settings.ML.OCREnabled,
-			CaptionEnabled: settings.ML.CaptionEnabled,
-			FaceEnabled:    settings.ML.FaceEnabled,
+			OCREnabled:  settings.ML.OCREnabled,
+			FaceEnabled: settings.ML.FaceEnabled,
 		},
 		UpdatedAt: settings.UpdatedAt,
 		UpdatedBy: settings.UpdatedBy,
@@ -94,9 +91,8 @@ func (dto UpdateSystemSettingsDTO) ToServiceInput(updatedBy *int32) (service.Upd
 		input.ML = &service.UpdateMLSettingsInput{
 			CLIPEnabled:    dto.ML.CLIPEnabled,
 			BioCLIPEnabled: dto.ML.BioCLIPEnabled,
-			OCREnabled:     dto.ML.OCREnabled,
-			CaptionEnabled: dto.ML.CaptionEnabled,
-			FaceEnabled:    dto.ML.FaceEnabled,
+			OCREnabled:  dto.ML.OCREnabled,
+			FaceEnabled: dto.ML.FaceEnabled,
 		}
 	}
 

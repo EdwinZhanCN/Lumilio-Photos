@@ -25,9 +25,6 @@ type LumenService interface {
 	BioClipClassify(ctx context.Context, imageData *imagesource.MLImage, topK int) ([]types.Label, error)
 	FaceDetectEmbed(ctx context.Context, imageData *imagesource.MLImage) (*types.FaceV1, error)
 	OCR(ctx context.Context, imageData *imagesource.MLImage) (*types.OCRV1, error)
-	VLMCaption(ctx context.Context, imageData *imagesource.MLImage) (string, error)
-	VLMCaptionWithPrompt(ctx context.Context, imageData *imagesource.MLImage, prompt string) (string, error)
-	VLMCaptionWithMetadata(ctx context.Context, imageData *imagesource.MLImage, prompt string) (*types.TextGenerationV1, error)
 	GetAvailableModels(ctx context.Context) ([]*discovery.NodeInfo, error)
 	WarmupTasks(ctx context.Context, tasks []string) map[string]bool
 	IsTaskAvailable(taskName string) bool
@@ -220,74 +217,6 @@ func (s *lumenService) OCR(ctx context.Context, imageData *imagesource.MLImage) 
 		zap.Int("items", len(ocrResp.Items)))
 
 	return ocrResp, nil
-}
-
-func (s *lumenService) VLMCaption(ctx context.Context, imageData *imagesource.MLImage) (string, error) {
-	return s.VLMCaptionWithPrompt(ctx, imageData, "<image>Describe this image in detail.")
-}
-
-func (s *lumenService) VLMCaptionWithPrompt(ctx context.Context, imageData *imagesource.MLImage, prompt string) (string, error) {
-	req, err := newVLMCaptionTensorInferRequest(imageData, prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to create caption request: %w", err)
-	}
-	resp, err := s.lumenClient.InferWithRetry(ctx, req,
-		client.WithMaxWaitTime(10*time.Second),
-		client.WithMaxRetries(3))
-	if err != nil {
-		return "", fmt.Errorf("failed to infer caption: %w", err)
-	}
-	captionResp, err := types.ParseInferResponse(resp).AsTextGenerationResponse()
-	if err != nil {
-		return "", fmt.Errorf("failed to parse caption response: %w", err)
-	}
-
-	s.logger.Debug("Generated VLM caption",
-		zap.String("model", captionResp.ModelID),
-		zap.Int("tokens", captionResp.GeneratedTokens),
-		zap.String("finished_reason", captionResp.FinishReason))
-
-	return captionResp.Text, nil
-}
-
-// VLMCaptionWithMetadata generates VLM caption with detailed metadata
-func (s *lumenService) VLMCaptionWithMetadata(ctx context.Context, imageData *imagesource.MLImage, prompt string) (*types.TextGenerationV1, error) {
-	req, err := newVLMCaptionTensorInferRequest(imageData, prompt)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create caption request: %w", err)
-	}
-	resp, err := s.lumenClient.InferWithRetry(ctx, req,
-		client.WithMaxWaitTime(10*time.Second),
-		client.WithMaxRetries(3))
-	if err != nil {
-		return nil, fmt.Errorf("failed to infer caption: %w", err)
-	}
-	captionResp, err := types.ParseInferResponse(resp).AsTextGenerationResponse()
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse caption response: %w", err)
-	}
-
-	s.logger.Debug("Generated VLM caption",
-		zap.String("model", captionResp.ModelID),
-		zap.Int("tokens", captionResp.GeneratedTokens),
-		zap.String("finished_reason", captionResp.FinishReason))
-
-	return captionResp, nil
-}
-
-func newVLMCaptionTensorInferRequest(imageData *imagesource.MLImage, prompt string) (*pb.InferRequest, error) {
-	req, err := newRGBTensorInferRequest("vlm_generate", imageData)
-	if err != nil {
-		return nil, err
-	}
-	req.Meta["prompt"] = prompt
-	req.Meta["max_new_tokens"] = "512"
-	req.Meta["temperature"] = "0.7"
-	req.Meta["top_p"] = "1.0"
-	req.Meta["repetition_penalty"] = "1.0"
-	req.Meta["do_sample"] = "false"
-	req.Meta["add_generation_prompt"] = "true"
-	return req, nil
 }
 
 func newRGBTensorInferRequest(task string, imageData *imagesource.MLImage) (*pb.InferRequest, error) {

@@ -10,7 +10,6 @@ func TestProcessArgsDecodeLegacyImageDataWithoutPersistingBytes(t *testing.T) {
 		"clip":    &ProcessClipArgs{},
 		"bioclip": &ProcessBioClipArgs{},
 		"ocr":     &ProcessOcrArgs{},
-		"caption": &ProcessCaptionArgs{},
 		"face":    &ProcessFaceArgs{},
 	}
 

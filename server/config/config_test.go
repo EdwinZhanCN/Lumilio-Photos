@@ -7,7 +7,6 @@ func TestLoadMLConfig_RespectsExplicitFlags(t *testing.T) {
 	t.Setenv("ML_CLIP_ENABLED", "true")
 	t.Setenv("ML_BIOCLIP_ENABLED", "false")
 	t.Setenv("ML_OCR_ENABLED", "false")
-	t.Setenv("ML_CAPTION_ENABLED", "false")
 	t.Setenv("ML_FACE_ENABLED", "false")
 
 	cfg := LoadMLConfig()
@@ -15,7 +14,7 @@ func TestLoadMLConfig_RespectsExplicitFlags(t *testing.T) {
 	if !cfg.CLIPEnabled {
 		t.Fatalf("expected clip enabled, got %+v", cfg)
 	}
-	if cfg.BioCLIPEnabled || cfg.OCREnabled || cfg.CaptionEnabled || cfg.FaceEnabled {
+	if cfg.BioCLIPEnabled || cfg.OCREnabled || cfg.FaceEnabled {
 		t.Fatalf("expected non-clip tasks disabled, got %+v", cfg)
 	}
 }
@@ -25,7 +24,6 @@ func TestMLConfig_HasRuntimeDemandReflectsTaskFlags(t *testing.T) {
 		CLIPEnabled:    false,
 		BioCLIPEnabled: false,
 		OCREnabled:     false,
-		CaptionEnabled: false,
 		FaceEnabled:    false,
 	}
 

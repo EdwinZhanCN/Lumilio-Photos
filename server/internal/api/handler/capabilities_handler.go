@@ -52,7 +52,6 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 		"clip_text_embed":       false,
 		"bioclip_classify":      false,
 		"ocr":                   false,
-		"vlm_generate":          false,
 		"face_detect_and_embed": false,
 	}
 
@@ -92,10 +91,6 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 				OCR: dto.MLTaskCapabilityDTO{
 					Enabled:   effectiveMLConfig.OCREnabled,
 					Available: taskAvailability["ocr"],
-				},
-				VLMGenerate: dto.MLTaskCapabilityDTO{
-					Enabled:   effectiveMLConfig.CaptionEnabled,
-					Available: taskAvailability["vlm_generate"],
 				},
 				FaceDetectAndEmbed: dto.MLTaskCapabilityDTO{
 					Enabled:   effectiveMLConfig.FaceEnabled,

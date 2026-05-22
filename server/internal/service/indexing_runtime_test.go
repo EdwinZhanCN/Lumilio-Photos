@@ -35,12 +35,6 @@ func TestIsIndexingTaskRuntimeAvailable(t *testing.T) {
 			t.Fatal("expected face task to be unavailable")
 		}
 	})
-
-	t.Run("nil checker disables runtime-dependent enqueueing", func(t *testing.T) {
-		if IsIndexingTaskRuntimeAvailable(nil, AssetIndexingTaskCaption) {
-			t.Fatal("expected nil runtime checker to report unavailable")
-		}
-	})
 }
 
 func TestFilterRuntimeAvailableIndexingTasks(t *testing.T) {

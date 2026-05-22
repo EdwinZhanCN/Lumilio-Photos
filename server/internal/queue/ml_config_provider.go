@@ -27,8 +27,6 @@ func isMLTaskEnabled(ctx context.Context, provider MLConfigProvider, queueName s
 		return cfg.BioCLIPEnabled, nil
 	case "process_ocr":
 		return cfg.OCREnabled, nil
-	case "process_caption":
-		return cfg.CaptionEnabled, nil
 	case "process_face":
 		return cfg.FaceEnabled, nil
 	default:

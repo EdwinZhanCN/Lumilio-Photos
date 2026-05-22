@@ -20,7 +20,7 @@ const (
 	PurposeClip    Purpose = "clip"
 	PurposeBioClip Purpose = "bioclip"
 	PurposeOCR     Purpose = "ocr"
-	PurposeCaption Purpose = "caption"
+
 	PurposeFace    Purpose = "face"
 )
 
@@ -132,18 +132,6 @@ func mlOptions(purpose Purpose) (imaging.ProcessOptions, error) {
 		return imaging.ProcessOptions{
 			Width:     1920,
 			Height:    1920,
-			Quality:   90,
-			Format:    vips.ImageTypeWEBP,
-			NoProfile: true,
-		}, nil
-	case PurposeCaption:
-		return imaging.ProcessOptions{
-			Width:     1024,
-			Height:    1024,
-			Enlarge:   true,
-			PadWidth:  1024,
-			PadHeight: 1024,
-			PadColor:  &vips.Color{R: 128, G: 128, B: 128},
 			Quality:   90,
 			Format:    vips.ImageTypeWEBP,
 			NoProfile: true,

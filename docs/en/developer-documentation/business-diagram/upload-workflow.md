@@ -26,7 +26,6 @@ graph TB
         CLIP_W[CLIP Worker]
         BIOCLIP_W[BioCLIP Worker]
         OCR_W[OCR Worker]
-        CAPTION_W[Caption Worker]
         FACE_W[Face Worker]
     end
 
@@ -52,7 +51,7 @@ graph TB
     INGEST_Q --> INGEST_W
     INGEST_W --> INBOX
     INGEST_W -->|fan-out| META_W & THUMB_W & TRANS_W
-    THUMB_W -->|Photo only| CLIP_W & BIOCLIP_W & OCR_W & CAPTION_W & FACE_W
+    THUMB_W -->|Photo only| CLIP_W & BIOCLIP_W & OCR_W & FACE_W
     INGEST_W --> DB
     META_W --> DB
     THUMB_W --> THUMBS
@@ -247,13 +246,12 @@ graph TB
         CLIP[process_clip<br/>MaxWorkers: 2<br/>CLIP embeddings + classification]
         BIOCLIP[process_bioclip<br/>MaxWorkers: 2<br/>Bio species classification]
         OCR[process_ocr<br/>MaxWorkers: 3<br/>Text extraction]
-        CAPTION[process_caption<br/>MaxWorkers: 1<br/>AI image captioning]
         FACE[process_face<br/>MaxWorkers: 2<br/>Face detection + recognition]
     end
 
     INGEST -->|always| META
     INGEST -->|PHOTO| THUMB
-    INGEST -->|PHOTO| CLIP & BIOCLIP & OCR & CAPTION & FACE
+    INGEST -->|PHOTO| CLIP & BIOCLIP & OCR & FACE
     INGEST -->|VIDEO| THUMB
     INGEST -->|VIDEO| TRANS
     INGEST -->|AUDIO| TRANS
@@ -265,7 +263,6 @@ graph TB
     style CLIP fill:#c6f
     style BIOCLIP fill:#c6f
     style OCR fill:#c6f
-    style CAPTION fill:#c6f
     style FACE fill:#c6f
 ```
 
@@ -482,7 +479,6 @@ flowchart TD
         H --> L[process_clip:<br/>CLIP embedding → pgvector]
         H --> M[process_bioclip:<br/>Species classification → tags]
         H --> N[process_ocr:<br/>Text extraction → full-text search]
-        H --> O[process_caption:<br/>AI description → captions table]
         H --> P[process_face:<br/>Detection + recognition → people]
     end
 
@@ -543,7 +539,6 @@ flowchart TD
 | `process_clip` | 2 | CLIP embedding + classification |
 | `process_bioclip` | 2 | BioCLIP species classification |
 | `process_ocr` | 3 | Text extraction |
-| `process_caption` | 1 | AI image captioning |
 | `process_face` | 2 | Face detection + recognition |
 | `retry_asset` | 2 | Selective task retry |
 | `reindex_assets` | 1 | Batch reindex backfill |

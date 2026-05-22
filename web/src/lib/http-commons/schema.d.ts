@@ -1317,8 +1317,6 @@ export interface paths {
                     include_ocr?: boolean;
                     /** @description Include face recognition */
                     include_faces?: boolean;
-                    /** @description Include captions */
-                    include_captions?: boolean;
                 };
                 header?: never;
                 path: {
@@ -8597,7 +8595,6 @@ export interface components {
         };
         "dto.AssetIndexingTaskSetStatsDTO": {
             bioclip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
-            caption?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             clip?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             face?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
             ocr?: components["schemas"]["dto.AssetIndexingTaskStatsDTO"];
@@ -9068,7 +9065,6 @@ export interface components {
         };
         "dto.MLSettingsDTO": {
             bioclip_enabled?: boolean;
-            caption_enabled?: boolean;
             clip_enabled?: boolean;
             face_enabled?: boolean;
             ocr_enabled?: boolean;
@@ -9083,7 +9079,6 @@ export interface components {
             clip_text_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             face_detect_and_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             ocr?: components["schemas"]["dto.MLTaskCapabilityDTO"];
-            vlm_generate?: components["schemas"]["dto.MLTaskCapabilityDTO"];
         };
         "dto.ManagedUserDTO": {
             album_count?: number;
@@ -9556,7 +9551,6 @@ export interface components {
         };
         "dto.UpdateMLSettingsDTO": {
             bioclip_enabled?: boolean;
-            caption_enabled?: boolean;
             clip_enabled?: boolean;
             face_enabled?: boolean;
             ocr_enabled?: boolean;
