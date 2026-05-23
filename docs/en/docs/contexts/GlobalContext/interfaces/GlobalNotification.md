@@ -2,7 +2,7 @@
 
 # Interface: GlobalNotification
 
-Defined in: [contexts/GlobalContext.tsx:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/contexts/GlobalContext.tsx#L13)
+Defined in: [contexts/GlobalContext.tsx:13](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/contexts/GlobalContext.tsx#L13)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [contexts/GlobalContext.tsx:13](https://github.com/EdwinZhanCN/Lumil
 
 > **createdAt**: `number`
 
-Defined in: [contexts/GlobalContext.tsx:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/contexts/GlobalContext.tsx#L17)
+Defined in: [contexts/GlobalContext.tsx:17](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/contexts/GlobalContext.tsx#L17)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [contexts/GlobalContext.tsx:17](https://github.com/EdwinZhanCN/Lumil
 
 > **id**: `string`
 
-Defined in: [contexts/GlobalContext.tsx:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/contexts/GlobalContext.tsx#L14)
+Defined in: [contexts/GlobalContext.tsx:14](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/contexts/GlobalContext.tsx#L14)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [contexts/GlobalContext.tsx:14](https://github.com/EdwinZhanCN/Lumil
 
 > **message**: `string`
 
-Defined in: [contexts/GlobalContext.tsx:16](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/contexts/GlobalContext.tsx#L16)
+Defined in: [contexts/GlobalContext.tsx:16](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/contexts/GlobalContext.tsx#L16)
 
 ***
 
@@ -34,7 +34,7 @@ Defined in: [contexts/GlobalContext.tsx:16](https://github.com/EdwinZhanCN/Lumil
 
 > **read**: `boolean`
 
-Defined in: [contexts/GlobalContext.tsx:18](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/contexts/GlobalContext.tsx#L18)
+Defined in: [contexts/GlobalContext.tsx:18](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/contexts/GlobalContext.tsx#L18)
 
 ***
 
@@ -42,4 +42,4 @@ Defined in: [contexts/GlobalContext.tsx:18](https://github.com/EdwinZhanCN/Lumil
 
 > **type**: [`GlobalMessageType`](../type-aliases/GlobalMessageType.md)
 
-Defined in: [contexts/GlobalContext.tsx:15](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/contexts/GlobalContext.tsx#L15)
+Defined in: [contexts/GlobalContext.tsx:15](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/contexts/GlobalContext.tsx#L15)

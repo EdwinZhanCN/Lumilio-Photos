@@ -2,7 +2,7 @@
 
 # Interface: useExportImageReturn
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L27)
+Defined in: [hooks/util-hooks/useExportImage.tsx:27](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/hooks/util-hooks/useExportImage.tsx#L27)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:27](https://github.com/EdwinZha
 
 > **cancelExport**: () => `void`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:37](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L37)
+Defined in: [hooks/util-hooks/useExportImage.tsx:37](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/hooks/util-hooks/useExportImage.tsx#L37)
 
 #### Returns
 
@@ -22,7 +22,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:37](https://github.com/EdwinZha
 
 > **downloadOriginal**: (`asset`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L30)
+Defined in: [hooks/util-hooks/useExportImage.tsx:30](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/hooks/util-hooks/useExportImage.tsx#L30)
 
 #### Parameters
 
@@ -86,11 +86,11 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:30](https://github.com/EdwinZha
 
 ###### specific_metadata?
 
-\{ `camera_model?`: `string`; `capture_offset_minutes?`: `number`; `description?`: `string`; `dimensions?`: `string`; `exposure?`: `number`; `exposure_time?`: `string`; `f_number?`: `number`; `focal_length?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `is_raw?`: `boolean`; `iso_speed?`: `number`; `lens_model?`: `string`; `resolution?`: `string`; `taken_time?`: `string`; \} \| \{ `bitrate?`: `number`; `camera_model?`: `string`; `capture_offset_minutes?`: `number`; `codec?`: `string`; `description?`: `string`; `frame_rate?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `recorded_time?`: `string`; \} \| \{ `album?`: `string`; `artist?`: `string`; `bitrate?`: `number`; `channels?`: `number`; `codec?`: `string`; `description?`: `string`; `genre?`: `string`; `sample_rate?`: `number`; `title?`: `string`; `year?`: `number`; \}
+\{ `camera_model?`: `string`; `capture_offset_minutes?`: `number`; `content_identifier?`: `string`; `description?`: `string`; `dimensions?`: `string`; `exposure?`: `number`; `exposure_time?`: `string`; `f_number?`: `number`; `focal_length?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `is_raw?`: `boolean`; `iso_speed?`: `number`; `lens_model?`: `string`; `resolution?`: `string`; `taken_time?`: `string`; \} \| \{ `bitrate?`: `number`; `camera_model?`: `string`; `capture_offset_minutes?`: `number`; `codec?`: `string`; `content_identifier?`: `string`; `description?`: `string`; `frame_rate?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `recorded_time?`: `string`; \} \| \{ `album?`: `string`; `artist?`: `string`; `bitrate?`: `number`; `channels?`: `number`; `codec?`: `string`; `description?`: `string`; `genre?`: `string`; `sample_rate?`: `number`; `title?`: `string`; `year?`: `number`; \}
 
 ###### stack?
 
-\{ `stack_cover?`: `boolean`; `stack_id?`: `string`; `stack_size?`: `number`; \}
+\{ `stack_cover?`: `boolean`; `stack_id?`: `string`; `stack_kind?`: `"manual"` \| `"raw_jpeg"` \| `"live_photo"`; `stack_size?`: `number`; \}
 
 ###### stack.stack_cover?
 
@@ -114,6 +114,17 @@ true
 
 ```ts
 550e8400-e29b-41d4-a716-446655440000
+```
+
+###### stack.stack_kind?
+
+`"manual"` \| `"raw_jpeg"` \| `"live_photo"`
+
+**Example**
+
+```ts
+live_photo
+@enum {string}
 ```
 
 ###### stack.stack_size?
@@ -164,7 +175,7 @@ Number of members in the stack
 
 > **exportImage**: (`asset`, `options`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L31)
+Defined in: [hooks/util-hooks/useExportImage.tsx:31](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/hooks/util-hooks/useExportImage.tsx#L31)
 
 #### Parameters
 
@@ -228,11 +239,11 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:31](https://github.com/EdwinZha
 
 ###### specific_metadata?
 
-\{ `camera_model?`: `string`; `capture_offset_minutes?`: `number`; `description?`: `string`; `dimensions?`: `string`; `exposure?`: `number`; `exposure_time?`: `string`; `f_number?`: `number`; `focal_length?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `is_raw?`: `boolean`; `iso_speed?`: `number`; `lens_model?`: `string`; `resolution?`: `string`; `taken_time?`: `string`; \} \| \{ `bitrate?`: `number`; `camera_model?`: `string`; `capture_offset_minutes?`: `number`; `codec?`: `string`; `description?`: `string`; `frame_rate?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `recorded_time?`: `string`; \} \| \{ `album?`: `string`; `artist?`: `string`; `bitrate?`: `number`; `channels?`: `number`; `codec?`: `string`; `description?`: `string`; `genre?`: `string`; `sample_rate?`: `number`; `title?`: `string`; `year?`: `number`; \}
+\{ `camera_model?`: `string`; `capture_offset_minutes?`: `number`; `content_identifier?`: `string`; `description?`: `string`; `dimensions?`: `string`; `exposure?`: `number`; `exposure_time?`: `string`; `f_number?`: `number`; `focal_length?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `is_raw?`: `boolean`; `iso_speed?`: `number`; `lens_model?`: `string`; `resolution?`: `string`; `taken_time?`: `string`; \} \| \{ `bitrate?`: `number`; `camera_model?`: `string`; `capture_offset_minutes?`: `number`; `codec?`: `string`; `content_identifier?`: `string`; `description?`: `string`; `frame_rate?`: `number`; `gps_latitude?`: `number`; `gps_longitude?`: `number`; `recorded_time?`: `string`; \} \| \{ `album?`: `string`; `artist?`: `string`; `bitrate?`: `number`; `channels?`: `number`; `codec?`: `string`; `description?`: `string`; `genre?`: `string`; `sample_rate?`: `number`; `title?`: `string`; `year?`: `number`; \}
 
 ###### stack?
 
-\{ `stack_cover?`: `boolean`; `stack_id?`: `string`; `stack_size?`: `number`; \}
+\{ `stack_cover?`: `boolean`; `stack_id?`: `string`; `stack_kind?`: `"manual"` \| `"raw_jpeg"` \| `"live_photo"`; `stack_size?`: `number`; \}
 
 ###### stack.stack_cover?
 
@@ -256,6 +267,17 @@ true
 
 ```ts
 550e8400-e29b-41d4-a716-446655440000
+```
+
+###### stack.stack_kind?
+
+`"manual"` \| `"raw_jpeg"` \| `"live_photo"`
+
+**Example**
+
+```ts
+live_photo
+@enum {string}
 ```
 
 ###### stack.stack_size?
@@ -310,7 +332,7 @@ Number of members in the stack
 
 > **exportMultiple**: (`assets`, `options`, `priority?`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L32)
+Defined in: [hooks/util-hooks/useExportImage.tsx:32](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/hooks/util-hooks/useExportImage.tsx#L32)
 
 #### Parameters
 
@@ -336,7 +358,7 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:32](https://github.com/EdwinZha
 
 > **exportProgress**: [`ExportProgress`](ExportProgress.md) \| `null`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L29)
+Defined in: [hooks/util-hooks/useExportImage.tsx:29](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/hooks/util-hooks/useExportImage.tsx#L29)
 
 ***
 
@@ -344,4 +366,4 @@ Defined in: [hooks/util-hooks/useExportImage.tsx:29](https://github.com/EdwinZha
 
 > **isExporting**: `boolean`
 
-Defined in: [hooks/util-hooks/useExportImage.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/b2767ed1cd02a988d009bb42f283faf491d646a7/web/src/hooks/util-hooks/useExportImage.tsx#L28)
+Defined in: [hooks/util-hooks/useExportImage.tsx:28](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/hooks/util-hooks/useExportImage.tsx#L28)
