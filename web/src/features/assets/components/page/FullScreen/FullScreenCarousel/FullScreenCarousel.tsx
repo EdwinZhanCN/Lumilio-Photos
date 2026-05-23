@@ -88,10 +88,10 @@ const FullScreenCarousel = ({
   // Update currentAsset when photos or slideIndex/initialSlide changes
   useEffect(() => {
     const index = slideIndex !== undefined ? slideIndex : initialSlide;
-    if (photos[index] && photos[index] !== currentAsset) {
+    if (photos[index] && photos[index].asset_id !== currentAsset?.asset_id) {
       setCurrentAsset(photos[index]);
     }
-  }, [photos, slideIndex, initialSlide, currentAsset]);
+  }, [photos, slideIndex, initialSlide, currentAsset?.asset_id]);
 
   useEffect(() => {
     const handler = () => setShowInfo((s) => !s);
@@ -133,6 +133,10 @@ const FullScreenCarousel = ({
       setOptimisticLiked(newLiked);
       try {
         await toggleLike(assetId, newLiked);
+        handleAssetUpdate({
+          ...currentAsset,
+          liked: newLiked,
+        });
       } catch (error) {
         console.error("Failed to update like status:", error);
       }

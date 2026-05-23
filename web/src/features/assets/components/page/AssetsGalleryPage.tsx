@@ -6,6 +6,7 @@ import FullScreenCarousel from "@/features/assets/components/page/FullScreen/Ful
 import JustifiedGallery from "@/features/assets/components/page/JustifiedGallery/JustifiedGallery";
 import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
+import { SearchFAB } from "@/features/assets/components/page/SearchFAB";
 import { useAssetsNavigation } from "@/features/assets/hooks/useAssetsNavigation";
 import {
   useCurrentAssetsView,
@@ -333,6 +334,7 @@ export function AssetsGalleryPage() {
             </div>
           </div>
         ))}
+      <SearchFAB />
     </div>
   );
 }

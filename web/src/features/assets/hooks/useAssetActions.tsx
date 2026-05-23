@@ -60,6 +60,38 @@ export const useAssetActions = (): AssetActionsResult => {
       });
     };
 
+    const updateBrowseItems = (items: any[] | undefined) => {
+      if (!Array.isArray(items)) return items;
+      return items.map((item: any) => {
+        if (!item) return item;
+        let updated = false;
+        let newAsset = item.asset;
+        let newStack = item.stack;
+
+        if (item.asset && item.asset.asset_id === assetId) {
+          newAsset = updateFn(item.asset);
+          updated = true;
+        }
+
+        if (item.stack && item.stack.cover_asset && item.stack.cover_asset.asset_id === assetId) {
+          newStack = {
+            ...item.stack,
+            cover_asset: updateFn(item.stack.cover_asset),
+          };
+          updated = true;
+        }
+
+        if (updated) {
+          return {
+            ...item,
+            asset: newAsset,
+            stack: newStack,
+          };
+        }
+        return item;
+      });
+    };
+
     queryClient.setQueriesData(
       {
         predicate: (query) => {
@@ -87,12 +119,15 @@ export const useAssetActions = (): AssetActionsResult => {
                   assets: updateAssets(page.data.assets),
                   results: updateAssets(page.data.results),
                   top_results: updateAssets(page.data.top_results),
+                  items: updateBrowseItems(page.data.items),
+                  result_items: updateBrowseItems(page.data.result_items),
+                  top_items: updateBrowseItems(page.data.top_items),
                 };
 
                 return {
                   ...page,
                   data: nextData,
-                }
+                };
               }
               return page;
             }),

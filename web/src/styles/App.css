@@ -186,3 +186,19 @@ label.toggle input:checked ~ svg {
         animation: none !important;
     }
 }
+
+/* Keep fab open when programmatically opened (e.g. has search query) */
+.fab.fab-open > [tabindex]:first-child {
+    pointer-events: none !important;
+    opacity: 0 !important;
+    rotate: 90deg !important;
+}
+.fab.fab-open > :nth-child(n + 2) {
+    visibility: visible !important;
+    opacity: 1 !important;
+    --tw-scale-x: 100% !important;
+    --tw-scale-y: 100% !important;
+    --tw-scale-z: 100% !important;
+    scale: 1 !important;
+}
+

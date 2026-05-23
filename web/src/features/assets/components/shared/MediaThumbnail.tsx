@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Play, Music, Video, Headphones, Check } from "lucide-react";
 import {
   isVideo,
@@ -35,14 +35,76 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   const duration = asset.duration;
   const ariaLabel = getAssetAriaLabel(asset);
   const resolvedThumbnailUrl = thumbnailUrl?.trim();
+
+  // retryCount drives cache-busting: the effective src for the <img> is
+  // resolvedThumbnailUrl + (retryCount > 0 ? `&_r=<n>` : "").
+  // Each onError increments this (up to MAX_RETRIES) after an exponential delay.
+  const MAX_RETRIES = 3;
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Derive the actual src we hand to <img> so retries get a fresh network request.
+  const effectiveSrc = resolvedThumbnailUrl
+    ? retryCount > 0
+      ? `${resolvedThumbnailUrl}&_r=${retryCount}`
+      : resolvedThumbnailUrl
+    : undefined;
+
   const [imageState, setImageState] = useState({
     url: "",
     loaded: false,
     failed: false,
   });
-  const imageStateMatches = imageState.url === (resolvedThumbnailUrl ?? "");
+
+  const imageStateMatches = imageState.url === (effectiveSrc ?? "");
   const imageLoaded = imageStateMatches && imageState.loaded;
-  const imageFailed = imageStateMatches && imageState.failed;
+  // Only treat as permanently failed once we have exhausted all retries.
+  const imageFailed = imageStateMatches && imageState.failed && retryCount >= MAX_RETRIES;
+
+  // Clear any pending retry timer when the component unmounts or url changes.
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current !== null) {
+        clearTimeout(retryTimerRef.current);
+      }
+    };
+  }, [resolvedThumbnailUrl]);
+
+  // When the user returns to the tab the browser may have stalled/errored on
+  // in-flight image requests. Reset the retry counter so the <img> re-fetches.
+  const handleVisibilityChange = useCallback(() => {
+    if (document.visibilityState === "visible" && imageState.failed) {
+      if (retryTimerRef.current !== null) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      setRetryCount((n) => n + 1);
+      setImageState({ url: "", loaded: false, failed: false });
+    }
+  }, [imageState.failed]);
+
+  useEffect(() => {
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [handleVisibilityChange]);
+
+  const handleImageError = useCallback(() => {
+    if (!effectiveSrc) return;
+    // Mark current src as failed in state.
+    setImageState({ url: effectiveSrc, loaded: false, failed: true });
+    if (retryCount < MAX_RETRIES) {
+      // Exponential back-off: 1s, 2s, 4s.
+      const delay = Math.pow(2, retryCount) * 1000;
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null;
+        setRetryCount((n) => n + 1);
+        // Reset image state so the new effectiveSrc triggers a fresh load.
+        setImageState({ url: "", loaded: false, failed: false });
+      }, delay);
+    }
+  }, [effectiveSrc, retryCount]);
 
   const selectionTint = isSelectionMode ? (
     <div
@@ -100,9 +162,9 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
         {(!resolvedThumbnailUrl || !imageLoaded || imageFailed) && (
           <div className="skeleton absolute inset-0 h-full w-full rounded-none bg-base-300" />
         )}
-        {resolvedThumbnailUrl && !imageFailed && (
+        {effectiveSrc && !imageFailed && (
           <img
-            src={resolvedThumbnailUrl}
+            src={effectiveSrc}
             alt={
               asset.original_filename ||
               t("assets.mediaThumbnail.asset_alt_text")
@@ -115,18 +177,12 @@ const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
             loading="lazy"
             onLoad={() =>
               setImageState({
-                url: resolvedThumbnailUrl,
+                url: effectiveSrc,
                 loaded: true,
                 failed: false,
               })
             }
-            onError={() => {
-              setImageState({
-                url: resolvedThumbnailUrl,
-                loaded: false,
-                failed: true,
-              });
-            }}
+            onError={handleImageError}
           />
         )}
 
