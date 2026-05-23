@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef } from "react";
+import React, { memo, useCallback, useMemo, useRef } from "react";
 import MediaThumbnail from "@/features/assets/components/shared/MediaThumbnail";
 import StackedThumbnail from "@/features/assets/components/shared/StackedThumbnail";
 import { useOptionalKeyboardSelection } from "@/features/assets/hooks/useSelection";
@@ -13,8 +13,8 @@ import {
 import EmptyState from "@/components/EmptyState";
 import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
 import type { BrowseItem } from "@/features/assets/types/assets.type";
-
 import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfiniteScroll";
+import { useVisibleOnce } from "@/features/assets/hooks/useVisibleOnce";
 
 interface SquareGalleryProps extends AssetGalleryProps {
   renderTileCaption?: (
@@ -24,6 +24,111 @@ interface SquareGalleryProps extends AssetGalleryProps {
   ) => React.ReactNode;
   render3DCard?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// SquareGalleryItem
+// ---------------------------------------------------------------------------
+
+interface SquareGalleryItemProps {
+  item: BrowseItem;
+  asset: Asset;
+  thumbnailUrl?: string;
+  render3DCard: boolean;
+  caption?: React.ReactNode;
+  isSelected: boolean;
+  isSelectionMode: boolean;
+  onItemClick: (
+    item: BrowseItem,
+    asset: Asset,
+    event: React.MouseEvent | React.KeyboardEvent,
+  ) => void;
+}
+
+/**
+ * Individual cell in the square grid.
+ * - Outer div (grid cell) always stays in the DOM.
+ * - Content mounts once the cell enters the viewport (useVisibleOnce).
+ * - content-visibility: auto + containIntrinsicSize skips paint for
+ *   off-screen cells. "auto <fallback>" lets the browser remember the real
+ *   rendered size so the scrollbar stays stable after first paint.
+ */
+const SquareGalleryItem = memo(
+  ({
+    item,
+    asset,
+    thumbnailUrl,
+    render3DCard,
+    caption,
+    isSelected,
+    isSelectionMode,
+    onItemClick,
+  }: SquareGalleryItemProps) => {
+    const [ref, mounted] = useVisibleOnce();
+    const assetId = asset.asset_id;
+
+    return (
+      <div
+        ref={ref}
+        className={
+          render3DCard
+            ? "hover-3d relative aspect-square"
+            : "relative aspect-square"
+        }
+        role="listitem"
+        data-asset-id={assetId}
+        style={{
+          contentVisibility: "auto",
+          // "auto" = remember last rendered size; 200px = initial fallback.
+          containIntrinsicSize: "auto 200px",
+        } as React.CSSProperties}
+      >
+        {mounted ? (
+          <>
+            <figure className="h-full w-full rounded-[1.25rem]">
+              {asset.stack?.stack_size && asset.stack.stack_size > 1 ? (
+                <StackedThumbnail
+                  asset={asset}
+                  thumbnailUrl={thumbnailUrl}
+                  stackInfo={asset.stack}
+                  browseStack={item.type === "stack" ? item : undefined}
+                  onClick={(event) => onItemClick(item, asset, event)}
+                  isSelected={isSelected}
+                  isSelectionMode={isSelectionMode}
+                  className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                />
+              ) : (
+                <MediaThumbnail
+                  asset={asset}
+                  thumbnailUrl={thumbnailUrl}
+                  onClick={(event) => onItemClick(item, asset, event)}
+                  isSelected={isSelected}
+                  isSelectionMode={isSelectionMode}
+                  className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                />
+              )}
+              {caption && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 rounded-b-2xl bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
+                  {caption}
+                </div>
+              )}
+            </figure>
+            {render3DCard && (
+              <>
+                <div /><div /><div /><div />
+                <div /><div /><div /><div />
+              </>
+            )}
+          </>
+        ) : (
+          <div className="skeleton absolute inset-0 h-full w-full rounded-[1.25rem] bg-base-300" />
+        )}
+      </div>
+    );
+  },
+);
+SquareGalleryItem.displayName = "SquareGalleryItem";
+
+// ---------------------------------------------------------------------------
 
 const SquareGallery: React.FC<SquareGalleryProps> = ({
   browseGroups,
@@ -130,54 +235,17 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
                 const caption = renderTileCaption?.(asset, index, groupKey);
 
                 return (
-                  <div
+                  <SquareGalleryItem
                     key={`${groupKey}-${item.id}`}
-                    className={render3DCard ? "hover-3d relative aspect-square" : "relative aspect-square"}
-                    role="listitem"
-                    data-asset-id={assetId}
-                  >
-                    <figure className="h-full w-full rounded-[1.25rem]">
-                      {asset.stack?.stack_size && asset.stack.stack_size > 1 ? (
-                        <StackedThumbnail
-                          asset={asset}
-                          thumbnailUrl={thumbnailUrl}
-                          stackInfo={asset.stack}
-                          browseStack={item.type === "stack" ? item : undefined}
-                          onClick={(event) => handleAssetClick(item, asset, event)}
-                          isSelected={selection.isSelected(item.id)}
-                          isSelectionMode={selection.enabled}
-                          className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
-                        />
-                      ) : (
-                        <MediaThumbnail
-                          asset={asset}
-                          thumbnailUrl={thumbnailUrl}
-                          onClick={(event) => handleAssetClick(item, asset, event)}
-                          isSelected={selection.isSelected(item.id)}
-                          isSelectionMode={selection.enabled}
-                          className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
-                        />
-                      )}
-                      {caption && (
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 rounded-b-2xl bg-gradient-to-t from-black/70 via-black/20 to-transparent px-4 pb-3 pt-10 text-sm text-white">
-                          {caption}
-                        </div>
-                      )}
-                    </figure>
-                    {render3DCard && (
-                      <>
-                        {/* 8 empty divs needed for the 3D hover effect */}
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                        <div></div>
-                      </>
-                    )}
-                  </div>
+                    item={item}
+                    asset={asset}
+                    thumbnailUrl={thumbnailUrl}
+                    render3DCard={render3DCard}
+                    caption={caption}
+                    isSelected={selection.isSelected(item.id)}
+                    isSelectionMode={selection.enabled}
+                    onItemClick={handleAssetClick}
+                  />
                 );
               })}
             </div>

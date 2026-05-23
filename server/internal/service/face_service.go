@@ -463,10 +463,6 @@ func (s *faceService) persistFaceCrop(repoPath string, assetID pgtype.UUID, inde
 	}
 	defer img.Close()
 
-	if err := img.AutoRotate(); err != nil {
-		return nil, fmt.Errorf("autorotate face crop source: %w", err)
-	}
-
 	srcW := img.Width()
 	srcH := img.Height()
 	if srcW <= 0 || srcH <= 0 {

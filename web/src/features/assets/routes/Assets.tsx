@@ -11,11 +11,15 @@ const Assets = () => {
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <ErrorFallBack code={500} title={t("assets.errorFallback.something_went_wrong")} {...props} />
+        <ErrorFallBack
+          code={500}
+          title={t("assets.errorFallback.something_went_wrong")}
+          {...props}
+        />
       )}
     >
       <AssetsProvider scopeId="assets:main" persist>
-        <WorkerProvider preload={["exif", "export"]}>
+        <WorkerProvider preload={["export"]}>
           <AssetsGalleryPage />
         </WorkerProvider>
       </AssetsProvider>

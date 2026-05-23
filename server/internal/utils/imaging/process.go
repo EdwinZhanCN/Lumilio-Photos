@@ -50,14 +50,19 @@ type ProcessOptions struct {
 	StripMetadata bool
 	// NoProfile removes the embedded ICC colour profile.
 	NoProfile bool
+	// AutoRotate applies EXIF orientation during load. Only supported for
+	// JPEG and TIFF sources; should be false for WebP and re-encoded images.
+	AutoRotate bool
 }
 
-// thumbnailImportParams builds an ImportParams that enables EXIF autorotation
-// during load. We always want this so downstream encoders see upright pixels
-// and orientation metadata is normalized away.
-func thumbnailImportParams() *vips.ImportParams {
+// thumbnailImportParams builds an ImportParams for the thumbnail load path.
+// Only sets AutoRotate when requested, because many loaders (PNG, WebP, HEIF)
+// don't support the property and will error if it's set at all.
+func thumbnailImportParams(autoRotate bool) *vips.ImportParams {
 	p := vips.NewImportParams()
-	p.AutoRotate.Set(true)
+	if autoRotate {
+		p.AutoRotate.Set(true)
+	}
 	return p
 }
 
@@ -145,7 +150,7 @@ func processImageRefFromBytes(buf []byte, opts ProcessOptions) (*vips.ImageRef, 
 			size = vips.SizeBoth
 		}
 
-		img, err = vips.LoadThumbnailFromBuffer(buf, w, h, interest, size, thumbnailImportParams())
+		img, err = vips.LoadThumbnailFromBuffer(buf, w, h, interest, size, thumbnailImportParams(opts.AutoRotate))
 		if err != nil {
 			return nil, fmt.Errorf("thumbnail load: %w", err)
 		}
@@ -154,9 +159,11 @@ func processImageRefFromBytes(buf []byte, opts ProcessOptions) (*vips.ImageRef, 
 		if err != nil {
 			return nil, fmt.Errorf("decode image: %w", err)
 		}
-		if err := img.AutoRotate(); err != nil {
-			img.Close()
-			return nil, fmt.Errorf("autorotate: %w", err)
+		if opts.AutoRotate {
+			if err := img.AutoRotate(); err != nil {
+				img.Close()
+				return nil, fmt.Errorf("autorotate: %w", err)
+			}
 		}
 	}
 	if opts.PadWidth > 0 && opts.PadHeight > 0 {
@@ -188,6 +195,8 @@ func processImageRefFromBytes(buf []byte, opts ProcessOptions) (*vips.ImageRef, 
 // path would force a full-resolution pixel buffer and a Copy() per size, which
 // is much more expensive than letting libvips decode straight to the target
 // scale.
+//
+// EXIF orientation is auto-applied only for JPEG and TIFF sources.
 func StreamThumbnails(
 	r io.Reader,
 	sizes map[string][2]int,
@@ -201,7 +210,7 @@ func StreamThumbnails(
 		return fmt.Errorf("empty source image")
 	}
 
-	params := thumbnailImportParams()
+	params := thumbnailImportParams(shouldAutoRotate(srcBuf))
 
 	for name, dim := range sizes {
 		out, ok := outputs[name]
@@ -345,4 +354,27 @@ func exportRGB(img *vips.ImageRef) (*RGBImage, error) {
 		DType:      "uint8",
 		ColorSpace: "RGB",
 	}, nil
+}
+
+// shouldAutoRotate returns true for image formats that carry EXIF orientation
+// metadata. JPEG and TIFF are the formats with reliable orientation tags;
+// WebP, PNG, HEIC/HEIF and others either don't use orientation or handle it
+// differently.
+func shouldAutoRotate(buf []byte) bool {
+	if len(buf) < 4 {
+		return false
+	}
+
+	// JPEG: 0xFF 0xD8
+	if buf[0] == 0xFF && buf[1] == 0xD8 {
+		return true
+	}
+
+	// TIFF: 0x49 0x49 0x2A 0x00 (little-endian) or 0x4D 0x4D 0x00 0x2A (big-endian)
+	if (buf[0] == 0x49 && buf[1] == 0x49 && buf[2] == 0x2A && buf[3] == 0x00) ||
+		(buf[0] == 0x4D && buf[1] == 0x4D && buf[2] == 0x00 && buf[3] == 0x2A) {
+		return true
+	}
+
+	return false
 }

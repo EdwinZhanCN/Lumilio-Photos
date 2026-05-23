@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  memo,
   useMemo,
   useRef,
   useState,
@@ -30,6 +31,53 @@ import type {
 import { getBrowseItemAsset } from "@/features/assets/utils/browseItems";
 
 import { useGalleryInfiniteScroll } from "@/features/assets/hooks/useGalleryInfiniteScroll";
+import { useVisibleOnce } from "@/features/assets/hooks/useVisibleOnce";
+
+interface AbsoluteGalleryItemProps {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  dataAssetId?: string;
+  children: React.ReactNode;
+}
+
+/**
+ * Shell element for each justified-layout tile.
+ * - Always in the DOM (preserves container height + scrollbar).
+ * - Mounts children only once the tile enters the viewport (useVisibleOnce).
+ * - Applies content-visibility: auto with exact dimensions so the browser
+ *   skips paint/composite for off-screen tiles (Plan B).
+ */
+const AbsoluteGalleryItem = memo(
+  ({ top, left, width, height, dataAssetId, children }: AbsoluteGalleryItemProps) => {
+    const [ref, mounted] = useVisibleOnce();
+
+    return (
+      <div
+        ref={ref}
+        className="absolute"
+        role="listitem"
+        style={{
+          top,
+          left,
+          width,
+          height,
+          contentVisibility: "auto",
+          containIntrinsicSize: `${width}px ${height}px`,
+        } as React.CSSProperties}
+        data-asset-id={dataAssetId}
+      >
+        {mounted ? (
+          children
+        ) : (
+          <div className="skeleton absolute inset-0 h-full w-full rounded-[1.25rem] bg-base-300" />
+        )}
+      </div>
+    );
+  },
+);
+AbsoluteGalleryItem.displayName = "AbsoluteGalleryItem";
 
 type LayoutState = {
   signature: string;
@@ -325,17 +373,13 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                     : undefined;
 
                   return (
-                    <div
+                    <AbsoluteGalleryItem
                       key={`${groupKey}-${item.id}`}
-                      className="absolute"
-                      role="listitem"
-                      style={{
-                        top: position.top,
-                        left: position.left,
-                        width,
-                        height,
-                      }}
-                      data-asset-id={assetId}
+                      top={position.top}
+                      left={position.left}
+                      width={width}
+                      height={height}
+                      dataAssetId={assetId}
                     >
                       {asset.stack?.stack_size && asset.stack.stack_size > 1 ? (
                         <StackedThumbnail
@@ -358,7 +402,7 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                           className="rounded-[1.25rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
                         />
                       )}
-                    </div>
+                    </AbsoluteGalleryItem>
                   );
                 })}
               </div>
