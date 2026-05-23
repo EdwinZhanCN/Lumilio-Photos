@@ -4,7 +4,7 @@
 
 > **useExtractExifdata**(): [`useExtractExifdataReturn`](../interfaces/useExtractExifdataReturn.md)
 
-Defined in: [hooks/util-hooks/useExtractExifdata.tsx:33](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/951cf1b7fa322fefddc97d3fa89023d9d5095996/web/src/hooks/util-hooks/useExtractExifdata.tsx#L33)
+Defined in: [hooks/util-hooks/useExtractExifdata.tsx:33](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6980ebbc3250d8ad1176b8bae48117f2eb65afdb/web/src/hooks/util-hooks/useExtractExifdata.tsx#L33)
 
 A hook to extract EXIF data from files using the shared web worker client.
 It encapsulates the state for the extraction process, progress, and results.
