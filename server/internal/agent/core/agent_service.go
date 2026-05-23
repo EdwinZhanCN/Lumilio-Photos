@@ -97,9 +97,6 @@ func (s *agentService) buildAgent(ctx context.Context, toolNames []string, sideC
 	// Time with weekdays
 	t := time.Now()
 	today := fmt.Sprintf("%s, %s", t.Weekday().String(), t.Format("2006-01-02"))
-	if err != nil { // Always check errors even if they should not happen.
-		panic(err)
-	}
 	return adk.NewChatModelAgent(
 		ctx,
 		&adk.ChatModelAgentConfig{

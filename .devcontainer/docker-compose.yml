@@ -41,7 +41,6 @@ services:
             PGPASSWORD: postgres
         volumes:
             - naturalearth_data:/data/naturalearth
-            - ../server/scripts/import-natural-earth.sh:/import-natural-earth.sh:ro
         command: ["/bin/bash", "/import-natural-earth.sh"]
 
     devcontainer:

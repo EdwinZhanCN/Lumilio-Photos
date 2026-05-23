@@ -7,7 +7,10 @@
 # NOTE: The db service and other infrastructure containers are defined
 # in .devcontainer/docker-compose.yml and run alongside this container.
 
-FROM golang:1.25.0-bookworm
+FROM golang:1.25.0-trixie
+
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
 
 # ---------------------------------------------------------------
 # Base system dependencies
@@ -16,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     libvips-dev \
+    libvips-tools \
     libraw-dev \
     ffmpeg \
     exiftool \
@@ -24,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     curl \
     zsh \
+    gnupg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -144,11 +149,23 @@ RUN chsh -s /usr/bin/zsh root
 # ---------------------------------------------------------------
 # Node.js 23.x + pnpm (matches web/.nvmrc)
 # ---------------------------------------------------------------
-RUN curl -fsSL https://deb.nodesource.com/setup_23.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g pnpm@latest && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+ARG NODE_VERSION=23.11.1
+
+RUN set -eux; \
+    arch="$(dpkg --print-architecture)"; \
+    case "$arch" in \
+      amd64) node_arch="x64" ;; \
+      arm64) node_arch="arm64" ;; \
+      *) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSLO "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
+    tar -xJf "node-v${NODE_VERSION}-linux-${node_arch}.tar.xz" -C /usr/local --strip-components=1; \
+    rm "node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
+    corepack enable; \
+    corepack prepare pnpm@latest --activate; \
+    node --version; \
+    npm --version; \
+    pnpm --version
 
 # ---------------------------------------------------------------
 # Rust toolchain (nightly + wasm target for WASM crates)
@@ -175,7 +192,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
 # Docker CLI (host socket is mounted at runtime)
 # ---------------------------------------------------------------
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian trixie stable" > /etc/apt/sources.list.d/docker.list && \
     apt-get update && apt-get install -y --no-install-recommends \
         docker-ce-cli \
         docker-compose-plugin && \

@@ -4,6 +4,7 @@ import type {
   AssetGroup,
   BrowseGroup,
   BrowseItem,
+  BrowseStackItem,
   BrowseItemId,
   SortByType,
 } from "@/features/assets/types/assets.type";
@@ -29,12 +30,11 @@ const preferRepresentative = (current: Asset, candidate: Asset): Asset => {
 
 export const resolveStackFocusAssetId = (
   asset: Asset,
+  stack?: BrowseStackItem,
 ): string | undefined => {
-  const matchedMemberId = asset.stack?.matched_member_ids?.find(
-    (id) => Boolean(id),
-  );
+  const matchedMemberId = stack?.matchedMemberIds?.find((id) => Boolean(id));
 
-  return matchedMemberId ?? asset.stack?.cover_asset_id ?? asset.asset_id;
+  return matchedMemberId ?? asset.asset_id;
 };
 
 const toAssetItem = (asset: Asset): BrowseItem | null => {

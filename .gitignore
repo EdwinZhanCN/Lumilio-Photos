@@ -97,5 +97,6 @@ server/main
 # agent
 .claude/
 .codex/
+.antigravitycli/
 
 notes/

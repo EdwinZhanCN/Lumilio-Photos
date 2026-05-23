@@ -48,7 +48,7 @@ type RegistrationFlowState = {
   setPassword: (value: string) => void;
   confirmPassword: string;
   setConfirmPassword: (value: string) => void;
-  confirmPasswordRef: RefObject<HTMLInputElement>;
+  confirmPasswordRef: RefObject<HTMLInputElement | null>;
   confirmPasswordMessage: string;
   capabilityMessage: string | null;
   totpSetup: RegistrationTOTPSetupResponse | null;

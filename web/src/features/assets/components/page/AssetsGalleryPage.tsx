@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect } from "react";
+import { AlertTriangle } from "lucide-react";
 import { useParams } from "react-router-dom";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import FullScreenCarousel from "@/features/assets/components/page/FullScreen/FullScreenCarousel/FullScreenCarousel";
@@ -232,7 +233,26 @@ export function AssetsGalleryPage() {
     activeBrowseItems,
   ]);
 
-  if (error && !isSearchActive) throw new Error(error);
+  // Render an inline error rather than throwing, so a transient API failure
+  // doesn't trigger the full-screen ErrorBoundary and lock the user out.
+  if (error && !isSearchActive) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 p-16 text-center">
+        <AlertTriangle className="size-8 text-warning" />
+        <p className="text-base-content/70">
+          {t("assets.all.load_error", {
+            defaultValue: "Failed to load photos. Check your connection and try again.",
+          })}
+        </p>
+        <button
+          className="btn btn-sm btn-outline"
+          onClick={() => fetchNextPage()}
+        >
+          {t("common.retry", { defaultValue: "Retry" })}
+        </button>
+      </div>
+    );
+  }
 
   const showEndOfResults =
     !hasNextPage &&

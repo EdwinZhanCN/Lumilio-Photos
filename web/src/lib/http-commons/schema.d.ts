@@ -8472,6 +8472,7 @@ export interface components {
         "dbtypes.PhotoSpecificMetadata": {
             camera_model?: string;
             capture_offset_minutes?: number;
+            content_identifier?: string;
             description?: string;
             dimensions?: string;
             exposure?: number;
@@ -8494,6 +8495,7 @@ export interface components {
             capture_offset_minutes?: number;
             /** @example H.264 */
             codec?: string;
+            content_identifier?: string;
             /** @example A beautiful sunset over the ocean */
             description?: string;
             /** @example 30 */
@@ -8718,6 +8720,11 @@ export interface components {
             member_asset_ids?: string[];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             stack_id?: string;
+            /**
+             * @example live_photo
+             * @enum {string}
+             */
+            stack_kind?: "raw_jpeg" | "live_photo" | "manual";
             /** @example 3 */
             stack_size?: number;
         };
@@ -9482,6 +9489,11 @@ export interface components {
             members?: components["schemas"]["dto.StackMemberDTO"][];
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             stack_id?: string;
+            /**
+             * @example live_photo
+             * @enum {string}
+             */
+            stack_kind?: "raw_jpeg" | "live_photo" | "manual";
         };
         "dto.StackMemberDTO": {
             /** @example 550e8400-e29b-41d4-a716-446655440001 */
@@ -9503,6 +9515,11 @@ export interface components {
             stack_cover?: boolean;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             stack_id?: string;
+            /**
+             * @example live_photo
+             * @enum {string}
+             */
+            stack_kind?: "raw_jpeg" | "live_photo" | "manual";
             /**
              * @description Number of members in the stack
              * @example 3

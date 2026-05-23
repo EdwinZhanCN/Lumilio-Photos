@@ -10,45 +10,6 @@ import { assetToPhotoLocation } from "@/lib/utils/mapUtils";
 import type { Asset, PhotoSpecificMetadata } from "@/lib/http-commons";
 import { isPhotoMetadata } from "@/lib/http-commons";
 
-interface GeoResponse {
-  display_name: string;
-}
-
-// Legacy browser-side reverse geocode fallback. Keep this dead code around for
-// reference while the product moves to backend-owned cached location labels.
-export const legacyBrowserReverseGeocode = async (
-  latitude: number,
-  longitude: number,
-  region: string = "other",
-  language: string = "en",
-): Promise<string> => {
-  const isChina = region === "china";
-  const baseUrl = isChina
-    ? "https://api.mirror-earth.com/nominatim/reverse"
-    : "https://nominatim.openstreetmap.org/reverse";
-  const acceptLanguage = language === "zh" ? "zh-CN" : "en-US,en";
-
-  const params = new URLSearchParams({
-    lat: latitude.toString(),
-    lon: longitude.toString(),
-    format: "jsonv2",
-    addressdetails: "1",
-    "accept-language": acceptLanguage,
-  });
-
-  if (!isChina) {
-    params.set("namedetails", "1");
-  }
-
-  const response = await fetch(`${baseUrl}?${params.toString()}`);
-
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-
-  const result: GeoResponse = await response.json();
-  return result.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-};
 
 interface PhotoInfoViewProps {
   asset: Asset;

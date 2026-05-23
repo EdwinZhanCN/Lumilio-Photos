@@ -145,38 +145,27 @@ func (h *AgentHandler) prepareSSE(c *gin.Context) (http.Flusher, error) {
 
 // streamAgentEvents handles the main loop for streaming agent and side-channel events via SSE.
 func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, iter *adk.AsyncIterator[*adk.AgentEvent], sideChannel chan *core.SideChannelEvent) {
-	done := make(chan struct{})
+	// Channel to receive agent events from the iterator in a non-blocking manner.
+	type iterResult struct {
+		event *adk.AgentEvent
+		ok    bool
+	}
+	eventChan := make(chan iterResult)
 
-	// Goroutine to handle side-channel events from tools.
-	// When the main loop finishes, we signal via done and then drain any
-	// remaining buffered events so the frontend receives all tool outputs.
+	// Run iterator in a separate goroutine to avoid blocking on iter.Next()
 	go func() {
 		for {
+			event, ok := iter.Next()
 			select {
-			case <-done:
-				// Drain remaining buffered events before exiting.
-				for {
-					select {
-					case event := <-sideChannel:
-						h.sendSSE(c, flusher, "side_event", event)
-					default:
-						return
-					}
-				}
 			case <-c.Request.Context().Done():
 				return
-			case event, ok := <-sideChannel:
+			case eventChan <- iterResult{event, ok}:
 				if !ok {
 					return
 				}
-				h.sendSSE(c, flusher, "side_event", event)
 			}
 		}
 	}()
-
-	// Ensure done is signaled when we leave this function so the
-	// side-channel goroutine can drain and exit.
-	defer close(done)
 
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -185,41 +174,65 @@ func (h *AgentHandler) streamAgentEvents(c *gin.Context, flusher http.Flusher, i
 		select {
 		case <-c.Request.Context().Done():
 			return
+
 		case <-ticker.C:
 			h.sendSSE(c, flusher, "heartbeat", map[string]interface{}{"timestamp": time.Now().Unix()})
-			continue
-		default:
-		}
 
-		event, ok := iter.Next()
-		if !ok {
-			h.sendSSE(c, flusher, "done", nil)
-			return
-		}
+		case sideEvent, ok := <-sideChannel:
+			if !ok {
+				sideChannel = nil
+				continue
+			}
+			h.sendSSE(c, flusher, "side_event", sideEvent)
 
-		// Guardrail: Skip internal-only events that are not meant for the user.
-		// An event with only `CustomizedOutput` is a raw tool result intended for the next LLM reasoning step.
-		if event.Output != nil && event.Output.MessageOutput == nil && event.Output.CustomizedOutput != nil {
-			log.Printf("[AgentHandler] Skipping internal tool output event")
-			continue
-		}
+		case res := <-eventChan:
+			if !res.ok {
+				// Main iterator completed.
+				// Before exiting, we must drain any remaining events from sideChannel.
+				if sideChannel != nil {
+					draining := true
+					for draining {
+						select {
+						case sideEvent, ok := <-sideChannel:
+							if ok {
+								h.sendSSE(c, flusher, "side_event", sideEvent)
+							} else {
+								draining = false
+							}
+						default:
+							draining = false
+						}
+					}
+				}
+				h.sendSSE(c, flusher, "done", nil)
+				return
+			}
 
-		if event.Err != nil {
-			log.Printf("[AgentHandler] Error event: %v", event.Err)
-			h.sendSSE(c, flusher, "error", map[string]interface{}{"error": event.Err.Error()})
-			return
-		}
+			event := res.event
+			// Guardrail: Skip internal-only events that are not meant for the user.
+			// An event with only `CustomizedOutput` is a raw tool result intended for the next LLM reasoning step.
+			if event.Output != nil && event.Output.MessageOutput == nil && event.Output.CustomizedOutput != nil {
+				log.Printf("[AgentHandler] Skipping internal tool output event")
+				continue
+			}
 
-		if event.Output != nil && event.Output.MessageOutput != nil && event.Output.MessageOutput.IsStreaming {
-			log.Printf("[AgentHandler] Handling streaming output")
-			h.handleStreamingOutput(c, flusher, event)
-		} else {
-			log.Printf("[AgentHandler] Handling non-streaming output")
-			eventData := h.formatAgentEvent(event)
-			if len(eventData) > 0 {
-				h.sendSSE(c, flusher, "message", eventData)
+			if event.Err != nil {
+				log.Printf("[AgentHandler] Error event: %v", event.Err)
+				h.sendSSE(c, flusher, "error", map[string]interface{}{"error": event.Err.Error()})
+				return
+			}
+
+			if event.Output != nil && event.Output.MessageOutput != nil && event.Output.MessageOutput.IsStreaming {
+				log.Printf("[AgentHandler] Handling streaming output")
+				h.handleStreamingOutput(c, flusher, event)
 			} else {
-				log.Printf("[AgentHandler] Skipped empty event data")
+				log.Printf("[AgentHandler] Handling non-streaming output")
+				eventData := h.formatAgentEvent(event)
+				if len(eventData) > 0 {
+					h.sendSSE(c, flusher, "message", eventData)
+				} else {
+					log.Printf("[AgentHandler] Skipped empty event data")
+				}
 			}
 		}
 	}

@@ -57,8 +57,6 @@ const asset = {
     stack_id: "stack-1",
     stack_size: 2,
     stack_cover: true,
-    cover_asset_id: "cover",
-    matched_member_ids: ["member"],
   },
 } as Asset;
 

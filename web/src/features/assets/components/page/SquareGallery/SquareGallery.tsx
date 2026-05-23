@@ -142,6 +142,7 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}
                           stackInfo={asset.stack}
+                          browseStack={item.type === "stack" ? item : undefined}
                           onClick={(event) => handleAssetClick(item, asset, event)}
                           isSelected={selection.isSelected(item.id)}
                           isSelectionMode={selection.enabled}

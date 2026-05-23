@@ -49,20 +49,32 @@ const asset = {
   original_filename: "stack-cover.jpg",
   stack: {
     stack_id: "stack-1",
+    stack_kind: "raw_jpeg",
     stack_size: 3,
     stack_cover: true,
   },
-  } as Asset;
+} as Asset;
 
-const matchedAsset = {
-  asset_id: "stack-cover",
-  original_filename: "stack-cover.jpg",
+
+
+const plainBrowseStack = {
+  type: "stack",
+  id: "stack:stack-1",
+  stackId: "stack-1",
+  representative: asset,
+  assets: [asset],
+  memberAssetIds: ["stack-cover", "stack-member"],
+  matchedMemberIds: [],
+} as const;
+
+const livePhotoAsset = {
+  asset_id: "live-photo-cover",
+  original_filename: "live-photo.jpg",
   stack: {
-    stack_id: "stack-1",
-    stack_size: 3,
+    stack_id: "stack-live",
+    stack_kind: "live_photo",
+    stack_size: 2,
     stack_cover: true,
-    cover_asset_id: "stack-cover",
-    matched_member_ids: ["stack-member"],
   },
 } as Asset;
 
@@ -78,6 +90,7 @@ describe("StackedThumbnail", () => {
       <StackedThumbnail
         asset={asset}
         stackInfo={asset.stack!}
+        browseStack={plainBrowseStack as any}
         onClick={handleClick}
       />,
     );
@@ -97,6 +110,7 @@ describe("StackedThumbnail", () => {
       <StackedThumbnail
         asset={asset}
         stackInfo={asset.stack!}
+        browseStack={plainBrowseStack as any}
         onClick={handleClick}
       />,
     );
@@ -106,20 +120,33 @@ describe("StackedThumbnail", () => {
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a matched hint badge when the stack has matched members", () => {
-    render(<StackedThumbnail asset={matchedAsset} stackInfo={matchedAsset.stack!} />);
 
-    expect(screen.getByText(/matched/i)).toBeInTheDocument();
-  });
-
-  it("passes the matched member as carousel focus when the stack has a match", () => {
+  it("shows a non-interactive Live Photo badge for live photo stacks", () => {
     render(
-      <StackedThumbnail asset={matchedAsset} stackInfo={matchedAsset.stack!} />,
+      <StackedThumbnail
+        asset={livePhotoAsset}
+        stackInfo={livePhotoAsset.stack!}
+      />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /view 3 related assets/i }));
+    // The Live Photo badge is a decorative div, not a button
+    expect(screen.queryByRole("button", { name: /live photo/i })).toBeNull();
+    expect(screen.queryByText("stack-carousel-overlay")).not.toBeInTheDocument();
+  });
 
-    expect(lastOverlayProps?.open).toBe(true);
-    expect(lastOverlayProps?.focusAssetId).toBe("stack-member");
+  it("still allows clicking the thumbnail for live photo stacks", () => {
+    const handleClick = vi.fn();
+
+    render(
+      <StackedThumbnail
+        asset={livePhotoAsset}
+        stackInfo={livePhotoAsset.stack!}
+        onClick={handleClick}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "thumbnail" }));
+
+    expect(handleClick).toHaveBeenCalledTimes(1);
   });
 });

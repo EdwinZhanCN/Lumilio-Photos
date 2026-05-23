@@ -8,7 +8,8 @@ import {
 } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Virtual, Navigation, Pagination } from "swiper/modules";
-import { Ellipsis, Info, Share, Heart, Trash2, X } from "lucide-react";
+import { Ellipsis, Info, Share, Heart, Trash2, X, ImageOff } from "lucide-react";
+import { ErrorBoundary } from "react-error-boundary";
 import ExportModal from "@/components/ExportModal";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -188,7 +189,22 @@ const FullScreenCarousel = ({
       >
         {slides.map((slide, index) => (
           <SwiperSlide key={slide.assetId} virtualIndex={index}>
-            <MediaViewer asset={slide.asset} />
+            {({ isActive }) => (
+              <ErrorBoundary
+                fallback={
+                  <div className="h-screen w-screen flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-3 text-white/60">
+                      <ImageOff className="size-10" />
+                      <p className="text-sm">
+                        {t("assets.mediaViewer.media_not_available")}
+                      </p>
+                    </div>
+                  </div>
+                }
+              >
+                <MediaViewer asset={slide.asset} isActive={isActive} />
+              </ErrorBoundary>
+            )}
           </SwiperSlide>
         ))}
       </Swiper>

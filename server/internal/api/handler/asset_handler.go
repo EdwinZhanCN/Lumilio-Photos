@@ -1583,6 +1583,7 @@ func toBrowseItemDTOs(items []service.BrowseItem) []dto.BrowseItemDTO {
 			stackSize := len(item.Stack.MemberAssetIDs)
 			assetDTO.Stack = &dto.StackPreviewDTO{
 				StackID:    item.Stack.StackID.String(),
+				StackKind:  string(item.Stack.Kind),
 				StackCover: true,
 				StackSize:  &stackSize,
 			}
@@ -1591,6 +1592,7 @@ func toBrowseItemDTOs(items []service.BrowseItem) []dto.BrowseItemDTO {
 				ID:   item.ID,
 				Stack: &dto.BrowseStackDTO{
 					StackID:          item.Stack.StackID.String(),
+					StackKind:        string(item.Stack.Kind),
 					CoverAssetID:     item.Stack.CoverAssetID.String(),
 					CoverAsset:       assetDTO,
 					StackSize:        stackSize,
@@ -3313,6 +3315,7 @@ func (h *AssetHandler) GetAssetStack(c *gin.Context) {
 		AssetID: assetID.String(),
 		Stack: dto.StackDTO{
 			StackID:     stackInfo.StackID.String(),
+			StackKind:   string(stackInfo.Kind),
 			MemberCount: stackInfo.MemberCount,
 			Members:     members,
 		},
@@ -3376,6 +3379,7 @@ func (h *AssetHandler) CreateManualStack(c *gin.Context) {
 
 	response := dto.StackDTO{
 		StackID:     stackInfo.StackID.String(),
+		StackKind:   string(stackInfo.Kind),
 		MemberCount: stackInfo.MemberCount,
 		Members:     members,
 	}
