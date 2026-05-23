@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 // stack membership order; MatchedMemberIDs lists members that matched the current query (e.g. vector hits).
 type BrowseStack struct {
 	StackID          uuid.UUID
+	Kind             dbtypes.StackKind
 	CoverAssetID     uuid.UUID
 	MemberAssetIDs   []uuid.UUID
 	MatchedMemberIDs []uuid.UUID
@@ -127,6 +129,9 @@ func (s *assetService) QueryBrowseItems(ctx context.Context, params QueryAssetsP
 	}
 	items, err := browseItemsFromCollapsedRows(rows)
 	if err != nil {
+		return BrowseQueryResult{}, err
+	}
+	if err := s.attachBrowseStackKinds(ctx, items); err != nil {
 		return BrowseQueryResult{}, err
 	}
 	return BrowseQueryResult{
@@ -602,7 +607,70 @@ func (s *assetService) collapseAssetsToBrowseItems(ctx context.Context, assets [
 		})
 	}
 
+	if err := s.attachBrowseStackKinds(ctx, items); err != nil {
+		return nil, err
+	}
+
 	return items, nil
+}
+
+func (s *assetService) attachBrowseStackKinds(ctx context.Context, items []BrowseItem) error {
+	if s == nil || s.pool == nil || len(items) == 0 {
+		return nil
+	}
+
+	stackIDs := make([]pgtype.UUID, 0)
+	seen := make(map[uuid.UUID]struct{})
+	for _, item := range items {
+		if item.Stack == nil || item.Type != "stack" {
+			continue
+		}
+		stackID := item.Stack.StackID
+		if stackID == uuid.Nil {
+			continue
+		}
+		if _, exists := seen[stackID]; exists {
+			continue
+		}
+		seen[stackID] = struct{}{}
+		stackIDs = append(stackIDs, pgtype.UUID{Bytes: stackID, Valid: true})
+	}
+
+	if len(stackIDs) == 0 {
+		return nil
+	}
+
+	rows, err := s.pool.Query(ctx, `SELECT stack_id, stack_kind FROM asset_stacks WHERE stack_id = ANY($1::uuid[])`, stackIDs)
+	if err != nil {
+		return fmt.Errorf("get browse stack kinds: %w", err)
+	}
+	defer rows.Close()
+
+	kindByStackID := make(map[uuid.UUID]dbtypes.StackKind, len(stackIDs))
+	for rows.Next() {
+		var stackID pgtype.UUID
+		var stackKind dbtypes.StackKind
+		if err := rows.Scan(&stackID, &stackKind); err != nil {
+			return fmt.Errorf("scan browse stack kinds: %w", err)
+		}
+		if parsed, ok := uuidFromPgUUID(stackID); ok {
+			kindByStackID[parsed] = stackKind
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate browse stack kinds: %w", err)
+	}
+
+	for i := range items {
+		if items[i].Stack == nil {
+			continue
+		}
+		if kind, ok := kindByStackID[items[i].Stack.StackID]; ok {
+			items[i].Stack.Kind = kind
+		}
+	}
+
+	return nil
 }
 
 // countAssetsUnified counts assets matching filters (ignores stack collapse).

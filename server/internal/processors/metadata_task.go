@@ -83,30 +83,43 @@ func (ap *AssetProcessor) extractPhotoMetadata(ctx context.Context, asset *repo.
 	if err != nil {
 		return fmt.Errorf("extract exif: %w", err)
 	}
+	// Defensive check: the extractor may store an error in the result even when
+	// the top-level error is nil (e.g. exiftool timeout, corrupt output).
+	if res.Error != nil {
+		return fmt.Errorf("extract exif: %w", res.Error)
+	}
 
 	// Update photo metadata
-	if meta, ok := res.Metadata.(*dbtypes.PhotoSpecificMetadata); ok {
-		meta.IsRAW = file.IsRAWFile(asset.OriginalFilename)
+	meta, ok := res.Metadata.(*dbtypes.PhotoSpecificMetadata)
+	if !ok {
+		return fmt.Errorf("unexpected metadata type for photo: %T", res.Metadata)
+	}
+	meta.IsRAW = file.IsRAWFile(asset.OriginalFilename)
 
-		// Parse dimensions and update asset
-		// The dimensions in meta.Dimensions are already corrected by orientation
-		re := regexp.MustCompile(`(\d+)\D+(\d+)`)
-		if matches := re.FindStringSubmatch(meta.Dimensions); len(matches) == 3 {
-			width, _ := strconv.ParseInt(matches[1], 10, 32)
-			height, _ := strconv.ParseInt(matches[2], 10, 32)
-			_ = ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID.Bytes, int32(width), int32(height))
-		}
-
-		sm, err := dbtypes.MarshalMeta(meta)
-		if err == nil {
-			_ = ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, res.Raw)
-			if hasValidLocationGPS(meta.GPSLatitude, meta.GPSLongitude) {
-				ap.enqueueLocationClusterRebuild(ctx, asset)
-			}
-			ap.enqueueDetectStacks(ctx, asset)
-			ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)
+	// Parse dimensions and update asset
+	// The dimensions in meta.Dimensions are already corrected by orientation
+	re := regexp.MustCompile(`(\d+)\D+(\d+)`)
+	if matches := re.FindStringSubmatch(meta.Dimensions); len(matches) == 3 {
+		width, _ := strconv.ParseInt(matches[1], 10, 32)
+		height, _ := strconv.ParseInt(matches[2], 10, 32)
+		if err := ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID.Bytes, int32(width), int32(height)); err != nil {
+			return fmt.Errorf("update asset dimensions: %w", err)
 		}
 	}
+
+	sm, err := dbtypes.MarshalMeta(meta)
+	if err != nil {
+		return fmt.Errorf("marshal photo metadata: %w", err)
+	}
+	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, res.Raw); err != nil {
+		return fmt.Errorf("update asset metadata: %w", err)
+	}
+
+	if hasValidLocationGPS(meta.GPSLatitude, meta.GPSLongitude) {
+		ap.enqueueLocationClusterRebuild(ctx, asset)
+	}
+	ap.enqueueDetectStacks(ctx, asset)
+	ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)
 
 	return nil
 }

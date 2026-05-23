@@ -12,3 +12,6 @@ RUN apt-get update \
     postgresql-client \
     unzip \
   && rm -rf /var/lib/apt/lists/*
+
+COPY server/scripts/import-natural-earth.sh /import-natural-earth.sh
+RUN chmod +x /import-natural-earth.sh

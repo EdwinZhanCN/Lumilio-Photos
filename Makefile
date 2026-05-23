@@ -183,8 +183,7 @@ geodata-import: db-wait geodata-build
 
 geodata-reset: db-wait geodata-build
 	@echo "==> Reimporting Natural Earth data (--force)..."
-	@$(COMPOSE) --profile geodata run --rm naturalearth-import \
-		/bin/bash /import-natural-earth.sh --force
+	@$(COMPOSE) --profile geodata run --rm naturalearth-import /bin/bash /import-natural-earth.sh --force
 
 # ══════════════════════════════════════════════════════════════════════
 # Server & Web

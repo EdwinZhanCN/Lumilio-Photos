@@ -57,20 +57,26 @@ func (ap *AssetProcessor) extractAudioMetadata(ctx context.Context, asset *repo.
 	if err != nil {
 		return fmt.Errorf("extract metadata: %w", err)
 	}
+	if result.Error != nil {
+		return fmt.Errorf("extract metadata: %w", result.Error)
+	}
 
-	if meta, ok := result.Metadata.(*dbtypes.AudioSpecificMetadata); ok {
-		if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID.Bytes, audioInfo.Duration); err != nil {
-			return fmt.Errorf("update duration: %w", err)
-		}
+	meta, ok := result.Metadata.(*dbtypes.AudioSpecificMetadata)
+	if !ok {
+		return fmt.Errorf("unexpected metadata type for audio: %T", result.Metadata)
+	}
 
-		sm, err := dbtypes.MarshalMeta(meta)
-		if err != nil {
-			return fmt.Errorf("marshal metadata: %w", err)
-		}
+	if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID.Bytes, audioInfo.Duration); err != nil {
+		return fmt.Errorf("update duration: %w", err)
+	}
 
-		if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, result.Raw); err != nil {
-			return fmt.Errorf("save metadata: %w", err)
-		}
+	sm, err := dbtypes.MarshalMeta(meta)
+	if err != nil {
+		return fmt.Errorf("marshal metadata: %w", err)
+	}
+
+	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, result.Raw); err != nil {
+		return fmt.Errorf("save metadata: %w", err)
 	}
 
 	return nil

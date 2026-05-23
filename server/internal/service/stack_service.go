@@ -33,6 +33,7 @@ var ErrAssetAlreadyStacked = errors.New("asset already belongs to a stack")
 // StackInfo holds the stack details plus its members.
 type StackInfo struct {
 	StackID     uuid.UUID
+	Kind        dbtypes.StackKind
 	MemberCount int64
 	Members     []StackMemberInfo
 }
@@ -442,12 +443,13 @@ func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUI
 	}
 
 	// Exact Apple Live Photo matching: one PHOTO + one VIDEO for the same owner and content identifier.
+	// Use ARRAY_AGG instead of MIN because MIN(uuid) is not supported on all PostgreSQL deployments.
 	const exactMatchQuery = `WITH candidate_group AS (
 		SELECT
 			a.owner_id,
 			a.specific_metadata->>'content_identifier' AS content_identifier,
-			MIN(a.asset_id) FILTER (WHERE a.type = 'PHOTO') AS photo_asset_id,
-			MIN(a.asset_id) FILTER (WHERE a.type = 'VIDEO') AS video_asset_id,
+			(ARRAY_AGG(a.asset_id) FILTER (WHERE a.type = 'PHOTO'))[1] AS photo_asset_id,
+			(ARRAY_AGG(a.asset_id) FILTER (WHERE a.type = 'VIDEO'))[1] AS video_asset_id,
 			COUNT(*) FILTER (WHERE a.type = 'PHOTO') AS photo_count,
 			COUNT(*) FILTER (WHERE a.type = 'VIDEO') AS video_count
 		FROM assets a
@@ -529,6 +531,11 @@ func (s *stackService) MatchLivePhotoStack(ctx context.Context, assetID uuid.UUI
 
 // buildStackInfo constructs a StackInfo from a stack ID.
 func (s *stackService) buildStackInfo(ctx context.Context, stackID pgtype.UUID) (*StackInfo, error) {
+	var stackKind dbtypes.StackKind
+	if err := s.pool.QueryRow(ctx, `SELECT stack_kind FROM asset_stacks WHERE stack_id = $1`, stackID).Scan(&stackKind); err != nil {
+		return nil, fmt.Errorf("get stack kind: %w", err)
+	}
+
 	members, err := s.queries.GetStackMembers(ctx, stackID)
 	if err != nil {
 		return nil, fmt.Errorf("get stack members: %w", err)
@@ -546,6 +553,7 @@ func (s *stackService) buildStackInfo(ctx context.Context, stackID pgtype.UUID) 
 
 	info := &StackInfo{
 		StackID:     stackUUID,
+		Kind:        stackKind,
 		MemberCount: count,
 		Members:     make([]StackMemberInfo, 0, len(members)),
 	}

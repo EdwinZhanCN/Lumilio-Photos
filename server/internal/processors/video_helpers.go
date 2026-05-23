@@ -58,69 +58,115 @@ func (ap *AssetProcessor) extractVideoMetadata(ctx context.Context, asset *repo.
 	if err != nil {
 		return fmt.Errorf("extract metadata: %w", err)
 	}
-
-	if meta, ok := result.Metadata.(*dbtypes.VideoSpecificMetadata); ok {
-		if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID.Bytes, videoInfo.Duration); err != nil {
-			return fmt.Errorf("update duration: %w", err)
-		}
-		if err := ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID.Bytes, int32(videoInfo.Width), int32(videoInfo.Height)); err != nil {
-			return fmt.Errorf("update dimensions: %w", err)
-		}
-		sm, err := dbtypes.MarshalMeta(meta)
-		if err != nil {
-			return fmt.Errorf("marshal metadata: %w", err)
-		}
-		if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, result.Raw); err != nil {
-			return fmt.Errorf("save metadata: %w", err)
-		}
-		ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)
+	if result.Error != nil {
+		return fmt.Errorf("extract metadata: %w", result.Error)
 	}
+
+	meta, ok := result.Metadata.(*dbtypes.VideoSpecificMetadata)
+	if !ok {
+		return fmt.Errorf("unexpected metadata type for video: %T", result.Metadata)
+	}
+
+	if err := ap.assetService.UpdateAssetDuration(ctx, asset.AssetID.Bytes, videoInfo.Duration); err != nil {
+		return fmt.Errorf("update duration: %w", err)
+	}
+	if err := ap.assetService.UpdateAssetDimensions(ctx, asset.AssetID.Bytes, int32(videoInfo.Width), int32(videoInfo.Height)); err != nil {
+		return fmt.Errorf("update dimensions: %w", err)
+	}
+	sm, err := dbtypes.MarshalMeta(meta)
+	if err != nil {
+		return fmt.Errorf("marshal metadata: %w", err)
+	}
+	if err := ap.assetService.UpdateAssetMetadataWithExifRaw(ctx, asset.AssetID.Bytes, sm, result.Raw); err != nil {
+		return fmt.Errorf("save metadata: %w", err)
+	}
+	ap.enqueueLivePhotoMatcher(ctx, asset, meta.ContentIdentifier)
 
 	return nil
 }
 
 // transcodeVideoSmart applies a best-effort, resource-aware transcoding strategy.
+// Constrains by the longer side: landscape videos are capped at 1080p height,
+// portrait videos are capped at 1080p width.
 func (ap *AssetProcessor) transcodeVideoSmart(ctx context.Context, repoPath string, asset *repo.Asset, videoPath string, videoInfo *VideoInfo, cfg config.TranscodeConfig) error {
-	maxHeight := 1080
-
-	if videoInfo.Height <= maxHeight && strings.ToLower(videoInfo.Format) == "mp4" && strings.Contains(strings.ToLower(videoInfo.Codec), "h264") {
-		return ap.copyVideoAsWebVersion(ctx, repoPath, asset, videoPath, "web")
+	maxDimension := 1080
+	longSide := videoInfo.Width
+	if videoInfo.Height > longSide {
+		longSide = videoInfo.Height
 	}
 
-	if videoInfo.Height <= maxHeight {
-		outputPath, err := ap.transcodeVideoToMP4(ctx, videoPath, videoInfo.Width, videoInfo.Height, cfg)
+	isLandscape := videoInfo.Width >= videoInfo.Height
+
+	// Already within bounds: copy if H.264 MP4, otherwise transcode at original size.
+	if longSide <= maxDimension {
+		if isLandscape && strings.ToLower(videoInfo.Format) == "mp4" && strings.Contains(strings.ToLower(videoInfo.Codec), "h264") {
+			return ap.copyVideoAsWebVersion(ctx, repoPath, asset, videoPath, "web")
+		}
+		scaleFilter := buildScaleFilter(videoInfo.Width, videoInfo.Height, videoInfo.Width, videoInfo.Height)
+		outputPath, err := ap.transcodeVideoToMP4(ctx, videoPath, scaleFilter, videoInfo.Width, videoInfo.Height, cfg)
 		if err != nil {
 			return fmt.Errorf("transcode to mp4: %w", err)
 		}
 		defer os.Remove(outputPath)
-
 		return ap.saveTranscodedVideo(ctx, repoPath, asset, outputPath, "web")
 	}
 
-	aspectRatio := float64(videoInfo.Width) / float64(videoInfo.Height)
-	newWidth := int(float64(maxHeight) * aspectRatio)
-	if newWidth%2 != 0 {
-		newWidth--
+	// Scale down: constrain the longer side to maxDimension, let ffmpeg compute
+	// the other dimension precisely with -2 (preserves aspect ratio, ensures even).
+	var scaleFilter string
+	var approxWidth, approxHeight int
+	if isLandscape {
+		scaleFilter = fmt.Sprintf("scale=-2:%d", maxDimension)
+		approxWidth = int(float64(maxDimension) * float64(videoInfo.Width) / float64(videoInfo.Height))
+		approxHeight = maxDimension
+	} else {
+		scaleFilter = fmt.Sprintf("scale=%d:-2", maxDimension)
+		approxWidth = maxDimension
+		approxHeight = int(float64(maxDimension) * float64(videoInfo.Height) / float64(videoInfo.Width))
 	}
 
-	outputPath1080p, err := ap.transcodeVideoToMP4(ctx, videoPath, newWidth, maxHeight, cfg)
+	outputPath, err := ap.transcodeVideoToMP4(ctx, videoPath, scaleFilter, approxWidth, approxHeight, cfg)
 	if err != nil {
-		return fmt.Errorf("transcode to 1080p: %w", err)
+		return fmt.Errorf("transcode to %dp: %w", maxDimension, err)
 	}
-	defer os.Remove(outputPath1080p)
+	defer os.Remove(outputPath)
 
-	if err := ap.saveTranscodedVideo(ctx, repoPath, asset, outputPath1080p, "web"); err != nil {
-		return fmt.Errorf("save 1080p version: %w", err)
+	if err := ap.saveTranscodedVideo(ctx, repoPath, asset, outputPath, "web"); err != nil {
+		return fmt.Errorf("save %dp version: %w", maxDimension, err)
 	}
 
 	return nil
 }
 
-// transcodeVideoToMP4 runs ffmpeg to produce an H.264/AAC MP4 at the target size.
-func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath string, width, height int, cfg config.TranscodeConfig) (string, error) {
-	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("transcoded_%d_%s.mp4", height, filepath.Base(inputPath)))
+// buildScaleFilter returns an ffmpeg scale filter string. Uses -2 for one
+// dimension so ffmpeg computes it precisely while keeping aspect ratio and
+// ensuring even dimensions.
+func buildScaleFilter(srcW, srcH, targetW, targetH int) string {
+	if srcW >= srcH {
+		// landscape: constrain by height
+		return fmt.Sprintf("scale=-2:%d", targetH)
+	}
+	// portrait: constrain by width
+	return fmt.Sprintf("scale=%d:-2", targetW)
+}
 
-	args := buildTranscodeArgs(inputPath, outputPath, width, height, cfg)
+// bitrateForResolution computes maxrate/bufsize based on pixel count.
+func bitrateForResolution(width, height int) (maxrate, bufsize string) {
+	pixels := width * height
+	rate := pixels / 300 // kbps, e.g. 1920×1080 → ~6912k
+	if rate < 2000 {
+		rate = 2000
+	}
+	return fmt.Sprintf("%dk", rate), fmt.Sprintf("%dk", rate*2)
+}
+
+// transcodeVideoToMP4 runs ffmpeg to produce an H.264/AAC MP4.
+// scaleFilter is the ffmpeg scale expression (e.g. "scale=-2:1080").
+// approxWidth/approxHeight are used for bitrate estimation and output filename.
+func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath string, scaleFilter string, approxWidth, approxHeight int, cfg config.TranscodeConfig) (string, error) {
+	outputPath := filepath.Join(os.TempDir(), fmt.Sprintf("transcoded_%d_%s.mp4", approxHeight, filepath.Base(inputPath)))
+
+	args := buildTranscodeArgs(inputPath, outputPath, scaleFilter, approxWidth, approxHeight, cfg)
 	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 
 	if err := cmd.Run(); err != nil {
@@ -130,8 +176,9 @@ func (ap *AssetProcessor) transcodeVideoToMP4(ctx context.Context, inputPath str
 	return outputPath, nil
 }
 
-func buildTranscodeArgs(inputPath, outputPath string, width, height int, cfg config.TranscodeConfig) []string {
-	scaleFilter := fmt.Sprintf("scale=%d:%d", width, height)
+func buildTranscodeArgs(inputPath, outputPath, scaleFilter string, approxWidth, approxHeight int, cfg config.TranscodeConfig) []string {
+	scaleExpr := scaleFilter[len("scale="):] // w:h portion, reused for VAAPI
+	maxrate, bufsize := bitrateForResolution(approxWidth, approxHeight)
 
 	switch cfg.HardwareAccel {
 	case "vaapi":
@@ -140,11 +187,14 @@ func buildTranscodeArgs(inputPath, outputPath string, width, height int, cfg con
 			"-hwaccel", "vaapi",
 			"-hwaccel_output_format", "vaapi",
 			"-i", inputPath,
-			"-vf", "scale_vaapi=" + scaleFilter[6:], // remove "scale=" prefix
+			"-map", "0:v:0",
+			"-map", "0:a?",
+			"-vf", "scale_vaapi=" + scaleExpr,
 			"-c:v", "h264_vaapi",
 			"-qp", "23",
-			"-maxrate", "5000k",
-			"-bufsize", "10000k",
+			"-maxrate", maxrate,
+			"-bufsize", bufsize,
+			"-pix_fmt", "yuv420p",
 			"-c:a", "aac",
 			"-b:a", "128k",
 			"-movflags", "+faststart",
@@ -156,12 +206,15 @@ func buildTranscodeArgs(inputPath, outputPath string, width, height int, cfg con
 	case "nvenc":
 		return []string{
 			"-i", inputPath,
+			"-map", "0:v:0",
+			"-map", "0:a?",
 			"-c:v", "h264_nvenc",
 			"-preset", "p4",
 			"-qp", "23",
-			"-maxrate", "5000k",
-			"-bufsize", "10000k",
+			"-maxrate", maxrate,
+			"-bufsize", bufsize,
 			"-vf", scaleFilter,
+			"-pix_fmt", "yuv420p",
 			"-c:a", "aac",
 			"-b:a", "128k",
 			"-movflags", "+faststart",
@@ -173,12 +226,15 @@ func buildTranscodeArgs(inputPath, outputPath string, width, height int, cfg con
 	default:
 		return []string{
 			"-i", inputPath,
+			"-map", "0:v:0",
+			"-map", "0:a?",
 			"-c:v", "libx264",
 			"-preset", "medium",
 			"-crf", "23",
-			"-maxrate", "5000k",
-			"-bufsize", "10000k",
+			"-maxrate", maxrate,
+			"-bufsize", bufsize,
 			"-vf", scaleFilter,
+			"-pix_fmt", "yuv420p",
 			"-c:a", "aac",
 			"-b:a", "128k",
 			"-movflags", "+faststart",

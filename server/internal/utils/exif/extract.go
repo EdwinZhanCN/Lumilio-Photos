@@ -87,6 +87,9 @@ func (e *Extractor) ExtractFromStream(ctx context.Context, req *StreamingExtract
 	// Extract metadata directly from stream without loading entire file into memory
 	result := &MetadataResult{Type: req.AssetType}
 	result.Metadata, result.Raw, result.Error = e.extractMetadataFromStream(ctx, req.Reader, req.AssetType)
+	if result.Error != nil {
+		return nil, fmt.Errorf("extract metadata from stream: %w", result.Error)
+	}
 
 	return result, nil
 }

@@ -75,6 +75,8 @@ components:
           type: string
         capture_offset_minutes:
           type: integer
+        content_identifier:
+          type: string
         description:
           type: string
         dimensions:
@@ -114,6 +116,8 @@ components:
           type: integer
         codec:
           example: H.264
+          type: string
+        content_identifier:
           type: string
         description:
           example: A beautiful sunset over the ocean
@@ -497,6 +501,13 @@ components:
           uniqueItems: false
         stack_id:
           example: 550e8400-e29b-41d4-a716-446655440000
+          type: string
+        stack_kind:
+          enum:
+          - raw_jpeg
+          - live_photo
+          - manual
+          example: live_photo
           type: string
         stack_size:
           example: 3
@@ -1799,6 +1810,13 @@ components:
         stack_id:
           example: 550e8400-e29b-41d4-a716-446655440000
           type: string
+        stack_kind:
+          enum:
+          - raw_jpeg
+          - live_photo
+          - manual
+          example: live_photo
+          type: string
       type: object
     dto.StackMemberDTO:
       properties:
@@ -1822,6 +1840,13 @@ components:
           type: boolean
         stack_id:
           example: 550e8400-e29b-41d4-a716-446655440000
+          type: string
+        stack_kind:
+          enum:
+          - raw_jpeg
+          - live_photo
+          - manual
+          example: live_photo
           type: string
         stack_size:
           description: Number of members in the stack

@@ -112,6 +112,9 @@ const docTemplate = `{
                     "capture_offset_minutes": {
                         "type": "integer"
                     },
+                    "content_identifier": {
+                        "type": "string"
+                    },
                     "description": {
                         "type": "string"
                     },
@@ -169,6 +172,9 @@ const docTemplate = `{
                     },
                     "codec": {
                         "example": "H.264",
+                        "type": "string"
+                    },
+                    "content_identifier": {
                         "type": "string"
                     },
                     "description": {
@@ -725,6 +731,15 @@ const docTemplate = `{
                     },
                     "stack_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "stack_kind": {
+                        "enum": [
+                            "raw_jpeg",
+                            "live_photo",
+                            "manual"
+                        ],
+                        "example": "live_photo",
                         "type": "string"
                     },
                     "stack_size": {
@@ -2587,6 +2602,15 @@ const docTemplate = `{
                     "stack_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
+                    },
+                    "stack_kind": {
+                        "enum": [
+                            "raw_jpeg",
+                            "live_photo",
+                            "manual"
+                        ],
+                        "example": "live_photo",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -2619,6 +2643,15 @@ const docTemplate = `{
                     },
                     "stack_id": {
                         "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "stack_kind": {
+                        "enum": [
+                            "raw_jpeg",
+                            "live_photo",
+                            "manual"
+                        ],
+                        "example": "live_photo",
                         "type": "string"
                     },
                     "stack_size": {
