@@ -2,7 +2,7 @@
 
 # Interface: useExtractExifdataReturn
 
-Defined in: [hooks/util-hooks/useExtractExifdata.tsx:18](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6980ebbc3250d8ad1176b8bae48117f2eb65afdb/web/src/hooks/util-hooks/useExtractExifdata.tsx#L18)
+Defined in: [hooks/util-hooks/useExtractExifdata.tsx:18](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3823d466f37d5d6dcd67b116921540ea5db7a8f6/web/src/hooks/util-hooks/useExtractExifdata.tsx#L18)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [hooks/util-hooks/useExtractExifdata.tsx:18](https://github.com/Edwi
 
 > **cancelExtraction**: () => `void`
 
-Defined in: [hooks/util-hooks/useExtractExifdata.tsx:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6980ebbc3250d8ad1176b8bae48117f2eb65afdb/web/src/hooks/util-hooks/useExtractExifdata.tsx#L23)
+Defined in: [hooks/util-hooks/useExtractExifdata.tsx:23](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3823d466f37d5d6dcd67b116921540ea5db7a8f6/web/src/hooks/util-hooks/useExtractExifdata.tsx#L23)
 
 #### Returns
 
@@ -22,7 +22,7 @@ Defined in: [hooks/util-hooks/useExtractExifdata.tsx:23](https://github.com/Edwi
 
 > **exifData**: `Record`\<`number`, `any`\> \| `null`
 
-Defined in: [hooks/util-hooks/useExtractExifdata.tsx:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6980ebbc3250d8ad1176b8bae48117f2eb65afdb/web/src/hooks/util-hooks/useExtractExifdata.tsx#L20)
+Defined in: [hooks/util-hooks/useExtractExifdata.tsx:20](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3823d466f37d5d6dcd67b116921540ea5db7a8f6/web/src/hooks/util-hooks/useExtractExifdata.tsx#L20)
 
 ***
 
@@ -30,7 +30,7 @@ Defined in: [hooks/util-hooks/useExtractExifdata.tsx:20](https://github.com/Edwi
 
 > **extractExifData**: (`files`, `priority?`) => `Promise`\<`void`\>
 
-Defined in: [hooks/util-hooks/useExtractExifdata.tsx:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6980ebbc3250d8ad1176b8bae48117f2eb65afdb/web/src/hooks/util-hooks/useExtractExifdata.tsx#L22)
+Defined in: [hooks/util-hooks/useExtractExifdata.tsx:22](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3823d466f37d5d6dcd67b116921540ea5db7a8f6/web/src/hooks/util-hooks/useExtractExifdata.tsx#L22)
 
 #### Parameters
 
@@ -52,7 +52,7 @@ Defined in: [hooks/util-hooks/useExtractExifdata.tsx:22](https://github.com/Edwi
 
 > **isExtracting**: `boolean`
 
-Defined in: [hooks/util-hooks/useExtractExifdata.tsx:19](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6980ebbc3250d8ad1176b8bae48117f2eb65afdb/web/src/hooks/util-hooks/useExtractExifdata.tsx#L19)
+Defined in: [hooks/util-hooks/useExtractExifdata.tsx:19](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3823d466f37d5d6dcd67b116921540ea5db7a8f6/web/src/hooks/util-hooks/useExtractExifdata.tsx#L19)
 
 ***
 
@@ -60,4 +60,4 @@ Defined in: [hooks/util-hooks/useExtractExifdata.tsx:19](https://github.com/Edwi
 
 > **progress**: [`ExifExtractionProgress`](../type-aliases/ExifExtractionProgress.md)
 
-Defined in: [hooks/util-hooks/useExtractExifdata.tsx:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/6980ebbc3250d8ad1176b8bae48117f2eb65afdb/web/src/hooks/util-hooks/useExtractExifdata.tsx#L21)
+Defined in: [hooks/util-hooks/useExtractExifdata.tsx:21](https://github.com/EdwinZhanCN/Lumilio-Photos/blob/3823d466f37d5d6dcd67b116921540ea5db7a8f6/web/src/hooks/util-hooks/useExtractExifdata.tsx#L21)
