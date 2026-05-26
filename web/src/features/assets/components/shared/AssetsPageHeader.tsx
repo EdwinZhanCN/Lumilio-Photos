@@ -1,5 +1,4 @@
 import PageHeader from "@/components/PageHeader";
-import { PhotoIcon } from "@heroicons/react/24/outline";
 import {
   SquareMousePointer,
   FunnelIcon,
@@ -14,6 +13,8 @@ import {
   RefreshCcwDot,
   Ellipsis,
   ArrowUpDown,
+  Star,
+  ImageIcon,
 } from "lucide-react";
 import FilterTool, {
   FilterDTO,
@@ -26,10 +27,7 @@ import {
   useSelection,
   useBulkAssetOperations,
 } from "@/features/assets/hooks/useSelection";
-import {
-  BrowseItem,
-  SortByType,
-} from "@/features/assets/types/assets.type";
+import { BrowseItem, SortByType } from "@/features/assets/types/assets.type";
 import {
   useCallback,
   useMemo,
@@ -41,18 +39,20 @@ import {
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
-import {
-  useFilterState,
-  useFilterActions,
-} from "@/features/assets/selectors";
+import { useFilterState, useFilterActions } from "@/features/assets/selectors";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult, ListAlbumsResponse } from "@/lib/albums/types";
 import { useWorkingRepository } from "@/features/settings";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 import {
   getBrowseItemAsset,
+  resolveBrowseSelectedAssetIds,
   resolveSelectedBrowseItems,
 } from "@/features/assets/utils/browseItems";
+
+type ConfirmableBulkAction =
+  | { type: "rating"; rating: number }
+  | { type: "liked"; liked: boolean };
 
 interface AssetsPageHeaderProps {
   sortBy: SortByType;
@@ -89,6 +89,8 @@ const AssetsPageHeader = ({
   const { batchUpdateFilters } = useFilterActions();
 
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [confirmableBulkAction, setConfirmableBulkAction] =
+    useState<ConfirmableBulkAction | null>(null);
   const [isAlbumModalOpen, setIsAlbumModalOpen] = useState(false);
   const [albums, setAlbums] = useState<Album[]>([]);
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(false);
@@ -256,7 +258,7 @@ const AssetsPageHeader = ({
       showMessage(
         "success",
         t("assets.assetsPageHeader.messages.deleteSuccess", {
-          count: selection.selectedCount,
+          count: affectedAssetCount,
         }),
       );
     } catch {
@@ -270,29 +272,39 @@ const AssetsPageHeader = ({
 
   const selectedBrowseItems = useMemo(() => {
     if (!effectiveBrowseItems || effectiveBrowseItems.length === 0) return [];
-    return resolveSelectedBrowseItems(selection.selectedIds, effectiveBrowseItems);
+    return resolveSelectedBrowseItems(
+      selection.selectedIds,
+      effectiveBrowseItems,
+    );
   }, [effectiveBrowseItems, selection.selectedIds]);
 
   const resolvedSelectedAssetIds = useMemo(
-    () => selectedBrowseItems.flatMap((item) => {
-      const assetId = getBrowseItemAsset(item).asset_id;
-      return assetId ? [assetId] : [];
-    }),
-    [selectedBrowseItems],
+    () =>
+      resolveBrowseSelectedAssetIds(
+        selection.selectedIds,
+        effectiveBrowseItems,
+        {
+          stackMode: "whole-stack",
+        },
+      ),
+    [effectiveBrowseItems, selection.selectedIds],
   );
 
   const bulkOps = useBulkAssetOperations(resolvedSelectedAssetIds);
+  const affectedAssetCount = resolvedSelectedAssetIds.length;
+  const selectedItemCount =
+    selectedBrowseItems.length || selection.selectedCount;
+  const showAffectedAssetCount =
+    affectedAssetCount > 0 && affectedAssetCount !== selectedItemCount;
 
   // Compute selected assets for operations that need the object (e.g. download filename)
   // We use useMemo to avoid re-calculation on every render
   const selectedAssets = useMemo(() => {
     if (!selection.enabled || selection.selectedCount === 0) return [];
-    return selectedBrowseItems.map(getBrowseItemAsset);
-  }, [
-    selection.enabled,
-    selection.selectedCount,
-    selectedBrowseItems,
-  ]);
+    return selectedBrowseItems.flatMap((item) =>
+      item.type === "stack" ? item.assets : [getBrowseItemAsset(item)],
+    );
+  }, [selection.enabled, selection.selectedCount, selectedBrowseItems]);
 
   const handleDownloadAll = async () => {
     try {
@@ -303,6 +315,34 @@ const AssetsPageHeader = ({
       );
     } catch {
       showMessage("error", t("assets.assetsPageHeader.messages.downloadError"));
+    }
+  };
+
+  const confirmBulkAction = async () => {
+    if (!confirmableBulkAction) return;
+
+    try {
+      if (confirmableBulkAction.type === "rating") {
+        await bulkOps.bulkUpdateRating(confirmableBulkAction.rating);
+      } else {
+        await bulkOps.bulkSetLike(confirmableBulkAction.liked);
+      }
+      showMessage(
+        "success",
+        t("assets.assetsPageHeader.messages.bulkActionSuccess", {
+          count: affectedAssetCount,
+          defaultValue: "Updated {{count}} assets.",
+        }),
+      );
+    } catch {
+      showMessage(
+        "error",
+        t("assets.assetsPageHeader.messages.bulkActionError", {
+          defaultValue: "Failed to update selected assets.",
+        }),
+      );
+    } finally {
+      setConfirmableBulkAction(null);
     }
   };
 
@@ -336,7 +376,7 @@ const AssetsPageHeader = ({
       showMessage(
         "success",
         t("assets.assetsPageHeader.messages.addToAlbumSuccess", {
-          count: selection.selectedCount,
+          count: affectedAssetCount,
         }),
       );
       setIsAlbumModalOpen(false);
@@ -359,11 +399,113 @@ const AssetsPageHeader = ({
     }
   };
 
+  const ratingOptions = [
+    { rating: 5, label: "★★★★★", valueLabel: "5" },
+    { rating: 4, label: "★★★★", valueLabel: "4" },
+    { rating: 3, label: "★★★", valueLabel: "3" },
+    { rating: 2, label: "★★", valueLabel: "2" },
+    { rating: 1, label: "★", valueLabel: "1" },
+    {
+      rating: 0,
+      label: t("assets.assetsPageHeader.actions.unrated", {
+        defaultValue: "Unrated",
+      }),
+      valueLabel: "0",
+    },
+  ];
+
+  const renderAffectedAssetHint = () =>
+    showAffectedAssetCount
+      ? t("assets.assetsPageHeader.actions.affectsAssets", {
+          selectedCount: selectedItemCount,
+          assetCount: affectedAssetCount,
+          defaultValue:
+            "{{selectedCount}} selected items will affect {{assetCount}} assets.",
+        })
+      : t("assets.assetsPageHeader.actions.affectsSelected", {
+          count: selectedItemCount,
+          defaultValue: "{{count}} selected items.",
+        });
+
+  const renderBulkActionItems = () => (
+    <>
+      <li>
+        <details>
+          <summary>
+            <Star size={16} />
+            {t("assets.assetsPageHeader.actions.setRating", {
+              defaultValue: "Set Rating",
+            })}
+          </summary>
+          <ul>
+            {ratingOptions.map((option) => (
+              <li key={option.rating}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmableBulkAction({
+                      type: "rating",
+                      rating: option.rating,
+                    });
+                    handleDropdownItemClick();
+                  }}
+                >
+                  <span className="min-w-20">{option.label}</span>
+                  <span className="ml-auto opacity-50">
+                    {option.valueLabel}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      </li>
+      <li>
+        <details>
+          <summary>
+            <Heart size={16} />
+            {t("assets.assetsPageHeader.actions.likedMenu", {
+              defaultValue: "Liked",
+            })}
+          </summary>
+          <ul>
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmableBulkAction({ type: "liked", liked: true });
+                  handleDropdownItemClick();
+                }}
+              >
+                {t("assets.assetsPageHeader.actions.like", {
+                  defaultValue: "Liked",
+                })}
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmableBulkAction({ type: "liked", liked: false });
+                  handleDropdownItemClick();
+                }}
+              >
+                {t("assets.assetsPageHeader.actions.unlike", {
+                  defaultValue: "Unliked",
+                })}
+              </button>
+            </li>
+          </ul>
+        </details>
+      </li>
+    </>
+  );
+
   return (
     <>
       <PageHeader
         title={title ?? tabTitle}
-        icon={icon ?? <PhotoIcon className="w-6 h-6 text-primary" />}
+        icon={icon ?? <ImageIcon className="w-6 h-6 text-primary" />}
         className="sticky top-0 z-40 bg-base-100 border-b border-base-200"
       >
         {selection.enabled && (
@@ -495,26 +637,7 @@ const AssetsPageHeader = ({
                     count: selection.selectedCount,
                   })}
                 </li>
-                <li>
-                  <div className="flex gap-1 px-1">
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-ghost flex-1 justify-start gap-2 rounded-lg"
-                      onClick={() => bulkOps.bulkSetLike(true)}
-                    >
-                      <Heart size={16} className="fill-error text-error" />
-                      {t("assets.assetsPageHeader.actions.like")}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-ghost flex-1 justify-start gap-2 rounded-lg"
-                      onClick={() => bulkOps.bulkSetLike(false)}
-                    >
-                      <Heart size={16} />
-                      {t("assets.assetsPageHeader.actions.unlike")}
-                    </button>
-                  </div>
-                </li>
+                {renderBulkActionItems()}
                 <div className="divider my-1"></div>
                 <li>
                   <button
@@ -667,28 +790,7 @@ const AssetsPageHeader = ({
                       {t("assets.assetsPageHeader.actions.title")}
                     </summary>
                     <ul className="w-full">
-                      <li>
-                        <button
-                          onClick={() => {
-                            bulkOps.bulkSetLike(true);
-                            handleDropdownItemClick();
-                          }}
-                        >
-                          <Heart size={16} className="text-error" />{" "}
-                          {t("assets.assetsPageHeader.actions.like")}
-                        </button>
-                      </li>
-                      <li>
-                        <button
-                          onClick={() => {
-                            bulkOps.bulkSetLike(false);
-                            handleDropdownItemClick();
-                          }}
-                        >
-                          <Heart size={16} />{" "}
-                          {t("assets.assetsPageHeader.actions.unlike")}
-                        </button>
-                      </li>
+                      {renderBulkActionItems()}
                       <li>
                         <button
                           onClick={() => {
@@ -741,6 +843,59 @@ const AssetsPageHeader = ({
         </div>
       </PageHeader>
 
+      {/* Bulk Action Confirmation Modal */}
+      {confirmableBulkAction && (
+        <div className="modal modal-open">
+          <div className="modal-box border-t-4 border-primary">
+            <div className="mb-4 flex items-center gap-3 text-primary">
+              {confirmableBulkAction.type === "rating" ? (
+                <Star size={24} />
+              ) : (
+                <Heart size={24} />
+              )}
+              <h3 className="text-lg font-bold">
+                {confirmableBulkAction.type === "rating"
+                  ? t("assets.assetsPageHeader.bulkConfirm.ratingTitle", {
+                      rating: confirmableBulkAction.rating,
+                      defaultValue:
+                        confirmableBulkAction.rating === 0
+                          ? "Set selected assets as unrated?"
+                          : "Set selected assets to {{rating}} stars?",
+                    })
+                  : t("assets.assetsPageHeader.bulkConfirm.likedTitle", {
+                      action: confirmableBulkAction.liked
+                        ? t("assets.assetsPageHeader.actions.like", {
+                            defaultValue: "Liked",
+                          })
+                        : t("assets.assetsPageHeader.actions.unlike", {
+                            defaultValue: "Unliked",
+                          }),
+                      defaultValue: "Update liked status?",
+                    })}
+              </h3>
+            </div>
+            <p className="py-4 text-sm text-base-content/70">
+              {renderAffectedAssetHint()}
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setConfirmableBulkAction(null)}
+              >
+                {t("common.cancel")}
+              </button>
+              <button className="btn btn-primary" onClick={confirmBulkAction}>
+                {t("common.confirm", { defaultValue: "Confirm" })}
+              </button>
+            </div>
+          </div>
+          <div
+            className="modal-backdrop"
+            onClick={() => setConfirmableBulkAction(null)}
+          ></div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {isDeleteConfirmOpen && (
         <div className="modal modal-open">
@@ -753,8 +908,13 @@ const AssetsPageHeader = ({
             </div>
             <p className="py-4">
               {t("assets.assetsPageHeader.deleteConfirmModal.message", {
-                count: selection.selectedCount,
+                count: selectedItemCount,
               })}
+              {showAffectedAssetCount && (
+                <span className="mt-2 block text-sm text-base-content/60">
+                  {renderAffectedAssetHint()}
+                </span>
+              )}
             </p>
             <div className="modal-action">
               <button
@@ -797,8 +957,11 @@ const AssetsPageHeader = ({
             {/* Hint */}
             <p className="text-sm opacity-70 px-5 py-2 shrink-0">
               {t("assets.assetsPageHeader.addToAlbumModal.message", {
-                count: selection.selectedCount,
+                count: selectedItemCount,
               })}
+              {showAffectedAssetCount && (
+                <span className="mt-1 block">{renderAffectedAssetHint()}</span>
+              )}
             </p>
 
             {/* Scrollable List */}

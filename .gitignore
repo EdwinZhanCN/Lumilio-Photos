@@ -100,3 +100,6 @@ server/main
 .antigravitycli/
 
 notes/
+
+# Local third-party source references
+/3rd-party/

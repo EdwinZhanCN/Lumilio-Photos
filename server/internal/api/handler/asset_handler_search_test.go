@@ -25,6 +25,11 @@ type stubAssetService struct {
 	searchFn       func(ctx context.Context, params service.SearchAssetsParams) (service.SearchAssetsResult, error)
 	queryBrowseFn  func(ctx context.Context, params service.QueryAssetsParams) (service.BrowseQueryResult, error)
 	searchBrowseFn func(ctx context.Context, params service.SearchAssetsParams) (service.SearchBrowseResult, error)
+	getAssetFn     func(ctx context.Context, id uuid.UUID) (*repo.Asset, error)
+}
+
+func (s stubAssetService) GetAsset(ctx context.Context, id uuid.UUID) (*repo.Asset, error) {
+	return s.getAssetFn(ctx, id)
 }
 
 func (s stubAssetService) QueryAssets(ctx context.Context, params service.QueryAssetsParams) ([]repo.Asset, int64, error) {

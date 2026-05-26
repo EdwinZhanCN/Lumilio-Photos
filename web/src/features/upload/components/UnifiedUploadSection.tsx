@@ -9,12 +9,7 @@ import {
 } from "@/lib/utils/validate-file.ts";
 import { getAcceptString } from "@/lib/utils/accept-file-extensions.ts";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import {
-  ArrowUpTrayIcon,
-  InformationCircleIcon,
-  FolderPlusIcon,
-} from "@heroicons/react/24/outline";
-import { FolderUp, X } from "lucide-react";
+import { Upload, Info, FolderPlus, FolderUp, X } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 import { useWorkingRepository } from "@/features/settings";
 
@@ -135,7 +130,7 @@ function UnifiedUploadSection(): React.JSX.Element {
           onFilesDropped={(files) => handleFiles(files)}
         >
           <div className="space-y-4">
-            <ArrowUpTrayIcon className="mx-auto h-16 w-16 text-base-content/30" />
+            <Upload className="mx-auto h-16 w-16 text-base-content/30" />
             <div>
               <p className="text-xl font-medium text-base-content/80">
                 {t("upload.UnifiedUploadSection.drag_drop_or_click")}
@@ -153,7 +148,7 @@ function UnifiedUploadSection(): React.JSX.Element {
         <div className="absolute top-4 right-4">
           <div className="dropdown dropdown-end">
             <label tabIndex={0} className="btn btn-circle btn-ghost btn-sm">
-              <InformationCircleIcon className="w-5 h-5" />
+              <Info className="w-5 h-5" />
             </label>
             <div
               tabIndex={0}
@@ -251,7 +246,7 @@ function UnifiedUploadSection(): React.JSX.Element {
             className="btn btn-outline btn-sm gap-2"
             disabled={isProcessing || fileCount >= maxTotalFiles}
           >
-            <FolderPlusIcon className="w-4 h-4" />
+            <FolderPlus className="w-4 h-4" />
             {t("upload.UnifiedUploadSection.add_files_button")}
           </button>
         </div>
@@ -271,7 +266,7 @@ function UnifiedUploadSection(): React.JSX.Element {
             className="btn btn-primary btn-sm gap-2"
             disabled={fileCount === 0 || isProcessing}
           >
-            <ArrowUpTrayIcon className="w-4 h-4" />
+            <Upload className="w-4 h-4" />
             {isProcessing
               ? t("upload.UnifiedUploadSection.uploading_status")
               : t("upload.UnifiedUploadSection.upload_button", {

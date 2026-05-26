@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -34,6 +35,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
+
+type assetDownloadFile struct {
+	asset repo.Asset
+	path  string
+}
 
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
@@ -790,6 +796,134 @@ func (h *AssetHandler) GetAssetExif(c *gin.Context) {
 	})
 }
 
+// GetAssetSidecar retrieves the Lumilio edit sidecar for an asset.
+// @Summary Get asset edit sidecar
+// @Description Retrieve the non-destructive Studio edit sidecar stored under the asset repository .lumilio directory.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {object} api.Result{data=dto.AssetSidecarResponseDTO} "Asset sidecar"
+// @Failure 400 {object} api.Result "Invalid asset ID"
+// @Failure 404 {object} api.Result "Asset not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/{id}/sidecar [get]
+func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	asset, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this asset", "You don't have permission to access this asset")
+	if !ok {
+		return
+	}
+
+	sidecarPath, err := h.resolveAssetSidecarPath(c.Request.Context(), asset)
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to resolve asset sidecar")
+		return
+	}
+
+	sidecar := h.defaultSidecarForAsset(id, asset)
+	exists := false
+	if content, err := os.ReadFile(sidecarPath); err == nil {
+		if err := json.Unmarshal(content, &sidecar); err != nil {
+			api.GinInternalError(c, err, "Failed to decode asset sidecar")
+			return
+		}
+		exists = true
+	} else if !os.IsNotExist(err) {
+		api.GinInternalError(c, err, "Failed to read asset sidecar")
+		return
+	}
+
+	if sidecar.Version == 0 {
+		sidecar.Version = 1
+	}
+	if sidecar.AssetID == "" {
+		sidecar.AssetID = id.String()
+	}
+
+	api.GinSuccess(c, dto.AssetSidecarResponseDTO{
+		AssetID: id.String(),
+		Exists:  exists,
+		Sidecar: sidecar,
+	})
+}
+
+// UpdateAssetSidecar stores the Lumilio edit sidecar for an asset.
+// @Summary Update asset edit sidecar
+// @Description Store non-destructive Studio edit data under the asset repository .lumilio directory.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Param request body dto.LumilioSidecarV1DTO true "Sidecar payload"
+// @Success 200 {object} api.Result{data=dto.AssetSidecarResponseDTO} "Asset sidecar saved"
+// @Failure 400 {object} api.Result "Invalid asset ID or request body"
+// @Failure 404 {object} api.Result "Asset not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/{id}/sidecar [put]
+func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	asset, ok := h.getAuthorizedAsset(c, id, "Authentication required to update this asset", "You don't have permission to update this asset")
+	if !ok {
+		return
+	}
+
+	var sidecar dto.LumilioSidecarV1DTO
+	if err := c.ShouldBindJSON(&sidecar); err != nil {
+		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	sidecar.Version = 1
+	sidecar.AssetID = id.String()
+	sidecar.Source = h.sidecarSourceForAsset(asset)
+	sidecar.UpdatedAt = time.Now().UTC()
+
+	sidecarPath, err := h.resolveAssetSidecarPath(c.Request.Context(), asset)
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to resolve asset sidecar")
+		return
+	}
+
+	if err := os.MkdirAll(filepath.Dir(sidecarPath), 0755); err != nil {
+		api.GinInternalError(c, err, "Failed to prepare sidecar directory")
+		return
+	}
+
+	content, err := json.MarshalIndent(sidecar, "", "  ")
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to encode asset sidecar")
+		return
+	}
+
+	tempPath := sidecarPath + ".tmp"
+	if err := os.WriteFile(tempPath, content, 0644); err != nil {
+		api.GinInternalError(c, err, "Failed to write asset sidecar")
+		return
+	}
+	if err := os.Rename(tempPath, sidecarPath); err != nil {
+		_ = os.Remove(tempPath)
+		api.GinInternalError(c, err, "Failed to save asset sidecar")
+		return
+	}
+
+	api.GinSuccess(c, dto.AssetSidecarResponseDTO{
+		AssetID: id.String(),
+		Exists:  true,
+		Sidecar: sidecar,
+	})
+}
+
 // GetAssetThumbnail retrieves a thumbnail for a specific asset by asset ID and size
 // @Summary Get asset thumbnail
 // @Description Retrieve a specific thumbnail image for an asset by asset ID and size parameter. Returns the image file directly.
@@ -934,6 +1068,140 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 
 	// Serve the file
 	c.File(fullPath)
+}
+
+// DownloadAssets serves multiple original files as a zip archive.
+// @Summary Download assets
+// @Description Serve original files for the requested asset IDs as a zip archive.
+// @Tags assets
+// @Accept json
+// @Produce application/zip
+// @Param request body dto.DownloadAssetsRequestDTO true "Asset IDs to download"
+// @Success 200 {file} file "Zip archive"
+// @Failure 400 {object} api.Result "Invalid request"
+// @Failure 401 {object} api.Result "Authentication required"
+// @Failure 403 {object} api.Result "Forbidden"
+// @Failure 404 {object} api.Result "Asset or original file not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/download [post]
+func (h *AssetHandler) DownloadAssets(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var req dto.DownloadAssetsRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	if len(req.AssetIDs) == 0 {
+		api.GinBadRequest(c, errors.New("asset_ids is required"), "asset_ids is required")
+		return
+	}
+
+	files := make([]assetDownloadFile, 0, len(req.AssetIDs))
+	for _, rawAssetID := range req.AssetIDs {
+		assetIDText := strings.TrimSpace(rawAssetID)
+		assetID, err := uuid.Parse(assetIDText)
+		if err != nil {
+			api.GinBadRequest(c, err, "Invalid asset ID")
+			return
+		}
+
+		asset, ok := h.getAuthorizedAssetForMedia(c, assetID, "Authentication required to access this file", "You don't have permission to access this file")
+		if !ok {
+			return
+		}
+
+		if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
+			api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Original file not found")
+			return
+		}
+
+		repository, err := h.getRepositoryForAsset(ctx, asset)
+		if err != nil {
+			log.Printf("Failed to resolve repository for bulk download: %v", err)
+			api.GinInternalError(c, err, "Failed to access repository")
+			return
+		}
+
+		fullPath := h.resolveRepositoryPath(repository.Path, *asset.StoragePath)
+		fileInfo, err := os.Stat(fullPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				log.Printf("Original file not found at path: %s", fullPath)
+				api.GinNotFound(c, err, "Original file not found")
+				return
+			}
+			api.GinInternalError(c, err, "Failed to access original file")
+			return
+		}
+		if fileInfo.IsDir() {
+			api.GinNotFound(c, fmt.Errorf("original file path is a directory"), "Original file not found")
+			return
+		}
+
+		files = append(files, assetDownloadFile{
+			asset: *asset,
+			path:  fullPath,
+		})
+	}
+
+	filename := fmt.Sprintf("lumilio-assets-%s.zip", time.Now().Format("20060102-150405"))
+	c.Header("Cache-Control", "no-store")
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	c.Status(http.StatusOK)
+
+	zipWriter := zip.NewWriter(c.Writer)
+	archiveNames := make(map[string]int, len(files))
+	for _, file := range files {
+		if err := h.writeAssetToZip(zipWriter, archiveNames, file); err != nil {
+			log.Printf("Failed to write asset to zip: %v", err)
+			_ = zipWriter.Close()
+			return
+		}
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		log.Printf("Failed to finalize asset download zip: %v", err)
+	}
+}
+
+func (h *AssetHandler) writeAssetToZip(zipWriter *zip.Writer, archiveNames map[string]int, file assetDownloadFile) error {
+	source, err := os.Open(file.path)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	archiveName := uniqueZipArchiveName(archiveNames, file.asset.OriginalFilename)
+	entry, err := zipWriter.Create(archiveName)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(entry, source)
+	return err
+}
+
+func uniqueZipArchiveName(seen map[string]int, filename string) string {
+	name := filepath.Base(strings.TrimSpace(filename))
+	if name == "." || name == ".." || name == string(filepath.Separator) || name == "" {
+		name = "asset"
+	}
+
+	ext := filepath.Ext(name)
+	stem := strings.TrimSuffix(name, ext)
+	if stem == "" {
+		stem = "asset"
+	}
+
+	candidate := name
+	for index := 2; seen[candidate] > 0; index++ {
+		candidate = fmt.Sprintf("%s (%d)%s", stem, index, ext)
+	}
+	seen[candidate] = 1
+	return candidate
 }
 
 // GetWebVideo serves the web-optimized video version by asset ID
@@ -2594,6 +2862,48 @@ func (h *AssetHandler) getRepositoryForAsset(ctx context.Context, asset *repo.As
 		return nil, fmt.Errorf("failed to get repository by id: %w", err)
 	}
 	return &repository, nil
+}
+
+func (h *AssetHandler) resolveAssetSidecarPath(ctx context.Context, asset *repo.Asset) (string, error) {
+	if asset == nil || !asset.AssetID.Valid {
+		return "", fmt.Errorf("asset id is invalid")
+	}
+
+	repository, err := h.getRepositoryForAsset(ctx, asset)
+	if err != nil {
+		return "", err
+	}
+
+	assetID := uuid.UUID(asset.AssetID.Bytes).String()
+	return filepath.Join(repository.Path, ".lumilio", "sidecars", assetID+".lumilio-sidecar"), nil
+}
+
+func (h *AssetHandler) sidecarSourceForAsset(asset *repo.Asset) dto.LumilioSidecarSourceDTO {
+	source := dto.LumilioSidecarSourceDTO{}
+	if asset == nil {
+		return source
+	}
+
+	source.OriginalFilename = asset.OriginalFilename
+	source.MimeType = asset.MimeType
+	source.FileSize = asset.FileSize
+	source.Hash = asset.Hash
+	source.Width = asset.Width
+	source.Height = asset.Height
+	if asset.StoragePath != nil {
+		source.StoragePath = *asset.StoragePath
+	}
+	return source
+}
+
+func (h *AssetHandler) defaultSidecarForAsset(assetID uuid.UUID, asset *repo.Asset) dto.LumilioSidecarV1DTO {
+	return dto.LumilioSidecarV1DTO{
+		Version:     1,
+		AssetID:     assetID.String(),
+		Source:      h.sidecarSourceForAsset(asset),
+		Adjustments: dto.StudioEditAdjustmentsDTO{},
+		UpdatedAt:   time.Now().UTC(),
+	}
 }
 
 func (h *AssetHandler) resolveRepositoryPath(repositoryPath string, storagePath string) string {

@@ -2468,6 +2468,179 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/{id}/sidecar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get asset edit sidecar
+         * @description Retrieve the non-destructive Studio edit sidecar stored under the asset repository .lumilio directory.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /**
+                     * @description Asset ID (UUID format)
+                     * @example "550e8400-e29b-41d4-a716-446655440000"
+                     */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Asset sidecar */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid asset ID */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Asset not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        /**
+         * Update asset edit sidecar
+         * @description Store non-destructive Studio edit data under the asset repository .lumilio directory.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /**
+                     * @description Asset ID (UUID format)
+                     * @example "550e8400-e29b-41d4-a716-446655440000"
+                     */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            /** @description Sidecar payload */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.LumilioSidecarV1DTO"];
+                };
+            };
+            responses: {
+                /** @description Asset sidecar saved */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid asset ID or request body */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Asset not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/{id}/stack": {
         parameters: {
             query?: never;
@@ -2910,6 +3083,95 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/assets/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Download assets
+         * @description Serve original files for the requested asset IDs as a zip archive.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Asset IDs to download */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.DownloadAssetsRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Zip archive */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": Record<string, never>;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Authentication required */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Asset or original file not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -8975,6 +9237,13 @@ export interface components {
             /** @example America/New_York */
             viewer_timezone?: string;
         };
+        "dto.AssetSidecarResponseDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            asset_id?: string;
+            /** @example true */
+            exists?: boolean;
+            sidecar?: components["schemas"]["dto.LumilioSidecarV1DTO"];
+        };
         "dto.AssetTypesResponseDTO": {
             types?: components["schemas"]["dbtypes.AssetType"][];
         };
@@ -9143,6 +9412,15 @@ export interface components {
         };
         "dto.DisableTOTPRequestDTO": {
             current_password: string;
+        };
+        "dto.DownloadAssetsRequestDTO": {
+            /**
+             * @example [
+             *       "550e8400-e29b-41d4-a716-446655440000",
+             *       "550e8400-e29b-41d4-a716-446655440001"
+             *     ]
+             */
+            asset_ids: string[];
         };
         "dto.DuplicateAssetDTO": {
             asset?: components["schemas"]["dto.AssetDTO"];
@@ -9378,6 +9656,32 @@ export interface components {
         "dto.LoginRequestDTO": {
             password: string;
             username: string;
+        };
+        "dto.LumilioSidecarSourceDTO": {
+            /** @example 1048576 */
+            file_size?: number;
+            /** @example abcd1234567890 */
+            hash?: string;
+            /** @example 4000 */
+            height?: number;
+            /** @example image/jpeg */
+            mime_type?: string;
+            /** @example IMG_0001.jpg */
+            original_filename?: string;
+            /** @example inbox/2026/05/IMG_0001.jpg */
+            storage_path?: string;
+            /** @example 6000 */
+            width?: number;
+        };
+        "dto.LumilioSidecarV1DTO": {
+            adjustments?: components["schemas"]["dto.StudioEditAdjustmentsDTO"];
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            asset_id?: string;
+            source?: components["schemas"]["dto.LumilioSidecarSourceDTO"];
+            /** @example 2026-05-26T10:00:00Z */
+            updated_at?: string;
+            /** @example 1 */
+            version?: number;
         };
         "dto.MFAStatusDTO": {
             available_methods?: string[];
@@ -9882,6 +10186,51 @@ export interface components {
              * @example 3
              */
             stack_size?: number;
+        };
+        "dto.StudioEditAdjustmentsDTO": {
+            /** @example 0 */
+            blacks?: number;
+            /** @example 0 */
+            clarity?: number;
+            /** @example 0 */
+            contrast?: number;
+            crop?: components["schemas"]["dto.StudioEditCropDTO"];
+            /** @example 0 */
+            exposure?: number;
+            /** @example false */
+            flipHorizontal?: boolean;
+            /** @example false */
+            flipVertical?: boolean;
+            /** @example 0 */
+            highlights?: number;
+            /** @example 0 */
+            noiseReduction?: number;
+            /** @example 0 */
+            rotation?: number;
+            /** @example 0 */
+            saturation?: number;
+            /** @example 0 */
+            shadows?: number;
+            /** @example 0 */
+            sharpness?: number;
+            /** @example 0 */
+            temperature?: number;
+            /** @example 0 */
+            tint?: number;
+            /** @example 0 */
+            vibrance?: number;
+            /** @example 0 */
+            whites?: number;
+        };
+        "dto.StudioEditCropDTO": {
+            /** @example 800 */
+            height?: number;
+            /** @example 1000 */
+            width?: number;
+            /** @example 0 */
+            x?: number;
+            /** @example 0 */
+            y?: number;
         };
         "dto.SystemSettingsDTO": {
             llm?: components["schemas"]["dto.LLMSettingsDTO"];

@@ -1,6 +1,6 @@
 import PageHeader from "@/components/PageHeader";
-import { BookOpenIcon } from "@heroicons/react/24/outline";
 import { useI18n } from "@/lib/i18n.tsx";
+import { BookOpenIcon } from "lucide-react";
 
 export function Portfolio() {
   const { t } = useI18n();

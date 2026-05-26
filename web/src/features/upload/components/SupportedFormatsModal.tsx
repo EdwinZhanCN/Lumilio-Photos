@@ -3,12 +3,7 @@ import {
   getFormatGroups,
   type FormatGroup,
 } from "@/lib/utils/accept-file-extensions";
-import {
-  PhotoIcon,
-  VideoCameraIcon,
-  MusicalNoteIcon,
-  CameraIcon,
-} from "@heroicons/react/24/outline";
+import { Image, Video, Music, Camera } from "lucide-react";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 
 interface SupportedFormatsModalProps {
@@ -26,13 +21,13 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case "Photos":
-        return <PhotoIcon className="w-5 h-5" />;
+        return <Image className="w-5 h-5" />;
       case "RAW Formats":
-        return <CameraIcon className="w-5 h-5" />;
+        return <Camera className="w-5 h-5" />;
       case "Videos":
-        return <VideoCameraIcon className="w-5 h-5" />;
+        return <Video className="w-5 h-5" />;
       case "Audio":
-        return <MusicalNoteIcon className="w-5 h-5" />;
+        return <Music className="w-5 h-5" />;
       default:
         return null;
     }
@@ -68,11 +63,15 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
         <div className="modal-box max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-2xl">{t('upload.SupportedFormatsModal.title')}</h3>
+            <h3 className="font-bold text-2xl">
+              {t("upload.SupportedFormatsModal.title")}
+            </h3>
             <button
               onClick={onClose}
               className="btn btn-sm btn-circle btn-ghost"
-              aria-label={t('upload.SupportedFormatsModal.close_button_aria_label')}
+              aria-label={t(
+                "upload.SupportedFormatsModal.close_button_aria_label",
+              )}
             >
               ✕
             </button>
@@ -90,12 +89,16 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
                         {getCategoryIcon(group.category)}
                       </div>
                       <h4 className="font-semibold text-lg">
-                        {t(`upload.SupportedFormatsModal.category_${group.category.toLowerCase().replace(/ /g, '_')}`)}
+                        {t(
+                          `upload.SupportedFormatsModal.category_${group.category.toLowerCase().replace(/ /g, "_")}`,
+                        )}
                       </h4>
                       <div
                         className={`badge ${getCategoryColor(group.category)} badge-sm`}
                       >
-                        {t('upload.SupportedFormatsModal.formats_count', { count: group.formats.length })}
+                        {t("upload.SupportedFormatsModal.formats_count", {
+                          count: group.formats.length,
+                        })}
                       </div>
                     </div>
 
@@ -124,7 +127,7 @@ const SupportedFormatsModal: React.FC<SupportedFormatsModalProps> = ({
           {/* Footer */}
           <div className="modal-action mt-4">
             <button onClick={onClose} className="btn btn-primary">
-              {t('upload.SupportedFormatsModal.got_it_button')}
+              {t("upload.SupportedFormatsModal.got_it_button")}
             </button>
           </div>
         </div>

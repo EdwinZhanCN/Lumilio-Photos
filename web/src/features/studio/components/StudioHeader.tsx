@@ -1,9 +1,5 @@
 import React from "react";
-import {
-  PaintBrushIcon,
-  ArrowUpTrayIcon,
-  ArrowDownTrayIcon,
-} from "@heroicons/react/24/outline";
+import { Paintbrush, Upload, Download } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { useI18n } from "@/lib/i18n.tsx";
 
@@ -27,7 +23,7 @@ export function StudioHeader({
   return (
     <PageHeader
       title={t("studio.title")}
-      icon={<PaintBrushIcon className="w-6 h-6 text-primary" />}
+      icon={<Paintbrush className="w-6 h-6 text-primary" />}
     >
       <input
         type="file"
@@ -38,12 +34,12 @@ export function StudioHeader({
       />
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button onClick={onOpenFile} className="btn btn-sm btn-primary">
-          <ArrowUpTrayIcon className="w-4 h-4 mr-1" />
+          <Upload className="w-4 h-4 mr-1" />
           {t("studio.imgOpen")}
         </button>
         {hasExportImage && onExportImage && (
           <button onClick={onExportImage} className="btn btn-sm btn-outline">
-            <ArrowDownTrayIcon className="w-4 h-4 mr-1" />
+            <Download className="w-4 h-4 mr-1" />
             {t("common.save")}
           </button>
         )}

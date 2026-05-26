@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { CameraIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { GitHubStyleHeatmap } from "@/components/Heatmap";
 import { usePhotoStats } from "../hooks/usePhotoStats";
 import { useI18n } from "@/lib/i18n.tsx";
+import { CameraIcon, ClockIcon } from "lucide-react";
 
 export type StatsCardsProps = {
   className?: string;
@@ -208,7 +208,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
         <div className="card-body">
           <div className="flex items-center gap-2 text-primary">
             <ClockIcon className="size-5" />
-            <h3 className="font-bold">{t("home.stats.timeDistribution.title")}</h3>
+            <h3 className="font-bold">
+              {t("home.stats.timeDistribution.title")}
+            </h3>
           </div>
           <div className="grid grid-cols-2 gap-4 items-center justify-center mt-2">
             <div className="flex flex-col items-center gap-1">

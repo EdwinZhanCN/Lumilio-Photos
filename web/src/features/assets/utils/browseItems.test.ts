@@ -356,6 +356,58 @@ describe("browseItems", () => {
     ).toEqual(["cover", "solo"]);
   });
 
+  it("resolves stack browse selection ids to all member asset ids for whole-stack actions", () => {
+    const items = createBrowseItemsFromApiItems([
+      {
+        type: "stack",
+        stack: {
+          stack_id: "stack-1",
+          cover_asset_id: "cover",
+          cover_asset: createAsset("cover"),
+          member_asset_ids: ["cover", "member"],
+        },
+      },
+      {
+        type: "asset",
+        asset: createAsset("solo"),
+      },
+    ]);
+
+    expect(
+      resolveBrowseSelectedAssetIds(
+        ["stack:stack-1", "asset:solo", "asset:missing"],
+        items,
+        { stackMode: "whole-stack" },
+      ),
+    ).toEqual(["cover", "member", "solo"]);
+  });
+
+  it("dedupes resolved whole-stack member asset ids", () => {
+    const items = createBrowseItemsFromApiItems([
+      {
+        type: "stack",
+        stack: {
+          stack_id: "stack-1",
+          cover_asset_id: "cover",
+          cover_asset: createAsset("cover"),
+          member_asset_ids: ["cover", "member"],
+        },
+      },
+      {
+        type: "asset",
+        asset: createAsset("member"),
+      },
+    ]);
+
+    expect(
+      resolveBrowseSelectedAssetIds(
+        ["stack:stack-1", "asset:member"],
+        items,
+        { stackMode: "whole-stack" },
+      ),
+    ).toEqual(["cover", "member"]);
+  });
+
   it("finds browse items by item id", () => {
     const items = flattenBrowseGroups(
       createBrowseGroupsFromAssetGroups([

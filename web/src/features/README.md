@@ -37,7 +37,7 @@ src/
 - The header should be consistent across all pages.
 - It should include the icon on the left and navigation title on the right.
 
-Using Heroicons or Lucide-react components for the icon is recommended. Standard className should be `w-6 h-6 text-primary` or `size-6 text-primary`.
+Using Lucide-react components for the icon is recommended. Standard className should be `w-6 h-6 text-primary` or `size-6 text-primary`.
 
 ```jsx
 <PageHeader
