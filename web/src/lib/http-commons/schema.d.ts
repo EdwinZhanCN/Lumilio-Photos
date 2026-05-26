@@ -2916,6 +2916,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/assets/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Download assets
+         * @description Serve original files for the requested asset IDs as a zip archive.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Asset IDs to download */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.DownloadAssetsRequestDTO"];
+                };
+            };
+            responses: {
+                /** @description Zip archive */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": Record<string, never>;
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Authentication required */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Asset or original file not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets/featured": {
         parameters: {
             query?: never;
@@ -9143,6 +9232,15 @@ export interface components {
         };
         "dto.DisableTOTPRequestDTO": {
             current_password: string;
+        };
+        "dto.DownloadAssetsRequestDTO": {
+            /**
+             * @example [
+             *       "550e8400-e29b-41d4-a716-446655440000",
+             *       "550e8400-e29b-41d4-a716-446655440001"
+             *     ]
+             */
+            asset_ids: string[];
         };
         "dto.DuplicateAssetDTO": {
             asset?: components["schemas"]["dto.AssetDTO"];

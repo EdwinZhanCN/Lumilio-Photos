@@ -980,6 +980,25 @@
                 ],
                 "type": "object"
             },
+            "dto.DownloadAssetsRequestDTO": {
+                "properties": {
+                    "asset_ids": {
+                        "example": [
+                            "550e8400-e29b-41d4-a716-446655440000",
+                            "550e8400-e29b-41d4-a716-446655440001"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "required": [
+                    "asset_ids"
+                ],
+                "type": "object"
+            },
             "dto.DuplicateAssetDTO": {
                 "properties": {
                     "asset": {
@@ -5329,6 +5348,97 @@
                     }
                 },
                 "summary": "Get upload progress",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/download": {
+            "post": {
+                "description": "Serve original files for the requested asset IDs as a zip archive.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.DownloadAssetsRequestDTO",
+                                        "summary": "request",
+                                        "description": "Asset IDs to download"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Asset IDs to download",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "type": "file"
+                                }
+                            }
+                        },
+                        "description": "Zip archive"
+                    },
+                    "400": {
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Authentication required"
+                    },
+                    "403": {
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset or original file not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Download assets",
                 "tags": [
                     "assets"
                 ]

@@ -258,6 +258,11 @@ type QueryAssetsResponseDTO struct {
 	Offset       int             `json:"offset" example:"0"`
 }
 
+// DownloadAssetsRequestDTO represents a bulk original-file download request.
+type DownloadAssetsRequestDTO struct {
+	AssetIDs []string `json:"asset_ids" binding:"required" example:"550e8400-e29b-41d4-a716-446655440000,550e8400-e29b-41d4-a716-446655440001"`
+}
+
 // FeaturedAssetsResponseDTO represents curated featured photos for home/gallery use.
 type FeaturedAssetsResponseDTO struct {
 	Assets          []AssetDTO `json:"assets"`

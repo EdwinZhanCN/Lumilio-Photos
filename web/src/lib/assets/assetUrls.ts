@@ -19,6 +19,10 @@ export const assetUrls = {
     return withMediaToken(`${baseURL}/api/v1/assets/${id}/original`);
   },
 
+  getBulkDownloadUrl(): string {
+    return withMediaToken(`${baseURL}/api/v1/assets/download`);
+  },
+
   getThumbnailUrl(
     id: string,
     size: "small" | "medium" | "large" = "small",
