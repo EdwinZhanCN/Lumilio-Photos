@@ -596,6 +596,22 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.AssetSidecarResponseDTO": {
+                "properties": {
+                    "asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "exists": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "sidecar": {
+                        "$ref": "#/components/schemas/dto.LumilioSidecarV1DTO"
+                    }
+                },
+                "type": "object"
+            },
             "dto.AssetTypesResponseDTO": {
                 "properties": {
                     "types": {
@@ -1580,6 +1596,62 @@ const docTemplate = `{
                     "password",
                     "username"
                 ],
+                "type": "object"
+            },
+            "dto.LumilioSidecarSourceDTO": {
+                "properties": {
+                    "file_size": {
+                        "example": 1048576,
+                        "type": "integer"
+                    },
+                    "hash": {
+                        "example": "abcd1234567890",
+                        "type": "string"
+                    },
+                    "height": {
+                        "example": 4000,
+                        "type": "integer"
+                    },
+                    "mime_type": {
+                        "example": "image/jpeg",
+                        "type": "string"
+                    },
+                    "original_filename": {
+                        "example": "IMG_0001.jpg",
+                        "type": "string"
+                    },
+                    "storage_path": {
+                        "example": "inbox/2026/05/IMG_0001.jpg",
+                        "type": "string"
+                    },
+                    "width": {
+                        "example": 6000,
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.LumilioSidecarV1DTO": {
+                "properties": {
+                    "adjustments": {
+                        "$ref": "#/components/schemas/dto.StudioEditAdjustmentsDTO"
+                    },
+                    "asset_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "source": {
+                        "$ref": "#/components/schemas/dto.LumilioSidecarSourceDTO"
+                    },
+                    "updated_at": {
+                        "example": "2026-05-26T10:00:00Z",
+                        "type": "string"
+                    },
+                    "version": {
+                        "example": 1,
+                        "type": "integer"
+                    }
+                },
                 "type": "object"
             },
             "dto.MFAStatusDTO": {
@@ -2813,6 +2885,99 @@ const docTemplate = `{
                         "description": "Number of members in the stack",
                         "example": 3,
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioEditAdjustmentsDTO": {
+                "properties": {
+                    "blacks": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "clarity": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "contrast": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "crop": {
+                        "$ref": "#/components/schemas/dto.StudioEditCropDTO"
+                    },
+                    "exposure": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "flipHorizontal": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "flipVertical": {
+                        "example": false,
+                        "type": "boolean"
+                    },
+                    "highlights": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "noiseReduction": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "rotation": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "saturation": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "shadows": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "sharpness": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "temperature": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "tint": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "vibrance": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "whites": {
+                        "example": 0,
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.StudioEditCropDTO": {
+                "properties": {
+                    "height": {
+                        "example": 800,
+                        "type": "number"
+                    },
+                    "width": {
+                        "example": 1000,
+                        "type": "number"
+                    },
+                    "x": {
+                        "example": 0,
+                        "type": "number"
+                    },
+                    "y": {
+                        "example": 0,
+                        "type": "number"
                     }
                 },
                 "type": "object"
@@ -7744,6 +7909,213 @@ const docTemplate = `{
                     }
                 },
                 "summary": "Reprocess asset",
+                "tags": [
+                    "assets"
+                ]
+            }
+        },
+        "/api/v1/assets/{id}/sidecar": {
+            "get": {
+                "description": "Retrieve the non-destructive Studio edit sidecar stored under the asset repository .lumilio directory.",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Asset sidecar"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get asset edit sidecar",
+                "tags": [
+                    "assets"
+                ]
+            },
+            "put": {
+                "description": "Store non-destructive Studio edit data under the asset repository .lumilio directory.",
+                "parameters": [
+                    {
+                        "description": "Asset ID (UUID format)",
+                        "example": "\"550e8400-e29b-41d4-a716-446655440000\"",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.LumilioSidecarV1DTO",
+                                        "summary": "request",
+                                        "description": "Sidecar payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Sidecar payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Asset sidecar saved"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid asset ID or request body"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Asset not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Update asset edit sidecar",
                 "tags": [
                     "assets"
                 ]

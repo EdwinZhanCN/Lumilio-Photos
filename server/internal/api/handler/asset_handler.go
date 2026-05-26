@@ -796,6 +796,134 @@ func (h *AssetHandler) GetAssetExif(c *gin.Context) {
 	})
 }
 
+// GetAssetSidecar retrieves the Lumilio edit sidecar for an asset.
+// @Summary Get asset edit sidecar
+// @Description Retrieve the non-destructive Studio edit sidecar stored under the asset repository .lumilio directory.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Success 200 {object} api.Result{data=dto.AssetSidecarResponseDTO} "Asset sidecar"
+// @Failure 400 {object} api.Result "Invalid asset ID"
+// @Failure 404 {object} api.Result "Asset not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/{id}/sidecar [get]
+func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	asset, ok := h.getAuthorizedAsset(c, id, "Authentication required to access this asset", "You don't have permission to access this asset")
+	if !ok {
+		return
+	}
+
+	sidecarPath, err := h.resolveAssetSidecarPath(c.Request.Context(), asset)
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to resolve asset sidecar")
+		return
+	}
+
+	sidecar := h.defaultSidecarForAsset(id, asset)
+	exists := false
+	if content, err := os.ReadFile(sidecarPath); err == nil {
+		if err := json.Unmarshal(content, &sidecar); err != nil {
+			api.GinInternalError(c, err, "Failed to decode asset sidecar")
+			return
+		}
+		exists = true
+	} else if !os.IsNotExist(err) {
+		api.GinInternalError(c, err, "Failed to read asset sidecar")
+		return
+	}
+
+	if sidecar.Version == 0 {
+		sidecar.Version = 1
+	}
+	if sidecar.AssetID == "" {
+		sidecar.AssetID = id.String()
+	}
+
+	api.GinSuccess(c, dto.AssetSidecarResponseDTO{
+		AssetID: id.String(),
+		Exists:  exists,
+		Sidecar: sidecar,
+	})
+}
+
+// UpdateAssetSidecar stores the Lumilio edit sidecar for an asset.
+// @Summary Update asset edit sidecar
+// @Description Store non-destructive Studio edit data under the asset repository .lumilio directory.
+// @Tags assets
+// @Accept json
+// @Produce json
+// @Param id path string true "Asset ID (UUID format)" example("550e8400-e29b-41d4-a716-446655440000")
+// @Param request body dto.LumilioSidecarV1DTO true "Sidecar payload"
+// @Success 200 {object} api.Result{data=dto.AssetSidecarResponseDTO} "Asset sidecar saved"
+// @Failure 400 {object} api.Result "Invalid asset ID or request body"
+// @Failure 404 {object} api.Result "Asset not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/{id}/sidecar [put]
+func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid asset ID")
+		return
+	}
+
+	asset, ok := h.getAuthorizedAsset(c, id, "Authentication required to update this asset", "You don't have permission to update this asset")
+	if !ok {
+		return
+	}
+
+	var sidecar dto.LumilioSidecarV1DTO
+	if err := c.ShouldBindJSON(&sidecar); err != nil {
+		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	sidecar.Version = 1
+	sidecar.AssetID = id.String()
+	sidecar.Source = h.sidecarSourceForAsset(asset)
+	sidecar.UpdatedAt = time.Now().UTC()
+
+	sidecarPath, err := h.resolveAssetSidecarPath(c.Request.Context(), asset)
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to resolve asset sidecar")
+		return
+	}
+
+	if err := os.MkdirAll(filepath.Dir(sidecarPath), 0755); err != nil {
+		api.GinInternalError(c, err, "Failed to prepare sidecar directory")
+		return
+	}
+
+	content, err := json.MarshalIndent(sidecar, "", "  ")
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to encode asset sidecar")
+		return
+	}
+
+	tempPath := sidecarPath + ".tmp"
+	if err := os.WriteFile(tempPath, content, 0644); err != nil {
+		api.GinInternalError(c, err, "Failed to write asset sidecar")
+		return
+	}
+	if err := os.Rename(tempPath, sidecarPath); err != nil {
+		_ = os.Remove(tempPath)
+		api.GinInternalError(c, err, "Failed to save asset sidecar")
+		return
+	}
+
+	api.GinSuccess(c, dto.AssetSidecarResponseDTO{
+		AssetID: id.String(),
+		Exists:  true,
+		Sidecar: sidecar,
+	})
+}
+
 // GetAssetThumbnail retrieves a thumbnail for a specific asset by asset ID and size
 // @Summary Get asset thumbnail
 // @Description Retrieve a specific thumbnail image for an asset by asset ID and size parameter. Returns the image file directly.
@@ -2734,6 +2862,48 @@ func (h *AssetHandler) getRepositoryForAsset(ctx context.Context, asset *repo.As
 		return nil, fmt.Errorf("failed to get repository by id: %w", err)
 	}
 	return &repository, nil
+}
+
+func (h *AssetHandler) resolveAssetSidecarPath(ctx context.Context, asset *repo.Asset) (string, error) {
+	if asset == nil || !asset.AssetID.Valid {
+		return "", fmt.Errorf("asset id is invalid")
+	}
+
+	repository, err := h.getRepositoryForAsset(ctx, asset)
+	if err != nil {
+		return "", err
+	}
+
+	assetID := uuid.UUID(asset.AssetID.Bytes).String()
+	return filepath.Join(repository.Path, ".lumilio", "sidecars", assetID+".lumilio-sidecar"), nil
+}
+
+func (h *AssetHandler) sidecarSourceForAsset(asset *repo.Asset) dto.LumilioSidecarSourceDTO {
+	source := dto.LumilioSidecarSourceDTO{}
+	if asset == nil {
+		return source
+	}
+
+	source.OriginalFilename = asset.OriginalFilename
+	source.MimeType = asset.MimeType
+	source.FileSize = asset.FileSize
+	source.Hash = asset.Hash
+	source.Width = asset.Width
+	source.Height = asset.Height
+	if asset.StoragePath != nil {
+		source.StoragePath = *asset.StoragePath
+	}
+	return source
+}
+
+func (h *AssetHandler) defaultSidecarForAsset(assetID uuid.UUID, asset *repo.Asset) dto.LumilioSidecarV1DTO {
+	return dto.LumilioSidecarV1DTO{
+		Version:     1,
+		AssetID:     assetID.String(),
+		Source:      h.sidecarSourceForAsset(asset),
+		Adjustments: dto.StudioEditAdjustmentsDTO{},
+		UpdatedAt:   time.Now().UTC(),
+	}
 }
 
 func (h *AssetHandler) resolveRepositoryPath(repositoryPath string, storagePath string) string {

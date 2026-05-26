@@ -38,6 +38,8 @@ export const DAISYUI_THEME_ORDER = [
   "caramellatte",
   "abyss",
   "silk",
+  "lumilio",
+  "lumilio-dark",
 ] as const;
 
 export type DaisyUIThemeName = (typeof DAISYUI_THEME_ORDER)[number];
@@ -64,6 +66,7 @@ export const DAISYUI_LIGHT_THEMES = [
   "nord",
   "caramellatte",
   "silk",
+  "lumilio",
 ] as const;
 
 export type DaisyUILightThemeName = (typeof DAISYUI_LIGHT_THEMES)[number];
@@ -83,6 +86,7 @@ export const DAISYUI_DARK_THEMES = [
   "dim",
   "sunset",
   "abyss",
+  "lumilio-dark",
 ] as const;
 
 export type DaisyUIDarkThemeName = (typeof DAISYUI_DARK_THEMES)[number];
