@@ -45,6 +45,8 @@ type AssetHandler struct {
 	repoManager     storage.RepositoryManager
 	stagingManager  storage.StagingManager
 	queueClient     *river.Client[pgx.Tx]
+	settingsService service.SettingsService
+	runtimeChecker  service.TaskAvailabilityChecker
 	memoryMonitor   *memory.MemoryMonitor
 	sessionManager  *upload.SessionManager
 	chunkMerger     *upload.ChunkMerger
@@ -61,6 +63,8 @@ func NewAssetHandler(
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
 	queueClient *river.Client[pgx.Tx],
+	settingsService service.SettingsService,
+	runtimeChecker service.TaskAvailabilityChecker,
 ) *AssetHandler {
 	memoryMonitor := memory.NewMemoryMonitor()
 	sessionManager := upload.NewSessionManager(30 * time.Minute) // 30 minute timeout
@@ -77,6 +81,8 @@ func NewAssetHandler(
 		repoManager:     repoManager,
 		stagingManager:  stagingManager,
 		queueClient:     queueClient,
+		settingsService: settingsService,
+		runtimeChecker:  runtimeChecker,
 		memoryMonitor:   memoryMonitor,
 		sessionManager:  sessionManager,
 		chunkMerger:     chunkMerger,
@@ -1213,8 +1219,26 @@ func (h *AssetHandler) AddAssetToAlbum(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to add asset to album")
 		return
 	}
+	h.enqueueBioClipForAddedAsset(c.Request.Context(), album, *asset)
 
 	api.GinSuccess(c, dto.MessageResponseDTO{Message: "Asset added to album successfully"})
+}
+
+func (h *AssetHandler) enqueueBioClipForAddedAsset(ctx context.Context, album repo.Album, asset repo.Asset) {
+	if !shouldQueueBioClipForAlbumAsset(album, asset) {
+		return
+	}
+	available, err := bioClipRuntimeAvailable(ctx, h.settingsService, h.runtimeChecker)
+	if err != nil {
+		log.Printf("Failed to check BioCLIP availability for album %d asset %s: %v", album.AlbumID, asset.AssetID.String(), err)
+		return
+	}
+	if !available {
+		return
+	}
+	if err := enqueueBioClipAsset(ctx, h.queueClient, asset); err != nil {
+		log.Printf("Failed to queue BioCLIP for album %d asset %s: %v", album.AlbumID, asset.AssetID.String(), err)
+	}
 }
 
 // GetAssetTypes returns available asset types
@@ -1298,11 +1322,12 @@ func parseIndexingTasks(tasks []string) ([]service.AssetIndexingTask, error) {
 	for _, rawTask := range tasks {
 		task := service.AssetIndexingTask(strings.ToLower(strings.TrimSpace(rawTask)))
 		switch task {
-		case service.AssetIndexingTaskClip,
-			service.AssetIndexingTaskBioCLIP,
+		case service.AssetIndexingTaskSemanticImage,
 			service.AssetIndexingTaskOCR,
-			service.AssetIndexingTaskFace:
+			service.AssetIndexingTaskFaceRecognition:
 			result = append(result, task)
+		case service.AssetIndexingTaskBioCLIP:
+			return nil, fmt.Errorf("bioclip indexing is album-scoped")
 		default:
 			return nil, fmt.Errorf("invalid indexing task: %s", rawTask)
 		}
@@ -1318,18 +1343,22 @@ func toIndexingStatsResponseDTO(stats service.AssetIndexingStats) dto.AssetIndex
 			Clip: dto.AssetIndexingTaskStatsDTO{
 				IndexedCount: int(stats.Tasks.Clip.IndexedCount),
 				QueuedJobs:   int(stats.Tasks.Clip.QueuedJobs),
+				TotalCount:   int(stats.Tasks.Clip.TotalCount),
 			},
 			BioCLIP: dto.AssetIndexingTaskStatsDTO{
 				IndexedCount: int(stats.Tasks.BioCLIP.IndexedCount),
 				QueuedJobs:   int(stats.Tasks.BioCLIP.QueuedJobs),
+				TotalCount:   int(stats.Tasks.BioCLIP.TotalCount),
 			},
 			OCR: dto.AssetIndexingTaskStatsDTO{
 				IndexedCount: int(stats.Tasks.OCR.IndexedCount),
 				QueuedJobs:   int(stats.Tasks.OCR.QueuedJobs),
+				TotalCount:   int(stats.Tasks.OCR.TotalCount),
 			},
 			Face: dto.AssetIndexingTaskStatsDTO{
 				IndexedCount: int(stats.Tasks.Face.IndexedCount),
 				QueuedJobs:   int(stats.Tasks.Face.QueuedJobs),
+				TotalCount:   int(stats.Tasks.Face.TotalCount),
 			},
 		},
 	}

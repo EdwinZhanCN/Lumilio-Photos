@@ -74,6 +74,7 @@ describe("StackCarouselOverlay", () => {
     const carousel = screen.getByTestId("fullscreen-carousel");
     expect(carousel).toHaveAttribute("data-initial-slide", "1");
     expect(carousel).toHaveAttribute("data-slide-index", "1");
+    expect(carousel.parentElement).toBe(document.body);
   });
 
   it("falls back to the cover when no matched member focus is provided", () => {

@@ -20,15 +20,23 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pgvector/pgvector-go"
 )
 
 const (
-	faceClusterMinConfidence  = float32(0.85)
-	faceClusterMinAreaPixels  = int32(4096)
-	faceClusterMinSimilarity  = float32(0.70)
-	faceCropPaddingMultiplier = float32(0.12)
-	faceCropQuality           = 85
+	faceClusterMinConfidence            = float32(0.75)
+	faceClusterMinAreaPixels            = int32(4096)
+	faceClusterMinSimilarity            = float32(0.70)
+	faceClusterDBSCANMinPoints          = 2
+	faceClusterIncrementalNeighborLimit = 256
+	faceClusterHDBSCANMinClusterSize    = 2
+	faceClusterHDBSCANMinSamples        = 2
+	faceClusterHDBSCANKNearestNeighbors = 48
+	faceClusterHDBSCANMaxDistance       = float64(1.0 - faceClusterMinSimilarity)
+	faceClusterMinMedoidSimilarity      = float64(0.58)
+	faceCropPaddingMultiplier           = float32(0.12)
+	faceCropQuality                     = 85
 )
 
 type faceRepositoryPathResolver interface {
@@ -51,6 +59,7 @@ type FaceService interface {
 	ListPeople(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32, limit, offset int) ([]Person, int64, error)
 	GetPerson(ctx context.Context, clusterID int32, repositoryID pgtype.UUID, ownerID *int32) (*Person, error)
 	RenamePerson(ctx context.Context, clusterID int32, name string) (*repo.FaceCluster, error)
+	RebuildFaceClusters(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32) (FaceClusterRebuildResult, error)
 }
 
 // FaceResultWithItems contains face results and detailed face items.
@@ -78,17 +87,56 @@ type Person struct {
 	UpdatedAt             time.Time
 }
 
+// FaceClusterRebuildResult summarizes a full HDBSCAN people-cluster rebuild.
+type FaceClusterRebuildResult struct {
+	Algorithm       string
+	RepositoryID    *string
+	CandidateFaces  int
+	ClusteredFaces  int
+	NoiseFaces      int
+	ClustersCreated int
+	ClustersReused  int
+	ClustersTotal   int
+	DurationMs      int64
+}
+
 type faceService struct {
 	queries          *repo.Queries
+	pool             *pgxpool.Pool
 	repoPathResolver faceRepositoryPathResolver
 }
 
 // NewFaceService creates face service instance.
-func NewFaceService(queries *repo.Queries, repoPathResolver faceRepositoryPathResolver) FaceService {
+func NewFaceService(queries *repo.Queries, repoPathResolver faceRepositoryPathResolver, pool ...*pgxpool.Pool) FaceService {
+	var pgPool *pgxpool.Pool
+	if len(pool) > 0 {
+		pgPool = pool[0]
+	}
 	return &faceService{
 		queries:          queries,
+		pool:             pgPool,
 		repoPathResolver: repoPathResolver,
 	}
+}
+
+func (s *faceService) withTx(ctx context.Context, fn func(*repo.Queries) error) error {
+	if s.pool == nil {
+		return fn(s.queries)
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin face clustering transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if err := fn(s.queries.WithTx(tx)); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit face clustering transaction: %w", err)
+	}
+	return nil
 }
 
 // SaveFaceResults saves face detection results, persists crops, and updates recognition clusters.
@@ -97,7 +145,7 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID pgtype.UUID, 
 		return fmt.Errorf("face result payload is required")
 	}
 
-	repoPath, _, err := s.resolveAssetRepository(ctx, assetID)
+	repoPath, asset, err := s.resolveAssetRepository(ctx, assetID)
 	if err != nil {
 		return err
 	}
@@ -176,7 +224,7 @@ func (s *faceService) SaveFaceResults(ctx context.Context, assetID pgtype.UUID, 
 			return fmt.Errorf("failed to create face item %d: %w", i, err)
 		}
 
-		if err := s.assignFaceToCluster(ctx, createdItem); err != nil {
+		if err := s.assignFaceToCluster(ctx, createdItem, *asset); err != nil {
 			return fmt.Errorf("failed to assign face %d to cluster: %w", i, err)
 		}
 	}
@@ -311,57 +359,32 @@ func (s *faceService) cleanupAffectedClusters(ctx context.Context, clusterIDs []
 	return nil
 }
 
-func (s *faceService) assignFaceToCluster(ctx context.Context, item repo.FaceItem) error {
-	if !isClusterCandidate(item) {
-		return nil
-	}
-	if item.Embedding == nil {
+func (s *faceService) assignFaceToCluster(ctx context.Context, item repo.FaceItem, asset repo.Asset) error {
+	if !isClusterCandidate(item) || item.Embedding == nil || !asset.RepositoryID.Valid {
 		return nil
 	}
 
-	similarFaces, err := s.FindSimilarFaces(ctx, item.Embedding.Slice(), item.ID, faceClusterMinSimilarity, 10)
-	if err != nil {
-		return fmt.Errorf("find similar faces: %w", err)
-	}
-
-	for _, similarFace := range similarFaces {
-		cluster, err := s.queries.GetFaceClusterByFaceID(ctx, similarFace.ID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				continue
-			}
-			return fmt.Errorf("load face cluster: %w", err)
-		}
-
-		if _, err := s.queries.CreateFaceClusterMember(ctx, repo.CreateFaceClusterMemberParams{
-			ClusterID:       cluster.ClusterID,
-			FaceID:          item.ID,
-			SimilarityScore: similarFace.Similarity,
-			Confidence:      similarFace.Similarity,
-			IsManual:        boolPtr(false),
-		}); err != nil {
-			return fmt.Errorf("create cluster member: %w", err)
-		}
-
-		return s.refreshClusterRepresentative(ctx, cluster.ClusterID)
-	}
-
-	_, err = s.createClusterForFace(ctx, item)
-	return err
+	return s.withTx(ctx, func(q *repo.Queries) error {
+		return s.assignFaceToClusterDBSCAN(ctx, q, item, asset)
+	})
 }
 
 func (s *faceService) createClusterForFace(ctx context.Context, item repo.FaceItem) (*repo.FaceCluster, error) {
-	cluster, err := s.queries.CreateFaceCluster(ctx, repo.CreateFaceClusterParams{
-		ClusterName:          nil,
+	return s.createClusterForFaceWithQueries(ctx, s.queries, item, nil, false)
+}
+
+func (s *faceService) createClusterForFaceWithQueries(ctx context.Context, q *repo.Queries, item repo.FaceItem, name *string, confirmed bool) (*repo.FaceCluster, error) {
+	cluster, err := q.CreateFaceCluster(ctx, repo.CreateFaceClusterParams{
+		ClusterName:          normalizedName(name),
 		RepresentativeFaceID: &item.ID,
 		ConfidenceScore:      &item.Confidence,
-		IsConfirmed:          boolPtr(false),
+		IsConfirmed:          boolPtr(confirmed),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create face cluster: %w", err)
 	}
 
-	if _, err := s.queries.CreateFaceClusterMember(ctx, repo.CreateFaceClusterMemberParams{
+	if _, err := q.AssignFaceClusterMemberExclusive(ctx, repo.AssignFaceClusterMemberExclusiveParams{
 		ClusterID:       cluster.ClusterID,
 		FaceID:          item.ID,
 		SimilarityScore: 1.0,
@@ -371,11 +394,11 @@ func (s *faceService) createClusterForFace(ctx context.Context, item repo.FaceIt
 		return nil, fmt.Errorf("create initial face cluster member: %w", err)
 	}
 
-	if err := s.refreshClusterRepresentative(ctx, cluster.ClusterID); err != nil {
+	if err := s.refreshClusterRepresentativeWithQueries(ctx, q, cluster.ClusterID); err != nil {
 		return nil, err
 	}
 
-	refreshed, err := s.queries.GetFaceClusterByID(ctx, cluster.ClusterID)
+	refreshed, err := q.GetFaceClusterByID(ctx, cluster.ClusterID)
 	if err != nil {
 		return nil, fmt.Errorf("reload face cluster: %w", err)
 	}
@@ -383,7 +406,11 @@ func (s *faceService) createClusterForFace(ctx context.Context, item repo.FaceIt
 }
 
 func (s *faceService) refreshClusterRepresentative(ctx context.Context, clusterID int32) error {
-	members, err := s.queries.GetFaceClusterMembers(ctx, clusterID)
+	return s.refreshClusterRepresentativeWithQueries(ctx, s.queries, clusterID)
+}
+
+func (s *faceService) refreshClusterRepresentativeWithQueries(ctx context.Context, q *repo.Queries, clusterID int32) error {
+	members, err := q.GetFaceClusterMembers(ctx, clusterID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
@@ -392,7 +419,7 @@ func (s *faceService) refreshClusterRepresentative(ctx context.Context, clusterI
 	}
 
 	if len(members) == 0 {
-		if err := s.queries.DeleteFaceCluster(ctx, clusterID); err != nil {
+		if err := q.DeleteFaceCluster(ctx, clusterID); err != nil {
 			return fmt.Errorf("failed to delete empty face cluster %d: %w", clusterID, err)
 		}
 		return nil
@@ -425,7 +452,7 @@ func (s *faceService) refreshClusterRepresentative(ctx context.Context, clusterI
 
 	representativeID := members[0].ID
 	confidenceScore := members[0].Confidence
-	if _, err := s.queries.UpdateFaceClusterRepresentative(ctx, repo.UpdateFaceClusterRepresentativeParams{
+	if _, err := q.UpdateFaceClusterRepresentative(ctx, repo.UpdateFaceClusterRepresentativeParams{
 		ClusterID:            clusterID,
 		RepresentativeFaceID: &representativeID,
 		ConfidenceScore:      &confidenceScore,

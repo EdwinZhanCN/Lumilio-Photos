@@ -257,6 +257,10 @@
                     "change": "更换封面",
                     "choose": "选择封面照片",
                     "requiredHint": "新建相册时必须选择"
+                },
+                "bioAlbum": {
+                    "label": "生物图鉴",
+                    "hint": "为加入此相册的照片启用物种识别。"
                 }
             },
             "actions": {
@@ -273,12 +277,25 @@
             "itemsCount_one": "{{count}} 项",
             "itemsCount_other": "{{count}} 项",
             "createdAtLabel": "创建于",
-            "loadError": "加载相册失败：{{error}}"
+            "loadError": "加载相册失败：{{error}}",
+            "bioClip": {
+                "badge": "生物图鉴",
+                "action": "生物图鉴识别",
+                "running": "排队中...",
+                "success": "已为 {{count}} 张照片加入 BioCLIP 队列。",
+                "error": "生物图鉴识别排队失败。"
+            }
         }
     },
     "people": {
         "unnamed": "未命名",
         "confirmed": "已命名",
+        "rebuild": {
+            "action": "重建",
+            "running": "重建中...",
+            "success": "已从 {{faces}} 张脸重建 {{clusters}} 个人物聚类（噪声 {{noise}}）。",
+            "error": "重建人物失败：{{message}}"
+        },
         "membersCount_one": "{{count}} 张脸",
         "membersCount_other": "{{count}} 张脸",
         "photosCount_one": "{{count}} 张照片",
@@ -340,6 +357,32 @@
                         "unauthorized": "访问原始文件需要身份验证",
                         "forbidden": "无权访问原始文件",
                         "extractFailed": "提取 EXIF 失败：{{message}}"
+                    }
+                },
+                "fieldGuide": {
+                    "open": "打开生物图鉴",
+                    "button": "生物图鉴",
+                    "topLabels": "Top3 标签",
+                    "pending": "等待 BioCLIP 结果",
+                    "loading": "正在加载物种识别结果",
+                    "loadError": "加载物种识别结果失败",
+                    "noResults": "暂无物种识别结果",
+                    "predictionsCount_one": "{{count}} 条识别结果",
+                    "predictionsCount_other": "{{count}} 条识别结果",
+                    "taxonomy": "分类阶元",
+                    "reference": "参考资料",
+                    "fromINaturalist": "iNaturalist",
+                    "referenceError": "暂时没有参考资料",
+                    "openINaturalist": "在 iNaturalist 打开",
+                    "openWikipedia": "维基百科",
+                    "ranks": {
+                        "kingdom": "界",
+                        "phylum": "门",
+                        "class": "纲",
+                        "order": "目",
+                        "family": "科",
+                        "genus": "属",
+                        "species": "种"
                     }
                 }
             }
@@ -1041,11 +1084,11 @@
                 "false": "否"
             },
             "taskNames": {
-                "clipImageEmbed": "CLIP 图像嵌入",
-                "clipTextEmbed": "CLIP 文本嵌入",
+                "semanticImageEmbed": "CLIP 图像嵌入",
+                "semanticTextEmbed": "CLIP 文本嵌入",
                 "bioClipClassify": "BioCLIP 分类",
                 "ocr": "OCR",
-                "faceDetectAndEmbed": "人脸检测与嵌入"
+                "faceRecognition": "人脸检测与嵌入"
             }
         },
         "lumenSettings": {
@@ -1266,6 +1309,8 @@
             "queuedMlJobs": "待处理 ML 任务",
             "reindexJobs": "待处理重建任务",
             "reindex": "重建索引",
+            "bioAlbumCoverage": "生物图鉴相册覆盖率",
+            "bioAlbumHint": "仅统计生物图鉴相册内的照片。请在相册详情中手动触发 BioCLIP。",
             "coverageValue": "{{indexed}} / {{total}} 已建立索引（{{percent}}）",
             "indexedAssets": "已索引",
             "remainingAssets": "剩余",

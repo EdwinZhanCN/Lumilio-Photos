@@ -19,15 +19,15 @@ type clipWorkerLumenStub struct {
 	bioLabels []types.Label
 }
 
-func (s *clipWorkerLumenStub) ClipTextEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
+func (s *clipWorkerLumenStub) SemanticTextEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
 	panic("not implemented")
 }
 
-func (s *clipWorkerLumenStub) ClipTextEmbedFast(context.Context, []byte) (*types.EmbeddingV1, error) {
+func (s *clipWorkerLumenStub) SemanticTextEmbedFast(context.Context, []byte) (*types.EmbeddingV1, error) {
 	panic("not implemented")
 }
 
-func (s *clipWorkerLumenStub) ClipImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
+func (s *clipWorkerLumenStub) SemanticImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
 	return &types.EmbeddingV1{ModelID: "clip-image", Vector: []float32{0.1, 0.2}}, nil
 }
 
@@ -35,7 +35,7 @@ func (s *clipWorkerLumenStub) BioClipClassify(context.Context, *imagesource.MLIm
 	return s.bioLabels, nil
 }
 
-func (s *clipWorkerLumenStub) FaceDetectEmbed(context.Context, *imagesource.MLImage) (*types.FaceV1, error) {
+func (s *clipWorkerLumenStub) FaceRecognition(context.Context, *imagesource.MLImage) (*types.FaceV1, error) {
 	panic("not implemented")
 }
 
@@ -142,7 +142,7 @@ func TestProcessClipWorkerSavesImageEmbedding(t *testing.T) {
 	embeddingSvc := &clipWorkerEmbeddingStub{}
 	lumenSvc := &clipWorkerLumenStub{
 		available: map[string]bool{
-			"clip_image_embed": true,
+			"semantic_image_embed": true,
 		},
 	}
 	imageLoader := &workerImageLoaderStub{data: []byte("image")}
@@ -178,7 +178,7 @@ func TestProcessClipWorkerSnoozesWithoutImageEmbeddingTask(t *testing.T) {
 	worker := &ProcessClipWorker{
 		LumenService: &clipWorkerLumenStub{
 			available: map[string]bool{
-				"clip_image_embed": false,
+				"semantic_image_embed": false,
 			},
 		},
 		EmbeddingService: &clipWorkerEmbeddingStub{},

@@ -95,11 +95,13 @@ type AlbumControllerInterface interface {
 	AddAssetToAlbum(c *gin.Context)
 	RemoveAssetFromAlbum(c *gin.Context)
 	UpdateAssetPositionInAlbum(c *gin.Context)
+	RebuildAlbumBioClip(c *gin.Context)
 	GetAssetAlbums(c *gin.Context)
 }
 
 type PeopleControllerInterface interface {
 	ListPeople(c *gin.Context)
+	RebuildPeople(c *gin.Context)
 	GetPerson(c *gin.Context)
 	GetPersonCover(c *gin.Context)
 	UpdatePerson(c *gin.Context)
@@ -109,6 +111,10 @@ type PeopleControllerInterface interface {
 type LocationControllerInterface interface {
 	ListLocationClusters(c *gin.Context)
 	RebuildLocationClusters(c *gin.Context)
+}
+
+type SpeciesControllerInterface interface {
+	GetSpeciesReference(c *gin.Context)
 }
 
 // QueueControllerInterface defines the interface for queue monitoring controllers
@@ -178,6 +184,7 @@ func NewRouter(
 	albumController AlbumControllerInterface,
 	peopleController PeopleControllerInterface,
 	locationController LocationControllerInterface,
+	speciesController SpeciesControllerInterface,
 	queueController QueueControllerInterface,
 	statsController StatsControllerInterface,
 	agentController AgentControllerInterface,
@@ -273,6 +280,12 @@ func NewRouter(
 			locations.POST("/rebuild", authController.AuthMiddleware(), authController.RequireAdmin(), locationController.RebuildLocationClusters)
 		}
 
+		species := v1.Group("/species")
+		species.Use(authController.OptionalAuthMiddleware())
+		{
+			species.GET("/reference", speciesController.GetSpeciesReference)
+		}
+
 		// Asset routes (new unified API) - with optional authentication
 		assets := v1.Group("/assets")
 		assets.Use(authController.OptionalAuthMiddleware())
@@ -330,6 +343,7 @@ func NewRouter(
 			albums.PUT("/:id", albumController.UpdateAlbum)
 			albums.DELETE("/:id", albumController.DeleteAlbum)
 			albums.GET("/:id/assets", albumController.GetAlbumAssets)
+			albums.POST("/:id/bioclip/rebuild", albumController.RebuildAlbumBioClip)
 			albums.POST("/:id/assets/:assetId", albumController.AddAssetToAlbum)
 			albums.DELETE("/:id/assets/:assetId", albumController.RemoveAssetFromAlbum)
 			albums.PUT("/:id/assets/:assetId/position", albumController.UpdateAssetPositionInAlbum)
@@ -339,6 +353,7 @@ func NewRouter(
 		people.Use(authController.OptionalAuthMiddleware())
 		{
 			people.GET("", peopleController.ListPeople)
+			people.POST("/rebuild", authController.AuthMiddleware(), peopleController.RebuildPeople)
 			people.GET("/:id", peopleController.GetPerson)
 			people.GET("/:id/cover", peopleController.GetPersonCover)
 			people.PATCH("/:id", authController.AuthMiddleware(), peopleController.UpdatePerson)

@@ -44,12 +44,10 @@ services:
         command: ["/bin/bash", "/import-natural-earth.sh"]
 
     devcontainer:
+        network_mode: "host"
         build:
             context: .
             dockerfile: Dockerfile
-        dns:
-            - 1.1.1.1
-            - 8.8.8.8
         volumes:
             - ..:/workspace:cached
             - /var/run/docker.sock:/var/run/docker.sock
@@ -57,8 +55,8 @@ services:
             - pnpm-store:/root/.local/share/pnpm
             - cargo-cache:/usr/local/cargo/registry
         environment:
-            DB_HOST: db
-            DB_PORT: "5432"
+            DB_HOST: localhost
+            DB_PORT: "5433"
             DB_USER: postgres
             DB_PASSWORD: postgres
             DB_NAME: lumiliophotos
@@ -78,6 +76,12 @@ services:
             STORAGE_PRESERVE_FILENAME: "true"
             STORAGE_DUPLICATE_HANDLING: rename
             REPOSITORY_SCAN_ENABLED: "false"
+
+            # Use host-native lumenhubd for discovery in dev containers.
+            # The SDK still connects directly to discovered gRPC node endpoints.
+            LUMEN_DISCOVERY_ENABLED: "true"
+            LUMEN_DISCOVERY_MDNS_ENABLED: "false"
+            LUMEN_DISCOVERY_HUB_URL: http://127.0.0.1:5866
 
             VITE_API_URL: http://localhost:6680
         depends_on:

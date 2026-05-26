@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Cpu, Database, Loader2, RefreshCcw, Workflow } from "lucide-react";
+import { Bird, Cpu, Database, Loader2, RefreshCcw, Workflow } from "lucide-react";
 import {
   useAssetIndexingStats,
   useRebuildAssetIndexes,
@@ -14,7 +14,7 @@ function formatCoveragePercent(coverage: number): string {
   return `${Math.round(coverage * 100)}%`;
 }
 
-const ML_TASK_KEYS = ["clip", "bioclip", "ocr", "face"] as const;
+const ML_TASK_KEYS = ["clip", "ocr", "face"] as const;
 
 export function MLMonitor({ localRepoId }: MLMonitorProps) {
   const { t } = useI18n();
@@ -37,12 +37,22 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
       })),
     [stats, t],
   );
+  const bioTaskStats = stats?.tasks.bioclip;
 
   const totalQueuedMLJobs = taskCards.reduce(
     (sum, task) => sum + (task.stats?.queuedJobs ?? 0),
     0,
-  );
+  ) + (bioTaskStats?.queuedJobs ?? 0);
   const rebuildingTasks = rebuildMutation.variables?.body?.tasks ?? [];
+  const selectedReindexTask = reindexModal
+    ? taskCards.find((task) => task.key === reindexModal.taskKey)
+    : undefined;
+  const selectedReindexTotal =
+    selectedReindexTask?.stats?.totalCount ?? stats?.photoTotal ?? 0;
+  const selectedReindexMissing = Math.max(
+    selectedReindexTotal - (selectedReindexTask?.stats?.indexedCount ?? 0),
+    0,
+  );
 
   if (statsQuery.isLoading && !stats) {
     return (
@@ -110,11 +120,9 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
         {taskCards.map(({ key, label, stats: taskStats }) => {
           const indexedCount = taskStats?.indexedCount ?? 0;
           const queuedJobs = taskStats?.queuedJobs ?? 0;
+          const totalCount = taskStats?.totalCount ?? stats?.photoTotal ?? 0;
           const coverage = taskStats?.coverage ?? 0;
-          const remaining = Math.max(
-            (stats?.photoTotal ?? 0) - indexedCount,
-            0,
-          );
+          const remaining = Math.max(totalCount - indexedCount, 0);
 
           return (
             <section
@@ -127,7 +135,7 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
                   <p className="text-sm text-base-content/70">
                     {t("monitor.ml.coverageValue", {
                       indexed: indexedCount,
-                      total: stats?.photoTotal ?? 0,
+                      total: totalCount,
                       percent: formatCoveragePercent(coverage),
                     })}
                   </p>
@@ -188,6 +196,68 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
             </section>
           );
         })}
+
+        {(() => {
+          const indexedCount = bioTaskStats?.indexedCount ?? 0;
+          const queuedJobs = bioTaskStats?.queuedJobs ?? 0;
+          const totalCount = bioTaskStats?.totalCount ?? 0;
+          const coverage = bioTaskStats?.coverage ?? 0;
+          const remaining = Math.max(totalCount - indexedCount, 0);
+
+          return (
+            <section className="bg-base-100 rounded-lg shadow-sm p-4 space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <Bird className="size-5 text-primary" />
+                    {t("monitor.ml.bioAlbumCoverage")}
+                  </h2>
+                  <p className="text-sm text-base-content/70">
+                    {t("monitor.ml.coverageValue", {
+                      indexed: indexedCount,
+                      total: totalCount,
+                      percent: formatCoveragePercent(coverage),
+                    })}
+                  </p>
+                </div>
+                <span className="badge badge-outline">
+                  {formatCoveragePercent(coverage)}
+                </span>
+              </div>
+
+              <progress
+                className="progress progress-primary w-full"
+                value={Math.round(coverage * 100)}
+                max="100"
+              />
+
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="rounded-lg border border-base-300 px-3 py-2">
+                  <div className="text-base-content/60">
+                    {t("monitor.ml.indexedAssets")}
+                  </div>
+                  <div className="mt-1 font-semibold">{indexedCount}</div>
+                </div>
+                <div className="rounded-lg border border-base-300 px-3 py-2">
+                  <div className="text-base-content/60">
+                    {t("monitor.ml.remainingAssets")}
+                  </div>
+                  <div className="mt-1 font-semibold">{remaining}</div>
+                </div>
+                <div className="rounded-lg border border-base-300 px-3 py-2">
+                  <div className="text-base-content/60">
+                    {t("monitor.ml.queuedJobs")}
+                  </div>
+                  <div className="mt-1 font-semibold">{queuedJobs}</div>
+                </div>
+              </div>
+
+              <p className="text-xs text-base-content/60">
+                {t("monitor.ml.bioAlbumHint")}
+              </p>
+            </section>
+          );
+        })()}
       </div>
 
       {reindexModal && (
@@ -201,13 +271,10 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
             <p className="py-4 text-sm text-base-content/70">
               {reindexAll
                 ? t("monitor.ml.reindexModal.descriptionAll", {
-                    count: stats?.photoTotal ?? 0,
+                    count: selectedReindexTotal,
                   })
                 : t("monitor.ml.reindexModal.descriptionMissing", {
-                    count:
-                      (stats?.photoTotal ?? 0) -
-                      (taskCards.find((tc) => tc.key === reindexModal.taskKey)
-                        ?.stats?.indexedCount ?? 0),
+                    count: selectedReindexMissing,
                   })}
             </p>
             {stats?.reindexJobs != null && stats.reindexJobs > 0 && (

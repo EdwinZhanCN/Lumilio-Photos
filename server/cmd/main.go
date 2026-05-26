@@ -158,7 +158,7 @@ func main() {
 	if err != nil {
 		appLogger.Fatal("failed to initialize queue", zap.String("operation", "queue.init"), zap.Error(err))
 	}
-	faceService := service.NewFaceService(queries, repoManager)
+	faceService := service.NewFaceService(queries, repoManager, pgxPool)
 
 	lumenService, embeddingService, err := initMLServices(ctx, pgxPool, queries, workers, appLogger, lumenLogger, settingsService, faceService)
 	if err != nil {
@@ -166,7 +166,7 @@ func main() {
 	}
 
 	if lumenService != nil {
-		warmupTasks := []string{"clip_image_embed", "bioclip_classify", "ocr", "face_detect_and_embed"}
+		warmupTasks := []string{"semantic_image_embed", "bioclip_classify", "ocr", "face_recognition"}
 		lumenService.WarmupTasks(ctx, warmupTasks)
 		go func() {
 			ticker := time.NewTicker(30 * time.Second)
@@ -195,6 +195,7 @@ func main() {
 		appLogger.Fatal("failed to initialize asset service", zap.String("operation", "asset.init"), zap.Error(err))
 	}
 	locationService := service.NewLocationService(queries, pgxPool)
+	speciesReferenceService := service.NewSpeciesReferenceService()
 	indexingService := service.NewAssetIndexingService(queries, settingsService, lumenService, queueClient, pgxPool, indexingLogger, repoAuditProvider)
 	stackService := service.NewStackService(queries, pgxPool, appLogger.Named("stack"), repoAuditProvider)
 	duplicateService := service.NewDuplicateService(queries, pgxPool, appLogger.Named("duplicate"), assetService)
@@ -244,11 +245,12 @@ func main() {
 	defer repositoryScanScheduler.Stop()
 
 	// Initialize controllers with new storage system
-	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient)
+	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
 	authController := handler.NewAuthHandler(authService)
-	albumController := handler.NewAlbumHandler(&albumService, queries)
+	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
 	locationController := handler.NewLocationHandler(locationService, queueClient)
+	speciesController := handler.NewSpeciesHandler(speciesReferenceService)
 	userController := handler.NewUserHandler(userService)
 	queueController := handler.NewQueueHandler(queueClient, pgxPool)
 	statsController := handler.NewStatsHandler(queries)
@@ -272,6 +274,7 @@ func main() {
 		albumController,
 		peopleController,
 		locationController,
+		speciesController,
 		queueController,
 		statsController,
 		agentController,
@@ -327,7 +330,7 @@ func initMLServices(
 	appLogger.Info("lumen service initialized", zap.String("operation", "ml.init"))
 
 	embeddingService := service.NewEmbeddingService(queries, pgxPool)
-	tagService := service.NewAIGeneratedTagService(queries)
+	speciesService := service.NewSpeciesService(queries)
 	ocrService := service.NewOCRService(queries)
 	imageLoader := queue.NewDBMLImageLoader(queries)
 
@@ -341,7 +344,7 @@ func initMLServices(
 
 	river.AddWorker[queue.ProcessBioClipArgs](workers, &queue.ProcessBioClipWorker{
 		LumenService:   lumenService,
-		TagService:     tagService,
+		SpeciesService: speciesService,
 		ConfigProvider: settingsService,
 		ImageLoader:    imageLoader,
 	})

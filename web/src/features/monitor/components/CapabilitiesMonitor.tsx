@@ -58,8 +58,8 @@ export function CapabilitiesMonitor() {
     },
     {
       key: "clip-text",
-      label: t("settings.serverSettings.taskNames.clipTextEmbed"),
-      capability: capabilities.ml.tasks.clipTextEmbed,
+      label: t("settings.serverSettings.taskNames.semanticTextEmbed"),
+      capability: capabilities.ml.tasks.semanticTextEmbed,
     },
     {
       key: "bioclip-classify",

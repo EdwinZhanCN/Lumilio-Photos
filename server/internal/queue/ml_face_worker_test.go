@@ -19,15 +19,15 @@ type faceWorkerLumenStub struct {
 	result    *types.FaceV1
 }
 
-func (s *faceWorkerLumenStub) ClipTextEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
+func (s *faceWorkerLumenStub) SemanticTextEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) ClipTextEmbedFast(context.Context, []byte) (*types.EmbeddingV1, error) {
+func (s *faceWorkerLumenStub) SemanticTextEmbedFast(context.Context, []byte) (*types.EmbeddingV1, error) {
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) ClipImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
+func (s *faceWorkerLumenStub) SemanticImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
 	panic("not implemented")
 }
 
@@ -35,7 +35,7 @@ func (s *faceWorkerLumenStub) BioClipClassify(context.Context, *imagesource.MLIm
 	panic("not implemented")
 }
 
-func (s *faceWorkerLumenStub) FaceDetectEmbed(context.Context, *imagesource.MLImage) (*types.FaceV1, error) {
+func (s *faceWorkerLumenStub) FaceRecognition(context.Context, *imagesource.MLImage) (*types.FaceV1, error) {
 	return s.result, nil
 }
 
@@ -98,7 +98,7 @@ func TestProcessFaceWorkerPassesImageDataToFaceService(t *testing.T) {
 		FaceService: faceService,
 		LumenService: &faceWorkerLumenStub{
 			available: map[string]bool{
-				"face_detect_and_embed": true,
+				"face_recognition": true,
 			},
 			result: &types.FaceV1{
 				ModelID: "face-model",
@@ -143,7 +143,7 @@ func TestProcessFaceWorkerSnoozesWhenTaskUnavailable(t *testing.T) {
 		FaceService: &faceWorkerFaceServiceStub{},
 		LumenService: &faceWorkerLumenStub{
 			available: map[string]bool{
-				"face_detect_and_embed": false,
+				"face_recognition": false,
 			},
 			result: &types.FaceV1{},
 		},

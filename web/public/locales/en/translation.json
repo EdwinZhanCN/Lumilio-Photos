@@ -257,6 +257,10 @@
                     "change": "Change cover",
                     "choose": "Choose a cover photo",
                     "requiredHint": "Required for new albums"
+                },
+                "bioAlbum": {
+                    "label": "Field guide",
+                    "hint": "Enable species recognition for photos added to this album."
                 }
             },
             "actions": {
@@ -273,12 +277,25 @@
             "itemsCount_one": "{{count}} item",
             "itemsCount_other": "{{count}} items",
             "createdAtLabel": "Created",
-            "loadError": "Failed to load album: {{error}}"
+            "loadError": "Failed to load album: {{error}}",
+            "bioClip": {
+                "badge": "Field guide",
+                "action": "Field guide recognition",
+                "running": "Queueing...",
+                "success": "Queued BioCLIP for {{count}} photo(s).",
+                "error": "Failed to queue field guide recognition."
+            }
         }
     },
     "people": {
         "unnamed": "Unnamed",
         "confirmed": "Named",
+        "rebuild": {
+            "action": "Rebuild",
+            "running": "Rebuilding...",
+            "success": "Rebuilt {{clusters}} people clusters from {{faces}} faces ({{noise}} noise).",
+            "error": "Failed to rebuild people: {{message}}"
+        },
         "membersCount_one": "{{count}} face",
         "membersCount_other": "{{count}} faces",
         "photosCount_one": "{{count}} photo",
@@ -340,6 +357,32 @@
                         "unauthorized": "Authentication required to access original file",
                         "forbidden": "Access denied to original file",
                         "extractFailed": "Failed to extract EXIF: {{message}}"
+                    }
+                },
+                "fieldGuide": {
+                    "open": "Open field guide",
+                    "button": "Field Guide",
+                    "topLabels": "Top3 Labels",
+                    "pending": "BioCLIP result pending",
+                    "loading": "Loading species predictions",
+                    "loadError": "Failed to load species predictions",
+                    "noResults": "No species predictions yet",
+                    "predictionsCount_one": "{{count}} prediction",
+                    "predictionsCount_other": "{{count}} predictions",
+                    "taxonomy": "Taxonomy",
+                    "reference": "Reference",
+                    "fromINaturalist": "iNaturalist",
+                    "referenceError": "Reference unavailable",
+                    "openINaturalist": "Open in iNaturalist",
+                    "openWikipedia": "Wikipedia",
+                    "ranks": {
+                        "kingdom": "Kingdom",
+                        "phylum": "Phylum",
+                        "class": "Class",
+                        "order": "Order",
+                        "family": "Family",
+                        "genus": "Genus",
+                        "species": "Species"
                     }
                 }
             },
@@ -1008,11 +1051,11 @@
                 "false": "No"
             },
             "taskNames": {
-                "clipImageEmbed": "CLIP image embed",
-                "clipTextEmbed": "CLIP text embed",
+                "semanticImageEmbed": "CLIP image embed",
+                "semanticTextEmbed": "CLIP text embed",
                 "bioClipClassify": "BioCLIP classify",
                 "ocr": "OCR",
-                "faceDetectAndEmbed": "Face detect & embed"
+                "faceRecognition": "Face detect & embed"
             }
         },
         "lumenSettings": {
@@ -1233,6 +1276,8 @@
             "queuedMlJobs": "Queued ML jobs",
             "reindexJobs": "Queued reindex jobs",
             "reindex": "Reindex",
+            "bioAlbumCoverage": "Bio album species coverage",
+            "bioAlbumHint": "Counts only photos inside field guide albums. Use album details to queue BioCLIP.",
             "coverageValue": "{{indexed}} / {{total}} indexed ({{percent}})",
             "indexedAssets": "Indexed",
             "remainingAssets": "Remaining",

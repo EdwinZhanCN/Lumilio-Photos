@@ -67,6 +67,7 @@ type IndexingRepositoryListResponseDTO struct {
 type AssetIndexingTaskStatsDTO struct {
 	IndexedCount int `json:"indexed_count" example:"1200"`
 	QueuedJobs   int `json:"queued_jobs" example:"12"`
+	TotalCount   int `json:"total_count" example:"2400"`
 }
 
 type AssetIndexingTaskSetStatsDTO struct {
@@ -148,27 +149,28 @@ type UploadProgressResponseDTO struct {
 
 // AssetDTO represents an asset
 type AssetDTO struct {
-	AssetID              string                   `json:"asset_id"`
-	OwnerID              *int32                   `json:"owner_id"`
-	RepositoryID         *string                  `json:"repository_id,omitempty"`
-	Type                 string                   `json:"type"`
-	OriginalFilename     string                   `json:"original_filename"`
-	StoragePath          string                   `json:"storage_path"`
-	MimeType             string                   `json:"mime_type"`
-	FileSize             int64                    `json:"file_size"`
-	Hash                 *string                  `json:"hash"`
-	Width                *int32                   `json:"width"`
-	Height               *int32                   `json:"height"`
-	Duration             *float64                 `json:"duration"`
-	UploadTime           time.Time                `json:"upload_time"`
-	TakenTime            *time.Time               `json:"taken_time,omitempty"`
-	CaptureOffsetMinutes *int16                   `json:"capture_offset_minutes,omitempty"`
-	Rating               *int32                   `json:"rating,omitempty"`
-	Liked                *bool                    `json:"liked,omitempty"`
-	IsDeleted            *bool                    `json:"is_deleted"`
-	DeletedAt            *time.Time               `json:"deleted_at,omitempty"`
-	Metadata             dbtypes.SpecificMetadata `json:"specific_metadata" swaggertype:"object" oneOf:"dbtypes.PhotoSpecificMetadata,dbtypes.VideoSpecificMetadata,dbtypes.AudioSpecificMetadata"`
-	Status               []byte                   `json:"status"`
+	AssetID              string                          `json:"asset_id"`
+	OwnerID              *int32                          `json:"owner_id"`
+	RepositoryID         *string                         `json:"repository_id,omitempty"`
+	Type                 string                          `json:"type"`
+	OriginalFilename     string                          `json:"original_filename"`
+	StoragePath          string                          `json:"storage_path"`
+	MimeType             string                          `json:"mime_type"`
+	FileSize             int64                           `json:"file_size"`
+	Hash                 *string                         `json:"hash"`
+	Width                *int32                          `json:"width"`
+	Height               *int32                          `json:"height"`
+	Duration             *float64                        `json:"duration"`
+	UploadTime           time.Time                       `json:"upload_time"`
+	TakenTime            *time.Time                      `json:"taken_time,omitempty"`
+	CaptureOffsetMinutes *int16                          `json:"capture_offset_minutes,omitempty"`
+	Rating               *int32                          `json:"rating,omitempty"`
+	Liked                *bool                           `json:"liked,omitempty"`
+	IsDeleted            *bool                           `json:"is_deleted"`
+	DeletedAt            *time.Time                      `json:"deleted_at,omitempty"`
+	Metadata             dbtypes.SpecificMetadata        `json:"specific_metadata" swaggertype:"object" oneOf:"dbtypes.PhotoSpecificMetadata,dbtypes.VideoSpecificMetadata,dbtypes.AudioSpecificMetadata"`
+	Status               []byte                          `json:"status"`
+	SpeciesPredictions   []dbtypes.SpeciesPredictionMeta `json:"species_predictions,omitempty"`
 	// Stack fields (populated when stack mode is enabled)
 	Stack *StackPreviewDTO `json:"stack,omitempty"`
 }
@@ -434,7 +436,7 @@ type SearchAssetsRequestDTO struct {
 	ViewerTimezone  string         `json:"viewer_timezone,omitempty" example:"America/New_York"`
 	Pagination      PaginationDTO  `json:"pagination"`
 	EnhancementMode string         `json:"enhancement_mode,omitempty" example:"auto" enums:"auto,off,only"`
-	TopResultsLimit int            `json:"top_results_limit,omitempty" example:"12" minimum:"1" maximum:"50"`
+	TopResultsLimit int            `json:"top_results_limit,omitempty" example:"200" minimum:"1" maximum:"200"`
 	StackMode       string         `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
 }
 

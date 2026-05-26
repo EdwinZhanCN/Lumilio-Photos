@@ -3,6 +3,8 @@ import type { Asset } from "@/lib/assets/types";
 import type { AssetGroup } from "@/features/assets/types/assets.type";
 import {
   browseGroupsFromQueryLikePage,
+  browseGroupsFromSearchResultsPage,
+  browseGroupsFromSearchTop,
   createBrowseItemsFromApiItems,
   createBrowseGroupsFromAssets,
   createBrowseGroupsFromAssetGroups,
@@ -17,10 +19,7 @@ import {
   resolveSelectedBrowseItems,
 } from "./browseItems";
 
-const createAsset = (
-  assetId: string,
-  overrides: Partial<Asset> = {},
-): Asset =>
+const createAsset = (assetId: string, overrides: Partial<Asset> = {}): Asset =>
   ({
     asset_id: assetId,
     original_filename: `${assetId}.jpg`,
@@ -92,7 +91,9 @@ describe("browseItems", () => {
       },
     ];
 
-    const items = flattenBrowseGroups(createBrowseGroupsFromAssetGroups(groups));
+    const items = flattenBrowseGroups(
+      createBrowseGroupsFromAssetGroups(groups),
+    );
 
     expect(items).toHaveLength(1);
     expect(items[0]?.id).toBe("stack:stack-1");
@@ -159,7 +160,9 @@ describe("browseItems", () => {
       },
     ];
 
-    const item = flattenBrowseGroups(createBrowseGroupsFromAssetGroups(groups))[0]!;
+    const item = flattenBrowseGroups(
+      createBrowseGroupsFromAssetGroups(groups),
+    )[0]!;
 
     expect(getBrowseItemAssetId(item)).toBe("first");
   });
@@ -188,7 +191,9 @@ describe("browseItems", () => {
       },
     ];
 
-    const items = flattenBrowseGroups(createBrowseGroupsFromAssetGroups(groups));
+    const items = flattenBrowseGroups(
+      createBrowseGroupsFromAssetGroups(groups),
+    );
 
     expect(findBrowseItemIndexByAssetId(items, "cover")).toBe(0);
     expect(findBrowseItemIndexByAssetId(items, "member")).toBe(0);
@@ -417,10 +422,7 @@ describe("browseItems", () => {
   });
 
   it("falls back to grouped legacy assets when browse items are absent", () => {
-    const legacyAssets = [
-      createAsset("a"),
-      createAsset("b"),
-    ];
+    const legacyAssets = [createAsset("a"), createAsset("b")];
     const browseGroups = browseGroupsFromQueryLikePage({
       items: [],
       legacyAssets,
@@ -431,6 +433,46 @@ describe("browseItems", () => {
       .map((item) => item.id)
       .sort();
     expect(ids).toEqual(["asset:a", "asset:b"].sort());
+  });
+
+  it("keeps search top results in one flat section", () => {
+    const browseGroups = browseGroupsFromSearchTop({
+      topItems: [
+        {
+          type: "asset",
+          asset: createAsset("newer", { taken_time: "2026-05-02T00:00:00Z" }),
+        },
+        {
+          type: "asset",
+          asset: createAsset("older", { taken_time: "2024-01-01T00:00:00Z" }),
+        },
+      ],
+      legacyTopAssets: [],
+    });
+
+    expect(browseGroups).toHaveLength(1);
+    expect(browseGroups[0]?.key).toBe("search:top_results");
+    expect(flattenBrowseGroups(browseGroups).map((item) => item.id)).toEqual([
+      "asset:newer",
+      "asset:older",
+    ]);
+  });
+
+  it("keeps search result pages in one flat results section", () => {
+    const browseGroups = browseGroupsFromSearchResultsPage({
+      resultItems: [],
+      legacyResultAssets: [
+        createAsset("newer", { taken_time: "2026-05-02T00:00:00Z" }),
+        createAsset("older", { taken_time: "2024-01-01T00:00:00Z" }),
+      ],
+    });
+
+    expect(browseGroups).toHaveLength(1);
+    expect(browseGroups[0]?.key).toBe("search:results");
+    expect(flattenBrowseGroups(browseGroups).map((item) => item.id)).toEqual([
+      "asset:newer",
+      "asset:older",
+    ]);
   });
 
   it("creates browse items from backend browse dto payloads", () => {

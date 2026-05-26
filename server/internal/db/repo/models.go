@@ -15,13 +15,57 @@ import (
 	"server/internal/storage/repocfg"
 )
 
+type AlbumType string
+
+const (
+	AlbumTypeDefault AlbumType = "default"
+	AlbumTypeBio     AlbumType = "bio"
+)
+
+func (e *AlbumType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AlbumType(s)
+	case string:
+		*e = AlbumType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AlbumType: %T", src)
+	}
+	return nil
+}
+
+type NullAlbumType struct {
+	AlbumType AlbumType `json:"album_type"`
+	Valid     bool      `json:"valid"` // Valid is true if AlbumType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAlbumType) Scan(value interface{}) error {
+	if value == nil {
+		ns.AlbumType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AlbumType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAlbumType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AlbumType), nil
+}
+
 type StackRelation string
 
 const (
-	StackRelationRawOriginal   StackRelation = "raw_original"
-	StackRelationJpegOriginal  StackRelation = "jpeg_original"
-	StackRelationEditedVersion StackRelation = "edited_version"
-	StackRelationAlternative   StackRelation = "alternative"
+	StackRelationRawOriginal    StackRelation = "raw_original"
+	StackRelationJpegOriginal   StackRelation = "jpeg_original"
+	StackRelationEditedVersion  StackRelation = "edited_version"
+	StackRelationAlternative    StackRelation = "alternative"
+	StackRelationLivePhotoStill StackRelation = "live_photo_still"
+	StackRelationLivePhotoVideo StackRelation = "live_photo_video"
 )
 
 func (e *StackRelation) Scan(src interface{}) error {
@@ -73,6 +117,7 @@ type Album struct {
 	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	Description  *string            `db:"description" json:"description"`
 	CoverAssetID pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
+	AlbumType    AlbumType          `db:"album_type" json:"album_type"`
 }
 
 type AlbumAsset struct {
@@ -114,6 +159,8 @@ type Asset struct {
 
 type AssetStack struct {
 	StackID   pgtype.UUID        `db:"stack_id" json:"stack_id"`
+	StackKind string             `db:"stack_kind" json:"stack_kind"`
+	GroupKey  *string            `db:"group_key" json:"group_key"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }

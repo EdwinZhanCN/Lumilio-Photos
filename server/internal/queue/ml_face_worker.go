@@ -47,7 +47,7 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	if w.LumenService == nil {
 		return river.JobSnooze(30 * time.Second)
 	}
-	if !w.LumenService.IsTaskAvailable("face_detect_and_embed") {
+	if !w.LumenService.IsTaskAvailable("face_recognition") {
 		return river.JobSnooze(30 * time.Second)
 	}
 	if w.ImageLoader == nil {
@@ -63,9 +63,9 @@ func (w *ProcessFaceWorker) Work(ctx context.Context, job *river.Job[ProcessFace
 	startTime := time.Now()
 
 	// Perform face detection using LumenService
-	faceV1, err := w.LumenService.FaceDetectEmbed(ctx, imageData)
+	faceV1, err := w.LumenService.FaceRecognition(ctx, imageData)
 	if err != nil {
-		return fmt.Errorf("failed to perform face detection: %w", err)
+		return maybeSnoozeMLInfraError(fmt.Errorf("failed to perform face detection: %w", err))
 	}
 
 	// Calculate processing time

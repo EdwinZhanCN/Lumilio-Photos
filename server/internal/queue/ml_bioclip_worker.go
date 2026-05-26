@@ -3,11 +3,13 @@ package queue
 import (
 	"context"
 	"fmt"
+	"server/internal/db/dbtypes"
 	"server/internal/queue/jobs"
 	"server/internal/service"
 	"server/internal/utils/imagesource"
 	"time"
 
+	"github.com/edwinzhancn/lumen-sdk/pkg/types"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
@@ -20,9 +22,13 @@ type ProcessBioClipWorker struct {
 	river.WorkerDefaults[ProcessBioClipArgs]
 
 	LumenService   service.LumenService
-	TagService     service.AIGeneratedTagService
+	SpeciesService speciesPredictionSaver
 	ConfigProvider MLConfigProvider
 	ImageLoader    MLImageLoader
+}
+
+type speciesPredictionSaver interface {
+	SaveSpeciesPredictions(ctx context.Context, assetID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error
 }
 
 func (w *ProcessBioClipWorker) Work(ctx context.Context, job *river.Job[ProcessBioClipArgs]) error {
@@ -48,8 +54,8 @@ func (w *ProcessBioClipWorker) Work(ctx context.Context, job *river.Job[ProcessB
 	if !w.LumenService.IsTaskAvailable("bioclip_classify") {
 		return river.JobSnooze(30 * time.Second)
 	}
-	if w.TagService == nil {
-		return fmt.Errorf("ai generated tag service unavailable")
+	if w.SpeciesService == nil {
+		return fmt.Errorf("species prediction service unavailable")
 	}
 	if w.ImageLoader == nil {
 		return fmt.Errorf("ml image loader unavailable")
@@ -62,14 +68,23 @@ func (w *ProcessBioClipWorker) Work(ctx context.Context, job *river.Job[ProcessB
 
 	labels, err := w.LumenService.BioClipClassify(ctx, imageData, 3)
 	if err != nil {
-		return fmt.Errorf("failed to classify image with BioCLIP: %w", err)
+		return maybeSnoozeMLInfraError(fmt.Errorf("failed to classify image with BioCLIP: %w", err))
 	}
 
-	if err := w.TagService.ReplaceAssetAIGeneratedTags(ctx, pgUUID, labelsToAIGeneratedTags(labels, "bioclip_classify"), []string{
-		"bioclip_classify",
-	}); err != nil {
-		return fmt.Errorf("failed to save BioCLIP tags: %w", err)
+	if err := w.SpeciesService.SaveSpeciesPredictions(ctx, pgUUID, labelsToSpeciesPredictions(labels)); err != nil {
+		return fmt.Errorf("failed to save BioCLIP species predictions: %w", err)
 	}
 
 	return nil
+}
+
+func labelsToSpeciesPredictions(labels []types.Label) []dbtypes.SpeciesPredictionMeta {
+	predictions := make([]dbtypes.SpeciesPredictionMeta, 0, len(labels))
+	for _, label := range labels {
+		predictions = append(predictions, dbtypes.SpeciesPredictionMeta{
+			Label: label.Label,
+			Score: label.Score,
+		})
+	}
+	return predictions
 }

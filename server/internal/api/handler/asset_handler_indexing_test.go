@@ -113,10 +113,10 @@ func TestAssetHandlerGetIndexingStats_ReturnsStats(t *testing.T) {
 					PhotoTotal:  240,
 					ReindexJobs: 2,
 				}
-				stats.Tasks.Clip = service.AssetIndexingTaskStats{IndexedCount: 120, QueuedJobs: 4}
-				stats.Tasks.BioCLIP = service.AssetIndexingTaskStats{IndexedCount: 80, QueuedJobs: 5}
-				stats.Tasks.OCR = service.AssetIndexingTaskStats{IndexedCount: 110, QueuedJobs: 3}
-				stats.Tasks.Face = service.AssetIndexingTaskStats{IndexedCount: 60, QueuedJobs: 1}
+				stats.Tasks.Clip = service.AssetIndexingTaskStats{IndexedCount: 120, QueuedJobs: 4, TotalCount: 240}
+				stats.Tasks.BioCLIP = service.AssetIndexingTaskStats{IndexedCount: 80, QueuedJobs: 5, TotalCount: 90}
+				stats.Tasks.OCR = service.AssetIndexingTaskStats{IndexedCount: 110, QueuedJobs: 3, TotalCount: 240}
+				stats.Tasks.Face = service.AssetIndexingTaskStats{IndexedCount: 60, QueuedJobs: 1, TotalCount: 240}
 				return stats, nil
 			},
 		},
@@ -140,12 +140,16 @@ func TestAssetHandlerGetIndexingStats_ReturnsStats(t *testing.T) {
 	require.Equal(t, 2, response.Data.ReindexJobs)
 	require.Equal(t, 120, response.Data.Tasks.Clip.IndexedCount)
 	require.Equal(t, 4, response.Data.Tasks.Clip.QueuedJobs)
+	require.Equal(t, 240, response.Data.Tasks.Clip.TotalCount)
 	require.Equal(t, 80, response.Data.Tasks.BioCLIP.IndexedCount)
 	require.Equal(t, 5, response.Data.Tasks.BioCLIP.QueuedJobs)
+	require.Equal(t, 90, response.Data.Tasks.BioCLIP.TotalCount)
 	require.Equal(t, 110, response.Data.Tasks.OCR.IndexedCount)
 	require.Equal(t, 3, response.Data.Tasks.OCR.QueuedJobs)
+	require.Equal(t, 240, response.Data.Tasks.OCR.TotalCount)
 	require.Equal(t, 60, response.Data.Tasks.Face.IndexedCount)
 	require.Equal(t, 1, response.Data.Tasks.Face.QueuedJobs)
+	require.Equal(t, 240, response.Data.Tasks.Face.TotalCount)
 }
 
 func TestAssetHandlerGetIndexingStats_RejectsInvalidRepositoryID(t *testing.T) {
@@ -182,7 +186,7 @@ func TestAssetHandlerRebuildAssetIndexes_QueuesDefaultBatch(t *testing.T) {
 
 				return service.ReindexAssetsJobResult{
 					JobID:       42,
-					Requested:   []service.AssetIndexingTask{service.AssetIndexingTaskClip, service.AssetIndexingTaskOCR},
+					Requested:   []service.AssetIndexingTask{service.AssetIndexingTaskSemanticImage, service.AssetIndexingTaskOCR},
 					Limit:       input.Limit,
 					MissingOnly: input.MissingOnly,
 				}, nil
@@ -230,7 +234,7 @@ func TestAssetHandlerRebuildAssetIndexes_NormalizesTasksAndLimit(t *testing.T) {
 				require.NotNil(t, input.RepositoryID)
 				require.Equal(t, repositoryID, *input.RepositoryID)
 				require.Equal(t, []service.AssetIndexingTask{
-					service.AssetIndexingTaskClip,
+					service.AssetIndexingTaskSemanticImage,
 					service.AssetIndexingTaskOCR,
 				}, input.Tasks)
 				require.Equal(t, 500, input.Limit)
@@ -281,6 +285,33 @@ func TestAssetHandlerRebuildAssetIndexes_RejectsInvalidTask(t *testing.T) {
 		indexingService: stubAssetIndexingService{
 			enqueueReindexAssets: func(ctx context.Context, input service.ReindexAssetsInput) (service.ReindexAssetsJobResult, error) {
 				t.Fatal("service should not be called for invalid tasks")
+				return service.ReindexAssetsJobResult{}, nil
+			},
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/assets/indexing/rebuild", bytes.NewReader(requestBody))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler.RebuildAssetIndexes(ctx)
+
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+}
+
+func TestAssetHandlerRebuildAssetIndexes_RejectsBioClipTask(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	requestBody, err := json.Marshal(dto.RebuildAssetIndexesRequestDTO{
+		Tasks: []string{"bioclip"},
+	})
+	require.NoError(t, err)
+
+	handler := &AssetHandler{
+		indexingService: stubAssetIndexingService{
+			enqueueReindexAssets: func(ctx context.Context, input service.ReindexAssetsInput) (service.ReindexAssetsJobResult, error) {
+				t.Fatal("service should not be called for album-scoped BioCLIP tasks")
 				return service.ReindexAssetsJobResult{}, nil
 			},
 		},

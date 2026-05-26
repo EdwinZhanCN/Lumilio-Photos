@@ -1,4 +1,4 @@
-import { GalleryVerticalEnd } from "lucide-react";
+import { Bird, GalleryVerticalEnd } from "lucide-react";
 import { useState } from "react";
 import { useI18n } from "@/lib/i18n.tsx";
 
@@ -6,9 +6,15 @@ interface ImgStackViewProps {
   coverImages?: string[];
   albumName?: string;
   isSelected?: boolean;
+  isBioAlbum?: boolean;
 }
 
-function ImgStackView({ coverImages, albumName, isSelected = false }: ImgStackViewProps) {
+function ImgStackView({
+  coverImages,
+  albumName,
+  isSelected = false,
+  isBioAlbum = false,
+}: ImgStackViewProps) {
   const { t } = useI18n();
   const hasCover = coverImages && coverImages.length > 0;
   const [imageError, setImageError] = useState(false);
@@ -57,6 +63,17 @@ function ImgStackView({ coverImages, albumName, isSelected = false }: ImgStackVi
         {/* Selection Overlay Tint */}
         {isSelected && (
           <div className="absolute inset-0 bg-primary/10 pointer-events-none animate-in fade-in duration-300" />
+        )}
+
+        {isBioAlbum && (
+          <div className="absolute bottom-2 right-2 z-10 rounded-full bg-black/55 px-2 py-1 shadow-lg backdrop-blur-md">
+            <div
+              className="tooltip m-0 inline-flex items-center text-xs font-medium gap-1.5 text-white"
+              data-tip="生物图鉴"
+            >
+              <Bird className="size-3.5" />
+            </div>
+          </div>
         )}
 
         {/* Subtle floating animation on hover */}

@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"os"
 	"server/internal/db/dbtypes"
 	"server/internal/utils/exif"
@@ -13,6 +16,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func validJPEGBytes(t *testing.T) []byte {
+	t.Helper()
+
+	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	for y := 0; y < img.Bounds().Dy(); y++ {
+		for x := 0; x < img.Bounds().Dx(); x++ {
+			img.Set(x, y, color.RGBA{R: uint8(80 + x*40), G: uint8(120 + y*40), B: 180, A: 255})
+		}
+	}
+
+	var buf bytes.Buffer
+	require.NoError(t, jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}))
+	return buf.Bytes()
+}
 
 // TestLargeFileHandling tests the EXIF extractor's ability to handle large files
 func TestLargeFileHandling(t *testing.T) {
@@ -83,17 +101,13 @@ func TestStreamingExtraction(t *testing.T) {
 		extractor := exif.NewExtractor(config)
 		defer extractor.Close()
 
-		// Create a mock large file reader (simulating 500MB file)
-		mockData := make([]byte, 10*1024*1024) // 10MB for testing
-		for i := range mockData {
-			mockData[i] = byte(i % 256)
-		}
+		mockData := validJPEGBytes(t)
 		reader := bytes.NewReader(mockData)
 
 		req := &exif.StreamingExtractRequest{
 			Reader:    reader,
-			AssetType: dbtypes.AssetTypeVideo,
-			Filename:  "test_large_video.mp4",
+			AssetType: dbtypes.AssetTypePhoto,
+			Filename:  "test_large_photo.jpg",
 			Size:      int64(len(mockData)),
 		}
 
@@ -174,15 +188,16 @@ func TestConcurrentLargeFileProcessing(t *testing.T) {
 	t.Run("Batch processing with simulated large files", func(t *testing.T) {
 		var requests []*exif.StreamingExtractRequest
 
-		// Create multiple mock large file requests
+		// Create multiple valid in-memory media requests. The streaming extractor
+		// test should exercise process I/O, not depend on random bytes being a valid mp4.
 		for i := 0; i < 3; i++ {
-			mockData := make([]byte, 5*1024*1024) // 5MB each
+			mockData := validJPEGBytes(t)
 			reader := bytes.NewReader(mockData)
 
 			requests = append(requests, &exif.StreamingExtractRequest{
 				Reader:    reader,
-				AssetType: dbtypes.AssetTypeVideo,
-				Filename:  fmt.Sprintf("test_large_%d.mp4", i),
+				AssetType: dbtypes.AssetTypePhoto,
+				Filename:  fmt.Sprintf("test_large_%d.jpg", i),
 				Size:      int64(len(mockData)),
 			})
 		}

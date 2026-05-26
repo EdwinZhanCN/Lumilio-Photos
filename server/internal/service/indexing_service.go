@@ -24,13 +24,11 @@ import (
 type AssetIndexingTask string
 
 const (
-	AssetIndexingTaskClip    AssetIndexingTask = "clip"
-	AssetIndexingTaskBioCLIP AssetIndexingTask = "bioclip"
-	AssetIndexingTaskOCR     AssetIndexingTask = "ocr"
-	AssetIndexingTaskFace    AssetIndexingTask = "face"
+	AssetIndexingTaskSemanticImage   AssetIndexingTask = "clip"
+	AssetIndexingTaskBioCLIP         AssetIndexingTask = "bioclip"
+	AssetIndexingTaskOCR             AssetIndexingTask = "ocr"
+	AssetIndexingTaskFaceRecognition AssetIndexingTask = "face"
 )
-
-const aiTagSourceBioCLIP = "bioclip_classify"
 
 const defaultIndexingBatchSize = 200
 const maxIndexingBatchSize = 500
@@ -38,6 +36,7 @@ const maxIndexingBatchSize = 500
 type AssetIndexingTaskStats struct {
 	IndexedCount int64
 	QueuedJobs   int64
+	TotalCount   int64
 }
 
 type AssetIndexingStats struct {
@@ -132,10 +131,9 @@ func normalizeReindexAssetsInput(input ReindexAssetsInput) ReindexAssetsInput {
 func normalizeRequestedIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingTask {
 	if len(tasks) == 0 {
 		return []AssetIndexingTask{
-			AssetIndexingTaskClip,
-			AssetIndexingTaskBioCLIP,
+			AssetIndexingTaskSemanticImage,
 			AssetIndexingTaskOCR,
-			AssetIndexingTaskFace,
+			AssetIndexingTaskFaceRecognition,
 		}
 	}
 
@@ -143,7 +141,7 @@ func normalizeRequestedIndexingTasks(tasks []AssetIndexingTask) []AssetIndexingT
 	result := make([]AssetIndexingTask, 0, len(tasks))
 	for _, task := range tasks {
 		switch task {
-		case AssetIndexingTaskClip, AssetIndexingTaskBioCLIP, AssetIndexingTaskOCR, AssetIndexingTaskFace:
+		case AssetIndexingTaskSemanticImage, AssetIndexingTaskOCR, AssetIndexingTaskFaceRecognition:
 			if seen[task] {
 				continue
 			}
@@ -182,6 +180,9 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 	if err != nil {
 		return AssetIndexingStats{}, fmt.Errorf("count photo assets: %w", err)
 	}
+	stats.Tasks.Clip.TotalCount = stats.PhotoTotal
+	stats.Tasks.OCR.TotalCount = stats.PhotoTotal
+	stats.Tasks.Face.TotalCount = stats.PhotoTotal
 
 	stats.Tasks.Clip.IndexedCount, err = s.queries.CountPhotoAssetsWithEmbeddingType(ctx, repo.CountPhotoAssetsWithEmbeddingTypeParams{
 		RepositoryID:  repositoryUUID,
@@ -191,10 +192,12 @@ func (s *assetIndexingService) GetIndexingStats(ctx context.Context, repositoryI
 		return AssetIndexingStats{}, fmt.Errorf("count clip coverage: %w", err)
 	}
 
-	stats.Tasks.BioCLIP.IndexedCount, err = s.queries.CountPhotoAssetsWithGeneratedTagSource(ctx, repo.CountPhotoAssetsWithGeneratedTagSourceParams{
-		RepositoryID: repositoryUUID,
-		Source:       aiTagSourceBioCLIP,
-	})
+	stats.Tasks.BioCLIP.TotalCount, err = s.queries.CountBioAlbumPhotoAssets(ctx, repositoryUUID)
+	if err != nil {
+		return AssetIndexingStats{}, fmt.Errorf("count bio album photos: %w", err)
+	}
+
+	stats.Tasks.BioCLIP.IndexedCount, err = s.queries.CountBioAlbumPhotoAssetsWithSpeciesPredictions(ctx, repositoryUUID)
 	if err != nil {
 		return AssetIndexingStats{}, fmt.Errorf("count bioclip coverage: %w", err)
 	}
@@ -398,19 +401,12 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 	limit int,
 ) ([]repo.Asset, error) {
 	switch task {
-	case AssetIndexingTaskClip:
+	case AssetIndexingTaskSemanticImage:
 		return s.queries.ListPhotoAssetsMissingEmbeddingType(ctx, repo.ListPhotoAssetsMissingEmbeddingTypeParams{
 			RepositoryID:  repositoryUUID,
 			EmbeddingType: string(EmbeddingTypeCLIP),
 			Limit:         int32(limit),
 			Offset:        0,
-		})
-	case AssetIndexingTaskBioCLIP:
-		return s.queries.ListPhotoAssetsMissingGeneratedTagSource(ctx, repo.ListPhotoAssetsMissingGeneratedTagSourceParams{
-			RepositoryID: repositoryUUID,
-			Source:       aiTagSourceBioCLIP,
-			Limit:        int32(limit),
-			Offset:       0,
 		})
 	case AssetIndexingTaskOCR:
 		return s.queries.ListPhotoAssetsMissingOCRResults(ctx, repo.ListPhotoAssetsMissingOCRResultsParams{
@@ -418,7 +414,7 @@ func (s *assetIndexingService) listMissingAssetsForTask(
 			Limit:        int32(limit),
 			Offset:       0,
 		})
-	case AssetIndexingTaskFace:
+	case AssetIndexingTaskFaceRecognition:
 		return s.queries.ListPhotoAssetsMissingFaceResults(ctx, repo.ListPhotoAssetsMissingFaceResultsParams{
 			RepositoryID: repositoryUUID,
 			Limit:        int32(limit),
@@ -458,14 +454,8 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 	}
 
 	queued := 0
-	if candidate.tasks[AssetIndexingTaskClip] {
+	if candidate.tasks[AssetIndexingTaskSemanticImage] {
 		if err := s.enqueueClipTask(ctx, candidate.asset.AssetID); err != nil {
-			return queued, err
-		}
-		queued++
-	}
-	if candidate.tasks[AssetIndexingTaskBioCLIP] {
-		if err := s.enqueueBioCLIPTask(ctx, candidate.asset.AssetID); err != nil {
 			return queued, err
 		}
 		queued++
@@ -476,7 +466,7 @@ func (s *assetIndexingService) enqueueAssetIndexingTasks(
 		}
 		queued++
 	}
-	if candidate.tasks[AssetIndexingTaskFace] {
+	if candidate.tasks[AssetIndexingTaskFaceRecognition] {
 		if err := s.enqueueFaceTask(ctx, candidate.asset.AssetID); err != nil {
 			return queued, err
 		}
@@ -496,20 +486,6 @@ func (s *assetIndexingService) enqueueClipTask(
 	}, &river.InsertOpts{Queue: "process_clip"})
 	if err != nil {
 		return fmt.Errorf("enqueue CLIP job: %w", err)
-	}
-	return nil
-}
-
-func (s *assetIndexingService) enqueueBioCLIPTask(
-	ctx context.Context,
-	assetID pgtype.UUID,
-) error {
-	_, err := s.queueClient.Insert(ctx, jobs.ProcessBioClipArgs{
-		AssetID:           assetID,
-		PreprocessVersion: jobs.MLPreprocessVersionV1,
-	}, &river.InsertOpts{Queue: "process_bioclip"})
-	if err != nil {
-		return fmt.Errorf("enqueue BioCLIP job: %w", err)
 	}
 	return nil
 }
@@ -592,7 +568,7 @@ func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg config.MLConfig) 
 
 	for _, task := range tasks {
 		switch task {
-		case AssetIndexingTaskClip:
+		case AssetIndexingTaskSemanticImage:
 			if cfg.CLIPEnabled {
 				enabled = append(enabled, task)
 			}
@@ -604,7 +580,7 @@ func filterEnabledIndexingTasks(tasks []AssetIndexingTask, cfg config.MLConfig) 
 			if cfg.OCREnabled {
 				enabled = append(enabled, task)
 			}
-		case AssetIndexingTaskFace:
+		case AssetIndexingTaskFaceRecognition:
 			if cfg.FaceEnabled {
 				enabled = append(enabled, task)
 			}

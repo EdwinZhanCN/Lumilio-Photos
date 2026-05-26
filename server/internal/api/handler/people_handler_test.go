@@ -21,9 +21,10 @@ import (
 
 type stubPeopleFaceService struct {
 	service.FaceService
-	listFn   func(context.Context, pgtype.UUID, *int32, int, int) ([]service.Person, int64, error)
-	getFn    func(context.Context, int32, pgtype.UUID, *int32) (*service.Person, error)
-	renameFn func(context.Context, int32, string) (*repo.FaceCluster, error)
+	listFn    func(context.Context, pgtype.UUID, *int32, int, int) ([]service.Person, int64, error)
+	getFn     func(context.Context, int32, pgtype.UUID, *int32) (*service.Person, error)
+	renameFn  func(context.Context, int32, string) (*repo.FaceCluster, error)
+	rebuildFn func(context.Context, pgtype.UUID, *int32) (service.FaceClusterRebuildResult, error)
 }
 
 func (s stubPeopleFaceService) ListPeople(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32, limit, offset int) ([]service.Person, int64, error) {
@@ -36,6 +37,10 @@ func (s stubPeopleFaceService) GetPerson(ctx context.Context, clusterID int32, r
 
 func (s stubPeopleFaceService) RenamePerson(ctx context.Context, clusterID int32, name string) (*repo.FaceCluster, error) {
 	return s.renameFn(ctx, clusterID, name)
+}
+
+func (s stubPeopleFaceService) RebuildFaceClusters(ctx context.Context, repositoryID pgtype.UUID, ownerID *int32) (service.FaceClusterRebuildResult, error) {
+	return s.rebuildFn(ctx, repositoryID, ownerID)
 }
 
 func TestPeopleHandlerListPeople(t *testing.T) {
@@ -85,6 +90,52 @@ func TestPeopleHandlerListPeople(t *testing.T) {
 	require.Len(t, response.Data.People, 1)
 	require.Equal(t, int32(7), response.Data.People[0].PersonID)
 	require.Equal(t, "Alice", *response.Data.People[0].Name)
+}
+
+func TestPeopleHandlerRebuildPeople(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	var capturedRepo pgtype.UUID
+	handler := NewPeopleHandler(
+		stubAssetService{},
+		stubPeopleFaceService{
+			rebuildFn: func(_ context.Context, repositoryID pgtype.UUID, ownerID *int32) (service.FaceClusterRebuildResult, error) {
+				capturedRepo = repositoryID
+				require.Nil(t, ownerID)
+				return service.FaceClusterRebuildResult{
+					Algorithm:       "hdbscan-mutual-reachability-v1",
+					RepositoryID:    strPtr("550e8400-e29b-41d4-a716-446655440000"),
+					CandidateFaces:  12,
+					ClusteredFaces:  10,
+					NoiseFaces:      2,
+					ClustersCreated: 3,
+					ClustersReused:  1,
+					ClustersTotal:   4,
+					DurationMs:      42,
+				}, nil
+			},
+		},
+		nil,
+		nil,
+	)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/v1/people/rebuild?repository_id=550e8400-e29b-41d4-a716-446655440000", nil)
+
+	handler.RebuildPeople(ctx)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.True(t, capturedRepo.Valid)
+
+	var response struct {
+		Code int                               `json:"code"`
+		Data dto.FaceClusterRebuildResponseDTO `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
+	require.Equal(t, "hdbscan-mutual-reachability-v1", response.Data.Algorithm)
+	require.Equal(t, 12, response.Data.CandidateFaces)
+	require.Equal(t, 4, response.Data.ClustersTotal)
 }
 
 func TestPeopleHandlerUpdatePerson(t *testing.T) {

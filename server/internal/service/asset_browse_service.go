@@ -263,7 +263,7 @@ func (s *assetService) queryCollapsedSemanticBrowseItems(ctx context.Context, pa
 	), nil
 }
 
-// searchBrowseItemsClipTopResults fetches extra vector-ranked assets (fetchLimit ~= 4× cap) under a short timeout,
+// searchBrowseItemsClipTopResults fetches vector-ranked assets under a short timeout,
 // then applies stack collapse when not expanded. Marks meta degraded on timeout/vector errors or collapse failure.
 func (s *assetService) searchBrowseItemsClipTopResults(ctx context.Context, params SearchAssetsParams) ([]BrowseItem, SearchTopResultsMeta) {
 	meta := SearchTopResultsMeta{
@@ -279,12 +279,7 @@ func (s *assetService) searchBrowseItemsClipTopResults(ctx context.Context, para
 		requestedLimit = TOP_RESULTS_FALLBACK_LIMIT
 	}
 
-	fetchLimit := requestedLimit * 4
-	if fetchLimit < requestedLimit {
-		fetchLimit = requestedLimit
-	}
-
-	assets, err := s.queryAssetsVectorTopResults(searchCtx, params.QueryAssetsParams, fetchLimit)
+	assets, err := s.queryAssetsVectorTopResults(searchCtx, params.QueryAssetsParams, requestedLimit)
 	if err != nil {
 		meta.Degraded = true
 		meta.Reason = classifySearchEnhancementError(err, searchCtx)
@@ -312,7 +307,7 @@ func (s *assetService) searchBrowseItemsClipTopResults(ctx context.Context, para
 }
 
 // TOP_RESULTS_FALLBACK_LIMIT is the default CLIP top-result cap when the client does not specify one.
-const TOP_RESULTS_FALLBACK_LIMIT = 12
+const TOP_RESULTS_FALLBACK_LIMIT = 200
 
 // assetsToBrowseItems maps plain asset rows to browse items without stack merging (expanded / pre-collapsed paths).
 func assetsToBrowseItems(assets []repo.Asset) []BrowseItem {

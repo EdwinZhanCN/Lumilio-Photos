@@ -157,6 +157,19 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dbtypes.SpeciesPredictionMeta": {
+                "properties": {
+                    "label": {
+                        "description": "物种标签",
+                        "type": "string"
+                    },
+                    "score": {
+                        "description": "置信度分数",
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
             "dbtypes.VideoSpecificMetadata": {
                 "properties": {
                     "bitrate": {
@@ -280,6 +293,13 @@ const docTemplate = `{
                     },
                     "repository_id": {
                         "type": "string"
+                    },
+                    "species_predictions": {
+                        "items": {
+                            "$ref": "#/components/schemas/dbtypes.SpeciesPredictionMeta"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
                     },
                     "specific_metadata": {
                         "oneOf": [
@@ -445,6 +465,10 @@ const docTemplate = `{
                     },
                     "queued_jobs": {
                         "example": 12,
+                        "type": "integer"
+                    },
+                    "total_count": {
+                        "example": 2400,
                         "type": "integer"
                     }
                 },
@@ -845,6 +869,13 @@ const docTemplate = `{
                     "album_name": {
                         "type": "string"
                     },
+                    "album_type": {
+                        "enum": [
+                            "default",
+                            "bio"
+                        ],
+                        "type": "string"
+                    },
                     "cover_asset_id": {
                         "type": "string"
                     },
@@ -1131,6 +1162,38 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.FaceClusterRebuildResponseDTO": {
+                "properties": {
+                    "algorithm": {
+                        "type": "string"
+                    },
+                    "candidate_faces": {
+                        "type": "integer"
+                    },
+                    "clustered_faces": {
+                        "type": "integer"
+                    },
+                    "clusters_created": {
+                        "type": "integer"
+                    },
+                    "clusters_reused": {
+                        "type": "integer"
+                    },
+                    "clusters_total": {
+                        "type": "integer"
+                    },
+                    "duration_ms": {
+                        "type": "integer"
+                    },
+                    "noise_faces": {
+                        "type": "integer"
+                    },
+                    "repository_id": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.FeaturedAssetsResponseDTO": {
                 "properties": {
                     "assets": {
@@ -1188,6 +1251,9 @@ const docTemplate = `{
                         "type": "integer"
                     },
                     "album_name": {
+                        "type": "string"
+                    },
+                    "album_type": {
                         "type": "string"
                     },
                     "asset_count": {
@@ -1570,16 +1636,16 @@ const docTemplate = `{
                     "bioclip_classify": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     },
-                    "clip_image_embed": {
-                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
-                    },
-                    "clip_text_embed": {
-                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
-                    },
-                    "face_detect_and_embed": {
+                    "face_recognition": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     },
                     "ocr": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    },
+                    "semantic_image_embed": {
+                        "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
+                    },
+                    "semantic_text_embed": {
                         "$ref": "#/components/schemas/dto.MLTaskCapabilityDTO"
                     }
                 },
@@ -1964,6 +2030,23 @@ const docTemplate = `{
                     "total_visible": {
                         "example": 120,
                         "type": "integer"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.RebuildAlbumBioClipResponseDTO": {
+                "properties": {
+                    "message": {
+                        "example": "BioCLIP processing queued successfully",
+                        "type": "string"
+                    },
+                    "queued_assets": {
+                        "example": 12,
+                        "type": "integer"
+                    },
+                    "status": {
+                        "example": "queued",
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -2439,8 +2522,8 @@ const docTemplate = `{
                         "type": "string"
                     },
                     "top_results_limit": {
-                        "example": 12,
-                        "maximum": 50,
+                        "example": 200,
+                        "maximum": 200,
                         "minimum": 1,
                         "type": "integer"
                     },
@@ -2575,6 +2658,59 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.SpeciesReferenceResponseDTO": {
+                "properties": {
+                    "common_name": {
+                        "example": "Barasingha",
+                        "type": "string"
+                    },
+                    "image_attribution": {
+                        "example": "(c) Ramesh Shenai Jr., some rights reserved (CC BY), uploaded by Ramesh Shenai Jr.",
+                        "type": "string"
+                    },
+                    "image_license": {
+                        "example": "cc-by",
+                        "type": "string"
+                    },
+                    "image_source_url": {
+                        "example": "https://www.inaturalist.org/photos/231650420",
+                        "type": "string"
+                    },
+                    "image_url": {
+                        "example": "https://inaturalist-open-data.s3.amazonaws.com/photos/231650420/large.jpeg",
+                        "type": "string"
+                    },
+                    "provider": {
+                        "example": "inaturalist",
+                        "type": "string"
+                    },
+                    "query": {
+                        "example": "Rucervus duvaucelii",
+                        "type": "string"
+                    },
+                    "reference_url": {
+                        "example": "https://www.inaturalist.org/taxa/75046",
+                        "type": "string"
+                    },
+                    "scientific_name": {
+                        "example": "Rucervus duvaucelii",
+                        "type": "string"
+                    },
+                    "taxon_id": {
+                        "example": 75046,
+                        "type": "integer"
+                    },
+                    "wikipedia_summary": {
+                        "example": "The barasingha, also called swamp deer, is a deer species distributed in the Indian subcontinent.",
+                        "type": "string"
+                    },
+                    "wikipedia_url": {
+                        "example": "https://en.wikipedia.org/wiki/Rucervus_duvaucelii",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.StackByAssetResponseDTO": {
                 "properties": {
                     "asset_id": {
@@ -2702,6 +2838,13 @@ const docTemplate = `{
             "dto.UpdateAlbumRequestDTO": {
                 "properties": {
                     "album_name": {
+                        "type": "string"
+                    },
+                    "album_type": {
+                        "enum": [
+                            "default",
+                            "bio"
+                        ],
                         "type": "string"
                     },
                     "cover_asset_id": {
@@ -4746,6 +4889,129 @@ const docTemplate = `{
                     }
                 ],
                 "summary": "Update asset position in album",
+                "tags": [
+                    "albums"
+                ]
+            }
+        },
+        "/api/v1/albums/{id}/bioclip/rebuild": {
+            "post": {
+                "description": "Queue BioCLIP processing for photo assets in a bio album that do not yet have species predictions.",
+                "parameters": [
+                    {
+                        "description": "Album ID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "BioCLIP jobs queued successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid album or album type"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Album not found"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "BioCLIP unavailable"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Queue BioCLIP for a bio album",
                 "tags": [
                     "albums"
                 ]
@@ -10693,6 +10959,99 @@ const docTemplate = `{
                 ]
             }
         },
+        "/api/v1/people/rebuild": {
+            "post": {
+                "description": "Rebuild recognized people for the selected repository scope using HDBSCAN over face embeddings.",
+                "parameters": [
+                    {
+                        "description": "Optional repository UUID filter",
+                        "in": "query",
+                        "name": "repository_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "People clusters rebuilt successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request parameters"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Rebuild people clusters",
+                "tags": [
+                    "people"
+                ]
+            }
+        },
         "/api/v1/people/{id}": {
             "get": {
                 "description": "Get a single recognized person by cluster ID.",
@@ -11827,6 +12186,122 @@ const docTemplate = `{
                 "summary": "Validate LLM settings",
                 "tags": [
                     "settings"
+                ]
+            }
+        },
+        "/api/v1/species/reference": {
+            "get": {
+                "description": "Fetch a species wiki summary and reference image from iNaturalist by scientific name, with optional common name fallback.",
+                "parameters": [
+                    {
+                        "description": "Scientific name",
+                        "example": "\"Rucervus duvaucelii\"",
+                        "in": "query",
+                        "name": "scientific_name",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Common name fallback",
+                        "example": "\"Barasingha\"",
+                        "in": "query",
+                        "name": "common_name",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "iNaturalist locale for localized common names and wiki summaries",
+                        "example": "\"zh\"",
+                        "in": "query",
+                        "name": "locale",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Species reference retrieved successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid query"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Species reference not found"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get species reference",
+                "tags": [
+                    "species"
                 ]
             }
         },

@@ -29,6 +29,18 @@ type ListPeopleResponseDTO struct {
 	Offset int                `json:"offset"`
 }
 
+type FaceClusterRebuildResponseDTO struct {
+	Algorithm       string  `json:"algorithm"`
+	RepositoryID    *string `json:"repository_id,omitempty"`
+	CandidateFaces  int     `json:"candidate_faces"`
+	ClusteredFaces  int     `json:"clustered_faces"`
+	NoiseFaces      int     `json:"noise_faces"`
+	ClustersCreated int     `json:"clusters_created"`
+	ClustersReused  int     `json:"clusters_reused"`
+	ClustersTotal   int     `json:"clusters_total"`
+	DurationMs      int64   `json:"duration_ms"`
+}
+
 type UpdatePersonRequestDTO struct {
 	Name string `json:"name" binding:"required"`
 }
@@ -50,5 +62,19 @@ func ToPersonSummaryDTO(person service.Person) PersonSummaryDTO {
 func ToPersonDetailDTO(person service.Person) PersonDetailDTO {
 	return PersonDetailDTO{
 		PersonSummaryDTO: ToPersonSummaryDTO(person),
+	}
+}
+
+func ToFaceClusterRebuildResponseDTO(result service.FaceClusterRebuildResult) FaceClusterRebuildResponseDTO {
+	return FaceClusterRebuildResponseDTO{
+		Algorithm:       result.Algorithm,
+		RepositoryID:    result.RepositoryID,
+		CandidateFaces:  result.CandidateFaces,
+		ClusteredFaces:  result.ClusteredFaces,
+		NoiseFaces:      result.NoiseFaces,
+		ClustersCreated: result.ClustersCreated,
+		ClustersReused:  result.ClustersReused,
+		ClustersTotal:   result.ClustersTotal,
+		DurationMs:      result.DurationMs,
 	}
 }

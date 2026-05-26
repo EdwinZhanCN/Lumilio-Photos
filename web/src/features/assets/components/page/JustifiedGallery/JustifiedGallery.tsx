@@ -39,6 +39,7 @@ interface AbsoluteGalleryItemProps {
   width: number;
   height: number;
   dataAssetId?: string;
+  allowOverflow?: boolean;
   children: React.ReactNode;
 }
 
@@ -46,12 +47,27 @@ interface AbsoluteGalleryItemProps {
  * Shell element for each justified-layout tile.
  * - Always in the DOM (preserves container height + scrollbar).
  * - Mounts children only once the tile enters the viewport (useVisibleOnce).
- * - Applies content-visibility: auto with exact dimensions so the browser
- *   skips paint/composite for off-screen tiles (Plan B).
+ * - Applies content-visibility: auto for tiles whose children do not need to
+ *   paint outside the tile bounds.
  */
 const AbsoluteGalleryItem = memo(
-  ({ top, left, width, height, dataAssetId, children }: AbsoluteGalleryItemProps) => {
+  ({
+    top,
+    left,
+    width,
+    height,
+    dataAssetId,
+    allowOverflow = false,
+    children,
+  }: AbsoluteGalleryItemProps) => {
     const [ref, mounted] = useVisibleOnce();
+
+    const visibilityStyle = allowOverflow
+      ? {}
+      : {
+          contentVisibility: "auto",
+          containIntrinsicSize: `${width}px ${height}px`,
+        };
 
     return (
       <div
@@ -63,8 +79,7 @@ const AbsoluteGalleryItem = memo(
           left,
           width,
           height,
-          contentVisibility: "auto",
-          containIntrinsicSize: `${width}px ${height}px`,
+          ...visibilityStyle,
         } as React.CSSProperties}
         data-asset-id={dataAssetId}
       >
@@ -365,6 +380,10 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                   const height = Math.max(1, position.height);
                   const asset = getBrowseItemAsset(item);
                   const assetId = asset.asset_id;
+                  const stackInfo = asset.stack;
+                  const hasStackOverlay =
+                    Boolean(stackInfo?.stack_size) &&
+                    (stackInfo?.stack_size ?? 0) > 1;
                   const thumbnailUrl = assetId
                     ? assetUrls.getThumbnailUrl(
                         assetId,
@@ -380,12 +399,13 @@ const JustifiedGallery: React.FC<AssetGalleryProps> = ({
                       width={width}
                       height={height}
                       dataAssetId={assetId}
+                      allowOverflow={hasStackOverlay}
                     >
-                      {asset.stack?.stack_size && asset.stack.stack_size > 1 ? (
+                      {stackInfo && stackInfo.stack_size && stackInfo.stack_size > 1 ? (
                         <StackedThumbnail
                           asset={asset}
                           thumbnailUrl={thumbnailUrl}
-                          stackInfo={asset.stack}
+                          stackInfo={stackInfo}
                           browseStack={item.type === "stack" ? item : undefined}
                           onClick={(event) => handleAssetClick(item, asset, event)}
                           isSelected={selection.isSelected(item.id)}

@@ -23,17 +23,17 @@ type semanticTestLumenStub struct {
 	vector      []float32
 }
 
-func (s *semanticTestLumenStub) ClipTextEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
+func (s *semanticTestLumenStub) SemanticTextEmbed(context.Context, []byte) (*types.EmbeddingV1, error) {
 	s.normalCalls++
 	return &types.EmbeddingV1{ModelID: s.modelID, Vector: append([]float32(nil), s.vector...)}, nil
 }
 
-func (s *semanticTestLumenStub) ClipTextEmbedFast(context.Context, []byte) (*types.EmbeddingV1, error) {
+func (s *semanticTestLumenStub) SemanticTextEmbedFast(context.Context, []byte) (*types.EmbeddingV1, error) {
 	s.fastCalls++
 	return &types.EmbeddingV1{ModelID: s.modelID, Vector: append([]float32(nil), s.vector...)}, nil
 }
 
-func (s *semanticTestLumenStub) ClipImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
+func (s *semanticTestLumenStub) SemanticImageEmbed(context.Context, *imagesource.MLImage) (*types.EmbeddingV1, error) {
 	panic("not implemented")
 }
 
@@ -41,7 +41,7 @@ func (s *semanticTestLumenStub) BioClipClassify(context.Context, *imagesource.ML
 	panic("not implemented")
 }
 
-func (s *semanticTestLumenStub) FaceDetectEmbed(context.Context, *imagesource.MLImage) (*types.FaceV1, error) {
+func (s *semanticTestLumenStub) FaceRecognition(context.Context, *imagesource.MLImage) (*types.FaceV1, error) {
 	panic("not implemented")
 }
 
@@ -58,7 +58,7 @@ func (s *semanticTestLumenStub) WarmupTasks(context.Context, []string) map[strin
 }
 
 func (s *semanticTestLumenStub) IsTaskAvailable(taskName string) bool {
-	return s.available && taskName == "clip_text_embed"
+	return s.available && taskName == "semantic_text_embed"
 }
 
 func (s *semanticTestLumenStub) Start(context.Context) error {
@@ -226,10 +226,44 @@ func TestBuildSemanticSearchBaseSQLTreatsUnratedAndUnlikedAsEmptyStates(t *testi
 	}
 }
 
-func TestSemanticMaxDistanceHonorsEnvironment(t *testing.T) {
-	const key = "SEMANTIC_MAX_DISTANCE"
-	t.Setenv(key, "0.33")
-	if got := semanticMaxDistance(); got != 0.33 {
-		t.Fatalf("expected semantic max distance 0.33, got %v", got)
+func TestNormalizeSearchAssetsParamsCapsTopResultsAt200(t *testing.T) {
+	t.Parallel()
+
+	defaulted := normalizeSearchAssetsParams(SearchAssetsParams{})
+	if defaulted.TopResultsLimit != 200 {
+		t.Fatalf("expected default top results limit 200, got %d", defaulted.TopResultsLimit)
+	}
+
+	capped := normalizeSearchAssetsParams(SearchAssetsParams{TopResultsLimit: 500})
+	if capped.TopResultsLimit != 200 {
+		t.Fatalf("expected top results limit to cap at 200, got %d", capped.TopResultsLimit)
+	}
+
+	preserved := normalizeSearchAssetsParams(SearchAssetsParams{TopResultsLimit: 199})
+	if preserved.TopResultsLimit != 199 {
+		t.Fatalf("expected top results limit 199 to be preserved, got %d", preserved.TopResultsLimit)
+	}
+}
+
+func TestBuildSemanticSearchBaseSQLDoesNotApplyHardDistanceThreshold(t *testing.T) {
+	t.Parallel()
+
+	svc := &assetService{}
+	builder := &semanticSQLBuilder{}
+	vector := pgvector.NewVector([]float32{0.1, 0.2, 0.3})
+
+	baseSQL, _, err := svc.buildSemanticSearchBaseSQL(builder, QueryAssetsParams{}, repo.EmbeddingSpace{
+		ID:         42,
+		Dimensions: 768,
+	}, &vector)
+	if err != nil {
+		t.Fatalf("buildSemanticSearchBaseSQL returned error: %v", err)
+	}
+
+	if strings.Contains(baseSQL, "<->") {
+		t.Fatalf("semantic search SQL should rank by distance without filtering by distance, got:\n%s", baseSQL)
+	}
+	if len(builder.args) != 2 {
+		t.Fatalf("expected only vector and space arguments, got %d", len(builder.args))
 	}
 }

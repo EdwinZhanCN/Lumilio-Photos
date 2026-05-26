@@ -13,6 +13,7 @@ type CreateAlbumRequestDTO struct {
 	AlbumName    string  `json:"album_name" binding:"required"`
 	Description  *string `json:"description"`
 	CoverAssetID *string `json:"cover_asset_id" binding:"omitempty,uuid4"`
+	AlbumType    *string `json:"album_type,omitempty" binding:"omitempty,oneof=default bio"`
 }
 
 // UpdateAlbumRequestDTO represents the request structure for updating an album
@@ -20,6 +21,7 @@ type UpdateAlbumRequestDTO struct {
 	AlbumName    *string `json:"album_name"`
 	Description  *string `json:"description"`
 	CoverAssetID *string `json:"cover_asset_id" binding:"omitempty,uuid4"`
+	AlbumType    *string `json:"album_type,omitempty" binding:"omitempty,oneof=default bio"`
 }
 
 // AlbumDTO represents an album
@@ -31,6 +33,7 @@ type AlbumDTO struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 	Description  *string   `json:"description"`
 	CoverAssetID *string   `json:"cover_asset_id"`
+	AlbumType    string    `json:"album_type"`
 }
 
 // ToAlbumDTO converts a repo.Album to AlbumDTO
@@ -57,6 +60,7 @@ func ToAlbumDTO(a repo.Album) AlbumDTO {
 		UpdatedAt:    updatedAt,
 		Description:  a.Description,
 		CoverAssetID: coverID,
+		AlbumType:    string(a.AlbumType),
 	}
 }
 
@@ -83,4 +87,10 @@ type AddAssetToAlbumRequestDTO struct {
 // UpdateAssetPositionRequestDTO represents the request structure for updating an asset's position in an album
 type UpdateAssetPositionRequestDTO struct {
 	Position *int32 `json:"position" binding:"required"`
+}
+
+type RebuildAlbumBioClipResponseDTO struct {
+	Status       string `json:"status" example:"queued"`
+	Message      string `json:"message" example:"BioCLIP processing queued successfully"`
+	QueuedAssets int    `json:"queued_assets" example:"12"`
 }

@@ -3,6 +3,8 @@ package jobs
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/riverqueue/river"
 )
 
 func TestProcessArgsDecodeLegacyImageDataWithoutPersistingBytes(t *testing.T) {
@@ -33,6 +35,23 @@ func TestProcessArgsDecodeLegacyImageDataWithoutPersistingBytes(t *testing.T) {
 			}
 			if containsJSONField(encoded, "imageData") {
 				t.Fatalf("expected marshaled args to omit legacy imageData: %s", encoded)
+			}
+		})
+	}
+}
+
+func TestMLProcessArgsInsertOpts(t *testing.T) {
+	tests := map[string]river.InsertOpts{
+		"clip":    ProcessClipArgs{}.InsertOpts(),
+		"bioclip": ProcessBioClipArgs{}.InsertOpts(),
+		"ocr":     ProcessOcrArgs{}.InsertOpts(),
+		"face":    ProcessFaceArgs{}.InsertOpts(),
+	}
+
+	for name, opts := range tests {
+		t.Run(name, func(t *testing.T) {
+			if opts.MaxAttempts != MLProcessMaxAttempts {
+				t.Fatalf("expected max attempts %d, got %d", MLProcessMaxAttempts, opts.MaxAttempts)
 			}
 		})
 	}

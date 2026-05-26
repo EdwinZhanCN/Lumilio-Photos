@@ -21,12 +21,14 @@ type Querier interface {
 	// Rating uses MAX, liked is OR'd, description is set only when keeper currently
 	// has no description (or the field is empty).
 	ApplyMergedKeeperPreferences(ctx context.Context, arg ApplyMergedKeeperPreferencesParams) error
+	AssignFaceClusterMemberExclusive(ctx context.Context, arg AssignFaceClusterMemberExclusiveParams) (FaceClusterMember, error)
 	BulkToggleAssetLiked(ctx context.Context, assetIds []pgtype.UUID) error
 	BulkUpdateAssetLiked(ctx context.Context, arg BulkUpdateAssetLikedParams) error
 	BulkUpdateAssetRating(ctx context.Context, arg BulkUpdateAssetRatingParams) error
 	BulkUpdateAssetStatus(ctx context.Context, arg BulkUpdateAssetStatusParams) error
 	CancelRepositoryScanRun(ctx context.Context, arg CancelRepositoryScanRunParams) (RepositoryScanRun, error)
 	CompleteRepositoryScanRun(ctx context.Context, arg CompleteRepositoryScanRunParams) (RepositoryScanRun, error)
+	CopyFaceClusterMembersToCluster(ctx context.Context, arg CopyFaceClusterMembersToClusterParams) error
 	CountActiveUsersByRole(ctx context.Context, role string) (int64, error)
 	CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsByUserScopedParams) (int64, error)
 	CountAssetsByRating(ctx context.Context, ownerID *int32) ([]CountAssetsByRatingRow, error)
@@ -36,16 +38,18 @@ type Querier interface {
 	// Count query matching GetAssetsUnified WHERE clause
 	// Returns total count of assets matching the filters (for pagination)
 	CountAssetsUnified(ctx context.Context, arg CountAssetsUnifiedParams) (int64, error)
+	CountBioAlbumPhotoAssets(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
+	CountBioAlbumPhotoAssetsWithSpeciesPredictions(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountCollapsedBrowseItemsUnified(ctx context.Context, arg CountCollapsedBrowseItemsUnifiedParams) (int64, error)
 	CountDuplicateGroups(ctx context.Context, arg CountDuplicateGroupsParams) (int64, error)
 	CountEmbeddingsByType(ctx context.Context, embeddingType string) (int64, error)
+	CountIncrementalFaceNeighbors(ctx context.Context, arg CountIncrementalFaceNeighborsParams) (int64, error)
 	CountLikedAssets(ctx context.Context, ownerID *int32) (int64, error)
 	CountLocationClusters(ctx context.Context, arg CountLocationClustersParams) (int64, error)
 	CountPeopleScoped(ctx context.Context, arg CountPeopleScopedParams) (int64, error)
 	CountPhotoAssetsForIndexing(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	CountPhotoAssetsWithEmbeddingType(ctx context.Context, arg CountPhotoAssetsWithEmbeddingTypeParams) (int64, error)
 	CountPhotoAssetsWithFaceResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
-	CountPhotoAssetsWithGeneratedTagSource(ctx context.Context, arg CountPhotoAssetsWithGeneratedTagSourceParams) (int64, error)
 	CountPhotoAssetsWithOCRResults(ctx context.Context, repositoryID pgtype.UUID) (int64, error)
 	// Count query matching GetPhotoMapPoints.
 	CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error)
@@ -77,9 +81,12 @@ type Querier interface {
 	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
+	DeleteEmptyUnconfirmedFaceClusters(ctx context.Context) error
 	DeleteExpiredRegistrationSessions(ctx context.Context) error
 	DeleteFaceCluster(ctx context.Context, clusterID int32) error
 	DeleteFaceClusterMember(ctx context.Context, arg DeleteFaceClusterMemberParams) error
+	DeleteFaceClusterMembersByCluster(ctx context.Context, clusterID int32) error
+	DeleteFaceClusterMembersForScope(ctx context.Context, arg DeleteFaceClusterMembersForScopeParams) error
 	DeleteFaceItemsByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteFaceResultByAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteLocationClustersForScope(ctx context.Context, arg DeleteLocationClustersForScopeParams) error
@@ -182,10 +189,13 @@ type Querier interface {
 	// Only photos are considered, and only non-deleted assets. Results are ordered
 	// so members of the same duplicate set are adjacent.
 	GetExactDuplicateCandidates(ctx context.Context, repositoryID pgtype.UUID) ([]GetExactDuplicateCandidatesRow, error)
+	GetFaceClusterAssignmentsForScope(ctx context.Context, arg GetFaceClusterAssignmentsForScopeParams) ([]GetFaceClusterAssignmentsForScopeRow, error)
 	GetFaceClusterByFaceID(ctx context.Context, faceID int32) (FaceCluster, error)
 	GetFaceClusterByID(ctx context.Context, clusterID int32) (FaceCluster, error)
 	GetFaceClusterByRepresentative(ctx context.Context, representativeFaceID *int32) (FaceCluster, error)
 	GetFaceClusterMembers(ctx context.Context, clusterID int32) ([]GetFaceClusterMembersRow, error)
+	GetFaceClusterMembershipsByFaceIDs(ctx context.Context, faceIds []int32) ([]GetFaceClusterMembershipsByFaceIDsRow, error)
+	GetFaceClusteringCandidates(ctx context.Context, arg GetFaceClusteringCandidatesParams) ([]GetFaceClusteringCandidatesRow, error)
 	GetFaceDemographics(ctx context.Context, confidence float32) ([]GetFaceDemographicsRow, error)
 	GetFaceEmbeddingsForClustering(ctx context.Context, arg GetFaceEmbeddingsForClusteringParams) ([]GetFaceEmbeddingsForClusteringRow, error)
 	GetFaceItemByID(ctx context.Context, id int32) (FaceItem, error)
@@ -198,6 +208,7 @@ type Querier interface {
 	// 获取焦距分布统计
 	GetFocalLengthDistribution(ctx context.Context, repositoryID pgtype.UUID) ([]GetFocalLengthDistributionRow, error)
 	GetHighConfidenceTextItems(ctx context.Context, arg GetHighConfidenceTextItemsParams) ([]OcrTextItem, error)
+	GetIncrementalFaceNeighbors(ctx context.Context, arg GetIncrementalFaceNeighborsParams) ([]GetIncrementalFaceNeighborsRow, error)
 	GetLatestRepositoryScanRun(ctx context.Context, repositoryID pgtype.UUID) (RepositoryScanRun, error)
 	GetLikedAssets(ctx context.Context, arg GetLikedAssetsParams) ([]Asset, error)
 	GetLikedAssetsByOwner(ctx context.Context, arg GetLikedAssetsByOwnerParams) ([]Asset, error)
@@ -263,6 +274,7 @@ type Querier interface {
 	ListActiveRepositories(ctx context.Context) ([]Repository, error)
 	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
 	ListAssetsByRepositoryAny(ctx context.Context, repositoryID pgtype.UUID) ([]Asset, error)
+	ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Context, albumID int32) ([]Asset, error)
 	// Paginated list of duplicate groups for the given repository and status.
 	// Pending groups are returned newest-first; resolved groups by resolution time.
 	ListDuplicateGroups(ctx context.Context, arg ListDuplicateGroupsParams) ([]DuplicateGroup, error)
@@ -275,7 +287,6 @@ type Querier interface {
 	ListPhotoAssetsForIndexingBatch(ctx context.Context, arg ListPhotoAssetsForIndexingBatchParams) ([]Asset, error)
 	ListPhotoAssetsMissingEmbeddingType(ctx context.Context, arg ListPhotoAssetsMissingEmbeddingTypeParams) ([]Asset, error)
 	ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error)
-	ListPhotoAssetsMissingGeneratedTagSource(ctx context.Context, arg ListPhotoAssetsMissingGeneratedTagSourceParams) ([]Asset, error)
 	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
 	ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error)

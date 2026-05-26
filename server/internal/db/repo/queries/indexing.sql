@@ -31,16 +31,28 @@ WHERE a.type = 'PHOTO'
   )
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'));
 
--- name: CountPhotoAssetsWithGeneratedTagSource :one
-SELECT COUNT(*) AS count
-FROM assets a
-WHERE a.type = 'PHOTO'
+-- name: CountBioAlbumPhotoAssets :one
+SELECT COUNT(DISTINCT a.asset_id) AS count
+FROM album_assets aa
+JOIN albums al ON al.album_id = aa.album_id
+JOIN assets a ON a.asset_id = aa.asset_id
+WHERE al.album_type = 'bio'
+  AND a.type = 'PHOTO'
+  AND a.is_deleted = false
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'));
+
+-- name: CountBioAlbumPhotoAssetsWithSpeciesPredictions :one
+SELECT COUNT(DISTINCT a.asset_id) AS count
+FROM album_assets aa
+JOIN albums al ON al.album_id = aa.album_id
+JOIN assets a ON a.asset_id = aa.asset_id
+WHERE al.album_type = 'bio'
+  AND a.type = 'PHOTO'
   AND a.is_deleted = false
   AND EXISTS (
     SELECT 1
-    FROM asset_tags at
-    WHERE at.asset_id = a.asset_id
-      AND at.source = sqlc.arg('source')::text
+    FROM species_predictions sp
+    WHERE sp.asset_id = a.asset_id
   )
   AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'));
 
@@ -88,30 +100,6 @@ WITH page_ids AS MATERIALIZED (
       WHERE e.asset_id = a.asset_id
         AND e.embedding_type = sqlc.arg('embedding_type')::text
         AND e.is_primary = true
-    )
-    AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
-  ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC
-  LIMIT sqlc.arg('limit')
-  OFFSET sqlc.arg('offset')
-)
-SELECT a.*
-FROM page_ids p
-JOIN assets a ON a.asset_id = p.asset_id
-ORDER BY p.sort_time DESC, p.asset_id DESC;
-
--- name: ListPhotoAssetsMissingGeneratedTagSource :many
-WITH page_ids AS MATERIALIZED (
-  SELECT
-    a.asset_id,
-    COALESCE(a.taken_time, a.upload_time) AS sort_time
-  FROM assets a
-  WHERE a.type = 'PHOTO'
-    AND a.is_deleted = false
-    AND NOT EXISTS (
-      SELECT 1
-      FROM asset_tags at
-      WHERE at.asset_id = a.asset_id
-        AND at.source = sqlc.arg('source')::text
     )
     AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id'))
   ORDER BY COALESCE(a.taken_time, a.upload_time) DESC, a.asset_id DESC

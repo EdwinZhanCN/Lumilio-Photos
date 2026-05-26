@@ -141,6 +141,38 @@ AND 1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) >= sqlc.arg('min_
 ORDER BY similarity DESC
 LIMIT sqlc.arg('limit');
 
+-- name: GetIncrementalFaceNeighbors :many
+SELECT
+    fi.*,
+    CAST(1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) AS double precision) AS similarity
+FROM face_items fi
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE fi.id != sqlc.arg('id')
+  AND COALESCE(a.is_deleted, false) = false
+  AND a.repository_id = sqlc.arg('repository_id')::uuid
+  AND a.owner_id IS NOT DISTINCT FROM sqlc.narg('owner_id')::integer
+  AND fi.embedding_model IS NOT DISTINCT FROM sqlc.narg('embedding_model')::text
+  AND fi.embedding IS NOT NULL
+  AND fi.confidence >= sqlc.arg('min_confidence')
+  AND COALESCE(fi.face_size, 0) >= sqlc.arg('min_face_size')
+  AND 1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) >= sqlc.arg('min_similarity')::float8
+ORDER BY similarity DESC, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC
+LIMIT sqlc.arg('limit');
+
+-- name: CountIncrementalFaceNeighbors :one
+SELECT COUNT(*)::bigint
+FROM face_items fi
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE fi.id != sqlc.arg('id')
+  AND COALESCE(a.is_deleted, false) = false
+  AND a.repository_id = sqlc.arg('repository_id')::uuid
+  AND a.owner_id IS NOT DISTINCT FROM sqlc.narg('owner_id')::integer
+  AND fi.embedding_model IS NOT DISTINCT FROM sqlc.narg('embedding_model')::text
+  AND fi.embedding IS NOT NULL
+  AND fi.confidence >= sqlc.arg('min_confidence')
+  AND COALESCE(fi.face_size, 0) >= sqlc.arg('min_face_size')
+  AND 1 - (fi.embedding <=> sqlc.arg('embedding_query')::vector) >= sqlc.arg('min_similarity')::float8;
+
 -- name: GetFaceStatsByModel :many
 SELECT
     model_id,
@@ -223,30 +255,104 @@ AND quality_score >= $2
 ORDER BY quality_score DESC, confidence DESC
 LIMIT $3;
 
+-- name: GetFaceClusteringCandidates :many
+SELECT
+    fi.*,
+    a.repository_id,
+    a.owner_id
+FROM face_items fi
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE COALESCE(a.is_deleted, false) = false
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id')::uuid)
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id')::integer)
+  AND fi.embedding IS NOT NULL
+  AND fi.confidence >= sqlc.arg('min_confidence')
+  AND COALESCE(fi.face_size, 0) >= sqlc.arg('min_face_size')
+ORDER BY a.repository_id ASC, a.owner_id ASC NULLS FIRST, fi.embedding_model ASC NULLS FIRST, fi.confidence DESC, COALESCE(fi.face_size, 0) DESC, fi.id ASC;
+
+-- name: GetFaceClusterAssignmentsForScope :many
+SELECT
+    fcm.face_id,
+    fcm.cluster_id,
+    fc.cluster_name,
+    fc.is_confirmed
+FROM face_cluster_members fcm
+JOIN face_clusters fc ON fc.cluster_id = fcm.cluster_id
+JOIN face_items fi ON fi.id = fcm.face_id
+JOIN assets a ON a.asset_id = fi.asset_id
+WHERE (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id')::uuid)
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id')::integer);
+
+-- name: GetFaceClusterMembershipsByFaceIDs :many
+SELECT face_id, cluster_id, similarity_score, confidence, is_manual
+FROM face_cluster_members
+WHERE face_id = ANY(sqlc.arg('face_ids')::integer[])
+ORDER BY face_id ASC, confidence DESC, similarity_score DESC, id ASC;
+
+-- name: AssignFaceClusterMemberExclusive :one
+INSERT INTO face_cluster_members (cluster_id, face_id, similarity_score, confidence, is_manual)
+VALUES (sqlc.arg('cluster_id'), sqlc.arg('face_id'), sqlc.arg('similarity_score'), sqlc.arg('confidence'), sqlc.narg('is_manual'))
+ON CONFLICT (face_id)
+DO UPDATE SET
+    cluster_id = EXCLUDED.cluster_id,
+    similarity_score = GREATEST(face_cluster_members.similarity_score, EXCLUDED.similarity_score),
+    confidence = GREATEST(face_cluster_members.confidence, EXCLUDED.confidence),
+    is_manual = COALESCE(face_cluster_members.is_manual, false) OR COALESCE(EXCLUDED.is_manual, false)
+RETURNING *;
+
+-- name: DeleteFaceClusterMembersForScope :exec
+DELETE FROM face_cluster_members fcm
+USING face_items fi, assets a
+WHERE fcm.face_id = fi.id
+  AND a.asset_id = fi.asset_id
+  AND (sqlc.narg('repository_id')::uuid IS NULL OR a.repository_id = sqlc.narg('repository_id')::uuid)
+  AND (sqlc.narg('owner_id')::integer IS NULL OR a.owner_id = sqlc.narg('owner_id')::integer);
+
+-- name: CopyFaceClusterMembersToCluster :exec
+UPDATE face_cluster_members
+SET cluster_id = sqlc.arg('target_cluster_id')
+WHERE cluster_id = sqlc.arg('source_cluster_id');
+
+-- name: DeleteFaceClusterMembersByCluster :exec
+DELETE FROM face_cluster_members
+WHERE cluster_id = $1;
+
+-- name: DeleteEmptyUnconfirmedFaceClusters :exec
+DELETE FROM face_clusters fc
+WHERE COALESCE(fc.is_confirmed, false) = false
+  AND NOT EXISTS (
+      SELECT 1
+      FROM face_cluster_members fcm
+      WHERE fcm.cluster_id = fc.cluster_id
+  );
+
 -- name: MergeFaceClusters :exec
 UPDATE face_cluster_members
 SET cluster_id = $1
 WHERE cluster_id = $2;
 
 -- name: GetClusterMergeCandidates :many
-SELECT
-    fc1.cluster_id,
-    fc1.cluster_name as name1,
-    fc2.cluster_id as other_cluster_id,
-    fc2.cluster_name as name2,
-    -- Calculate average similarity between cluster members
-    (SELECT AVG(1 - (fi1.embedding <=> fi2.embedding))
-     FROM face_cluster_members fcm1
-     JOIN face_items fi1 ON fcm1.face_id = fi1.id
-     JOIN face_cluster_members fcm2 ON fcm1.cluster_id = fc1.cluster_id
-     JOIN face_items fi2 ON fcm2.face_id = fi2.id
-     WHERE fcm2.cluster_id = fc2.cluster_id
-     LIMIT 100) as avg_similarity
-FROM face_clusters fc1
-CROSS JOIN face_clusters fc2
-WHERE fc1.cluster_id < fc2.cluster_id
-AND fc1.is_confirmed = true
-AND fc2.is_confirmed = true
-HAVING AVG(1 - (fi1.embedding <=> fi2.embedding)) >= $1
+WITH pair_scores AS (
+    SELECT
+        fc1.cluster_id,
+        fc1.cluster_name AS name1,
+        fc2.cluster_id AS other_cluster_id,
+        fc2.cluster_name AS name2,
+        AVG(1 - (fi1.embedding <=> fi2.embedding))::double precision AS avg_similarity
+    FROM face_clusters fc1
+    JOIN face_cluster_members fcm1 ON fcm1.cluster_id = fc1.cluster_id
+    JOIN face_items fi1 ON fi1.id = fcm1.face_id
+    JOIN face_clusters fc2 ON fc1.cluster_id < fc2.cluster_id
+    JOIN face_cluster_members fcm2 ON fcm2.cluster_id = fc2.cluster_id
+    JOIN face_items fi2 ON fi2.id = fcm2.face_id
+    WHERE fi1.embedding IS NOT NULL
+      AND fi2.embedding IS NOT NULL
+      AND COALESCE(fc1.is_confirmed, false) = true
+      AND COALESCE(fc2.is_confirmed, false) = true
+    GROUP BY fc1.cluster_id, fc1.cluster_name, fc2.cluster_id, fc2.cluster_name
+)
+SELECT cluster_id, name1, other_cluster_id, name2, avg_similarity
+FROM pair_scores
+WHERE avg_similarity >= sqlc.arg('min_similarity')::float8
 ORDER BY avg_similarity DESC
-LIMIT $2;
+LIMIT sqlc.arg('limit');

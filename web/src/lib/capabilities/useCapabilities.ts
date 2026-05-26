@@ -23,7 +23,7 @@ export type Capabilities = {
     activeNodeCount: number;
     tasks: {
       clipImageEmbed: MLTaskCapability;
-      clipTextEmbed: MLTaskCapability;
+      semanticTextEmbed: MLTaskCapability;
       bioClipClassify: MLTaskCapability;
       ocr: MLTaskCapability;
       faceDetectAndEmbed: MLTaskCapability;
@@ -64,15 +64,15 @@ function normalizeCapabilities(
       activeNodeCount: data.ml?.active_node_count ?? 0,
       tasks: {
         clipImageEmbed: normalizeTaskCapability(
-          data.ml?.tasks?.clip_image_embed,
+          data.ml?.tasks?.semantic_image_embed,
         ),
-        clipTextEmbed: normalizeTaskCapability(data.ml?.tasks?.clip_text_embed),
+        semanticTextEmbed: normalizeTaskCapability(data.ml?.tasks?.semantic_text_embed),
         bioClipClassify: normalizeTaskCapability(
           data.ml?.tasks?.bioclip_classify,
         ),
         ocr: normalizeTaskCapability(data.ml?.tasks?.ocr),
         faceDetectAndEmbed: normalizeTaskCapability(
-          data.ml?.tasks?.face_detect_and_embed,
+          data.ml?.tasks?.face_recognition,
         ),
       },
     },

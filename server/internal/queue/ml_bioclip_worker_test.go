@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"server/internal/db/dbtypes"
 	"server/internal/utils/imagesource"
 
 	"github.com/edwinzhancn/lumen-sdk/pkg/types"
@@ -11,7 +12,18 @@ import (
 	"github.com/riverqueue/river"
 )
 
-func TestProcessBioClipWorkerProcessesBioClipTags(t *testing.T) {
+type bioClipWorkerSpeciesStub struct {
+	assetID     pgtype.UUID
+	predictions []dbtypes.SpeciesPredictionMeta
+}
+
+func (s *bioClipWorkerSpeciesStub) SaveSpeciesPredictions(_ context.Context, assetID pgtype.UUID, predictions []dbtypes.SpeciesPredictionMeta) error {
+	s.assetID = assetID
+	s.predictions = append([]dbtypes.SpeciesPredictionMeta(nil), predictions...)
+	return nil
+}
+
+func TestProcessBioClipWorkerProcessesSpeciesPredictions(t *testing.T) {
 	t.Parallel()
 
 	assetID := pgtype.UUID{}
@@ -19,7 +31,7 @@ func TestProcessBioClipWorkerProcessesBioClipTags(t *testing.T) {
 		t.Fatalf("scan asset id: %v", err)
 	}
 
-	tagSvc := &clipWorkerTagStub{}
+	speciesSvc := &bioClipWorkerSpeciesStub{}
 	imageLoader := &workerImageLoaderStub{data: []byte("image")}
 	worker := &ProcessBioClipWorker{
 		LumenService: &clipWorkerLumenStub{
@@ -28,8 +40,8 @@ func TestProcessBioClipWorkerProcessesBioClipTags(t *testing.T) {
 			},
 			bioLabels: []types.Label{{Label: "sparrow", Score: 0.7}},
 		},
-		TagService:  tagSvc,
-		ImageLoader: imageLoader,
+		SpeciesService: speciesSvc,
+		ImageLoader:    imageLoader,
 	}
 
 	if err := worker.Work(context.Background(), &river.Job[ProcessBioClipArgs]{
@@ -41,11 +53,11 @@ func TestProcessBioClipWorkerProcessesBioClipTags(t *testing.T) {
 	if imageLoader.purpose != imagesource.PurposeBioClip {
 		t.Fatalf("expected BioCLIP image purpose, got %q", imageLoader.purpose)
 	}
-	if len(tagSvc.tags) != 1 || tagSvc.tags[0].Source != "bioclip_classify" {
-		t.Fatalf("unexpected BioCLIP tags: %#v", tagSvc.tags)
+	if speciesSvc.assetID != assetID {
+		t.Fatalf("unexpected species asset id: %#v", speciesSvc.assetID)
 	}
-	if len(tagSvc.sources) != 1 || tagSvc.sources[0] != "bioclip_classify" {
-		t.Fatalf("unexpected replacement sources: %#v", tagSvc.sources)
+	if len(speciesSvc.predictions) != 1 || speciesSvc.predictions[0].Label != "sparrow" || speciesSvc.predictions[0].Score != 0.7 {
+		t.Fatalf("unexpected species predictions: %#v", speciesSvc.predictions)
 	}
 }
 
@@ -64,8 +76,8 @@ func TestProcessBioClipWorkerSnoozesWhenUnavailable(t *testing.T) {
 				"bioclip_classify": false,
 			},
 		},
-		TagService:  &clipWorkerTagStub{},
-		ImageLoader: imageLoader,
+		SpeciesService: &bioClipWorkerSpeciesStub{},
+		ImageLoader:    imageLoader,
 	}
 
 	err := worker.Work(context.Background(), &river.Job[ProcessBioClipArgs]{

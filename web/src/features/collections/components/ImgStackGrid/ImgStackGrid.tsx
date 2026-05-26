@@ -11,6 +11,7 @@ export interface Album {
   coverImages?: string[];
   createdAt: Date;
   updatedAt: Date;
+  albumType?: string;
 }
 
 interface ImgStackGridProps {
@@ -91,6 +92,7 @@ function ImgStackGrid({
                 coverImages={album.coverImages}
                 albumName={album.name}
                 isSelected={isSelected}
+                isBioAlbum={album.albumType === "bio"}
               />
             </div>
 
