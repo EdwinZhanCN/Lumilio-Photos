@@ -1,7 +1,6 @@
 import Home from "@/features/home/routes/Home";
 import Assets from "@/features/assets/routes/Assets";
-import { Studio } from "@/features/studio/routes/Studio";
-import { WorkerProvider } from "@/contexts/WorkerProvider";
+import { StudioEditMvp } from "@/features/studio/routes/StudioEditMvp";
 import Settings from "@/features/settings/routes/Settings";
 import Monitor from "@/features/monitor/routes/Monitor";
 import Manage from "@/features/manage/routes/Manage";
@@ -131,11 +130,7 @@ export const appRoutes = [
   },
   {
     path: "/studio",
-    element: (
-      <WorkerProvider preload={["exif", "plugin"]}>
-        <Studio />
-      </WorkerProvider>
-    ),
+    element: <StudioEditMvp />,
   },
   {
     path: "/server-monitor",

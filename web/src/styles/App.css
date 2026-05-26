@@ -2,6 +2,92 @@
 @plugin "daisyui" {
     themes: all;
 }
+
+@plugin "daisyui/theme" {
+    name: "lumilio";
+    default: true;
+    prefersdark: false;
+    color-scheme: light;
+    /*
+    Lumilio Light Theme
+    主色规则：
+    - 主色淡橙：低到中等饱和度，避免刺眼
+    - 灰阶带轻微暖橙色倾向
+    - 状态色统一降低饱和度，保证整体品牌调性统一
+  */
+    --color-base-100: oklch(98.5% 0.008 72);
+    --color-base-200: oklch(96.2% 0.014 72);
+    --color-base-300: oklch(91.5% 0.022 72);
+    --color-base-content: oklch(25% 0.025 55);
+    --color-primary: oklch(78% 0.115 57);
+    --color-primary-content: oklch(23% 0.045 48);
+    --color-secondary: oklch(70% 0.075 305);
+    --color-secondary-content: oklch(24% 0.035 305);
+    --color-accent: oklch(82% 0.135 78);
+    --color-accent-content: oklch(25% 0.05 65);
+    --color-neutral: oklch(36% 0.026 58);
+    --color-neutral-content: oklch(96% 0.01 72);
+    --color-info: oklch(72% 0.08 225);
+    --color-info-content: oklch(24% 0.035 230);
+    --color-success: oklch(68% 0.105 145);
+    --color-success-content: oklch(22% 0.04 145);
+    --color-warning: oklch(82% 0.13 82);
+    --color-warning-content: oklch(25% 0.05 68);
+    --color-error: oklch(68% 0.13 28);
+    --color-error-content: oklch(98% 0.01 28);
+    /* radius */
+    --radius-selector: 0.7rem;
+    --radius-field: 0.8rem;
+    --radius-box: 1.1rem;
+    /* sizing */
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    /* border */
+    --border: 1px;
+    /* effects */
+    --depth: 1;
+    --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+    name: "lumilio-dark";
+    default: false;
+    prefersdark: true;
+    color-scheme: dark;
+    /*
+    Lumilio Dark Theme
+    不是纯黑，而是 warm charcoal。
+    这样照片浏览界面不会太刺眼，也更接近专业图库 / 编辑器背景。
+  */
+    --color-base-100: oklch(18% 0.012 58);
+    --color-base-200: oklch(22% 0.014 58);
+    --color-base-300: oklch(28% 0.018 58);
+    --color-base-content: oklch(91% 0.015 72);
+    --color-primary: oklch(76% 0.105 57);
+    --color-primary-content: oklch(18% 0.035 48);
+    --color-secondary: oklch(72% 0.07 305);
+    --color-secondary-content: oklch(18% 0.03 305);
+    --color-accent: oklch(80% 0.12 78);
+    --color-accent-content: oklch(18% 0.04 65);
+    --color-neutral: oklch(82% 0.018 62);
+    --color-neutral-content: oklch(18% 0.012 58);
+    --color-info: oklch(74% 0.075 225);
+    --color-info-content: oklch(18% 0.03 230);
+    --color-success: oklch(72% 0.095 145);
+    --color-success-content: oklch(17% 0.035 145);
+    --color-warning: oklch(82% 0.12 82);
+    --color-warning-content: oklch(20% 0.045 68);
+    --color-error: oklch(70% 0.12 28);
+    --color-error-content: oklch(98% 0.01 28);
+    --radius-selector: 0.7rem;
+    --radius-field: 0.8rem;
+    --radius-box: 1.1rem;
+    --size-selector: 0.25rem;
+    --size-field: 0.25rem;
+    --border: 1px;
+    --depth: 1;
+    --noise: 0;
+}
 :root:has(
     :is(
         .modal-open,
@@ -201,4 +287,3 @@ label.toggle input:checked ~ svg {
     --tw-scale-z: 100% !important;
     scale: 1 !important;
 }
-

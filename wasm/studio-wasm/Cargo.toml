@@ -1,0 +1,25 @@
+[package]
+name = "studio-wasm"
+version = "0.1.0"
+authors = ["EdwinZhan <ed_zhan@outlook.com>"]
+edition = "2021"
+rust-version = "1.70"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+console_error_panic_hook = { version = "0.1.7", optional = true }
+serde = { version = "1.0.210", features = ["derive"] }
+serde-wasm-bindgen = "0.6.5"
+wasm-bindgen = "0.2.95"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+debug = false
+overflow-checks = false
