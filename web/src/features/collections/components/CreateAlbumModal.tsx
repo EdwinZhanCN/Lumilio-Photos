@@ -2,7 +2,13 @@ import React, { useState, useCallback } from "react";
 import { useCollections } from "../CollectionsProvider";
 import { useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/lib/i18n.tsx";
-import { X, FolderPlus, Image as ImageIcon, MoveLeft } from "lucide-react";
+import {
+  Bird,
+  FolderPlus,
+  Image as ImageIcon,
+  MoveLeft,
+  X,
+} from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { ApiResult } from "@/lib/albums/types";
 import { assetUrls } from "@/lib/assets/assetUrls";
@@ -14,6 +20,7 @@ const CreateAlbumModal: React.FC = () => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedCoverId, setSelectedCoverId] = useState<string | null>(null);
+  const [isBioAlbum, setIsBioAlbum] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isChoosingCover, setIsChoosingCover] = useState(false);
   const queryClient = useQueryClient();
@@ -37,6 +44,7 @@ const CreateAlbumModal: React.FC = () => {
           album_name: name,
           description: description,
           cover_asset_id: selectedCoverId,
+          album_type: isBioAlbum ? "bio" : undefined,
         },
       });
 
@@ -57,6 +65,7 @@ const CreateAlbumModal: React.FC = () => {
     setName("");
     setDescription("");
     setSelectedCoverId(null);
+    setIsBioAlbum(false);
     setIsChoosingCover(false);
   };
 
@@ -117,6 +126,21 @@ const CreateAlbumModal: React.FC = () => {
                       onChange={(e) => setDescription(e.target.value)}
                     ></textarea>
                   </fieldset>
+
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      className={`btn w-fit gap-2 ${isBioAlbum ? "btn-primary" : "btn-outline"}`}
+                      aria-pressed={isBioAlbum}
+                      onClick={() => setIsBioAlbum((value) => !value)}
+                    >
+                      <Bird className="size-4" />
+                      {t("collections.createModal.fields.bioAlbum.label")}
+                    </button>
+                    <p className="text-xs text-base-content/60 leading-relaxed">
+                      {t("collections.createModal.fields.bioAlbum.hint")}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Right Column: Cover Selection Preview */}

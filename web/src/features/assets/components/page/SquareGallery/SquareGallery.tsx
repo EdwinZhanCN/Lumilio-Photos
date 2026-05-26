@@ -65,6 +65,17 @@ const SquareGalleryItem = memo(
   }: SquareGalleryItemProps) => {
     const [ref, mounted] = useVisibleOnce();
     const assetId = asset.asset_id;
+    const stackInfo = asset.stack;
+    const hasStackOverlay =
+      Boolean(stackInfo?.stack_size) && (stackInfo?.stack_size ?? 0) > 1;
+    const allowOverflow = render3DCard || hasStackOverlay;
+    const visibilityStyle = allowOverflow
+      ? {}
+      : {
+          contentVisibility: "auto",
+          // "auto" = remember last rendered size; 200px = initial fallback.
+          containIntrinsicSize: "auto 200px",
+        };
 
     return (
       <div
@@ -76,20 +87,16 @@ const SquareGalleryItem = memo(
         }
         role="listitem"
         data-asset-id={assetId}
-        style={{
-          contentVisibility: "auto",
-          // "auto" = remember last rendered size; 200px = initial fallback.
-          containIntrinsicSize: "auto 200px",
-        } as React.CSSProperties}
+        style={visibilityStyle as React.CSSProperties}
       >
         {mounted ? (
           <>
             <figure className="h-full w-full rounded-[1.25rem]">
-              {asset.stack?.stack_size && asset.stack.stack_size > 1 ? (
+              {stackInfo && stackInfo.stack_size && stackInfo.stack_size > 1 ? (
                 <StackedThumbnail
                   asset={asset}
                   thumbnailUrl={thumbnailUrl}
-                  stackInfo={asset.stack}
+                  stackInfo={stackInfo}
                   browseStack={item.type === "stack" ? item : undefined}
                   onClick={(event) => onItemClick(item, asset, event)}
                   isSelected={isSelected}
@@ -114,8 +121,14 @@ const SquareGalleryItem = memo(
             </figure>
             {render3DCard && (
               <>
-                <div /><div /><div /><div />
-                <div /><div /><div /><div />
+                <div />
+                <div />
+                <div />
+                <div />
+                <div />
+                <div />
+                <div />
+                <div />
               </>
             )}
           </>
@@ -163,7 +176,11 @@ const SquareGallery: React.FC<SquareGalleryProps> = ({
   const selection = useOptionalKeyboardSelection(flatAssetIds);
 
   const handleAssetClick = useCallback(
-    (item: BrowseItem, asset: Asset, event: React.MouseEvent | React.KeyboardEvent) => {
+    (
+      item: BrowseItem,
+      asset: Asset,
+      event: React.MouseEvent | React.KeyboardEvent,
+    ) => {
       if (!asset.asset_id) return;
       if (selection.enabled) {
         selection.handleClick(item.id, event as any);

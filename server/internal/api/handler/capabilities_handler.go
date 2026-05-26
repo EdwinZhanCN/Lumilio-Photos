@@ -48,11 +48,11 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 	discoveredNodeCount := 0
 	activeNodeCount := 0
 	taskAvailability := map[string]bool{
-		"clip_image_embed":      false,
-		"clip_text_embed":       false,
+		"semantic_image_embed":      false,
+		"semantic_text_embed":       false,
 		"bioclip_classify":      false,
 		"ocr":                   false,
-		"face_detect_and_embed": false,
+		"face_recognition": false,
 	}
 
 	if h.lumenService != nil {
@@ -76,13 +76,13 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 			DiscoveredNodeCount: discoveredNodeCount,
 			ActiveNodeCount:     activeNodeCount,
 			Tasks: dto.MLTaskSetDTO{
-				ClipImageEmbed: dto.MLTaskCapabilityDTO{
+				SemanticImageEmbed: dto.MLTaskCapabilityDTO{
 					Enabled:   effectiveMLConfig.CLIPEnabled,
-					Available: taskAvailability["clip_image_embed"],
+					Available: taskAvailability["semantic_image_embed"],
 				},
-				ClipTextEmbed: dto.MLTaskCapabilityDTO{
+				SemanticTextEmbed: dto.MLTaskCapabilityDTO{
 					Enabled:   effectiveMLConfig.CLIPEnabled,
-					Available: taskAvailability["clip_text_embed"],
+					Available: taskAvailability["semantic_text_embed"],
 				},
 				BioClipClassify: dto.MLTaskCapabilityDTO{
 					Enabled:   effectiveMLConfig.BioCLIPEnabled,
@@ -92,9 +92,9 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 					Enabled:   effectiveMLConfig.OCREnabled,
 					Available: taskAvailability["ocr"],
 				},
-				FaceDetectAndEmbed: dto.MLTaskCapabilityDTO{
+				FaceRecognition: dto.MLTaskCapabilityDTO{
 					Enabled:   effectiveMLConfig.FaceEnabled,
-					Available: taskAvailability["face_detect_and_embed"],
+					Available: taskAvailability["face_recognition"],
 				},
 			},
 		},

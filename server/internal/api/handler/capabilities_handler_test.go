@@ -75,8 +75,8 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesClipCapabilities(t *testing.
 				return []*discovery.NodeInfo{}, nil
 			},
 			isTaskAvailableFn: func(taskName string) bool {
-				return taskName == "clip_image_embed" ||
-					taskName == "clip_text_embed" ||
+				return taskName == "semantic_image_embed" ||
+					taskName == "semantic_text_embed" ||
 					taskName == "bioclip_classify"
 			},
 		},
@@ -96,10 +96,10 @@ func TestCapabilitiesHandlerGetCapabilities_IncludesClipCapabilities(t *testing.
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Equal(t, 0, response.Code)
-	require.True(t, response.Data.ML.Tasks.ClipImageEmbed.Enabled)
-	require.True(t, response.Data.ML.Tasks.ClipImageEmbed.Available)
-	require.True(t, response.Data.ML.Tasks.ClipTextEmbed.Enabled)
-	require.True(t, response.Data.ML.Tasks.ClipTextEmbed.Available)
+	require.True(t, response.Data.ML.Tasks.SemanticImageEmbed.Enabled)
+	require.True(t, response.Data.ML.Tasks.SemanticImageEmbed.Available)
+	require.True(t, response.Data.ML.Tasks.SemanticTextEmbed.Enabled)
+	require.True(t, response.Data.ML.Tasks.SemanticTextEmbed.Available)
 	require.True(t, response.Data.ML.Tasks.BioClipClassify.Enabled)
 	require.True(t, response.Data.ML.Tasks.BioClipClassify.Available)
 }

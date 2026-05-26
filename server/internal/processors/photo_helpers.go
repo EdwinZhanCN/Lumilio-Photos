@@ -118,7 +118,7 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset) 
 	}
 
 	// Early return if no ML services are enabled by runtime config.
-	if !mlConfig.CLIPEnabled && !mlConfig.BioCLIPEnabled && !mlConfig.OCREnabled && !mlConfig.FaceEnabled {
+	if !mlConfig.CLIPEnabled && !mlConfig.OCREnabled && !mlConfig.FaceEnabled {
 		return nil
 	}
 
@@ -129,16 +129,6 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset) 
 		}, &river.InsertOpts{Queue: "process_clip"})
 		if err != nil {
 			return fmt.Errorf("enqueue CLIP: %w", err)
-		}
-	}
-
-	if mlConfig.BioCLIPEnabled {
-		_, err = ap.queueClient.Insert(ctx, jobs.ProcessBioClipArgs{
-			AssetID:           asset.AssetID,
-			PreprocessVersion: jobs.MLPreprocessVersionV1,
-		}, &river.InsertOpts{Queue: "process_bioclip"})
-		if err != nil {
-			return fmt.Errorf("enqueue BioCLIP: %w", err)
 		}
 	}
 

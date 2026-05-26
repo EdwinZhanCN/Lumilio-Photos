@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"log"
+	"net/http"
 	"strconv"
 
 	"server/internal/api"
@@ -12,7 +14,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/riverqueue/river"
 )
 
 func optionalUUIDToString(value pgtype.UUID) *string {
@@ -42,6 +46,7 @@ func toScopedAlbumResponseDTO(row repo.GetAlbumByIDScopedRow) dto.GetAlbumRespon
 			UpdatedAt:    row.UpdatedAt,
 			Description:  row.Description,
 			CoverAssetID: row.CoverAssetID,
+			AlbumType:    row.AlbumType,
 		}),
 		row.AssetCount,
 		optionalUUIDToString(row.DisplayCoverAssetID),
@@ -58,6 +63,7 @@ func toScopedAlbumListItemDTO(row repo.GetAlbumsByUserScopedRow) dto.GetAlbumRes
 			UpdatedAt:    row.UpdatedAt,
 			Description:  row.Description,
 			CoverAssetID: row.CoverAssetID,
+			AlbumType:    row.AlbumType,
 		}),
 		row.AssetCount,
 		optionalUUIDToString(row.DisplayCoverAssetID),
@@ -65,15 +71,27 @@ func toScopedAlbumListItemDTO(row repo.GetAlbumsByUserScopedRow) dto.GetAlbumRes
 }
 
 type AlbumHandler struct {
-	albumService *service.AlbumService
-	queries      *repo.Queries
+	albumService    *service.AlbumService
+	queries         *repo.Queries
+	queueClient     *river.Client[pgx.Tx]
+	settingsService service.SettingsService
+	runtimeChecker  service.TaskAvailabilityChecker
 }
 
 // NewAlbumHandler creates a new album handler
-func NewAlbumHandler(albumService *service.AlbumService, queries *repo.Queries) *AlbumHandler {
+func NewAlbumHandler(
+	albumService *service.AlbumService,
+	queries *repo.Queries,
+	queueClient *river.Client[pgx.Tx],
+	settingsService service.SettingsService,
+	runtimeChecker service.TaskAvailabilityChecker,
+) *AlbumHandler {
 	return &AlbumHandler{
-		albumService: albumService,
-		queries:      queries,
+		albumService:    albumService,
+		queries:         queries,
+		queueClient:     queueClient,
+		settingsService: settingsService,
+		runtimeChecker:  runtimeChecker,
 	}
 }
 
@@ -109,6 +127,10 @@ func (h *AlbumHandler) NewAlbum(c *gin.Context) {
 		UserID:      int32(userID.(int)),
 		AlbumName:   req.AlbumName,
 		Description: req.Description,
+		AlbumType:   repo.AlbumTypeDefault,
+	}
+	if req.AlbumType != nil {
+		params.AlbumType = repo.AlbumType(*req.AlbumType)
 	}
 
 	// Handle optional cover asset ID
@@ -305,6 +327,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		AlbumName:    existingAlbum.AlbumName,
 		Description:  existingAlbum.Description,
 		CoverAssetID: existingAlbum.CoverAssetID,
+		AlbumType:    existingAlbum.AlbumType,
 	}
 
 	// Update fields if provided
@@ -313,6 +336,9 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 	}
 	if req.Description != nil {
 		updateParams.Description = req.Description
+	}
+	if req.AlbumType != nil {
+		updateParams.AlbumType = repo.AlbumType(*req.AlbumType)
 	}
 	if req.CoverAssetID != nil {
 		coverAssetUUID, err := uuid.Parse(*req.CoverAssetID)
@@ -498,8 +524,93 @@ func (h *AlbumHandler) AddAssetToAlbum(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to add asset to album")
 		return
 	}
+	h.enqueueBioClipForAddedAsset(c.Request.Context(), *album, asset)
 
 	api.GinSuccess(c, gin.H{"message": "Asset added to album successfully"})
+}
+
+// RebuildAlbumBioClip queues BioCLIP processing for missing species predictions in a bio album.
+// @Summary Queue BioCLIP for a bio album
+// @Description Queue BioCLIP processing for photo assets in a bio album that do not yet have species predictions.
+// @Tags albums
+// @Accept json
+// @Produce json
+// @Param id path int true "Album ID"
+// @Success 200 {object} api.Result{data=dto.RebuildAlbumBioClipResponseDTO} "BioCLIP jobs queued successfully"
+// @Failure 400 {object} api.Result "Invalid album or album type"
+// @Failure 401 {object} api.Result "Unauthorized"
+// @Failure 403 {object} api.Result "Forbidden"
+// @Failure 404 {object} api.Result "Album not found"
+// @Failure 503 {object} api.Result "BioCLIP unavailable"
+// @Router /api/v1/albums/{id}/bioclip/rebuild [post]
+// @Security BearerAuth
+func (h *AlbumHandler) RebuildAlbumBioClip(c *gin.Context) {
+	albumID, err := strconv.ParseInt(c.Param("id"), 10, 32)
+	if err != nil {
+		api.GinBadRequest(c, err, "Invalid album ID")
+		return
+	}
+
+	album, ok := h.getAuthorizedAlbum(c, int32(albumID), "Authentication required to rebuild this album", "You don't have permission to rebuild this album")
+	if !ok {
+		return
+	}
+	if album.AlbumType != repo.AlbumTypeBio {
+		api.GinBadRequest(c, errors.New("album is not a bio album"), "Album is not a bio album")
+		return
+	}
+
+	if h.queueClient == nil {
+		api.GinError(c, http.StatusServiceUnavailable, errors.New("queue client is not configured"), http.StatusServiceUnavailable, "BioCLIP queue is unavailable")
+		return
+	}
+	available, err := bioClipRuntimeAvailable(c.Request.Context(), h.settingsService, h.runtimeChecker)
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to check BioCLIP availability")
+		return
+	}
+	if !available {
+		api.GinError(c, http.StatusServiceUnavailable, errors.New("bioclip is unavailable"), http.StatusServiceUnavailable, "BioCLIP is unavailable")
+		return
+	}
+
+	assets, err := h.queries.ListBioAlbumAssetsMissingSpeciesPredictions(c.Request.Context(), album.AlbumID)
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to load bio album assets")
+		return
+	}
+
+	queued := 0
+	for _, asset := range assets {
+		if err := enqueueBioClipAsset(c.Request.Context(), h.queueClient, asset); err != nil {
+			api.GinInternalError(c, err, "Failed to queue BioCLIP job")
+			return
+		}
+		queued++
+	}
+
+	api.GinSuccess(c, dto.RebuildAlbumBioClipResponseDTO{
+		Status:       "queued",
+		Message:      "BioCLIP processing queued successfully",
+		QueuedAssets: queued,
+	})
+}
+
+func (h *AlbumHandler) enqueueBioClipForAddedAsset(ctx context.Context, album repo.Album, asset repo.Asset) {
+	if !shouldQueueBioClipForAlbumAsset(album, asset) {
+		return
+	}
+	available, err := bioClipRuntimeAvailable(ctx, h.settingsService, h.runtimeChecker)
+	if err != nil {
+		log.Printf("Failed to check BioCLIP availability for album %d asset %s: %v", album.AlbumID, asset.AssetID.String(), err)
+		return
+	}
+	if !available {
+		return
+	}
+	if err := enqueueBioClipAsset(ctx, h.queueClient, asset); err != nil {
+		log.Printf("Failed to queue BioCLIP for album %d asset %s: %v", album.AlbumID, asset.AssetID.String(), err)
+	}
 }
 
 // RemoveAssetFromAlbum removes an asset from an album

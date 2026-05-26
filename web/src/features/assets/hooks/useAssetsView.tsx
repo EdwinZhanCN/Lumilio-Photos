@@ -131,7 +131,7 @@ const EMPTY_PHOTO_SEARCH_VIEW_RESULT: PhotoSearchViewResult = {
   topResultsMeta: DEFAULT_TOP_RESULTS_META,
 };
 
-const TOP_RESULTS_LIMIT = 12;
+const TOP_RESULTS_LIMIT = 200;
 const DEFAULT_ASSET_TYPES: AssetMediaType[] = ["photos", "videos"];
 
 const getApiMimeTypes = (
@@ -206,10 +206,7 @@ const useDefinitionFilter = (definition: AssetViewDefinition): AssetFilter => {
     }
 
     return mergedFilter;
-  }, [
-    definition.filter,
-    scopedRepositoryId,
-  ]);
+  }, [definition.filter, scopedRepositoryId]);
 };
 
 const buildApiFilter = (
@@ -219,7 +216,8 @@ const buildApiFilter = (
   const filter: AssetFilter = { ...effectiveFilter };
 
   if (
-    (filter.type === undefined && filter.types === undefined) &&
+    filter.type === undefined &&
+    filter.types === undefined &&
     definition.types &&
     definition.types.length > 0
   ) {
@@ -286,7 +284,8 @@ export const useAssetsViewQuery = (
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = (lastPage as QueryAssetsApiEnvelope | undefined)?.data;
+        const responseData = (lastPage as QueryAssetsApiEnvelope | undefined)
+          ?.data;
         const legacyAssets = normalizeVisibleLegacyAssets(responseData?.assets);
         const total = responseData?.total_visible ?? responseData?.total;
         const offset = Number(lastPageParam ?? 0) || 0;
@@ -339,7 +338,10 @@ export const useAssetsViewQuery = (
   );
   const assets = useMemo(() => flattenAssetGroups(groups), [groups]);
   const browseGroups = useMemo(
-    () => mergeAdjacentBrowseGroups(...assetsPages.map((page) => page.browseGroups)),
+    () =>
+      mergeAdjacentBrowseGroups(
+        ...assetsPages.map((page) => page.browseGroups),
+      ),
     [assetsPages],
   );
   const browseProjection = useMemo(
@@ -433,7 +435,6 @@ export const usePhotoSearchView = (
   const pageSize = definition.pageSize || 50;
   const queryText = definition.search?.query?.trim() ?? "";
   const viewerTimeZone = useMemo(() => getViewerTimeZone(), []);
-  const sortBy = definition.sortBy ?? "date_captured";
   const viewKey = useMemo(
     () =>
       `${generateViewKey({
@@ -471,8 +472,11 @@ export const usePhotoSearchView = (
       initialPageParam: 0,
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
-        const responseData = (lastPage as SearchAssetsApiEnvelope | undefined)?.data;
-        const legacyResults = normalizeVisibleLegacyAssets(responseData?.results);
+        const responseData = (lastPage as SearchAssetsApiEnvelope | undefined)
+          ?.data;
+        const legacyResults = normalizeVisibleLegacyAssets(
+          responseData?.results,
+        );
         const total =
           responseData?.results_total_visible ?? responseData?.results_total;
         const offset = Number(lastPageParam ?? 0) || 0;
@@ -528,30 +532,18 @@ export const usePhotoSearchView = (
       browseGroupsFromSearchTop({
         topItems: firstPage?.topItems,
         legacyTopAssets: normalizeVisibleLegacyAssets(firstPage?.topResultsRaw),
-        sortBy,
       }),
-    [firstPage?.topItems, firstPage?.topResultsRaw, sortBy],
+    [firstPage?.topItems, firstPage?.topResultsRaw],
   );
   const resultBrowseGroups = useMemo(() => {
     const perPage = searchPages.map((page) =>
       browseGroupsFromSearchResultsPage({
         resultItems: page.resultItems,
         legacyResultAssets: page.legacyResults,
-        sortBy,
       }),
     );
     return mergeAdjacentBrowseGroups(...perPage);
-  }, [searchPages, sortBy]);
-
-  const resultGroups = useMemo(
-    () =>
-      mergeAdjacentAssetGroups(
-        ...searchPages.map((page) =>
-          groupAssetsBySort(page.legacyResults, sortBy),
-        ),
-      ),
-    [searchPages, sortBy],
-  );
+  }, [searchPages]);
 
   const topResults = useMemo(
     () => flattenBrowseGroupsToAssets(topResultsBrowseGroups),
@@ -560,6 +552,13 @@ export const usePhotoSearchView = (
   const resultAssets = useMemo(
     () => flattenBrowseGroupsToAssets(resultBrowseGroups),
     [resultBrowseGroups],
+  );
+  const resultGroups = useMemo(
+    () =>
+      resultAssets.length > 0
+        ? [{ key: "search:results", assets: resultAssets }]
+        : [],
+    [resultAssets],
   );
   const browseItems = useMemo(
     () =>

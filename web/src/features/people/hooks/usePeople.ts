@@ -3,6 +3,7 @@ import { $api } from "@/lib/http-commons/queryClient";
 import { useWorkingRepository } from "@/features/settings";
 import type {
   ApiResult,
+  FaceClusterRebuildResponse,
   ListPeopleResponse,
   PersonDetail,
   PersonSummaryList,
@@ -15,9 +16,10 @@ export type UsePeopleOptions = {
   repositoryId?: string;
 };
 
-export function usePeople(
-  options: UsePeopleOptions = {},
-): UseQueryResult<ApiResult<ListPeopleResponse>, unknown> & {
+export function usePeople(options: UsePeopleOptions = {}): UseQueryResult<
+  ApiResult<ListPeopleResponse>,
+  unknown
+> & {
   people: PersonSummaryList;
   total: number;
 } {
@@ -49,6 +51,38 @@ export function usePeople(
     ...query,
     people: query.data?.data?.people ?? [],
     total: query.data?.data?.total ?? 0,
+  };
+}
+
+export function useRebuildPeopleClusters(repositoryId?: string): {
+  rebuildPeople: () => Promise<ApiResult<FaceClusterRebuildResponse>>;
+  isRebuilding: boolean;
+} {
+  const { scopedRepositoryId } = useWorkingRepository();
+  const queryClient = useQueryClient();
+  const scopedId = repositoryId ?? scopedRepositoryId;
+
+  const mutation = $api.useMutation("post", "/api/v1/people/rebuild", {
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["get", "/api/v1/people"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["get", "/api/v1/people/{id}"],
+        }),
+      ]);
+    },
+  });
+
+  return {
+    rebuildPeople: () =>
+      mutation.mutateAsync({
+        params: {
+          query: scopedId ? { repository_id: scopedId } : {},
+        },
+      }) as Promise<ApiResult<FaceClusterRebuildResponse>>,
+    isRebuilding: mutation.isPending,
   };
 }
 

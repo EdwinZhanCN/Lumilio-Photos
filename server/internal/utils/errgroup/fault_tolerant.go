@@ -24,31 +24,22 @@ func (g *FaultTolerantGroup) Go(fn func() error) {
 	g.tasks = append(g.tasks, fn)
 }
 
-// Wait executes all tasks and returns individual errors
+// Wait executes all tasks and returns individual errors in task registration order.
 func (g *FaultTolerantGroup) Wait() []error {
-	g.mu.Lock()
-	tasks := g.tasks
-	g.mu.Unlock()
-
-	var wg sync.WaitGroup
-	errorChan := make(chan error, len(tasks))
-
-	for _, task := range tasks {
-		wg.Add(1)
-		go func(fn func() error) {
-			defer wg.Done()
-			if err := fn(); err != nil {
-				errorChan <- err
-			}
-		}(task)
+	results := g.WaitWithResults()
+	if len(results) == 0 {
+		return nil
 	}
 
-	wg.Wait()
-	close(errorChan)
+	g.mu.Lock()
+	taskCount := len(g.tasks)
+	g.mu.Unlock()
 
-	var errors []error
-	for err := range errorChan {
-		errors = append(errors, err)
+	errors := make([]error, 0, len(results))
+	for i := 0; i < taskCount; i++ {
+		if err := results[i]; err != nil {
+			errors = append(errors, err)
+		}
 	}
 
 	return errors
@@ -57,7 +48,7 @@ func (g *FaultTolerantGroup) Wait() []error {
 // WaitWithResults executes tasks and returns results with individual errors
 func (g *FaultTolerantGroup) WaitWithResults() map[int]error {
 	g.mu.Lock()
-	tasks := g.tasks
+	tasks := append([]func() error(nil), g.tasks...)
 	g.mu.Unlock()
 
 	var wg sync.WaitGroup

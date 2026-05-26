@@ -1,5 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AssetsProvider } from "@/features/assets/AssetsProvider";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
 import {
@@ -13,15 +14,20 @@ import FullScreenCarousel from "@/features/assets/components/page/FullScreen/Ful
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import PhotosLoadingSkeleton from "@/features/assets/components/page/LoadingSkeleton";
 import { AssetViewDefinition, JustifiedGallery } from "@/features/assets";
-import { AlbumIcon } from "lucide-react";
+import { AlbumIcon, Bird, RefreshCcw } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult } from "@/lib/albums/types";
+import type { components } from "@/lib/http-commons/schema";
 import { useWorkingRepository } from "@/features/settings";
 import { findBrowseItemIndexByAssetId } from "@/features/assets/utils/browseItems";
 import { useI18n } from "@/lib/i18n.tsx";
 
+type RebuildAlbumBioClipResponse =
+  components["schemas"]["dto.RebuildAlbumBioClipResponseDTO"];
+
 const AlbumAssetsContent = () => {
   const { t, i18n } = useI18n();
+  const queryClient = useQueryClient();
   const { albumId, assetId } = useParams<{
     albumId: string;
     assetId: string;
@@ -32,6 +38,10 @@ const AlbumAssetsContent = () => {
   const { setSortBy } = useUIActions();
   const { openCarousel, closeCarousel } = useAssetsNavigation();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [bioClipFeedback, setBioClipFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const albumIdNumber = albumId ? Number(albumId) : 0;
 
@@ -52,6 +62,11 @@ const AlbumAssetsContent = () => {
   const albumResponse = albumQuery.data as ApiResult<Album> | undefined;
   const album = albumResponse?.data;
   const isAlbumLoading = albumQuery.isLoading;
+  const isBioAlbum = album?.album_type === "bio";
+  const rebuildBioClipMutation = $api.useMutation(
+    "post",
+    "/api/v1/albums/{id}/bioclip/rebuild",
+  );
 
   // Memoize view definition to prevent unnecessary re-renders/fetches
   const viewDefinition: AssetViewDefinition = useMemo(
@@ -123,6 +138,44 @@ const AlbumAssetsContent = () => {
     setIsScrolled((prev) => (prev ? top > 20 : top > 60));
   }, []);
 
+  const handleRebuildBioClip = useCallback(async () => {
+    if (!albumIdNumber || !isBioAlbum) return;
+
+    setBioClipFeedback(null);
+    try {
+      const response = await rebuildBioClipMutation.mutateAsync({
+        params: {
+          path: { id: albumIdNumber },
+        },
+        body: {},
+      });
+      const responseData = response as ApiResult<RebuildAlbumBioClipResponse>;
+      const queuedAssets = responseData?.data?.queued_assets ?? 0;
+
+      await queryClient.invalidateQueries({
+        queryKey: ["get", "/api/v1/assets/indexing/stats"],
+      });
+      setBioClipFeedback({
+        tone: "success",
+        message: t("collections.albumDetails.bioClip.success", {
+          count: queuedAssets,
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to rebuild BioCLIP for album:", error);
+      setBioClipFeedback({
+        tone: "error",
+        message: t("collections.albumDetails.bioClip.error"),
+      });
+    }
+  }, [
+    albumIdNumber,
+    isBioAlbum,
+    queryClient,
+    rebuildBioClipMutation,
+    t,
+  ]);
+
   if (error)
     return (
       <div className="p-8 text-error">
@@ -163,6 +216,12 @@ const AlbumAssetsContent = () => {
                 <span className="badge badge-ghost font-mono text-xs opacity-50">
                   {t("collections.albumDetails.albumCode", { id: albumId })}
                 </span>
+                {isBioAlbum && (
+                  <span className="badge badge-primary gap-1.5">
+                    <Bird className="size-3.5" />
+                    {t("collections.albumDetails.bioClip.badge")}
+                  </span>
+                )}
               </>
             )}
           </div>
@@ -214,6 +273,24 @@ const AlbumAssetsContent = () => {
               )}
             </div>
 
+            {isBioAlbum && (
+              <button
+                type="button"
+                className="btn btn-primary btn-xs gap-1.5"
+                onClick={handleRebuildBioClip}
+                disabled={rebuildBioClipMutation.isPending}
+              >
+                {rebuildBioClipMutation.isPending ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <RefreshCcw className="size-3.5" />
+                )}
+                {rebuildBioClipMutation.isPending
+                  ? t("collections.albumDetails.bioClip.running")
+                  : t("collections.albumDetails.bioClip.action")}
+              </button>
+            )}
+
             {/* Inline description preview when scrolled */}
             <div
               className={`flex items-center gap-2 ml-auto max-w-[50%] transition-all duration-500 ${isScrolled ? "opacity-70 translate-x-0" : "opacity-0 translate-x-4 pointer-events-none"}`}
@@ -223,6 +300,14 @@ const AlbumAssetsContent = () => {
               </span>
             </div>
           </div>
+
+          {bioClipFeedback && !isScrolled && (
+            <div
+              className={`alert mt-4 py-2 text-sm max-w-xl ${bioClipFeedback.tone === "success" ? "alert-success" : "alert-error"}`}
+            >
+              {bioClipFeedback.message}
+            </div>
+          )}
         </div>
       </div>
 

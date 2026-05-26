@@ -39,13 +39,19 @@ func (q *Queries) AddStackMember(ctx context.Context, arg AddStackMemberParams) 
 
 const createStack = `-- name: CreateStack :one
 INSERT INTO asset_stacks DEFAULT VALUES
-RETURNING stack_id, created_at, updated_at
+RETURNING stack_id, stack_kind, group_key, created_at, updated_at
 `
 
 func (q *Queries) CreateStack(ctx context.Context) (AssetStack, error) {
 	row := q.db.QueryRow(ctx, createStack)
 	var i AssetStack
-	err := row.Scan(&i.StackID, &i.CreatedAt, &i.UpdatedAt)
+	err := row.Scan(
+		&i.StackID,
+		&i.StackKind,
+		&i.GroupKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
@@ -237,14 +243,20 @@ func (q *Queries) GetStackByAssetID(ctx context.Context, assetID pgtype.UUID) (G
 }
 
 const getStackByID = `-- name: GetStackByID :one
-SELECT stack_id, created_at, updated_at FROM asset_stacks
+SELECT stack_id, stack_kind, group_key, created_at, updated_at FROM asset_stacks
 WHERE stack_id = $1
 `
 
 func (q *Queries) GetStackByID(ctx context.Context, stackID pgtype.UUID) (AssetStack, error) {
 	row := q.db.QueryRow(ctx, getStackByID, stackID)
 	var i AssetStack
-	err := row.Scan(&i.StackID, &i.CreatedAt, &i.UpdatedAt)
+	err := row.Scan(
+		&i.StackID,
+		&i.StackKind,
+		&i.GroupKey,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 

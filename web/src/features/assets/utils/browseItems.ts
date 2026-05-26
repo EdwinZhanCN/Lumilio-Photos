@@ -15,9 +15,9 @@ export type BrowseItemDTO = components["schemas"]["dto.BrowseItemDTO"];
 const isStackAsset = (asset: Asset): boolean =>
   Boolean(
     asset.asset_id &&
-      asset.stack?.stack_id &&
-      asset.stack?.stack_size &&
-      asset.stack.stack_size > 1,
+    asset.stack?.stack_id &&
+    asset.stack?.stack_size &&
+    asset.stack.stack_size > 1,
   );
 
 const preferRepresentative = (current: Asset, candidate: Asset): Asset => {
@@ -259,10 +259,12 @@ export const createBrowseGroupsFromBrowseItemDTOs = (
 };
 
 /** @deprecated Use createBrowseItemsFromBrowseItemDTOs */
-export const createBrowseItemsFromApiItems = createBrowseItemsFromBrowseItemDTOs;
+export const createBrowseItemsFromApiItems =
+  createBrowseItemsFromBrowseItemDTOs;
 
 /** @deprecated Use createBrowseGroupsFromBrowseItemDTOs */
-export const createBrowseGroupsFromApiItems = createBrowseGroupsFromBrowseItemDTOs;
+export const createBrowseGroupsFromApiItems =
+  createBrowseGroupsFromBrowseItemDTOs;
 
 export const normalizeVisibleLegacyAssets = (
   assets?: Asset[] | null,
@@ -282,10 +284,7 @@ export const groupBrowseItemsBySort = (
     itemByRepresentativeId.set(assetId, item);
   });
 
-  return groupAssetsBySort(
-    items.map(getBrowseItemAsset),
-    sortBy,
-  )
+  return groupAssetsBySort(items.map(getBrowseItemAsset), sortBy)
     .map((group) => ({
       key: group.key,
       items: group.assets.flatMap((asset) => {
@@ -334,29 +333,29 @@ export const browseGroupsFromQueryLikePage = (params: {
 export const browseGroupsFromSearchTop = (params: {
   topItems?: BrowseItemDTO[] | null;
   legacyTopAssets: Asset[];
-  sortBy: SortByType;
 }): BrowseGroup[] => {
   const fromDto = createBrowseItemsFromBrowseItemDTOs(params.topItems);
   if (fromDto.length > 0) {
-    return groupBrowseItemsBySort(fromDto, params.sortBy);
+    return [{ key: "search:top_results", items: fromDto }];
   }
-  if (params.legacyTopAssets.length === 0) return [];
-  return createBrowseGroupsFromAssetGroups([
-    { key: "search:top_results", assets: params.legacyTopAssets },
-  ]);
+  return createBrowseGroupsFromAssets(
+    params.legacyTopAssets,
+    "search:top_results",
+  );
 };
 
 export const browseGroupsFromSearchResultsPage = (params: {
   resultItems?: BrowseItemDTO[] | null;
   legacyResultAssets: Asset[];
-  sortBy: SortByType;
 }): BrowseGroup[] => {
   const fromDto = createBrowseItemsFromBrowseItemDTOs(params.resultItems);
   if (fromDto.length > 0) {
-    return groupBrowseItemsBySort(fromDto, params.sortBy);
+    return [{ key: "search:results", items: fromDto }];
   }
-  const groups = groupAssetsBySort(params.legacyResultAssets, params.sortBy);
-  return createBrowseGroupsFromAssetGroups(groups);
+  return createBrowseGroupsFromAssets(
+    params.legacyResultAssets,
+    "search:results",
+  );
 };
 
 export const countLoadedBrowseRowsFromPage = (params: {

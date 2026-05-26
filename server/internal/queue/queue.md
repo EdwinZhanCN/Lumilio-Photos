@@ -84,7 +84,8 @@ flowchart LR
   - Video metadata can trigger `LivePhotoMatchWorker` when `content_identifier` exists.
 - `ThumbnailWorker` is the image enrichment fan-out:
   - Photos can trigger `ProcessPHashWorker` when thumbnail generation falls back.
-  - Photos can also trigger CLIP, BioCLIP, OCR, and Face workers when the ML settings enable them.
+  - Photos can also trigger CLIP, OCR, and Face workers when the ML settings enable them.
+  - BioCLIP is album-scoped: adding photos to `bio` albums or manually rebuilding a bio album enqueues `ProcessBioClipWorker`.
 - `AssetRetryWorker` is a dispatcher. It does not depend on a single downstream worker; instead, it can re-enqueue any task based on the retry request.
 
 ## Idempotence Rules

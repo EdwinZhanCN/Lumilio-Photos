@@ -50,9 +50,9 @@ func (q *Queries) CountAlbumsByUserScoped(ctx context.Context, arg CountAlbumsBy
 }
 
 const createAlbum = `-- name: CreateAlbum :one
-INSERT INTO albums (user_id, album_name, description, cover_asset_id)
-VALUES ($1, $2, $3, $4)
-RETURNING album_id, user_id, album_name, created_at, updated_at, description, cover_asset_id
+INSERT INTO albums (user_id, album_name, description, cover_asset_id, album_type)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING album_id, user_id, album_name, created_at, updated_at, description, cover_asset_id, album_type
 `
 
 type CreateAlbumParams struct {
@@ -60,6 +60,7 @@ type CreateAlbumParams struct {
 	AlbumName    string      `db:"album_name" json:"album_name"`
 	Description  *string     `db:"description" json:"description"`
 	CoverAssetID pgtype.UUID `db:"cover_asset_id" json:"cover_asset_id"`
+	AlbumType    AlbumType   `db:"album_type" json:"album_type"`
 }
 
 func (q *Queries) CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error) {
@@ -68,6 +69,7 @@ func (q *Queries) CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album
 		arg.AlbumName,
 		arg.Description,
 		arg.CoverAssetID,
+		arg.AlbumType,
 	)
 	var i Album
 	err := row.Scan(
@@ -78,6 +80,7 @@ func (q *Queries) CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album
 		&i.UpdatedAt,
 		&i.Description,
 		&i.CoverAssetID,
+		&i.AlbumType,
 	)
 	return i, err
 }
@@ -320,7 +323,7 @@ func (q *Queries) GetAlbumAssetsScoped(ctx context.Context, arg GetAlbumAssetsSc
 }
 
 const getAlbumByID = `-- name: GetAlbumByID :one
-SELECT album_id, user_id, album_name, created_at, updated_at, description, cover_asset_id FROM albums WHERE album_id = $1
+SELECT album_id, user_id, album_name, created_at, updated_at, description, cover_asset_id, album_type FROM albums WHERE album_id = $1
 `
 
 func (q *Queries) GetAlbumByID(ctx context.Context, albumID int32) (Album, error) {
@@ -334,6 +337,7 @@ func (q *Queries) GetAlbumByID(ctx context.Context, albumID int32) (Album, error
 		&i.UpdatedAt,
 		&i.Description,
 		&i.CoverAssetID,
+		&i.AlbumType,
 	)
 	return i, err
 }
@@ -347,6 +351,7 @@ SELECT
   al.updated_at,
   al.description,
   al.cover_asset_id,
+  al.album_type,
   COALESCE(asset_counts.asset_count, 0) AS asset_count,
   COALESCE(cover_asset.cover_asset_id, first_asset.asset_id)::uuid AS display_cover_asset_id
 FROM albums al
@@ -401,6 +406,7 @@ type GetAlbumByIDScopedRow struct {
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	Description         *string            `db:"description" json:"description"`
 	CoverAssetID        pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
+	AlbumType           AlbumType          `db:"album_type" json:"album_type"`
 	AssetCount          int64              `db:"asset_count" json:"asset_count"`
 	DisplayCoverAssetID pgtype.UUID        `db:"display_cover_asset_id" json:"display_cover_asset_id"`
 }
@@ -416,6 +422,7 @@ func (q *Queries) GetAlbumByIDScoped(ctx context.Context, arg GetAlbumByIDScoped
 		&i.UpdatedAt,
 		&i.Description,
 		&i.CoverAssetID,
+		&i.AlbumType,
 		&i.AssetCount,
 		&i.DisplayCoverAssetID,
 	)
@@ -423,7 +430,7 @@ func (q *Queries) GetAlbumByIDScoped(ctx context.Context, arg GetAlbumByIDScoped
 }
 
 const getAlbumsByUser = `-- name: GetAlbumsByUser :many
-SELECT album_id, user_id, album_name, created_at, updated_at, description, cover_asset_id FROM albums
+SELECT album_id, user_id, album_name, created_at, updated_at, description, cover_asset_id, album_type FROM albums
 WHERE user_id = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -452,6 +459,7 @@ func (q *Queries) GetAlbumsByUser(ctx context.Context, arg GetAlbumsByUserParams
 			&i.UpdatedAt,
 			&i.Description,
 			&i.CoverAssetID,
+			&i.AlbumType,
 		); err != nil {
 			return nil, err
 		}
@@ -499,6 +507,7 @@ SELECT
   al.updated_at,
   al.description,
   al.cover_asset_id,
+  al.album_type,
   COALESCE(asset_counts.asset_count, 0) AS asset_count,
   COALESCE(cover_asset.cover_asset_id, first_asset.asset_id)::uuid AS display_cover_asset_id
 FROM page_albums p
@@ -556,6 +565,7 @@ type GetAlbumsByUserScopedRow struct {
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	Description         *string            `db:"description" json:"description"`
 	CoverAssetID        pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
+	AlbumType           AlbumType          `db:"album_type" json:"album_type"`
 	AssetCount          int64              `db:"asset_count" json:"asset_count"`
 	DisplayCoverAssetID pgtype.UUID        `db:"display_cover_asset_id" json:"display_cover_asset_id"`
 }
@@ -582,6 +592,7 @@ func (q *Queries) GetAlbumsByUserScoped(ctx context.Context, arg GetAlbumsByUser
 			&i.UpdatedAt,
 			&i.Description,
 			&i.CoverAssetID,
+			&i.AlbumType,
 			&i.AssetCount,
 			&i.DisplayCoverAssetID,
 		); err != nil {
@@ -596,7 +607,7 @@ func (q *Queries) GetAlbumsByUserScoped(ctx context.Context, arg GetAlbumsByUser
 }
 
 const getAssetAlbums = `-- name: GetAssetAlbums :many
-SELECT al.album_id, al.user_id, al.album_name, al.created_at, al.updated_at, al.description, al.cover_asset_id, aa.position, aa.added_time
+SELECT al.album_id, al.user_id, al.album_name, al.created_at, al.updated_at, al.description, al.cover_asset_id, al.album_type, aa.position, aa.added_time
 FROM albums al
 JOIN album_assets aa ON al.album_id = aa.album_id
 WHERE aa.asset_id = $1
@@ -611,6 +622,7 @@ type GetAssetAlbumsRow struct {
 	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	Description  *string            `db:"description" json:"description"`
 	CoverAssetID pgtype.UUID        `db:"cover_asset_id" json:"cover_asset_id"`
+	AlbumType    AlbumType          `db:"album_type" json:"album_type"`
 	Position     *int32             `db:"position" json:"position"`
 	AddedTime    pgtype.Timestamptz `db:"added_time" json:"added_time"`
 }
@@ -632,6 +644,7 @@ func (q *Queries) GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]Ge
 			&i.UpdatedAt,
 			&i.Description,
 			&i.CoverAssetID,
+			&i.AlbumType,
 			&i.Position,
 			&i.AddedTime,
 		); err != nil {
@@ -645,11 +658,76 @@ func (q *Queries) GetAssetAlbums(ctx context.Context, assetID pgtype.UUID) ([]Ge
 	return items, nil
 }
 
+const listBioAlbumAssetsMissingSpeciesPredictions = `-- name: ListBioAlbumAssetsMissingSpeciesPredictions :many
+SELECT a.asset_id, a.owner_id, a.type, a.original_filename, a.storage_path, a.mime_type, a.file_size, a.hash, a.width, a.height, a.duration, a.upload_time, a.taken_time, a.capture_offset_minutes, a.is_deleted, a.deleted_at, a.specific_metadata, a.rating, a.liked, a.repository_id, a.status, a.updated_at, a.gps_latitude, a.gps_longitude, a.gps_geohash_5, a.gps_geohash_7, a.exif_raw
+FROM album_assets aa
+JOIN albums al ON al.album_id = aa.album_id
+JOIN assets a ON a.asset_id = aa.asset_id
+WHERE aa.album_id = $1
+  AND al.album_type = 'bio'
+  AND a.type = 'PHOTO'
+  AND a.is_deleted = false
+  AND NOT EXISTS (
+    SELECT 1
+    FROM species_predictions sp
+    WHERE sp.asset_id = a.asset_id
+  )
+ORDER BY aa.position ASC NULLS LAST, aa.added_time ASC, aa.asset_id ASC
+`
+
+func (q *Queries) ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Context, albumID int32) ([]Asset, error) {
+	rows, err := q.db.Query(ctx, listBioAlbumAssetsMissingSpeciesPredictions, albumID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Asset
+	for rows.Next() {
+		var i Asset
+		if err := rows.Scan(
+			&i.AssetID,
+			&i.OwnerID,
+			&i.Type,
+			&i.OriginalFilename,
+			&i.StoragePath,
+			&i.MimeType,
+			&i.FileSize,
+			&i.Hash,
+			&i.Width,
+			&i.Height,
+			&i.Duration,
+			&i.UploadTime,
+			&i.TakenTime,
+			&i.CaptureOffsetMinutes,
+			&i.IsDeleted,
+			&i.DeletedAt,
+			&i.SpecificMetadata,
+			&i.Rating,
+			&i.Liked,
+			&i.RepositoryID,
+			&i.Status,
+			&i.UpdatedAt,
+			&i.GpsLatitude,
+			&i.GpsLongitude,
+			&i.GpsGeohash5,
+			&i.GpsGeohash7,
+			&i.ExifRaw,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateAlbum = `-- name: UpdateAlbum :one
 UPDATE albums
-SET album_name = $2, description = $3, cover_asset_id = $4, updated_at = CURRENT_TIMESTAMP
+SET album_name = $2, description = $3, cover_asset_id = $4, album_type = $5, updated_at = CURRENT_TIMESTAMP
 WHERE album_id = $1
-RETURNING album_id, user_id, album_name, created_at, updated_at, description, cover_asset_id
+RETURNING album_id, user_id, album_name, created_at, updated_at, description, cover_asset_id, album_type
 `
 
 type UpdateAlbumParams struct {
@@ -657,6 +735,7 @@ type UpdateAlbumParams struct {
 	AlbumName    string      `db:"album_name" json:"album_name"`
 	Description  *string     `db:"description" json:"description"`
 	CoverAssetID pgtype.UUID `db:"cover_asset_id" json:"cover_asset_id"`
+	AlbumType    AlbumType   `db:"album_type" json:"album_type"`
 }
 
 func (q *Queries) UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error) {
@@ -665,6 +744,7 @@ func (q *Queries) UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album
 		arg.AlbumName,
 		arg.Description,
 		arg.CoverAssetID,
+		arg.AlbumType,
 	)
 	var i Album
 	err := row.Scan(
@@ -675,6 +755,7 @@ func (q *Queries) UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album
 		&i.UpdatedAt,
 		&i.Description,
 		&i.CoverAssetID,
+		&i.AlbumType,
 	)
 	return i, err
 }

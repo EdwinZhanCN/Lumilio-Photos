@@ -1,6 +1,6 @@
 -- name: CreateAlbum :one
-INSERT INTO albums (user_id, album_name, description, cover_asset_id)
-VALUES ($1, $2, $3, $4)
+INSERT INTO albums (user_id, album_name, description, cover_asset_id, album_type)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetAlbumByID :one
@@ -71,6 +71,7 @@ SELECT
   al.updated_at,
   al.description,
   al.cover_asset_id,
+  al.album_type,
   COALESCE(asset_counts.asset_count, 0) AS asset_count,
   COALESCE(cover_asset.cover_asset_id, first_asset.asset_id)::uuid AS display_cover_asset_id
 FROM page_albums p
@@ -121,6 +122,7 @@ SELECT
   al.updated_at,
   al.description,
   al.cover_asset_id,
+  al.album_type,
   COALESCE(asset_counts.asset_count, 0) AS asset_count,
   COALESCE(cover_asset.cover_asset_id, first_asset.asset_id)::uuid AS display_cover_asset_id
 FROM albums al
@@ -163,7 +165,7 @@ WHERE al.album_id = sqlc.arg('album_id');
 
 -- name: UpdateAlbum :one
 UPDATE albums
-SET album_name = $2, description = $3, cover_asset_id = $4, updated_at = CURRENT_TIMESTAMP
+SET album_name = $2, description = $3, cover_asset_id = $4, album_type = $5, updated_at = CURRENT_TIMESTAMP
 WHERE album_id = $1
 RETURNING *;
 
@@ -217,3 +219,19 @@ WHERE aa.album_id = sqlc.arg('album_id')
     sqlc.narg('repository_id')::uuid IS NULL
     OR a.repository_id = sqlc.narg('repository_id')
   );
+
+-- name: ListBioAlbumAssetsMissingSpeciesPredictions :many
+SELECT a.*
+FROM album_assets aa
+JOIN albums al ON al.album_id = aa.album_id
+JOIN assets a ON a.asset_id = aa.asset_id
+WHERE aa.album_id = sqlc.arg('album_id')
+  AND al.album_type = 'bio'
+  AND a.type = 'PHOTO'
+  AND a.is_deleted = false
+  AND NOT EXISTS (
+    SELECT 1
+    FROM species_predictions sp
+    WHERE sp.asset_id = a.asset_id
+  )
+ORDER BY aa.position ASC NULLS LAST, aa.added_time ASC, aa.asset_id ASC;

@@ -84,6 +84,34 @@ func (h *PeopleHandler) ListPeople(c *gin.Context) {
 	})
 }
 
+// RebuildPeople rebuilds recognized people with the HDBSCAN batch clusterer.
+// @Summary Rebuild people clusters
+// @Description Rebuild recognized people for the selected repository scope using HDBSCAN over face embeddings.
+// @Tags people
+// @Produce json
+// @Param repository_id query string false "Optional repository UUID filter"
+// @Success 200 {object} api.Result{data=dto.FaceClusterRebuildResponseDTO} "People clusters rebuilt successfully"
+// @Failure 400 {object} api.Result "Invalid request parameters"
+// @Failure 401 {object} api.Result "Unauthorized"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/people/rebuild [post]
+// @Security BearerAuth
+func (h *PeopleHandler) RebuildPeople(c *gin.Context) {
+	repositoryID, ok := parseOptionalRepositoryUUID(c)
+	if !ok {
+		return
+	}
+
+	result, err := h.faceService.RebuildFaceClusters(c.Request.Context(), repositoryID, scopedOwnerIDFromContext(c))
+	if err != nil {
+		log.Printf("Failed to rebuild people clusters: %v", err)
+		api.GinInternalError(c, err, "Failed to rebuild people clusters")
+		return
+	}
+
+	api.GinSuccess(c, dto.ToFaceClusterRebuildResponseDTO(result))
+}
+
 // GetPerson gets a single recognized person.
 // @Summary Get person
 // @Description Get a single recognized person by cluster ID.

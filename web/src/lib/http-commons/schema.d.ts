@@ -1207,6 +1207,115 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/albums/{id}/bioclip/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue BioCLIP for a bio album
+         * @description Queue BioCLIP processing for photo assets in a bio album that do not yet have species predictions.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Album ID */
+                    id: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description BioCLIP jobs queued successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid album or album type */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Album not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description BioCLIP unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/assets": {
         parameters: {
             query?: never;
@@ -6911,6 +7020,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/people/rebuild": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rebuild people clusters
+         * @description Rebuild recognized people for the selected repository scope using HDBSCAN over face embeddings.
+         */
+        post: {
+            parameters: {
+                query?: {
+                    /** @description Optional repository UUID filter */
+                    repository_id?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description People clusters rebuilt successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request parameters */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/repositories": {
         parameters: {
             query?: never;
@@ -7529,6 +7725,110 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/species/reference": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get species reference
+         * @description Fetch a species wiki summary and reference image from iNaturalist by scientific name, with optional common name fallback.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /**
+                     * @description Scientific name
+                     * @example "Rucervus duvaucelii"
+                     */
+                    scientific_name?: string;
+                    /**
+                     * @description Common name fallback
+                     * @example "Barasingha"
+                     */
+                    common_name?: string;
+                    /**
+                     * @description iNaturalist locale for localized common names and wiki summaries
+                     * @example "zh"
+                     */
+                    locale?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            responses: {
+                /** @description Species reference retrieved successfully */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid query */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Species reference not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8487,6 +8787,12 @@ export interface components {
             resolution?: string;
             taken_time?: string;
         };
+        "dbtypes.SpeciesPredictionMeta": {
+            /** @description 物种标签 */
+            label?: string;
+            /** @description 置信度分数 */
+            score?: number;
+        };
         "dbtypes.VideoSpecificMetadata": {
             /** @example 1000000 */
             bitrate?: number;
@@ -8540,6 +8846,7 @@ export interface components {
             owner_id?: number;
             rating?: number;
             repository_id?: string;
+            species_predictions?: components["schemas"]["dbtypes.SpeciesPredictionMeta"][];
             specific_metadata?: components["schemas"]["dbtypes.PhotoSpecificMetadata"] | components["schemas"]["dbtypes.VideoSpecificMetadata"] | components["schemas"]["dbtypes.AudioSpecificMetadata"];
             stack?: components["schemas"]["dto.StackPreviewDTO"];
             status?: number[];
@@ -8606,6 +8913,8 @@ export interface components {
             indexed_count?: number;
             /** @example 12 */
             queued_jobs?: number;
+            /** @example 2400 */
+            total_count?: number;
         };
         "dto.AssetListResponseDTO": {
             assets?: components["schemas"]["dto.AssetDTO"][];
@@ -8789,6 +9098,8 @@ export interface components {
         };
         "dto.CreateAlbumRequestDTO": {
             album_name: string;
+            /** @enum {string} */
+            album_type?: "default" | "bio";
             cover_asset_id?: string;
             description?: string;
         };
@@ -8912,6 +9223,17 @@ export interface components {
             code: string;
             setup_token: string;
         };
+        "dto.FaceClusterRebuildResponseDTO": {
+            algorithm?: string;
+            candidate_faces?: number;
+            clustered_faces?: number;
+            clusters_created?: number;
+            clusters_reused?: number;
+            clusters_total?: number;
+            duration_ms?: number;
+            noise_faces?: number;
+            repository_id?: string;
+        };
         "dto.FeaturedAssetsResponseDTO": {
             assets?: components["schemas"]["dto.AssetDTO"][];
             /** @example 240 */
@@ -8937,6 +9259,7 @@ export interface components {
         "dto.GetAlbumResponseDTO": {
             album_id?: number;
             album_name?: string;
+            album_type?: string;
             asset_count?: number;
             cover_asset_id?: string;
             created_at?: string;
@@ -9082,10 +9405,10 @@ export interface components {
         };
         "dto.MLTaskSetDTO": {
             bioclip_classify?: components["schemas"]["dto.MLTaskCapabilityDTO"];
-            clip_image_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
-            clip_text_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
-            face_detect_and_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+            face_recognition?: components["schemas"]["dto.MLTaskCapabilityDTO"];
             ocr?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+            semantic_image_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
+            semantic_text_embed?: components["schemas"]["dto.MLTaskCapabilityDTO"];
         };
         "dto.ManagedUserDTO": {
             album_count?: number;
@@ -9232,6 +9555,14 @@ export interface components {
             total_assets?: number;
             /** @example 120 */
             total_visible?: number;
+        };
+        "dto.RebuildAlbumBioClipResponseDTO": {
+            /** @example BioCLIP processing queued successfully */
+            message?: string;
+            /** @example 12 */
+            queued_assets?: number;
+            /** @example queued */
+            status?: string;
         };
         "dto.RebuildAssetIndexesRequestDTO": {
             /** @example 200 */
@@ -9429,7 +9760,7 @@ export interface components {
              * @enum {string}
              */
             stack_mode?: "collapsed" | "expanded";
-            /** @example 12 */
+            /** @example 200 */
             top_results_limit?: number;
             /** @example America/New_York */
             viewer_timezone?: string;
@@ -9478,6 +9809,32 @@ export interface components {
             session_id?: string;
             status?: string;
             total_chunks?: number;
+        };
+        "dto.SpeciesReferenceResponseDTO": {
+            /** @example Barasingha */
+            common_name?: string;
+            /** @example (c) Ramesh Shenai Jr., some rights reserved (CC BY), uploaded by Ramesh Shenai Jr. */
+            image_attribution?: string;
+            /** @example cc-by */
+            image_license?: string;
+            /** @example https://www.inaturalist.org/photos/231650420 */
+            image_source_url?: string;
+            /** @example https://inaturalist-open-data.s3.amazonaws.com/photos/231650420/large.jpeg */
+            image_url?: string;
+            /** @example inaturalist */
+            provider?: string;
+            /** @example Rucervus duvaucelii */
+            query?: string;
+            /** @example https://www.inaturalist.org/taxa/75046 */
+            reference_url?: string;
+            /** @example Rucervus duvaucelii */
+            scientific_name?: string;
+            /** @example 75046 */
+            taxon_id?: number;
+            /** @example The barasingha, also called swamp deer, is a deer species distributed in the Indian subcontinent. */
+            wikipedia_summary?: string;
+            /** @example https://en.wikipedia.org/wiki/Rucervus_duvaucelii */
+            wikipedia_url?: string;
         };
         "dto.StackByAssetResponseDTO": {
             asset_id?: string;
@@ -9541,6 +9898,8 @@ export interface components {
         };
         "dto.UpdateAlbumRequestDTO": {
             album_name?: string;
+            /** @enum {string} */
+            album_type?: "default" | "bio";
             cover_asset_id?: string;
             description?: string;
         };

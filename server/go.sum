@@ -66,8 +66,8 @@ github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
-github.com/edwinzhancn/lumen-sdk v1.1.4 h1:DE7cubgzhuXkXJqCk/7EPjc+yrusGBur+y84HORLvYg=
-github.com/edwinzhancn/lumen-sdk v1.1.4/go.mod h1:KiLSg9dQ7nnpOuOjO26ZDgRd+z1kgz+lcxY7veQb1+o=
+github.com/edwinzhancn/lumen-sdk v1.1.11 h1:kCoE+tJXi1FjKwuWrzeZESaMFUuQJhRbZlJBfIYve/Q=
+github.com/edwinzhancn/lumen-sdk v1.1.11/go.mod h1:KiLSg9dQ7nnpOuOjO26ZDgRd+z1kgz+lcxY7veQb1+o=
 github.com/eino-contrib/jsonschema v1.0.3 h1:2Kfsm1xlMV0ssY2nuxshS4AwbLFuqmPmzIjLVJ1Fsp0=
 github.com/eino-contrib/jsonschema v1.0.3/go.mod h1:cpnX4SyKjWjGC7iN2EbhxaTdLqGjCi0e9DxpLYxddD4=
 github.com/eino-contrib/ollama v0.1.0 h1:z1NaMdKW6X1ftP8g5xGGR5zDRPUtuTKFq35vBQgxsN4=

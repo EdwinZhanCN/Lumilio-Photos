@@ -13,7 +13,6 @@ import (
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/storage"
-	"strconv"
 	"strings"
 	"time"
 
@@ -252,35 +251,44 @@ func (s *assetService) GetAssetWithOptions(ctx context.Context, id uuid.UUID, in
 			return nil, fmt.Errorf("failed to get asset with relations: %w", err)
 		}
 
+		speciesPredictions := []dbtypes.SpeciesPredictionMeta{}
+		if includeSpecies && len(dbAsset.SpeciesPredictions) > 0 {
+			if err := json.Unmarshal(dbAsset.SpeciesPredictions, &speciesPredictions); err != nil {
+				return nil, fmt.Errorf("decode species predictions: %w", err)
+			}
+		}
+
 		// Create a map to conditionally include AI data based on flags
 		result := map[string]interface{}{
-			"asset_id":            dbAsset.AssetID,
-			"owner_id":            dbAsset.OwnerID,
-			"type":                dbAsset.Type,
-			"original_filename":   dbAsset.OriginalFilename,
-			"storage_path":        dbAsset.StoragePath,
-			"mime_type":           dbAsset.MimeType,
-			"file_size":           dbAsset.FileSize,
-			"hash":                dbAsset.Hash,
-			"width":               dbAsset.Width,
-			"height":              dbAsset.Height,
-			"duration":            dbAsset.Duration,
-			"taken_time":          dbAsset.TakenTime,
-			"upload_time":         dbAsset.UploadTime,
-			"is_deleted":          dbAsset.IsDeleted,
-			"deleted_at":          dbAsset.DeletedAt,
-			"specific_metadata":   dbAsset.SpecificMetadata,
-			"rating":              dbAsset.Rating,
-			"liked":               dbAsset.Liked,
-			"repository_id":       dbAsset.RepositoryID,
-			"status":              dbAsset.Status,
-			"thumbnails":          dbAsset.Thumbnails,
-			"tags":                dbAsset.Tags,
-			"albums":              dbAsset.Albums,
-			"species_predictions": dbAsset.SpeciesPredictions,
+			"asset_id":          dbAsset.AssetID,
+			"owner_id":          dbAsset.OwnerID,
+			"type":              dbAsset.Type,
+			"original_filename": dbAsset.OriginalFilename,
+			"storage_path":      dbAsset.StoragePath,
+			"mime_type":         dbAsset.MimeType,
+			"file_size":         dbAsset.FileSize,
+			"hash":              dbAsset.Hash,
+			"width":             dbAsset.Width,
+			"height":            dbAsset.Height,
+			"duration":          dbAsset.Duration,
+			"taken_time":        dbAsset.TakenTime,
+			"upload_time":       dbAsset.UploadTime,
+			"is_deleted":        dbAsset.IsDeleted,
+			"deleted_at":        dbAsset.DeletedAt,
+			"specific_metadata": dbAsset.SpecificMetadata,
+			"rating":            dbAsset.Rating,
+			"liked":             dbAsset.Liked,
+			"repository_id":     dbAsset.RepositoryID,
+			"status":            dbAsset.Status,
+			"thumbnails":        dbAsset.Thumbnails,
+			"tags":              dbAsset.Tags,
+			"albums":            dbAsset.Albums,
 		}
 
 		// Only include AI data if specifically requested
+		if includeSpecies {
+			result["species_predictions"] = speciesPredictions
+		}
 		if includeOCR {
 			result["ocr_result"] = dbAsset.OcrResult
 		}
@@ -1160,8 +1168,8 @@ func normalizeSearchEnhancementMode(raw SearchEnhancementMode) SearchEnhancement
 func normalizeSearchAssetsParams(params SearchAssetsParams) SearchAssetsParams {
 	params.Query = strings.TrimSpace(params.Query)
 	params.EnhancementMode = normalizeSearchEnhancementMode(params.EnhancementMode)
-	if params.TopResultsLimit <= 0 || params.TopResultsLimit > 50 {
-		params.TopResultsLimit = 12
+	if params.TopResultsLimit <= 0 || params.TopResultsLimit > 200 {
+		params.TopResultsLimit = 200
 	}
 	return params
 }
@@ -1445,8 +1453,8 @@ func (s *assetService) resolveClipQueryEmbedding(ctx context.Context, query stri
 	if s.embeddingService == nil {
 		return nil, fmt.Errorf("%w: embedding service not available", ErrSemanticSearchUnavailable)
 	}
-	if !s.lumen.IsTaskAvailable("clip_text_embed") {
-		return nil, fmt.Errorf("%w: clip_text_embed task not available", ErrSemanticSearchUnavailable)
+	if !s.lumen.IsTaskAvailable("semantic_text_embed") {
+		return nil, fmt.Errorf("%w: semantic_text_embed task not available", ErrSemanticSearchUnavailable)
 	}
 
 	var (
@@ -1454,15 +1462,15 @@ func (s *assetService) resolveClipQueryEmbedding(ctx context.Context, query stri
 		err             error
 	)
 	if fast {
-		embeddingResult, err = s.lumen.ClipTextEmbedFast(ctx, []byte(query))
+		embeddingResult, err = s.lumen.SemanticTextEmbedFast(ctx, []byte(query))
 	} else {
-		embeddingResult, err = s.lumen.ClipTextEmbed(ctx, []byte(query))
+		embeddingResult, err = s.lumen.SemanticTextEmbed(ctx, []byte(query))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get query embedding: %w", err)
 	}
 	if len(embeddingResult.Vector) == 0 {
-		return nil, fmt.Errorf("%w: clip_text_embed returned empty embedding", ErrSemanticSearchUnavailable)
+		return nil, fmt.Errorf("%w: semantic_text_embed returned empty embedding", ErrSemanticSearchUnavailable)
 	}
 	return embeddingResult, nil
 }
@@ -1564,15 +1572,12 @@ func (s *assetService) buildSemanticSearchBaseSQL(builder *semanticSQLBuilder, p
 
 	embeddingPlaceholder := builder.addArg(vector)
 	spacePlaceholder := builder.addArg(space.ID)
-	maxDistance := semanticMaxDistance()
-	maxDistancePlaceholder := builder.addArg(maxDistance)
 
 	distanceExpr := fmt.Sprintf("(e.vector::vector(%d) <-> %s::vector(%d))", space.Dimensions, embeddingPlaceholder, space.Dimensions)
 	conditions := []string{
 		"a.is_deleted = false",
 		fmt.Sprintf("e.space_id = %s", spacePlaceholder),
 		"e.is_primary = true",
-		fmt.Sprintf("%s <= %s::float8", distanceExpr, maxDistancePlaceholder),
 	}
 
 	if params.AssetType != nil {
@@ -1678,16 +1683,6 @@ JOIN assets a ON a.asset_id = e.asset_id
 WHERE %s`, strings.Join(conditions, "\n  AND "))
 
 	return baseSQL, distanceExpr, nil
-}
-
-func semanticMaxDistance() float64 {
-	maxDistance := 0.5
-	if v := os.Getenv("SEMANTIC_MAX_DISTANCE"); v != "" {
-		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
-			maxDistance = f
-		}
-	}
-	return maxDistance
 }
 
 func (s *assetService) QueryPhotoMapPoints(ctx context.Context, params QueryPhotoMapPointsParams) ([]PhotoMapPoint, int64, error) {

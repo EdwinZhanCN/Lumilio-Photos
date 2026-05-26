@@ -11,10 +11,10 @@ func (s stubTaskAvailabilityChecker) IsTaskAvailable(taskName string) bool {
 func TestIsIndexingTaskRuntimeAvailable(t *testing.T) {
 	t.Run("clip requires image embedding runtime task", func(t *testing.T) {
 		checker := stubTaskAvailabilityChecker{
-			"clip_image_embed": true,
+			"semantic_image_embed": true,
 		}
 
-		if !IsIndexingTaskRuntimeAvailable(checker, AssetIndexingTaskClip) {
+		if !IsIndexingTaskRuntimeAvailable(checker, AssetIndexingTaskSemanticImage) {
 			t.Fatal("expected clip task to be available when image embedding runtime is present")
 		}
 	})
@@ -31,7 +31,7 @@ func TestIsIndexingTaskRuntimeAvailable(t *testing.T) {
 		if !IsIndexingTaskRuntimeAvailable(checker, AssetIndexingTaskBioCLIP) {
 			t.Fatal("expected BioCLIP task to be available")
 		}
-		if IsIndexingTaskRuntimeAvailable(checker, AssetIndexingTaskFace) {
+		if IsIndexingTaskRuntimeAvailable(checker, AssetIndexingTaskFaceRecognition) {
 			t.Fatal("expected face task to be unavailable")
 		}
 	})
@@ -39,23 +39,23 @@ func TestIsIndexingTaskRuntimeAvailable(t *testing.T) {
 
 func TestFilterRuntimeAvailableIndexingTasks(t *testing.T) {
 	checker := stubTaskAvailabilityChecker{
-		"clip_image_embed":      true,
+		"semantic_image_embed":      true,
 		"bioclip_classify":      true,
-		"face_detect_and_embed": false,
+		"face_recognition": false,
 		"ocr":                   true,
 	}
 
 	filtered := FilterRuntimeAvailableIndexingTasks([]AssetIndexingTask{
-		AssetIndexingTaskClip,
+		AssetIndexingTaskSemanticImage,
 		AssetIndexingTaskBioCLIP,
-		AssetIndexingTaskFace,
+		AssetIndexingTaskFaceRecognition,
 		AssetIndexingTaskOCR,
 	}, checker)
 
 	if len(filtered) != 3 {
 		t.Fatalf("expected 3 available tasks, got %d", len(filtered))
 	}
-	if filtered[0] != AssetIndexingTaskClip || filtered[1] != AssetIndexingTaskBioCLIP || filtered[2] != AssetIndexingTaskOCR {
+	if filtered[0] != AssetIndexingTaskSemanticImage || filtered[1] != AssetIndexingTaskBioCLIP || filtered[2] != AssetIndexingTaskOCR {
 		t.Fatalf("unexpected filtered task order: %#v", filtered)
 	}
 }

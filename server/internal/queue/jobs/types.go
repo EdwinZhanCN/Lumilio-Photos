@@ -19,7 +19,14 @@ type ProcessClipArgs struct {
 
 func (ProcessClipArgs) Kind() string { return "process_clip" }
 
-const MLPreprocessVersionV1 = "ml-image-v1"
+func (ProcessClipArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+}
+
+const (
+	MLPreprocessVersionV1 = "ml-image-v1"
+	MLProcessMaxAttempts  = 5
+)
 
 // ProcessBioClipArgs is the River job payload for BioCLIP classification.
 // Duplicated here (instead of importing processors) to avoid import cycles.
@@ -29,6 +36,10 @@ type ProcessBioClipArgs struct {
 }
 
 func (ProcessBioClipArgs) Kind() string { return "process_bioclip" }
+
+func (ProcessBioClipArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+}
 
 // AssetRetryPayload is the River job payload for selective retry of asset processing tasks
 type AssetRetryPayload struct {
@@ -57,6 +68,10 @@ type ProcessOcrArgs struct {
 
 func (ProcessOcrArgs) Kind() string { return "process_ocr" }
 
+func (ProcessOcrArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+}
+
 // ProcessFaceArgs is the River job payload for face detection and recognition.
 // Duplicated here (instead of importing processors) to avoid import cycles.
 type ProcessFaceArgs struct {
@@ -65,6 +80,10 @@ type ProcessFaceArgs struct {
 }
 
 func (ProcessFaceArgs) Kind() string { return "process_face" }
+
+func (ProcessFaceArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{MaxAttempts: MLProcessMaxAttempts}
+}
 
 // ReindexAssetsArgs queues a batch backfill for existing photo indexing tasks.
 type ReindexAssetsArgs struct {

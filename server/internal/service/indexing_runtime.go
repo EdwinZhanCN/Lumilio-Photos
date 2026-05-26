@@ -7,10 +7,10 @@ type TaskAvailabilityChecker interface {
 }
 
 var indexingTaskRuntimeRequirements = map[AssetIndexingTask][]string{
-	AssetIndexingTaskClip:    {"clip_image_embed"},
+	AssetIndexingTaskSemanticImage:    {"semantic_image_embed"},
 	AssetIndexingTaskBioCLIP: {"bioclip_classify"},
 	AssetIndexingTaskOCR:     {"ocr"},
-	AssetIndexingTaskFace:    {"face_detect_and_embed"},
+	AssetIndexingTaskFaceRecognition:    {"face_recognition"},
 }
 
 func IsIndexingTaskRuntimeAvailable(checker TaskAvailabilityChecker, task AssetIndexingTask) bool {

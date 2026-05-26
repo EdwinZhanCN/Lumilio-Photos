@@ -29,6 +29,7 @@ export const mapAlbumToUI = (
       : undefined,
     createdAt: album.created_at ? new Date(album.created_at) : new Date(),
     updatedAt: album.updated_at ? new Date(album.updated_at) : new Date(),
+    albumType: album.album_type,
   };
 };
 

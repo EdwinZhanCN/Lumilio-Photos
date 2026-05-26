@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Layers, X } from "lucide-react";
 import type { Asset } from "@/lib/assets/types";
 import { useI18n } from "@/lib/i18n";
@@ -41,8 +42,13 @@ export default function StackCarouselOverlay({
     return null;
   }
 
+  const renderOverlay = (content: ReactNode) => {
+    if (typeof document === "undefined") return content;
+    return createPortal(content, document.body);
+  };
+
   if (isLoading) {
-    return (
+    return renderOverlay(
       <div className={overlayMessageClasses}>
         <button
           type="button"
@@ -64,12 +70,12 @@ export default function StackCarouselOverlay({
             })}
           </p>
         </div>
-      </div>
+      </div>,
     );
   }
 
   if (error || assets.length === 0) {
-    return (
+    return renderOverlay(
       <div className={overlayMessageClasses}>
         <button
           type="button"
@@ -105,17 +111,17 @@ export default function StackCarouselOverlay({
             </button>
           </div>
         </div>
-      </div>
+      </div>,
     );
   }
 
-  return (
+  return renderOverlay(
     <FullScreenCarousel
       photos={assets}
       initialSlide={slideIndex >= 0 ? slideIndex : 0}
       slideIndex={slideIndex >= 0 ? slideIndex : undefined}
       onClose={onClose}
       onNavigate={setActiveAssetId}
-    />
+    />,
   );
 }

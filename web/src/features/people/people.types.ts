@@ -9,5 +9,7 @@ export type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
 export type PersonSummary = Schemas["dto.PersonSummaryDTO"];
 export type PersonDetail = Schemas["dto.PersonDetailDTO"];
 export type ListPeopleResponse = Schemas["dto.ListPeopleResponseDTO"];
+export type FaceClusterRebuildResponse =
+  Schemas["dto.FaceClusterRebuildResponseDTO"];
 export type PersonSummaryList = NonNullable<ListPeopleResponse["people"]>;
 export type UpdatePersonRequest = Schemas["dto.UpdatePersonRequestDTO"];
