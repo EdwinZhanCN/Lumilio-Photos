@@ -1,9 +1,4 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
-import {
-  SparklesIcon,
-  CameraIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
 import PageHeader from "@/components/PageHeader";
 import GalleryGrid from "../components/GalleryGrid";
 import StatsCards from "../components/StatsCards";
@@ -13,7 +8,12 @@ import { useFeaturedPhotos } from "../hooks/useFeaturedPhotos";
 import { useLocationClusters } from "../hooks/useLocationClusters";
 import { useMapPhotoAssets } from "../hooks/useMapPhotoAssets";
 import { useWorkingRepository } from "@/features/settings";
-import { HomeIcon } from "@heroicons/react/24/outline/index.js";
+import {
+  AlertTriangleIcon,
+  CameraIcon,
+  HomeIcon,
+  SparklesIcon,
+} from "lucide-react";
 
 function Home() {
   const { t } = useI18n();
@@ -120,7 +120,7 @@ function Home() {
           <div className="space-y-4">
             {isError && (
               <div className="alert alert-warning">
-                <ExclamationTriangleIcon className="size-5" />
+                <AlertTriangleIcon className="size-5" />
                 <span>
                   {t("home.errors.featuredLoadFailed", {
                     message:

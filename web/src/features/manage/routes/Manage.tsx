@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { DocumentTextIcon } from "@heroicons/react/24/outline";
-import { Folders } from "lucide-react";
+import { FileTextIcon, Folders } from "lucide-react";
 import { ErrorBoundary } from "react-error-boundary";
 import ErrorFallBack from "@/components/ErrorFallBack";
 import PageHeader from "@/components/PageHeader";
@@ -35,7 +34,7 @@ const ManageHeader: React.FC = () => {
           className="btn btn-sm btn-soft btn-info"
           onClick={() => setShowFormatsModal(true)}
         >
-          <DocumentTextIcon className="h-4 w-4" />
+          <FileTextIcon className="h-4 w-4" />
           {t("upload.UploadAssets.supported_formats_button")}
         </button>
       </PageHeader>

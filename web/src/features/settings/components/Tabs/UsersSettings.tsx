@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ExclamationTriangleIcon,
-  UsersIcon,
-} from "@heroicons/react/24/outline";
-import { MoveLeft } from "lucide-react";
+import { AlertTriangleIcon, MoveLeft, UserIcon } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import UserAvatar from "@/components/UserAvatar";
 import PhotoPicker from "@/components/PhotoPicker";
@@ -286,7 +282,7 @@ export default function UsersSettings() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <UsersIcon className="size-6 text-primary" />
+        <UserIcon className="size-6 text-primary" />
         <h2 className="text-2xl font-bold">
           {t("settings.users.title", { defaultValue: "Users" })}
         </h2>
@@ -397,7 +393,7 @@ export default function UsersSettings() {
             {resetAccessState && (
               <div className="rounded-3xl border border-warning/30 bg-warning/10 p-5">
                 <div className="flex items-start gap-3">
-                  <ExclamationTriangleIcon className="mt-0.5 size-5 shrink-0 text-warning" />
+                  <AlertTriangleIcon className="mt-0.5 size-5 shrink-0 text-warning" />
                   <div className="min-w-0 flex-1 space-y-3">
                     <div>
                       <div className="font-semibold text-warning-content">

@@ -1,6 +1,6 @@
 import { useI18n } from "@/lib/i18n.tsx";
 import { useSettingsContext } from "@/features/settings";
-import { ArrowUpTrayIcon } from "@heroicons/react/24/outline";
+import { UploadIcon } from "lucide-react";
 
 export default function UploadSettings() {
   const { t } = useI18n();
@@ -18,7 +18,7 @@ export default function UploadSettings() {
     <div className="space-y-6">
       <header className="space-y-2">
         <div className="flex items-center gap-2">
-          <ArrowUpTrayIcon className="size-6 text-primary" />
+          <UploadIcon className="size-6 text-primary" />
           <h2 className="text-2xl font-bold">{t("settings.upload")}</h2>
         </div>
         <p className="text-base-content/70">

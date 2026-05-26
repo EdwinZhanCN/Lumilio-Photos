@@ -1,4 +1,4 @@
-import { PhotoIcon } from "@heroicons/react/24/outline";
+import { Image } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 
 type StudioViewportProps = {
@@ -40,7 +40,7 @@ export function StudioViewport({
         // Placeholder view when no image is loaded
         <div className="flex-1 flex items-center justify-center h-full">
           <div className="text-center p-8">
-            <PhotoIcon className="w-16 h-16 mx-auto text-base-content/30" />
+            <Image className="w-16 h-16 mx-auto text-base-content/30" />
             <p className="mt-4">{t("studio.emptyHint")}</p>
             <button onClick={onOpenFile} className="btn btn-primary mt-4">
               {t("studio.imgOpen")}

@@ -36,9 +36,9 @@ function initI18n(instance: I18NextInstance) {
       // Only load language part (e.g., "en-US" -> "en")
       load: "languageOnly",
 
-      // Backend configuration: serve from /public/locales
+      // Backend configuration: serve from src/locales
       backend: {
-        loadPath: "/locales/{{lng}}/translation.json",
+        loadPath: "/src/locales/{{lng}}/translation.json",
       },
 
       // Language detection strategy
