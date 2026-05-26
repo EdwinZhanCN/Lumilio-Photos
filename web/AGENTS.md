@@ -88,7 +88,7 @@ Current canonical example: assets domain store at `web/src/features/assets/asset
 - `zustand` + `immer`: feature UI store slices
 - `react-router-dom`: route state, params, URL-driven UX
 - `i18next` + `react-i18next`: all user-facing copy should be i18n-ready
-- `lucide-react` / `@heroicons/react`: icons (avoid mixing many icon systems in one component)
+- `lucide-react` : icons (avoid mixing many icon systems in one component)
 - `@immich/justified-layout-wasm`, local wasm modules: compute-intensive image workflows
 
 ## 6. File and Module Conventions

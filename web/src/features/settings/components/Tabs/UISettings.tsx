@@ -2,18 +2,18 @@ import React from "react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useSettingsContext } from "@/features/settings";
 import {
-  MoonIcon,
-  PhotoIcon,
-  GlobeAltIcon,
-  PaintBrushIcon,
-  SunIcon,
-} from "@heroicons/react/24/outline";
-import {
   DAISYUI_DARK_THEMES,
   DAISYUI_LIGHT_THEMES,
   type DaisyUIDarkThemeName,
   type DaisyUILightThemeName,
 } from "@/lib/theme/daisyuiThemes";
+import {
+  EarthIcon,
+  ImageIcon,
+  MoonIcon,
+  PaintbrushIcon,
+  SunIcon,
+} from "lucide-react";
 
 type ModeThemeName = DaisyUILightThemeName | DaisyUIDarkThemeName;
 
@@ -195,7 +195,7 @@ export default function UISettings() {
     <div className="space-y-6">
       <header className="space-y-2">
         <div className="flex items-center gap-2">
-          <PaintBrushIcon className="size-6 text-primary" />
+          <PaintbrushIcon className="size-6 text-primary" />
           <h2 className="text-2xl font-bold">{t("settings.appearance")}</h2>
         </div>
         <p className="text-base-content/70">
@@ -205,7 +205,7 @@ export default function UISettings() {
 
       <section className="rounded-2xl border border-base-300 bg-base-100 p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <GlobeAltIcon className="size-6 text-primary" />
+          <EarthIcon className="size-6 text-primary" />
           <h3 className="text-lg font-semibold">
             {t("settings.languageAndRegion")}
           </h3>
@@ -246,7 +246,7 @@ export default function UISettings() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <PaintBrushIcon className="size-6 text-primary" />
+              <PaintbrushIcon className="size-6 text-primary" />
               <h3 className="text-lg font-semibold">
                 {t("settings.appearanceSettings.themes.title")}
               </h3>
@@ -315,7 +315,7 @@ export default function UISettings() {
 
       <section className="rounded-2xl border border-base-300 bg-base-100 p-5 space-y-4">
         <div className="flex items-center gap-2">
-          <PhotoIcon className="size-6 text-primary" />
+          <ImageIcon className="size-6 text-primary" />
           <div>
             <h3 className="text-lg font-semibold">{t("settings.assetPage")}</h3>
             <p className="text-sm text-base-content/70">

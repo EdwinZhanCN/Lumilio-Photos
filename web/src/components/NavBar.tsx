@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FolderIcon } from "@heroicons/react/24/outline";
-import { Moon, Sun } from "lucide-react";
+import { Folder, Moon, Sun } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "@/features/auth";
 import { LumilioAvatar } from "@/features/lumilio/components/LumilioAvatar/LumilioAvatar";
@@ -69,7 +68,7 @@ function NavBar() {
                 </option>
               ))}
             </select>
-            <FolderIcon className="size-5 shrink-0 text-base-content/60" />
+            <Folder className="size-5 shrink-0 text-base-content/60" />
           </div>
           {repositoriesQuery.isError && (
             <span className="text-xs text-base-content/60">

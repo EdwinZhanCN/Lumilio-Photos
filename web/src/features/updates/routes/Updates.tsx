@@ -1,5 +1,5 @@
 import PageHeader from "@/components/PageHeader";
-import { InformationCircleIcon } from "@heroicons/react/24/outline";
+import { Info } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 
 export default function Updates() {
@@ -7,7 +7,7 @@ export default function Updates() {
   return (
     <PageHeader
       title={t("routes.updates")}
-      icon={<InformationCircleIcon className="w-6 h-6 text-primary" />}
+      icon={<Info className="w-6 h-6 text-primary" />}
     />
   );
 }

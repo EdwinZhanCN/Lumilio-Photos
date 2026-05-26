@@ -180,6 +180,57 @@ type AssetExifResponseDTO struct {
 	ExifRaw map[string]any `json:"exif_raw" swaggertype:"object"`
 }
 
+type LumilioSidecarSourceDTO struct {
+	OriginalFilename string  `json:"original_filename" example:"IMG_0001.jpg"`
+	StoragePath      string  `json:"storage_path" example:"inbox/2026/05/IMG_0001.jpg"`
+	MimeType         string  `json:"mime_type" example:"image/jpeg"`
+	FileSize         int64   `json:"file_size" example:"1048576"`
+	Hash             *string `json:"hash,omitempty" example:"abcd1234567890"`
+	Width            *int32  `json:"width,omitempty" example:"6000"`
+	Height           *int32  `json:"height,omitempty" example:"4000"`
+}
+
+type StudioEditCropDTO struct {
+	X      float64 `json:"x" example:"0"`
+	Y      float64 `json:"y" example:"0"`
+	Width  float64 `json:"width" example:"1000"`
+	Height float64 `json:"height" example:"800"`
+}
+
+type StudioEditAdjustmentsDTO struct {
+	Exposure       float64            `json:"exposure" example:"0"`
+	Contrast       float64            `json:"contrast" example:"0"`
+	Highlights     float64            `json:"highlights" example:"0"`
+	Shadows        float64            `json:"shadows" example:"0"`
+	Whites         float64            `json:"whites" example:"0"`
+	Blacks         float64            `json:"blacks" example:"0"`
+	Temperature    float64            `json:"temperature" example:"0"`
+	Tint           float64            `json:"tint" example:"0"`
+	Vibrance       float64            `json:"vibrance" example:"0"`
+	Saturation     float64            `json:"saturation" example:"0"`
+	Clarity        float64            `json:"clarity" example:"0"`
+	Sharpness      float64            `json:"sharpness" example:"0"`
+	NoiseReduction float64            `json:"noiseReduction" example:"0"`
+	Rotation       float64            `json:"rotation" example:"0"`
+	FlipHorizontal bool               `json:"flipHorizontal" example:"false"`
+	FlipVertical   bool               `json:"flipVertical" example:"false"`
+	Crop           *StudioEditCropDTO `json:"crop,omitempty"`
+}
+
+type LumilioSidecarV1DTO struct {
+	Version     int                      `json:"version" example:"1"`
+	AssetID     string                   `json:"asset_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Source      LumilioSidecarSourceDTO  `json:"source"`
+	Adjustments StudioEditAdjustmentsDTO `json:"adjustments"`
+	UpdatedAt   time.Time                `json:"updated_at" example:"2026-05-26T10:00:00Z"`
+}
+
+type AssetSidecarResponseDTO struct {
+	AssetID string              `json:"asset_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Exists  bool                `json:"exists" example:"true"`
+	Sidecar LumilioSidecarV1DTO `json:"sidecar"`
+}
+
 type AssetGroupDTO struct {
 	Key    string     `json:"key" example:"date:today"`
 	Assets []AssetDTO `json:"assets"`
@@ -256,6 +307,11 @@ type QueryAssetsResponseDTO struct {
 	StackMode    string          `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
 	Limit        int             `json:"limit" example:"20"`
 	Offset       int             `json:"offset" example:"0"`
+}
+
+// DownloadAssetsRequestDTO represents a bulk original-file download request.
+type DownloadAssetsRequestDTO struct {
+	AssetIDs []string `json:"asset_ids" binding:"required" example:"550e8400-e29b-41d4-a716-446655440000,550e8400-e29b-41d4-a716-446655440001"`
 }
 
 // FeaturedAssetsResponseDTO represents curated featured photos for home/gallery use.
