@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -34,6 +35,11 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/riverqueue/river"
 )
+
+type assetDownloadFile struct {
+	asset repo.Asset
+	path  string
+}
 
 // AssetHandler handles HTTP requests for asset management
 type AssetHandler struct {
@@ -934,6 +940,140 @@ func (h *AssetHandler) GetOriginalFile(c *gin.Context) {
 
 	// Serve the file
 	c.File(fullPath)
+}
+
+// DownloadAssets serves multiple original files as a zip archive.
+// @Summary Download assets
+// @Description Serve original files for the requested asset IDs as a zip archive.
+// @Tags assets
+// @Accept json
+// @Produce application/zip
+// @Param request body dto.DownloadAssetsRequestDTO true "Asset IDs to download"
+// @Success 200 {file} file "Zip archive"
+// @Failure 400 {object} api.Result "Invalid request"
+// @Failure 401 {object} api.Result "Authentication required"
+// @Failure 403 {object} api.Result "Forbidden"
+// @Failure 404 {object} api.Result "Asset or original file not found"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/assets/download [post]
+func (h *AssetHandler) DownloadAssets(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	var req dto.DownloadAssetsRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request body")
+		return
+	}
+
+	if len(req.AssetIDs) == 0 {
+		api.GinBadRequest(c, errors.New("asset_ids is required"), "asset_ids is required")
+		return
+	}
+
+	files := make([]assetDownloadFile, 0, len(req.AssetIDs))
+	for _, rawAssetID := range req.AssetIDs {
+		assetIDText := strings.TrimSpace(rawAssetID)
+		assetID, err := uuid.Parse(assetIDText)
+		if err != nil {
+			api.GinBadRequest(c, err, "Invalid asset ID")
+			return
+		}
+
+		asset, ok := h.getAuthorizedAssetForMedia(c, assetID, "Authentication required to access this file", "You don't have permission to access this file")
+		if !ok {
+			return
+		}
+
+		if asset.StoragePath == nil || strings.TrimSpace(*asset.StoragePath) == "" {
+			api.GinNotFound(c, fmt.Errorf("asset storage path is empty"), "Original file not found")
+			return
+		}
+
+		repository, err := h.getRepositoryForAsset(ctx, asset)
+		if err != nil {
+			log.Printf("Failed to resolve repository for bulk download: %v", err)
+			api.GinInternalError(c, err, "Failed to access repository")
+			return
+		}
+
+		fullPath := h.resolveRepositoryPath(repository.Path, *asset.StoragePath)
+		fileInfo, err := os.Stat(fullPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				log.Printf("Original file not found at path: %s", fullPath)
+				api.GinNotFound(c, err, "Original file not found")
+				return
+			}
+			api.GinInternalError(c, err, "Failed to access original file")
+			return
+		}
+		if fileInfo.IsDir() {
+			api.GinNotFound(c, fmt.Errorf("original file path is a directory"), "Original file not found")
+			return
+		}
+
+		files = append(files, assetDownloadFile{
+			asset: *asset,
+			path:  fullPath,
+		})
+	}
+
+	filename := fmt.Sprintf("lumilio-assets-%s.zip", time.Now().Format("20060102-150405"))
+	c.Header("Cache-Control", "no-store")
+	c.Header("Content-Type", "application/zip")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	c.Status(http.StatusOK)
+
+	zipWriter := zip.NewWriter(c.Writer)
+	archiveNames := make(map[string]int, len(files))
+	for _, file := range files {
+		if err := h.writeAssetToZip(zipWriter, archiveNames, file); err != nil {
+			log.Printf("Failed to write asset to zip: %v", err)
+			_ = zipWriter.Close()
+			return
+		}
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		log.Printf("Failed to finalize asset download zip: %v", err)
+	}
+}
+
+func (h *AssetHandler) writeAssetToZip(zipWriter *zip.Writer, archiveNames map[string]int, file assetDownloadFile) error {
+	source, err := os.Open(file.path)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	archiveName := uniqueZipArchiveName(archiveNames, file.asset.OriginalFilename)
+	entry, err := zipWriter.Create(archiveName)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(entry, source)
+	return err
+}
+
+func uniqueZipArchiveName(seen map[string]int, filename string) string {
+	name := filepath.Base(strings.TrimSpace(filename))
+	if name == "." || name == ".." || name == string(filepath.Separator) || name == "" {
+		name = "asset"
+	}
+
+	ext := filepath.Ext(name)
+	stem := strings.TrimSuffix(name, ext)
+	if stem == "" {
+		stem = "asset"
+	}
+
+	candidate := name
+	for index := 2; seen[candidate] > 0; index++ {
+		candidate = fmt.Sprintf("%s (%d)%s", stem, index, ext)
+	}
+	seen[candidate] = 1
+	return candidate
 }
 
 // GetWebVideo serves the web-optimized video version by asset ID

@@ -115,14 +115,41 @@ export const resolveSelectedBrowseItems = (
   });
 };
 
+export type BrowseSelectionResolveMode = "visible" | "whole-stack";
+
+export interface BrowseSelectionResolveOptions {
+  stackMode?: BrowseSelectionResolveMode;
+}
+
 export const resolveBrowseSelectedAssetIds = (
   selectedIds: Iterable<string>,
   items: BrowseItem[],
-): string[] =>
-  resolveSelectedBrowseItems(selectedIds, items).flatMap((item) => {
-    const assetId = getBrowseItemAssetId(item);
-    return assetId ? [assetId] : [];
+  options: BrowseSelectionResolveOptions = {},
+): string[] => {
+  const stackMode = options.stackMode ?? "visible";
+  const seen = new Set<string>();
+  const resolved: string[] = [];
+
+  const addAssetId = (assetId?: string) => {
+    if (!assetId || seen.has(assetId)) return;
+    seen.add(assetId);
+    resolved.push(assetId);
+  };
+
+  resolveSelectedBrowseItems(selectedIds, items).forEach((item) => {
+    if (item.type === "stack" && stackMode === "whole-stack") {
+      const memberAssetIds = item.memberAssetIds?.filter(Boolean) ?? [];
+      if (memberAssetIds.length > 0) {
+        memberAssetIds.forEach(addAssetId);
+        return;
+      }
+    }
+
+    addAssetId(getBrowseItemAssetId(item));
   });
+
+  return resolved;
+};
 
 export const createBrowseGroupsFromAssetGroups = (
   groups?: AssetGroup[],

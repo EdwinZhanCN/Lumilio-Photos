@@ -17,6 +17,7 @@ import {
 } from "../slices/selection.slice";
 import { useAssetActions } from "./useAssetActions";
 import { assetUrls } from "@/lib/assets/assetUrls";
+import { getToken } from "@/lib/http-commons/auth";
 import { $api } from "@/lib/http-commons/queryClient";
 import { Asset } from "@/lib/assets/types";
 
@@ -345,6 +346,29 @@ export const useSelectionState = () => {
   );
 };
 
+const triggerDownload = (blob: Blob, filename: string): void => {
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(blobUrl);
+};
+
+const filenameFromContentDisposition = (
+  contentDisposition: string | null,
+): string | undefined => {
+  if (!contentDisposition) return undefined;
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+  const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+  return filenameMatch?.[1];
+};
+
 /**
  * Hook for bulk operations on selected assets.
  */
@@ -393,14 +417,37 @@ export const useBulkAssetOperations = (resolvedAssetIds?: string[]) => {
     const ids = resolvedAssetIds ?? Array.from(selection.selectedIds);
     if (ids.length === 0) return;
 
+    if (ids.length > 10) {
+      const headers = new Headers({
+        "Content-Type": "application/json",
+      });
+      const token = getToken();
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+
+      const response = await fetch(assetUrls.getBulkDownloadUrl(), {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ asset_ids: ids }),
+      });
+      if (!response.ok) {
+        throw new Error(`Bulk download failed with ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const filename =
+        filenameFromContentDisposition(response.headers.get('content-disposition')) ??
+        "lumilio-assets.zip";
+      triggerDownload(blob, filename);
+      return;
+    }
+
     for (const id of ids) {
       try {
         const url = assetUrls.getOriginalFileUrl(id as string);
         const response = await fetch(url);
         const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
 
         // Try to get filename from asset object first, then content-disposition, then fallback
         let filename = `asset-${id}`;
@@ -415,18 +462,12 @@ export const useBulkAssetOperations = (resolvedAssetIds?: string[]) => {
 
         // 2. Try content-disposition if we didn't find it
         if (filename === `asset-${id}`) {
-          const contentDisposition = response.headers.get('content-disposition');
-          if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-            if (filenameMatch) filename = filenameMatch[1];
-          }
+          filename =
+            filenameFromContentDisposition(response.headers.get('content-disposition')) ??
+            filename;
         }
 
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
+        triggerDownload(blob, filename);
       } catch (error) {
         console.error(`Failed to download asset ${id}:`, error);
       }
