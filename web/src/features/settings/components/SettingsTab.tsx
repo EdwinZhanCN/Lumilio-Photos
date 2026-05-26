@@ -1,12 +1,3 @@
-import {
-  PaintBrushIcon,
-  ArrowUpTrayIcon,
-  ServerStackIcon,
-  CpuChipIcon,
-  SparklesIcon,
-  UserCircleIcon,
-  UsersIcon,
-} from "@heroicons/react/24/outline";
 import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/auth";
@@ -18,6 +9,15 @@ import PerformanceSettings from "./Tabs/PerformanceSettings";
 import AISettings from "./Tabs/AISettings";
 import UsersSettings from "./Tabs/UsersSettings";
 import { useI18n } from "@/lib/i18n.tsx";
+import {
+  CpuIcon,
+  PaintbrushIcon,
+  ServerIcon,
+  SparklesIcon,
+  UploadIcon,
+  UserCircle2Icon,
+  Users2Icon,
+} from "lucide-react";
 
 type SettingsTabKey =
   | "account"
@@ -56,27 +56,27 @@ export default function SettingsTab() {
     {
       key: "account",
       label: t("settings.account.title", { defaultValue: "Account" }),
-      icon: <UserCircleIcon className="size-4" />,
+      icon: <UserCircle2Icon className="size-4" />,
     },
     {
       key: "appearance",
       label: t("settings.appearance"),
-      icon: <PaintBrushIcon className="size-4" />,
+      icon: <PaintbrushIcon className="size-4" />,
     },
     {
       key: "upload",
       label: t("settings.upload"),
-      icon: <ArrowUpTrayIcon className="size-4" />,
+      icon: <UploadIcon className="size-4" />,
     },
     {
       key: "performance",
       label: t("settings.performance"),
-      icon: <CpuChipIcon className="size-4" />,
+      icon: <CpuIcon className="size-4" />,
     },
     {
       key: "server",
       label: t("settings.server"),
-      icon: <ServerStackIcon className="size-4" />,
+      icon: <ServerIcon className="size-4" />,
     },
   ];
   if (isAdmin) {
@@ -88,7 +88,7 @@ export default function SettingsTab() {
     tabs.push({
       key: "users",
       label: t("settings.users.title", { defaultValue: "Users" }),
-      icon: <UsersIcon className="size-4" />,
+      icon: <Users2Icon className="size-4" />,
     });
   }
 

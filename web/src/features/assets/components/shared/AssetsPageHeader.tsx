@@ -1,5 +1,4 @@
 import PageHeader from "@/components/PageHeader";
-import { PhotoIcon } from "@heroicons/react/24/outline";
 import {
   SquareMousePointer,
   FunnelIcon,
@@ -15,6 +14,7 @@ import {
   Ellipsis,
   ArrowUpDown,
   Star,
+  ImageIcon,
 } from "lucide-react";
 import FilterTool, {
   FilterDTO,
@@ -27,10 +27,7 @@ import {
   useSelection,
   useBulkAssetOperations,
 } from "@/features/assets/hooks/useSelection";
-import {
-  BrowseItem,
-  SortByType,
-} from "@/features/assets/types/assets.type";
+import { BrowseItem, SortByType } from "@/features/assets/types/assets.type";
 import {
   useCallback,
   useMemo,
@@ -42,10 +39,7 @@ import {
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { useI18n } from "@/lib/i18n";
-import {
-  useFilterState,
-  useFilterActions,
-} from "@/features/assets/selectors";
+import { useFilterState, useFilterActions } from "@/features/assets/selectors";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { Album, ApiResult, ListAlbumsResponse } from "@/lib/albums/types";
 import { useWorkingRepository } from "@/features/settings";
@@ -278,20 +272,28 @@ const AssetsPageHeader = ({
 
   const selectedBrowseItems = useMemo(() => {
     if (!effectiveBrowseItems || effectiveBrowseItems.length === 0) return [];
-    return resolveSelectedBrowseItems(selection.selectedIds, effectiveBrowseItems);
+    return resolveSelectedBrowseItems(
+      selection.selectedIds,
+      effectiveBrowseItems,
+    );
   }, [effectiveBrowseItems, selection.selectedIds]);
 
   const resolvedSelectedAssetIds = useMemo(
     () =>
-      resolveBrowseSelectedAssetIds(selection.selectedIds, effectiveBrowseItems, {
-        stackMode: "whole-stack",
-      }),
+      resolveBrowseSelectedAssetIds(
+        selection.selectedIds,
+        effectiveBrowseItems,
+        {
+          stackMode: "whole-stack",
+        },
+      ),
     [effectiveBrowseItems, selection.selectedIds],
   );
 
   const bulkOps = useBulkAssetOperations(resolvedSelectedAssetIds);
   const affectedAssetCount = resolvedSelectedAssetIds.length;
-  const selectedItemCount = selectedBrowseItems.length || selection.selectedCount;
+  const selectedItemCount =
+    selectedBrowseItems.length || selection.selectedCount;
   const showAffectedAssetCount =
     affectedAssetCount > 0 && affectedAssetCount !== selectedItemCount;
 
@@ -302,11 +304,7 @@ const AssetsPageHeader = ({
     return selectedBrowseItems.flatMap((item) =>
       item.type === "stack" ? item.assets : [getBrowseItemAsset(item)],
     );
-  }, [
-    selection.enabled,
-    selection.selectedCount,
-    selectedBrowseItems,
-  ]);
+  }, [selection.enabled, selection.selectedCount, selectedBrowseItems]);
 
   const handleDownloadAll = async () => {
     try {
@@ -453,7 +451,9 @@ const AssetsPageHeader = ({
                   }}
                 >
                   <span className="min-w-20">{option.label}</span>
-                  <span className="ml-auto opacity-50">{option.valueLabel}</span>
+                  <span className="ml-auto opacity-50">
+                    {option.valueLabel}
+                  </span>
                 </button>
               </li>
             ))}
@@ -505,7 +505,7 @@ const AssetsPageHeader = ({
     <>
       <PageHeader
         title={title ?? tabTitle}
-        icon={icon ?? <PhotoIcon className="w-6 h-6 text-primary" />}
+        icon={icon ?? <ImageIcon className="w-6 h-6 text-primary" />}
         className="sticky top-0 z-40 bg-base-100 border-b border-base-200"
       >
         {selection.enabled && (

@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import {
-  AdjustmentsHorizontalIcon,
-  HomeIcon,
-  PhotoIcon,
-  PaintBrushIcon,
-} from "@heroicons/react/24/outline/index.js";
 
-import { Activity, Folders, LibraryBig } from "lucide-react";
+import {
+  Activity,
+  Folders,
+  Home,
+  Image,
+  LibraryBig,
+  Paintbrush,
+  SlidersHorizontal,
+} from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useGlobal } from "@/contexts/GlobalContext";
 import { useAuth } from "@/features/auth";
@@ -24,7 +26,7 @@ function SideBar() {
       <ul className="menu rounded-box mx-2 my-2 gap-2">
         <li>
           <Link to="/" className={location.pathname === "/" ? "active" : ""}>
-            <HomeIcon className="size-5" />
+            <Home className="size-5" />
             {t("sidebar.home")}
             <span className="badge badge-sm">{messageCount}</span>
           </Link>
@@ -34,7 +36,7 @@ function SideBar() {
             to="/assets/"
             className={location.pathname.startsWith("/assets") ? "active" : ""}
           >
-            <PhotoIcon className="size-5" />
+            <Image className="size-5" />
             {t("sidebar.assets")}
           </Link>
         </li>
@@ -51,7 +53,7 @@ function SideBar() {
         </li>
         <li>
           <Link to={"/studio"}>
-            <PaintBrushIcon className="size-5" />
+            <Paintbrush className="size-5" />
             {t("sidebar.studio")}
           </Link>
         </li>
@@ -72,7 +74,7 @@ function SideBar() {
         </li>
         <li>
           <Link to="/settings">
-            <AdjustmentsHorizontalIcon className="size-5" />
+            <SlidersHorizontal className="size-5" />
             {t("sidebar.settings")}
           </Link>
         </li>

@@ -7,6 +7,7 @@ import {
   X,
   RefreshCw,
   Loader2,
+  Paintbrush,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -15,7 +16,6 @@ import {
 } from "@/hooks/util-hooks/useExportImage.tsx";
 import { assetUrls } from "@/lib/assets/assetUrls";
 import { $api } from "@/lib/http-commons/queryClient";
-import { PaintBrushIcon } from "@heroicons/react/24/outline";
 import type { Asset } from "@/lib/assets/types";
 import {
   getRetryTasksByCategoryForAssetType,
@@ -212,7 +212,7 @@ export default function ExportModal({
         <div className="flex gap-2 mb-2">
           <div className="tooltip tooltip-bottom" data-tip="Studio">
             <button className="btn btn-soft btn-circle" disabled>
-              <PaintBrushIcon className="size-6" />
+              <Paintbrush className="size-6" />
             </button>
           </div>
 

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { SparklesIcon } from "@heroicons/react/24/outline";
 import { useI18n } from "@/lib/i18n.tsx";
 import {
   useSystemSettings,
@@ -8,6 +7,7 @@ import {
   type SystemSettings,
   type UpdateSystemSettingsPayload,
 } from "@/features/settings/hooks/useSystemSettings";
+import { SparklesIcon } from "lucide-react";
 
 type AgentProvider = SystemSettings["llm"]["provider"];
 

@@ -1,7 +1,7 @@
-import { ServerStackIcon } from "@heroicons/react/24/outline";
 import { useSettingsContext } from "@/features/settings";
 import { useWorkingRepository } from "@/features/settings/hooks/useWorkingRepository";
 import { useI18n } from "@/lib/i18n.tsx";
+import { ServerIcon } from "lucide-react";
 
 export default function ServerSettings() {
   const { t } = useI18n();
@@ -27,7 +27,7 @@ export default function ServerSettings() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <ServerStackIcon className="size-6 text-primary" />
+        <ServerIcon className="size-6 text-primary" />
         <h2 className="text-2xl font-bold">{t("settings.server")}</h2>
       </div>
 

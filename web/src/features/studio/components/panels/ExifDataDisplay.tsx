@@ -1,7 +1,4 @@
-import {
-  InformationCircleIcon,
-  ArrowDownTrayIcon,
-} from "@heroicons/react/24/outline";
+import { Info, Download } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 
 type ExifDataDisplayProps = {
@@ -18,7 +15,8 @@ const formatExifValue = (
     locale: string;
   },
 ): string => {
-  if (value === null || value === undefined || value === "") return options.naText;
+  if (value === null || value === undefined || value === "")
+    return options.naText;
   if (typeof value === "string" && value.trim() === "") return options.naText;
 
   if (key.toLowerCase().includes("date") && !isNaN(new Date(value).getTime())) {
@@ -139,7 +137,7 @@ export function ExifDataDisplay({ exifData, isLoading }: ExifDataDisplayProps) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
-          <InformationCircleIcon className="w-5 h-5 mr-2" />
+          <Info className="w-5 h-5 mr-2" />
           <h2 className="text-lg font-semibold">{t("studio.exif.title")}</h2>
         </div>
         <button
@@ -150,7 +148,7 @@ export function ExifDataDisplay({ exifData, isLoading }: ExifDataDisplayProps) {
           title={t("studio.exif.download")}
           aria-label={t("studio.exif.download")}
         >
-          <ArrowDownTrayIcon className="w-5 h-5" />
+          <Download className="w-5 h-5" />
         </button>
       </div>
 
