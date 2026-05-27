@@ -25,16 +25,16 @@ import (
 )
 
 const (
-	faceClusterMinConfidence            = float32(0.75)
+	faceClusterMinConfidence            = float32(0.60)
 	faceClusterMinAreaPixels            = int32(4096)
-	faceClusterMinSimilarity            = float32(0.70)
+	faceClusterMinSimilarity            = float32(0.55)
 	faceClusterDBSCANMinPoints          = 2
 	faceClusterIncrementalNeighborLimit = 256
 	faceClusterHDBSCANMinClusterSize    = 2
 	faceClusterHDBSCANMinSamples        = 2
 	faceClusterHDBSCANKNearestNeighbors = 48
 	faceClusterHDBSCANMaxDistance       = float64(1.0 - faceClusterMinSimilarity)
-	faceClusterMinMedoidSimilarity      = float64(0.58)
+	faceClusterMinMedoidSimilarity      = float64(0.50)
 	faceCropPaddingMultiplier           = float32(0.12)
 	faceCropQuality                     = 85
 )

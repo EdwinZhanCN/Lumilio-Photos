@@ -166,8 +166,8 @@ func TestAssetHandlerSearchAssets_ReturnsDegradedResultsWithout503(t *testing.T)
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Equal(t, 0, response.Code)
-	require.Empty(t, response.Data.TopResults)
-	require.Len(t, response.Data.Results, 1)
+	require.Empty(t, response.Data.TopItems)
+	require.Len(t, response.Data.ResultItems, 1)
 	require.True(t, response.Data.TopResultsMeta.Enabled)
 	require.True(t, response.Data.TopResultsMeta.Degraded)
 	require.Equal(t, "runtime_unavailable", response.Data.TopResultsMeta.Reason)
@@ -224,8 +224,8 @@ func TestAssetHandlerSearchAssets_ReturnsTopResultsAndResults(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Equal(t, 0, response.Code)
-	require.Len(t, response.Data.TopResults, 1)
-	require.Len(t, response.Data.Results, 1)
+	require.Len(t, response.Data.TopItems, 1)
+	require.Len(t, response.Data.ResultItems, 1)
 	require.True(t, response.Data.TopResultsMeta.Enabled)
 	require.False(t, response.Data.TopResultsMeta.Degraded)
 }

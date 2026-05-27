@@ -5,7 +5,7 @@ import {
   browseGroupsFromQueryLikePage,
   browseGroupsFromSearchResultsPage,
   browseGroupsFromSearchTop,
-  createBrowseItemsFromApiItems,
+  createBrowseItemsFromBrowseItemDTOs,
   createBrowseGroupsFromAssets,
   createBrowseGroupsFromAssetGroups,
   dedupeBrowseItemsById,
@@ -201,7 +201,7 @@ describe("browseItems", () => {
   });
 
   it("finds stack items by memberAssetIds when only backend browse payload is loaded", () => {
-    const items = createBrowseItemsFromApiItems([
+    const items = createBrowseItemsFromBrowseItemDTOs([
       {
         type: "stack",
         stack: {
@@ -357,7 +357,7 @@ describe("browseItems", () => {
   });
 
   it("resolves stack browse selection ids to all member asset ids for whole-stack actions", () => {
-    const items = createBrowseItemsFromApiItems([
+    const items = createBrowseItemsFromBrowseItemDTOs([
       {
         type: "stack",
         stack: {
@@ -383,7 +383,7 @@ describe("browseItems", () => {
   });
 
   it("dedupes resolved whole-stack member asset ids", () => {
-    const items = createBrowseItemsFromApiItems([
+    const items = createBrowseItemsFromBrowseItemDTOs([
       {
         type: "stack",
         stack: {
@@ -422,25 +422,7 @@ describe("browseItems", () => {
     expect(findBrowseItemById(items, "asset:missing")).toBeUndefined();
   });
 
-  it("prefers browse DTO rows over legacy assets when mapping query-like pages", () => {
-    const legacyAssets = [
-      createAsset("cover", {
-        stack: {
-          stack_id: "stack-1",
-          stack_size: 2,
-          stack_cover: true,
-        },
-      }),
-      createAsset("member", {
-        stack: {
-          stack_id: "stack-1",
-          stack_size: 2,
-          stack_cover: false,
-        },
-      }),
-      createAsset("solo"),
-    ];
-
+  it("maps query-like pages using BrowseItem DTO items", () => {
     const browseGroups = browseGroupsFromQueryLikePage({
       items: [
         {
@@ -463,7 +445,6 @@ describe("browseItems", () => {
           asset: createAsset("solo"),
         },
       ],
-      legacyAssets,
       sortBy: "date_captured",
     });
 
@@ -471,20 +452,6 @@ describe("browseItems", () => {
       "stack:stack-1",
       "asset:solo",
     ]);
-  });
-
-  it("falls back to grouped legacy assets when browse items are absent", () => {
-    const legacyAssets = [createAsset("a"), createAsset("b")];
-    const browseGroups = browseGroupsFromQueryLikePage({
-      items: [],
-      legacyAssets,
-      sortBy: "date_captured",
-    });
-
-    const ids = flattenBrowseGroups(browseGroups)
-      .map((item) => item.id)
-      .sort();
-    expect(ids).toEqual(["asset:a", "asset:b"].sort());
   });
 
   it("keeps search top results in one flat section", () => {
@@ -499,7 +466,6 @@ describe("browseItems", () => {
           asset: createAsset("older", { taken_time: "2024-01-01T00:00:00Z" }),
         },
       ],
-      legacyTopAssets: [],
     });
 
     expect(browseGroups).toHaveLength(1);
@@ -512,10 +478,15 @@ describe("browseItems", () => {
 
   it("keeps search result pages in one flat results section", () => {
     const browseGroups = browseGroupsFromSearchResultsPage({
-      resultItems: [],
-      legacyResultAssets: [
-        createAsset("newer", { taken_time: "2026-05-02T00:00:00Z" }),
-        createAsset("older", { taken_time: "2024-01-01T00:00:00Z" }),
+      resultItems: [
+        {
+          type: "asset",
+          asset: createAsset("newer", { taken_time: "2026-05-02T00:00:00Z" }),
+        },
+        {
+          type: "asset",
+          asset: createAsset("older", { taken_time: "2024-01-01T00:00:00Z" }),
+        },
       ],
     });
 
@@ -528,7 +499,7 @@ describe("browseItems", () => {
   });
 
   it("creates browse items from backend browse dto payloads", () => {
-    const items = createBrowseItemsFromApiItems([
+    const items = createBrowseItemsFromBrowseItemDTOs([
       {
         type: "asset",
         asset: createAsset("solo"),

@@ -1,4 +1,4 @@
-import { baseUrl } from "@/lib/http-commons/client";
+import { client } from "@/lib/http-commons/client";
 import {
   getMediaToken,
   getMediaTokenExpiresAt,
@@ -6,16 +6,6 @@ import {
   removeMediaToken,
   saveMediaToken,
 } from "@/lib/http-commons/auth.ts";
-
-type MediaTokenPayload = {
-  token?: string;
-  expires_at?: string;
-};
-
-type ApiResult<T> = {
-  code?: number;
-  data?: T;
-};
 
 const MEDIA_TOKEN_REFRESH_BUFFER_MS = 60_000;
 const MEDIA_TOKEN_REFRESH_INTERVAL_MS = 60_000;
@@ -29,25 +19,19 @@ const shouldRefreshMediaToken = (expiresAt: number | null) => {
   return expiresAt - Date.now() <= MEDIA_TOKEN_REFRESH_BUFFER_MS;
 };
 
-const requestMediaToken = async (accessToken: string): Promise<string | null> => {
-  const response = await fetch(`${baseUrl}/api/v1/auth/media-token`, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+const requestMediaToken = async (): Promise<string | null> => {
+  const { data, error, response } = await client.GET("/api/v1/auth/media-token");
 
-  if (response.status === 401 || response.status === 403) {
+  if (response?.status === 401 || response?.status === 403) {
     removeMediaToken();
     return null;
   }
-  if (!response.ok) {
-    throw new Error(`media token request failed with status ${response.status}`);
+  if (error || !data) {
+    throw new Error(`media token request failed: ${JSON.stringify(error)}`);
   }
 
-  const result = (await response.json()) as ApiResult<MediaTokenPayload>;
-  const token = result?.data?.token;
-  const expiresAt = result?.data?.expires_at;
+  const token = data.data?.token;
+  const expiresAt = data.data?.expires_at;
   if (!token || !expiresAt) {
     throw new Error("media token response is missing required fields");
   }
@@ -79,7 +63,7 @@ export const ensureMediaToken = async (
     return mediaTokenRequestInFlight;
   }
 
-  mediaTokenRequestInFlight = requestMediaToken(accessToken)
+  mediaTokenRequestInFlight = requestMediaToken()
     .catch((error: unknown) => {
       const isExistingTokenStillValid =
         !!existingToken && !!expiresAt && expiresAt > Date.now();

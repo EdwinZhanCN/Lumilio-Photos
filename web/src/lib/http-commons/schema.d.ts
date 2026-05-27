@@ -9842,7 +9842,6 @@ export interface components {
             total_sessions?: number;
         };
         "dto.QueryAssetsResponseDTO": {
-            assets?: components["schemas"]["dto.AssetDTO"][];
             items?: components["schemas"]["dto.BrowseItemDTO"][];
             /** @example 20 */
             limit?: number;
@@ -9853,8 +9852,6 @@ export interface components {
              * @enum {string}
              */
             stack_mode?: "collapsed" | "expanded";
-            /** @example 150 */
-            total?: number;
             /** @example 150 */
             total_assets?: number;
             /** @example 120 */
@@ -10075,9 +10072,6 @@ export interface components {
             /** @example 0 */
             offset?: number;
             result_items?: components["schemas"]["dto.BrowseItemDTO"][];
-            results?: components["schemas"]["dto.AssetDTO"][];
-            /** @example 150 */
-            results_total?: number;
             /** @example 150 */
             results_total_assets?: number;
             /** @example 120 */
@@ -10088,7 +10082,6 @@ export interface components {
              */
             stack_mode?: "collapsed" | "expanded";
             top_items?: components["schemas"]["dto.BrowseItemDTO"][];
-            top_results?: components["schemas"]["dto.AssetDTO"][];
             top_results_meta?: components["schemas"]["dto.SearchTopResultsMetaDTO"];
         };
         "dto.SearchTopResultsMetaDTO": {

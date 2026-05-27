@@ -2080,13 +2080,6 @@ const docTemplate = `{
             },
             "dto.QueryAssetsResponseDTO": {
                 "properties": {
-                    "assets": {
-                        "items": {
-                            "$ref": "#/components/schemas/dto.AssetDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    },
                     "items": {
                         "items": {
                             "$ref": "#/components/schemas/dto.BrowseItemDTO"
@@ -2109,10 +2102,6 @@ const docTemplate = `{
                         ],
                         "example": "collapsed",
                         "type": "string"
-                    },
-                    "total": {
-                        "example": 150,
-                        "type": "integer"
                     },
                     "total_assets": {
                         "example": 150,
@@ -2645,17 +2634,6 @@ const docTemplate = `{
                         "type": "array",
                         "uniqueItems": false
                     },
-                    "results": {
-                        "items": {
-                            "$ref": "#/components/schemas/dto.AssetDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    },
-                    "results_total": {
-                        "example": 150,
-                        "type": "integer"
-                    },
                     "results_total_assets": {
                         "example": 150,
                         "type": "integer"
@@ -2675,13 +2653,6 @@ const docTemplate = `{
                     "top_items": {
                         "items": {
                             "$ref": "#/components/schemas/dto.BrowseItemDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
-                    },
-                    "top_results": {
-                        "items": {
-                            "$ref": "#/components/schemas/dto.AssetDTO"
                         },
                         "type": "array",
                         "uniqueItems": false

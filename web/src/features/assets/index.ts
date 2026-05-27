@@ -58,7 +58,6 @@ export { generateViewKey } from "./utils/viewKey";
 export {
   createBrowseGroupsFromAssets,
   createBrowseGroupsFromAssetGroups,
-  createBrowseItemsFromApiItems,
   dedupeBrowseItemsById,
   findBrowseItemById,
   findBrowseItemIndexByAssetId,

@@ -67,6 +67,13 @@ const authMiddleware: Middleware = {
               return fetch(newRequest);
             }
           }
+          // Refresh failed (e.g. expired or invalid refresh token)
+          removeToken();
+          window.location.href = "/login";
+        } else {
+          // No refresh token available
+          removeToken();
+          window.location.href = "/login";
         }
       } catch {
         removeToken();

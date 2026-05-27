@@ -331,8 +331,9 @@ func TestPeopleHandlerListPersonAssets_StackModeCollapsed_ReturnsBrowseContract(
 	}
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &response))
 	require.Len(t, response.Data.Items, 1)
-	require.Len(t, response.Data.Assets, 1)
-	require.Equal(t, coverUUID.String(), response.Data.Assets[0].AssetID)
+	require.Equal(t, "stack", response.Data.Items[0].Type)
+	require.NotNil(t, response.Data.Items[0].Stack)
+	require.Equal(t, coverUUID.String(), response.Data.Items[0].Stack.CoverAssetID)
 	require.NotNil(t, response.Data.TotalVisible)
 	require.Equal(t, 1, *response.Data.TotalVisible)
 	require.NotNil(t, response.Data.TotalAssets)

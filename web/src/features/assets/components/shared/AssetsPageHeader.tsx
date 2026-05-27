@@ -510,13 +510,6 @@ const AssetsPageHeader = ({
       >
         {selection.enabled && (
           <div className="badge badge-lg badge-neutral hidden gap-2 rounded-full px-3 py-3 text-xs font-medium sm:inline-flex shrink-0">
-            <span
-              className={`size-2 rounded-full ${
-                selection.selectedCount > 0
-                  ? "bg-primary"
-                  : "bg-base-content/20"
-              }`}
-            ></span>
             {t("assets.assetsPageHeader.selectionMode.selectedCount", {
               count: selection.selectedCount,
               defaultValue: "{{count}} selected",
