@@ -26,10 +26,8 @@ import { Asset } from "@/lib/assets/types";
 import { useWorkingRepository } from "@/features/settings";
 import {
   flattenAssetGroups,
-  groupAssetsBySort,
   getViewerTimeZone,
-  mergeAdjacentAssetGroups,
-} from "@/features/assets/utils/assetGroups";
+} from "../utils/assetGroups";
 import {
   browseGroupsFromQueryLikePage,
   browseGroupsFromSearchResultsPage,
@@ -40,8 +38,7 @@ import {
   flattenBrowseGroupsToAssets,
   getBrowseItemAsset,
   mergeAdjacentBrowseGroups,
-  normalizeVisibleLegacyAssets,
-} from "@/features/assets/utils/browseItems";
+} from "../utils/browseItems";
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
 type AssetFilter = components["schemas"]["dto.AssetFilterDTO"];
@@ -286,12 +283,10 @@ export const useAssetsViewQuery = (
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const responseData = (lastPage as QueryAssetsApiEnvelope | undefined)
           ?.data;
-        const legacyAssets = normalizeVisibleLegacyAssets(responseData?.assets);
-        const total = responseData?.total_visible ?? responseData?.total;
+        const total = responseData?.total_visible;
         const offset = Number(lastPageParam ?? 0) || 0;
         const loadedCount = countLoadedBrowseRowsFromPage({
           items: responseData?.items,
-          legacyAssets,
         });
         const hasMore =
           typeof total === "number"
@@ -310,33 +305,23 @@ export const useAssetsViewQuery = (
     return pages.map((page, index) => {
       const offset = Number(pageParams[index] ?? 0) || 0;
       const responseData = page?.data;
-      const legacyAssets = normalizeVisibleLegacyAssets(responseData?.assets);
-      const groups = groupAssetsBySort(legacyAssets, sortBy);
       const browseGroups = browseGroupsFromQueryLikePage({
         items: responseData?.items,
-        legacyAssets,
         sortBy,
       });
-      const total = responseData?.total;
-      const visibleTotal = responseData?.total_visible ?? total;
+      const visibleTotal = responseData?.total_visible;
       const loadedCount = countLoadedBrowseRowsFromPage({
         items: responseData?.items,
-        legacyAssets,
       });
       const hasMore =
         typeof visibleTotal === "number"
           ? offset + loadedCount < visibleTotal
           : loadedCount >= pageSize;
 
-      return { groups, browseGroups, offset, total: visibleTotal, hasMore };
+      return { browseGroups, offset, total: visibleTotal, hasMore };
     });
   }, [query.data?.pageParams, query.dataUpdatedAt, pageSize, sortBy]);
 
-  const groups = useMemo(
-    () => mergeAdjacentAssetGroups(...assetsPages.map((page) => page.groups)),
-    [assetsPages],
-  );
-  const assets = useMemo(() => flattenAssetGroups(groups), [groups]);
   const browseGroups = useMemo(
     () =>
       mergeAdjacentBrowseGroups(
@@ -344,6 +329,15 @@ export const useAssetsViewQuery = (
       ),
     [assetsPages],
   );
+  const groups = useMemo(
+    () =>
+      browseGroups.map((bg) => ({
+        key: bg.key,
+        assets: bg.items.map(getBrowseItemAsset),
+      })),
+    [browseGroups],
+  );
+  const assets = useMemo(() => flattenAssetGroups(groups), [groups]);
   const browseProjection = useMemo(
     () => ({
       browseGroups,
@@ -399,10 +393,7 @@ export const useAssetsView = (
 ): AssetsViewResult => {
   const { withGroups = false } = options;
   const queryResult = useAssetsViewQuery(definition, options);
-  const assets = useMemo(
-    () => normalizeVisibleLegacyAssets(queryResult.assets),
-    [queryResult.assets],
-  );
+  const assets = queryResult.assets;
 
   return {
     assets,
@@ -474,15 +465,10 @@ export const usePhotoSearchView = (
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const responseData = (lastPage as SearchAssetsApiEnvelope | undefined)
           ?.data;
-        const legacyResults = normalizeVisibleLegacyAssets(
-          responseData?.results,
-        );
-        const total =
-          responseData?.results_total_visible ?? responseData?.results_total;
+        const total = responseData?.results_total_visible;
         const offset = Number(lastPageParam ?? 0) || 0;
         const loadedCount = countLoadedBrowseRowsFromPage({
           items: responseData?.result_items,
-          legacyAssets: legacyResults,
         });
         const hasMore =
           typeof total === "number"
@@ -501,12 +487,9 @@ export const usePhotoSearchView = (
     return pages.map((page, index) => {
       const responseData = page?.data;
       const offset = Number(pageParams[index] ?? 0) || 0;
-      const legacyResults = normalizeVisibleLegacyAssets(responseData?.results);
-      const total =
-        responseData?.results_total_visible ?? responseData?.results_total;
+      const total = responseData?.results_total_visible;
       const loadedCount = countLoadedBrowseRowsFromPage({
         items: responseData?.result_items,
-        legacyAssets: legacyResults,
       });
       const hasMore =
         typeof total === "number"
@@ -514,10 +497,8 @@ export const usePhotoSearchView = (
           : loadedCount >= pageSize;
 
       return {
-        topResultsRaw: responseData?.top_results ?? [],
         topItems: responseData?.top_items,
         topResultsMeta: normalizeTopResultsMeta(responseData?.top_results_meta),
-        legacyResults,
         resultItems: responseData?.result_items,
         total,
         offset,
@@ -531,15 +512,13 @@ export const usePhotoSearchView = (
     () =>
       browseGroupsFromSearchTop({
         topItems: firstPage?.topItems,
-        legacyTopAssets: normalizeVisibleLegacyAssets(firstPage?.topResultsRaw),
       }),
-    [firstPage?.topItems, firstPage?.topResultsRaw],
+    [firstPage?.topItems],
   );
   const resultBrowseGroups = useMemo(() => {
     const perPage = searchPages.map((page) =>
       browseGroupsFromSearchResultsPage({
         resultItems: page.resultItems,
-        legacyResultAssets: page.legacyResults,
       }),
     );
     return mergeAdjacentBrowseGroups(...perPage);

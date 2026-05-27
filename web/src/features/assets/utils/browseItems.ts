@@ -285,19 +285,6 @@ export const createBrowseGroupsFromBrowseItemDTOs = (
   return items.length > 0 ? [{ key, items }] : [];
 };
 
-/** @deprecated Use createBrowseItemsFromBrowseItemDTOs */
-export const createBrowseItemsFromApiItems =
-  createBrowseItemsFromBrowseItemDTOs;
-
-/** @deprecated Use createBrowseGroupsFromBrowseItemDTOs */
-export const createBrowseGroupsFromApiItems =
-  createBrowseGroupsFromBrowseItemDTOs;
-
-export const normalizeVisibleLegacyAssets = (
-  assets?: Asset[] | null,
-): Asset[] =>
-  (assets ?? []).filter((asset) => !asset.is_deleted && !asset.deleted_at);
-
 export const groupBrowseItemsBySort = (
   items: BrowseItem[],
   sortBy: SortByType,
@@ -343,52 +330,31 @@ export const mergeAdjacentBrowseGroups = (
   return merged;
 };
 
-/** Prefer `items` / `top_items` / `result_items`; fall back to grouped legacy asset rows. */
 export const browseGroupsFromQueryLikePage = (params: {
   items?: BrowseItemDTO[] | null;
-  legacyAssets: Asset[];
   sortBy: SortByType;
 }): BrowseGroup[] => {
   const fromDto = createBrowseItemsFromBrowseItemDTOs(params.items);
-  if (fromDto.length > 0) {
-    return groupBrowseItemsBySort(fromDto, params.sortBy);
-  }
-  const groups = groupAssetsBySort(params.legacyAssets, params.sortBy);
-  return createBrowseGroupsFromAssetGroups(groups);
+  return groupBrowseItemsBySort(fromDto, params.sortBy);
 };
 
 export const browseGroupsFromSearchTop = (params: {
   topItems?: BrowseItemDTO[] | null;
-  legacyTopAssets: Asset[];
 }): BrowseGroup[] => {
   const fromDto = createBrowseItemsFromBrowseItemDTOs(params.topItems);
-  if (fromDto.length > 0) {
-    return [{ key: "search:top_results", items: fromDto }];
-  }
-  return createBrowseGroupsFromAssets(
-    params.legacyTopAssets,
-    "search:top_results",
-  );
+  return fromDto.length > 0 ? [{ key: "search:top_results", items: fromDto }] : [];
 };
 
 export const browseGroupsFromSearchResultsPage = (params: {
   resultItems?: BrowseItemDTO[] | null;
-  legacyResultAssets: Asset[];
 }): BrowseGroup[] => {
   const fromDto = createBrowseItemsFromBrowseItemDTOs(params.resultItems);
-  if (fromDto.length > 0) {
-    return [{ key: "search:results", items: fromDto }];
-  }
-  return createBrowseGroupsFromAssets(
-    params.legacyResultAssets,
-    "search:results",
-  );
+  return fromDto.length > 0 ? [{ key: "search:results", items: fromDto }] : [];
 };
 
 export const countLoadedBrowseRowsFromPage = (params: {
   items?: BrowseItemDTO[] | null;
-  legacyAssets: Asset[];
 }): number => {
   const fromDto = createBrowseItemsFromBrowseItemDTOs(params.items);
-  return fromDto.length > 0 ? fromDto.length : params.legacyAssets.length;
+  return fromDto.length;
 };

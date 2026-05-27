@@ -299,9 +299,7 @@ type AssetListResponseDTO struct {
 }
 
 type QueryAssetsResponseDTO struct {
-	Assets       []AssetDTO      `json:"assets"`
 	Items        []BrowseItemDTO `json:"items,omitempty"`
-	Total        *int            `json:"total,omitempty" example:"150"`
 	TotalVisible *int            `json:"total_visible,omitempty" example:"120"`
 	TotalAssets  *int            `json:"total_assets,omitempty" example:"150"`
 	StackMode    string          `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
@@ -504,12 +502,9 @@ type SearchTopResultsMetaDTO struct {
 }
 
 type SearchAssetsResponseDTO struct {
-	TopResults          []AssetDTO              `json:"top_results"`
 	TopItems            []BrowseItemDTO         `json:"top_items,omitempty"`
 	TopResultsMeta      SearchTopResultsMetaDTO `json:"top_results_meta"`
-	Results             []AssetDTO              `json:"results"`
 	ResultItems         []BrowseItemDTO         `json:"result_items,omitempty"`
-	ResultsTotal        *int                    `json:"results_total,omitempty" example:"150"`
 	ResultsTotalVisible *int                    `json:"results_total_visible,omitempty" example:"120"`
 	ResultsTotalAssets  *int                    `json:"results_total_assets,omitempty" example:"150"`
 	StackMode           string                  `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`

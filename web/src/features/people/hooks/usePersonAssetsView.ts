@@ -20,17 +20,15 @@ import type { components, paths } from "@/lib/http-commons/schema.d.ts";
 import { useWorkingRepository } from "@/features/settings";
 import {
   flattenAssetGroups,
-  groupAssetsBySort,
   getViewerTimeZone,
-  mergeAdjacentAssetGroups,
 } from "@/features/assets/utils/assetGroups";
 import {
   browseGroupsFromQueryLikePage,
   countLoadedBrowseRowsFromPage,
   flattenBrowseGroups,
   flattenBrowseGroupsToAssets,
+  getBrowseItemAsset,
   mergeAdjacentBrowseGroups,
-  normalizeVisibleLegacyAssets,
 } from "@/features/assets/utils/browseItems";
 
 type AssetQueryRequest = components["schemas"]["dto.AssetQueryRequestDTO"];
@@ -135,12 +133,10 @@ export function usePersonAssetsView(
       pageParamName: "offset",
       getNextPageParam: (lastPage, _allPages, lastPageParam) => {
         const responseData = (lastPage as PersonAssetsApiEnvelope | undefined)?.data;
-        const legacyAssets = normalizeVisibleLegacyAssets(responseData?.assets);
-        const total = responseData?.total_visible ?? responseData?.total;
+        const total = responseData?.total_visible;
         const offset = Number(lastPageParam ?? 0) || 0;
         const loadedCount = countLoadedBrowseRowsFromPage({
           items: responseData?.items,
-          legacyAssets,
         });
         const hasMore =
           typeof total === "number"
@@ -159,36 +155,36 @@ export function usePersonAssetsView(
     return responsePages.map((page, index) => {
       const offset = Number(pageParams[index] ?? 0) || 0;
       const responseData = page?.data;
-      const legacyAssets = normalizeVisibleLegacyAssets(responseData?.assets);
-      const groups = groupAssetsBySort(legacyAssets, sortBy);
       const browseGroups = browseGroupsFromQueryLikePage({
         items: responseData?.items,
-        legacyAssets,
         sortBy,
       });
-      const total = responseData?.total_visible ?? responseData?.total;
+      const total = responseData?.total_visible;
       const loadedCount = countLoadedBrowseRowsFromPage({
         items: responseData?.items,
-        legacyAssets,
       });
       const hasMore =
         typeof total === "number"
           ? offset + loadedCount < total
           : loadedCount >= pageSize;
 
-      return { groups, browseGroups, offset, total, hasMore };
+      return { browseGroups, offset, total, hasMore };
     });
   }, [pageSize, query.data?.pageParams, query.dataUpdatedAt, sortBy]);
 
-  const groups = useMemo(
-    () => mergeAdjacentAssetGroups(...pages.map((page) => page.groups)),
-    [pages],
-  );
-  const assets = useMemo(() => flattenAssetGroups(groups), [groups]);
   const browseGroups = useMemo(
     () => mergeAdjacentBrowseGroups(...pages.map((page) => page.browseGroups)),
     [pages],
   );
+  const groups = useMemo(
+    () =>
+      browseGroups.map((bg) => ({
+        key: bg.key,
+        assets: bg.items.map(getBrowseItemAsset),
+      })),
+    [browseGroups],
+  );
+  const assets = useMemo(() => flattenAssetGroups(groups), [groups]);
   const browseItems = useMemo(
     () => flattenBrowseGroups(browseGroups),
     [browseGroups],
@@ -223,7 +219,7 @@ export function usePersonAssetsView(
   }, [query]);
 
   return {
-    assets: normalizeVisibleLegacyAssets(assets),
+    assets,
     groups: withGroups ? groups : undefined,
     browseGroups,
     browseItems,

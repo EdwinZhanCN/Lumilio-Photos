@@ -1835,28 +1835,6 @@ func (h *AssetHandler) enrichAssetDTOsWithStackInfo(ctx context.Context, dtos []
 	return nil
 }
 
-func toSearchAssetsResponseDTO(result service.SearchAssetsResult, limit, offset int) dto.SearchAssetsResponseDTO {
-	var total *int
-	if result.ResultsTotal >= 0 {
-		totalValue := int(result.ResultsTotal)
-		total = &totalValue
-	}
-
-	return dto.SearchAssetsResponseDTO{
-		TopResults: toAssetDTOs(result.TopResults),
-		TopResultsMeta: dto.SearchTopResultsMetaDTO{
-			Enabled:     result.TopResultsMeta.Enabled,
-			Degraded:    result.TopResultsMeta.Degraded,
-			Reason:      result.TopResultsMeta.Reason,
-			SourceTypes: append([]string{}, result.TopResultsMeta.SourceTypes...),
-		},
-		Results:      toAssetDTOs(result.Results),
-		ResultsTotal: total,
-		Limit:        limit,
-		Offset:       offset,
-	}
-}
-
 func uuidStrings(values []uuid.UUID) []string {
 	if len(values) == 0 {
 		return nil
@@ -1909,28 +1887,12 @@ func toBrowseItemDTOs(items []service.BrowseItem) []dto.BrowseItemDTO {
 	return dtos
 }
 
-func legacyAssetDTOsFromBrowseItemDTOs(items []dto.BrowseItemDTO) []dto.AssetDTO {
-	assets := make([]dto.AssetDTO, 0, len(items))
-	for _, item := range items {
-		if item.Type == "stack" && item.Stack != nil {
-			assets = append(assets, item.Stack.CoverAsset)
-			continue
-		}
-		if item.Asset != nil {
-			assets = append(assets, *item.Asset)
-		}
-	}
-	return assets
-}
-
 func toQueryBrowseResponseDTO(result service.BrowseQueryResult, limit, offset int) dto.QueryAssetsResponseDTO {
 	totalVisible := int(result.TotalVisible)
 	totalAssets := int(result.TotalAssets)
 	itemDTOs := toBrowseItemDTOs(result.Items)
 	return dto.QueryAssetsResponseDTO{
-		Assets:       legacyAssetDTOsFromBrowseItemDTOs(itemDTOs),
 		Items:        itemDTOs,
-		Total:        &totalVisible,
 		TotalVisible: &totalVisible,
 		TotalAssets:  &totalAssets,
 		StackMode:    result.StackMode,
@@ -1945,7 +1907,6 @@ func toSearchBrowseResponseDTO(result service.SearchBrowseResult, limit, offset 
 	topItemDTOs := toBrowseItemDTOs(result.TopResults)
 	resultItemDTOs := toBrowseItemDTOs(result.Results)
 	return dto.SearchAssetsResponseDTO{
-		TopResults: legacyAssetDTOsFromBrowseItemDTOs(topItemDTOs),
 		TopItems:   topItemDTOs,
 		TopResultsMeta: dto.SearchTopResultsMetaDTO{
 			Enabled:     result.TopResultsMeta.Enabled,
@@ -1953,9 +1914,7 @@ func toSearchBrowseResponseDTO(result service.SearchBrowseResult, limit, offset 
 			Reason:      result.TopResultsMeta.Reason,
 			SourceTypes: append([]string{}, result.TopResultsMeta.SourceTypes...),
 		},
-		Results:             legacyAssetDTOsFromBrowseItemDTOs(resultItemDTOs),
 		ResultItems:         resultItemDTOs,
-		ResultsTotal:        &resultsTotalVisible,
 		ResultsTotalVisible: &resultsTotalVisible,
 		ResultsTotalAssets:  &resultsTotalAssets,
 		StackMode:           result.StackMode,
