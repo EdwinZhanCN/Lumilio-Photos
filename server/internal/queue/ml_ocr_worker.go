@@ -47,9 +47,6 @@ func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrAr
 	if w.LumenService == nil {
 		return river.JobSnooze(30 * time.Second)
 	}
-	if !w.LumenService.IsTaskAvailable("ocr") {
-		return river.JobSnooze(30 * time.Second)
-	}
 	if w.ImageLoader == nil {
 		return fmt.Errorf("ml image loader unavailable")
 	}
@@ -62,7 +59,7 @@ func (w *ProcessOcrWorker) Work(ctx context.Context, job *river.Job[ProcessOcrAr
 	// Perform OCR using LumenService
 	ocrResult, err := w.LumenService.OCR(ctx, imageData)
 	if err != nil {
-		return maybeSnoozeMLInfraError(fmt.Errorf("failed to perform OCR: %w", err))
+		return fmt.Errorf("failed to perform OCR: %w", err)
 	}
 
 	// Save OCR results using OCRService

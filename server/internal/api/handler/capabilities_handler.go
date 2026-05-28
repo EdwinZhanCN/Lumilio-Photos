@@ -48,23 +48,17 @@ func (h *capabilitiesHandler) GetCapabilities(c *gin.Context) {
 	discoveredNodeCount := 0
 	activeNodeCount := 0
 	taskAvailability := map[string]bool{
-		"semantic_image_embed":      false,
-		"semantic_text_embed":       false,
-		"bioclip_classify":      false,
-		"ocr":                   false,
-		"face_recognition": false,
+		"semantic_image_embed": false,
+		"semantic_text_embed":  false,
+		"bioclip_classify":     false,
+		"ocr":                  false,
+		"face_recognition":     false,
 	}
 
 	if h.lumenService != nil {
-		nodes, err := h.lumenService.GetAvailableModels(c.Request.Context())
-		if err == nil {
-			discoveredNodeCount = len(nodes)
-			for _, node := range nodes {
-				if node != nil && node.IsActive() {
-					activeNodeCount++
-				}
-			}
-		}
+		stats := h.lumenService.PoolStats()
+		discoveredNodeCount = stats.TotalConnections
+		activeNodeCount = stats.HealthyConnections
 
 		for taskName := range taskAvailability {
 			taskAvailability[taskName] = h.lumenService.IsTaskAvailable(taskName)

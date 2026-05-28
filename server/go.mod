@@ -10,7 +10,10 @@ require (
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.8
 	github.com/corona10/goimagehash v1.1.0
 	github.com/davidbyttow/govips/v2 v2.18.0
-	github.com/edwinzhancn/lumen-sdk v1.1.11
+	github.com/edwinzhancn/lumen-sdk v1.2.5
+)
+
+require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-webauthn/webauthn v0.16.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -31,6 +34,8 @@ require (
 	golang.org/x/crypto v0.49.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
+
+require github.com/gorilla/websocket v1.5.3 // indirect
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
@@ -73,7 +78,6 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/riverqueue/river/riverdriver v0.24.0 // indirect
 	github.com/riverqueue/river/rivershared v0.24.0 // indirect
-	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
 	github.com/sv-tools/openapi v0.4.0 // indirect

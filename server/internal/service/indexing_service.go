@@ -74,7 +74,7 @@ type AssetIndexingService interface {
 type assetIndexingService struct {
 	queries         *repo.Queries
 	settingsService SettingsService
-	runtimeChecker  TaskAvailabilityChecker
+	runtimeChecker  LumenService
 	queueClient     *river.Client[pgx.Tx]
 	dbpool          *pgxpool.Pool
 	logger          *zap.Logger
@@ -89,7 +89,7 @@ type reindexCandidate struct {
 func NewAssetIndexingService(
 	queries *repo.Queries,
 	settingsService SettingsService,
-	runtimeChecker TaskAvailabilityChecker,
+	runtimeChecker LumenService,
 	queueClient *river.Client[pgx.Tx],
 	dbpool *pgxpool.Pool,
 	logger *zap.Logger,

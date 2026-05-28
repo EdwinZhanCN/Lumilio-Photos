@@ -47,9 +47,6 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 	if w.LumenService == nil {
 		return river.JobSnooze(30 * time.Second)
 	}
-	if !w.LumenService.IsTaskAvailable("semantic_image_embed") {
-		return river.JobSnooze(30 * time.Second)
-	}
 	if w.ImageLoader == nil {
 		return fmt.Errorf("ml image loader unavailable")
 	}
@@ -61,7 +58,7 @@ func (w *ProcessClipWorker) Work(ctx context.Context, job *river.Job[ProcessClip
 
 	embedding, err := w.LumenService.SemanticImageEmbed(ctx, imageData)
 	if err != nil {
-		return maybeSnoozeMLInfraError(fmt.Errorf("failed to generate CLIP embedding: %w", err))
+		return fmt.Errorf("failed to generate CLIP embedding: %w", err)
 	}
 
 	err = w.EmbeddingService.SaveEmbedding(ctx, pgUUID,

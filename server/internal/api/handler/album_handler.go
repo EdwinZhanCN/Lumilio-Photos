@@ -75,7 +75,7 @@ type AlbumHandler struct {
 	queries         *repo.Queries
 	queueClient     *river.Client[pgx.Tx]
 	settingsService service.SettingsService
-	runtimeChecker  service.TaskAvailabilityChecker
+	runtimeChecker  service.LumenService
 }
 
 // NewAlbumHandler creates a new album handler
@@ -84,7 +84,7 @@ func NewAlbumHandler(
 	queries *repo.Queries,
 	queueClient *river.Client[pgx.Tx],
 	settingsService service.SettingsService,
-	runtimeChecker service.TaskAvailabilityChecker,
+	runtimeChecker service.LumenService,
 ) *AlbumHandler {
 	return &AlbumHandler{
 		albumService:    albumService,

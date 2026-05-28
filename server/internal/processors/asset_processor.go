@@ -33,6 +33,7 @@ type AssetProcessor struct {
 	queueClient      *river.Client[pgx.Tx]
 	settingsService  service.SettingsService
 	embeddingService service.EmbeddingService
+	lumenService     service.LumenService
 	logger           *zap.Logger
 	auditProvider    logging.RepositoryAuditProvider
 }
@@ -46,6 +47,7 @@ func NewAssetProcessor(
 	queueClient *river.Client[pgx.Tx],
 	settingsService service.SettingsService,
 	embeddingService service.EmbeddingService,
+	lumenService service.LumenService,
 	logger *zap.Logger,
 	auditProvider logging.RepositoryAuditProvider,
 ) *AssetProcessor {
@@ -63,6 +65,7 @@ func NewAssetProcessor(
 		queueClient:      queueClient,
 		settingsService:  settingsService,
 		embeddingService: embeddingService,
+		lumenService:     lumenService,
 		logger:           logger.With(zap.String("component", "processor")),
 		auditProvider:    auditProvider,
 	}
