@@ -6,6 +6,7 @@ import (
 	"server/internal/db/repo"
 	"server/internal/logging"
 	"server/internal/service"
+	"server/internal/sourcing"
 	"server/internal/storage"
 
 	"github.com/jackc/pgx/v5"
@@ -30,6 +31,7 @@ type AssetProcessor struct {
 	queries          *repo.Queries
 	repoManager      storage.RepositoryManager
 	stagingManager   storage.StagingManager
+	materializer     *sourcing.SourceMaterializer
 	queueClient      *river.Client[pgx.Tx]
 	settingsService  service.SettingsService
 	embeddingService service.EmbeddingService
@@ -44,6 +46,7 @@ func NewAssetProcessor(
 	queries *repo.Queries,
 	repoManager storage.RepositoryManager,
 	stagingManager storage.StagingManager,
+	materializer *sourcing.SourceMaterializer,
 	queueClient *river.Client[pgx.Tx],
 	settingsService service.SettingsService,
 	embeddingService service.EmbeddingService,
@@ -62,6 +65,7 @@ func NewAssetProcessor(
 		queries:          queries,
 		repoManager:      repoManager,
 		stagingManager:   stagingManager,
+		materializer:     materializer,
 		queueClient:      queueClient,
 		settingsService:  settingsService,
 		embeddingService: embeddingService,

@@ -20,6 +20,7 @@ import (
 	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/service"
+	"server/internal/sourcing"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/scanner"
@@ -194,7 +195,10 @@ func main() {
 	tools.RegisterBulkLikeTool()
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
-	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, settingsService, embeddingService, lumenService, processorLogger, repoAuditProvider)
+	// Initialize SourceMaterializer (unified ingest entry point for upload, scan, cloud sync)
+	sourceMaterializer := sourcing.NewSourceMaterializer(queries, stagingManager, queueClient, assetService, processorLogger, repoAuditProvider)
+
+	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, sourceMaterializer, queueClient, settingsService, embeddingService, lumenService, processorLogger, repoAuditProvider)
 	repositoryScanner := scanner.NewScanner(queries, queueClient, appConfig.RepositoryScan, scannerLogger)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})
