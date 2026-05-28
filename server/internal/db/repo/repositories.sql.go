@@ -43,21 +43,23 @@ INSERT INTO repositories (
     path,
     config,
     status,
+    default_owner_id,
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
-) RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at
+    $1, $2, $3, $4, $5, $6, $7, $8
+) RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id
 `
 
 type CreateRepositoryParams struct {
-	RepoID    pgtype.UUID              `db:"repo_id" json:"repo_id"`
-	Name      string                   `db:"name" json:"name"`
-	Path      string                   `db:"path" json:"path"`
-	Config    repocfg.RepositoryConfig `db:"config" json:"config"`
-	Status    dbtypes.RepoStatus       `db:"status" json:"status"`
-	CreatedAt pgtype.Timestamptz       `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	RepoID         pgtype.UUID              `db:"repo_id" json:"repo_id"`
+	Name           string                   `db:"name" json:"name"`
+	Path           string                   `db:"path" json:"path"`
+	Config         repocfg.RepositoryConfig `db:"config" json:"config"`
+	Status         dbtypes.RepoStatus       `db:"status" json:"status"`
+	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
+	CreatedAt      pgtype.Timestamptz       `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryParams) (Repository, error) {
@@ -67,6 +69,7 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 		arg.Path,
 		arg.Config,
 		arg.Status,
+		arg.DefaultOwnerID,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -80,6 +83,7 @@ func (q *Queries) CreateRepository(ctx context.Context, arg CreateRepositoryPara
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultOwnerID,
 	)
 	return i, err
 }
@@ -105,7 +109,7 @@ func (q *Queries) DeleteRepository(ctx context.Context, repoID pgtype.UUID) erro
 }
 
 const getRepository = `-- name: GetRepository :one
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at FROM repositories
+SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id FROM repositories
 WHERE repo_id = $1
 `
 
@@ -121,12 +125,13 @@ func (q *Queries) GetRepository(ctx context.Context, repoID pgtype.UUID) (Reposi
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultOwnerID,
 	)
 	return i, err
 }
 
 const getRepositoryByPath = `-- name: GetRepositoryByPath :one
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at FROM repositories
+SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id FROM repositories
 WHERE path = $1
 `
 
@@ -142,12 +147,13 @@ func (q *Queries) GetRepositoryByPath(ctx context.Context, path string) (Reposit
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultOwnerID,
 	)
 	return i, err
 }
 
 const listActiveRepositories = `-- name: ListActiveRepositories :many
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at FROM repositories
+SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id FROM repositories
 WHERE status = 'active'
 ORDER BY created_at DESC
 `
@@ -170,6 +176,7 @@ func (q *Queries) ListActiveRepositories(ctx context.Context) ([]Repository, err
 			&i.LastSync,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DefaultOwnerID,
 		); err != nil {
 			return nil, err
 		}
@@ -182,7 +189,7 @@ func (q *Queries) ListActiveRepositories(ctx context.Context) ([]Repository, err
 }
 
 const listRepositories = `-- name: ListRepositories :many
-SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at FROM repositories
+SELECT repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id FROM repositories
 ORDER BY created_at DESC
 `
 
@@ -204,6 +211,7 @@ func (q *Queries) ListRepositories(ctx context.Context) ([]Repository, error) {
 			&i.LastSync,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DefaultOwnerID,
 		); err != nil {
 			return nil, err
 		}
@@ -229,23 +237,51 @@ func (q *Queries) RepositoryExists(ctx context.Context, path string) (bool, erro
 	return exists, err
 }
 
+const setPrimaryRepositoryOwner = `-- name: SetPrimaryRepositoryOwner :one
+UPDATE repositories
+SET
+    default_owner_id = $1,
+    updated_at = NOW()
+WHERE name = 'Primary Storage' AND default_owner_id IS NULL
+RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id
+`
+
+func (q *Queries) SetPrimaryRepositoryOwner(ctx context.Context, defaultOwnerID *int32) (Repository, error) {
+	row := q.db.QueryRow(ctx, setPrimaryRepositoryOwner, defaultOwnerID)
+	var i Repository
+	err := row.Scan(
+		&i.RepoID,
+		&i.Name,
+		&i.Path,
+		&i.Config,
+		&i.Status,
+		&i.LastSync,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultOwnerID,
+	)
+	return i, err
+}
+
 const updateRepository = `-- name: UpdateRepository :one
 UPDATE repositories
 SET
     name = $2,
     config = $3,
     status = $4,
-    updated_at = $5
+    default_owner_id = $5,
+    updated_at = $6
 WHERE repo_id = $1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at
+RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id
 `
 
 type UpdateRepositoryParams struct {
-	RepoID    pgtype.UUID              `db:"repo_id" json:"repo_id"`
-	Name      string                   `db:"name" json:"name"`
-	Config    repocfg.RepositoryConfig `db:"config" json:"config"`
-	Status    dbtypes.RepoStatus       `db:"status" json:"status"`
-	UpdatedAt pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	RepoID         pgtype.UUID              `db:"repo_id" json:"repo_id"`
+	Name           string                   `db:"name" json:"name"`
+	Config         repocfg.RepositoryConfig `db:"config" json:"config"`
+	Status         dbtypes.RepoStatus       `db:"status" json:"status"`
+	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
+	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error) {
@@ -254,6 +290,7 @@ func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryPara
 		arg.Name,
 		arg.Config,
 		arg.Status,
+		arg.DefaultOwnerID,
 		arg.UpdatedAt,
 	)
 	var i Repository
@@ -266,6 +303,7 @@ func (q *Queries) UpdateRepository(ctx context.Context, arg UpdateRepositoryPara
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultOwnerID,
 	)
 	return i, err
 }
@@ -276,7 +314,7 @@ SET
     last_sync = $2,
     updated_at = $3
 WHERE repo_id = $1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at
+RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id
 `
 
 type UpdateRepositoryLastSyncParams struct {
@@ -297,6 +335,7 @@ func (q *Queries) UpdateRepositoryLastSync(ctx context.Context, arg UpdateReposi
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultOwnerID,
 	)
 	return i, err
 }
@@ -307,7 +346,7 @@ SET
     status = $2,
     updated_at = $3
 WHERE repo_id = $1
-RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at
+RETURNING repo_id, name, path, config, status, last_sync, created_at, updated_at, default_owner_id
 `
 
 type UpdateRepositoryStatusParams struct {
@@ -328,6 +367,7 @@ func (q *Queries) UpdateRepositoryStatus(ctx context.Context, arg UpdateReposito
 		&i.LastSync,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultOwnerID,
 	)
 	return i, err
 }

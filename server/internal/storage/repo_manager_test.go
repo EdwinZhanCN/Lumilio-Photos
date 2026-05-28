@@ -113,7 +113,6 @@ func TestRepositoryWorkflow_Integration(t *testing.T) {
 			path: filepath.Join(testRoot, "photos-2024"),
 			config: func() *repocfg.RepositoryConfig {
 				config := repocfg.NewRepositoryConfig("Family Photos 2024")
-				config.LocalSettings.MaxFileSize = 104857600 // 100MB
 				return config
 			}(),
 		},

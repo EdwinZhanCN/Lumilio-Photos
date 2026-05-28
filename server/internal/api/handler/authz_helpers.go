@@ -58,6 +58,16 @@ func currentUserIsAdmin(c *gin.Context) bool {
 	return ok && service.IsAdminRole(user.Role)
 }
 
+// adminIDFromContext returns the current admin user's ID, or nil if not an admin.
+func adminIDFromContext(c *gin.Context) *int32 {
+	user, ok := currentUserFromContext(c)
+	if !ok || !service.IsAdminRole(user.Role) {
+		return nil
+	}
+	id := int32(user.UserID)
+	return &id
+}
+
 func requireCurrentUser(c *gin.Context) (*service.UserResponse, bool) {
 	user, ok := currentUserFromContext(c)
 	if !ok {

@@ -391,14 +391,15 @@ type RegistrationSession struct {
 }
 
 type Repository struct {
-	RepoID    pgtype.UUID              `db:"repo_id" json:"repo_id"`
-	Name      string                   `db:"name" json:"name"`
-	Path      string                   `db:"path" json:"path"`
-	Config    repocfg.RepositoryConfig `db:"config" json:"config"`
-	Status    dbtypes.RepoStatus       `db:"status" json:"status"`
-	LastSync  pgtype.Timestamptz       `db:"last_sync" json:"last_sync"`
-	CreatedAt pgtype.Timestamptz       `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	RepoID         pgtype.UUID              `db:"repo_id" json:"repo_id"`
+	Name           string                   `db:"name" json:"name"`
+	Path           string                   `db:"path" json:"path"`
+	Config         repocfg.RepositoryConfig `db:"config" json:"config"`
+	Status         dbtypes.RepoStatus       `db:"status" json:"status"`
+	LastSync       pgtype.Timestamptz       `db:"last_sync" json:"last_sync"`
+	CreatedAt      pgtype.Timestamptz       `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
 }
 
 type RepositoryScanRun struct {

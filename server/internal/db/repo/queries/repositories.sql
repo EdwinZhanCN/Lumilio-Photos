@@ -5,10 +5,11 @@ INSERT INTO repositories (
     path,
     config,
     status,
+    default_owner_id,
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1, $2, $3, $4, $5, $6, $7, $8
 ) RETURNING *;
 
 -- name: GetRepository :one
@@ -34,7 +35,8 @@ SET
     name = $2,
     config = $3,
     status = $4,
-    updated_at = $5
+    default_owner_id = $5,
+    updated_at = $6
 WHERE repo_id = $1
 RETURNING *;
 
@@ -74,3 +76,11 @@ SELECT COUNT(*) FROM repositories;
 -- name: CountRepositoriesByStatus :one
 SELECT COUNT(*) FROM repositories
 WHERE status = $1;
+
+-- name: SetPrimaryRepositoryOwner :one
+UPDATE repositories
+SET
+    default_owner_id = $1,
+    updated_at = NOW()
+WHERE name = 'Primary Storage' AND default_owner_id IS NULL
+RETURNING *;

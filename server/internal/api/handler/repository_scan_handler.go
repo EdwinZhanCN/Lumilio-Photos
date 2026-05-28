@@ -87,11 +87,12 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 	}
 
 	var dbRepo *repo.Repository
+	ownerID := adminIDFromContext(c)
 	if repocfg.IsRepositoryRoot(repoPath) {
-		dbRepo, err = h.repoManager.AddRepository(repoPath)
+		dbRepo, err = h.repoManager.AddRepository(repoPath, ownerID)
 	} else {
 		cfg := repocfg.NewDefaultRepositoryConfig(name)
-		dbRepo, err = h.repoManager.InitializeRepository(repoPath, *cfg)
+		dbRepo, err = h.repoManager.InitializeRepository(repoPath, *cfg, ownerID)
 	}
 	if err != nil {
 		api.GinBadRequest(c, err, "Failed to create repository")

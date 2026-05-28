@@ -29,14 +29,6 @@ type LocalSettings struct {
 	// HandleDuplicateFilenames how to handle files with same name
 	// "rename" = add (1), (2) suffix, "uuid" = add UUID, "overwrite" = replace existing
 	HandleDuplicateFilenames string `yaml:"handle_duplicate_filenames" json:"handle_duplicate_filenames"`
-	// MaxFileSize maximum file size in bytes (0 = no limit)
-	MaxFileSize int64 `yaml:"max_file_size" json:"max_file_size"`
-	// CompressFiles whether to compress files before storage
-	CompressFiles bool `yaml:"compress_files" json:"compress_files"`
-	// CreateBackups whether to create backup copies
-	CreateBackups bool `yaml:"create_backups" json:"create_backups"`
-	// BackupPath where to store backup copies (if CreateBackups is true)
-	BackupPath string `yaml:"backup_path,omitempty" json:"backup_path,omitempty"`
 }
 
 // DefaultRepositoryConfig returns a sensible default configuration template
@@ -48,9 +40,6 @@ func DefaultRepositoryConfig() *RepositoryConfig {
 		LocalSettings: LocalSettings{
 			PreserveOriginalFilename: true,
 			HandleDuplicateFilenames: "uuid",
-			MaxFileSize:              0, // No limit
-			CompressFiles:            false,
-			CreateBackups:            false,
 		},
 	}
 }
@@ -66,20 +55,18 @@ func WithStorageStrategy(strategy string) RepositoryConfigOption {
 }
 
 // WithLocalSettings sets the local settings for the repository
-func WithLocalSettings(preserveFilename bool, duplicateHandling string, maxSize int64, compress, backup bool) RepositoryConfigOption {
+func WithLocalSettings(preserveFilename bool, duplicateHandling string) RepositoryConfigOption {
 	return func(config *RepositoryConfig) {
 		config.LocalSettings.PreserveOriginalFilename = preserveFilename
 		config.LocalSettings.HandleDuplicateFilenames = duplicateHandling
-		config.LocalSettings.MaxFileSize = maxSize
-		config.LocalSettings.CompressFiles = compress
-		config.LocalSettings.CreateBackups = backup
 	}
 }
 
-// WithBackupPath sets the backup path for file backups
+// WithBackupPath is deprecated and no longer used.
 func WithBackupPath(path string) RepositoryConfigOption {
 	return func(config *RepositoryConfig) {
-		config.LocalSettings.BackupPath = path
+		// No-op: backup settings have been removed.
+		_ = path
 	}
 }
 
@@ -194,11 +181,6 @@ func (rc *RepositoryConfig) Validate() error {
 	}
 	if !validDuplicateStrategies[rc.LocalSettings.HandleDuplicateFilenames] {
 		return fmt.Errorf("invalid handle_duplicate_filenames '%s', must be one of: rename, uuid, overwrite", rc.LocalSettings.HandleDuplicateFilenames)
-	}
-
-	// Validate max file size
-	if rc.LocalSettings.MaxFileSize < 0 {
-		return fmt.Errorf("max_file_size cannot be negative")
 	}
 
 	return nil
