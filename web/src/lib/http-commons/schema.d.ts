@@ -3678,25 +3678,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            /**
-                             * @description Business status code (0 for success, non-zero for errors)
-                             * @example 0
-                             */
-                            code?: number;
-                            /** @description Business data, ignore empty values */
-                            data?: Record<string, never>;
-                            /**
-                             * @description Debug error message, ignore empty values
-                             * @example error details
-                             */
-                            error?: string;
-                            /**
-                             * @description User readable message
-                             * @example success
-                             */
-                            message?: string;
-                        } & components["schemas"]["data"];
+                        "application/json": components["schemas"]["dto.QueryAssetsResponse"];
                     };
                 };
                 /** @description Invalid request parameters */
@@ -9840,6 +9822,14 @@ export interface components {
             failed_sessions?: number;
             overall_progress?: number;
             total_sessions?: number;
+        };
+        "dto.QueryAssetsResponse": {
+            /** @example 0 */
+            code?: number;
+            data?: components["schemas"]["dto.QueryAssetsResponseDTO"];
+            error?: string;
+            /** @example success */
+            message?: string;
         };
         "dto.QueryAssetsResponseDTO": {
             items?: components["schemas"]["dto.BrowseItemDTO"][];

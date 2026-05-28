@@ -38,6 +38,7 @@ import type { Asset, components } from "@/lib/http-commons";
 import { $api } from "@/lib/http-commons/queryClient";
 import {
   type ParsedSpeciesPrediction,
+  type TaxonomyRank,
   formatSpeciesScore,
   getSpeciesScorePercent,
   normalizeSpeciesPredictions,
@@ -270,6 +271,25 @@ const SpeciesReferenceTrigger = ({
     </>
   );
 };
+
+function getRankLabel(t: (key: string) => string, rank: TaxonomyRank) {
+  switch (rank) {
+    case "kingdom":
+      return t("assets.photos.fullscreen.fieldGuide.ranks.kingdom");
+    case "phylum":
+      return t("assets.photos.fullscreen.fieldGuide.ranks.phylum");
+    case "class":
+      return t("assets.photos.fullscreen.fieldGuide.ranks.class");
+    case "order":
+      return t("assets.photos.fullscreen.fieldGuide.ranks.order");
+    case "family":
+      return t("assets.photos.fullscreen.fieldGuide.ranks.family");
+    case "genus":
+      return t("assets.photos.fullscreen.fieldGuide.ranks.genus");
+    case "species":
+      return t("assets.photos.fullscreen.fieldGuide.ranks.species");
+  }
+}
 
 const FullScreenCarousel = ({
   photos,
@@ -652,7 +672,7 @@ const FullScreenCarousel = ({
                     className="grid grid-cols-[104px_1fr] items-center border-b border-white/10 pb-2 text-sm last:border-b-0 last:pb-0"
                   >
                     <span className="text-white/48">
-                      {t(`assets.photos.fullscreen.fieldGuide.ranks.${rank}`)}
+                      {getRankLabel(t, rank)}
                     </span>
                     <span
                       className={

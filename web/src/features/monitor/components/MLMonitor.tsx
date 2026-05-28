@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { Bird, Cpu, Database, Loader2, RefreshCcw, Workflow } from "lucide-react";
+import {
+  Bird,
+  Cpu,
+  Database,
+  Loader2,
+  RefreshCcw,
+  Workflow,
+} from "lucide-react";
 import {
   useAssetIndexingStats,
   useRebuildAssetIndexes,
@@ -15,6 +22,18 @@ function formatCoveragePercent(coverage: number): string {
 }
 
 const ML_TASK_KEYS = ["clip", "ocr", "face"] as const;
+type MLTaskKey = (typeof ML_TASK_KEYS)[number];
+
+function getTaskLabel(t: (key: string) => string, key: MLTaskKey) {
+  switch (key) {
+    case "clip":
+      return t("settings.aiSettings.taskNames.clip");
+    case "ocr":
+      return t("settings.aiSettings.taskNames.ocr");
+    case "face":
+      return t("settings.aiSettings.taskNames.face");
+  }
+}
 
 export function MLMonitor({ localRepoId }: MLMonitorProps) {
   const { t } = useI18n();
@@ -32,17 +51,16 @@ export function MLMonitor({ localRepoId }: MLMonitorProps) {
     () =>
       ML_TASK_KEYS.map((key) => ({
         key,
-        label: t(`settings.aiSettings.taskNames.${key}`),
+        label: getTaskLabel(t, key),
         stats: stats?.tasks[key],
       })),
     [stats, t],
   );
   const bioTaskStats = stats?.tasks.bioclip;
 
-  const totalQueuedMLJobs = taskCards.reduce(
-    (sum, task) => sum + (task.stats?.queuedJobs ?? 0),
-    0,
-  ) + (bioTaskStats?.queuedJobs ?? 0);
+  const totalQueuedMLJobs =
+    taskCards.reduce((sum, task) => sum + (task.stats?.queuedJobs ?? 0), 0) +
+    (bioTaskStats?.queuedJobs ?? 0);
   const rebuildingTasks = rebuildMutation.variables?.body?.tasks ?? [];
   const selectedReindexTask = reindexModal
     ? taskCards.find((task) => task.key === reindexModal.taskKey)

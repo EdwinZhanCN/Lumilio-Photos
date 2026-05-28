@@ -1930,7 +1930,7 @@ func toSearchBrowseResponseDTO(result service.SearchBrowseResult, limit, offset 
 // @Accept json
 // @Produce json
 // @Param request body dto.AssetQueryRequestDTO true "Query parameters"
-// @Success 200 {object} api.Result{data=dto.QueryAssetsResponseDTO} "Assets queried successfully"
+// @Success 200 {object} dto.QueryAssetsResponse "Assets queried successfully"
 // @Failure 400 {object} api.Result "Invalid request parameters"
 // @Failure 503 {object} api.Result "Semantic search unavailable"
 // @Failure 500 {object} api.Result "Internal server error"

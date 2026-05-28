@@ -47,7 +47,7 @@ function SideBar() {
               location.pathname.startsWith("/collections") ? "active" : ""
             }
           >
-            <LibraryBig size={20} strokeWidth={1.5} />
+            <LibraryBig className="size-5" />
             {t("sidebar.collections")}
           </Link>
         </li>

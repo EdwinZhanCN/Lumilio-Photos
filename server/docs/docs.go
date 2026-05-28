@@ -2078,6 +2078,25 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.QueryAssetsResponse": {
+                "properties": {
+                    "code": {
+                        "example": 0,
+                        "type": "integer"
+                    },
+                    "data": {
+                        "$ref": "#/components/schemas/dto.QueryAssetsResponseDTO"
+                    },
+                    "error": {
+                        "type": "string"
+                    },
+                    "message": {
+                        "example": "success",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.QueryAssetsResponseDTO": {
                 "properties": {
                     "items": {
@@ -6132,34 +6151,7 @@ const docTemplate = `{
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/data"
-                                        }
-                                    ],
-                                    "description": "Standard API response wrapper",
-                                    "properties": {
-                                        "code": {
-                                            "description": "Business status code (0 for success, non-zero for errors)",
-                                            "example": 0,
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "description": "Business data, ignore empty values",
-                                            "type": "object"
-                                        },
-                                        "error": {
-                                            "description": "Debug error message, ignore empty values",
-                                            "example": "error details",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "description": "User readable message",
-                                            "example": "success",
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/dto.QueryAssetsResponse"
                                 }
                             }
                         },

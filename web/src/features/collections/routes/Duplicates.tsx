@@ -35,6 +35,31 @@ type StatusBadgeProps = {
   method?: DuplicateMethod | string;
 };
 
+function getMethodLabel(t: (key: string) => string, method: DuplicateMethod) {
+  switch (method) {
+    case "exact":
+      return t("duplicates.method.exact");
+    case "mixed":
+      return t("duplicates.method.mixed");
+    case "phash":
+      return t("duplicates.method.phash");
+  }
+}
+
+function getStatusFilterLabel(
+  t: (key: string) => string,
+  status: DuplicateStatus,
+) {
+  switch (status) {
+    case "pending":
+      return t("duplicates.filters.pending");
+    case "merged":
+      return t("duplicates.filters.merged");
+    case "dismissed":
+      return t("duplicates.filters.dismissed");
+  }
+}
+
 const StatusBadge = ({ method }: StatusBadgeProps) => {
   const { t } = useI18n();
   const m = (method ?? "phash") as DuplicateMethod;
@@ -46,7 +71,7 @@ const StatusBadge = ({ method }: StatusBadgeProps) => {
         : "badge-info";
   return (
     <span className={`badge badge-sm ${color} badge-outline`}>
-      {t(`duplicates.method.${m}`)}
+      {getMethodLabel(t, m)}
     </span>
   );
 };
@@ -403,7 +428,7 @@ function DuplicatesContent() {
                     status === opt ? "btn-primary" : "btn-ghost"
                   }`}
                 >
-                  {t(`duplicates.filters.${opt}`)}
+                  {getStatusFilterLabel(t, opt)}
                 </button>
               ))}
             </div>

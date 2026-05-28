@@ -52,6 +52,19 @@ function getStatusOrder(status: UploadRowStatus) {
   }
 }
 
+function getStatusLabel(t: (key: string) => string, status: UploadRowStatus) {
+  switch (status) {
+    case "pending":
+      return t("upload.FileUploadProgress.status_pending");
+    case "uploading":
+      return t("upload.FileUploadProgress.status_uploading");
+    case "completed":
+      return t("upload.FileUploadProgress.status_completed");
+    case "failed":
+      return t("upload.FileUploadProgress.status_failed");
+  }
+}
+
 export default function NavbarUploadQueue() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -207,7 +220,7 @@ export default function NavbarUploadQueue() {
                 <span
                   className={`badge badge-sm ${getStatusBadgeClass(item.status)}`}
                 >
-                  {t(`upload.FileUploadProgress.status_${item.status}`)}
+                  {getStatusLabel(t, item.status)}
                 </span>
               </div>
 
