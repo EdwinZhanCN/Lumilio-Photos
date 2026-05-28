@@ -2,27 +2,21 @@ package processors
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/riverqueue/river"
 	"go.uber.org/zap"
 
-	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
 	"server/internal/queue/jobs"
-	"server/internal/utils/file"
-	"server/internal/utils/hash"
+	"server/internal/sourcing"
 )
 
 // ProcessDiscoveredAsset ingests files discovered by repository tree monitoring.
+// Delete operations are handled directly; upsert operations delegate to the SourceMaterializer.
 func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.DiscoverAssetArgs) error {
 	repoUUID, err := uuid.Parse(strings.TrimSpace(args.RepositoryID))
 	if err != nil {
@@ -54,196 +48,21 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 		return nil
 	}
 
-	repository, err := ap.queries.GetRepository(ctx, repoID)
-	if err != nil {
-		return fmt.Errorf("get repository: %w", err)
-	}
-
-	fullPath := filepath.Join(repository.Path, filepath.FromSlash(storagePath))
-
-	info, err := os.Stat(fullPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("stat discovered file: %w", err)
-	}
-	if info.IsDir() {
-		return nil
-	}
-
+	// Upsert: delegate to the materializer (file validation, hash, create-or-update, pipeline)
 	filename := strings.TrimSpace(args.FileName)
 	if filename == "" {
 		filename = filepath.Base(storagePath)
 	}
 
-	validation := file.ValidateFile(filename, args.ContentType)
-	if !validation.Valid {
-		// Discovery queue should not retry unsupported files.
-		return nil
-	}
-	contentType := validation.MimeType
-
-	hashResult, err := hash.CalculateFileHash(fullPath, hash.AlgorithmBLAKE3, true)
-	if err != nil {
-		return fmt.Errorf("calculate hash: %w", err)
-	}
-
-	statusJSON, err := buildTrackedProcessingStatus(validation.AssetType, "Asset discovery ingestion started")
-	if err != nil {
-		return fmt.Errorf("marshal status: %w", err)
-	}
-
-	rating := int32(0)
-	storagePathPtr := storagePath
-	hashPtr := hashResult.Hash
-	createdOrUpdatedAsset := (*repo.Asset)(nil)
-
-	existing, err := ap.queries.GetAssetByRepositoryAndStoragePathAny(ctx, repo.GetAssetByRepositoryAndStoragePathAnyParams{
-		RepositoryID: repoID,
-		StoragePath:  &storagePath,
+	_, err = ap.materializer.Materialize(ctx, sourcing.IngestSource{
+		RepositoryID:     repoUUID,
+		Kind:             sourcing.IngestSourceScan,
+		SourcePath:       storagePath, // repo-relative path
+		OriginalFilename: filename,
+		ContentType:      args.ContentType,
+		Timestamp:        args.DetectedAt,
 	})
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return fmt.Errorf("find discovered asset by path: %w", err)
-	}
-	if err == nil {
-		wasDeleted := isSoftDeleted(existing)
-		hashUnchanged := existing.Hash != nil && *existing.Hash == hashResult.Hash
-		if !wasDeleted && hashUnchanged && existing.FileSize == info.Size() && strings.EqualFold(existing.MimeType, contentType) {
-			return nil
-		}
-
-		updated, updateErr := ap.queries.UpdateDiscoveredAssetByID(ctx, repo.UpdateDiscoveredAssetByIDParams{
-			AssetID:          existing.AssetID,
-			OriginalFilename: filename,
-			MimeType:         contentType,
-			FileSize:         info.Size(),
-			Hash:             &hashPtr,
-			TakenTime:        pgtype.Timestamptz{Time: info.ModTime().UTC(), Valid: true},
-			Status:           statusJSON,
-		})
-		if updateErr != nil {
-			return fmt.Errorf("update discovered asset: %w", updateErr)
-		}
-		createdOrUpdatedAsset = &updated
-	}
-
-	if createdOrUpdatedAsset == nil {
-		asset, err := ap.assetService.CreateAssetRecord(ctx, repo.CreateAssetParams{
-			OwnerID:          repository.DefaultOwnerID,
-			Type:             string(validation.AssetType),
-			OriginalFilename: filename,
-			StoragePath:      &storagePathPtr,
-			MimeType:         contentType,
-			FileSize:         info.Size(),
-			Hash:             &hashPtr,
-			TakenTime:        pgtype.Timestamptz{Time: info.ModTime().UTC(), Valid: true},
-			Rating:           &rating,
-			RepositoryID:     repository.RepoID,
-			Status:           statusJSON,
-		})
-		if err != nil {
-			if isUniqueConstraintViolation(err) {
-				latestAsset, fetchErr := ap.queries.GetAssetByRepositoryAndStoragePathAny(ctx, repo.GetAssetByRepositoryAndStoragePathAnyParams{
-					RepositoryID: repoID,
-					StoragePath:  &storagePath,
-				})
-				if fetchErr == nil {
-					createdOrUpdatedAsset = &latestAsset
-				} else if !errors.Is(fetchErr, pgx.ErrNoRows) {
-					return fmt.Errorf("fetch discovered asset after unique conflict: %w", fetchErr)
-				}
-			} else {
-				return fmt.Errorf("create discovered asset: %w", err)
-			}
-		}
-		if createdOrUpdatedAsset == nil {
-			if asset == nil {
-				return nil
-			}
-			createdOrUpdatedAsset = asset
-		}
-	}
-
-	return ap.enqueueDiscoveredDownstream(ctx, repository, createdOrUpdatedAsset, storagePath)
-}
-
-func (ap *AssetProcessor) enqueueDiscoveredDownstream(
-	ctx context.Context,
-	repository repo.Repository,
-	asset *repo.Asset,
-	storagePath string,
-) error {
-	if asset == nil {
-		return fmt.Errorf("discovered asset is nil")
-	}
-
-	pgID := asset.AssetID
-	assetType := dbtypes.AssetType(asset.Type)
-	commonMeta := jobs.MetadataArgs{
-		AssetID:          pgID,
-		RepoPath:         repository.Path,
-		StoragePath:      storagePath,
-		AssetType:        assetType,
-		OriginalFilename: asset.OriginalFilename,
-		FileSize:         asset.FileSize,
-		MimeType:         asset.MimeType,
-	}
-	commonThumb := jobs.ThumbnailArgs{
-		AssetID:     pgID,
-		RepoPath:    repository.Path,
-		StoragePath: storagePath,
-		AssetType:   assetType,
-	}
-	commonTranscode := jobs.TranscodeArgs{
-		AssetID:     pgID,
-		RepoPath:    repository.Path,
-		StoragePath: storagePath,
-		AssetType:   assetType,
-	}
-
-	_, err := ap.queueClient.Insert(ctx, commonMeta, &river.InsertOpts{Queue: "metadata_asset"})
-	if err != nil {
-		ap.markPipelineTasksFailed(ctx, asset.AssetID, trackedPipelineTasks(assetType), fmt.Errorf("enqueue metadata: %w", err))
-		return fmt.Errorf("enqueue metadata: %w", err)
-	}
-
-	switch assetType {
-	case dbtypes.AssetTypePhoto:
-		_, err = ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
-		if err != nil {
-			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskThumbnail}, fmt.Errorf("enqueue thumbnails: %w", err))
-			return fmt.Errorf("enqueue thumbnails: %w", err)
-		}
-	case dbtypes.AssetTypeVideo:
-		_, err = ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
-		if err != nil {
-			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskThumbnail, taskTranscode}, fmt.Errorf("enqueue thumbnails: %w", err))
-			return fmt.Errorf("enqueue thumbnails: %w", err)
-		}
-		_, err = ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
-		if err != nil {
-			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskTranscode}, fmt.Errorf("enqueue transcode: %w", err))
-			return fmt.Errorf("enqueue transcode: %w", err)
-		}
-	case dbtypes.AssetTypeAudio:
-		_, err = ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
-		if err != nil {
-			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskTranscode}, fmt.Errorf("enqueue transcode: %w", err))
-			return fmt.Errorf("enqueue transcode: %w", err)
-		}
-	default:
-		return fmt.Errorf("unsupported asset type: %s", assetType)
-	}
-
-	ap.repoAudit(repository.Path).Operation("asset.discover.upsert",
-		zap.String("repository_id", uuid.UUID(repository.RepoID.Bytes).String()),
-		zap.String("asset_id", asset.AssetID.String()),
-		zap.String("storage_path", storagePath),
-		zap.String("asset_type", string(assetType)),
-	)
-
-	return nil
+	return err
 }
 
 func normalizeDiscoverOperation(raw string) string {
@@ -283,16 +102,4 @@ func sanitizeDiscoveredPath(path string) (string, error) {
 	}
 
 	return normalized, nil
-}
-
-func isSoftDeleted(asset repo.Asset) bool {
-	return asset.IsDeleted != nil && *asset.IsDeleted
-}
-
-func isUniqueConstraintViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "23505"
-	}
-	return false
 }
