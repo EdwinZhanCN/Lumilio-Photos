@@ -130,7 +130,7 @@ func (ap *AssetProcessor) ProcessDiscoveredAsset(ctx context.Context, args jobs.
 
 	if createdOrUpdatedAsset == nil {
 		asset, err := ap.assetService.CreateAssetRecord(ctx, repo.CreateAssetParams{
-			OwnerID:          nil,
+			OwnerID:          repository.DefaultOwnerID,
 			Type:             string(validation.AssetType),
 			OriginalFilename: filename,
 			StoragePath:      &storagePathPtr,

@@ -1,8 +1,6 @@
 package repocfg
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -16,8 +14,7 @@ func TestRepositoryConfig_SaveAndLoad(t *testing.T) {
 
 	cfg := NewRepositoryConfig("Family Photos",
 		WithStorageStrategy("date"),
-		WithLocalSettings(true, "rename", 128*1024*1024, false, true),
-		WithBackupPath("/mnt/backup"),
+		WithLocalSettings(true, "rename"),
 	)
 
 	require.NoError(t, cfg.SaveConfigToFile(repoPath))
@@ -31,10 +28,6 @@ func TestRepositoryConfig_SaveAndLoad(t *testing.T) {
 	assert.Equal(t, cfg.StorageStrategy, loaded.StorageStrategy)
 	assert.Equal(t, cfg.LocalSettings.PreserveOriginalFilename, loaded.LocalSettings.PreserveOriginalFilename)
 	assert.Equal(t, cfg.LocalSettings.HandleDuplicateFilenames, loaded.LocalSettings.HandleDuplicateFilenames)
-	assert.Equal(t, cfg.LocalSettings.MaxFileSize, loaded.LocalSettings.MaxFileSize)
-	assert.Equal(t, cfg.LocalSettings.CompressFiles, loaded.LocalSettings.CompressFiles)
-	assert.Equal(t, cfg.LocalSettings.CreateBackups, loaded.LocalSettings.CreateBackups)
-	assert.Equal(t, cfg.LocalSettings.BackupPath, loaded.LocalSettings.BackupPath)
 }
 
 func TestDefaultRepositoryConfig_Template(t *testing.T) {
@@ -76,15 +69,12 @@ func TestNewRepositoryConfig_SystemGeneratedFields(t *testing.T) {
 func TestNewRepositoryConfig_WithOptions(t *testing.T) {
 	cfg := NewRepositoryConfig("Archive",
 		WithStorageStrategy("cas"),
-		WithLocalSettings(false, "overwrite", 50*1024*1024, true, false),
+		WithLocalSettings(false, "overwrite"),
 	)
 
 	assert.Equal(t, "cas", cfg.StorageStrategy)
 	assert.False(t, cfg.LocalSettings.PreserveOriginalFilename)
 	assert.Equal(t, "overwrite", cfg.LocalSettings.HandleDuplicateFilenames)
-	assert.Equal(t, int64(50*1024*1024), cfg.LocalSettings.MaxFileSize)
-	assert.True(t, cfg.LocalSettings.CompressFiles)
-	assert.False(t, cfg.LocalSettings.CreateBackups)
 	assert.NoError(t, cfg.Validate())
 }
 
@@ -103,31 +93,16 @@ func TestRepositoryConfig_ValidateFailures(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid handle_duplicate_filenames")
 	})
-
-	t.Run("negative max file size", func(t *testing.T) {
-		cfg := NewRepositoryConfig("Invalid")
-		cfg.LocalSettings.MaxFileSize = -1
-		err := cfg.Validate()
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "max_file_size cannot be negative")
-	})
 }
 
-func TestRepositoryConfig_WithBackupPathInYAML(t *testing.T) {
-	cfg := NewRepositoryConfig("Repository with Backup",
-		WithLocalSettings(true, "uuid", 0, false, true),
+func TestRepositoryConfig_WithBackupPathRemoved(t *testing.T) {
+	cfg := NewRepositoryConfig("Repository",
+		WithLocalSettings(true, "uuid"),
 		WithBackupPath("/external/backup/drive"),
 	)
 
-	dir := t.TempDir()
-	require.NoError(t, cfg.SaveConfigToFile(dir))
-
-	configPath := filepath.Join(dir, ".lumiliorepo")
-	content, err := os.ReadFile(configPath)
-	require.NoError(t, err)
-
-	assert.Contains(t, string(content), "backup_path: /external/backup/drive")
-	assert.Contains(t, string(content), "create_backups: true")
+	// WithBackupPath is now a no-op — backup settings have been removed.
+	assert.NoError(t, cfg.Validate())
 }
 
 func TestIsRepositoryRoot(t *testing.T) {

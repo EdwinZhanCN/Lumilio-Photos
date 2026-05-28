@@ -135,7 +135,7 @@ func TestStagingManager_InboxIntegration(t *testing.T) {
 		// Create repository config with date strategy
 		config := repocfg.NewRepositoryConfig("Test Repo",
 			repocfg.WithStorageStrategy("date"),
-			repocfg.WithLocalSettings(true, "uuid", 0, false, false))
+			repocfg.WithLocalSettings(true, "uuid"))
 		err := config.SaveConfigToFile(testDir)
 		require.NoError(t, err)
 
@@ -176,7 +176,7 @@ func TestStagingManager_InboxIntegration(t *testing.T) {
 		// Create repository config with flat strategy
 		config := repocfg.NewRepositoryConfig("Test Repo Flat",
 			repocfg.WithStorageStrategy("flat"),
-			repocfg.WithLocalSettings(true, "rename", 0, false, false))
+			repocfg.WithLocalSettings(true, "rename"))
 		err := config.SaveConfigToFile(testDir)
 		require.NoError(t, err)
 
@@ -201,7 +201,7 @@ func TestStagingManager_InboxIntegration(t *testing.T) {
 		// Create repository config with CAS strategy
 		config := repocfg.NewRepositoryConfig("Test Repo CAS",
 			repocfg.WithStorageStrategy("cas"),
-			repocfg.WithLocalSettings(true, "uuid", 0, false, false))
+			repocfg.WithLocalSettings(true, "uuid"))
 		err := config.SaveConfigToFile(testDir)
 		require.NoError(t, err)
 
@@ -228,7 +228,7 @@ func TestStagingManager_InboxIntegration(t *testing.T) {
 		// Create repository config with CAS strategy
 		config := repocfg.NewRepositoryConfig("Test Repo CAS Fallback",
 			repocfg.WithStorageStrategy("cas"),
-			repocfg.WithLocalSettings(true, "uuid", 0, false, false))
+			repocfg.WithLocalSettings(true, "uuid"))
 		err := config.SaveConfigToFile(testDir)
 		require.NoError(t, err)
 
@@ -275,7 +275,7 @@ func TestStagingManager_DuplicateHandling(t *testing.T) {
 	t.Run("duplicate handling with rename strategy", func(t *testing.T) {
 		config := repocfg.NewRepositoryConfig("Test Rename",
 			repocfg.WithStorageStrategy("flat"),
-			repocfg.WithLocalSettings(true, "rename", 0, false, false))
+			repocfg.WithLocalSettings(true, "rename"))
 		err := config.SaveConfigToFile(testDir)
 		require.NoError(t, err)
 
@@ -312,7 +312,7 @@ func TestStagingManager_DuplicateHandling(t *testing.T) {
 	t.Run("duplicate handling with UUID strategy", func(t *testing.T) {
 		config := repocfg.NewRepositoryConfig("Test UUID",
 			repocfg.WithStorageStrategy("flat"),
-			repocfg.WithLocalSettings(true, "uuid", 0, false, false))
+			repocfg.WithLocalSettings(true, "uuid"))
 		err := config.SaveConfigToFile(testDir)
 		require.NoError(t, err)
 

@@ -39,8 +39,8 @@ const primaryRepositoryFolderName = "primary"
 
 type primaryStorageRepositoryManager interface {
 	GetRepositoryByPath(path string) (*repo.Repository, error)
-	AddRepository(path string) (*repo.Repository, error)
-	InitializeRepository(path string, config repocfg.RepositoryConfig) (*repo.Repository, error)
+	AddRepository(path string, defaultOwnerID *int32) (*repo.Repository, error)
+	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error)
 }
 
 func init() {
@@ -398,7 +398,7 @@ func initPrimaryStorage(repoManager primaryStorageRepositoryManager, logger *zap
 		}
 
 		// Otherwise, register the existing repository
-		existingRepo, err := repoManager.AddRepository(primaryRepoPath)
+		existingRepo, err := repoManager.AddRepository(primaryRepoPath, nil)
 		if err != nil {
 			return fmt.Errorf("failed to register existing primary storage repository: %w", err)
 		}
@@ -415,11 +415,11 @@ func initPrimaryStorage(repoManager primaryStorageRepositoryManager, logger *zap
 	cfg := repocfg.NewRepositoryConfig(
 		"Primary Storage",
 		repocfg.WithStorageStrategy(storageStrategy),
-		repocfg.WithLocalSettings(preserve, duplicateHandling, 0, false, false),
+		repocfg.WithLocalSettings(preserve, duplicateHandling),
 	)
 
 	// Initialize a new repository with the configuration
-	repo, err := repoManager.InitializeRepository(primaryRepoPath, *cfg)
+	repo, err := repoManager.InitializeRepository(primaryRepoPath, *cfg, nil)
 	if err != nil {
 		return fmt.Errorf("failed to initialize primary storage repository: %w", err)
 	}

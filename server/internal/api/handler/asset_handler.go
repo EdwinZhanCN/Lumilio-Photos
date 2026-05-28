@@ -820,23 +820,27 @@ func (h *AssetHandler) GetAssetSidecar(c *gin.Context) {
 		return
 	}
 
-	sidecarPath, err := h.resolveAssetSidecarPath(c.Request.Context(), asset)
+	repoPath, err := h.resolveAssetRepoPath(c.Request.Context(), asset)
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to resolve asset sidecar")
 		return
 	}
 
+	dirManager := h.repoManager.GetDirectoryManager()
 	sidecar := h.defaultSidecarForAsset(id, asset)
 	exists := false
-	if content, err := os.ReadFile(sidecarPath); err == nil {
+
+	content, err := dirManager.ReadSidecar(repoPath, id.String())
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to read asset sidecar")
+		return
+	}
+	if content != nil {
 		if err := json.Unmarshal(content, &sidecar); err != nil {
 			api.GinInternalError(c, err, "Failed to decode asset sidecar")
 			return
 		}
 		exists = true
-	} else if !os.IsNotExist(err) {
-		api.GinInternalError(c, err, "Failed to read asset sidecar")
-		return
 	}
 
 	if sidecar.Version == 0 {
@@ -889,14 +893,9 @@ func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 	sidecar.Source = h.sidecarSourceForAsset(asset)
 	sidecar.UpdatedAt = time.Now().UTC()
 
-	sidecarPath, err := h.resolveAssetSidecarPath(c.Request.Context(), asset)
+	repoPath, err := h.resolveAssetRepoPath(c.Request.Context(), asset)
 	if err != nil {
 		api.GinInternalError(c, err, "Failed to resolve asset sidecar")
-		return
-	}
-
-	if err := os.MkdirAll(filepath.Dir(sidecarPath), 0755); err != nil {
-		api.GinInternalError(c, err, "Failed to prepare sidecar directory")
 		return
 	}
 
@@ -906,13 +905,8 @@ func (h *AssetHandler) UpdateAssetSidecar(c *gin.Context) {
 		return
 	}
 
-	tempPath := sidecarPath + ".tmp"
-	if err := os.WriteFile(tempPath, content, 0644); err != nil {
-		api.GinInternalError(c, err, "Failed to write asset sidecar")
-		return
-	}
-	if err := os.Rename(tempPath, sidecarPath); err != nil {
-		_ = os.Remove(tempPath)
+	dirManager := h.repoManager.GetDirectoryManager()
+	if err := dirManager.WriteSidecar(repoPath, id.String(), content); err != nil {
 		api.GinInternalError(c, err, "Failed to save asset sidecar")
 		return
 	}
@@ -2823,9 +2817,9 @@ func (h *AssetHandler) getRepositoryForAsset(ctx context.Context, asset *repo.As
 	return &repository, nil
 }
 
-func (h *AssetHandler) resolveAssetSidecarPath(ctx context.Context, asset *repo.Asset) (string, error) {
-	if asset == nil || !asset.AssetID.Valid {
-		return "", fmt.Errorf("asset id is invalid")
+func (h *AssetHandler) resolveAssetRepoPath(ctx context.Context, asset *repo.Asset) (string, error) {
+	if asset == nil {
+		return "", fmt.Errorf("asset is nil")
 	}
 
 	repository, err := h.getRepositoryForAsset(ctx, asset)
@@ -2833,8 +2827,7 @@ func (h *AssetHandler) resolveAssetSidecarPath(ctx context.Context, asset *repo.
 		return "", err
 	}
 
-	assetID := uuid.UUID(asset.AssetID.Bytes).String()
-	return filepath.Join(repository.Path, ".lumilio", "sidecars", assetID+".lumilio-sidecar"), nil
+	return repository.Path, nil
 }
 
 func (h *AssetHandler) sidecarSourceForAsset(asset *repo.Asset) dto.LumilioSidecarSourceDTO {
