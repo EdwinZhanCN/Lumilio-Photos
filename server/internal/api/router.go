@@ -166,6 +166,10 @@ type UserControllerInterface interface {
 
 type RepositoryScanControllerInterface interface {
 	CreateRepository(c *gin.Context)
+	ListRepositories(c *gin.Context)
+	GetRepository(c *gin.Context)
+	UpdateRepository(c *gin.Context)
+	DeleteRepository(c *gin.Context)
 	QueueRepositoryScan(c *gin.Context)
 	GetLatestRepositoryScan(c *gin.Context)
 	ListRepositoryScans(c *gin.Context)
@@ -269,7 +273,11 @@ func NewRouter(
 		repositories := v1.Group("/repositories")
 		repositories.Use(authController.AuthMiddleware(), authController.RequireAdmin())
 		{
+			repositories.GET("", repositoryScanController.ListRepositories)
 			repositories.POST("", repositoryScanController.CreateRepository)
+			repositories.GET("/:id", repositoryScanController.GetRepository)
+			repositories.PATCH("/:id", repositoryScanController.UpdateRepository)
+			repositories.DELETE("/:id", repositoryScanController.DeleteRepository)
 			repositories.POST("/:id/scan", repositoryScanController.QueueRepositoryScan)
 			repositories.GET("/:id/scans/latest", repositoryScanController.GetLatestRepositoryScan)
 			repositories.GET("/:id/scans", repositoryScanController.ListRepositoryScans)
