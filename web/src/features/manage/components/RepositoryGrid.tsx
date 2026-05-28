@@ -13,6 +13,7 @@ import {
   Folder,
   FolderPlus,
   Layers,
+  MapPin,
   Plus,
   RefreshCcw,
   RefreshCcwDot,
@@ -28,12 +29,6 @@ import {
 import { getRepositoryDisplayName } from "@/features/settings/hooks/useWorkingRepository";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 import { useDetectDuplicates } from "@/features/collections/hooks/useDuplicates";
-
-type AssetListResponse = {
-  data?: {
-    total?: number;
-  };
-};
 
 const getViewerTimeZone = () =>
   typeof Intl !== "undefined"
@@ -71,8 +66,7 @@ function useRepositoryAssetCount(repositoryId: string) {
 
   return {
     ...query,
-    assetCount: ((query.data as AssetListResponse | undefined)?.data?.total ??
-      0) as number,
+    assetCount: (query.data?.data?.total_assets ?? 0) as number,
   };
 }
 
@@ -81,24 +75,29 @@ function RepositoryCard({
   isScanning,
   isDetecting,
   isDuplicateScanning,
+  isRebuildingLocation,
   onScan,
   onDetectStacks,
   onDuplicateScan,
+  onLocationRebuild,
 }: {
   repository: IndexingRepositoryOption;
   isScanning: boolean;
   isDetecting: boolean;
   isDuplicateScanning: boolean;
+  isRebuildingLocation: boolean;
   onScan: (repository: IndexingRepositoryOption) => void;
   onDetectStacks: (repository: IndexingRepositoryOption) => void;
   onDuplicateScan: (repository: IndexingRepositoryOption) => void;
+  onLocationRebuild: (repository: IndexingRepositoryOption) => void;
 }) {
   const { t } = useI18n();
   const countQuery = useRepositoryAssetCount(repository.id);
   const name = getRepositoryDisplayName(repository, t);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const isBusy = isScanning || isDetecting || isDuplicateScanning;
+  const isBusy =
+    isScanning || isDetecting || isDuplicateScanning || isRebuildingLocation;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -131,7 +130,10 @@ function RepositoryCard({
                 </span>
               )}
             </div>
-            <p className="mt-1 truncate text-xs text-base-content/55" title={repository.path}>
+            <p
+              className="mt-1 truncate text-xs text-base-content/55"
+              title={repository.path}
+            >
               {repository.path}
             </p>
           </div>
@@ -212,6 +214,22 @@ function RepositoryCard({
                   <Copy size={16} className="text-base-content/70" />
                 )}
                 <span>{t("manage.repositories.duplicateScan")}</span>
+              </button>
+              <button
+                type="button"
+                className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onLocationRebuild(repository);
+                }}
+                disabled={isBusy}
+              >
+                {isRebuildingLocation ? (
+                  <span className="loading loading-spinner loading-xs" />
+                ) : (
+                  <MapPin size={16} className="text-base-content/70" />
+                )}
+                <span>{t("manage.repositories.rebuildLocation")}</span>
               </button>
             </div>
           )}
@@ -396,14 +414,16 @@ export default function RepositoryGrid() {
     detectStacks,
     detectingIds,
     isScanning,
-  } =
-    useRepositoryScan();
+  } = useRepositoryScan();
   const detectDuplicatesMutation = useDetectDuplicates();
   const duplicateScanningRepositoryId =
-    detectDuplicatesMutation.isPending &&
-    detectDuplicatesMutation.variables
+    detectDuplicatesMutation.isPending && detectDuplicatesMutation.variables
       ? detectDuplicatesMutation.variables.repositoryId
       : undefined;
+  const locationRebuildMutation = $api.useMutation(
+    "post",
+    "/api/v1/locations/rebuild",
+  );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const repositoryIds = useMemo(
@@ -484,6 +504,32 @@ export default function RepositoryGrid() {
       }
     },
     [detectDuplicatesMutation, showMessage, t],
+  );
+
+  const rebuildingLocationId =
+    locationRebuildMutation.isPending && locationRebuildMutation.variables
+      ? ((
+          locationRebuildMutation.variables as {
+            body?: { repository_id?: string };
+          }
+        )?.body?.repository_id ?? null)
+      : null;
+
+  const handleLocationRebuild = useCallback(
+    async (repository: IndexingRepositoryOption) => {
+      try {
+        await locationRebuildMutation.mutateAsync({
+          body: { repository_id: repository.id },
+        });
+        showMessage("success", t("manage.repositories.rebuildLocationQueued"));
+      } catch (error) {
+        showMessage(
+          "error",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    },
+    [locationRebuildMutation, showMessage, t],
   );
 
   const handleScanAll = useCallback(async () => {
@@ -570,9 +616,11 @@ export default function RepositoryGrid() {
               isDuplicateScanning={
                 duplicateScanningRepositoryId === repository.id
               }
+              isRebuildingLocation={rebuildingLocationId === repository.id}
               onScan={handleScanRepository}
               onDetectStacks={handleDetectStacks}
               onDuplicateScan={handleDuplicateScan}
+              onLocationRebuild={handleLocationRebuild}
             />
           ))}
         </div>
