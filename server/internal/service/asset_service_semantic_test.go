@@ -69,6 +69,14 @@ func (s *semanticTestLumenStub) Close() error {
 	panic("not implemented")
 }
 
+func (s *semanticTestLumenStub) PoolStats() PoolStats {
+	return PoolStats{}
+}
+
+func (s *semanticTestLumenStub) GetNodes() []*discovery.NodeInfo {
+	return nil
+}
+
 type semanticTestEmbeddingStub struct {
 	resolveFn func(ctx context.Context, embeddingType EmbeddingType, model string, dimensions int) (repo.EmbeddingSpace, error)
 }

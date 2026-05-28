@@ -123,32 +123,38 @@ func (ap *AssetProcessor) enqueueMLJobs(ctx context.Context, asset *repo.Asset) 
 	}
 
 	if mlConfig.CLIPEnabled {
-		_, err = ap.queueClient.Insert(ctx, jobs.ProcessClipArgs{
-			AssetID:           asset.AssetID,
-			PreprocessVersion: jobs.MLPreprocessVersionV1,
-		}, &river.InsertOpts{Queue: "process_clip"})
-		if err != nil {
-			return fmt.Errorf("enqueue CLIP: %w", err)
+		if ap.lumenService == nil || ap.lumenService.IsTaskAvailable("semantic_image_embed") {
+			_, err = ap.queueClient.Insert(ctx, jobs.ProcessClipArgs{
+				AssetID:           asset.AssetID,
+				PreprocessVersion: jobs.MLPreprocessVersionV1,
+			}, &river.InsertOpts{Queue: "process_clip"})
+			if err != nil {
+				return fmt.Errorf("enqueue CLIP: %w", err)
+			}
 		}
 	}
 
 	if mlConfig.OCREnabled {
-		_, err = ap.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
-			AssetID:           asset.AssetID,
-			PreprocessVersion: jobs.MLPreprocessVersionV1,
-		}, &river.InsertOpts{Queue: "process_ocr"})
-		if err != nil {
-			return fmt.Errorf("enqueue OCR: %w", err)
+		if ap.lumenService == nil || ap.lumenService.IsTaskAvailable("ocr") {
+			_, err = ap.queueClient.Insert(ctx, jobs.ProcessOcrArgs{
+				AssetID:           asset.AssetID,
+				PreprocessVersion: jobs.MLPreprocessVersionV1,
+			}, &river.InsertOpts{Queue: "process_ocr"})
+			if err != nil {
+				return fmt.Errorf("enqueue OCR: %w", err)
+			}
 		}
 	}
 
 	if mlConfig.FaceEnabled {
-		_, err = ap.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
-			AssetID:           asset.AssetID,
-			PreprocessVersion: jobs.MLPreprocessVersionV1,
-		}, &river.InsertOpts{Queue: "process_face"})
-		if err != nil {
-			return fmt.Errorf("enqueue face: %w", err)
+		if ap.lumenService == nil || ap.lumenService.IsTaskAvailable("face_recognition") {
+			_, err = ap.queueClient.Insert(ctx, jobs.ProcessFaceArgs{
+				AssetID:           asset.AssetID,
+				PreprocessVersion: jobs.MLPreprocessVersionV1,
+			}, &river.InsertOpts{Queue: "process_face"})
+			if err != nil {
+				return fmt.Errorf("enqueue face: %w", err)
+			}
 		}
 	}
 

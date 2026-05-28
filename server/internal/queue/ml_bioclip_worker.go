@@ -51,9 +51,6 @@ func (w *ProcessBioClipWorker) Work(ctx context.Context, job *river.Job[ProcessB
 	if w.LumenService == nil {
 		return river.JobSnooze(30 * time.Second)
 	}
-	if !w.LumenService.IsTaskAvailable("bioclip_classify") {
-		return river.JobSnooze(30 * time.Second)
-	}
 	if w.SpeciesService == nil {
 		return fmt.Errorf("species prediction service unavailable")
 	}
@@ -68,7 +65,7 @@ func (w *ProcessBioClipWorker) Work(ctx context.Context, job *river.Job[ProcessB
 
 	labels, err := w.LumenService.BioClipClassify(ctx, imageData, 3)
 	if err != nil {
-		return maybeSnoozeMLInfraError(fmt.Errorf("failed to classify image with BioCLIP: %w", err))
+		return fmt.Errorf("failed to classify image with BioCLIP: %w", err)
 	}
 
 	if err := w.SpeciesService.SaveSpeciesPredictions(ctx, pgUUID, labelsToSpeciesPredictions(labels)); err != nil {

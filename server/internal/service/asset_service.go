@@ -1453,9 +1453,6 @@ func (s *assetService) resolveClipQueryEmbedding(ctx context.Context, query stri
 	if s.embeddingService == nil {
 		return nil, fmt.Errorf("%w: embedding service not available", ErrSemanticSearchUnavailable)
 	}
-	if !s.lumen.IsTaskAvailable("semantic_text_embed") {
-		return nil, fmt.Errorf("%w: semantic_text_embed task not available", ErrSemanticSearchUnavailable)
-	}
 
 	var (
 		embeddingResult *types.EmbeddingV1

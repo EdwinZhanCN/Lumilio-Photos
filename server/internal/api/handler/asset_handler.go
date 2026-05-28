@@ -52,7 +52,7 @@ type AssetHandler struct {
 	stagingManager  storage.StagingManager
 	queueClient     *river.Client[pgx.Tx]
 	settingsService service.SettingsService
-	runtimeChecker  service.TaskAvailabilityChecker
+	runtimeChecker  service.LumenService
 	memoryMonitor   *memory.MemoryMonitor
 	sessionManager  *upload.SessionManager
 	chunkMerger     *upload.ChunkMerger
@@ -70,7 +70,7 @@ func NewAssetHandler(
 	stagingManager storage.StagingManager,
 	queueClient *river.Client[pgx.Tx],
 	settingsService service.SettingsService,
-	runtimeChecker service.TaskAvailabilityChecker,
+	runtimeChecker service.LumenService,
 ) *AssetHandler {
 	memoryMonitor := memory.NewMemoryMonitor()
 	sessionManager := upload.NewSessionManager(30 * time.Minute) // 30 minute timeout
@@ -1907,7 +1907,7 @@ func toSearchBrowseResponseDTO(result service.SearchBrowseResult, limit, offset 
 	topItemDTOs := toBrowseItemDTOs(result.TopResults)
 	resultItemDTOs := toBrowseItemDTOs(result.Results)
 	return dto.SearchAssetsResponseDTO{
-		TopItems:   topItemDTOs,
+		TopItems: topItemDTOs,
 		TopResultsMeta: dto.SearchTopResultsMetaDTO{
 			Enabled:     result.TopResultsMeta.Enabled,
 			Degraded:    result.TopResultsMeta.Degraded,

@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
@@ -165,23 +164,6 @@ func main() {
 		appLogger.Fatal("failed to initialize ML services", zap.String("operation", "ml.init"), zap.Error(err))
 	}
 
-	if lumenService != nil {
-		warmupTasks := []string{"semantic_image_embed", "bioclip_classify", "ocr", "face_recognition"}
-		lumenService.WarmupTasks(ctx, warmupTasks)
-		go func() {
-			ticker := time.NewTicker(30 * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					lumenService.WarmupTasks(context.Background(), warmupTasks)
-				}
-			}
-		}()
-	}
-
 	defer func() {
 		if lumenService != nil {
 			if err := lumenService.Close(); err != nil {
@@ -212,7 +194,7 @@ func main() {
 	tools.RegisterBulkLikeTool()
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
-	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, settingsService, embeddingService, processorLogger, repoAuditProvider)
+	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, settingsService, embeddingService, lumenService, processorLogger, repoAuditProvider)
 	repositoryScanner := scanner.NewScanner(queries, queueClient, appConfig.RepositoryScan, scannerLogger)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})

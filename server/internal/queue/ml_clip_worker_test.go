@@ -51,6 +51,14 @@ func (s *clipWorkerLumenStub) WarmupTasks(context.Context, []string) map[string]
 	panic("not implemented")
 }
 
+func (s *clipWorkerLumenStub) PoolStats() service.PoolStats {
+	return service.PoolStats{}
+}
+
+func (s *clipWorkerLumenStub) GetNodes() []*discovery.NodeInfo {
+	return nil
+}
+
 func (s *clipWorkerLumenStub) IsTaskAvailable(taskName string) bool {
 	return s.available[taskName]
 }
@@ -167,7 +175,7 @@ func TestProcessClipWorkerSavesImageEmbedding(t *testing.T) {
 	}
 }
 
-func TestProcessClipWorkerSnoozesWithoutImageEmbeddingTask(t *testing.T) {
+func TestProcessClipWorkerDoesNotSnoozeWithoutTaskCheck(t *testing.T) {
 	t.Parallel()
 
 	assetID := pgtype.UUID{}
@@ -175,24 +183,28 @@ func TestProcessClipWorkerSnoozesWithoutImageEmbeddingTask(t *testing.T) {
 		t.Fatalf("scan asset id: %v", err)
 	}
 
+	imageLoader := &workerImageLoaderStub{data: []byte("image")}
+	embeddingSvc := &clipWorkerEmbeddingStub{}
 	worker := &ProcessClipWorker{
 		LumenService: &clipWorkerLumenStub{
 			available: map[string]bool{
 				"semantic_image_embed": false,
 			},
 		},
-		EmbeddingService: &clipWorkerEmbeddingStub{},
-		ImageLoader:      &workerImageLoaderStub{data: []byte("image")},
+		EmbeddingService: embeddingSvc,
+		ImageLoader:      imageLoader,
 	}
 
 	err := worker.Work(context.Background(), &river.Job[ProcessClipArgs]{
 		Args: ProcessClipArgs{AssetID: assetID},
 	})
-	if err == nil {
-		t.Fatal("expected snooze error")
+	// In the new architecture, IsTaskAvailable is not checked before Infer.
+	// The worker proceeds to call Infer directly. The stub always returns
+	// a successful embedding, so the worker should succeed.
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if loader := worker.ImageLoader.(*workerImageLoaderStub); loader.called != 0 {
-		t.Fatalf("expected image loader not to be called while task is unavailable, got %d calls", loader.called)
+	if embeddingSvc.savedType != service.EmbeddingTypeCLIP {
+		t.Fatalf("expected CLIP embedding to be saved even without task check")
 	}
 }

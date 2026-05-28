@@ -61,7 +61,7 @@ func TestProcessBioClipWorkerProcessesSpeciesPredictions(t *testing.T) {
 	}
 }
 
-func TestProcessBioClipWorkerSnoozesWhenUnavailable(t *testing.T) {
+func TestProcessBioClipWorkerDoesNotSnoozeWithoutTaskCheck(t *testing.T) {
 	t.Parallel()
 
 	assetID := pgtype.UUID{}
@@ -70,23 +70,27 @@ func TestProcessBioClipWorkerSnoozesWhenUnavailable(t *testing.T) {
 	}
 
 	imageLoader := &workerImageLoaderStub{data: []byte("image")}
+	speciesSvc := &bioClipWorkerSpeciesStub{}
 	worker := &ProcessBioClipWorker{
 		LumenService: &clipWorkerLumenStub{
 			available: map[string]bool{
 				"bioclip_classify": false,
 			},
+			bioLabels: []types.Label{{Label: "sparrow", Score: 0.7}},
 		},
-		SpeciesService: &bioClipWorkerSpeciesStub{},
+		SpeciesService: speciesSvc,
 		ImageLoader:    imageLoader,
 	}
 
 	err := worker.Work(context.Background(), &river.Job[ProcessBioClipArgs]{
 		Args: ProcessBioClipArgs{AssetID: assetID},
 	})
-	if err == nil {
-		t.Fatal("expected snooze error")
+	// In the new architecture, IsTaskAvailable is not checked.
+	// The worker proceeds to call Infer and should succeed.
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if imageLoader.called != 0 {
-		t.Fatalf("expected image loader not to be called while task is unavailable, got %d calls", imageLoader.called)
+	if len(speciesSvc.predictions) != 1 {
+		t.Fatalf("expected predictions to be saved without task check")
 	}
 }
