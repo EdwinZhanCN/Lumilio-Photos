@@ -33,11 +33,12 @@ type ICloudConfig struct {
 // ICloudProvider implements CloudProvider for Apple iCloud Photos using
 // the native Go iCloud client (no external CLI dependency).
 type ICloudProvider struct {
-	config     ICloudConfig
-	client     *icloud.Client
-	photoCli   *icloud.PhotoService
-	cookieDir  string
-	assetCache sync.Map
+	config          ICloudConfig
+	client          *icloud.Client
+	photoCli        *icloud.PhotoService
+	cookieDir       string
+	assetCache      sync.Map
+	twoFACodeGetter icloud.TextGetter
 }
 
 // NewICloudProvider creates an iCloud provider from the given configuration.
@@ -65,12 +66,11 @@ func (p *ICloudProvider) ensureClient(ctx context.Context) error {
 	p.cookieDir = cookieDir
 
 	client, err := icloud.NewClient(&icloud.ClientOption{
-		AppID:     p.config.Username,
-		Password:  p.config.Password,
-		CookieDir: cookieDir,
-		Domain:    p.config.Domain,
-		// TwoFACodeGetter is nil here; MFA will be handled by the caller
-		// setting it before calling Authenticate.
+		AppID:           p.config.Username,
+		Password:        p.config.Password,
+		CookieDir:       cookieDir,
+		Domain:          p.config.Domain,
+		TwoFACodeGetter: p.twoFACodeGetter,
 	})
 	if err != nil {
 		return fmt.Errorf("create icloud client: %w", err)
@@ -103,6 +103,7 @@ func (p *ICloudProvider) ensurePhotoCli(ctx context.Context) (*icloud.PhotoServi
 // SetTwoFACodeGetter sets the MFA code provider. Must be called before
 // any List/Download operation if MFA is required.
 func (p *ICloudProvider) SetTwoFACodeGetter(getter icloud.TextGetter) {
+	p.twoFACodeGetter = getter
 	if p.client != nil {
 		p.client.SetTwoFACodeGetter(getter)
 	}
