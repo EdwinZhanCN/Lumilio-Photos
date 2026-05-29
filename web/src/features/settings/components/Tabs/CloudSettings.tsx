@@ -85,22 +85,27 @@ export default function CloudSettings() {
     }
 
     try {
-      const res = await connectMutation.mutateAsync({
+      const res = (await connectMutation.mutateAsync({
         body: {
           username,
           password,
           domain,
           syncMode,
         },
-      });
+      })) as any;
 
-      if (res.data?.needs_2fa) {
+      console.log("Connect iCloud response:", res);
+
+      if (res && res.data?.needs_2fa) {
         setNeeds2FA(true);
-      } else {
+      } else if (res) {
         setSuccessMsg("Successfully connected to iCloud!");
         refetchProviders();
+      } else {
+        throw new Error("Received empty response from server.");
       }
     } catch (err: any) {
+      console.error("Connect iCloud error:", err);
       setErrorMsg(err?.message || "Failed to connect to iCloud. Please check your credentials.");
     }
   };
@@ -142,12 +147,15 @@ export default function CloudSettings() {
 
       // 1. If repo "iCloud Sync" doesn't exist, create it silently
       if (!targetRepoId) {
-        const repoRes = await createRepoMutation.mutateAsync({
+        const repoRes = (await createRepoMutation.mutateAsync({
           body: {
             name: "iCloud Sync",
           },
-        });
-        targetRepoId = repoRes.data?.repository?.id;
+        })) as any;
+        
+        console.log("Create repository response:", repoRes);
+        
+        targetRepoId = repoRes?.data?.repository?.id;
         if (!targetRepoId) {
           throw new Error("Failed to create isolated repository for iCloud Sync");
         }
@@ -163,6 +171,7 @@ export default function CloudSettings() {
 
       setSuccessMsg("iCloud synchronization started in the background!");
     } catch (err: any) {
+      console.error("Trigger sync error:", err);
       setErrorMsg(err?.message || "Failed to trigger iCloud sync.");
       setIsSyncingLocal(false);
     }
