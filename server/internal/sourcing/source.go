@@ -23,9 +23,13 @@ const (
 // The SourceMaterializer consumes these to validate, materialize, and
 // enqueue into the asset ingest pipeline.
 type IngestSource struct {
-	RepositoryID     uuid.UUID
-	OwnerID          *int32 // nullable; when nil the materializer falls back to repository default
-	Kind             IngestSourceKind
+	RepositoryID uuid.UUID
+	OwnerID      *int32 // nullable; when nil the materializer falls back to repository default
+	Kind         IngestSourceKind
+	// SkipCommit skips staging→inbox commit. When true, SourcePath is treated
+	// as the final repo-relative storage path (files already in-place, like
+	// cloud provider downloads landing directly in cloud/).
+	SkipCommit       bool
 	SourcePath       string // staging path (upload/cloud) or repo-relative path (scan)
 	OriginalFilename string
 	Size             int64   // optional hint; the materializer always stats the file for the authoritative size

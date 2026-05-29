@@ -35,7 +35,12 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
-require github.com/gorilla/websocket v1.5.3 // indirect
+require (
+	github.com/chyroc/gorequests v0.33.0 // indirect
+	github.com/chyroc/persistent-cookiejar v0.1.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/satori/go.uuid v1.2.0 // indirect
+)
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect

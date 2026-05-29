@@ -185,6 +185,15 @@ type DuplicateControllerInterface interface {
 	DismissDuplicateGroup(c *gin.Context) // POST   /duplicates/groups/:id/dismiss
 }
 
+// CloudControllerInterface defines the cloud sync endpoints.
+type CloudControllerInterface interface {
+	ConnectICloud(c *gin.Context)   // POST   /cloud/icloud/connect
+	VerifyICloud2FA(c *gin.Context) // POST   /cloud/icloud/verify-2fa
+	ListProviders(c *gin.Context)   // GET    /cloud/providers
+	TriggerSync(c *gin.Context)     // POST   /cloud/sync
+	Disconnect(c *gin.Context)      // DELETE /cloud/:provider
+}
+
 func NewRouter(
 	assetController AssetControllerInterface,
 	authController AuthControllerInterface,
@@ -200,6 +209,7 @@ func NewRouter(
 	userController UserControllerInterface,
 	repositoryScanController RepositoryScanControllerInterface,
 	duplicateController DuplicateControllerInterface,
+	cloudController CloudControllerInterface,
 	agentAvailabilityMiddleware gin.HandlerFunc,
 ) *gin.Engine {
 	r := gin.Default()
@@ -385,6 +395,17 @@ func NewRouter(
 			duplicates.POST("/detect", duplicateController.DetectDuplicates)
 			duplicates.POST("/groups/:id/merge", duplicateController.MergeDuplicateGroup)
 			duplicates.POST("/groups/:id/dismiss", duplicateController.DismissDuplicateGroup)
+		}
+
+		// Cloud sync routes - admin only
+		cloud := v1.Group("/cloud")
+		cloud.Use(authController.AuthMiddleware(), authController.RequireAdmin())
+		{
+			cloud.GET("/providers", cloudController.ListProviders)
+			cloud.POST("/icloud/connect", cloudController.ConnectICloud)
+			cloud.POST("/icloud/verify-2fa", cloudController.VerifyICloud2FA)
+			cloud.POST("/sync", cloudController.TriggerSync)
+			cloud.DELETE("/:provider", cloudController.Disconnect)
 		}
 
 		// Admin routes for queue monitoring (read-only)
