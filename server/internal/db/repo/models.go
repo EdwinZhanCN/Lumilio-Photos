@@ -180,6 +180,23 @@ type AssetTag struct {
 	Source     string         `db:"source" json:"source"`
 }
 
+type CloudSyncCursor struct {
+	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	Provider     string             `db:"provider" json:"provider"`
+	CursorValue  string             `db:"cursor_value" json:"cursor_value"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type CloudSyncFile struct {
+	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	Provider     string             `db:"provider" json:"provider"`
+	RemoteKey    string             `db:"remote_key" json:"remote_key"`
+	Etag         string             `db:"etag" json:"etag"`
+	LocalHash    string             `db:"local_hash" json:"local_hash"`
+	AssetID      pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	SyncedAt     pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
+}
+
 type DuplicateGroup struct {
 	GroupID                  pgtype.UUID        `db:"group_id" json:"group_id"`
 	RepositoryID             pgtype.UUID        `db:"repository_id" json:"repository_id"`

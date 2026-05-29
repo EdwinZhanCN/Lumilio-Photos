@@ -91,7 +91,12 @@ func (m *SourceMaterializer) Materialize(ctx context.Context, source IngestSourc
 
 	// 3. Branch on source kind
 	switch source.Kind {
-	case IngestSourceUpload, IngestSourceCloud:
+	case IngestSourceUpload:
+		return m.materializeFromStaging(ctx, source, repository, validation)
+	case IngestSourceCloud:
+		if source.SkipCommit {
+			return m.materializeInPlace(ctx, source, repository, validation)
+		}
 		return m.materializeFromStaging(ctx, source, repository, validation)
 	case IngestSourceScan:
 		return m.materializeInPlace(ctx, source, repository, validation)

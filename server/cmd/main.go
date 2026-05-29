@@ -14,6 +14,7 @@ import (
 	"server/internal/agent/tools"
 	"server/internal/api"
 	"server/internal/api/handler"
+	"server/internal/cloud"
 	"server/internal/db"
 	"server/internal/db/repo"
 	"server/internal/logging"
@@ -246,6 +247,10 @@ func main() {
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, os.Getenv("STORAGE_PATH"))
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 
+	// Initialize Cloud Sync service and handler
+	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, assetService, appLogger.Named("cloud_sync"))
+	cloudController := handler.NewCloudHandler(cloudSyncService)
+
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
 	docs.SwaggerInfo.Description = "Photo management system API with asset upload, processing, and organization features"
@@ -269,6 +274,7 @@ func main() {
 		userController,
 		repositoryScanController,
 		duplicateController,
+		cloudController,
 		handler.RequireLLMAgentEnabled(settingsService),
 	)
 
