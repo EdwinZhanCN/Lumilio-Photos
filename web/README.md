@@ -43,7 +43,6 @@ pnpm build
 - `pnpm lint`: Run oxlint for fast linting.
 - `pnpm type-check`: Run TypeScript type checking.
 - `pnpm test`: Run unit tests with Vitest.
-- `pnpm docs`: Generate documentation using TypeDoc.
 
 ## Project Structure
 
@@ -76,10 +75,4 @@ pnpm test:ui       # Run tests with UI
 pnpm test:coverage # Generate coverage report
 ```
 
-## Documentation
 
-API and internal documentation can be generated via TypeDoc:
-
-```bash
-pnpm docs
-```

@@ -1,7 +1,6 @@
 {
     "scripts": {
         "monitor:import": "node scripts/monitor-import.mjs",
-        "typedoc": "node scripts/generate-typedoc.cjs",
         "docs:dev": "vitepress dev docs",
         "docs:build": "vitepress build docs",
         "docs:preview": "vitepress preview docs"
