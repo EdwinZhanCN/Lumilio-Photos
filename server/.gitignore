@@ -1,5 +1,6 @@
 # Go build artifacts
 *.exe
+bin/
 *.exe~
 *.dll
 *.so

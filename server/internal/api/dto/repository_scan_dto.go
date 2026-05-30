@@ -7,10 +7,29 @@ type CreateRepositoryRequestDTO struct {
 }
 
 type RepositoryDTO struct {
-	ID        string `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Name      string `json:"name" example:"Family Photos"`
-	Path      string `json:"path" example:"/data/storage/family-photos"`
-	IsPrimary bool   `json:"is_primary" example:"false"`
+	ID              string                  `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Name            string                  `json:"name" example:"Family Photos"`
+	Path            string                  `json:"path" example:"/data/storage/family-photos"`
+	IsPrimary       bool                    `json:"is_primary" example:"false"`
+	DefaultOwnerID  *int32                  `json:"default_owner_id,omitempty"`
+	StorageStrategy string                  `json:"storage_strategy" example:"date"`
+	LocalSettings   RepositoryLocalSettings `json:"local_settings"`
+}
+
+type RepositoryLocalSettings struct {
+	PreserveOriginalFilename bool   `json:"preserve_original_filename" example:"true"`
+	HandleDuplicateFilenames string `json:"handle_duplicate_filenames" example:"uuid"`
+}
+
+type UpdateRepositoryRequestDTO struct {
+	Name            *string                  `json:"name,omitempty" example:"My Photos"`
+	StorageStrategy *string                  `json:"storage_strategy,omitempty" example:"flat"`
+	LocalSettings   *RepositoryLocalSettings `json:"local_settings,omitempty"`
+	DefaultOwnerID  *int32                   `json:"default_owner_id,omitempty"`
+}
+
+type ListRepositoriesResponseDTO struct {
+	Repositories []RepositoryDTO `json:"repositories"`
 }
 
 type CreateRepositoryResponseDTO struct {

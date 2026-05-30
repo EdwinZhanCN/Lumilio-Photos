@@ -13,7 +13,7 @@ import (
 	"github.com/riverqueue/river"
 )
 
-func bioClipRuntimeAvailable(ctx context.Context, settingsService service.SettingsService, checker service.TaskAvailabilityChecker) (bool, error) {
+func bioClipRuntimeAvailable(ctx context.Context, settingsService service.SettingsService, lumenService service.LumenService) (bool, error) {
 	if settingsService == nil {
 		return false, nil
 	}
@@ -26,7 +26,10 @@ func bioClipRuntimeAvailable(ctx context.Context, settingsService service.Settin
 		return false, nil
 	}
 
-	return checker != nil && checker.IsTaskAvailable("bioclip_classify"), nil
+	if lumenService == nil {
+		return false, nil
+	}
+	return service.IsIndexingTaskRuntimeAvailable(lumenService, service.AssetIndexingTaskBioCLIP), nil
 }
 
 func enqueueBioClipAsset(ctx context.Context, queueClient *river.Client[pgx.Tx], asset repo.Asset) error {

@@ -1,0 +1,64 @@
+package icloud
+
+import (
+	"sync"
+)
+
+type PhotosIterNext interface {
+	Next() (*PhotoAsset, error)
+	Offset() int64
+}
+
+func newPhotosIterNext(album *PhotoAlbum, offset int64) PhotosIterNext {
+	return &photosIterNextImpl{
+		album:  album,
+		lock:   new(sync.Mutex),
+		offset: offset,
+		assets: nil,
+		index:  0,
+		end:    false,
+	}
+}
+
+type photosIterNextImpl struct {
+	album  *PhotoAlbum
+	lock   *sync.Mutex
+	offset int64
+	assets []*PhotoAsset
+	index  int
+	end    bool
+}
+
+func (r *photosIterNextImpl) Next() (*PhotoAsset, error) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	if r.index < len(r.assets) {
+		r.index++
+		return r.assets[r.index-1], nil
+	}
+
+	if r.end {
+		return nil, ErrPhotosIterateEnd
+	}
+
+	assets, err := r.album.GetPhotosByOffset(r.offset, 200)
+	if err != nil {
+		return nil, err
+	}
+
+	r.index = 1
+	r.assets = assets
+	r.offset = r.album.calOffset(r.offset, int64(len(assets)))
+	r.end = len(assets) == 0
+
+	if r.end {
+		return nil, ErrPhotosIterateEnd
+	}
+
+	return r.assets[r.index-1], nil
+}
+
+func (r *photosIterNextImpl) Offset() int64 {
+	return r.offset
+}

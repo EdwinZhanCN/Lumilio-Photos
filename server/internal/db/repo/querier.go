@@ -134,6 +134,7 @@ type Querier interface {
 	GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	GetAssetByRepositoryAndStoragePathAny(ctx context.Context, arg GetAssetByRepositoryAndStoragePathAnyParams) (Asset, error)
 	GetAssetExifRaw(ctx context.Context, assetID pgtype.UUID) (json.RawMessage, error)
+	GetAssetIDByCloudFile(ctx context.Context, arg GetAssetIDByCloudFileParams) (pgtype.UUID, error)
 	GetAssetStatsForOwner(ctx context.Context, ownerID int32) (GetAssetStatsForOwnerRow, error)
 	GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error)
 	GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error)
@@ -166,6 +167,8 @@ type Querier interface {
 	// 获取相机+镜头组合统计
 	GetCameraLensStats(ctx context.Context, arg GetCameraLensStatsParams) ([]GetCameraLensStatsRow, error)
 	GetCheckpoint(ctx context.Context, id string) ([]byte, error)
+	GetCloudSyncCursor(ctx context.Context, arg GetCloudSyncCursorParams) (string, error)
+	GetCloudSyncFile(ctx context.Context, arg GetCloudSyncFileParams) (GetCloudSyncFileRow, error)
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
 	GetCollapsedBrowseItemsUnified(ctx context.Context, arg GetCollapsedBrowseItemsUnifiedParams) ([]GetCollapsedBrowseItemsUnifiedRow, error)
 	GetConfirmedFaceClusters(ctx context.Context) ([]FaceCluster, error)
@@ -295,6 +298,7 @@ type Querier interface {
 	ListUserWebAuthnCredentials(ctx context.Context, userID int32) ([]UserWebauthnCredential, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error)
+	MarkCloudSyncFile(ctx context.Context, arg MarkCloudSyncFileParams) error
 	MarkDuplicateGroupDismissed(ctx context.Context, groupID pgtype.UUID) error
 	MarkDuplicateGroupMerged(ctx context.Context, arg MarkDuplicateGroupMergedParams) error
 	MarkLocationClustersGeocodeDisabled(ctx context.Context, arg MarkLocationClustersGeocodeDisabledParams) error
@@ -331,6 +335,7 @@ type Querier interface {
 	SearchAssetsBySpecies(ctx context.Context, arg SearchAssetsBySpeciesParams) ([]Asset, error)
 	SetPrimaryEmbedding(ctx context.Context, arg SetPrimaryEmbeddingParams) error
 	SetPrimaryEmbeddingForAsset(ctx context.Context, arg SetPrimaryEmbeddingForAssetParams) error
+	SetPrimaryRepositoryOwner(ctx context.Context, defaultOwnerID *int32) (Repository, error)
 	SoftDeleteAssetByRepositoryAndStoragePath(ctx context.Context, arg SoftDeleteAssetByRepositoryAndStoragePathParams) (int64, error)
 	UpdateAlbum(ctx context.Context, arg UpdateAlbumParams) (Album, error)
 	UpdateAsset(ctx context.Context, arg UpdateAssetParams) (Asset, error)
@@ -367,6 +372,7 @@ type Querier interface {
 	UpdateUserTOTPLastUsed(ctx context.Context, userID int32) error
 	UpdateUserWebAuthnCredentialUsage(ctx context.Context, arg UpdateUserWebAuthnCredentialUsageParams) (UserWebauthnCredential, error)
 	UpsertCheckpoint(ctx context.Context, arg UpsertCheckpointParams) error
+	UpsertCloudSyncCursor(ctx context.Context, arg UpsertCloudSyncCursorParams) error
 	// Unified embeddings table queries
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
 	// Embedding spaces

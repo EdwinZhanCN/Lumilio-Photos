@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"server/config"
 	"server/docs" // Import docs for swaggo
@@ -15,12 +14,14 @@ import (
 	"server/internal/agent/tools"
 	"server/internal/api"
 	"server/internal/api/handler"
+	"server/internal/cloud"
 	"server/internal/db"
 	"server/internal/db/repo"
 	"server/internal/logging"
 	"server/internal/processors"
 	"server/internal/queue"
 	"server/internal/service"
+	"server/internal/sourcing"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
 	"server/internal/storage/scanner"
@@ -40,8 +41,8 @@ const primaryRepositoryFolderName = "primary"
 
 type primaryStorageRepositoryManager interface {
 	GetRepositoryByPath(path string) (*repo.Repository, error)
-	AddRepository(path string) (*repo.Repository, error)
-	InitializeRepository(path string, config repocfg.RepositoryConfig) (*repo.Repository, error)
+	AddRepository(path string, defaultOwnerID *int32) (*repo.Repository, error)
+	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error)
 }
 
 func init() {
@@ -165,23 +166,6 @@ func main() {
 		appLogger.Fatal("failed to initialize ML services", zap.String("operation", "ml.init"), zap.Error(err))
 	}
 
-	if lumenService != nil {
-		warmupTasks := []string{"semantic_image_embed", "bioclip_classify", "ocr", "face_recognition"}
-		lumenService.WarmupTasks(ctx, warmupTasks)
-		go func() {
-			ticker := time.NewTicker(30 * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					lumenService.WarmupTasks(context.Background(), warmupTasks)
-				}
-			}
-		}()
-	}
-
 	defer func() {
 		if lumenService != nil {
 			if err := lumenService.Close(); err != nil {
@@ -212,7 +196,10 @@ func main() {
 	tools.RegisterBulkLikeTool()
 	appLogger.Info("agent tools registered", zap.String("operation", "agent.tools"))
 
-	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, queueClient, settingsService, embeddingService, processorLogger, repoAuditProvider)
+	// Initialize SourceMaterializer (unified ingest entry point for upload, scan, cloud sync)
+	sourceMaterializer := sourcing.NewSourceMaterializer(queries, stagingManager, queueClient, assetService, processorLogger, repoAuditProvider)
+
+	assetProcessor := processors.NewAssetProcessor(assetService, queries, repoManager, stagingManager, sourceMaterializer, queueClient, settingsService, embeddingService, lumenService, processorLogger, repoAuditProvider)
 	repositoryScanner := scanner.NewScanner(queries, queueClient, appConfig.RepositoryScan, scannerLogger)
 	river.AddWorker[queue.IngestAssetArgs](workers, &queue.IngestAssetWorker{Processor: assetProcessor})
 	river.AddWorker[queue.DiscoverAssetArgs](workers, &queue.DiscoverAssetWorker{ProcessDiscover: assetProcessor.ProcessDiscoveredAsset})
@@ -260,6 +247,10 @@ func main() {
 	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, os.Getenv("STORAGE_PATH"))
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 
+	// Initialize Cloud Sync service and handler
+	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, assetService, appLogger.Named("cloud_sync"))
+	cloudController := handler.NewCloudHandler(cloudSyncService)
+
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
 	docs.SwaggerInfo.Description = "Photo management system API with asset upload, processing, and organization features"
@@ -283,6 +274,7 @@ func main() {
 		userController,
 		repositoryScanController,
 		duplicateController,
+		cloudController,
 		handler.RequireLLMAgentEnabled(settingsService),
 	)
 
@@ -416,7 +408,7 @@ func initPrimaryStorage(repoManager primaryStorageRepositoryManager, logger *zap
 		}
 
 		// Otherwise, register the existing repository
-		existingRepo, err := repoManager.AddRepository(primaryRepoPath)
+		existingRepo, err := repoManager.AddRepository(primaryRepoPath, nil)
 		if err != nil {
 			return fmt.Errorf("failed to register existing primary storage repository: %w", err)
 		}
@@ -433,11 +425,11 @@ func initPrimaryStorage(repoManager primaryStorageRepositoryManager, logger *zap
 	cfg := repocfg.NewRepositoryConfig(
 		"Primary Storage",
 		repocfg.WithStorageStrategy(storageStrategy),
-		repocfg.WithLocalSettings(preserve, duplicateHandling, 0, false, false),
+		repocfg.WithLocalSettings(preserve, duplicateHandling),
 	)
 
 	// Initialize a new repository with the configuration
-	repo, err := repoManager.InitializeRepository(primaryRepoPath, *cfg)
+	repo, err := repoManager.InitializeRepository(primaryRepoPath, *cfg, nil)
 	if err != nil {
 		return fmt.Errorf("failed to initialize primary storage repository: %w", err)
 	}

@@ -8,8 +8,10 @@ import ServerSettings from "./Tabs/ServerSettings";
 import PerformanceSettings from "./Tabs/PerformanceSettings";
 import AISettings from "./Tabs/AISettings";
 import UsersSettings from "./Tabs/UsersSettings";
+import CloudSettings from "./Tabs/CloudSettings";
 import { useI18n } from "@/lib/i18n.tsx";
 import {
+  CloudIcon,
   CpuIcon,
   PaintbrushIcon,
   ServerIcon,
@@ -24,6 +26,7 @@ type SettingsTabKey =
   | "appearance"
   | "upload"
   | "ai"
+  | "cloud"
   | "performance"
   | "server"
   | "users";
@@ -36,6 +39,7 @@ function isSettingsTabKey(value: string | null): value is SettingsTabKey {
     value === "appearance" ||
     value === "upload" ||
     value === "ai" ||
+    value === "cloud" ||
     value === "performance" ||
     value === "server" ||
     value === "users"
@@ -86,6 +90,11 @@ export default function SettingsTab() {
       icon: <SparklesIcon className="size-4" />,
     });
     tabs.push({
+      key: "cloud",
+      label: t("settings.cloud.title", { defaultValue: "Cloud Sync" }),
+      icon: <CloudIcon className="size-4" />,
+    });
+    tabs.push({
       key: "users",
       label: t("settings.users.title", { defaultValue: "Users" }),
       icon: <Users2Icon className="size-4" />,
@@ -119,6 +128,8 @@ export default function SettingsTab() {
         return <UploadSettings />;
       case "ai":
         return <AISettings />;
+      case "cloud":
+        return <CloudSettings />;
       case "performance":
         return <PerformanceSettings />;
       case "server":

@@ -63,6 +63,14 @@ func (s *faceWorkerLumenStub) Close() error {
 	panic("not implemented")
 }
 
+func (s *faceWorkerLumenStub) PoolStats() service.PoolStats {
+	return service.PoolStats{}
+}
+
+func (s *faceWorkerLumenStub) GetNodes() []*discovery.NodeInfo {
+	return nil
+}
+
 type faceWorkerFaceServiceStub struct {
 	service.FaceService
 	savedAssetID pgtype.UUID
@@ -131,7 +139,7 @@ func TestProcessFaceWorkerPassesImageDataToFaceService(t *testing.T) {
 	}
 }
 
-func TestProcessFaceWorkerSnoozesWhenTaskUnavailable(t *testing.T) {
+func TestProcessFaceWorkerDoesNotSnoozeWithoutTaskCheck(t *testing.T) {
 	t.Parallel()
 
 	assetID := pgtype.UUID{}
@@ -139,23 +147,28 @@ func TestProcessFaceWorkerSnoozesWhenTaskUnavailable(t *testing.T) {
 		t.Fatalf("scan asset id: %v", err)
 	}
 
+	faceService := &faceWorkerFaceServiceStub{}
 	worker := &ProcessFaceWorker{
-		FaceService: &faceWorkerFaceServiceStub{},
+		FaceService: faceService,
 		LumenService: &faceWorkerLumenStub{
 			available: map[string]bool{
 				"face_recognition": false,
 			},
-			result: &types.FaceV1{},
+			result: &types.FaceV1{ModelID: "face-model", Count: 0},
 		},
 		ConfigProvider: faceWorkerConfigStub{},
+		ImageLoader:    &workerImageLoaderStub{data: []byte("face-rgb"), encodedSource: []byte("face-source")},
 	}
 
 	err := worker.Work(context.Background(), &river.Job[ProcessFaceArgs]{
-		Args: ProcessFaceArgs{
-			AssetID: assetID,
-		},
+		Args: ProcessFaceArgs{AssetID: assetID},
 	})
-	if err == nil {
-		t.Fatal("expected snooze error")
+	// In the new architecture, IsTaskAvailable is not checked.
+	// The worker proceeds to call Infer and forward results.
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if faceService.savedFaces == nil || faceService.savedFaces.ModelID != "face-model" {
+		t.Fatalf("expected face result to be saved even without task check")
 	}
 }

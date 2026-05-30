@@ -19,13 +19,20 @@ const RELATION_STYLES: Record<string, string> = {
   alternative: "border-base-300 bg-base-200 text-base-content/70",
 };
 
-const relationLabel = (relation: string, t: ReturnType<typeof useI18n>["t"]) =>
-  t(`assets.stackDetail.relation.${relation}`, {
-    defaultValue: relation
-      .split("_")
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(" "),
-  });
+function getRelationLabel(t: (key: string) => string, relation: string) {
+  switch (relation) {
+    case "raw_original":
+      return t("assets.stackDetail.relation.raw_original");
+    case "jpeg_original":
+      return t("assets.stackDetail.relation.jpeg_original");
+    case "edited_version":
+      return t("assets.stackDetail.relation.edited_version");
+    case "alternative":
+      return t("assets.stackDetail.relation.alternative");
+    default:
+      return t("assets.stackDetail.relation.alternative");
+  }
+}
 
 const truncateAssetId = (assetId: string) => {
   if (assetId.length <= 12) return assetId;
@@ -178,8 +185,7 @@ export default function StackDetailModal({
                     "medium",
                   );
                   const badgeClass =
-                    RELATION_STYLES[relation] ??
-                    RELATION_STYLES.alternative;
+                    RELATION_STYLES[relation] ?? RELATION_STYLES.alternative;
 
                   return (
                     <article
@@ -222,7 +228,7 @@ export default function StackDetailModal({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-base-content">
-                              {relationLabel(relation, t)}
+                              {getRelationLabel(t, relation)}
                             </p>
                             <p className="mt-1 font-mono text-xs text-base-content/50">
                               {truncateAssetId(memberAssetId)}

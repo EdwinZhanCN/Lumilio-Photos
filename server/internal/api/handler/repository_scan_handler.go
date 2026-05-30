@@ -87,11 +87,12 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 	}
 
 	var dbRepo *repo.Repository
+	ownerID := adminIDFromContext(c)
 	if repocfg.IsRepositoryRoot(repoPath) {
-		dbRepo, err = h.repoManager.AddRepository(repoPath)
+		dbRepo, err = h.repoManager.AddRepository(repoPath, ownerID)
 	} else {
 		cfg := repocfg.NewDefaultRepositoryConfig(name)
-		dbRepo, err = h.repoManager.InitializeRepository(repoPath, *cfg)
+		dbRepo, err = h.repoManager.InitializeRepository(repoPath, *cfg, ownerID)
 	}
 	if err != nil {
 		api.GinBadRequest(c, err, "Failed to create repository")
@@ -203,6 +204,128 @@ func (h *RepositoryScanHandler) ListRepositoryScans(c *gin.Context) {
 	api.GinSuccess(c, dto.RepositoryScanRunListDTO{Scans: items})
 }
 
+// ListRepositories returns all registered repositories.
+// @Summary List repositories
+// @Description Return all registered repositories.
+// @Tags repositories
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} api.Result{data=dto.ListRepositoriesResponseDTO} "Repositories retrieved successfully"
+// @Router /api/v1/repositories [get]
+func (h *RepositoryScanHandler) ListRepositories(c *gin.Context) {
+	repos, err := h.repoManager.ListRepositories()
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to list repositories")
+		return
+	}
+
+	items := make([]dto.RepositoryDTO, 0, len(repos))
+	for _, r := range repos {
+		items = append(items, toRepositoryDTO(r))
+	}
+	api.GinSuccess(c, dto.ListRepositoriesResponseDTO{Repositories: items})
+}
+
+// GetRepository returns a single repository by ID.
+// @Summary Get repository
+// @Description Return a single repository.
+// @Tags repositories
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Repository UUID"
+// @Success 200 {object} api.Result{data=dto.RepositoryDTO} "Repository retrieved successfully"
+// @Failure 404 {object} api.Result "Repository not found"
+// @Router /api/v1/repositories/{id} [get]
+func (h *RepositoryScanHandler) GetRepository(c *gin.Context) {
+	repo, err := h.repoManager.GetRepository(strings.TrimSpace(c.Param("id")))
+	if err != nil {
+		api.GinNotFound(c, err, "Repository not found")
+		return
+	}
+	api.GinSuccess(c, toRepositoryDTO(repo))
+}
+
+// UpdateRepository updates mutable fields of a repository.
+// @Summary Update repository
+// @Description Update mutable repository fields (name, storage_strategy, local_settings, default_owner_id).
+// @Tags repositories
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Repository UUID"
+// @Param request body dto.UpdateRepositoryRequestDTO true "Fields to update"
+// @Success 200 {object} api.Result{data=dto.RepositoryDTO} "Repository updated successfully"
+// @Failure 400 {object} api.Result "Invalid request"
+// @Failure 404 {object} api.Result "Repository not found"
+// @Router /api/v1/repositories/{id} [patch]
+func (h *RepositoryScanHandler) UpdateRepository(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+
+	existing, err := h.repoManager.GetRepository(id)
+	if err != nil {
+		api.GinNotFound(c, err, "Repository not found")
+		return
+	}
+
+	var req dto.UpdateRepositoryRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		api.GinBadRequest(c, err, "Invalid request")
+		return
+	}
+
+	// Merge patch into existing config
+	cfg := existing.Config
+	if req.Name != nil {
+		cfg.Name = *req.Name
+	}
+	if req.StorageStrategy != nil {
+		cfg.StorageStrategy = *req.StorageStrategy
+	}
+	if req.LocalSettings != nil {
+		cfg.LocalSettings.PreserveOriginalFilename = req.LocalSettings.PreserveOriginalFilename
+		cfg.LocalSettings.HandleDuplicateFilenames = req.LocalSettings.HandleDuplicateFilenames
+	}
+
+	defaultOwnerID := existing.DefaultOwnerID
+	if req.DefaultOwnerID != nil {
+		defaultOwnerID = req.DefaultOwnerID
+	}
+
+	updated, err := h.repoManager.UpdateRepository(id, cfg, defaultOwnerID)
+	if err != nil {
+		api.GinBadRequest(c, err, "Failed to update repository")
+		return
+	}
+
+	api.GinSuccess(c, toRepositoryDTO(updated))
+}
+
+// DeleteRepository removes a repository registration.
+// @Summary Delete repository
+// @Description Remove a repository from the registry. Does not delete files on disk.
+// @Tags repositories
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Repository UUID"
+// @Success 200 {object} api.Result "Repository deleted successfully"
+// @Failure 404 {object} api.Result "Repository not found"
+// @Router /api/v1/repositories/{id} [delete]
+func (h *RepositoryScanHandler) DeleteRepository(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+
+	if _, err := h.repoManager.GetRepository(id); err != nil {
+		api.GinNotFound(c, err, "Repository not found")
+		return
+	}
+
+	if err := h.repoManager.RemoveRepository(id); err != nil {
+		api.GinInternalError(c, err, "Failed to delete repository")
+		return
+	}
+
+	api.GinSuccess(c, nil)
+}
+
 func resolveRepositoryCreatePath(storageRoot, name string) (string, error) {
 	root := strings.TrimSpace(storageRoot)
 	if root == "" {
@@ -278,10 +401,16 @@ func toRepositoryDTO(repository *repo.Repository) dto.RepositoryDTO {
 	}
 
 	return dto.RepositoryDTO{
-		ID:        id,
-		Name:      repository.Name,
-		Path:      repository.Path,
-		IsPrimary: repo.IsPrimaryRepository(repository.Name, repository.Path),
+		ID:              id,
+		Name:            repository.Name,
+		Path:            repository.Path,
+		IsPrimary:       repo.IsPrimaryRepository(repository.Name, repository.Path),
+		DefaultOwnerID:  repository.DefaultOwnerID,
+		StorageStrategy: repository.Config.StorageStrategy,
+		LocalSettings: dto.RepositoryLocalSettings{
+			PreserveOriginalFilename: repository.Config.LocalSettings.PreserveOriginalFilename,
+			HandleDuplicateFilenames: repository.Config.LocalSettings.HandleDuplicateFilenames,
+		},
 	}
 }
 

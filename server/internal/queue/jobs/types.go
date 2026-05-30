@@ -25,7 +25,7 @@ func (ProcessClipArgs) InsertOpts() river.InsertOpts {
 
 const (
 	MLPreprocessVersionV1 = "ml-image-v1"
-	MLProcessMaxAttempts  = 5
+	MLProcessMaxAttempts  = 50
 )
 
 // ProcessBioClipArgs is the River job payload for BioCLIP classification.
