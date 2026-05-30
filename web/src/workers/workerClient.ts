@@ -13,7 +13,6 @@ import type {
   LayoutConfig,
   LayoutResult,
 } from "@/lib/layout/justifiedLayout";
-import type { RuntimeManifestV1 } from "@/features/studio/plugins/types";
 
 export type WorkerType =
   | "thumbnail"
@@ -21,7 +20,7 @@ export type WorkerType =
   | "export"
   | "exif"
   | "justified"
-  | "plugin";
+  | "tool";
 
 export interface WorkerClientOptions {
   preload?: WorkerType[];
@@ -30,7 +29,7 @@ export interface WorkerClientOptions {
 export interface SingleHashResult {
   index: number;
   hash: string;
-  file?: File; // 可选：把原始文件传回来方便后续处理
+  file?: File;
   error?: string;
 }
 
@@ -40,18 +39,17 @@ export class AppWorkerClient {
   private exportWorker: Worker | null = null;
   private extractExifWorker: Worker | null = null;
   private justifiedLayoutWorker: Worker | null = null;
-  private studioPluginWorker: Worker | null = null;
+  private toolWorker: Worker | null = null;
   private justifiedInitPromise: Promise<void> | null = null;
   private justifiedRequestId = 0;
-  private studioPluginRequestId = 0;
-  private studioPluginLoadedRunners: Set<string> = new Set();
+  private toolRequestId = 0;
+  private toolLoadedSet: Set<string> = new Set();
 
   private eventTarget: EventTarget;
 
   constructor(options: WorkerClientOptions = {}) {
     this.eventTarget = new EventTarget();
 
-    // Pre-load specified workers
     if (options.preload) {
       options.preload.forEach((workerType) => {
         this.getOrInitializeWorker(workerType);
@@ -59,9 +57,6 @@ export class AppWorkerClient {
     }
   }
 
-  /**
-   * Get or initialize a worker on demand
-   */
   private getOrInitializeWorker(type: WorkerType, index: number = 0): Worker {
     switch (type) {
       case "thumbnail":
@@ -109,25 +104,20 @@ export class AppWorkerClient {
         }
         return this.justifiedLayoutWorker;
 
-      case "plugin":
-        if (!this.studioPluginWorker) {
-          this.studioPluginWorker = new Worker(
-            new URL("./plugin.worker.ts", import.meta.url),
+      case "tool":
+        if (!this.toolWorker) {
+          this.toolWorker = new Worker(
+            new URL("./tool.worker.ts", import.meta.url),
             { type: "module" },
           );
         }
-        return this.studioPluginWorker;
+        return this.toolWorker;
 
       default:
         throw new Error(`Unknown worker type: ${type}`);
     }
   }
 
-  /**
-   * Adds a progress listener that can be used by any worker task.
-   * @param callback - Function to handle progress events.
-   * @returns A function to remove the event listener.
-   */
   addProgressListener(callback: (detail: any) => void): () => void {
     const handler = (e: CustomEvent) => callback(e.detail);
     this.eventTarget.addEventListener("progress", handler as EventListener);
@@ -143,13 +133,9 @@ export class AppWorkerClient {
     return this.justifiedRequestId;
   }
 
-  private nextStudioPluginRequestId(): number {
-    this.studioPluginRequestId += 1;
-    return this.studioPluginRequestId;
-  }
-
-  private getStudioPluginRunnerKey(manifest: RuntimeManifestV1): string {
-    return `${manifest.id}@${manifest.version}`;
+  private nextToolRequestId(): number {
+    this.toolRequestId += 1;
+    return this.toolRequestId;
   }
 
   async initializeJustifiedLayout(): Promise<void> {
@@ -337,7 +323,7 @@ export class AppWorkerClient {
           } else if (e.data.type === "HASH_COMPLETE") {
             worker.removeEventListener("message", handler);
             activeWorkers--;
-            runTask(workerIndex); // Get next task
+            runTask(workerIndex);
           } else if (e.data.type === "ERROR") {
             worker.removeEventListener("message", handler);
             hasError = true;
@@ -350,13 +336,11 @@ export class AppWorkerClient {
           type: "GENERATE_HASH",
           data: [file],
           config: {
-            // Pass memory constraint multiplier to adjust chunk sizes in worker
             memoryMultiplier: globalPerformancePreferences.getMemoryConstraintMultiplier()
           }
         });
       };
 
-      // Start initial workers
       const numWorkers = Math.min(maxThreads, total);
       for (let i = 0; i < numWorkers; i++) {
         runTask(i);
@@ -368,62 +352,52 @@ export class AppWorkerClient {
     this.hashWorkers.forEach(w => w.postMessage({ type: "ABORT" }));
   }
 
-  // --- Studio Plugin Runtime ---
-  async loadStudioPluginRunner(manifest: RuntimeManifestV1): Promise<void> {
-    const runnerKey = this.getStudioPluginRunnerKey(manifest);
-    if (this.studioPluginLoadedRunners.has(runnerKey)) {
+  // --- Tool Runtime ---
+  async loadTool(toolId: string): Promise<void> {
+    if (this.toolLoadedSet.has(toolId)) {
       return;
     }
 
-    const worker = this.getOrInitializeWorker("plugin");
+    const worker = this.getOrInitializeWorker("tool");
 
     await new Promise<void>((resolve, reject) => {
       const timeoutId = globalThis.setTimeout(() => {
         worker.removeEventListener("message", handler);
-        reject(new Error(`Timed out loading plugin runner: ${runnerKey}`));
+        reject(new Error(`Timed out loading tool: ${toolId}`));
       }, 15000);
 
       const handler = (event: MessageEvent) => {
         const { type, payload } = event.data || {};
 
-        if (
-          type === "RUNNER_LOADED" &&
-          payload?.pluginId === manifest.id &&
-          payload?.version === manifest.version
-        ) {
+        if (type === "TOOL_LOADED" && payload?.toolId === toolId) {
           globalThis.clearTimeout(timeoutId);
           worker.removeEventListener("message", handler);
-          this.studioPluginLoadedRunners.add(runnerKey);
+          this.toolLoadedSet.add(toolId);
           resolve();
           return;
         }
 
         if (
           type === "ERROR" &&
-          payload?.stage === "load_runner" &&
-          payload?.pluginId === manifest.id &&
-          payload?.version === manifest.version
+          payload?.stage === "load_tool" &&
+          payload?.toolId === toolId
         ) {
           globalThis.clearTimeout(timeoutId);
           worker.removeEventListener("message", handler);
-          reject(new Error(payload?.error || `Failed to load plugin runner: ${runnerKey}`));
+          reject(new Error(payload?.error || `Failed to load tool: ${toolId}`));
         }
       };
 
       worker.addEventListener("message", handler);
       worker.postMessage({
-        type: "LOAD_RUNNER",
-        payload: {
-          pluginId: manifest.id,
-          version: manifest.version,
-          runnerUrl: manifest.entries.runner,
-        },
+        type: "LOAD_TOOL",
+        payload: { toolId },
       });
     });
   }
 
-  async runStudioPlugin(
-    manifest: RuntimeManifestV1,
+  async runTool(
+    toolId: string,
     file: File,
     params: Record<string, unknown>,
   ): Promise<{
@@ -431,9 +405,9 @@ export class AppWorkerClient {
     mimeType: string;
     blob: Blob;
   }> {
-    await this.loadStudioPluginRunner(manifest);
-    const worker = this.getOrInitializeWorker("plugin");
-    const requestId = this.nextStudioPluginRequestId();
+    await this.loadTool(toolId);
+    const worker = this.getOrInitializeWorker("tool");
+    const requestId = this.nextToolRequestId();
 
     return new Promise((resolve, reject) => {
       const handler = (event: MessageEvent) => {
@@ -443,11 +417,11 @@ export class AppWorkerClient {
           return;
         }
 
-        if (type === "PLUGIN_PROGRESS") {
+        if (type === "TOOL_PROGRESS") {
           this.eventTarget.dispatchEvent(
             new CustomEvent("progress", {
               detail: {
-                operation: "plugin",
+                operation: "tool",
                 processed: payload.processed,
                 total: payload.total,
               },
@@ -456,14 +430,14 @@ export class AppWorkerClient {
           return;
         }
 
-        if (type === "PLUGIN_COMPLETE") {
+        if (type === "TOOL_COMPLETE") {
           worker.removeEventListener("message", handler);
           const bytes = payload.bytes instanceof Uint8Array
             ? payload.bytes
             : new Uint8Array(payload.bytes);
 
           resolve({
-            fileName: payload.fileName || "plugin-output.bin",
+            fileName: payload.fileName || "tool-output.bin",
             mimeType: payload.mimeType || "application/octet-stream",
             blob: new Blob([bytes], {
               type: payload.mimeType || "application/octet-stream",
@@ -472,12 +446,11 @@ export class AppWorkerClient {
           return;
         }
 
-        if (type === "ERROR" && payload.stage === "run_plugin") {
+        if (type === "ERROR" && payload.stage === "run_tool") {
           worker.removeEventListener("message", handler);
           reject(
             new Error(
-              payload.error ||
-                `Plugin execution failed: ${manifest.id}@${manifest.version}`,
+              payload.error || `Tool execution failed: ${toolId}`,
             ),
           );
         }
@@ -485,12 +458,10 @@ export class AppWorkerClient {
 
       worker.addEventListener("message", handler);
       worker.postMessage({
-        type: "RUN_PLUGIN",
+        type: "RUN_TOOL",
         payload: {
           requestId,
-          pluginId: manifest.id,
-          version: manifest.version,
-          manifest,
+          toolId,
           file,
           params,
         },
@@ -498,9 +469,9 @@ export class AppWorkerClient {
     });
   }
 
-  abortStudioPlugin(): void {
-    if (this.studioPluginWorker) {
-      this.studioPluginWorker.postMessage({ type: "ABORT" });
+  abortTool(): void {
+    if (this.toolWorker) {
+      this.toolWorker.postMessage({ type: "ABORT" });
     }
   }
 
@@ -601,10 +572,6 @@ export class AppWorkerClient {
   }
 
   // --- Lifecycle Management ---
-  /**
-   * Terminates all active workers to clean up resources.
-   * This should be called when the application is unmounting.
-   */
   terminateAllWorkers(): void {
     if (this.generateThumbnailworker) {
       this.generateThumbnailworker.terminate();
@@ -626,12 +593,12 @@ export class AppWorkerClient {
       this.justifiedLayoutWorker.terminate();
       this.justifiedLayoutWorker = null;
     }
-    if (this.studioPluginWorker) {
-      this.studioPluginWorker.terminate();
-      this.studioPluginWorker = null;
+    if (this.toolWorker) {
+      this.toolWorker.terminate();
+      this.toolWorker = null;
     }
     this.justifiedInitPromise = null;
-    this.studioPluginLoadedRunners.clear();
+    this.toolLoadedSet.clear();
     console.log("All workers terminated.");
   }
 }

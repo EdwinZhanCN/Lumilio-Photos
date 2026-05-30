@@ -27,7 +27,6 @@ type BorderWasmModule = {
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47];
 const MODE_PREPROCESS_LIMITS: Record<BorderMode, { maxSide: number; maxPixels: number }> = {
   COLORED: { maxSide: Number.MAX_SAFE_INTEGER, maxPixels: Number.MAX_SAFE_INTEGER },
-  // Frosted mode has full-frame blur, so use a lower threshold to keep latency predictable.
   FROSTED: { maxSide: 3072, maxPixels: 9_000_000 },
   VIGNETTE: { maxSide: 4096, maxPixels: 16_000_000 },
 };
@@ -88,7 +87,8 @@ function canUseCanvasTranscode(): boolean {
 async function getBorderWasm(): Promise<BorderWasmModule> {
   if (!wasmPromise) {
     wasmPromise = (async () => {
-      const mod = (await import("./vendor/border_wasm.js")) as BorderWasmModule;
+      // @ts-ignore -- wasm-bindgen generated JS has no type declarations
+      const mod = (await import("./vendor/border_wasm.js")) as unknown as BorderWasmModule;
       const wasmUrlCandidates = [
         new URL("./vendor/border_wasm_bg.wasm", import.meta.url),
         new URL("./border_wasm_bg.wasm", import.meta.url),
@@ -231,7 +231,6 @@ async function maybeDownscaleForHeavyMode(
     }
 
     const bytes = await transcodeWithCanvas(bitmap, signal, {
-      // Pre-normalize to PNG for better wasm decode stability.
       mimeType: "image/png",
       maxSide: needsDownscale ? limits.maxSide : undefined,
     });
@@ -243,8 +242,9 @@ async function maybeDownscaleForHeavyMode(
   }
 }
 
-export async function run(
-  ctx: { inputFile: File; signal: AbortSignal },
+export async function runBorderTransform(
+  file: File,
+  signal: AbortSignal,
   rawParams: Record<string, unknown>,
   helpers?: { reportProgress?: (processed: number, total: number) => void },
 ): Promise<{ bytes: Uint8Array; mimeType: string; fileName: string }> {
@@ -253,21 +253,21 @@ export async function run(
   const wasm = await getBorderWasm();
   const params = normalizeParams(rawParams);
 
-  assertNotAborted(ctx.signal);
+  assertNotAborted(signal);
   helpers?.reportProgress?.(2, 6);
 
   let usedPreTranscode = false;
   const preprocessed = await maybeDownscaleForHeavyMode(
-    ctx.inputFile,
+    file,
     params.mode,
-    ctx.signal,
+    signal,
   );
   const inputBytes = preprocessed
     ? new Uint8Array(preprocessed.bytes)
-    : new Uint8Array(await ctx.inputFile.arrayBuffer());
+    : new Uint8Array(await file.arrayBuffer());
   usedPreTranscode = preprocessed?.preTranscoded ?? false;
 
-  assertNotAborted(ctx.signal);
+  assertNotAborted(signal);
   helpers?.reportProgress?.(3, 6);
 
   let outputBytes: Uint8Array;
@@ -280,26 +280,25 @@ export async function run(
     }
     if (usedPreTranscode) {
       throw new Error(
-        `Border plugin failed to decode even after canvas preprocessing: ${message}`,
+        `Border tool failed to decode even after canvas preprocessing: ${message}`,
       );
     }
 
-    // Fallback: browser decode + transcode to PNG, then retry wasm.
-    const fallbackBytes = await transcodeWithCanvas(ctx.inputFile, ctx.signal, {
+    const fallbackBytes = await transcodeWithCanvas(file, signal, {
       mimeType: "image/png",
     });
-    assertNotAborted(ctx.signal);
+    assertNotAborted(signal);
     outputBytes = runWasmTransform(wasm, params.mode, fallbackBytes, params);
   }
 
-  assertNotAborted(ctx.signal);
+  assertNotAborted(signal);
   helpers?.reportProgress?.(5, 6);
 
   const mimeType = detectMimeType(outputBytes);
   if (mimeType !== "image/png") {
-    throw new Error("Border plugin expected PNG output from wasm encoder");
+    throw new Error("Border tool expected PNG output from wasm encoder");
   }
-  const base = ctx.inputFile.name.replace(/\.[^.]+$/, "");
+  const base = file.name.replace(/\.[^.]+$/, "");
   const ext = fileExtensionFromMime(mimeType);
 
   helpers?.reportProgress?.(6, 6);
@@ -309,7 +308,3 @@ export async function run(
     fileName: `${base}-border.${ext}`,
   };
 }
-
-export default {
-  run,
-};

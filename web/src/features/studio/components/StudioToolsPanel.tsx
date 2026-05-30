@@ -1,15 +1,9 @@
 import type { PanelType } from "../routes/Studio";
 import { ExifDataDisplay } from "./panels/ExifDataDisplay";
 import { DevelopPanel } from "./panels/DevelopPanel";
-import { MarketplacePanel } from "./panels/MarketplacePanel";
-import { PluginsWorkspacePanel } from "./panels/PluginsWorkspacePanel";
-import { ExifExtractionProgress } from "@/hooks/util-hooks/useExtractExifdata";
+import { BorderPanel } from "@/features/studio/tools/border";
+import type { ExifExtractionProgress } from "@/hooks/util-hooks/useExtractExifdata";
 import { useI18n } from "@/lib/i18n.tsx";
-import type {
-  CatalogPluginSummary,
-  InstalledPluginRecord,
-  StudioPluginUiModule,
-} from "@/features/studio/plugins/types";
 
 export type StudioFrameProgress = {
   processed: number;
@@ -25,26 +19,13 @@ type StudioToolsPanelProps = {
   exifProgress: ExifExtractionProgress;
   exifToDisplay: Record<string, any> | null;
   onExtractExif: () => void;
-  isGeneratingPlugin: boolean;
-  pluginProgress: StudioFrameProgress;
-  onGeneratePlugin: () => Promise<void>;
-  pluginRuntimeEnabled: boolean;
-  installedPlugins: InstalledPluginRecord[];
-  catalogPlugins: CatalogPluginSummary[];
-  selectedPluginId: string | null;
-  onInstallPlugin: (pluginId: string, version: string) => void;
-  onUninstallPlugin: (pluginId: string) => void;
-  isPluginInstalled: (pluginId: string, version?: string) => boolean;
-  pluginUiModule: StudioPluginUiModule | null;
-  pluginParams: Record<string, unknown>;
-  onPluginParamsChange: (next: Record<string, unknown>) => void;
-  pluginLoading: boolean;
-  pluginError: string | null;
-  catalogLoading: boolean;
-  catalogError: string | null;
-  onOpenMarketplace: () => void;
-  onCancelPluginGeneration?: () => void;
-  isCancellingPlugin?: boolean;
+  isGeneratingTool: boolean;
+  toolProgress: StudioFrameProgress;
+  onGenerateTool: () => Promise<void>;
+  toolParams: Record<string, unknown>;
+  onToolParamsChange: (next: Record<string, unknown>) => void;
+  onCancelToolGeneration?: () => void;
+  isCancellingTool?: boolean;
   onCancelExtraction?: () => void;
   isCancellingExif?: boolean;
 };
@@ -56,37 +37,24 @@ export function StudioToolsPanel({
   exifProgress,
   exifToDisplay,
   onExtractExif,
-  isGeneratingPlugin,
-  pluginProgress,
-  onGeneratePlugin,
-  pluginRuntimeEnabled,
-  installedPlugins,
-  catalogPlugins,
-  selectedPluginId,
-  onInstallPlugin,
-  onUninstallPlugin,
-  isPluginInstalled,
-  pluginUiModule,
-  pluginParams,
-  onPluginParamsChange,
-  pluginLoading,
-  pluginError,
-  catalogLoading,
-  catalogError,
-  onOpenMarketplace,
-  onCancelPluginGeneration,
-  isCancellingPlugin = false,
+  isGeneratingTool,
+  toolProgress,
+  onGenerateTool,
+  toolParams,
+  onToolParamsChange,
+  onCancelToolGeneration,
+  isCancellingTool = false,
   onCancelExtraction,
   isCancellingExif = false,
 }: StudioToolsPanelProps) {
   const { t } = useI18n();
 
-  const isLoading = isExtracting || isGeneratingPlugin;
+  const isLoading = isExtracting || isGeneratingTool;
   const currentProgress =
     activePanel === "exif"
       ? exifProgress
-      : activePanel === "plugins"
-        ? pluginProgress
+      : activePanel === "border"
+        ? toolProgress
         : null;
 
   const renderPanelContent = () => {
@@ -97,34 +65,12 @@ export function StudioToolsPanel({
         );
       case "develop":
         return <DevelopPanel />;
-      case "marketplace":
+      case "border":
         return (
-          <MarketplacePanel
-            isGenerating={isGeneratingPlugin}
-            pluginRuntimeEnabled={pluginRuntimeEnabled}
-            installedPlugins={installedPlugins}
-            catalogPlugins={catalogPlugins}
-            onInstallPlugin={onInstallPlugin}
-            onUninstallPlugin={onUninstallPlugin}
-            isPluginInstalled={isPluginInstalled}
-            catalogLoading={catalogLoading}
-            catalogError={catalogError}
-          />
-        );
-      case "plugins":
-        return (
-          <PluginsWorkspacePanel
-            isGenerating={isGeneratingPlugin}
-            onGeneratePlugin={onGeneratePlugin}
-            pluginRuntimeEnabled={pluginRuntimeEnabled}
-            installedPlugins={installedPlugins}
-            selectedPluginId={selectedPluginId}
-            pluginUiModule={pluginUiModule}
-            pluginParams={pluginParams}
-            onPluginParamsChange={onPluginParamsChange}
-            pluginLoading={pluginLoading}
-            pluginError={pluginError}
-            onOpenMarketplace={onOpenMarketplace}
+          <BorderPanel
+            value={toolParams}
+            onChange={onToolParamsChange}
+            disabled={isGeneratingTool}
           />
         );
       default:
@@ -177,17 +123,33 @@ export function StudioToolsPanel({
                 </button>
               )}
 
-              {isGeneratingPlugin && (
+              {isGeneratingTool && onCancelToolGeneration && (
                 <button
-                  onClick={onCancelPluginGeneration}
+                  onClick={onCancelToolGeneration}
                   className="btn btn-xs btn-outline btn-error mt-2"
-                  disabled={isCancellingPlugin}
+                  disabled={isCancellingTool}
                 >
-                  {isCancellingPlugin
+                  {isCancellingTool
                     ? t("studio.cancelling")
-                    : t("studio.plugins.cancel")}
+                    : t("studio.tools.cancel", "Cancel")}
                 </button>
               )}
+            </div>
+          )}
+
+          {activePanel === "border" && !isGeneratingTool && (
+            <div className="mb-4">
+              <button
+                onClick={onGenerateTool}
+                className="btn btn-primary w-full"
+                disabled={isGeneratingTool}
+              >
+                {isGeneratingTool ? (
+                  <span className="loading loading-spinner"></span>
+                ) : (
+                  t("studio.tools.apply", "Apply Border")
+                )}
+              </button>
             </div>
           )}
 

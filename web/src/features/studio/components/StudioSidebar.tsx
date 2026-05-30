@@ -1,26 +1,15 @@
-import { Blocks, FileText, Plug, SlidersHorizontal } from "lucide-react";
+import { FileText, Frame, SlidersHorizontal } from "lucide-react";
 import type { PanelType } from "../routes/Studio";
 import { useI18n } from "@/lib/i18n.tsx";
-import type { InstalledPluginRecord } from "@/features/studio/plugins/types";
 
 type StudioSidebarProps = {
   activePanel: PanelType;
   setActivePanel: (panel: PanelType) => void;
-  pluginRuntimeEnabled: boolean;
-  installedPlugins: InstalledPluginRecord[];
-  selectedPluginId: string | null;
-  onSelectPlugin: (pluginId: string) => void;
-  isPluginNavDisabled?: boolean;
 };
 
 export function StudioSidebar({
   activePanel,
   setActivePanel,
-  pluginRuntimeEnabled,
-  installedPlugins,
-  selectedPluginId,
-  onSelectPlugin,
-  isPluginNavDisabled = false,
 }: StudioSidebarProps) {
   const { t } = useI18n();
   const navItems = [
@@ -30,15 +19,8 @@ export function StudioSidebar({
       label: t("studio.nav.develop"),
       icon: SlidersHorizontal,
     },
-    { id: "marketplace", label: t("studio.nav.marketplace"), icon: Blocks },
+    { id: "border", label: t("studio.nav.border", "Border"), icon: Frame },
   ];
-  const hasPluginChildren = pluginRuntimeEnabled && installedPlugins.length > 0;
-  const isPluginsActive = activePanel === "plugins";
-
-  const handleSelectPlugin = (pluginId: string) => {
-    setActivePanel("plugins");
-    onSelectPlugin(pluginId);
-  };
 
   return (
     <aside className="w-40 shrink-0 overflow-y-auto border-r border-base-content/10 bg-base-200">
@@ -56,48 +38,6 @@ export function StudioSidebar({
               </button>
             </li>
           ))}
-
-          <li>
-            {hasPluginChildren ? (
-              <details open={isPluginsActive}>
-                <summary
-                  className={isPluginsActive ? "active" : undefined}
-                  onClick={() => setActivePanel("plugins")}
-                >
-                  <Plug className="size-5 flex-shrink-0" />
-                  {t("studio.nav.plugins")}
-                </summary>
-                <ul>
-                  {installedPlugins.map((item) => (
-                    <li key={`${item.pluginId}@${item.version}`}>
-                      <button
-                        type="button"
-                        className={
-                          selectedPluginId === item.pluginId
-                            ? "menu-active"
-                            : undefined
-                        }
-                        onClick={() => handleSelectPlugin(item.pluginId)}
-                        disabled={isPluginNavDisabled}
-                        title={`${item.pluginId}`}
-                      >
-                        <span className="truncate">{item.pluginId}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            ) : (
-              <button
-                type="button"
-                className={isPluginsActive ? "menu-active" : undefined}
-                onClick={() => setActivePanel("plugins")}
-              >
-                <Plug className="size-5 flex-shrink-0" />
-                {t("studio.nav.plugins")}
-              </button>
-            )}
-          </li>
         </ul>
       </div>
     </aside>
