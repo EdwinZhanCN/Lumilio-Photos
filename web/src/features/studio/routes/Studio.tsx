@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useExtractExifdata } from "@/hooks/util-hooks/useExtractExifdata.tsx";
 import { useWorker } from "@/contexts/WorkerProvider.tsx";
 import { useMessage } from "@/hooks/util-hooks/useMessage.tsx";
@@ -8,67 +8,37 @@ import {
   StudioToolsPanel,
   StudioViewport,
 } from "@/features/studio/components";
-import { useStudioPluginCatalog } from "@/features/studio/hooks/useStudioPluginCatalog";
-import { useStudioPluginInstall } from "@/features/studio/hooks/useStudioPluginInstall";
-import { fetchAndVerifyManifest } from "@/features/studio/plugins/registryClient";
-import { loadPluginUiModule } from "@/features/studio/plugins/uiLoader";
-import type {
-  RuntimeManifestV1,
-  StudioPluginUiModule,
-} from "@/features/studio/plugins/types";
+import { DEFAULT_PARAMS } from "@/features/studio/tools/border";
 
-type FrameProcessingProgress = {
+type ToolProgress = {
   processed: number;
   total: number;
   error?: string;
   failedAt?: number | null;
 } | null;
 
-export type PanelType = "exif" | "develop" | "marketplace" | "plugins";
-
-const pluginRuntimeEnabled =
-  import.meta.env.VITE_STUDIO_PLUGIN_RUNTIME_ENABLED !== "false";
+export type PanelType = "exif" | "develop" | "border";
 
 export function Studio() {
-  // Core State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isCancellingExif, setIsCancellingExif] = useState(false);
 
-  // UI State
   const [activePanel, setActivePanel] = useState<PanelType>("exif");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Processed EXIF data for display
   const [exifToDisplay, setExifToDisplay] = useState<Record<string, any> | null>(null);
 
-  // Plugin Runtime State
-  const [selectedPluginId, setSelectedPluginId] = useState<string | null>(null);
-  const [selectedPluginManifest, setSelectedPluginManifest] =
-    useState<RuntimeManifestV1 | null>(null);
-  const [selectedPluginUiModule, setSelectedPluginUiModule] =
-    useState<StudioPluginUiModule | null>(null);
-  const [pluginParams, setPluginParams] = useState<Record<string, unknown>>({});
-  const [pluginLoading, setPluginLoading] = useState(false);
-  const [pluginError, setPluginError] = useState<string | null>(null);
-  const [pluginResultUrl, setPluginResultUrl] = useState<string | null>(null);
-  const [pluginResultFileName, setPluginResultFileName] = useState<string | null>(null);
-  const [isGeneratingPlugin, setIsGeneratingPlugin] = useState(false);
-  const [pluginProgress, setPluginProgress] =
-    useState<FrameProcessingProgress>(null);
-  const [isCancellingPlugin, setIsCancellingPlugin] = useState(false);
+  // Tool state
+  const [toolParams, setToolParams] = useState<Record<string, unknown>>(DEFAULT_PARAMS);
+  const [toolResultUrl, setToolResultUrl] = useState<string | null>(null);
+  const [toolResultFileName, setToolResultFileName] = useState<string | null>(null);
+  const [isGeneratingTool, setIsGeneratingTool] = useState(false);
+  const [toolProgress, setToolProgress] = useState<ToolProgress>(null);
+  const [isCancellingTool, setIsCancellingTool] = useState(false);
 
-  // Hooks
   const workerClient = useWorker();
   const showMessage = useMessage();
-
-  const {
-    catalog: pluginCatalog,
-    isLoading: isCatalogLoading,
-    error: catalogError,
-  } = useStudioPluginCatalog("plugins", pluginRuntimeEnabled);
-
-  const { installed, install, uninstall, isInstalled } = useStudioPluginInstall();
 
   const {
     isExtracting,
@@ -77,13 +47,6 @@ export function Studio() {
     extractExifData,
     cancelExtraction,
   } = useExtractExifdata();
-
-  const selectedInstalledPluginRecord = useMemo(() => {
-    if (!selectedPluginId) {
-      return null;
-    }
-    return installed.find((item) => item.pluginId === selectedPluginId) ?? null;
-  }, [installed, selectedPluginId]);
 
   useEffect(() => {
     if (exifData && exifData[0]) {
@@ -94,105 +57,12 @@ export function Studio() {
   }, [exifData]);
 
   useEffect(() => {
-    if (!pluginRuntimeEnabled) {
-      setSelectedPluginId(null);
-      setSelectedPluginManifest(null);
-      setSelectedPluginUiModule(null);
-      setPluginParams({});
-      setPluginError(null);
-      return;
-    }
-
-    if (installed.length === 0) {
-      setSelectedPluginId(null);
-      return;
-    }
-
-    if (!selectedPluginId || !installed.some((item) => item.pluginId === selectedPluginId)) {
-      setSelectedPluginId(installed[0].pluginId);
-    }
-  }, [installed, selectedPluginId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadPlugin = async () => {
-      if (!pluginRuntimeEnabled || !selectedInstalledPluginRecord) {
-        setSelectedPluginManifest(null);
-        setSelectedPluginUiModule(null);
-        setPluginParams({});
-        setPluginError(null);
-        return;
-      }
-
-      setPluginLoading(true);
-      setPluginError(null);
-
-      try {
-        const manifest = await fetchAndVerifyManifest(
-          selectedInstalledPluginRecord.pluginId,
-          selectedInstalledPluginRecord.version,
-        );
-
-        if (manifest.mount.panel !== "plugins") {
-          throw new Error(
-            `Plugin ${manifest.id} cannot mount on plugins workspace (${manifest.mount.panel})`,
-          );
-        }
-
-        const uiModule = await loadPluginUiModule(manifest.entries.ui);
-        if (
-          uiModule.meta.id !== manifest.id ||
-          uiModule.meta.version !== manifest.version
-        ) {
-          throw new Error(
-            `Plugin UI entry mismatch for ${manifest.id}@${manifest.version}`,
-          );
-        }
-
-        if (cancelled) {
-          return;
-        }
-
-        setSelectedPluginManifest(manifest);
-        setSelectedPluginUiModule(uiModule);
-        setPluginParams(uiModule.defaultParams);
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        setSelectedPluginManifest(null);
-        setSelectedPluginUiModule(null);
-        setPluginParams({});
-        setPluginError(
-          error instanceof Error
-            ? error.message
-            : "Failed to load selected Studio plugin",
-        );
-      } finally {
-        if (!cancelled) {
-          setPluginLoading(false);
-        }
-      }
-    };
-
-    loadPlugin().catch(() => {
-      // handled by state updates above
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedInstalledPluginRecord]);
-
-  useEffect(() => {
     const removeListener = workerClient.addProgressListener((detail) => {
-      if (detail?.operation !== "plugin") {
+      if (detail?.operation !== "tool") {
         return;
       }
 
-      setPluginProgress({
+      setToolProgress({
         processed: Number(detail.processed || 0),
         total: Number(detail.total || 100),
       });
@@ -203,7 +73,6 @@ export function Studio() {
     };
   }, [workerClient]);
 
-  // Clean up original image URL when it is replaced or component unmounts
   useEffect(() => {
     return () => {
       if (imageUrl) {
@@ -212,16 +81,14 @@ export function Studio() {
     };
   }, [imageUrl]);
 
-  // Revoke plugin output object URL when replaced/unmounted
   useEffect(() => {
     return () => {
-      if (pluginResultUrl) {
-        URL.revokeObjectURL(pluginResultUrl);
+      if (toolResultUrl) {
+        URL.revokeObjectURL(toolResultUrl);
       }
     };
-  }, [pluginResultUrl]);
+  }, [toolResultUrl]);
 
-  //#region Handlers
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
@@ -234,20 +101,19 @@ export function Studio() {
       URL.revokeObjectURL(imageUrl);
     }
 
-    setPluginResultUrl((prev) => {
+    setToolResultUrl((prev) => {
       if (prev) {
         URL.revokeObjectURL(prev);
       }
       return null;
     });
-    setPluginResultFileName(null);
+    setToolResultFileName(null);
 
     const newUrl = URL.createObjectURL(file);
     setImageUrl(newUrl);
 
-    // Reset panel-scoped state for the new source image.
     setExifToDisplay(null);
-    setPluginProgress(null);
+    setToolProgress(null);
     setActivePanel("exif");
   };
 
@@ -261,39 +127,35 @@ export function Studio() {
     setActivePanel("exif");
   }, [selectedFile, extractExifData]);
 
-  const handleGeneratePlugin = useCallback(async () => {
-    if (!selectedFile || !selectedPluginManifest || !selectedPluginUiModule) {
+  const handleGenerateTool = useCallback(async () => {
+    if (!selectedFile) {
       return;
     }
 
-    setIsGeneratingPlugin(true);
-    setPluginProgress({ processed: 0, total: 100 });
+    setIsGeneratingTool(true);
+    setToolProgress({ processed: 0, total: 100 });
 
     try {
-      const normalizedParams = selectedPluginUiModule.normalizeParams
-        ? selectedPluginUiModule.normalizeParams(pluginParams)
-        : pluginParams;
-
-      const result = await workerClient.runStudioPlugin(
-        selectedPluginManifest,
+      const result = await workerClient.runTool(
+        "border",
         selectedFile,
-        normalizedParams,
+        toolParams,
       );
 
       const resultUrl = URL.createObjectURL(result.blob);
-      setPluginResultUrl((prev) => {
+      setToolResultUrl((prev) => {
         if (prev) {
           URL.revokeObjectURL(prev);
         }
         return resultUrl;
       });
-      setPluginResultFileName(result.fileName);
+      setToolResultFileName(result.fileName);
 
-      showMessage("success", `Plugin processing complete: ${result.fileName}`);
+      showMessage("success", `Processing complete: ${result.fileName}`);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Plugin processing failed";
-      setPluginProgress((prev) =>
+        error instanceof Error ? error.message : "Tool processing failed";
+      setToolProgress((prev) =>
         prev
           ? {
               ...prev,
@@ -304,26 +166,19 @@ export function Studio() {
       );
       showMessage("error", message);
     } finally {
-      setIsGeneratingPlugin(false);
+      setIsGeneratingTool(false);
     }
-  }, [
-    selectedFile,
-    selectedPluginManifest,
-    selectedPluginUiModule,
-    pluginParams,
-    workerClient,
-    showMessage,
-  ]);
+  }, [selectedFile, toolParams, workerClient, showMessage]);
 
-  const handleCancelPluginGeneration = useCallback(() => {
-    setIsCancellingPlugin(true);
+  const handleCancelToolGeneration = useCallback(() => {
+    setIsCancellingTool(true);
     try {
-      workerClient.abortStudioPlugin();
-      setIsGeneratingPlugin(false);
-      setPluginProgress(null);
-      showMessage("info", "Plugin generation has been cancelled.");
+      workerClient.abortTool();
+      setIsGeneratingTool(false);
+      setToolProgress(null);
+      showMessage("info", "Tool generation has been cancelled.");
     } finally {
-      setIsCancellingPlugin(false);
+      setIsCancellingTool(false);
     }
   }, [workerClient, showMessage]);
 
@@ -336,64 +191,35 @@ export function Studio() {
     }
   }, [cancelExtraction]);
 
-  const handleInstallPlugin = useCallback(
-    (pluginId: string, version: string) => {
-      install(pluginId, version);
-      setSelectedPluginId(pluginId);
-      setActivePanel("plugins");
-    },
-    [install],
-  );
-
-  const handleUninstallPlugin = useCallback(
-    (pluginId: string) => {
-      uninstall(pluginId);
-      if (selectedPluginId === pluginId) {
-        setSelectedPluginId(null);
-        setSelectedPluginManifest(null);
-        setSelectedPluginUiModule(null);
-        setPluginParams({});
-        setPluginError(null);
-      }
-    },
-    [uninstall, selectedPluginId],
-  );
-
-  const handleSelectPlugin = useCallback((pluginId: string) => {
-    setSelectedPluginId(pluginId || null);
-  }, []);
-
-  const handleExportPluginResult = useCallback(() => {
-    if (!pluginResultUrl) {
+  const handleExportToolResult = useCallback(() => {
+    if (!toolResultUrl) {
       return;
     }
 
     try {
       const link = document.createElement("a");
-      link.href = pluginResultUrl;
-      link.download = pluginResultFileName || "plugin-output.png";
+      link.href = toolResultUrl;
+      link.download = toolResultFileName || "tool-output.png";
       document.body.appendChild(link);
       link.click();
       link.remove();
     } catch {
-      showMessage("error", "Failed to export plugin output image");
+      showMessage("error", "Failed to export output image");
     }
-  }, [pluginResultUrl, pluginResultFileName, showMessage]);
-  //#endregion
+  }, [toolResultUrl, toolResultFileName, showMessage]);
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
   };
 
-  // Display priority: plugin output > original
-  const displayUrl = pluginResultUrl || imageUrl;
+  const displayUrl = toolResultUrl || imageUrl;
 
   return (
     <div className="flex flex-col h-[calc(85vh)] bg-base-100 overflow-hidden">
       <StudioHeader
         onOpenFile={triggerFileInput}
-        onExportImage={handleExportPluginResult}
-        hasExportImage={Boolean(pluginResultUrl)}
+        onExportImage={handleExportToolResult}
+        hasExportImage={Boolean(toolResultUrl)}
         fileInputRef={fileInputRef}
         onFileChange={handleFileChange}
       />
@@ -402,11 +228,6 @@ export function Studio() {
         <StudioSidebar
           activePanel={activePanel}
           setActivePanel={setActivePanel}
-          pluginRuntimeEnabled={pluginRuntimeEnabled}
-          installedPlugins={installed}
-          selectedPluginId={selectedPluginId}
-          onSelectPlugin={handleSelectPlugin}
-          isPluginNavDisabled={isGeneratingPlugin}
         />
 
         <StudioViewport
@@ -423,26 +244,13 @@ export function Studio() {
           exifProgress={exifProgress}
           exifToDisplay={exifToDisplay}
           onExtractExif={handleExtractExif}
-          isGeneratingPlugin={isGeneratingPlugin}
-          pluginProgress={pluginProgress}
-          onGeneratePlugin={handleGeneratePlugin}
-          pluginRuntimeEnabled={pluginRuntimeEnabled}
-          installedPlugins={installed}
-          catalogPlugins={pluginCatalog}
-          selectedPluginId={selectedPluginId}
-          onInstallPlugin={handleInstallPlugin}
-          onUninstallPlugin={handleUninstallPlugin}
-          isPluginInstalled={isInstalled}
-          pluginUiModule={selectedPluginUiModule}
-          pluginParams={pluginParams}
-          onPluginParamsChange={setPluginParams}
-          pluginLoading={pluginLoading}
-          pluginError={pluginError}
-          catalogLoading={isCatalogLoading}
-          catalogError={catalogError}
-          onOpenMarketplace={() => setActivePanel("marketplace")}
-          onCancelPluginGeneration={handleCancelPluginGeneration}
-          isCancellingPlugin={isCancellingPlugin}
+          isGeneratingTool={isGeneratingTool}
+          toolProgress={toolProgress}
+          onGenerateTool={handleGenerateTool}
+          toolParams={toolParams}
+          onToolParamsChange={setToolParams}
+          onCancelToolGeneration={handleCancelToolGeneration}
+          isCancellingTool={isCancellingTool}
           onCancelExtraction={handleCancelExtraction}
           isCancellingExif={isCancellingExif}
         />

@@ -1,19 +1,9 @@
 import React from "react";
 import { DEFAULT_PARAMS, type BorderParams, normalizeParams } from "./types";
 
-export const meta = {
-  id: "com.lumilio.border",
-  version: "0.2.3",
-  displayName: "Lumilio Border",
-  mount: {
-    panel: "plugins" as const,
-    order: 10,
-  },
-};
-
 export const defaultParams: Record<string, unknown> = DEFAULT_PARAMS;
 
-const BorderPanel: React.FC<{
+export const BorderPanel: React.FC<{
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
   disabled?: boolean;
@@ -134,14 +124,4 @@ const BorderPanel: React.FC<{
       )}
     </div>
   );
-};
-
-export const Panel = BorderPanel;
-export { normalizeParams };
-
-export default {
-  meta,
-  defaultParams,
-  Panel,
-  normalizeParams,
 };
