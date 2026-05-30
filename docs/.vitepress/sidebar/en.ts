@@ -1,5 +1,4 @@
 import { DefaultTheme } from "vitepress";
-import typedocSidebar from "./typedoc-sidebar.json";
 
 export const enSidebar: DefaultTheme.Sidebar = {
   "/user-manual/": [
@@ -71,16 +70,6 @@ export const enSidebar: DefaultTheme.Sidebar = {
     {
       text: "Lumen",
       link: "/developer-documentation/lumen/",
-    },
-    {
-      text: "TypeDoc",
-      link: "/docs/",
-    },
-  ],
-  "/docs/": [
-    {
-      text: "TypeDoc",
-      items: typedocSidebar,
     },
   ],
 };
