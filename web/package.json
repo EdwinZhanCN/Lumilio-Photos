@@ -13,8 +13,7 @@
         "test": "vitest",
         "test:coverage": "vitest run --coverage",
         "test:watch": "vitest --watch",
-        "test:ui": "vitest --ui",
-        "docs": "typedoc"
+        "test:ui": "vitest --ui"
     },
     "dependencies": {
         "@immich/justified-layout-wasm": "^0.4.3",
@@ -86,9 +85,6 @@
         "openapi-typescript": "^7.13.0",
         "oxlint": "^1.39.0",
         "rolldown-vite": "^7.0.12",
-        "typedoc": "^0.28.7",
-        "typedoc-plugin-markdown": "^4.7.0",
-        "typedoc-vitepress-theme": "^1.1.2",
         "typescript": "^5.8.3",
         "typescript-eslint": "^8.39.0",
         "vite": "^7.3.1",
