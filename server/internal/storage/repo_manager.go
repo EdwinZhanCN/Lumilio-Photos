@@ -29,14 +29,14 @@ type RepositoryManager interface {
 	ValidateRepository(path string) (*ValidationResult, error)
 
 	// Repository lifecycle CRUD
-	InitializeRepository(path string, config repocfg.RepositoryConfig) (*repo.Repository, error)
-	AddRepository(path string) (*repo.Repository, error)
+	InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error)
+	AddRepository(path string, defaultOwnerID *int32) (*repo.Repository, error)
 	GetRepository(id string) (*repo.Repository, error)
 	GetRepositoryByPath(path string) (*repo.Repository, error)
 	ListRepositories() ([]*repo.Repository, error)
 	RemoveRepository(id string) error
 	RemoveRepositories(ids []string) error
-	UpdateRepository(id string, config repocfg.RepositoryConfig) (*repo.Repository, error)
+	UpdateRepository(id string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error)
 
 	// Repository-Asset relationship (path-based)
 	GetRepositoryAssetStats(repoID string, ownerID *int32) (*RepositoryAssetStats, error)
@@ -53,6 +53,9 @@ type RepositoryManager interface {
 
 	// Staging operations (delegated to staging manager)
 	GetStagingManager() StagingManager
+
+	// Directory manager access
+	GetDirectoryManager() DirectoryManager
 }
 
 // RepositoryAssetStats contains statistics about assets in a repository
@@ -103,7 +106,7 @@ func NewRepositoryManager(
 }
 
 // AddRepository registers an existing repository with the system
-func (rm *DefaultRepositoryManager) AddRepository(path string) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) AddRepository(path string, defaultOwnerID *int32) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
@@ -148,13 +151,14 @@ func (rm *DefaultRepositoryManager) AddRepository(path string) (*repo.Repository
 
 	now := time.Now()
 	dbRepo, err := rm.queries.CreateRepository(context.Background(), repo.CreateRepositoryParams{
-		RepoID:    pgtype.UUID{Bytes: repoUUID, Valid: true},
-		Name:      config.Name,
-		Path:      cleanPath,
-		Config:    *config,
-		Status:    dbtypes.RepoStatusActive,
-		CreatedAt: pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
-		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		RepoID:         pgtype.UUID{Bytes: repoUUID, Valid: true},
+		Name:           config.Name,
+		Path:           cleanPath,
+		Config:         *config,
+		Status:         dbtypes.RepoStatusActive,
+		DefaultOwnerID: defaultOwnerID,
+		CreatedAt:      pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
+		UpdatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
 	})
 	if err != nil {
 		rm.repoAudit(cleanPath).Error("repository.add", err, zap.String("repository_id", config.ID))
@@ -345,7 +349,7 @@ func (rm *DefaultRepositoryManager) checkDirectoryPermissions(path string) error
 }
 
 // InitializeRepository creates a new repository with full directory structure
-func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) InitializeRepository(path string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error) {
 	// Clean and validate path
 	cleanPath, err := filepath.Abs(filepath.Clean(path))
 	if err != nil {
@@ -396,13 +400,14 @@ func (rm *DefaultRepositoryManager) InitializeRepository(path string, config rep
 
 	now := time.Now()
 	dbRepo, err := rm.queries.CreateRepository(context.Background(), repo.CreateRepositoryParams{
-		RepoID:    pgtype.UUID{Bytes: repoUUID, Valid: true},
-		Name:      config.Name,
-		Path:      cleanPath,
-		Config:    config,
-		Status:    dbtypes.RepoStatusActive,
-		CreatedAt: pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
-		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		RepoID:         pgtype.UUID{Bytes: repoUUID, Valid: true},
+		Name:           config.Name,
+		Path:           cleanPath,
+		Config:         config,
+		Status:         dbtypes.RepoStatusActive,
+		DefaultOwnerID: defaultOwnerID,
+		CreatedAt:      pgtype.Timestamptz{Time: config.CreatedAt, Valid: true},
+		UpdatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
 	})
 	if err != nil {
 		// Clean up on failure
@@ -497,6 +502,11 @@ func (rm *DefaultRepositoryManager) GetStagingManager() StagingManager {
 	return rm.stagingManager
 }
 
+// GetDirectoryManager returns the underlying DirectoryManager for direct file operations.
+func (rm *DefaultRepositoryManager) GetDirectoryManager() DirectoryManager {
+	return rm.dirManager
+}
+
 func (rm *DefaultRepositoryManager) RemoveRepositories(ids []string) error {
 	uuids := make([]pgtype.UUID, len(ids))
 	for i, id := range ids {
@@ -515,7 +525,7 @@ func (rm *DefaultRepositoryManager) RemoveRepositories(ids []string) error {
 	return nil
 }
 
-func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.RepositoryConfig) (*repo.Repository, error) {
+func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.RepositoryConfig, defaultOwnerID *int32) (*repo.Repository, error) {
 	repoUUID, err := uuid.Parse(id)
 	if err != nil {
 		rm.logger.Warn("repository update failed: invalid id", zap.String("operation", "repository.update"), zap.String("repository_id", id), zap.Error(err))
@@ -530,11 +540,12 @@ func (rm *DefaultRepositoryManager) UpdateRepository(id string, config repocfg.R
 	// Update database record
 	now := time.Now()
 	dbRepo, err := rm.queries.UpdateRepository(context.Background(), repo.UpdateRepositoryParams{
-		RepoID:    pgtype.UUID{Bytes: repoUUID, Valid: true},
-		Name:      config.Name,
-		Config:    config,
-		Status:    dbtypes.RepoStatusActive,
-		UpdatedAt: pgtype.Timestamptz{Time: now, Valid: true},
+		RepoID:         pgtype.UUID{Bytes: repoUUID, Valid: true},
+		Name:           config.Name,
+		Config:         config,
+		Status:         dbtypes.RepoStatusActive,
+		DefaultOwnerID: defaultOwnerID,
+		UpdatedAt:      pgtype.Timestamptz{Time: now, Valid: true},
 	})
 	if err != nil {
 		rm.repoAudit("").Error("repository.update", err, zap.String("repository_id", id))

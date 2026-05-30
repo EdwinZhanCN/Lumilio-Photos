@@ -3,278 +3,52 @@ package processors
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/riverqueue/river"
-	"go.uber.org/zap"
 
-	"server/internal/db/dbtypes"
-	"server/internal/db/dbtypes/status"
 	"server/internal/db/repo"
-	"server/internal/queue/jobs"
-	"server/internal/storage"
-	"server/internal/utils/file"
-	"server/internal/utils/hash"
+	"server/internal/sourcing"
 )
 
-// IngestAsset performs initial staging validation, asset record creation, commits the
-// file to repository inbox, and enqueues downstream tasks.
+// IngestAsset converts an upload payload into an IngestSource and delegates to the
+// SourceMaterializer for validation, staging→inbox commit, asset creation, and pipeline enqueuing.
+// Audit logging is handled by the materializer.
 func (ap *AssetProcessor) IngestAsset(ctx context.Context, task AssetPayload) (*repo.Asset, error) {
-	// Resolve repository
-	repository, err := ap.resolveRepository(ctx, task.RepositoryID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Validate file
-	validation := file.ValidateFile(task.FileName, task.ContentType)
-	if !validation.Valid {
-		return nil, fmt.Errorf("file validation failed: %s", validation.ErrorReason)
-	}
-	assetType := validation.AssetType
-	canonicalMimeType := validation.MimeType
-
-	// Staging file check
-	info, err := os.Stat(task.StagedPath)
-	if err != nil {
-		return nil, fmt.Errorf("staged file not found: %w", err)
-	}
-	fileSize := info.Size()
-
-	normalizedHash := strings.ToLower(strings.TrimSpace(task.ClientHash))
-	if normalizedHash == "" {
-		hashResult, hashErr := hash.CalculateFileHash(task.StagedPath, hash.AlgorithmBLAKE3, true)
-		if hashErr != nil {
-			return nil, fmt.Errorf("calculate hash: %w", hashErr)
-		}
-		normalizedHash = strings.ToLower(strings.TrimSpace(hashResult.Hash))
-	}
-	if normalizedHash == "" {
-		return nil, fmt.Errorf("asset hash is empty")
-	}
-
-	// Prepare staging file struct
-	stagingFile := &storage.StagingFile{
-		ID:        filepath.Base(task.StagedPath),
-		RepoPath:  repository.Path,
-		Path:      task.StagedPath,
-		Filename:  task.FileName,
-		CreatedAt: task.Timestamp,
-	}
-
-	// Owner handling (anonymous → nil)
+	// Resolve owner from upload payload (upload-specific concern)
 	var ownerIDPtr *int32
 	if task.UserID != "" && task.UserID != "anonymous" {
-		// Try to parse UserID as integer
 		var id int
-		_, err := fmt.Sscanf(task.UserID, "%d", &id)
-		if err == nil {
-			ownerID := int32(id)
-			ownerIDPtr = &ownerID
-		} else {
-			// If not an integer, try to look up by username
-			user, err := ap.queries.GetUserByUsername(ctx, task.UserID)
-			if err == nil {
-				ownerID := user.UserID
-				ownerIDPtr = &ownerID
-			}
+		if _, err := fmt.Sscanf(task.UserID, "%d", &id); err == nil {
+			o := int32(id)
+			ownerIDPtr = &o
+		} else if user, err := ap.queries.GetUserByUsername(ctx, task.UserID); err == nil {
+			ownerIDPtr = &user.UserID
 		}
 	}
 
-	// Initial status
-	statusJSON, err := buildTrackedProcessingStatus(assetType, "Asset ingestion started")
-	if err != nil {
-		return nil, fmt.Errorf("marshal status: %w", err)
+	// Parse optional repository ID; uuid.Nil signals fallback-to-primary in the materializer
+	var repoUUID uuid.UUID
+	if task.RepositoryID != "" {
+		parsed, err := uuid.Parse(task.RepositoryID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid repository ID: %w", err)
+		}
+		repoUUID = parsed
 	}
 
-	// Create asset record with empty storage path
-	asset, err := ap.assetService.CreateAssetRecord(ctx, repo.CreateAssetParams{
+	var hashPtr *string
+	if task.ClientHash != "" {
+		hashPtr = &task.ClientHash
+	}
+
+	return ap.materializer.Materialize(ctx, sourcing.IngestSource{
+		RepositoryID:     repoUUID,
 		OwnerID:          ownerIDPtr,
-		Type:             string(assetType),
+		Kind:             sourcing.IngestSourceUpload,
+		SourcePath:       task.StagedPath,
 		OriginalFilename: task.FileName,
-		StoragePath:      nil,
-		MimeType:         canonicalMimeType,
-		FileSize:         fileSize,
-		Hash:             &normalizedHash,
-		TakenTime:        pgtype.Timestamptz{Time: time.Now(), Valid: true},
-		Rating:           func() *int32 { r := int32(0); return &r }(),
-		RepositoryID:     repository.RepoID,
-		Status:           statusJSON,
+		Hash:             hashPtr,
+		Timestamp:        task.Timestamp,
+		ContentType:      task.ContentType,
 	})
-	if err != nil {
-		return nil, fmt.Errorf("create asset: %w", err)
-	}
-
-	// Commit file to inbox now so downstream workers can access it
-	storageRelPath, err := ap.stagingManager.CommitStagingFileToInbox(stagingFile, normalizedHash)
-	if err != nil {
-		failureDetail := fmt.Sprintf("commit staging to inbox failed: %v", err)
-		if moveErr := ap.stagingManager.MoveStagingToFailed(stagingFile); moveErr != nil {
-			ap.logger.Warn("failed to move staging file to failed dir",
-				zap.String("operation", "asset.ingest"),
-				zap.String("staging_path", stagingFile.Path),
-				zap.Error(moveErr),
-			)
-			ap.repoAudit(repository.Path).Error("asset.ingest.move_failed", moveErr,
-				zap.String("asset_id", asset.AssetID.String()),
-				zap.String("staging_path", stagingFile.Path),
-			)
-			if removeErr := os.Remove(stagingFile.Path); removeErr != nil && !os.IsNotExist(removeErr) {
-				ap.logger.Warn("failed to remove staging file after move failure",
-					zap.String("operation", "asset.ingest"),
-					zap.String("staging_path", stagingFile.Path),
-					zap.Error(removeErr),
-				)
-			}
-			failureDetail = fmt.Sprintf("%s; move to failed dir failed: %v", failureDetail, moveErr)
-		}
-
-		if markErr := ap.markAssetFailed(ctx, asset.AssetID, "commit_staging", failureDetail); markErr != nil {
-			ap.logger.Warn("failed to mark asset as failed after staging commit error",
-				zap.String("operation", "asset.ingest"),
-				zap.String("asset_id", asset.AssetID.String()),
-				zap.Error(markErr),
-			)
-		}
-		ap.repoAudit(repository.Path).Error("asset.ingest.commit_staging", err,
-			zap.String("asset_id", asset.AssetID.String()),
-			zap.String("storage_path", storageRelPath),
-			zap.String("original_filename", task.FileName),
-		)
-		return asset, nil
-	}
-
-	assetType = dbtypes.AssetType(asset.Type)
-
-	// Update storage path + keep status processing
-	_, err = ap.queries.UpdateAssetStoragePathAndStatus(ctx, repo.UpdateAssetStoragePathAndStatusParams{
-		AssetID:     asset.AssetID,
-		StoragePath: &storageRelPath,
-		Status:      statusJSON,
-	})
-	if err != nil {
-		ap.markPipelineTasksFailed(ctx, asset.AssetID, trackedPipelineTasks(assetType), fmt.Errorf("update asset storage path: %w", err))
-		return nil, fmt.Errorf("update asset storage path: %w", err)
-	}
-
-	// Enqueue downstream tasks
-	pgID := asset.AssetID
-	commonMeta := jobs.MetadataArgs{
-		AssetID:          pgID,
-		RepoPath:         repository.Path,
-		StoragePath:      storageRelPath,
-		AssetType:        assetType,
-		OriginalFilename: asset.OriginalFilename,
-		FileSize:         asset.FileSize,
-		MimeType:         asset.MimeType,
-	}
-	commonThumb := jobs.ThumbnailArgs{
-		AssetID:     pgID,
-		RepoPath:    repository.Path,
-		StoragePath: storageRelPath,
-		AssetType:   assetType,
-	}
-	commonTranscode := jobs.TranscodeArgs{
-		AssetID:     pgID,
-		RepoPath:    repository.Path,
-		StoragePath: storageRelPath,
-		AssetType:   assetType,
-	}
-
-	// Always enqueue metadata first
-	_, err = ap.queueClient.Insert(ctx, commonMeta, &river.InsertOpts{Queue: "metadata_asset"})
-	if err != nil {
-		ap.markPipelineTasksFailed(ctx, asset.AssetID, trackedPipelineTasks(assetType), fmt.Errorf("enqueue metadata: %w", err))
-		return nil, fmt.Errorf("enqueue metadata: %w", err)
-	}
-
-	switch assetType {
-	case dbtypes.AssetTypePhoto:
-		_, err = ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
-		if err != nil {
-			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskThumbnail}, fmt.Errorf("enqueue thumbnails: %w", err))
-			return nil, fmt.Errorf("enqueue thumbnails: %w", err)
-		}
-
-	case dbtypes.AssetTypeVideo:
-		_, err = ap.queueClient.Insert(ctx, commonThumb, &river.InsertOpts{Queue: "thumbnail_asset"})
-		if err != nil {
-			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskThumbnail, taskTranscode}, fmt.Errorf("enqueue thumbnails: %w", err))
-			return nil, fmt.Errorf("enqueue thumbnails: %w", err)
-		}
-		_, err = ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
-		if err != nil {
-			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskTranscode}, fmt.Errorf("enqueue transcode: %w", err))
-			return nil, fmt.Errorf("enqueue transcode: %w", err)
-		}
-	case dbtypes.AssetTypeAudio:
-		_, err = ap.queueClient.Insert(ctx, commonTranscode, &river.InsertOpts{Queue: "transcode_asset"})
-		if err != nil {
-			ap.markPipelineTasksFailed(ctx, asset.AssetID, []string{taskTranscode}, fmt.Errorf("enqueue transcode: %w", err))
-			return nil, fmt.Errorf("enqueue transcode: %w", err)
-		}
-	default:
-		return nil, fmt.Errorf("unsupported asset type: %s", assetType)
-	}
-
-	ap.repoAudit(repository.Path).Operation("asset.ingest",
-		zap.String("repository_id", uuid.UUID(repository.RepoID.Bytes).String()),
-		zap.String("asset_id", asset.AssetID.String()),
-		zap.String("storage_path", storageRelPath),
-		zap.String("asset_type", string(assetType)),
-	)
-
-	return asset, nil
-}
-
-func (ap *AssetProcessor) markAssetFailed(ctx context.Context, assetID pgtype.UUID, taskName string, detail string) error {
-	failedStatus := status.NewFailedStatus("Asset ingestion failed", []status.ErrorDetail{
-		{
-			Task:  taskName,
-			Error: detail,
-			Time:  time.Now().Format(time.RFC3339),
-		},
-	})
-	statusJSON, err := failedStatus.ToJSONB()
-	if err != nil {
-		return fmt.Errorf("marshal failed status: %w", err)
-	}
-
-	_, err = ap.queries.UpdateAssetStatusWithErrors(ctx, repo.UpdateAssetStatusWithErrorsParams{
-		AssetID: assetID,
-		Status:  statusJSON,
-	})
-	if err != nil {
-		return fmt.Errorf("update asset status: %w", err)
-	}
-	return nil
-}
-
-// resolveRepository resolves repository by ID or fallback to primary.
-func (ap *AssetProcessor) resolveRepository(ctx context.Context, repositoryID string) (repo.Repository, error) {
-	if repositoryID != "" {
-		repoUUID, err := uuid.Parse(repositoryID)
-		if err != nil {
-			return repo.Repository{}, fmt.Errorf("invalid repository ID: %w", err)
-		}
-		repoUUIDPg := pgtype.UUID{Bytes: repoUUID, Valid: true}
-		return ap.queries.GetRepository(ctx, repoUUIDPg)
-	}
-
-	repositories, err := ap.queries.ListRepositories(ctx)
-	if err != nil || len(repositories) == 0 {
-		return repo.Repository{}, fmt.Errorf("no repository available: %w", err)
-	}
-	// Find the primary repository; fall back to first if none marked primary
-	for _, r := range repositories {
-		if repo.IsPrimaryRepository(r.Name, r.Path) {
-			return r, nil
-		}
-	}
-	return repositories[0], nil
 }

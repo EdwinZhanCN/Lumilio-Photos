@@ -180,6 +180,23 @@ type AssetTag struct {
 	Source     string         `db:"source" json:"source"`
 }
 
+type CloudSyncCursor struct {
+	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	Provider     string             `db:"provider" json:"provider"`
+	CursorValue  string             `db:"cursor_value" json:"cursor_value"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type CloudSyncFile struct {
+	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	Provider     string             `db:"provider" json:"provider"`
+	RemoteKey    string             `db:"remote_key" json:"remote_key"`
+	Etag         string             `db:"etag" json:"etag"`
+	LocalHash    string             `db:"local_hash" json:"local_hash"`
+	AssetID      pgtype.UUID        `db:"asset_id" json:"asset_id"`
+	SyncedAt     pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
+}
+
 type DuplicateGroup struct {
 	GroupID                  pgtype.UUID        `db:"group_id" json:"group_id"`
 	RepositoryID             pgtype.UUID        `db:"repository_id" json:"repository_id"`
@@ -391,14 +408,15 @@ type RegistrationSession struct {
 }
 
 type Repository struct {
-	RepoID    pgtype.UUID              `db:"repo_id" json:"repo_id"`
-	Name      string                   `db:"name" json:"name"`
-	Path      string                   `db:"path" json:"path"`
-	Config    repocfg.RepositoryConfig `db:"config" json:"config"`
-	Status    dbtypes.RepoStatus       `db:"status" json:"status"`
-	LastSync  pgtype.Timestamptz       `db:"last_sync" json:"last_sync"`
-	CreatedAt pgtype.Timestamptz       `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	RepoID         pgtype.UUID              `db:"repo_id" json:"repo_id"`
+	Name           string                   `db:"name" json:"name"`
+	Path           string                   `db:"path" json:"path"`
+	Config         repocfg.RepositoryConfig `db:"config" json:"config"`
+	Status         dbtypes.RepoStatus       `db:"status" json:"status"`
+	LastSync       pgtype.Timestamptz       `db:"last_sync" json:"last_sync"`
+	CreatedAt      pgtype.Timestamptz       `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
+	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
 }
 
 type RepositoryScanRun struct {

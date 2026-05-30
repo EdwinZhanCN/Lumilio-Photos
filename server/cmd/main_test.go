@@ -33,7 +33,7 @@ func (f *fakePrimaryStorageRepositoryManager) GetRepositoryByPath(path string) (
 	return nil, fmt.Errorf("not found")
 }
 
-func (f *fakePrimaryStorageRepositoryManager) AddRepository(path string) (*repo.Repository, error) {
+func (f *fakePrimaryStorageRepositoryManager) AddRepository(path string, _ *int32) (*repo.Repository, error) {
 	f.addCalls = append(f.addCalls, path)
 	if f.addRepo != nil {
 		return f.addRepo, nil
@@ -41,7 +41,7 @@ func (f *fakePrimaryStorageRepositoryManager) AddRepository(path string) (*repo.
 	return fakeRepo(path), nil
 }
 
-func (f *fakePrimaryStorageRepositoryManager) InitializeRepository(path string, _ repocfg.RepositoryConfig) (*repo.Repository, error) {
+func (f *fakePrimaryStorageRepositoryManager) InitializeRepository(path string, _ repocfg.RepositoryConfig, _ *int32) (*repo.Repository, error) {
 	f.initCalls = append(f.initCalls, path)
 	if f.initRepo != nil {
 		return f.initRepo, nil

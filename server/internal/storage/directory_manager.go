@@ -23,6 +23,7 @@ type DirectoryStructure struct {
 	VideosDir     string // .lumilio/assets/videos
 	AudiosDir     string // .lumilio/assets/audios
 	FacesDir      string // .lumilio/assets/faces
+	SidecarsDir   string // .lumilio/sidecars
 	StagingDir    string // .lumilio/staging
 	TempDir       string // .lumilio/temp
 	TrashDir      string // .lumilio/trash
@@ -42,6 +43,7 @@ var DefaultStructure = DirectoryStructure{
 	VideosDir:     ".lumilio/assets/videos",
 	AudiosDir:     ".lumilio/assets/audios",
 	FacesDir:      ".lumilio/assets/faces",
+	SidecarsDir:   ".lumilio/sidecars",
 	StagingDir:    ".lumilio/staging",
 	TempDir:       ".lumilio/temp",
 	TrashDir:      ".lumilio/trash",
@@ -62,6 +64,7 @@ var Directories = []string{
 	".lumilio/assets/audios",
 	".lumilio/assets/audios/web",
 	".lumilio/assets/faces",
+	".lumilio/sidecars",         // Studio non-destructive edit sidecar files
 	".lumilio/staging",          // Upload staging area
 	".lumilio/staging/incoming", // Upload staging area
 	".lumilio/staging/failed",   // Upload staging area
@@ -98,6 +101,12 @@ type DirectoryManager interface {
 	ListTrashFiles(repoPath string) ([]*TrashFile, error)
 	RecoverFromTrash(repoPath, trashID string) error
 	PurgeTrash(repoPath string, olderThan time.Duration) error
+
+	// Sidecar operations (Studio non-destructive edit files)
+	SidecarExists(repoPath, assetID string) (bool, error)
+	ReadSidecar(repoPath, assetID string) ([]byte, error)
+	WriteSidecar(repoPath, assetID string, data []byte) error
+	DeleteSidecar(repoPath, assetID string) error
 }
 
 // StructureValidation represents the result of directory structure validation
@@ -311,6 +320,7 @@ func (dm *DefaultDirectoryManager) ProtectSystemDirectories(repoPath string) err
 		DefaultStructure.VideosDir:     0755, // rwxr-xr-x
 		DefaultStructure.AudiosDir:     0755, // rwxr-xr-x
 		DefaultStructure.FacesDir:      0755, // rwxr-xr-x
+		DefaultStructure.SidecarsDir:   0755, // rwxr-xr-x
 		DefaultStructure.StagingDir:    0700, // rwx------ (app-only)
 		DefaultStructure.TempDir:       0700, // rwx------
 		DefaultStructure.TrashDir:      0755, // rwxr-xr-x
@@ -753,6 +763,68 @@ func (dm *DefaultDirectoryManager) PurgeTrash(repoPath string, olderThan time.Du
 		}
 	}
 
+	return nil
+}
+
+// sidecarPath returns the full path for an asset's sidecar file.
+func (dm *DefaultDirectoryManager) sidecarPath(repoPath, assetID string) string {
+	return filepath.Join(repoPath, DefaultStructure.SidecarsDir, assetID+".lumilio-sidecar")
+}
+
+// SidecarExists reports whether a sidecar file exists for the given asset ID.
+func (dm *DefaultDirectoryManager) SidecarExists(repoPath, assetID string) (bool, error) {
+	path := dm.sidecarPath(repoPath, assetID)
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to stat sidecar: %w", err)
+	}
+	return true, nil
+}
+
+// ReadSidecar reads the raw content of an asset's sidecar file.
+func (dm *DefaultDirectoryManager) ReadSidecar(repoPath, assetID string) ([]byte, error) {
+	path := dm.sidecarPath(repoPath, assetID)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // no sidecar is not an error
+		}
+		return nil, fmt.Errorf("failed to read sidecar: %w", err)
+	}
+	return data, nil
+}
+
+// WriteSidecar atomically writes the sidecar data using a temp-file+rename strategy.
+func (dm *DefaultDirectoryManager) WriteSidecar(repoPath, assetID string, data []byte) error {
+	dir := filepath.Join(repoPath, DefaultStructure.SidecarsDir)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to prepare sidecar directory: %w", err)
+	}
+
+	targetPath := dm.sidecarPath(repoPath, assetID)
+	tempPath := targetPath + ".tmp"
+
+	if err := os.WriteFile(tempPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write sidecar temp file: %w", err)
+	}
+	if err := os.Rename(tempPath, targetPath); err != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("failed to save sidecar file: %w", err)
+	}
+	return nil
+}
+
+// DeleteSidecar removes an asset's sidecar file.
+func (dm *DefaultDirectoryManager) DeleteSidecar(repoPath, assetID string) error {
+	path := dm.sidecarPath(repoPath, assetID)
+	if err := os.Remove(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to delete sidecar: %w", err)
+	}
 	return nil
 }
 

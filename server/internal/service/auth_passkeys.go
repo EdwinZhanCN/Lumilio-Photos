@@ -559,6 +559,16 @@ func (s *AuthService) finalizeRegistrationWithPasskey(ctx context.Context, sessi
 		}
 
 		createdUser = user
+
+		// Assign primary repository owner on first user creation.
+		ownerID := user.UserID
+		if _, ownerErr := q.SetPrimaryRepositoryOwner(ctx, &ownerID); ownerErr != nil {
+			// Ignore NoRows — primary repo may already have an owner or not exist.
+			if !errors.Is(ownerErr, pgx.ErrNoRows) {
+				return fmt.Errorf("set primary repository owner: %w", ownerErr)
+			}
+		}
+
 		return nil
 	}); err != nil {
 		return repo.User{}, UserRoleUser, err

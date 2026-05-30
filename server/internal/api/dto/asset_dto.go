@@ -307,6 +307,27 @@ type QueryAssetsResponseDTO struct {
 	Offset       int             `json:"offset" example:"0"`
 }
 
+// QueryAssetsResponse wraps QueryAssetsResponseDTO with the standard API envelope
+// to give swaggo a concrete type it can reference without generic resolution.
+type QueryAssetsResponse struct {
+	Code    int                    `json:"code" example:"0"`
+	Message string                 `json:"message" example:"success"`
+	Data    QueryAssetsResponseDTO `json:"data"`
+	Error   string                 `json:"error,omitempty"`
+}
+
+// SearchAssetsResponseDTO represents the response structure for searching assets
+type SearchAssetsResponseDTO struct {
+	TopItems            []BrowseItemDTO         `json:"top_items,omitempty"`
+	TopResultsMeta      SearchTopResultsMetaDTO `json:"top_results_meta"`
+	ResultItems         []BrowseItemDTO         `json:"result_items,omitempty"`
+	ResultsTotalVisible *int                    `json:"results_total_visible,omitempty" example:"120"`
+	ResultsTotalAssets  *int                    `json:"results_total_assets,omitempty" example:"150"`
+	StackMode           string                  `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
+	Limit               int                     `json:"limit" example:"20"`
+	Offset              int                     `json:"offset" example:"0"`
+}
+
 // DownloadAssetsRequestDTO represents a bulk original-file download request.
 type DownloadAssetsRequestDTO struct {
 	AssetIDs []string `json:"asset_ids" binding:"required" example:"550e8400-e29b-41d4-a716-446655440000,550e8400-e29b-41d4-a716-446655440001"`
@@ -499,17 +520,6 @@ type SearchTopResultsMetaDTO struct {
 	Degraded    bool     `json:"degraded"`
 	Reason      string   `json:"reason,omitempty" example:"runtime_unavailable"`
 	SourceTypes []string `json:"source_types" example:"clip"`
-}
-
-type SearchAssetsResponseDTO struct {
-	TopItems            []BrowseItemDTO         `json:"top_items,omitempty"`
-	TopResultsMeta      SearchTopResultsMetaDTO `json:"top_results_meta"`
-	ResultItems         []BrowseItemDTO         `json:"result_items,omitempty"`
-	ResultsTotalVisible *int                    `json:"results_total_visible,omitempty" example:"120"`
-	ResultsTotalAssets  *int                    `json:"results_total_assets,omitempty" example:"150"`
-	StackMode           string                  `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
-	Limit               int                     `json:"limit" example:"20"`
-	Offset              int                     `json:"offset" example:"0"`
 }
 
 // OptionsResponseDTO represents the response for filter options
