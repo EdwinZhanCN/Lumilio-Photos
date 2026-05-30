@@ -136,7 +136,7 @@ func (s *lumenService) BioClipClassify(ctx context.Context, imageData *imagesour
 }
 
 func (s *lumenService) FaceRecognition(ctx context.Context, imageData *imagesource.MLImage) (*types.FaceV1, error) {
-	req := types.NewInferRequest("face").
+	req := types.NewInferRequest("face_recognition").
 		ForFaceRecognitionRaw(imageData.EncodedSource, "image/webp").
 		Build()
 

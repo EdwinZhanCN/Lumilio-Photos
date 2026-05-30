@@ -10,10 +10,11 @@ require (
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.8
 	github.com/corona10/goimagehash v1.1.0
 	github.com/davidbyttow/govips/v2 v2.18.0
-	github.com/edwinzhancn/lumen-sdk v1.2.5
+	github.com/edwinzhancn/lumen-sdk v1.2.6
 )
 
 require (
+	github.com/chyroc/gorequests v0.33.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-webauthn/webauthn v0.16.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -25,6 +26,7 @@ require (
 	github.com/riverqueue/river v0.24.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.24.0
 	github.com/riverqueue/river/rivertype v0.24.0
+	github.com/satori/go.uuid v1.2.0
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
@@ -36,10 +38,8 @@ require (
 )
 
 require (
-	github.com/chyroc/gorequests v0.33.0 // indirect
 	github.com/chyroc/persistent-cookiejar v0.1.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/satori/go.uuid v1.2.0 // indirect
 )
 
 require (
