@@ -4,7 +4,7 @@ import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
 import type { components } from "@/lib/http-commons/schema.d.ts";
-import { ExifDataDisplay } from "@/features/studio/components/panels/ExifDataDisplay";
+import { ExifDataDisplay } from "@/components/ExifDataDisplay";
 import type { Asset } from "@/lib/http-commons";
 import {
   isPhotoMetadata,
