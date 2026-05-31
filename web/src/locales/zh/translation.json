@@ -11,8 +11,8 @@
             "loading_more_data": "正在加载更多数据以查找资源...",
             "locating_asset": "正在定位资源...",
             "title": "资源库",
-            "title_one": "assets.all.title",
-            "title_other": "assets.all.title"
+            "title_one": "{{count}} 张照片",
+            "title_other": "{{count}} 张照片"
         },
         "assetsPageHeader": {
             "actions": {
@@ -20,8 +20,8 @@
                 "affectsAssets": "已选择 {{selectedCount}} 项，将影响 {{assetCount}} 个资源。",
                 "affectsSelected_one": "已选择 {{count}} 项。",
                 "affectsSelected_other": "已选择 {{count}} 项。",
-                "applyToItems_one": "assets.assetsPageHeader.actions.applyToItems",
-                "applyToItems_other": "assets.assetsPageHeader.actions.applyToItems",
+                "applyToItems_one": "应用于 {{count}} 个项目",
+                "applyToItems_other": "应用于 {{count}} 个项目",
                 "deleteSelected": "删除所选",
                 "downloadAll": "下载全部",
                 "like": "喜欢",
@@ -32,16 +32,16 @@
                 "unrated": "未评分"
             },
             "addToAlbumModal": {
-                "itemCount_one": "assets.assetsPageHeader.addToAlbumModal.itemCount",
-                "itemCount_other": "assets.assetsPageHeader.addToAlbumModal.itemCount",
-                "message_one": "assets.assetsPageHeader.addToAlbumModal.message",
-                "message_other": "assets.assetsPageHeader.addToAlbumModal.message",
+                "itemCount_one": "{{count}} 个项目",
+                "itemCount_other": "{{count}} 个项目",
+                "message_one": "将 {{count}} 个项目添加到相册？",
+                "message_other": "将 {{count}} 个项目添加到相册？",
                 "noAlbumsFound": "未找到相册",
                 "title": "添加到相册"
             },
             "bulkConfirm": {
                 "likedTitle": "更新喜欢状态？",
-                "ratingTitle": "assets.assetsPageHeader.bulkConfirm.ratingTitle"
+                "ratingTitle": "设置评分"
             },
             "compactMenu": {
                 "actions": "操作",
@@ -51,28 +51,28 @@
             "deleteConfirmModal": {
                 "cancelButton": "取消",
                 "deleteButton": "删除资源",
-                "message_one": "assets.assetsPageHeader.deleteConfirmModal.message",
-                "message_other": "assets.assetsPageHeader.deleteConfirmModal.message",
+                "message_one": "这将删除 {{count}} 个资源。",
+                "message_other": "这将删除 {{count}} 个资源。",
                 "title": "确认删除"
             },
             "messages": {
                 "addToAlbumError": "添加到相册失败",
-                "addToAlbumSuccess_one": "assets.assetsPageHeader.messages.addToAlbumSuccess",
-                "addToAlbumSuccess_other": "assets.assetsPageHeader.messages.addToAlbumSuccess",
+                "addToAlbumSuccess_one": "已将 {{count}} 个项目添加到相册。",
+                "addToAlbumSuccess_other": "已将 {{count}} 个项目添加到相册。",
                 "bulkActionError": "更新所选资源失败。",
                 "bulkActionSuccess_one": "已更新 {{count}} 个资源。",
                 "bulkActionSuccess_other": "已更新 {{count}} 个资源。",
                 "deleteError": "删除资源失败",
-                "deleteSuccess_one": "assets.assetsPageHeader.messages.deleteSuccess",
-                "deleteSuccess_other": "assets.assetsPageHeader.messages.deleteSuccess",
+                "deleteSuccess_one": "已删除 {{count}} 个资源。",
+                "deleteSuccess_other": "已删除 {{count}} 个资源。",
                 "downloadError": "启动下载失败",
                 "downloadStart": "下载已开始",
                 "loadAlbumsError": "加载相册失败"
             },
             "moreActions": "更多操作",
             "scan": {
-                "allQueued_one": "assets.assetsPageHeader.scan.allQueued",
-                "allQueued_other": "assets.assetsPageHeader.scan.allQueued",
+                "allQueued_one": "已为 {{count}} 个库添加扫描队列。",
+                "allQueued_other": "已为 {{count}} 个库添加扫描队列。",
                 "currentQueued": "已为 {{name}} 加入扫描队列。",
                 "failed": "加入扫描队列失败。",
                 "label": "扫描当前资源库",
@@ -94,8 +94,8 @@
         },
         "audioInfoView": {
             "audio_badge": "音频",
-            "channels_count_one": "assets.audioInfoView.channels_count",
-            "channels_count_other": "assets.audioInfoView.channels_count",
+            "channels_count_one": "{{count}} 个声道",
+            "channels_count_other": "{{count}} 个声道",
             "channels_mono": "单声道",
             "channels_stereo": "立体声",
             "codec_label": "编码: {{codec}}"
@@ -173,8 +173,8 @@
                 "west_placeholder": "西"
             },
             "main": {
-                "active_filters_count_one": "assets.filterTool.main.active_filters_count",
-                "active_filters_count_other": "assets.filterTool.main.active_filters_count",
+                "active_filters_count_one": "已启用 {{count}} 个筛选器",
+                "active_filters_count_other": "已启用 {{count}} 个筛选器",
                 "apply_button": "应用",
                 "enable_toggle": "启用",
                 "filters_button_title": "筛选器",
@@ -287,10 +287,10 @@
             "error": "此资源的堆叠详情暂时不可用。",
             "livePhoto": "实况照片",
             "loading": "正在加载堆叠详情...",
-            "memberCount_one": "assets.stackDetail.memberCount_one",
-            "memberCount_other": "assets.stackDetail.memberCount_other",
-            "openButton_one": "assets.stackDetail.openButton_one",
-            "openButton_other": "assets.stackDetail.openButton_other",
+            "memberCount_one": "堆叠中 {{count}} 个资源",
+            "memberCount_other": "堆叠中 {{count}} 个资源",
+            "openButton_one": "查看堆叠详情",
+            "openButton_other": "查看 {{count}} 个相关资源",
             "relation": {
                 "alternative": "替代版本",
                 "edited_version": "编辑版",
@@ -433,8 +433,8 @@
     },
     "bulk": {
         "updateError": "更新失败",
-        "updateSuccess_one": "bulk.updateSuccess",
-        "updateSuccess_other": "bulk.updateSuccess"
+        "updateSuccess_one": "已更新 {{count}} 个项目。",
+        "updateSuccess_other": "已更新 {{count}} 个项目。"
     },
     "collections": {
         "albumDetails": {
@@ -444,8 +444,8 @@
                 "badge": "生物图鉴",
                 "error": "生物图鉴识别排队失败。",
                 "running": "排队中...",
-                "success_one": "collections.albumDetails.bioClip.success",
-                "success_other": "collections.albumDetails.bioClip.success"
+                "success_one": "已将 {{count}} 张照片加入识别队列。",
+                "success_other": "已将 {{count}} 张照片加入识别队列。"
             },
             "createdAtLabel": "创建于",
             "fallbackName": "相册",
@@ -547,8 +547,8 @@
         "retry": "重试",
         "save": "保存",
         "select": "选择",
-        "selected_one": "common.selected",
-        "selected_other": "common.selected",
+        "selected_one": "已选 {{count}} 项",
+        "selected_other": "已选 {{count}} 项",
         "uploaded": "上传于",
         "viewAll": "查看全部"
     },
@@ -627,8 +627,8 @@
             "loadedStatusMore": "（继续加载中）",
             "loadedStatusTotal": " / 总计 {{totalCount}}",
             "loading": "正在加载地图数据...",
-            "placesCount_one": "home.map.placesCount",
-            "placesCount_other": "home.map.placesCount",
+            "placesCount_one": "{{count}} 个地点",
+            "placesCount_other": "{{count}} 个地点",
             "title": "时空轨迹"
         },
         "stats": {
@@ -724,19 +724,19 @@
             "createTitle": "添加资源库",
             "description": "当前接入的仓库，可用于上传、筛选和文件系统扫描。",
             "detectStacks": "检测堆叠",
-            "detectStacksCompleted_one": "manage.repositories.detectStacksCompleted",
-            "detectStacksCompleted_other": "manage.repositories.detectStacksCompleted",
+            "detectStacksCompleted_one": "在 {{name}} 中检测到 {{count}} 个堆叠。",
+            "detectStacksCompleted_other": "在 {{name}} 中检测到 {{count}} 个堆叠。",
             "detectStacksFailed": "堆叠检测失败。",
             "duplicateScan": "扫描重复项",
             "duplicateScanFailed": "重复项扫描失败。",
-            "rebuildLocation": "重建位置聚类",
-            "rebuildLocationQueued": "位置聚类重建已加入队列。",
             "empty": "暂无可用仓库。",
             "primaryBadge": "主仓库",
+            "rebuildLocation": "重建位置聚类",
+            "rebuildLocationQueued": "位置聚类重建已加入队列。",
             "rescanRepository": "重新扫描",
             "scanAll": "扫描全部资源库",
-            "scanAllQueued_one": "manage.repositories.scanAllQueued",
-            "scanAllQueued_other": "manage.repositories.scanAllQueued",
+            "scanAllQueued_one": "已为 {{count}} 个库添加扫描队列。",
+            "scanAllQueued_other": "已为 {{count}} 个库添加扫描队列。",
             "scanFailed": "加入扫描队列失败。",
             "scanQueued": "已为 {{name}} 加入扫描队列。",
             "title": "资源库",
@@ -778,17 +778,17 @@
             "loading": "正在加载任务...",
             "pagination": {
                 "moreResults": "还有更多结果",
-                "totalJobs_one": "monitor.jobs.pagination.totalJobs",
-                "totalJobs_other": "monitor.jobs.pagination.totalJobs"
+                "totalJobs_one": "{{count}} 个任务",
+                "totalJobs_other": "{{count}} 个任务"
             },
-            "timeAgoDays_one": "monitor.jobs.timeAgoDays",
-            "timeAgoDays_other": "monitor.jobs.timeAgoDays",
-            "timeAgoHours_one": "monitor.jobs.timeAgoHours",
-            "timeAgoHours_other": "monitor.jobs.timeAgoHours",
-            "timeAgoMinutes_one": "monitor.jobs.timeAgoMinutes",
-            "timeAgoMinutes_other": "monitor.jobs.timeAgoMinutes",
-            "timeAgoSeconds_one": "monitor.jobs.timeAgoSeconds",
-            "timeAgoSeconds_other": "monitor.jobs.timeAgoSeconds"
+            "timeAgoDays_one": "{{count}} 天前",
+            "timeAgoDays_other": "{{count}} 天前",
+            "timeAgoHours_one": "{{count}} 小时前",
+            "timeAgoHours_other": "{{count}} 小时前",
+            "timeAgoMinutes_one": "{{count}} 分钟前",
+            "timeAgoMinutes_other": "{{count}} 分钟前",
+            "timeAgoSeconds_one": "{{count}} 秒前",
+            "timeAgoSeconds_other": "{{count}} 秒前"
         },
         "ml": {
             "bioAlbumCoverage": "生物图鉴相册覆盖率",
@@ -804,12 +804,12 @@
             "reindexModal": {
                 "cancel": "取消",
                 "confirm": "开始重建",
-                "descriptionAll_one": "monitor.ml.reindexModal.descriptionAll",
-                "descriptionAll_other": "monitor.ml.reindexModal.descriptionAll",
-                "descriptionMissing_one": "monitor.ml.reindexModal.descriptionMissing",
-                "descriptionMissing_other": "monitor.ml.reindexModal.descriptionMissing",
-                "existingJobsWarning_one": "monitor.ml.reindexModal.existingJobsWarning",
-                "existingJobsWarning_other": "monitor.ml.reindexModal.existingJobsWarning",
+                "descriptionAll_one": "重新索引全部 {{count}} 个资源。",
+                "descriptionAll_other": "重新索引全部 {{count}} 个资源。",
+                "descriptionMissing_one": "重新索引 {{count}} 个缺失的资源。",
+                "descriptionMissing_other": "重新索引 {{count}} 个缺失的资源。",
+                "existingJobsWarning_one": "已有 {{count}} 个重新索引任务在队列中。",
+                "existingJobsWarning_other": "已有 {{count}} 个重新索引任务在队列中。",
                 "reindexAllCheckbox": "全量重建（而非仅补缺）",
                 "title": "重建索引 — {{task}}"
             },
@@ -823,12 +823,12 @@
             "fetchError": "获取队列失败",
             "idle": "空闲",
             "loading": "正在加载队列...",
-            "timeAgoHours_one": "monitor.queues.timeAgoHours",
-            "timeAgoHours_other": "monitor.queues.timeAgoHours",
-            "timeAgoMinutes_one": "monitor.queues.timeAgoMinutes",
-            "timeAgoMinutes_other": "monitor.queues.timeAgoMinutes",
-            "timeAgoSeconds_one": "monitor.queues.timeAgoSeconds",
-            "timeAgoSeconds_other": "monitor.queues.timeAgoSeconds"
+            "timeAgoHours_one": "{{count}} 小时前",
+            "timeAgoHours_other": "{{count}} 小时前",
+            "timeAgoMinutes_one": "{{count}} 分钟前",
+            "timeAgoMinutes_other": "{{count}} 分钟前",
+            "timeAgoSeconds_one": "{{count}} 秒前",
+            "timeAgoSeconds_other": "{{count}} 秒前"
         },
         "sections": {
             "activeQueues": "活跃队列",
@@ -837,23 +837,23 @@
         "stats": {
             "activeJobs": "活跃任务",
             "allHealthy": "状态正常",
-            "availableCount_one": "monitor.stats.availableCount",
-            "availableCount_other": "monitor.stats.availableCount",
-            "cancelledCount_one": "monitor.stats.cancelledCount",
-            "cancelledCount_other": "monitor.stats.cancelledCount",
+            "availableCount_one": "{{count}} 可用",
+            "availableCount_other": "{{count}} 可用",
+            "cancelledCount_one": "{{count}} 已取消",
+            "cancelledCount_other": "{{count}} 已取消",
+            "discardedCount_one": "{{count}} 已丢弃",
+            "discardedCount_other": "{{count}} 已丢弃",
             "completed": "已完成",
-            "discardedCount_one": "monitor.stats.discardedCount",
-            "discardedCount_other": "monitor.stats.discardedCount",
             "fetchError": "获取队列统计失败",
             "issues": "异常",
             "noData": "暂无数据",
             "noProcessedJobs": "暂无已处理任务",
-            "retryableCount_one": "monitor.stats.retryableCount",
-            "retryableCount_other": "monitor.stats.retryableCount",
-            "runningCount_one": "monitor.stats.runningCount",
-            "runningCount_other": "monitor.stats.runningCount",
-            "scheduledCount_one": "monitor.stats.scheduledCount",
-            "scheduledCount_other": "monitor.stats.scheduledCount",
+            "retryableCount_one": "{{count}} 可重试",
+            "retryableCount_other": "{{count}} 可重试",
+            "runningCount_one": "{{count}} 运行中",
+            "runningCount_other": "{{count}} 运行中",
+            "scheduledCount_one": "{{count}} 已调度",
+            "scheduledCount_other": "{{count}} 已调度",
             "successRate": "成功率 {{rate}}%"
         },
         "subtitles": {
@@ -910,8 +910,8 @@
     },
     "rating": {
         "none": "无评分",
-        "stars_one": "rating.stars",
-        "stars_other": "rating.stars",
+        "stars_one": "{{count}} 星",
+        "stars_other": "{{count}} 星",
         "unrated": "未评分",
         "updateError": "更新评分失败"
     },
@@ -1001,7 +1001,35 @@
             "passwordDescription": "修改你的账户密码。修改后需重新登录。",
             "passwordTitle": "密码",
             "permissions": {
-                "customPermission": "自定义权限"
+                "customPermission": "自定义权限",
+                "manage_users": {
+                    "label": "管理用户",
+                    "description": "创建、编辑和停用用户账户。"
+                },
+                "manage_settings": {
+                    "label": "管理设置",
+                    "description": "修改全局应用程序设置。"
+                },
+                "view_all_assets": {
+                    "label": "查看所有资源",
+                    "description": "浏览图库中的所有照片和媒体。"
+                },
+                "manage_all_assets": {
+                    "label": "管理所有资源",
+                    "description": "编辑、删除和修改任何资源的元数据。"
+                },
+                "view_own_assets": {
+                    "label": "查看自己的资源",
+                    "description": "浏览自己上传的照片和媒体。"
+                },
+                "manage_own_assets": {
+                    "label": "管理自己的资源",
+                    "description": "编辑、删除和修改自己资源的元数据。"
+                },
+                "manage_own_profile": {
+                    "label": "管理个人资料",
+                    "description": "更新你的显示名称、头像和安全设置。"
+                }
             },
             "permissionsSubtitle": "根据你的角色分配给账户的权限。",
             "permissionsTitle": "账户权限",
@@ -1081,6 +1109,10 @@
             "themes": {
                 "activeBadge": "当前模式",
                 "currentMode": "当前模式",
+                "modeNames": {
+                    "light": "亮色",
+                    "dark": "暗色"
+                },
                 "dark": {
                     "description": "导航栏处于暗色模式时使用。",
                     "label": "暗色模式主题"
@@ -1100,6 +1132,9 @@
             }
         },
         "assetPage": "资源页面",
+        "cloud": {
+            "title": ""
+        },
         "language": "语言",
         "languageAndRegion": "语言和地区",
         "performance": "性能",
@@ -1277,72 +1312,89 @@
         "updates": "更新"
     },
     "studio": {
-        "cancelling": "正在取消…",
+        "asset": {
+            "dim": "尺寸",
+            "exif": "拍摄参数 · EXIF",
+            "file": "文件",
+            "name": "名称",
+            "size": "大小",
+            "type": "类型"
+        },
+        "backToStudio": "返回工作室",
         "develop": {
             "desc": "颜色调整、裁剪等工具即将上线。",
+            "geometry": "几何",
+            "hint": "双击任意滑块重置",
+            "reset": "重置",
+            "resetAll": "重置所有调整",
+            "rotation": "旋转",
+            "light": "光线",
+            "color": "色彩",
+            "detail": "细节",
             "title": "显影工具"
         },
-        "editMvp": {
-            "asset": "资源",
-            "before": "修改前",
-            "changePhoto": "更换照片",
-            "develop": "显影",
+        "editor": {
+            "before": "原图",
+            "change": "切换照片",
             "export": "导出",
-            "loading": "加载中...",
-            "loadingImage": "正在加载图像",
-            "noExif": "没有可用的 EXIF 字段。",
-            "pickPhoto": "选择一张照片进行编辑",
-            "rendering": "正在渲染",
-            "reset": "重置",
+            "fit": "适应",
+            "loading": "加载中…",
+            "renderFailed": "渲染失败",
+            "rendering": "正在渲染预览…",
+            "resetAll": "全部重置",
             "save": "保存",
             "saved": "已保存",
+            "savedToast": "Sidecar 已保存",
+            "undo": "撤销",
             "unsaved": "未保存的更改",
+            "upToDate": "已是最新",
             "waiting": "等待预览"
         },
-        "emptyHint": "选择一张图片开始。",
         "exif": {
-            "cancel": "取消提取",
             "download": "下载 JSON",
             "empty": "暂无元数据可显示。",
-            "extract": "提取元数据",
             "extracting": "正在提取数据…",
-            "fieldsCount_one": "studio.exif.fieldsCount",
-            "fieldsCount_other": "studio.exif.fieldsCount",
+            "fieldsCount_one": "{{count}} 个字段",
+            "fieldsCount_other": "{{count}} 个字段",
             "properties": "图像属性",
             "title": "EXIF 元数据"
         },
-        "imgOpen": "打开图片",
-        "marketplace": {
-            "catalogLoading": "正在加载插件目录...",
-            "empty": "当前筛选条件下没有匹配的插件。",
-            "install": "安装",
-            "installedOnly": "仅显示已安装",
-            "runtimeDisabled": "工作室插件运行时已禁用。启用 VITE_STUDIO_PLUGIN_RUNTIME_ENABLED 以浏览插件。",
-            "searchPlaceholder": "按名称、ID 或描述搜索插件",
-            "statusInstalled": "已安装",
-            "statusNotInstalled": "未安装",
-            "summary": "显示 {{visible}} / {{total}} 个插件（已安装 {{installed}} 个）",
-            "title": "插件市场",
-            "uninstall": "移除"
+        "home": {
+            "border": {
+                "body": "为照片添加彩色、磨砂或暗角边框 — 在您的编辑之上应用。",
+                "title": "添加边框"
+            },
+            "clear": "清除",
+            "empty": {
+                "body": "从您的图库中打开一张照片开始编辑。最近的作品会显示在这里。",
+                "title": "暂无最近的编辑"
+            },
+            "openEditor": "打开编辑器",
+            "recent": "最近的编辑",
+            "resume": "继续",
+            "tools": "工具"
         },
-        "nav": {
-            "develop": "显影",
-            "exif": "EXIF",
-            "marketplace": "插件市场",
-            "plugins": "插件"
-        },
-        "plugins": {
-            "apply": "应用插件",
-            "cancel": "取消插件运行",
-            "emptyInstalled": "暂无已安装插件。",
-            "loading": "正在加载插件界面...",
-            "openMarketplace": "打开插件市场",
-            "runtimeDisabled": "工作室插件运行时已禁用。启用 VITE_STUDIO_PLUGIN_RUNTIME_ENABLED 以运行插件。",
-            "title": "插件工作区"
-        },
-        "previewAlt": "预览",
-        "processing": "处理中：{{processed}} / {{total}}",
-        "title": "工作室"
+        "pickPhoto": "选择要编辑的照片",
+        "tagline": "对图库中的照片进行快速、无损的编辑。",
+        "title": "工作室",
+        "tools": {
+            "border": {
+                "apply": "应用边框",
+                "clear": "清除",
+                "done": "边框已应用",
+                "hint": "边框在当前编辑之上叠加新像素。应用后可预览，然后导出。",
+                "modeColored": "彩色",
+                "modeFrosted": "磨砂",
+                "modeVignette": "暗角",
+                "borderWidth": "边框宽度",
+                "color": "颜色",
+                "blur": "模糊",
+                "brightness": "亮度",
+                "cornerRadius": "圆角半径",
+                "strength": "强度"
+            },
+            "title": "工具"
+        }
     },
     "upload": {
         "FileUploadProgress": {
@@ -1366,8 +1418,8 @@
         },
         "SupportedFormatsModal": {
             "close_button_aria_label": "关闭",
-            "formats_count_one": "upload.SupportedFormatsModal.formats_count",
-            "formats_count_other": "upload.SupportedFormatsModal.formats_count",
+            "formats_count_one": "{{count}} 种格式",
+            "formats_count_other": "{{count}} 种格式",
             "got_it_button": "知道了！",
             "title": "支持的文件格式"
         },
@@ -1395,11 +1447,11 @@
             "uploading_status": "上传中..."
         },
         "UploadAssets": {
-            "files_ready_to_upload_one": "upload.UploadAssets.files_ready_to_upload",
-            "files_ready_to_upload_other": "upload.UploadAssets.files_ready_to_upload",
+            "files_ready_to_upload_one": "{{count}} 个文件准备上传",
+            "files_ready_to_upload_other": "{{count}} 个文件准备上传",
             "no_files_selected": "未选择文件",
-            "processing_files_one": "upload.UploadAssets.processing_files",
-            "processing_files_other": "upload.UploadAssets.processing_files",
+            "processing_files_one": "正在处理 {{count}} 个文件…",
+            "processing_files_other": "正在处理 {{count}} 个文件…",
             "supported_formats_button": "支持的格式"
         },
         "UploadProcess": {
@@ -1411,10 +1463,10 @@
             "uploadFailed": "上传失败"
         },
         "UploadProvider": {
-            "files_exceeded_limit_one": "upload.UploadProvider.files_exceeded_limit",
-            "files_exceeded_limit_other": "upload.UploadProvider.files_exceeded_limit",
-            "max_files_allowed_one": "upload.UploadProvider.max_files_allowed",
-            "max_files_allowed_other": "upload.UploadProvider.max_files_allowed",
+            "files_exceeded_limit_one": "{{count}} 个文件超出限制。",
+            "files_exceeded_limit_other": "{{count}} 个文件超出限制。",
+            "max_files_allowed_one": "最多允许 {{count}} 个文件。",
+            "max_files_allowed_other": "最多允许 {{count}} 个文件。",
             "no_files_selected_for_upload_message": "未选择要上传的文件",
             "upload_failed_generic": "上传失败"
         }

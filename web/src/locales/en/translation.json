@@ -11,8 +11,8 @@
             "loading_more_data": "Loading more data to find the asset...",
             "locating_asset": "Locating asset...",
             "title": "Assets",
-            "title_one": "assets.all.title",
-            "title_other": "assets.all.title"
+            "title_one": "{{count}} photo",
+            "title_other": "{{count}} photos"
         },
         "assetsPageHeader": {
             "actions": {
@@ -20,8 +20,8 @@
                 "affectsAssets": "{{selectedCount}} selected items will affect {{assetCount}} assets.",
                 "affectsSelected_one": "{{count}} selected items.",
                 "affectsSelected_other": "{{count}} selected items.",
-                "applyToItems_one": "assets.assetsPageHeader.actions.applyToItems",
-                "applyToItems_other": "assets.assetsPageHeader.actions.applyToItems",
+                "applyToItems_one": "Apply to {{count}} item",
+                "applyToItems_other": "Apply to {{count}} items",
                 "deleteSelected": "Delete Selected",
                 "downloadAll": "Download All",
                 "like": "Liked",
@@ -32,16 +32,16 @@
                 "unrated": "Unrated"
             },
             "addToAlbumModal": {
-                "itemCount_one": "assets.assetsPageHeader.addToAlbumModal.itemCount",
-                "itemCount_other": "assets.assetsPageHeader.addToAlbumModal.itemCount",
-                "message_one": "assets.assetsPageHeader.addToAlbumModal.message",
-                "message_other": "assets.assetsPageHeader.addToAlbumModal.message",
+                "itemCount_one": "{{count}} item",
+                "itemCount_other": "{{count}} items",
+                "message_one": "Add {{count}} item to album?",
+                "message_other": "Add {{count}} items to album?",
                 "noAlbumsFound": "No albums found",
                 "title": "Add to Album"
             },
             "bulkConfirm": {
                 "likedTitle": "Update liked status?",
-                "ratingTitle": "assets.assetsPageHeader.bulkConfirm.ratingTitle"
+                "ratingTitle": "Set rating"
             },
             "compactMenu": {
                 "actions": "Actions",
@@ -51,28 +51,28 @@
             "deleteConfirmModal": {
                 "cancelButton": "Cancel",
                 "deleteButton": "Delete Assets",
-                "message_one": "assets.assetsPageHeader.deleteConfirmModal.message",
-                "message_other": "assets.assetsPageHeader.deleteConfirmModal.message",
+                "message_one": "This will delete {{count}} asset.",
+                "message_other": "This will delete {{count}} assets.",
                 "title": "Confirm Deletion"
             },
             "messages": {
                 "addToAlbumError": "Failed to add items to album",
-                "addToAlbumSuccess_one": "assets.assetsPageHeader.messages.addToAlbumSuccess",
-                "addToAlbumSuccess_other": "assets.assetsPageHeader.messages.addToAlbumSuccess",
+                "addToAlbumSuccess_one": "Added {{count}} item to album.",
+                "addToAlbumSuccess_other": "Added {{count}} items to album.",
                 "bulkActionError": "Failed to update selected assets.",
                 "bulkActionSuccess_one": "Updated {{count}} assets.",
                 "bulkActionSuccess_other": "Updated {{count}} assets.",
                 "deleteError": "Failed to delete assets",
-                "deleteSuccess_one": "assets.assetsPageHeader.messages.deleteSuccess",
-                "deleteSuccess_other": "assets.assetsPageHeader.messages.deleteSuccess",
+                "deleteSuccess_one": "Deleted {{count}} asset.",
+                "deleteSuccess_other": "Deleted {{count}} assets.",
                 "downloadError": "Failed to start download",
                 "downloadStart": "Download started",
                 "loadAlbumsError": "Failed to load albums"
             },
             "moreActions": "More actions",
             "scan": {
-                "allQueued_one": "assets.assetsPageHeader.scan.allQueued",
-                "allQueued_other": "assets.assetsPageHeader.scan.allQueued",
+                "allQueued_one": "Scan queued for {{count}} library.",
+                "allQueued_other": "Scan queued for {{count}} libraries.",
                 "currentQueued": "Scan queued for {{name}}.",
                 "failed": "Failed to queue scan.",
                 "label": "Scan current library",
@@ -94,8 +94,8 @@
         },
         "audioInfoView": {
             "audio_badge": "AUDIO",
-            "channels_count_one": "assets.audioInfoView.channels_count",
-            "channels_count_other": "assets.audioInfoView.channels_count",
+            "channels_count_one": "{{count}} channel",
+            "channels_count_other": "{{count}} channels",
             "channels_mono": "Mono",
             "channels_stereo": "Stereo",
             "codec_label": "Codec: {{codec}}"
@@ -173,8 +173,8 @@
                 "west_placeholder": "West"
             },
             "main": {
-                "active_filters_count_one": "assets.filterTool.main.active_filters_count",
-                "active_filters_count_other": "assets.filterTool.main.active_filters_count",
+                "active_filters_count_one": "{{count}} filter active",
+                "active_filters_count_other": "{{count}} filters active",
                 "apply_button": "Apply",
                 "enable_toggle": "Enable",
                 "filters_button_title": "Filters",
@@ -287,10 +287,10 @@
             "error": "Stack details are temporarily unavailable for this asset.",
             "livePhoto": "Live Photo",
             "loading": "Loading stack details...",
-            "memberCount_one": "assets.stackDetail.memberCount_one",
-            "memberCount_other": "assets.stackDetail.memberCount_other",
-            "openButton_one": "assets.stackDetail.openButton_one",
-            "openButton_other": "assets.stackDetail.openButton_other",
+            "memberCount_one": "{{count}} asset in stack",
+            "memberCount_other": "{{count}} assets in stack",
+            "openButton_one": "View stack details",
+            "openButton_other": "View {{count}} related assets",
             "relation": {
                 "alternative": "Alternative",
                 "edited_version": "Edited Version",
@@ -433,8 +433,8 @@
     },
     "bulk": {
         "updateError": "Failed to update items",
-        "updateSuccess_one": "bulk.updateSuccess",
-        "updateSuccess_other": "bulk.updateSuccess"
+        "updateSuccess_one": "Updated {{count}} item.",
+        "updateSuccess_other": "Updated {{count}} items."
     },
     "collections": {
         "albumDetails": {
@@ -444,8 +444,8 @@
                 "badge": "Field guide",
                 "error": "Failed to queue field guide recognition.",
                 "running": "Queueing...",
-                "success_one": "collections.albumDetails.bioClip.success",
-                "success_other": "collections.albumDetails.bioClip.success"
+                "success_one": "Queued {{count}} photo for recognition.",
+                "success_other": "Queued {{count}} photos for recognition."
             },
             "createdAtLabel": "Created",
             "fallbackName": "Album",
@@ -547,8 +547,8 @@
         "retry": "Retry",
         "save": "Save",
         "select": "Select",
-        "selected_one": "common.selected",
-        "selected_other": "common.selected",
+        "selected_one": "{{count}} selected",
+        "selected_other": "{{count}} selected",
         "uploaded": "Uploaded",
         "viewAll": "View All"
     },
@@ -627,8 +627,8 @@
             "loadedStatusMore": " (loading more)",
             "loadedStatusTotal": " / Total {{totalCount}}",
             "loading": "Loading map data...",
-            "placesCount_one": "home.map.placesCount",
-            "placesCount_other": "home.map.placesCount",
+            "placesCount_one": "{{count}} place",
+            "placesCount_other": "{{count}} places",
             "title": "Spacetime Trail"
         },
         "stats": {
@@ -724,19 +724,19 @@
             "createTitle": "Add library",
             "description": "Connected repositories available for upload, filtering, and file-system scans.",
             "detectStacks": "Detect stacks",
-            "detectStacksCompleted_one": "manage.repositories.detectStacksCompleted",
-            "detectStacksCompleted_other": "manage.repositories.detectStacksCompleted",
+            "detectStacksCompleted_one": "Detected {{count}} stack for {{name}}.",
+            "detectStacksCompleted_other": "Detected {{count}} stacks for {{name}}.",
             "detectStacksFailed": "Failed to detect stacks.",
             "duplicateScan": "Scan for duplicates",
             "duplicateScanFailed": "Duplicate scan failed.",
-            "rebuildLocation": "Rebuild location clusters",
-            "rebuildLocationQueued": "Location cluster rebuild queued.",
             "empty": "No repositories are available.",
             "primaryBadge": "Primary",
+            "rebuildLocation": "Rebuild location clusters",
+            "rebuildLocationQueued": "Location cluster rebuild queued.",
             "rescanRepository": "Rescan",
             "scanAll": "Scan all libraries",
-            "scanAllQueued_one": "manage.repositories.scanAllQueued",
-            "scanAllQueued_other": "manage.repositories.scanAllQueued",
+            "scanAllQueued_one": "Scan queued for {{count}} library.",
+            "scanAllQueued_other": "Scan queued for {{count}} libraries.",
             "scanFailed": "Failed to queue scan.",
             "scanQueued": "Scan queued for {{name}}.",
             "title": "Libraries",
@@ -778,17 +778,17 @@
             "loading": "Loading jobs...",
             "pagination": {
                 "moreResults": "More results available",
-                "totalJobs_one": "monitor.jobs.pagination.totalJobs",
-                "totalJobs_other": "monitor.jobs.pagination.totalJobs"
+                "totalJobs_one": "{{count}} job",
+                "totalJobs_other": "{{count}} jobs"
             },
-            "timeAgoDays_one": "monitor.jobs.timeAgoDays",
-            "timeAgoDays_other": "monitor.jobs.timeAgoDays",
-            "timeAgoHours_one": "monitor.jobs.timeAgoHours",
-            "timeAgoHours_other": "monitor.jobs.timeAgoHours",
-            "timeAgoMinutes_one": "monitor.jobs.timeAgoMinutes",
-            "timeAgoMinutes_other": "monitor.jobs.timeAgoMinutes",
-            "timeAgoSeconds_one": "monitor.jobs.timeAgoSeconds",
-            "timeAgoSeconds_other": "monitor.jobs.timeAgoSeconds"
+            "timeAgoDays_one": "{{count}} day ago",
+            "timeAgoDays_other": "{{count}} days ago",
+            "timeAgoHours_one": "{{count}} hour ago",
+            "timeAgoHours_other": "{{count}} hours ago",
+            "timeAgoMinutes_one": "{{count}} minute ago",
+            "timeAgoMinutes_other": "{{count}} minutes ago",
+            "timeAgoSeconds_one": "{{count}} second ago",
+            "timeAgoSeconds_other": "{{count}} seconds ago"
         },
         "ml": {
             "bioAlbumCoverage": "Bio album species coverage",
@@ -804,12 +804,12 @@
             "reindexModal": {
                 "cancel": "Cancel",
                 "confirm": "Start reindex",
-                "descriptionAll_one": "monitor.ml.reindexModal.descriptionAll",
-                "descriptionAll_other": "monitor.ml.reindexModal.descriptionAll",
-                "descriptionMissing_one": "monitor.ml.reindexModal.descriptionMissing",
-                "descriptionMissing_other": "monitor.ml.reindexModal.descriptionMissing",
-                "existingJobsWarning_one": "monitor.ml.reindexModal.existingJobsWarning",
-                "existingJobsWarning_other": "monitor.ml.reindexModal.existingJobsWarning",
+                "descriptionAll_one": "Reindex all {{count}} asset.",
+                "descriptionAll_other": "Reindex all {{count}} assets.",
+                "descriptionMissing_one": "Reindex {{count}} missing asset.",
+                "descriptionMissing_other": "Reindex {{count}} missing assets.",
+                "existingJobsWarning_one": "{{count}} reindex job already queued.",
+                "existingJobsWarning_other": "{{count}} reindex jobs already queued.",
                 "reindexAllCheckbox": "Reindex all (not just missing)",
                 "title": "Reindex — {{task}}"
             },
@@ -823,12 +823,12 @@
             "fetchError": "Failed to fetch queues",
             "idle": "Idle",
             "loading": "Loading queues...",
-            "timeAgoHours_one": "monitor.queues.timeAgoHours",
-            "timeAgoHours_other": "monitor.queues.timeAgoHours",
-            "timeAgoMinutes_one": "monitor.queues.timeAgoMinutes",
-            "timeAgoMinutes_other": "monitor.queues.timeAgoMinutes",
-            "timeAgoSeconds_one": "monitor.queues.timeAgoSeconds",
-            "timeAgoSeconds_other": "monitor.queues.timeAgoSeconds"
+            "timeAgoHours_one": "{{count}} hour ago",
+            "timeAgoHours_other": "{{count}} hours ago",
+            "timeAgoMinutes_one": "{{count}} minute ago",
+            "timeAgoMinutes_other": "{{count}} minutes ago",
+            "timeAgoSeconds_one": "{{count}} second ago",
+            "timeAgoSeconds_other": "{{count}} seconds ago"
         },
         "sections": {
             "activeQueues": "Active Queues",
@@ -837,23 +837,23 @@
         "stats": {
             "activeJobs": "Active jobs",
             "allHealthy": "All healthy",
-            "availableCount_one": "monitor.stats.availableCount",
-            "availableCount_other": "monitor.stats.availableCount",
-            "cancelledCount_one": "monitor.stats.cancelledCount",
-            "cancelledCount_other": "monitor.stats.cancelledCount",
+            "availableCount_one": "{{count}} available",
+            "availableCount_other": "{{count}} available",
+            "cancelledCount_one": "{{count}} cancelled",
+            "cancelledCount_other": "{{count}} cancelled",
             "completed": "Completed",
-            "discardedCount_one": "monitor.stats.discardedCount",
-            "discardedCount_other": "monitor.stats.discardedCount",
+            "discardedCount_one": "{{count}} discarded",
+            "discardedCount_other": "{{count}} discarded",
             "fetchError": "Failed to fetch queue stats",
             "issues": "Issues",
             "noData": "No data",
             "noProcessedJobs": "No jobs processed yet",
-            "retryableCount_one": "monitor.stats.retryableCount",
-            "retryableCount_other": "monitor.stats.retryableCount",
-            "runningCount_one": "monitor.stats.runningCount",
-            "runningCount_other": "monitor.stats.runningCount",
-            "scheduledCount_one": "monitor.stats.scheduledCount",
-            "scheduledCount_other": "monitor.stats.scheduledCount",
+            "retryableCount_one": "{{count}} retryable",
+            "retryableCount_other": "{{count}} retryable",
+            "runningCount_one": "{{count}} running",
+            "runningCount_other": "{{count}} running",
+            "scheduledCount_one": "{{count}} scheduled",
+            "scheduledCount_other": "{{count}} scheduled",
             "successRate": "{{rate}}% success rate"
         },
         "subtitles": {
@@ -910,8 +910,8 @@
     },
     "rating": {
         "none": "No rating",
-        "stars_one": "rating.stars",
-        "stars_other": "rating.stars",
+        "stars_one": "{{count}} star",
+        "stars_other": "{{count}} stars",
         "unrated": "Unrated",
         "updateError": "Failed to update rating"
     },
@@ -1001,7 +1001,35 @@
             "passwordDescription": "Change your account password. You will be signed out afterwards.",
             "passwordTitle": "Password",
             "permissions": {
-                "customPermission": "Custom permission"
+                "customPermission": "Custom permission",
+                "manage_users": {
+                    "label": "Manage Users",
+                    "description": "Create, edit, and deactivate user accounts."
+                },
+                "manage_settings": {
+                    "label": "Manage Settings",
+                    "description": "Modify global application settings."
+                },
+                "view_all_assets": {
+                    "label": "View All Assets",
+                    "description": "Browse all photos and media in the library."
+                },
+                "manage_all_assets": {
+                    "label": "Manage All Assets",
+                    "description": "Edit, delete, and modify metadata for any asset."
+                },
+                "view_own_assets": {
+                    "label": "View Own Assets",
+                    "description": "Browse your own uploaded photos and media."
+                },
+                "manage_own_assets": {
+                    "label": "Manage Own Assets",
+                    "description": "Edit, delete, and modify metadata on your own assets."
+                },
+                "manage_own_profile": {
+                    "label": "Manage Own Profile",
+                    "description": "Update your display name, avatar, and security settings."
+                }
             },
             "permissionsSubtitle": "Permissions assigned to your account based on your role.",
             "permissionsTitle": "Account Permissions",
@@ -1081,6 +1109,10 @@
             "themes": {
                 "activeBadge": "Current mode",
                 "currentMode": "Current mode",
+                "modeNames": {
+                    "light": "Light",
+                    "dark": "Dark"
+                },
                 "dark": {
                     "description": "Applied when the navbar is in dark mode.",
                     "label": "Dark mode theme"
@@ -1100,6 +1132,9 @@
             }
         },
         "assetPage": "Asset Page",
+        "cloud": {
+            "title": "Cloud Sync"
+        },
         "language": "Language",
         "languageAndRegion": "Language & Region",
         "performance": "Performance",
@@ -1177,8 +1212,8 @@
             "taskAvailability": "Task availability",
             "taskNames": {
                 "bioClipClassify": "BioCLIP classify",
-                "clipImageEmbed": "settings.serverSettings.taskNames.clipImageEmbed",
-                "faceDetectAndEmbed": "settings.serverSettings.taskNames.faceDetectAndEmbed",
+                "clipImageEmbed": "CLIP image embed",
+                "faceDetectAndEmbed": "Face detect & embed",
                 "ocr": "OCR",
                 "semanticTextEmbed": "CLIP text embed"
             },
@@ -1277,72 +1312,89 @@
         "updates": "Updates"
     },
     "studio": {
-        "cancelling": "Cancelling...",
+        "asset": {
+            "dim": "Dimensions",
+            "exif": "Capture · EXIF",
+            "file": "File",
+            "name": "Name",
+            "size": "Size",
+            "type": "Type"
+        },
+        "backToStudio": "Back to Studio",
         "develop": {
             "desc": "Color adjustments, cropping, and other tools will be available here soon.",
+            "geometry": "Geometry",
+            "hint": "Double-click any slider to reset it.",
+            "reset": "Reset",
+            "resetAll": "Reset all adjustments",
+            "rotation": "Rotation",
+            "light": "Light",
+            "color": "Color",
+            "detail": "Detail",
             "title": "Development Tools"
         },
-        "editMvp": {
-            "asset": "Asset",
+        "editor": {
             "before": "Before",
-            "changePhoto": "Change Photo",
-            "develop": "Develop",
+            "change": "Change Photo",
             "export": "Export",
-            "loading": "Loading...",
-            "loadingImage": "Loading image",
-            "noExif": "No filtered EXIF fields available.",
-            "pickPhoto": "Pick a photo to edit",
-            "rendering": "Rendering",
-            "reset": "Reset",
+            "fit": "Fit",
+            "loading": "Loading…",
+            "renderFailed": "Render failed",
+            "rendering": "Rendering preview…",
+            "resetAll": "Reset all",
             "save": "Save",
             "saved": "Saved",
+            "savedToast": "Sidecar saved",
+            "undo": "Undo",
             "unsaved": "Unsaved changes",
+            "upToDate": "Up to date",
             "waiting": "Waiting for preview"
         },
-        "emptyHint": "Select an image to begin.",
         "exif": {
-            "cancel": "Cancel Extraction",
             "download": "Download JSON",
             "empty": "No metadata to display.",
-            "extract": "Extract Metadata",
             "extracting": "Extracting data...",
-            "fieldsCount_one": "studio.exif.fieldsCount",
-            "fieldsCount_other": "studio.exif.fieldsCount",
+            "fieldsCount_one": "{{count}} field",
+            "fieldsCount_other": "{{count}} fields",
             "properties": "Image Properties",
             "title": "EXIF Metadata"
         },
-        "imgOpen": "Open Image",
-        "marketplace": {
-            "catalogLoading": "Loading plugin catalog...",
-            "empty": "No plugins match the current filters.",
-            "install": "Install",
-            "installedOnly": "Installed only",
-            "runtimeDisabled": "Studio plugin runtime is disabled. Enable VITE_STUDIO_PLUGIN_RUNTIME_ENABLED to browse plugins.",
-            "searchPlaceholder": "Search plugins by name, id, or description",
-            "statusInstalled": "Installed",
-            "statusNotInstalled": "Not installed",
-            "summary": "Showing {{visible}} of {{total}} plugins ({{installed}} installed)",
-            "title": "Marketplace",
-            "uninstall": "Remove"
+        "home": {
+            "border": {
+                "body": "Frame a photo with colored, frosted, or vignette borders — applied on top of your edits.",
+                "title": "Add a Border"
+            },
+            "clear": "Clear",
+            "empty": {
+                "body": "Open a photo from your library to start editing. Your latest work shows up here.",
+                "title": "No recent edits yet"
+            },
+            "openEditor": "Open editor",
+            "recent": "Recent Edits",
+            "resume": "Resume",
+            "tools": "Tools"
         },
-        "nav": {
-            "develop": "Develop",
-            "exif": "EXIF",
-            "marketplace": "Marketplace",
-            "plugins": "Plugins"
-        },
-        "plugins": {
-            "apply": "Apply Plugin",
-            "cancel": "Cancel Plugin Run",
-            "emptyInstalled": "No plugins installed yet.",
-            "loading": "Loading plugin UI...",
-            "openMarketplace": "Open Marketplace",
-            "runtimeDisabled": "Studio plugin runtime is disabled. Enable VITE_STUDIO_PLUGIN_RUNTIME_ENABLED to run plugins.",
-            "title": "Plugins Workspace"
-        },
-        "previewAlt": "Preview",
-        "processing": "Processing: {{processed}} / {{total}}",
-        "title": "Studio"
+        "pickPhoto": "Pick a photo to edit",
+        "tagline": "Quick, non-destructive edits for photos already in your library.",
+        "title": "Studio",
+        "tools": {
+            "border": {
+                "apply": "Apply border",
+                "clear": "Clear",
+                "done": "Border applied",
+                "hint": "Border bakes new pixels on top of your current edit. Apply to preview, then export.",
+                "modeColored": "Colored",
+                "modeFrosted": "Frosted",
+                "modeVignette": "Vignette",
+                "borderWidth": "Border Width",
+                "color": "Color",
+                "blur": "Blur",
+                "brightness": "Brightness",
+                "cornerRadius": "Corner Radius",
+                "strength": "Strength"
+            },
+            "title": "Tools"
+        }
     },
     "upload": {
         "FileUploadProgress": {
@@ -1366,8 +1418,8 @@
         },
         "SupportedFormatsModal": {
             "close_button_aria_label": "Close",
-            "formats_count_one": "upload.SupportedFormatsModal.formats_count",
-            "formats_count_other": "upload.SupportedFormatsModal.formats_count",
+            "formats_count_one": "{{count}} format",
+            "formats_count_other": "{{count}} formats",
             "got_it_button": "Got it!",
             "title": "Supported File Formats"
         },
@@ -1395,11 +1447,11 @@
             "uploading_status": "Uploading..."
         },
         "UploadAssets": {
-            "files_ready_to_upload_one": "upload.UploadAssets.files_ready_to_upload",
-            "files_ready_to_upload_other": "upload.UploadAssets.files_ready_to_upload",
+            "files_ready_to_upload_one": "{{count}} file ready to upload",
+            "files_ready_to_upload_other": "{{count}} files ready to upload",
             "no_files_selected": "No files selected",
-            "processing_files_one": "upload.UploadAssets.processing_files",
-            "processing_files_other": "upload.UploadAssets.processing_files",
+            "processing_files_one": "Processing {{count}} file...",
+            "processing_files_other": "Processing {{count}} files...",
             "supported_formats_button": "Supported Formats"
         },
         "UploadProcess": {
@@ -1411,10 +1463,10 @@
             "uploadFailed": "Upload failed"
         },
         "UploadProvider": {
-            "files_exceeded_limit_one": "upload.UploadProvider.files_exceeded_limit",
-            "files_exceeded_limit_other": "upload.UploadProvider.files_exceeded_limit",
-            "max_files_allowed_one": "upload.UploadProvider.max_files_allowed",
-            "max_files_allowed_other": "upload.UploadProvider.max_files_allowed",
+            "files_exceeded_limit_one": "{{count}} file exceeds the limit.",
+            "files_exceeded_limit_other": "{{count}} files exceed the limit.",
+            "max_files_allowed_one": "Max {{count}} file allowed.",
+            "max_files_allowed_other": "Max {{count}} files allowed.",
             "no_files_selected_for_upload_message": "No files selected for upload",
             "upload_failed_generic": "Upload failed"
         }

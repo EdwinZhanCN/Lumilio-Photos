@@ -124,6 +124,10 @@ export default function UISettings() {
   const lightModeTheme = state.ui.theme.themes.light;
   const darkModeTheme = state.ui.theme.themes.dark;
   const currentLayout = state.ui.asset_page?.layout ?? "full";
+  const themeModeNameKey =
+    currentThemeMode === "light"
+      ? "settings.appearanceSettings.themes.modeNames.light"
+      : "settings.appearanceSettings.themes.modeNames.dark";
   const compactColumns = state.ui.asset_page?.columns ?? 6;
 
   const onChangeLanguage = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -257,9 +261,7 @@ export default function UISettings() {
           </div>
           <div className="badge badge-primary badge-soft">
             {t("settings.appearanceSettings.themes.currentMode")}:{" "}
-            {t(
-              `settings.appearanceSettings.themes.modeNames.${currentThemeMode}`,
-            )}
+            {t(themeModeNameKey)}
           </div>
         </div>
 
@@ -273,9 +275,7 @@ export default function UISettings() {
             </p>
             <p className="text-xs text-base-content/60">
               {t("settings.appearanceSettings.themes.followSystem.status", {
-                mode: t(
-                  `settings.appearanceSettings.themes.modeNames.${currentThemeMode}`,
-                ),
+                mode: t(themeModeNameKey),
               })}
             </p>
           </div>

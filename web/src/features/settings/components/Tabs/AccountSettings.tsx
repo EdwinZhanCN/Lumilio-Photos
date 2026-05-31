@@ -48,47 +48,105 @@ type FeedbackState = {
 /*  Permission display config                                          */
 /* ------------------------------------------------------------------ */
 
-const ALL_KNOWN_PERMISSIONS: {
-  key: string;
-  labelKey: string;
-  descKey: string;
-}[] = [
-  {
-    key: "manage_users",
-    labelKey: "settings.account.permissions.manage_users.label",
-    descKey: "settings.account.permissions.manage_users.description",
-  },
-  {
-    key: "manage_settings",
-    labelKey: "settings.account.permissions.manage_settings.label",
-    descKey: "settings.account.permissions.manage_settings.description",
-  },
-  {
-    key: "view_all_assets",
-    labelKey: "settings.account.permissions.view_all_assets.label",
-    descKey: "settings.account.permissions.view_all_assets.description",
-  },
-  {
-    key: "manage_all_assets",
-    labelKey: "settings.account.permissions.manage_all_assets.label",
-    descKey: "settings.account.permissions.manage_all_assets.description",
-  },
-  {
-    key: "view_own_assets",
-    labelKey: "settings.account.permissions.view_own_assets.label",
-    descKey: "settings.account.permissions.view_own_assets.description",
-  },
-  {
-    key: "manage_own_assets",
-    labelKey: "settings.account.permissions.manage_own_assets.label",
-    descKey: "settings.account.permissions.manage_own_assets.description",
-  },
-  {
-    key: "manage_own_profile",
-    labelKey: "settings.account.permissions.manage_own_profile.label",
-    descKey: "settings.account.permissions.manage_own_profile.description",
-  },
-];
+const PERMISSION_KEYS = [
+  "manage_users",
+  "manage_settings",
+  "view_all_assets",
+  "manage_all_assets",
+  "view_own_assets",
+  "manage_own_assets",
+  "manage_own_profile",
+] as const;
+
+function getPermissionLabel(
+  key: string,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  const labels: Record<string, string> = {
+    manage_users: t("settings.account.permissions.manage_users.label", {
+      defaultValue: "Manage Users",
+    }),
+    manage_settings: t("settings.account.permissions.manage_settings.label", {
+      defaultValue: "Manage Settings",
+    }),
+    view_all_assets: t("settings.account.permissions.view_all_assets.label", {
+      defaultValue: "View All Assets",
+    }),
+    manage_all_assets: t(
+      "settings.account.permissions.manage_all_assets.label",
+      {
+        defaultValue: "Manage All Assets",
+      },
+    ),
+    view_own_assets: t("settings.account.permissions.view_own_assets.label", {
+      defaultValue: "View Own Assets",
+    }),
+    manage_own_assets: t(
+      "settings.account.permissions.manage_own_assets.label",
+      {
+        defaultValue: "Manage Own Assets",
+      },
+    ),
+    manage_own_profile: t(
+      "settings.account.permissions.manage_own_profile.label",
+      {
+        defaultValue: "Manage Own Profile",
+      },
+    ),
+  };
+  return (
+    labels[key] ??
+    key.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())
+  );
+}
+
+function getPermissionDescription(
+  key: string,
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  const descriptions: Record<string, string> = {
+    manage_users: t("settings.account.permissions.manage_users.description", {
+      defaultValue: "",
+    }),
+    manage_settings: t(
+      "settings.account.permissions.manage_settings.description",
+      {
+        defaultValue: "",
+      },
+    ),
+    view_all_assets: t(
+      "settings.account.permissions.view_all_assets.description",
+      {
+        defaultValue: "",
+      },
+    ),
+    manage_all_assets: t(
+      "settings.account.permissions.manage_all_assets.description",
+      {
+        defaultValue: "",
+      },
+    ),
+    view_own_assets: t(
+      "settings.account.permissions.view_own_assets.description",
+      {
+        defaultValue: "",
+      },
+    ),
+    manage_own_assets: t(
+      "settings.account.permissions.manage_own_assets.description",
+      {
+        defaultValue: "",
+      },
+    ),
+    manage_own_profile: t(
+      "settings.account.permissions.manage_own_profile.description",
+      {
+        defaultValue: "",
+      },
+    ),
+  };
+  return descriptions[key] ?? "";
+}
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -125,7 +183,7 @@ function PermissionsModal({
   const extraPermissions = useMemo(
     () =>
       permissions.filter(
-        (p) => !ALL_KNOWN_PERMISSIONS.some((k) => k.key === p),
+        (p) => !(PERMISSION_KEYS as readonly string[]).includes(p),
       ),
     [permissions],
   );
@@ -161,10 +219,10 @@ function PermissionsModal({
         </div>
 
         <div className="divide-y divide-base-200">
-          {ALL_KNOWN_PERMISSIONS.map((perm) => {
-            const granted = permissionSet.has(perm.key);
+          {PERMISSION_KEYS.map((key) => {
+            const granted = permissionSet.has(key);
             return (
-              <div key={perm.key} className="flex items-center gap-3 py-3">
+              <div key={key} className="flex items-center gap-3 py-3">
                 <div
                   className={`flex size-7 shrink-0 items-center justify-center rounded-full ${
                     granted
@@ -184,14 +242,10 @@ function PermissionsModal({
                       granted ? "text-base-content" : "text-base-content/50"
                     }`}
                   >
-                    {t(perm.labelKey, {
-                      defaultValue: perm.key
-                        .replace(/_/g, " ")
-                        .replace(/\b\w/g, (c: string) => c.toUpperCase()),
-                    })}
+                    {getPermissionLabel(key, t)}
                   </div>
                   <div className="text-xs text-base-content/60">
-                    {t(perm.descKey, { defaultValue: "" })}
+                    {getPermissionDescription(key, t)}
                   </div>
                 </div>
               </div>

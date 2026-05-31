@@ -1,4 +1,5 @@
 import React from "react";
+import { useI18n } from "@/lib/i18n";
 import { DEFAULT_PARAMS, type BorderParams, normalizeParams } from "./types";
 
 export const defaultParams: Record<string, unknown> = DEFAULT_PARAMS;
@@ -9,6 +10,7 @@ export const BorderPanel: React.FC<{
   disabled?: boolean;
 }> = ({ value, onChange, disabled }) => {
   const p = normalizeParams(value);
+  const { t } = useI18n();
 
   const update = (next: Partial<BorderParams>) => {
     onChange({ ...p, ...next });
@@ -23,7 +25,7 @@ export const BorderPanel: React.FC<{
           disabled={disabled}
           onClick={() => update({ mode: "COLORED" })}
         >
-          Colored
+          {t("studio.tools.border.modeColored", { defaultValue: "Colored" })}
         </button>
         <button
           type="button"
@@ -31,7 +33,7 @@ export const BorderPanel: React.FC<{
           disabled={disabled}
           onClick={() => update({ mode: "FROSTED" })}
         >
-          Frosted
+          {t("studio.tools.border.modeFrosted", { defaultValue: "Frosted" })}
         </button>
         <button
           type="button"
@@ -39,13 +41,18 @@ export const BorderPanel: React.FC<{
           disabled={disabled}
           onClick={() => update({ mode: "VIGNETTE" })}
         >
-          Vignette
+          {t("studio.tools.border.modeVignette", { defaultValue: "Vignette" })}
         </button>
       </div>
 
       {p.mode === "COLORED" && (
         <div className="space-y-2">
-          <label className="label">Border Width: {p.border_width}</label>
+          <label className="label">
+            {t("studio.tools.border.borderWidth", {
+              defaultValue: "Border Width",
+            })}
+            : {p.border_width}
+          </label>
           <input
             className="range range-primary"
             type="range"
@@ -56,7 +63,9 @@ export const BorderPanel: React.FC<{
             onChange={(e) => update({ border_width: Number(e.target.value) })}
           />
 
-          <label className="label">Color</label>
+          <label className="label">
+            {t("studio.tools.border.color", { defaultValue: "Color" })}
+          </label>
           <input
             className="w-full h-10 p-1"
             type="color"
@@ -69,7 +78,10 @@ export const BorderPanel: React.FC<{
 
       {p.mode === "FROSTED" && (
         <div className="space-y-2">
-          <label className="label">Blur: {p.blur_sigma.toFixed(1)}</label>
+          <label className="label">
+            {t("studio.tools.border.blur", { defaultValue: "Blur" })}:{" "}
+            {p.blur_sigma.toFixed(1)}
+          </label>
           <input
             className="range range-primary"
             type="range"
@@ -81,7 +93,12 @@ export const BorderPanel: React.FC<{
             onChange={(e) => update({ blur_sigma: Number(e.target.value) })}
           />
 
-          <label className="label">Brightness: {p.brightness_adjustment}</label>
+          <label className="label">
+            {t("studio.tools.border.brightness", {
+              defaultValue: "Brightness",
+            })}
+            : {p.brightness_adjustment}
+          </label>
           <input
             className="range range-primary"
             type="range"
@@ -94,7 +111,12 @@ export const BorderPanel: React.FC<{
             }
           />
 
-          <label className="label">Corner Radius: {p.corner_radius}</label>
+          <label className="label">
+            {t("studio.tools.border.cornerRadius", {
+              defaultValue: "Corner Radius",
+            })}
+            : {p.corner_radius}
+          </label>
           <input
             className="range range-primary"
             type="range"
@@ -109,7 +131,10 @@ export const BorderPanel: React.FC<{
 
       {p.mode === "VIGNETTE" && (
         <div className="space-y-2">
-          <label className="label">Strength: {p.strength.toFixed(2)}</label>
+          <label className="label">
+            {t("studio.tools.border.strength", { defaultValue: "Strength" })}:{" "}
+            {p.strength.toFixed(2)}
+          </label>
           <input
             className="range range-primary"
             type="range"
