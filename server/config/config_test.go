@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestLoadMLConfig_RespectsExplicitFlags(t *testing.T) {
 	t.Setenv("SERVER_ENV", "development")
@@ -100,4 +104,140 @@ func TestLoadRepositoryScanConfig_EnvOverrides(t *testing.T) {
 	if cfg.IntervalSeconds != 60 || cfg.SettleSeconds != 2 || cfg.MaxConcurrentRepos != 3 || cfg.BatchSize != 25 {
 		t.Fatalf("unexpected config overrides: %+v", cfg)
 	}
+}
+
+func TestLoadAppConfigWithError_LoadsExplicitTOML(t *testing.T) {
+	configFile := writeTestConfig(t, `
+environment = "development"
+
+[server]
+port = "7777"
+log_level = "debug"
+cors_allowed_origins = ["http://localhost:6657"]
+
+[database]
+host = "db-from-toml"
+port = "5432"
+user = "postgres"
+password = "postgres"
+name = "lumiliophotos"
+ssl = "disable"
+
+[storage]
+path = "/tmp/lumilio"
+strategy = "date"
+preserve_filename = true
+duplicate_handling = "rename"
+
+[repository_scan]
+enabled = false
+interval_seconds = 120
+settle_seconds = 3
+max_concurrent_repos = 2
+batch_size = 250
+
+[geocoding]
+provider = "naturalearth"
+language = "zh"
+user_agent = "Lumilio-Test/1.0"
+naturalearth_city_radius_meters = 25000
+
+[ml]
+clip_enabled = true
+bioclip_enabled = false
+ocr_enabled = false
+face_enabled = true
+
+[auth]
+secret_key_path = "/tmp/secret"
+access_token_ttl = "10m"
+refresh_token_ttl = "24h"
+media_token_ttl = "5m"
+
+[transcode]
+hardware_accel = "auto"
+`)
+	t.Setenv("SERVER_CONFIG_FILE", configFile)
+	t.Setenv("SERVER_ENV", "")
+
+	cfg, err := LoadAppConfigWithError()
+	if err != nil {
+		t.Fatalf("expected config to load: %v", err)
+	}
+
+	if cfg.ServerConfig.Port != "7777" {
+		t.Fatalf("expected server port from toml, got %+v", cfg.ServerConfig)
+	}
+	if cfg.DatabaseConfig.Host != "db-from-toml" {
+		t.Fatalf("expected database host from toml, got %+v", cfg.DatabaseConfig)
+	}
+	if cfg.RepositoryScan.Enabled || cfg.RepositoryScan.IntervalSeconds != 120 {
+		t.Fatalf("expected repository scan from toml, got %+v", cfg.RepositoryScan)
+	}
+	if cfg.Geocoding.Provider != "naturalearth" || cfg.Geocoding.Language != "zh" {
+		t.Fatalf("expected geocoding from toml, got %+v", cfg.Geocoding)
+	}
+	if !cfg.MLConfig.CLIPEnabled || !cfg.MLConfig.FaceEnabled {
+		t.Fatalf("expected ml flags from toml, got %+v", cfg.MLConfig)
+	}
+}
+
+func TestLoadAppConfigWithError_EnvOverridesTOML(t *testing.T) {
+	configFile := writeTestConfig(t, `
+[server]
+port = "7777"
+log_level = "info"
+
+[database]
+host = "db-from-toml"
+
+[storage]
+path = "/toml/storage"
+
+[repository_scan]
+enabled = true
+interval_seconds = 300
+settle_seconds = 5
+max_concurrent_repos = 1
+batch_size = 500
+
+[ml]
+clip_enabled = false
+`)
+	t.Setenv("SERVER_CONFIG_FILE", configFile)
+	t.Setenv("SERVER_PORT", "9999")
+	t.Setenv("DB_HOST", "db-from-env")
+	t.Setenv("STORAGE_PATH", "/env/storage")
+	t.Setenv("REPOSITORY_SCAN_ENABLED", "false")
+	t.Setenv("ML_CLIP_ENABLED", "true")
+
+	cfg, err := LoadAppConfigWithError()
+	if err != nil {
+		t.Fatalf("expected config to load: %v", err)
+	}
+
+	if cfg.ServerConfig.Port != "9999" {
+		t.Fatalf("expected env server port override, got %s", cfg.ServerConfig.Port)
+	}
+	if cfg.DatabaseConfig.Host != "db-from-env" {
+		t.Fatalf("expected env database host override, got %s", cfg.DatabaseConfig.Host)
+	}
+	if cfg.StorageConfig.Path != "/env/storage" {
+		t.Fatalf("expected env storage path override, got %s", cfg.StorageConfig.Path)
+	}
+	if cfg.RepositoryScan.Enabled {
+		t.Fatalf("expected env repository scan override, got %+v", cfg.RepositoryScan)
+	}
+	if !cfg.MLConfig.CLIPEnabled {
+		t.Fatalf("expected env ML override, got %+v", cfg.MLConfig)
+	}
+}
+
+func writeTestConfig(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "server.toml")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write test config: %v", err)
+	}
+	return path
 }

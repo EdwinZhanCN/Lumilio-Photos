@@ -57,7 +57,7 @@ RUN set -eux; \
     fi; \
     rm -rf /var/lib/apt/lists/*
 
-ENV STORAGE_PATH=/data/storage/primary \
+ENV SERVER_CONFIG_FILE=/app/config/server.toml \
     SERVER_PORT=6680 \
     SERVER_ENV=production \
     PATH="/usr/local/bin:${PATH}"
@@ -75,9 +75,10 @@ RUN groupadd --gid ${APP_GID} app \
 COPY --from=builder /out/server /usr/local/bin/server
 COPY --from=builder /go/bin/river /usr/local/bin/river
 COPY --from=builder /app/migrations ./migrations
+COPY server/config/server.toml ./config/server.toml
 
 # Prepare storage path
-RUN mkdir -p "${STORAGE_PATH}" && chown -R app:app /data /app
+RUN mkdir -p /data/storage/primary && chown -R app:app /data /app
 
 USER app
 

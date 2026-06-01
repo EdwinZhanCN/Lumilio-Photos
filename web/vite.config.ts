@@ -1,15 +1,15 @@
 import { defineConfig } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import wasm from "vite-plugin-wasm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import topLevelAwait from "vite-plugin-top-level-await";
-import { preview } from "vite-plus/test/browser-preview";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const browserTestsEnabled = process.env.VITEST_BROWSER === "true";
+const browserPreview = browserTestsEnabled
+  ? (await import("vite-plus/test/browser-preview")).preview
+  : undefined;
 const testProjects = [
   {
     extends: true,
@@ -30,7 +30,7 @@ const testProjects = [
             include: ["src/workers/*"],
             exclude: ["**/node_modules/**"],
             browser: {
-              provider: preview(),
+              provider: browserPreview?.(),
               instances: [{ browser: "chrome" }],
               enabled: true,
             },
@@ -53,7 +53,7 @@ export default defineConfig({
       "Cross-Origin-Embedder-Policy": "credentialless",
     },
   },
-  plugins: [react(), tailwindcss(), wasm(), topLevelAwait()],
+  plugins: [react(), tailwindcss()],
 
   build: {
     target: "esnext",
@@ -61,15 +61,20 @@ export default defineConfig({
 
   worker: {
     format: "es",
-    plugins: () => [wasm(), topLevelAwait()],
   },
 
   test: {
-    projects: testProjects,
+    projects: testProjects as any,
   },
 
   lint: {
-    ignorePatterns: ["dist/**", "coverage/**"],
+    ignorePatterns: [
+      "dist/**",
+      "coverage/**",
+      "src/wasm/**",
+      "src/lib/http-commons/schema.d.ts",
+      "src/lib/http-commons/openapi-fetch/**",
+    ],
     options: {
       typeAware: true,
       typeCheck: true,

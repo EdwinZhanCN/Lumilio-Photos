@@ -71,7 +71,7 @@ Access:
 - API: http://localhost:6680/api/v1/health
 - API Docs: http://localhost:6680/swagger/index.html
 
-**Note:** Database runs on port 5433. Outside Dev Containers, `make db-up` starts it from `server/db.Dockerfile`.
+**Note:** Database runs on port 5433. `make db` starts the development PostgreSQL service.
 `LUMILIO_SECRET_KEY` defaults to `./data/storage/.secrets/lumilio_secret_key` in local dev templates.
 
 #### Dev Container
@@ -88,11 +88,11 @@ cd .devcontainer && docker compose --profile geodata run --rm naturalearth-impor
 
 ```bash
 make dev            # Start database, server, and web (recommended)
+make db             # Start development PostgreSQL
 make server-dev     # Start API server only
 make web-dev        # Start web dev server only
+make test           # Run backend and frontend checks
 make server-test    # Run Go tests
-make db-logs        # View database logs
-make db-shell       # PostgreSQL shell
 make db-reset       # Reset database (⚠️ deletes all data)
 make dto            # Generate DTO schemas for both backend and frontend
 make clean          # Clean generated files
@@ -104,13 +104,13 @@ If `make dev` doesn't work for you:
 
 ```bash
 # Terminal 1: Database
-make db-wait
+make db
 
 # Terminal 2: Server
 cd server
-SERVER_ENV=development go run ./cmd
+SERVER_ENV=development SERVER_CONFIG_FILE=config/server.development.toml go run ./cmd
 
 # Terminal 3: Web
 cd web
-npm run dev -- --host --port 6657
+vp dev --host --port 6657
 ```

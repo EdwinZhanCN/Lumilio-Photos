@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"server/config"
 	"server/internal/db/repo"
 	"server/internal/storage/repocfg"
 
@@ -80,16 +81,12 @@ func TestResolvePrimaryStoragePaths(t *testing.T) {
 
 func TestInitPrimaryStorage_InitializesPrimaryUnderStorageRoot(t *testing.T) {
 	root := t.TempDir()
-	t.Setenv("STORAGE_PATH", root)
-	t.Setenv("STORAGE_STRATEGY", "date")
-	t.Setenv("STORAGE_PRESERVE_FILENAME", "true")
-	t.Setenv("STORAGE_DUPLICATE_HANDLING", "rename")
 
 	manager := &fakePrimaryStorageRepositoryManager{
 		getByPathRepos: map[string]*repo.Repository{},
 	}
 
-	err := initPrimaryStorage(manager, zap.NewNop())
+	err := initPrimaryStorage(manager, zap.NewNop(), testStorageConfig(root))
 	require.NoError(t, err)
 
 	require.Empty(t, manager.addCalls)
@@ -101,18 +98,13 @@ func TestInitPrimaryStorage_RejectsLegacyRootRepository(t *testing.T) {
 	root := t.TempDir()
 	writeRepositoryConfig(t, root, "legacy-root")
 
-	t.Setenv("STORAGE_PATH", root)
-	t.Setenv("STORAGE_STRATEGY", "date")
-	t.Setenv("STORAGE_PRESERVE_FILENAME", "true")
-	t.Setenv("STORAGE_DUPLICATE_HANDLING", "rename")
-
 	manager := &fakePrimaryStorageRepositoryManager{
 		getByPathRepos: map[string]*repo.Repository{
 			root: fakeRepo(root),
 		},
 	}
 
-	err := initPrimaryStorage(manager, zap.NewNop())
+	err := initPrimaryStorage(manager, zap.NewNop(), testStorageConfig(root))
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "legacy repository detected")
 	require.Empty(t, manager.addCalls)
@@ -124,17 +116,12 @@ func TestInitPrimaryStorage_RegistersExistingPrimaryRepository(t *testing.T) {
 	primaryPath := filepath.Join(root, "primary")
 	writeRepositoryConfig(t, primaryPath, "primary")
 
-	t.Setenv("STORAGE_PATH", root)
-	t.Setenv("STORAGE_STRATEGY", "date")
-	t.Setenv("STORAGE_PRESERVE_FILENAME", "true")
-	t.Setenv("STORAGE_DUPLICATE_HANDLING", "rename")
-
 	manager := &fakePrimaryStorageRepositoryManager{
 		getByPathRepos: map[string]*repo.Repository{},
 		addRepo:        fakeRepo(primaryPath),
 	}
 
-	err := initPrimaryStorage(manager, zap.NewNop())
+	err := initPrimaryStorage(manager, zap.NewNop(), testStorageConfig(root))
 	require.NoError(t, err)
 
 	require.Len(t, manager.getCalls, 1)
@@ -142,4 +129,13 @@ func TestInitPrimaryStorage_RegistersExistingPrimaryRepository(t *testing.T) {
 	require.Len(t, manager.addCalls, 1)
 	require.Equal(t, primaryPath, manager.addCalls[0])
 	require.Empty(t, manager.initCalls)
+}
+
+func testStorageConfig(root string) config.StorageConfig {
+	return config.StorageConfig{
+		Path:              root,
+		Strategy:          "date",
+		PreserveFilename:  true,
+		DuplicateHandling: "rename",
+	}
 }
