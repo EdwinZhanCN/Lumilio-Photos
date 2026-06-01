@@ -74,7 +74,7 @@ Current canonical example: assets domain store at `web/src/features/assets/asset
 ## 4. Frontend Stack Baseline
 
 - React 19 + TypeScript 5
-- Vite 7
+- Vite+ alpha (Vite 8 core)
 - React Router 7
 - TanStack Query 5
 - Zustand 5 + immer
@@ -105,9 +105,9 @@ Current canonical example: assets domain store at `web/src/features/assets/asset
 
 From `web/` run:
 
-1. `pnpm type-check`
-2. `pnpm lint`
-3. `pnpm test` (when behavior changes or bug fix touches logic)
+1. `vp check --no-fmt --no-lint`
+2. `vp lint`
+3. `vp test` (when behavior changes or bug fix touches logic)
 
 If backend contract changed, also ensure `make dto` has been run from repo root.
 

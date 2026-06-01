@@ -100,7 +100,7 @@ EOF
 RUN cat > /root/.zshrc <<'EOF'
 # zsh configuration for the dev container.
 
-export PATH="/root/go/bin:/usr/local/cargo/bin:/usr/local/go/bin:$PATH"
+export PATH="/root/.vite-plus/bin:/root/go/bin:/usr/local/cargo/bin:/usr/local/go/bin:$PATH"
 
 # Enable Starship prompt.
 eval "$(starship init zsh)"
@@ -133,12 +133,12 @@ alias gl='git log --oneline --graph --decorate'
 alias gco='git checkout'
 alias gb='git branch'
 
-alias pn='pnpm'
-alias pni='pnpm install'
-alias pnd='pnpm dev'
-alias pnb='pnpm build'
-alias pnt='pnpm test'
-alias pnl='pnpm lint'
+alias vpw='cd /workspace/web && vp'
+alias vpi='cd /workspace/web && vp install'
+alias vpd='cd /workspace/web && vp dev --host --port 6657'
+alias vpb='cd /workspace/web && vp build'
+alias vpt='cd /workspace/web && vp test'
+alias vpc='cd /workspace/web && vp check'
 
 alias dc='docker compose'
 alias dps='docker ps'
@@ -147,7 +147,7 @@ EOF
 RUN chsh -s /usr/bin/zsh root
 
 # ---------------------------------------------------------------
-# Node.js 23.x + pnpm (matches web/.nvmrc)
+# Node.js 23.x + Vite+ CLI (matches web/.nvmrc)
 # ---------------------------------------------------------------
 ARG NODE_VERSION=23.11.1
 
@@ -163,9 +163,11 @@ RUN set -eux; \
     rm "node-v${NODE_VERSION}-linux-${node_arch}.tar.xz"; \
     corepack enable; \
     corepack prepare pnpm@latest --activate; \
+    curl -fsSL https://vite.plus | bash; \
     node --version; \
     npm --version; \
-    pnpm --version
+    pnpm --version; \
+    /root/.vite-plus/bin/vp --version
 
 # ---------------------------------------------------------------
 # Rust toolchain (nightly + wasm target for WASM crates)
@@ -174,7 +176,7 @@ RUN set -eux; \
 # ---------------------------------------------------------------
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
-    PATH=/usr/local/cargo/bin:$PATH
+    PATH=/root/.vite-plus/bin:/usr/local/cargo/bin:$PATH
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
       --default-toolchain nightly-2025-11-15 \

@@ -2,3 +2,8 @@ allowBuilds:
   '@parcel/watcher': true
   '@swc/core': true
   esbuild: true
+
+# Route transitive Vite/Vitest consumers through the Vite+ alpha packages.
+overrides:
+  vite: npm:@voidzero-dev/vite-plus-core@latest
+  vitest: npm:@voidzero-dev/vite-plus-test@latest
