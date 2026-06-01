@@ -4,7 +4,7 @@ WEB_DIR := web
 SERVER_DIR := server
 
 GO := go
-PNPM := pnpm
+VP := vp
 DOCKER := docker
 
 API_URL ?= http://localhost:6680
@@ -63,7 +63,7 @@ setup:
 	@echo "==> Installing Go dependencies"
 	cd $(SERVER_DIR) && $(GO) mod download
 	@echo "==> Installing web dependencies"
-	cd $(WEB_DIR) && $(PNPM) install
+	cd $(WEB_DIR) && $(VP) install
 	@echo "==> Ensuring wasm-pack is installed"
 	@command -v wasm-pack >/dev/null 2>&1 || { curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh; }
 	@echo "==> Ensuring river CLI is installed"
@@ -201,7 +201,7 @@ server-build:
 
 web-dev: env-web-dev
 	@echo "==> Starting web development server..."
-	cd $(WEB_DIR) && $(PNPM) run dev --host --port 6657
+	cd $(WEB_DIR) && $(VP) dev --host --port 6657
 
 dev: db-wait
 	@echo "==> Starting development environment..."

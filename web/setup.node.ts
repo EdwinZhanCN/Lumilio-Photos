@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, test, vi } from 'vite-plus/test';
 
 // Setup global mocks and test environment for Node
 beforeEach(() => {
