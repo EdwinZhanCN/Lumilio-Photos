@@ -174,7 +174,7 @@ func main() {
 		}
 	}()
 
-	assetService, err := service.NewAssetService(queries, pgxPool, lumenService, &repoManager, embeddingService)
+	assetService, err := service.NewAssetService(queries, pgxPool, lumenService, &repoManager, embeddingService, appLogger.Named("asset_service"))
 	if err != nil {
 		appLogger.Fatal("failed to initialize asset service", zap.String("operation", "asset.init"), zap.Error(err))
 	}

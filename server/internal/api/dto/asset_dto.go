@@ -505,7 +505,7 @@ type FilterAssetsRequestDTO struct {
 
 // SearchAssetsRequestDTO represents the request structure for searching assets
 type SearchAssetsRequestDTO struct {
-	Query           string         `json:"query" binding:"required" example:"red bird on branch"`
+	Query           string         `json:"query,omitempty" example:"red bird on branch"`
 	Filter          AssetFilterDTO `json:"filter,omitempty"`
 	SortBy          string         `json:"sort_by,omitempty" example:"date_captured" enums:"recently_added,date_captured"`
 	ViewerTimezone  string         `json:"viewer_timezone,omitempty" example:"America/New_York"`
@@ -513,13 +513,39 @@ type SearchAssetsRequestDTO struct {
 	EnhancementMode string         `json:"enhancement_mode,omitempty" example:"auto" enums:"auto,off,only"`
 	TopResultsLimit int            `json:"top_results_limit,omitempty" example:"200" minimum:"1" maximum:"200"`
 	StackMode       string         `json:"stack_mode,omitempty" example:"collapsed" enums:"collapsed,expanded"`
+	Debug           bool           `json:"debug,omitempty"`
 }
 
 type SearchTopResultsMetaDTO struct {
-	Enabled     bool     `json:"enabled"`
-	Degraded    bool     `json:"degraded"`
-	Reason      string   `json:"reason,omitempty" example:"runtime_unavailable"`
-	SourceTypes []string `json:"source_types" example:"clip"`
+	Enabled           bool                  `json:"enabled"`
+	Degraded          bool                  `json:"degraded"`
+	Reason            string                `json:"reason,omitempty" example:"runtime_unavailable"`
+	SourceTypes       []string              `json:"source_types" example:"embedding,ocr,place"`
+	CandidateCount    int                   `json:"candidate_count,omitempty"`
+	CandidatePoolSize int                   `json:"candidate_pool_size,omitempty"`
+	Sources           []SearchSourceMetaDTO `json:"sources,omitempty"`
+	Debug             []SearchDebugItemDTO  `json:"debug,omitempty"`
+}
+
+type SearchSourceMetaDTO struct {
+	Type           string  `json:"type"`
+	Weight         float64 `json:"weight"`
+	CandidateCount int     `json:"candidate_count"`
+	DurationMs     int64   `json:"duration_ms"`
+	Error          string  `json:"error,omitempty"`
+}
+
+type SearchDebugContributionDTO struct {
+	Rank     int     `json:"rank"`
+	Weight   float64 `json:"weight"`
+	RRFScore float64 `json:"rrf_score"`
+	RawScore float64 `json:"raw_score"`
+}
+
+type SearchDebugItemDTO struct {
+	AssetID       string                                `json:"asset_id"`
+	Score         float64                               `json:"score"`
+	Contributions map[string]SearchDebugContributionDTO `json:"contributions"`
 }
 
 // OptionsResponseDTO represents the response for filter options

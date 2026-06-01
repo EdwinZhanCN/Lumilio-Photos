@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"server/internal/db/dbtypes"
 	"server/internal/db/repo"
+	aggregatesearch "server/internal/search"
 	"server/internal/storage"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pgvector/pgvector-go"
+	"go.uber.org/zap"
 )
 
 // Asset type constants
@@ -141,13 +143,39 @@ type SearchAssetsParams struct {
 	QueryAssetsParams
 	EnhancementMode SearchEnhancementMode
 	TopResultsLimit int
+	Debug           bool
 }
 
 type SearchTopResultsMeta struct {
-	Enabled     bool
-	Degraded    bool
-	Reason      string
-	SourceTypes []string
+	Enabled           bool
+	Degraded          bool
+	Reason            string
+	SourceTypes       []string
+	CandidateCount    int
+	CandidatePoolSize int
+	Sources           []SearchSourceMeta
+	Debug             []SearchDebugItem
+}
+
+type SearchSourceMeta struct {
+	Type           string
+	Weight         float64
+	CandidateCount int
+	DurationMs     int64
+	Error          string
+}
+
+type SearchDebugContribution struct {
+	Rank     int
+	Weight   float64
+	RRFScore float64
+	RawScore float64
+}
+
+type SearchDebugItem struct {
+	AssetID       string
+	Score         float64
+	Contributions map[string]SearchDebugContribution
 }
 
 type SearchAssetsResult struct {
@@ -179,18 +207,48 @@ type assetService struct {
 	lumen                        LumenService
 	repoManager                  *storage.RepositoryManager
 	embeddingService             EmbeddingService
+	aggregateSearch              aggregatesearch.Service
 	queryAssetsUnifiedFn         func(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error)
 	searchAssetsClipTopResultsFn func(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta)
 }
 
-func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, r *storage.RepositoryManager, e EmbeddingService) (AssetService, error) {
-	return &assetService{
+func NewAssetService(q *repo.Queries, pool *pgxpool.Pool, l LumenService, r *storage.RepositoryManager, e EmbeddingService, loggers ...*zap.Logger) (AssetService, error) {
+	logger := zap.NewNop()
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
+	svc := &assetService{
 		queries:          q,
 		pool:             pool,
 		lumen:            l,
 		repoManager:      r,
 		embeddingService: e,
-	}, nil
+	}
+	svc.aggregateSearch = aggregatesearch.NewAggregateService(pool, []aggregatesearch.Retriever{
+		aggregatesearch.NewEmbeddingRetriever(
+			pool,
+			func(ctx context.Context, query string, fast bool) (aggregatesearch.QueryEmbedding, error) {
+				embedding, err := svc.resolveClipQueryEmbedding(ctx, query, fast)
+				if err != nil {
+					return aggregatesearch.QueryEmbedding{}, err
+				}
+				return aggregatesearch.QueryEmbedding{
+					Model:  embedding.ModelID,
+					Vector: embedding.Vector,
+				}, nil
+			},
+			func(ctx context.Context, model string, dimensions int) (repo.EmbeddingSpace, error) {
+				if svc.embeddingService == nil {
+					return repo.EmbeddingSpace{}, fmt.Errorf("%w: embedding service not available", ErrSemanticSearchUnavailable)
+				}
+				return svc.embeddingService.ResolveDefaultSearchSpace(ctx, EmbeddingTypeCLIP, model, dimensions)
+			},
+			1.0,
+		),
+		aggregatesearch.NewOCRRetriever(pool, 0.7),
+		aggregatesearch.NewPlaceRetriever(pool, 0.8),
+	}, logger.Named("aggregate_search"))
+	return svc, nil
 }
 
 // ================================
@@ -1234,7 +1292,7 @@ func (s *assetService) runSearchAssetsClipTopResults(ctx context.Context, params
 	if s.searchAssetsClipTopResultsFn != nil {
 		return s.searchAssetsClipTopResultsFn(ctx, params)
 	}
-	return s.searchAssetsClipTopResults(ctx, params)
+	return s.searchAssetsAggregateTopResults(ctx, params)
 }
 
 func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsParams) (SearchAssetsResult, error) {
@@ -1256,6 +1314,9 @@ func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsPara
 		topResults, meta := s.runSearchAssetsClipTopResults(ctx, params)
 		result.TopResults = topResults
 		result.TopResultsMeta = meta
+		if params.EnhancementMode == SearchEnhancementModeOnly && meta.Reason == "all_retrievers_failed" {
+			return SearchAssetsResult{}, fmt.Errorf("aggregate search failed")
+		}
 	}
 
 	if params.EnhancementMode != SearchEnhancementModeOnly {
@@ -1300,9 +1361,31 @@ func (s *assetService) SearchAssets(ctx context.Context, params SearchAssetsPara
 // QueryAssets is the unified method for listing, filtering, and searching assets.
 func (s *assetService) QueryAssets(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
 	if params.SearchType == "semantic" && params.Query != "" {
-		return s.queryAssetsVector(ctx, params)
+		return s.queryAssetsAggregate(ctx, params)
 	}
 	return s.queryAssetsUnified(ctx, params)
+}
+
+func (s *assetService) queryAssetsAggregate(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {
+	if s.aggregateSearch == nil {
+		return nil, 0, fmt.Errorf("%w: aggregate search service not available", ErrSemanticSearchUnavailable)
+	}
+	filter, err := buildAggregateSearchFilter(params)
+	if err != nil {
+		return nil, 0, err
+	}
+	response, err := s.aggregateSearch.Search(ctx, aggregatesearch.Request{
+		Query:      params.Query,
+		Filter:     filter,
+		Limit:      params.Limit,
+		Offset:     params.Offset,
+		CountTotal: true,
+		Debug:      false,
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	return response.Assets, int64(response.TotalCandidates), nil
 }
 
 func (s *assetService) searchAssetsClipTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
@@ -1322,6 +1405,157 @@ func (s *assetService) searchAssetsClipTopResults(ctx context.Context, params Se
 	}
 
 	return results, meta
+}
+
+func (s *assetService) searchAssetsAggregateTopResults(ctx context.Context, params SearchAssetsParams) ([]repo.Asset, SearchTopResultsMeta) {
+	meta := SearchTopResultsMeta{
+		Enabled:     true,
+		SourceTypes: []string{aggregatesearch.SourceEmbedding, aggregatesearch.SourceOCR, aggregatesearch.SourcePlace},
+	}
+	if s.aggregateSearch == nil {
+		meta.Degraded = true
+		meta.Reason = "runtime_unavailable"
+		return []repo.Asset{}, meta
+	}
+
+	searchCtx, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+	defer cancel()
+
+	requestedLimit := params.TopResultsLimit
+	if requestedLimit <= 0 {
+		requestedLimit = TOP_RESULTS_FALLBACK_LIMIT
+	}
+	filter, err := buildAggregateSearchFilter(params.QueryAssetsParams)
+	if err != nil {
+		meta.Degraded = true
+		meta.Reason = "invalid_filter"
+		return []repo.Asset{}, meta
+	}
+
+	response, err := s.aggregateSearch.Search(searchCtx, aggregatesearch.Request{
+		Query:  params.Query,
+		Filter: filter,
+		Limit:  requestedLimit,
+		Offset: 0,
+		TopK:   aggregateCandidatePoolSize(requestedLimit, 0),
+		Debug:  params.Debug,
+	})
+	if err != nil {
+		meta.Degraded = true
+		meta.Reason = classifySearchEnhancementError(err, searchCtx)
+		meta.Sources = mapAggregateSearchSources(response.Sources)
+		meta.CandidateCount = response.TotalCandidates
+		meta.CandidatePoolSize = response.CandidatePoolSize
+		if allAggregateSourcesFailed(response.Sources) {
+			meta.Reason = "all_retrievers_failed"
+		}
+		return []repo.Asset{}, meta
+	}
+
+	meta.Sources = mapAggregateSearchSources(response.Sources)
+	meta.Debug = mapAggregateSearchDebug(response.Debug)
+	meta.CandidateCount = response.TotalCandidates
+	meta.CandidatePoolSize = response.CandidatePoolSize
+	for _, source := range response.Sources {
+		if source.Error != "" {
+			meta.Degraded = true
+			if meta.Reason == "" {
+				meta.Reason = "partial_failure"
+			}
+			break
+		}
+	}
+	return response.Assets, meta
+}
+
+func buildAggregateSearchFilter(params QueryAssetsParams) (aggregatesearch.Filter, error) {
+	var repositoryID *uuid.UUID
+	if params.RepositoryID != nil && *params.RepositoryID != "" {
+		parsed, err := uuid.Parse(*params.RepositoryID)
+		if err != nil {
+			return aggregatesearch.Filter{}, fmt.Errorf("invalid repository ID: %w", err)
+		}
+		repositoryID = &parsed
+	}
+	return aggregatesearch.Filter{
+		RepositoryID:     repositoryID,
+		PersonID:         params.PersonID,
+		AssetType:        params.AssetType,
+		AssetTypes:       cloneStringSlice(params.AssetTypes),
+		OwnerID:          params.OwnerID,
+		AlbumID:          params.AlbumID,
+		FilenameValue:    params.FilenameValue,
+		FilenameOperator: params.FilenameOperator,
+		DateFrom:         params.DateFrom,
+		DateTo:           params.DateTo,
+		IsRaw:            params.IsRaw,
+		Rating:           params.Rating,
+		Liked:            params.Liked,
+		CameraModel:      params.CameraModel,
+		LensModel:        params.LensModel,
+		LocationNorth:    params.LocationNorth,
+		LocationSouth:    params.LocationSouth,
+		LocationEast:     params.LocationEast,
+		LocationWest:     params.LocationWest,
+	}, nil
+}
+
+func mapAggregateSearchSources(sources []aggregatesearch.SourceMeta) []SearchSourceMeta {
+	mapped := make([]SearchSourceMeta, 0, len(sources))
+	for _, source := range sources {
+		mapped = append(mapped, SearchSourceMeta{
+			Type:           source.Type,
+			Weight:         source.Weight,
+			CandidateCount: source.CandidateCount,
+			DurationMs:     source.DurationMs,
+			Error:          source.Error,
+		})
+	}
+	return mapped
+}
+
+func mapAggregateSearchDebug(debug []aggregatesearch.AssetDebug) []SearchDebugItem {
+	mapped := make([]SearchDebugItem, 0, len(debug))
+	for _, item := range debug {
+		contributions := make(map[string]SearchDebugContribution, len(item.Contributions))
+		for source, contribution := range item.Contributions {
+			contributions[source] = SearchDebugContribution{
+				Rank:     contribution.Rank,
+				Weight:   contribution.Weight,
+				RRFScore: contribution.RRFScore,
+				RawScore: contribution.RawScore,
+			}
+		}
+		mapped = append(mapped, SearchDebugItem{
+			AssetID:       item.AssetID,
+			Score:         item.Score,
+			Contributions: contributions,
+		})
+	}
+	return mapped
+}
+
+func allAggregateSourcesFailed(sources []aggregatesearch.SourceMeta) bool {
+	if len(sources) == 0 {
+		return false
+	}
+	for _, source := range sources {
+		if source.Error == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func aggregateCandidatePoolSize(limit, offset int) int {
+	topK := (limit + offset) * aggregatesearch.DefaultCandidateMultiplier
+	if topK < aggregatesearch.DefaultCandidatePoolMin {
+		return aggregatesearch.DefaultCandidatePoolMin
+	}
+	if topK > aggregatesearch.DefaultCandidatePoolMax {
+		return aggregatesearch.DefaultCandidatePoolMax
+	}
+	return topK
 }
 
 func (s *assetService) queryAssetsUnified(ctx context.Context, params QueryAssetsParams) ([]repo.Asset, int64, error) {

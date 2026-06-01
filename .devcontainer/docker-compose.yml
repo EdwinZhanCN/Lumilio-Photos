@@ -18,6 +18,12 @@ services:
             - "5433:5432"
         volumes:
             - db_data:/var/lib/postgresql/data
+        command:
+            - postgres
+            - -c
+            - maintenance_work_mem=256MB
+            - -c
+            - max_parallel_maintenance_workers=4
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
             interval: 10s
@@ -77,11 +83,17 @@ services:
             STORAGE_DUPLICATE_HANDLING: rename
             REPOSITORY_SCAN_ENABLED: "false"
 
+            ML_CLIP_ENABLED: ${ML_CLIP_ENABLED:-false}
+            ML_BIOCLIP_ENABLED: ${ML_BIOCLIP_ENABLED:-false}
+            ML_OCR_ENABLED: ${ML_OCR_ENABLED:-false}
+            ML_FACE_ENABLED: ${ML_FACE_ENABLED:-false}
+
             # Use host-native lumenhubd for discovery in dev containers.
             # The SDK still connects directly to discovered gRPC node endpoints.
             LUMEN_DISCOVERY_ENABLED: "true"
             LUMEN_DISCOVERY_MDNS_ENABLED: "false"
             LUMEN_DISCOVERY_HUB_URL: http://127.0.0.1:5866
+            LUMEN_CONNECTION_INSECURE: "true"
 
             VITE_API_URL: http://localhost:6680
         depends_on:

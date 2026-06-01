@@ -1903,10 +1903,14 @@ func toSearchBrowseResponseDTO(result service.SearchBrowseResult, limit, offset 
 	return dto.SearchAssetsResponseDTO{
 		TopItems: topItemDTOs,
 		TopResultsMeta: dto.SearchTopResultsMetaDTO{
-			Enabled:     result.TopResultsMeta.Enabled,
-			Degraded:    result.TopResultsMeta.Degraded,
-			Reason:      result.TopResultsMeta.Reason,
-			SourceTypes: append([]string{}, result.TopResultsMeta.SourceTypes...),
+			Enabled:           result.TopResultsMeta.Enabled,
+			Degraded:          result.TopResultsMeta.Degraded,
+			Reason:            result.TopResultsMeta.Reason,
+			SourceTypes:       append([]string{}, result.TopResultsMeta.SourceTypes...),
+			CandidateCount:    result.TopResultsMeta.CandidateCount,
+			CandidatePoolSize: result.TopResultsMeta.CandidatePoolSize,
+			Sources:           toSearchSourceMetaDTOs(result.TopResultsMeta.Sources),
+			Debug:             toSearchDebugItemDTOs(result.TopResultsMeta.Debug),
 		},
 		ResultItems:         resultItemDTOs,
 		ResultsTotalVisible: &resultsTotalVisible,
@@ -1915,6 +1919,41 @@ func toSearchBrowseResponseDTO(result service.SearchBrowseResult, limit, offset 
 		Limit:               limit,
 		Offset:              offset,
 	}
+}
+
+func toSearchSourceMetaDTOs(sources []service.SearchSourceMeta) []dto.SearchSourceMetaDTO {
+	items := make([]dto.SearchSourceMetaDTO, 0, len(sources))
+	for _, source := range sources {
+		items = append(items, dto.SearchSourceMetaDTO{
+			Type:           source.Type,
+			Weight:         source.Weight,
+			CandidateCount: source.CandidateCount,
+			DurationMs:     source.DurationMs,
+			Error:          source.Error,
+		})
+	}
+	return items
+}
+
+func toSearchDebugItemDTOs(debug []service.SearchDebugItem) []dto.SearchDebugItemDTO {
+	items := make([]dto.SearchDebugItemDTO, 0, len(debug))
+	for _, item := range debug {
+		contributions := make(map[string]dto.SearchDebugContributionDTO, len(item.Contributions))
+		for source, contribution := range item.Contributions {
+			contributions[source] = dto.SearchDebugContributionDTO{
+				Rank:     contribution.Rank,
+				Weight:   contribution.Weight,
+				RRFScore: contribution.RRFScore,
+				RawScore: contribution.RawScore,
+			}
+		}
+		items = append(items, dto.SearchDebugItemDTO{
+			AssetID:       item.AssetID,
+			Score:         item.Score,
+			Contributions: contributions,
+		})
+	}
+	return items
 }
 
 // QueryAssets handles unified asset listing, filtering, and searching
@@ -2022,6 +2061,7 @@ func (h *AssetHandler) SearchAssets(c *gin.Context) {
 		QueryAssetsParams: params,
 		EnhancementMode:   service.SearchEnhancementMode(req.EnhancementMode),
 		TopResultsLimit:   req.TopResultsLimit,
+		Debug:             req.Debug,
 	})
 	if err != nil {
 		log.Printf("Failed to search assets: %v", err)
