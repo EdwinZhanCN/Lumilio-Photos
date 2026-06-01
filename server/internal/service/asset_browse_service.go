@@ -112,7 +112,7 @@ func (s *assetService) QueryBrowseItems(ctx context.Context, params QueryAssetsP
 	}
 
 	if params.SearchType == "semantic" && strings.TrimSpace(params.Query) != "" {
-		return s.queryCollapsedSemanticBrowseItems(ctx, params)
+		return s.queryCollapsedAggregateBrowseItems(ctx, params)
 	}
 
 	totalAssets, err := s.countAssetsUnified(ctx, params)
@@ -162,9 +162,12 @@ func (s *assetService) SearchBrowseItems(ctx context.Context, params SearchAsset
 	topResultsEnabled := query != "" && params.EnhancementMode != SearchEnhancementModeOff
 
 	if topResultsEnabled {
-		topItems, meta := s.searchBrowseItemsClipTopResults(ctx, params)
+		topItems, meta := s.searchBrowseItemsAggregateTopResults(ctx, params)
 		result.TopResults = topItems
 		result.TopResultsMeta = meta
+		if params.EnhancementMode == SearchEnhancementModeOnly && meta.Reason == "all_retrievers_failed" {
+			return SearchBrowseResult{}, fmt.Errorf("aggregate search failed")
+		}
 	}
 
 	if params.EnhancementMode != SearchEnhancementModeOnly {
@@ -263,6 +266,60 @@ func (s *assetService) queryCollapsedSemanticBrowseItems(ctx context.Context, pa
 	), nil
 }
 
+func (s *assetService) queryCollapsedAggregateBrowseItems(ctx context.Context, params QueryAssetsParams) (BrowseQueryResult, error) {
+	assets, totalAssets, err := s.queryAssetsAggregate(ctx, QueryAssetsParams{
+		Query:            params.Query,
+		SearchType:       params.SearchType,
+		ViewerTimeZone:   params.ViewerTimeZone,
+		RepositoryID:     params.RepositoryID,
+		PersonID:         params.PersonID,
+		AssetType:        params.AssetType,
+		AssetTypes:       cloneStringSlice(params.AssetTypes),
+		OwnerID:          params.OwnerID,
+		AlbumID:          params.AlbumID,
+		FilenameValue:    params.FilenameValue,
+		FilenameOperator: params.FilenameOperator,
+		DateFrom:         params.DateFrom,
+		DateTo:           params.DateTo,
+		IsRaw:            params.IsRaw,
+		Rating:           params.Rating,
+		Liked:            params.Liked,
+		CameraModel:      params.CameraModel,
+		LensModel:        params.LensModel,
+		LocationNorth:    params.LocationNorth,
+		LocationSouth:    params.LocationSouth,
+		LocationEast:     params.LocationEast,
+		LocationWest:     params.LocationWest,
+		SortBy:           params.SortBy,
+		StackMode:        params.StackMode,
+		Limit:            aggregateCandidatePoolSize(params.Limit, params.Offset),
+		Offset:           0,
+	})
+	if err != nil {
+		return BrowseQueryResult{}, err
+	}
+	if len(assets) == 0 {
+		return browseQueryResultFromItems(
+			[]BrowseItem{},
+			totalAssets,
+			params.StackMode,
+			params.Limit,
+			params.Offset,
+		), nil
+	}
+	items, err := s.collapseAssetsToBrowseItems(ctx, assets)
+	if err != nil {
+		return BrowseQueryResult{}, err
+	}
+	return browseQueryResultFromItems(
+		items,
+		totalAssets,
+		params.StackMode,
+		params.Limit,
+		params.Offset,
+	), nil
+}
+
 // searchBrowseItemsClipTopResults fetches vector-ranked assets under a short timeout,
 // then applies stack collapse when not expanded. Marks meta degraded on timeout/vector errors or collapse failure.
 func (s *assetService) searchBrowseItemsClipTopResults(ctx context.Context, params SearchAssetsParams) ([]BrowseItem, SearchTopResultsMeta) {
@@ -302,6 +359,31 @@ func (s *assetService) searchBrowseItemsClipTopResults(ctx context.Context, para
 	}
 	if len(items) > requestedLimit {
 		items = items[:requestedLimit]
+	}
+	return items, meta
+}
+
+func (s *assetService) searchBrowseItemsAggregateTopResults(ctx context.Context, params SearchAssetsParams) ([]BrowseItem, SearchTopResultsMeta) {
+	assets, meta := s.runSearchAssetsClipTopResults(ctx, params)
+	if params.StackMode == StackModeExpanded {
+		items := assetsToBrowseItems(assets)
+		if len(items) > params.TopResultsLimit {
+			items = items[:params.TopResultsLimit]
+		}
+		return items, meta
+	}
+
+	searchCtx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
+	defer cancel()
+
+	items, err := s.collapseAssetsToBrowseItems(searchCtx, assets)
+	if err != nil {
+		meta.Degraded = true
+		meta.Reason = "collapse_failed"
+		return []BrowseItem{}, meta
+	}
+	if len(items) > params.TopResultsLimit {
+		items = items[:params.TopResultsLimit]
 	}
 	return items, meta
 }

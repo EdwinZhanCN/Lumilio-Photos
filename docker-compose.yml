@@ -13,6 +13,12 @@ services:
             - "5433:5432"
         volumes:
             - db_data:/var/lib/postgresql/data
+        command:
+            - postgres
+            - -c
+            - maintenance_work_mem=256MB
+            - -c
+            - max_parallel_maintenance_workers=4
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U postgres -d lumiliophotos"]
             interval: 10s
@@ -50,10 +56,14 @@ services:
             GEOCODING_LANGUAGE: en
             GEOCODING_USER_AGENT: Lumilio-Photos/1.0
             GEOCODING_NATURALEARTH_CITY_RADIUS_METERS: "50000"
-            ML_CLIP_ENABLED: "false"
-            ML_BIOCLIP_ENABLED: "false"
-            ML_OCR_ENABLED: "false"
-            ML_FACE_ENABLED: "false"
+            ML_CLIP_ENABLED: ${ML_CLIP_ENABLED:-false}
+            ML_BIOCLIP_ENABLED: ${ML_BIOCLIP_ENABLED:-false}
+            ML_OCR_ENABLED: ${ML_OCR_ENABLED:-false}
+            ML_FACE_ENABLED: ${ML_FACE_ENABLED:-false}
+            LUMEN_DISCOVERY_ENABLED: ${LUMEN_DISCOVERY_ENABLED:-true}
+            LUMEN_DISCOVERY_MDNS_ENABLED: ${LUMEN_DISCOVERY_MDNS_ENABLED:-false}
+            LUMEN_DISCOVERY_HUB_URL: ${LUMEN_DISCOVERY_HUB_URL:-http://host.docker.internal:5866}
+            LUMEN_CONNECTION_INSECURE: ${LUMEN_CONNECTION_INSECURE:-true}
             LUMILIO_SECRET_KEY: /data/storage/.secrets/lumilio_secret_key
             LLM_AGENT_ENABLED: "false"
             LLM_PROVIDER: your-llm-provider
@@ -77,6 +87,14 @@ services:
             - /PATH/TO/YOUR/ASSETS:/data/storage
         ports:
             - "6680:6680"
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        healthcheck:
+            test: ["CMD-SHELL", "curl -fsS http://localhost:6680/api/v1/health >/dev/null"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 20s
 
     web:
         build:
@@ -87,7 +105,8 @@ services:
                 VITE_PLUGIN_CDN_ORIGIN: ${VITE_PLUGIN_CDN_ORIGIN:-https://cdn.lumilio.org}
                 VITE_STUDIO_PLUGIN_RUNTIME_ENABLED: ${VITE_STUDIO_PLUGIN_RUNTIME_ENABLED:-true}
         depends_on:
-            - server
+            server:
+                condition: service_healthy
         environment:
             API_URL: ""
         ports:

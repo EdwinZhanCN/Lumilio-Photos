@@ -43,6 +43,7 @@ RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         ca-certificates \
+        curl \
         ffmpeg \
         exiftool \
         libvips42 \
@@ -81,5 +82,8 @@ RUN mkdir -p "${STORAGE_PATH}" && chown -R app:app /data /app
 USER app
 
 EXPOSE 6680
+
+HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=20s CMD \
+    curl -fsS "http://localhost:${SERVER_PORT}/api/v1/health" >/dev/null || exit 1
 
 ENTRYPOINT ["server"]

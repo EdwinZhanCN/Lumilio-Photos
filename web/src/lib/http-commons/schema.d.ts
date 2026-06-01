@@ -10671,6 +10671,7 @@ export interface components {
             temporary_password?: string;
         };
         "dto.SearchAssetsRequestDTO": {
+            debug?: boolean;
             /**
              * @example auto
              * @enum {string}
@@ -10679,7 +10680,7 @@ export interface components {
             filter?: components["schemas"]["dto.AssetFilterDTO"];
             pagination?: components["schemas"]["dto.PaginationDTO"];
             /** @example red bird on branch */
-            query: string;
+            query?: string;
             /**
              * @example date_captured
              * @enum {string}
@@ -10713,17 +10714,43 @@ export interface components {
             top_items?: components["schemas"]["dto.BrowseItemDTO"][];
             top_results_meta?: components["schemas"]["dto.SearchTopResultsMetaDTO"];
         };
+        "dto.SearchDebugContributionDTO": {
+            rank?: number;
+            raw_score?: number;
+            rrf_score?: number;
+            weight?: number;
+        };
+        "dto.SearchDebugItemDTO": {
+            asset_id?: string;
+            contributions?: {
+                [key: string]: components["schemas"]["dto.SearchDebugContributionDTO"];
+            };
+            score?: number;
+        };
+        "dto.SearchSourceMetaDTO": {
+            candidate_count?: number;
+            duration_ms?: number;
+            error?: string;
+            type?: string;
+            weight?: number;
+        };
         "dto.SearchTopResultsMetaDTO": {
+            candidate_count?: number;
+            candidate_pool_size?: number;
+            debug?: components["schemas"]["dto.SearchDebugItemDTO"][];
             degraded?: boolean;
             enabled?: boolean;
             /** @example runtime_unavailable */
             reason?: string;
             /**
              * @example [
-             *       "clip"
+             *       "embedding",
+             *       "ocr",
+             *       "place"
              *     ]
              */
             source_types?: string[];
+            sources?: components["schemas"]["dto.SearchSourceMetaDTO"][];
         };
         "dto.SessionProgressDTO": {
             bytes_done?: number;

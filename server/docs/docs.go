@@ -2718,6 +2718,9 @@ const docTemplate = `{
             },
             "dto.SearchAssetsRequestDTO": {
                 "properties": {
+                    "debug": {
+                        "type": "boolean"
+                    },
                     "enhancement_mode": {
                         "enum": [
                             "auto",
@@ -2764,9 +2767,6 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
-                "required": [
-                    "query"
-                ],
                 "type": "object"
             },
             "dto.SearchAssetsResponseDTO": {
@@ -2815,8 +2815,75 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.SearchDebugContributionDTO": {
+                "properties": {
+                    "rank": {
+                        "type": "integer"
+                    },
+                    "raw_score": {
+                        "type": "number"
+                    },
+                    "rrf_score": {
+                        "type": "number"
+                    },
+                    "weight": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.SearchDebugItemDTO": {
+                "properties": {
+                    "asset_id": {
+                        "type": "string"
+                    },
+                    "contributions": {
+                        "additionalProperties": {
+                            "$ref": "#/components/schemas/dto.SearchDebugContributionDTO"
+                        },
+                        "type": "object"
+                    },
+                    "score": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.SearchSourceMetaDTO": {
+                "properties": {
+                    "candidate_count": {
+                        "type": "integer"
+                    },
+                    "duration_ms": {
+                        "type": "integer"
+                    },
+                    "error": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "weight": {
+                        "type": "number"
+                    }
+                },
+                "type": "object"
+            },
             "dto.SearchTopResultsMetaDTO": {
                 "properties": {
+                    "candidate_count": {
+                        "type": "integer"
+                    },
+                    "candidate_pool_size": {
+                        "type": "integer"
+                    },
+                    "debug": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.SearchDebugItemDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
                     "degraded": {
                         "type": "boolean"
                     },
@@ -2829,10 +2896,19 @@ const docTemplate = `{
                     },
                     "source_types": {
                         "example": [
-                            "clip"
+                            "embedding",
+                            "ocr",
+                            "place"
                         ],
                         "items": {
                             "type": "string"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    },
+                    "sources": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.SearchSourceMetaDTO"
                         },
                         "type": "array",
                         "uniqueItems": false
