@@ -1,8 +1,16 @@
 # Build React app stage
-FROM node:23.11.1-alpine as build
+FROM node:23.11.1-bookworm-slim as build
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install Vite+ and keep pnpm available for package-manager delegation.
+RUN corepack enable \
+    && corepack prepare pnpm@latest --activate \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && curl -fsSL https://vite.plus | bash \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+ENV PATH="/root/.vite-plus/bin:${PATH}"
 
 WORKDIR /app
 
@@ -12,10 +20,10 @@ ARG VITE_PLUGIN_CDN_ORIGIN=https://cdn.lumilio.org
 ARG VITE_STUDIO_PLUGIN_RUNTIME_ENABLED=true
 
 # Copy package.json and pnpm-lock.yaml files
-COPY web/package.json web/pnpm-lock.yaml ./
+COPY web/package.json web/pnpm-lock.yaml web/pnpm-workspace.yaml ./
 
 # Install dependencies
-RUN pnpm install --frozen-lockfile
+RUN vp install
 
 # Copy frontend source code
 COPY web/ ./
@@ -29,7 +37,7 @@ RUN printf '%s\n' \
     > .env
 
 # Build the application
-RUN pnpm run build
+RUN vp build
 
 # Production stage
 FROM nginx:alpine

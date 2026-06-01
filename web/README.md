@@ -5,44 +5,44 @@ The modern, high-performance web interface for Lumilio Photos, built with React,
 ## Tech Stack
 
 - **Framework:** [React 19](https://react.dev/)
-- **Build Tool:** [Vite](https://vitejs.dev/)
+- **Build Toolchain:** [Vite+](https://viteplus.dev/) (Vite 8 core)
 - **Language:** [TypeScript](https://www.typescriptlang.org/)
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/) & [DaisyUI](https://daisyui.com/)
 - **State Management:** [Zustand](https://zustand-demo.pmnd.rs/) & [TanStack Query](https://tanstack.com/query/latest)
 - **Performance:** [WebAssembly (WASM)](https://webassembly.org/) & [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API)
 - **Routing:** [React Router 7](https://reactrouter.com/)
-- **Testing:** [Vitest](https://vitest.dev/)
+- **Testing:** Vite+ test runner (Vitest-compatible APIs)
 
 ## Getting Started
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (version specified in `.nvmrc`)
-- [pnpm](https://pnpm.io/) (recommended)
+- [Vite+ `vp`](https://viteplus.dev/) (delegates installs through pnpm)
 
 ### Installation
 
 ```bash
-pnpm install
+vp install
 ```
 
 ### Development
 
 ```bash
-pnpm dev
+vp dev
 ```
 
 ### Build
 
 ```bash
-pnpm build
+vp build
 ```
 
 ### Other Scripts
 
-- `pnpm lint`: Run oxlint for fast linting.
-- `pnpm type-check`: Run TypeScript type checking.
-- `pnpm test`: Run unit tests with Vitest.
+- `vp lint`: Run Oxlint through Vite+.
+- `vp check --no-fmt --no-lint`: Run TypeScript type checking through Vite+.
+- `vp test`: Run unit tests through Vite+.
 
 ## Project Structure
 
@@ -67,12 +67,12 @@ The project follows a feature-based and modular architecture:
 
 ## Testing
 
-We use Vitest for unit and integration testing.
+We use the Vite+ test command for unit and integration testing.
 
 ```bash
-pnpm test          # Run tests
-pnpm test:ui       # Run tests with UI
-pnpm test:coverage # Generate coverage report
+vp test                # Run tests
+vp test --ui           # Run tests with UI
+vp test run --coverage # Generate coverage report
 ```
 
 

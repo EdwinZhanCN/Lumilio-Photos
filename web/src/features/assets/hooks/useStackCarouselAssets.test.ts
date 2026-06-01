@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vite-plus/test";
 import type { Asset, StackMemberDTO } from "@/lib/assets/types";
 import client from "@/lib/http-commons/client";
 import {

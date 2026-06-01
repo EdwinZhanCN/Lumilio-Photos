@@ -17,7 +17,7 @@
             "onAutoForward": "notify"
         },
         "6657": {
-            "label": "Vite Dev Server (Web)",
+            "label": "Vite+ Dev Server (Web)",
             "onAutoForward": "openBrowserOnce"
         }
     },
