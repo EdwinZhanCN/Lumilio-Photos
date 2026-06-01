@@ -75,25 +75,14 @@ services:
             CARGO_HOME: /usr/local/cargo
 
             SERVER_ENV: development
+            SERVER_CONFIG_FILE: /workspace/server/config/server.development.toml
             SERVER_PORT: "6680"
-            SERVER_LOG_LEVEL: debug
             STORAGE_PATH: /workspace/server/data/storage
-            STORAGE_STRATEGY: date
-            STORAGE_PRESERVE_FILENAME: "true"
-            STORAGE_DUPLICATE_HANDLING: rename
-            REPOSITORY_SCAN_ENABLED: "false"
 
             ML_CLIP_ENABLED: ${ML_CLIP_ENABLED:-false}
             ML_BIOCLIP_ENABLED: ${ML_BIOCLIP_ENABLED:-false}
             ML_OCR_ENABLED: ${ML_OCR_ENABLED:-false}
             ML_FACE_ENABLED: ${ML_FACE_ENABLED:-false}
-
-            # Use host-native lumenhubd for discovery in dev containers.
-            # The SDK still connects directly to discovered gRPC node endpoints.
-            LUMEN_DISCOVERY_ENABLED: "true"
-            LUMEN_DISCOVERY_MDNS_ENABLED: "false"
-            LUMEN_DISCOVERY_HUB_URL: http://127.0.0.1:5866
-            LUMEN_CONNECTION_INSECURE: "true"
 
             VITE_API_URL: http://localhost:6680
         depends_on:

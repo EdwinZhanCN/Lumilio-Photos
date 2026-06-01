@@ -1,38 +1,36 @@
-# Repository Guidelines
+# Agent Guide
 
-## Project Structure & Module Organization
-- `server/`: Go API service. Entry point is `server/cmd/main.go`; business logic lives in `server/internal/*`; SQL migrations are in `server/migrations`; generated OpenAPI files are in `server/docs`.
-- `web/`: React 19 + TypeScript frontend. Feature code is organized under `web/src/features/*`; shared utilities are in `web/src/lib`, `web/src/components`, and `web/src/contexts`.
-- `wasm/`: Rust WebAssembly crates (`*-wasm`) used by web and plugin flows.
-- `plugins/`: Studio plugin packages (for example `plugins/lumilio-border-plugin`).
-- `docs/`: VitePress documentation site.
+This file is the short entry point for humans and coding agents working in Lumilio Photos. Keep it compact; longer harness notes live under `docs/agent/` and are excluded from the public VitePress site.
 
-## Build, Test, and Development Commands
-- `make setup`: install Go/Node dependencies and local tooling.
-- `make dev`: start DB, Go server, and web app together.
-- `make server-dev` / `make web-dev`: run one side only.
-- `make server-test`: run backend tests (`go test ./...`).
-- `cd web && npm run lint && npm run type-check && npm run test`: frontend quality gate.
-- `make dto`: regenerate OpenAPI + frontend schema types after API contract changes.
-- `npm run docs:dev` (root): run docs locally.
+## Overview
 
-## Coding Style & Naming Conventions
-- Go: always format with `gofmt` (tabs, standard import grouping). Keep package names lowercase and focused.
-- TypeScript/React: follow existing 2-space indentation and ESLint/Oxlint rules. Prefer `@/...` path aliases in `web/`.
-- Naming: React components use `PascalCase`; hooks use `useXxx`; tests use `*.test.ts(x)` and Go uses `*_test.go`.
-- Do not hand-edit generated files such as `web/src/lib/http-commons/schema.d.ts`.
+- `server/`: Go API service. Startup is `server/cmd/main.go`; application config is `server/config`; business logic lives in `server/internal/*`; migrations live in `server/migrations`.
+- `web/`: React 19 + TypeScript frontend on Vite+. Feature code lives under `web/src/features/*`; shared pieces live in `web/src/lib`, `web/src/components`, and `web/src/contexts`.
+- `wasm/`: Rust WebAssembly crates used by the web and plugin flows.
+- `docs/`: product/user documentation site. Internal harness docs only belong in `docs/agent/`.
 
-## Testing Guidelines
-- Frontend tests run on Vitest; keep tests close to features (for example `web/src/features/studio/.../*.test.tsx`).
-- Backend uses Go `testing` + `testify`.
-- No enforced global coverage threshold is defined; for non-trivial changes, run `cd web && npm run test:coverage` and include results in PR notes.
+The system is local-first: preserve original media, keep repository/storage semantics explicit, make ML/AI optional, and prefer boring configuration that boots cleanly in Docker and local dev.
 
-## Commit & Pull Request Guidelines
-- Follow Conventional Commit style used in history: `feat(scope): ...`, `fix(scope): ...`, `docs: ...`, `chore(repo): ...`.
-- PRs should include: concise problem/solution summary, impacted paths, test commands run, and screenshots for UI changes.
-- If API contracts changed, include generated artifacts from `make dto` (`server/docs/*` and `web/src/lib/http-commons/schema.d.ts`).
+## Documentation
 
-## Security & Configuration Tips
-- Never commit secrets; use local `.env.development` files.
-- Media pipeline features depend on external tools (`exiftool`, `ffmpeg`, `ffprobe`, `dcraw`). Verify availability before debugging processing failures.
-- For frontend-specific guardrails, also follow `web/AGENTS.md`.
+- `docs/agent/architecture.md`: system map, backend/frontend boundaries, config/runtime notes.
+- `docs/agent/BACKEND.md`: backend runtime, package map, config, queues, storage, API contracts.
+- `docs/agent/FRONTEND.md`: frontend runtime, toolchain, routes, state boundaries, API usage.
+- `docs/agent/DESIGN.md`: product and interface guidance for app work.
+- `docs/agent/core-beliefs.md`: decision principles for product and engineering tradeoffs.
+- `docs/agent/exec-plans/active/`: current execution plans.
+- `docs/agent/exec-plans/completed/`: completed execution records.
+- `docs/agent/exec-plans/tech-debt-tracker.md`: small known debt that should not be forgotten.
+- `docs/agent/vite-plus.md`: frontend Vite+ setup and command mapping.
+
+## Usage Rules
+
+- Use root `make` targets for daily work: `make setup`, `make dev`, `make server-dev`, `make web-dev`, `make test`, `make dto`.
+- Backend quality gate: `make server-test` or `cd server && go test ./...`.
+- Frontend quality gate: `make web-test` or `cd web && vp check --no-fmt --no-lint && vp lint && vp test`.
+- API contracts are OpenAPI-first. Do not hand-edit `web/src/lib/http-commons/schema.d.ts`; change backend annotations and run `make dto`.
+- Runtime app defaults belong in TOML (`server/config/server*.toml`). Env files are for bootstrap, machine-specific overrides, and secrets.
+- Do not commit secrets. `LUMILIO_SECRET_KEY` is a key file path, not raw secret text.
+- Go code must be formatted with `gofmt`. TypeScript should follow Vite+ lint/fmt rules and prefer `@/...` imports.
+- Frontend server state belongs in TanStack Query; feature-local interactive UI state can use Zustand; Context is for cross-cutting app state.
+- Keep generated files generated. If a generated artifact changes, include the command that produced it in your notes.

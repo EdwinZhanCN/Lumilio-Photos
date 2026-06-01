@@ -34,6 +34,7 @@ export const sharedConfig = withMermaid(defineConfig({
     lang: 'en',
     title: "Lumilio Photos",
     description: "Next-Gen Lightweight High-performance Media Manage Web App",
+    srcExclude: ['agent/**'],
     appearance: true, // 主题模式，默认浅色且开启切换
     base: VITE_BASE_URL,
     lastUpdated: true, // 上次更新

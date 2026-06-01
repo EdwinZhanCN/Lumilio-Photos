@@ -1,0 +1,28 @@
+{
+	servers :80 {
+		protocols h1 h2c
+	}
+
+	servers :443 {
+		protocols h1 h2 h3
+	}
+}
+
+{$LUMILIO_SITE_ADDRESS} {
+	root * /usr/share/caddy
+	encode zstd gzip
+
+	@api path /api/*
+	reverse_proxy @api {$LUMILIO_API_UPSTREAM} {
+		flush_interval -1
+	}
+
+	@immutable path *.js *.css *.wasm *.png *.jpg *.jpeg *.gif *.ico *.svg *.webp *.woff *.woff2 *.ttf *.eot
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	@wasm path *.wasm
+	header @wasm Content-Type "application/wasm"
+
+	try_files {path} /index.html
+	file_server
+}

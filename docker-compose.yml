@@ -33,44 +33,20 @@ services:
             db:
                 condition: service_healthy
         environment:
+            SERVER_CONFIG_FILE: /app/config/server.toml
             SERVER_PORT: 6680
-            SERVER_ENV: development
-            SERVER_LOG_LEVEL: debug
+            SERVER_ENV: production
             DB_HOST: db
             DB_PORT: 5432
             DB_USER: postgres
             DB_PASSWORD: postgres
             DB_NAME: lumiliophotos
             DB_SSL: disable
-            STORAGE_PATH: /data/storage
-            STORAGE_STRATEGY: date
-            STORAGE_PRESERVE_FILENAME: "true"
-            STORAGE_DUPLICATE_HANDLING: rename
-            REPOSITORY_SCAN_ENABLED: "true"
-            REPOSITORY_SCAN_INTERVAL_SECONDS: "300"
-            REPOSITORY_SCAN_SETTLE_SECONDS: "5"
-            REPOSITORY_SCAN_MAX_CONCURRENT_REPOS: "1"
-            REPOSITORY_SCAN_BATCH_SIZE: "500"
-            GEOCODING_PROVIDER: disabled
-            GEOCODING_NOMINATIM_ENDPOINT: ""
-            GEOCODING_LANGUAGE: en
-            GEOCODING_USER_AGENT: Lumilio-Photos/1.0
-            GEOCODING_NATURALEARTH_CITY_RADIUS_METERS: "50000"
             ML_CLIP_ENABLED: ${ML_CLIP_ENABLED:-false}
             ML_BIOCLIP_ENABLED: ${ML_BIOCLIP_ENABLED:-false}
             ML_OCR_ENABLED: ${ML_OCR_ENABLED:-false}
             ML_FACE_ENABLED: ${ML_FACE_ENABLED:-false}
-            LUMEN_DISCOVERY_ENABLED: ${LUMEN_DISCOVERY_ENABLED:-true}
-            LUMEN_DISCOVERY_MDNS_ENABLED: ${LUMEN_DISCOVERY_MDNS_ENABLED:-false}
-            LUMEN_DISCOVERY_HUB_URL: ${LUMEN_DISCOVERY_HUB_URL:-http://host.docker.internal:5866}
-            LUMEN_CONNECTION_INSECURE: ${LUMEN_CONNECTION_INSECURE:-true}
             LUMILIO_SECRET_KEY: /data/storage/.secrets/lumilio_secret_key
-            LLM_AGENT_ENABLED: "false"
-            LLM_PROVIDER: your-llm-provider
-            LLM_API_KEY: your-api-key-here
-            LLM_MODEL_NAME: your-model-name
-            LLM_BASE_URL: your-openai-compatiable-base-url
-            TRANSCODE_HW_ACCEL: auto
         # Uncomment below to enable hardware-accelerated transcoding (Intel/AMD GPU):
         # devices:
         #     - /dev/dri:/dev/dri
@@ -109,8 +85,12 @@ services:
                 condition: service_healthy
         environment:
             API_URL: ""
+            LUMILIO_SITE_ADDRESS: ${LUMILIO_SITE_ADDRESS:-:80}
+            LUMILIO_API_UPSTREAM: ${LUMILIO_API_UPSTREAM:-h2c://server:6680}
         ports:
-            - "6657:80"
+            - "${WEB_HTTP_PORT:-6657}:80"
+            - "${WEB_HTTPS_PORT:-6658}:443"
+            - "${WEB_HTTPS_PORT:-6658}:443/udp"
 
 volumes:
     db_data:

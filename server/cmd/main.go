@@ -69,9 +69,20 @@ func init() {
 // @openapi 3.0.0
 func main() {
 	// Load configurations
-	dbConfig := config.LoadDBConfig()
-	appConfig := config.LoadAppConfig()
-	logRuntime, err := logging.NewLogger(logging.LoadConfig(appConfig.ServerConfig.LogLevel))
+	appConfig, err := config.LoadAppConfigWithError()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load server configuration: %v\n", err)
+		os.Exit(1)
+	}
+	config.ApplyRuntimeEnvDefaults(appConfig)
+	dbConfig := appConfig.DatabaseConfig
+	logRuntime, err := logging.NewLogger(logging.Config{
+		Level:         appConfig.LoggingConfig.Level,
+		LogDir:        appConfig.LoggingConfig.LogDir,
+		ConsoleFormat: appConfig.LoggingConfig.ConsoleFormat,
+		FileFormat:    appConfig.LoggingConfig.FileFormat,
+		Development:   strings.EqualFold(appConfig.Environment, "development"),
+	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to initialize logger: %v\n", err)
 		os.Exit(1)
@@ -150,7 +161,7 @@ func main() {
 	appLogger.Info("repository storage system initialized", zap.String("operation", "repository.init"))
 	// Initialize primary storage repository
 	appLogger.Info("initializing primary storage repository", zap.String("operation", "repository.primary"))
-	if err := initPrimaryStorage(repoManager, repositoryLogger); err != nil {
+	if err := initPrimaryStorage(repoManager, repositoryLogger, appConfig.StorageConfig); err != nil {
 		appLogger.Fatal("failed to initialize primary storage", zap.String("operation", "repository.primary"), zap.Error(err))
 	}
 
@@ -244,7 +255,7 @@ func main() {
 	agentController := handler.NewAgentHandler(agentService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
 	settingsController := handler.NewSettingsHandler(settingsService)
-	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, os.Getenv("STORAGE_PATH"))
+	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, appConfig.StorageConfig.Path)
 	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 
 	// Initialize Cloud Sync service and handler
@@ -362,12 +373,11 @@ func initMLServices(
 	return lumenService, embeddingService, nil
 }
 
-func initPrimaryStorage(repoManager primaryStorageRepositoryManager, logger *zap.Logger) error {
+func initPrimaryStorage(repoManager primaryStorageRepositoryManager, logger *zap.Logger, storageConfig config.StorageConfig) error {
 	if logger == nil {
 		logger = zap.NewNop()
 	}
-	// Load environment variables
-	storagePath := os.Getenv("STORAGE_PATH")
+	storagePath := storageConfig.Path
 	storageRootPath, primaryRepoPath, err := resolvePrimaryStoragePaths(storagePath)
 	if err != nil {
 		return err
@@ -376,15 +386,14 @@ func initPrimaryStorage(repoManager primaryStorageRepositoryManager, logger *zap
 		return fmt.Errorf("failed to create storage root path %s: %w", storageRootPath, err)
 	}
 
-	storageStrategy := os.Getenv("STORAGE_STRATEGY")
+	storageStrategy := strings.TrimSpace(storageConfig.Strategy)
 	if storageStrategy == "" {
 		storageStrategy = "date" // Default to date strategy
 	}
 
-	preserveFilename := os.Getenv("STORAGE_PRESERVE_FILENAME")
-	preserve := preserveFilename != "false" // Default to true
+	preserve := storageConfig.PreserveFilename
 
-	duplicateHandling := os.Getenv("STORAGE_DUPLICATE_HANDLING")
+	duplicateHandling := strings.TrimSpace(storageConfig.DuplicateHandling)
 	if duplicateHandling == "" {
 		duplicateHandling = "rename" // Default to rename
 	}
@@ -449,7 +458,7 @@ func initPrimaryStorage(repoManager primaryStorageRepositoryManager, logger *zap
 func resolvePrimaryStoragePaths(storagePath string) (string, string, error) {
 	trimmed := strings.TrimSpace(storagePath)
 	if trimmed == "" {
-		return "", "", fmt.Errorf("STORAGE_PATH environment variable is required")
+		return "", "", fmt.Errorf("storage.path is required")
 	}
 
 	storageRootPath, err := filepath.Abs(filepath.Clean(trimmed))
