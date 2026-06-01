@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import type { Asset } from "@/lib/http-commons";
 import { isAudio, isPhoto, isRawPhoto, isVideo } from "./mediaTypes";

@@ -1,11 +1,13 @@
-/// <reference types="vitest" />
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite-plus";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import wasm from "vite-plugin-wasm";
-import path from "path";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import topLevelAwait from "vite-plugin-top-level-await";
-import { preview } from "@vitest/browser-preview";
+import { preview } from "vite-plus/test/browser-preview";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const browserTestsEnabled = process.env.VITEST_BROWSER === "true";
 const testProjects = [
@@ -54,7 +56,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss(), wasm(), topLevelAwait()],
 
   build: {
-    target: 'esnext',
+    target: "esnext",
   },
 
   worker: {
@@ -64,6 +66,24 @@ export default defineConfig({
 
   test: {
     projects: testProjects,
+  },
+
+  lint: {
+    ignorePatterns: ["dist/**", "coverage/**"],
+    options: {
+      typeAware: true,
+      typeCheck: true,
+    },
+  },
+
+  fmt: {
+    semi: true,
+    singleQuote: false,
+  },
+
+  staged: {
+    "*.{js,jsx,ts,tsx}": "vp check --fix",
+    "*.{css,scss,json,md,yml,yaml}": "vp fmt . --write",
   },
 
   optimizeDeps: {
