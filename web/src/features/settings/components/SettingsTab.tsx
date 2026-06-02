@@ -3,20 +3,16 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/features/auth";
 import AccountSettings from "./Tabs/AccountSettings";
 import UISettings from "./Tabs/UISettings";
-import UploadSettings from "./Tabs/UploadSettings";
 import ServerSettings from "./Tabs/ServerSettings";
-import PerformanceSettings from "./Tabs/PerformanceSettings";
 import AISettings from "./Tabs/AISettings";
 import UsersSettings from "./Tabs/UsersSettings";
 import CloudSettings from "./Tabs/CloudSettings";
 import { useI18n } from "@/lib/i18n.tsx";
 import {
   CloudIcon,
-  CpuIcon,
   PaintbrushIcon,
   ServerIcon,
   SparklesIcon,
-  UploadIcon,
   UserCircle2Icon,
   Users2Icon,
 } from "lucide-react";
@@ -24,10 +20,8 @@ import {
 type SettingsTabKey =
   | "account"
   | "appearance"
-  | "upload"
   | "ai"
   | "cloud"
-  | "performance"
   | "server"
   | "users";
 
@@ -37,10 +31,8 @@ function isSettingsTabKey(value: string | null): value is SettingsTabKey {
   return (
     value === "account" ||
     value === "appearance" ||
-    value === "upload" ||
     value === "ai" ||
     value === "cloud" ||
-    value === "performance" ||
     value === "server" ||
     value === "users"
   );
@@ -68,23 +60,13 @@ export default function SettingsTab() {
       icon: <PaintbrushIcon className="size-4" />,
     },
     {
-      key: "upload",
-      label: t("settings.upload"),
-      icon: <UploadIcon className="size-4" />,
-    },
-    {
-      key: "performance",
-      label: t("settings.performance"),
-      icon: <CpuIcon className="size-4" />,
-    },
-    {
       key: "server",
       label: t("settings.server"),
       icon: <ServerIcon className="size-4" />,
     },
   ];
   if (isAdmin) {
-    tabs.splice(4, 0, {
+    tabs.splice(2, 0, {
       key: "ai",
       label: t("settings.ai"),
       icon: <SparklesIcon className="size-4" />,
@@ -124,14 +106,10 @@ export default function SettingsTab() {
         return <AccountSettings />;
       case "appearance":
         return <UISettings />;
-      case "upload":
-        return <UploadSettings />;
       case "ai":
         return <AISettings />;
       case "cloud":
         return <CloudSettings />;
-      case "performance":
-        return <PerformanceSettings />;
       case "server":
         return <ServerSettings />;
       case "users":

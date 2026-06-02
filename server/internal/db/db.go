@@ -4,9 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"strings"
+
 	"server/config"
 	"server/internal/db/repo"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -27,7 +31,25 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 		cfg.SSL,
 	)
 
-	pool, err := pgxpool.New(context.Background(), dsn)
+	poolCfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse connection config: %w", err)
+	}
+
+	// Resolve the rotated credential on every new connection rather than baking
+	// the bootstrap password into the pool. First-run setup rotates the database
+	// role password (ALTER USER) and writes the new secret to disk; without this
+	// hook the pool would keep opening connections with the stale bootstrap
+	// password and fail SASL auth (notably River's producer fetching jobs).
+	secretPath := config.ResolveDBPasswordFilePath(cfg)
+	poolCfg.BeforeConnect = func(_ context.Context, connConfig *pgx.ConnConfig) error {
+		if password := readRotatedPassword(secretPath); password != "" {
+			connConfig.Password = password
+		}
+		return nil
+	}
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection pool: %w", err)
 	}
@@ -46,6 +68,17 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 		Pool:    pool,
 		Queries: queries,
 	}, nil
+}
+
+// readRotatedPassword returns the rotated database password persisted on disk,
+// or an empty string when the secret file is missing or empty. A missing file is
+// expected on first boot, where the bootstrap password from the DSN still applies.
+func readRotatedPassword(secretPath string) string {
+	data, err := os.ReadFile(secretPath)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 // Close closes the database connection

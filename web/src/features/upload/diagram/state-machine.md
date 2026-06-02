@@ -15,7 +15,7 @@ This document models the `uploadReducer` transitions in `web/src/features/upload
 - `CLEAR_FILES`: revokes all previews and resets to `initialState`.
 
 ## Guards / Preconditions (from UploadProvider)
-- `ADD_FILES` only dispatches when input files pass validation and there are available slots (`maxTotalFiles`).
+- `ADD_FILES` only dispatches when input files pass validation. There is no client-side file count limit.
 - `CLEAR_FILES` is blocked by the UI while `isProcessing` is true, even though the reducer would accept it.
 
 ## Derived States Used in the Diagram

@@ -46,10 +46,6 @@ function clampInt(
   return Math.floor(clampNumber(n, min, max, fallback));
 }
 
-function asBool(value: unknown, fallback: boolean): boolean {
-  return typeof value === "boolean" ? value : fallback;
-}
-
 function asLanguage(
   value: unknown,
   fallback: SupportedLanguage,
@@ -137,13 +133,6 @@ function defaultedState(base: SettingsState): SettingsState {
         layout: base.ui.asset_page?.layout ?? "full",
         columns: base.ui.asset_page?.columns ?? 6,
       },
-      upload: {
-        max_total_files: base.ui.upload?.max_total_files ?? 100,
-        low_power_mode: base.ui.upload?.low_power_mode ?? true,
-        chunk_size_mb: base.ui.upload?.chunk_size_mb ?? 24,
-        max_concurrent_chunks: base.ui.upload?.max_concurrent_chunks ?? 2,
-        use_server_config: base.ui.upload?.use_server_config ?? true,
-      },
     },
     server: {
       update_timespan: base.server.update_timespan,
@@ -161,7 +150,6 @@ function sanitizeSettings(
   }
 
   const ui = isRecord(candidate.ui) ? candidate.ui : {};
-  const upload = isRecord(ui.upload) ? ui.upload : {};
   const server = isRecord(candidate.server) ? candidate.server : {};
 
   return {
@@ -180,34 +168,6 @@ function sanitizeSettings(
           4,
           10,
           defaults.ui.asset_page!.columns,
-        ),
-      },
-      upload: {
-        max_total_files: clampInt(
-          asNumber(upload.max_total_files),
-          1,
-          500,
-          defaults.ui.upload!.max_total_files,
-        ),
-        low_power_mode: asBool(
-          upload.low_power_mode,
-          defaults.ui.upload!.low_power_mode!,
-        ),
-        chunk_size_mb: clampInt(
-          asNumber(upload.chunk_size_mb),
-          1,
-          128,
-          defaults.ui.upload!.chunk_size_mb!,
-        ),
-        max_concurrent_chunks: clampInt(
-          asNumber(upload.max_concurrent_chunks),
-          1,
-          6,
-          defaults.ui.upload!.max_concurrent_chunks!,
-        ),
-        use_server_config: asBool(
-          upload.use_server_config,
-          defaults.ui.upload!.use_server_config!,
         ),
       },
     },

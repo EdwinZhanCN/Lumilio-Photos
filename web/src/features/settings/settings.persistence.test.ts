@@ -30,13 +30,6 @@ const baseState: SettingsState = {
       },
     },
     asset_page: { layout: "full", columns: 6 },
-    upload: {
-      max_total_files: 100,
-      low_power_mode: true,
-      chunk_size_mb: 24,
-      max_concurrent_chunks: 2,
-      use_server_config: true,
-    },
   },
   server: {
     update_timespan: 5,
@@ -81,8 +74,6 @@ describe("settings.persistence", () => {
     expect(state.ui.theme.mode).toBe("light");
     expect(state.ui.theme.themes.light).toBe("light");
     expect(state.ui.theme.themes.dark).toBe("night");
-    expect(state.ui.upload?.max_total_files).toBe(100);
-    expect(state.ui.upload?.use_server_config).toBe(true);
     expect(state.ui.asset_page?.columns).toBe(6);
     expect(state.server.update_timespan).toBe(5);
   });
@@ -106,13 +97,6 @@ describe("settings.persistence", () => {
             layout: "wide",
             columns: 99,
           },
-          upload: {
-            max_total_files: 999,
-            low_power_mode: false,
-            chunk_size_mb: -1,
-            max_concurrent_chunks: 99,
-            use_server_config: false,
-          },
         },
         server: { update_timespan: 100 },
       }),
@@ -130,10 +114,6 @@ describe("settings.persistence", () => {
     expect(state.ui.theme.themes.dark).toBe("night");
     expect(state.ui.asset_page?.layout).toBe("full");
     expect(state.ui.asset_page?.columns).toBe(10);
-    expect(state.ui.upload?.max_total_files).toBe(500);
-    expect(state.ui.upload?.chunk_size_mb).toBe(1);
-    expect(state.ui.upload?.max_concurrent_chunks).toBe(6);
-    expect(state.ui.upload?.use_server_config).toBe(false);
     expect(state.server.update_timespan).toBe(50);
     expect(localStorage.getItem(LEGACY_SETTINGS_STORAGE_KEY)).toBeNull();
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBeNull();

@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
-import { useSettingsContext, useWorkingRepository } from "@/features/settings";
+import { useWorkingRepository } from "@/features/settings";
 import { useI18n } from "@/lib/i18n";
 import {
   HashcodeProgress,
@@ -17,11 +17,16 @@ import {
   useChunkedUploadMutation,
 } from "@/features/upload/hooks/useUploadMutations";
 import { useUploadConfig } from "@/features/upload/hooks/useUploadQueries";
-import { globalPerformancePreferences } from "@/lib/utils/performancePreferences.ts";
 import {
   getOptimalBatchSize,
   ProcessingPriority,
 } from "@/lib/utils/smartBatchSizing.ts";
+
+// Transport fallbacks used only while the server upload config is unavailable.
+// The server endpoint is the source of truth for these values.
+const FALLBACK_CHUNK_SIZE = 5 * 1024 * 1024;
+const FALLBACK_MAX_CONCURRENT = 3;
+const FALLBACK_MAX_IN_FLIGHT = 3;
 
 interface FailedFile {
   name: string;
@@ -69,7 +74,6 @@ export function useUploadProcess(): useUploadProcessReturn {
   const queryClient = useQueryClient();
   const showMessage = useMessage();
   const { t } = useI18n();
-  const { state: settings } = useSettingsContext();
   const { scopedRepositoryId } = useWorkingRepository();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
@@ -78,7 +82,6 @@ export function useUploadProcess(): useUploadProcessReturn {
   const chunkedUploadMutation = useChunkedUploadMutation();
   const uploadConfigQuery = useUploadConfig();
   const serverUploadConfig = uploadConfigQuery.data?.data;
-  const useServerUploadConfig = settings.ui.upload?.use_server_config ?? true;
 
   const {
     generateHashCodes,
@@ -135,47 +138,21 @@ export function useUploadProcess(): useUploadProcessReturn {
     const startTime = performance.now();
     let totalBytesHashed = 0;
 
-    // Resolve effective upload controls with clear precedence:
-    // server config (if enabled) -> user UI settings -> adaptive defaults.
-    const adaptiveConcurrency = Math.max(
-      1,
-      globalPerformancePreferences.getMaxConcurrentOperations() * 2,
+    // Upload transport parameters are server-authoritative: the backend sizes
+    // chunks and concurrency against its own memory. Fall back to fixed
+    // defaults only while the server config request is in flight or failed.
+    const maxConcurrentUploads = toPositiveInt(
+      serverUploadConfig?.max_in_flight_requests,
+      FALLBACK_MAX_IN_FLIGHT,
     );
-    const maxConcurrentUploads = useServerUploadConfig
-      ? toPositiveInt(
-          serverUploadConfig?.max_in_flight_requests,
-          adaptiveConcurrency,
-        )
-      : adaptiveConcurrency;
-    const uiChunkConcurrency = toPositiveInt(
-      settings.ui.upload?.max_concurrent_chunks,
-      adaptiveConcurrency,
+    const effectiveChunkConcurrency = toPositiveInt(
+      serverUploadConfig?.max_concurrent,
+      FALLBACK_MAX_CONCURRENT,
     );
-    let effectiveChunkConcurrency = useServerUploadConfig
-      ? toPositiveInt(serverUploadConfig?.max_concurrent, uiChunkConcurrency)
-      : uiChunkConcurrency;
-    if (settings.ui.upload?.low_power_mode) {
-      effectiveChunkConcurrency = Math.min(effectiveChunkConcurrency, 2);
-    }
-
-    const adaptiveChunkSize = Math.max(
-      1,
-      Math.floor(
-        globalPerformancePreferences.getMemoryConstraintMultiplier() *
-          5 *
-          1024 *
-          1024,
-      ),
+    const effectiveChunkSize = toPositiveInt(
+      serverUploadConfig?.chunk_size,
+      FALLBACK_CHUNK_SIZE,
     );
-    const uiChunkSize = settings.ui.upload?.chunk_size_mb
-      ? Math.floor(settings.ui.upload.chunk_size_mb * 1024 * 1024)
-      : undefined;
-    const effectiveChunkSize = useServerUploadConfig
-      ? toPositiveInt(
-          serverUploadConfig?.chunk_size,
-          uiChunkSize ?? adaptiveChunkSize,
-        )
-      : toPositiveInt(uiChunkSize, adaptiveChunkSize);
 
     const semaphore = {
       count: maxConcurrentUploads,
