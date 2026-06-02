@@ -7,6 +7,15 @@ import PhotoPicker from "./PhotoPicker";
 const mocks = vi.hoisted(() => ({
   useCurrentAssetsView: vi.fn(),
   useSelection: vi.fn(),
+  AssetsProvider: vi.fn((props: { children: ReactNode }) => props.children),
+  AssetsPageHeader: vi.fn(
+    (_props: { lockedFilterFields?: readonly string[] }) => "assets-page-header",
+  ),
+  resetFilters: vi.fn(),
+  batchUpdateFilters: vi.fn(),
+  setSearchQuery: vi.fn(),
+  setSelectionEnabled: vi.fn(),
+  clearSelection: vi.fn(),
 }));
 
 vi.mock("@/contexts/WorkerProvider", () => ({
@@ -14,22 +23,22 @@ vi.mock("@/contexts/WorkerProvider", () => ({
 }));
 
 vi.mock("@/features/assets/AssetsProvider", () => ({
-  AssetsProvider: ({ children }: { children: ReactNode }) => children,
+  AssetsProvider: mocks.AssetsProvider,
 }));
 
 vi.mock("@/features/assets/selectors", () => ({
   useSortBy: () => "date_captured",
   useUIActions: () => ({
     setSortBy: vi.fn(),
-    setSearchQuery: vi.fn(),
+    setSearchQuery: mocks.setSearchQuery,
   }),
   useFilterActions: () => ({
-    resetFilters: vi.fn(),
-    batchUpdateFilters: vi.fn(),
+    resetFilters: mocks.resetFilters,
+    batchUpdateFilters: mocks.batchUpdateFilters,
   }),
   useSelectionActions: () => ({
-    clear: vi.fn(),
-    setEnabled: vi.fn(),
+    clear: mocks.clearSelection,
+    setEnabled: mocks.setSelectionEnabled,
   }),
 }));
 
@@ -46,13 +55,12 @@ vi.mock("@/features/assets/components/page/SquareGallery/SquareGallery", () => (
 }));
 
 vi.mock("@/features/assets/components/shared/AssetsPageHeader", () => ({
-  default: () => <div>assets-page-header</div>,
+  default: mocks.AssetsPageHeader,
 }));
 
 vi.mock("@/lib/i18n", () => ({
   useI18n: () => ({
-    t: (_key: string, options?: { defaultValue?: string }) =>
-      options?.defaultValue ?? _key,
+    t: (_key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? _key,
   }),
 }));
 
@@ -61,10 +69,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const createAsset = (
-  assetId: string,
-  overrides: Partial<Asset> = {},
-): Asset =>
+const createAsset = (assetId: string, overrides: Partial<Asset> = {}): Asset =>
   ({
     asset_id: assetId,
     original_filename: `${assetId}.jpg`,
@@ -72,6 +77,92 @@ const createAsset = (
   }) as Asset;
 
 describe("PhotoPicker", () => {
+  it("locks the media type filter by default", async () => {
+    mocks.useCurrentAssetsView.mockReturnValue({
+      assets: [],
+      browseGroups: [],
+      browseItems: [],
+      browseAssets: [],
+      isLoading: false,
+      isLoadingMore: false,
+      fetchMore: vi.fn(),
+      hasMore: false,
+      viewKey: "picker-view",
+    });
+    mocks.useSelection.mockReturnValue({
+      enabled: true,
+      selectedIds: new Set(),
+      selectedCount: 0,
+    });
+
+    render(<PhotoPicker scopeId="test-scope" onSelect={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(mocks.batchUpdateFilters).toHaveBeenCalledWith({
+        enabled: true,
+        type: "PHOTO",
+        raw: undefined,
+      });
+    });
+    expect(mocks.AssetsPageHeader.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        lockedFilterFields: ["type"],
+      }),
+    );
+  });
+
+  it("passes additional locked filters and initial raw constraint", async () => {
+    mocks.useCurrentAssetsView.mockReturnValue({
+      assets: [],
+      browseGroups: [],
+      browseItems: [],
+      browseAssets: [],
+      isLoading: false,
+      isLoadingMore: false,
+      fetchMore: vi.fn(),
+      hasMore: false,
+      viewKey: "picker-view",
+    });
+    mocks.useSelection.mockReturnValue({
+      enabled: true,
+      selectedIds: new Set(),
+      selectedCount: 0,
+    });
+
+    render(
+      <PhotoPicker
+        scopeId="test-scope"
+        onSelect={vi.fn()}
+        initialFilters={{ raw: false }}
+        lockedFields={["type", "raw"]}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(mocks.batchUpdateFilters).toHaveBeenCalledWith({
+        enabled: true,
+        type: "PHOTO",
+        raw: false,
+      });
+    });
+    expect(mocks.AssetsProvider.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        initialState: {
+          filters: {
+            enabled: true,
+            type: "PHOTO",
+            raw: false,
+          },
+        },
+      }),
+    );
+    expect(mocks.AssetsPageHeader.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        lockedFilterFields: ["type", "raw"],
+      }),
+    );
+  });
+
   it("resolves stack selections to the representative asset id", async () => {
     const onSelect = vi.fn();
 

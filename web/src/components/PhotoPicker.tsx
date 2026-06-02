@@ -12,42 +12,48 @@ import { useCurrentAssetsView } from "@/features/assets/hooks/useAssetsView";
 import { useSelection } from "@/features/assets/hooks/useSelection";
 import SquareGallery from "@/features/assets/components/page/SquareGallery/SquareGallery";
 import AssetsPageHeader from "@/features/assets/components/shared/AssetsPageHeader";
+import type {
+  FilterDTO,
+  FilterFieldKey,
+} from "@/features/assets/components/page/FilterTool/FilterTool";
 import { resolveBrowseSelectedAssetIds } from "@/features/assets/utils/browseItems";
 import { useI18n } from "@/lib/i18n";
+
+const DEFAULT_LOCKED_FIELDS: readonly FilterFieldKey[] = ["type"];
 
 type PhotoPickerContentProps = {
   onSelect: (id: string) => void;
   title?: string;
+  initialFilters: FilterDTO;
+  lockedFields: readonly FilterFieldKey[];
 };
 
-type PhotoPickerProps = PhotoPickerContentProps & {
+type PhotoPickerProps = {
   scopeId: string;
+  onSelect: (id: string) => void;
+  title?: string;
+  initialFilters?: FilterDTO;
+  lockedFields?: readonly FilterFieldKey[];
 };
 
 function PhotoPickerContent({
   onSelect,
   title,
+  initialFilters,
+  lockedFields,
 }: PhotoPickerContentProps): React.JSX.Element {
   const { t } = useI18n();
   const sortBy = useSortBy();
   const { setSortBy, setSearchQuery } = useUIActions();
   const { resetFilters, batchUpdateFilters } = useFilterActions();
-  const { clear: clearSelection, setEnabled: setSelectionEnabled } =
-    useSelectionActions();
+  const { clear: clearSelection, setEnabled: setSelectionEnabled } = useSelectionActions();
   const selection = useSelection();
 
-  const {
-    browseGroups,
-    browseItems,
-    isLoading,
-    isLoadingMore,
-    fetchMore,
-    hasMore,
-    viewKey,
-  } = useCurrentAssetsView({
-    withGroups: true,
-    sortBy,
-  });
+  const { browseGroups, browseItems, isLoading, isLoadingMore, fetchMore, hasMore, viewKey } =
+    useCurrentAssetsView({
+      withGroups: true,
+      sortBy,
+    });
 
   const layoutKey = useMemo(() => {
     const itemIds = (browseItems ?? []).map((item) => item.id);
@@ -60,12 +66,14 @@ function PhotoPickerContent({
     batchUpdateFilters({
       enabled: true,
       type: "PHOTO",
+      raw: initialFilters.raw,
     });
     setSearchQuery("");
     setSelectionEnabled(true);
   }, [
     batchUpdateFilters,
     clearSelection,
+    initialFilters.raw,
     resetFilters,
     setSearchQuery,
     setSelectionEnabled,
@@ -78,13 +86,7 @@ function PhotoPickerContent({
         onSelect(id);
       }
     }
-  }, [
-    browseItems,
-    selection.selectedIds,
-    selection.selectedCount,
-    selection.enabled,
-    onSelect,
-  ]);
+  }, [browseItems, selection.selectedIds, selection.selectedCount, selection.enabled, onSelect]);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-base-100">
@@ -99,6 +101,7 @@ function PhotoPickerContent({
           })
         }
         icon={<ImageIcon className="h-6 w-6 text-primary" />}
+        lockedFilterFields={lockedFields}
       />
       <div className="custom-scrollbar flex-1 overflow-x-hidden overflow-y-auto">
         <SquareGallery
@@ -121,7 +124,21 @@ export default function PhotoPicker({
   scopeId,
   onSelect,
   title,
+  initialFilters,
+  lockedFields = DEFAULT_LOCKED_FIELDS,
 }: PhotoPickerProps): React.JSX.Element {
+  const pickerInitialFilters = useMemo<FilterDTO>(
+    () => ({
+      ...initialFilters,
+      type: "PHOTO",
+    }),
+    [initialFilters],
+  );
+  const pickerLockedFields = useMemo<readonly FilterFieldKey[]>(
+    () => Array.from(new Set<FilterFieldKey>(["type", ...lockedFields])),
+    [lockedFields],
+  );
+
   return (
     <WorkerProvider preload={["justified"]}>
       <AssetsProvider
@@ -132,10 +149,16 @@ export default function PhotoPicker({
           filters: {
             enabled: true,
             type: "PHOTO",
+            raw: pickerInitialFilters.raw,
           },
         }}
       >
-        <PhotoPickerContent onSelect={onSelect} title={title} />
+        <PhotoPickerContent
+          onSelect={onSelect}
+          title={title}
+          initialFilters={pickerInitialFilters}
+          lockedFields={pickerLockedFields}
+        />
       </AssetsProvider>
     </WorkerProvider>
   );
