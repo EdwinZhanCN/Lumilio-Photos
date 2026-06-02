@@ -2049,22 +2049,13 @@ components:
           type: integer
       type: object
     dto.SetupRequestDTO:
-      properties:
-        admin_username:
-          type: string
-        site_name:
-          type: string
       type: object
     dto.SetupResultDTO:
       properties:
-        admin_username:
-          type: string
         database_user:
           type: string
         password_length:
           type: integer
-        site_name:
-          type: string
       type: object
     dto.SetupStatusDTO:
       properties:
@@ -8896,8 +8887,7 @@ paths:
   /api/v1/setup:
     post:
       description: 'Run first-run bootstrapping: generate and rotate the database
-        credential, persist the secret, and write system metadata. Refused once the
-        system is already initialized.'
+        credential, then persist the secret. Refused once the system is already initialized.'
       requestBody:
         content:
           application/json:
@@ -8905,10 +8895,9 @@ paths:
               oneOf:
               - type: object
               - $ref: '#/components/schemas/dto.SetupRequestDTO'
-                description: Setup payload
+                description: Optional empty setup payload
                 summary: request
-        description: Setup payload
-        required: true
+        description: Optional empty setup payload
       responses:
         "200":
           content:
@@ -8959,8 +8948,8 @@ paths:
       - setup
   /api/v1/setup/status:
     get:
-      description: Report whether Lumilio has completed first-run initialization.
-        The web frontend routes all traffic to the setup wizard while uninitialized.
+      description: Report whether Lumilio has rotated the temporary database credential.
+        The web frontend runs setup as a preflight while uninitialized.
       responses:
         "200":
           content:

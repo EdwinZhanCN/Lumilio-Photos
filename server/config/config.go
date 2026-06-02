@@ -14,12 +14,13 @@ import (
 
 // DatabaseConfig holds all the configuration for the database connection.
 type DatabaseConfig struct {
-	Host     string `toml:"host"`
-	Port     string `toml:"port"`
-	User     string `toml:"user"`
-	Password string `toml:"password"`
-	DBName   string `toml:"name"`
-	SSL      string `toml:"ssl"`
+	Host         string `toml:"host"`
+	Port         string `toml:"port"`
+	User         string `toml:"user"`
+	Password     string `toml:"password"`
+	PasswordFile string `toml:"password_file"`
+	DBName       string `toml:"name"`
+	SSL          string `toml:"ssl"`
 }
 
 // AppConfig holds general application configuration
@@ -226,10 +227,8 @@ func LoadAppConfigWithError() (AppConfig, error) {
 	return cfg, nil
 }
 
-// DBPasswordFilePath returns the path to the rotated database password secret.
-// First-run setup writes the high-entropy database password here; on subsequent
-// boots this file is the authoritative credential, superseding the temporary
-// bootstrap password supplied via env.
+// DBPasswordFilePath returns the default path to the rotated database password
+// secret. Prefer ResolveDBPasswordFilePath when a DatabaseConfig is available.
 func DBPasswordFilePath() string {
 	if v := strings.TrimSpace(os.Getenv("LUMILIO_DB_PASSWORD_FILE")); v != "" {
 		return v
@@ -237,20 +236,25 @@ func DBPasswordFilePath() string {
 	return filepath.Join("data", "config", "secrets", "db_password")
 }
 
-// SystemConfigFilePath returns the path to the persisted, non-sensitive system
-// configuration payload (TOML). Its presence marks the system as initialized.
-func SystemConfigFilePath() string {
-	if v := strings.TrimSpace(os.Getenv("LUMILIO_SYSTEM_CONFIG_FILE")); v != "" {
+// ResolveDBPasswordFilePath returns the configured rotated database password
+// path. First-run setup writes the high-entropy password here; on subsequent
+// boots this file is the authoritative credential, superseding the temporary
+// bootstrap password supplied through env or TOML.
+func ResolveDBPasswordFilePath(dbConfig DatabaseConfig) string {
+	if v := strings.TrimSpace(os.Getenv("LUMILIO_DB_PASSWORD_FILE")); v != "" {
 		return v
 	}
-	return filepath.Join("data", "config", "system.toml")
+	if v := strings.TrimSpace(dbConfig.PasswordFile); v != "" {
+		return v
+	}
+	return DBPasswordFilePath()
 }
 
 // applyDBPasswordFile prefers the rotated database password persisted on disk
 // over the temporary bootstrap password. Missing or empty files are ignored so
 // first boot can connect with the env-provided temporary credential.
 func applyDBPasswordFile(cfg *AppConfig) {
-	data, err := os.ReadFile(DBPasswordFilePath())
+	data, err := os.ReadFile(ResolveDBPasswordFilePath(cfg.DatabaseConfig))
 	if err != nil {
 		return
 	}
@@ -300,12 +304,13 @@ func defaultAppConfig() AppConfig {
 	return AppConfig{
 		Environment: environment,
 		DatabaseConfig: DatabaseConfig{
-			Host:     dbHost,
-			Port:     "5432",
-			User:     "postgres",
-			Password: "postgres",
-			DBName:   "lumiliophotos",
-			SSL:      "disable",
+			Host:         dbHost,
+			Port:         "5432",
+			User:         "postgres",
+			Password:     "postgres",
+			PasswordFile: DBPasswordFilePath(),
+			DBName:       "lumiliophotos",
+			SSL:          "disable",
 		},
 		ServerConfig: ServerConfig{
 			Port:     "8080",
@@ -464,6 +469,12 @@ func applyEnvOverrides(cfg *AppConfig) {
 	}
 	if value := envString("DB_PASSWORD"); value != "" {
 		cfg.DatabaseConfig.Password = value
+	}
+	if value := envString("DB_PASSWORD_FILE"); value != "" {
+		cfg.DatabaseConfig.PasswordFile = value
+	}
+	if value := envString("LUMILIO_DB_PASSWORD_FILE"); value != "" {
+		cfg.DatabaseConfig.PasswordFile = value
 	}
 	if value := envString("DB_NAME"); value != "" {
 		cfg.DatabaseConfig.DBName = value
