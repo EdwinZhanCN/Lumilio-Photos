@@ -6096,7 +6096,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/cloud/{provider}": {
+    "/api/v1/cloud/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List cloud credentials
+         * @description List configured cloud credentials without exposing secrets.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Credential list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cloud/credentials/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -6107,22 +6182,22 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Disconnect cloud provider
-         * @description Remove a cloud provider's configuration and stop any active sync.
+         * Disable cloud credential
+         * @description Disable a saved cloud credential so it cannot start new imports.
          */
         delete: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
-                    /** @description Provider name */
-                    provider: "icloud" | "s3";
+                    /** @description Credential UUID */
+                    id: string;
                 };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Disconnected successfully */
+                /** @description Credential disabled */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6131,7 +6206,7 @@ export interface paths {
                         "application/json": components["schemas"]["api.Result"];
                     };
                 };
-                /** @description Invalid provider */
+                /** @description Invalid request */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -6165,7 +6240,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/cloud/icloud/connect": {
+    "/api/v1/cloud/icloud/credentials": {
         parameters: {
             query?: never;
             header?: never;
@@ -6175,8 +6250,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Connect to iCloud
-         * @description Start iCloud authentication. If 2FA is required, returns needs_2fa=true.
+         * Create iCloud credential
+         * @description Authenticate with iCloud and save a repo-reusable credential session. If 2FA is required, returns needs_2fa=true.
          */
         post: {
             parameters: {
@@ -6185,14 +6260,14 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description iCloud credentials */
+            /** @description iCloud credential */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.ConnectICloudRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.CreateICloudCredentialRequest"];
                 };
             };
             responses: {
-                /** @description Connection result */
+                /** @description Credential creation result */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6254,7 +6329,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/cloud/icloud/verify-2fa": {
+    "/api/v1/cloud/icloud/credentials/{id}/verify-2fa": {
         parameters: {
             query?: never;
             header?: never;
@@ -6264,14 +6339,17 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Verify iCloud 2FA
-         * @description Submit a two-factor authentication code to complete iCloud login.
+         * Verify iCloud credential 2FA
+         * @description Submit a two-factor authentication code to complete iCloud credential creation.
          */
         post: {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    /** @description Credential UUID */
+                    id: string;
+                };
                 cookie?: never;
             };
             /** @description 2FA code */
@@ -6325,7 +6403,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/cloud/providers": {
+    "/api/v1/cloud/import-runs/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -6333,19 +6411,22 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List cloud providers
-         * @description Get the status of all configured cloud storage providers.
+         * Get cloud import run
+         * @description Return a cloud import run by ID.
          */
         get: {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    /** @description Import run UUID */
+                    id: string;
+                };
                 cookie?: never;
             };
             requestBody?: never;
             responses: {
-                /** @description Provider list */
+                /** @description Import run */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -6370,6 +6451,15 @@ export interface paths {
                              */
                             message?: string;
                         } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Unauthorized */
@@ -6410,8 +6500,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Trigger cloud sync
-         * @description Start a sync operation for the specified cloud provider.
+         * Deprecated cloud sync endpoint
+         * @description Deprecated. Use repo-scoped cloud import endpoints instead.
          */
         post: {
             parameters: {
@@ -6420,42 +6510,10 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description Sync configuration */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.TriggerSyncRequest"];
-                };
-            };
+            requestBody?: never;
             responses: {
-                /** @description Sync started */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Invalid request */
+                /** @description Deprecated endpoint */
                 400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -8034,6 +8092,180 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/cloud": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get repository cloud status
+         * @description Return cloud credential binding and latest import run for a repository.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Repository cloud status */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/repositories/{id}/cloud/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start repository cloud import
+         * @description Start an import run for the repository's configured cloud credential.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repository UUID */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Import started */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/repositories/{id}/scan": {
@@ -9728,16 +9960,6 @@ export interface components {
              */
             message?: string;
         } & components["schemas"]["data"];
-        /**
-         * @example icloud
-         * @enum {string}
-         */
-        "cloud.ProviderKind": "icloud" | "s3";
-        /**
-         * @example import
-         * @enum {string}
-         */
-        "cloud.SyncMode": "import" | "one_way" | "import" | "one_way";
         data: {
             data?: components["schemas"]["dto.ResetAccessResponseDTO"];
         };
@@ -10099,31 +10321,48 @@ export interface components {
             current_password: string;
             new_password: string;
         };
-        "dto.CloudProviderStatusDTO": {
-            /** @example true */
-            connected?: boolean;
-            last_cursor?: string;
+        "dto.CloudCredentialDTO": {
+            created_at?: string;
+            /** @example Personal iCloud */
+            display_name?: string;
+            /** @example com */
+            domain?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /** @example u***r@icloud.com */
+            masked_account?: string;
             /** @example icloud */
             provider?: string;
-            /** @example import */
-            sync_mode?: string;
-            /** @example 42 */
-            synced_file_count?: number;
+            /** @example connected */
+            status?: string;
+            updated_at?: string;
         };
-        "dto.ConnectICloudRequest": {
-            /**
-             * @example com
-             * @enum {string}
-             */
-            domain?: "com" | "cn";
-            /** @example app-specific-password */
-            password: string;
-            sync_mode?: components["schemas"]["cloud.SyncMode"];
-            /** @example user@icloud.com */
-            username: string;
-        };
-        "dto.ConnectICloudResponse": {
-            needs_2fa?: boolean;
+        "dto.CloudImportRunDTO": {
+            created_at?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            credential_id?: string;
+            /** @example 80 */
+            downloaded_count?: number;
+            error?: string;
+            /** @example 5 */
+            failed_count?: number;
+            finished_at?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            id?: string;
+            /** @example 75 */
+            imported_count?: number;
+            /** @example icloud */
+            provider?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            repository_id?: string;
+            /** @example 40 */
+            skipped_count?: number;
+            started_at?: string;
+            /** @example running */
+            status?: string;
+            /** @example 120 */
+            total_seen?: number;
+            updated_at?: string;
         };
         "dto.CreateAlbumRequestDTO": {
             album_name: string;
@@ -10131,6 +10370,23 @@ export interface components {
             album_type?: "default" | "bio";
             cover_asset_id?: string;
             description?: string;
+        };
+        "dto.CreateICloudCredentialRequest": {
+            /** @example Personal iCloud */
+            display_name?: string;
+            /**
+             * @example com
+             * @enum {string}
+             */
+            domain?: "com" | "cn";
+            /** @example app-specific-password */
+            password: string;
+            /** @example user@icloud.com */
+            username: string;
+        };
+        "dto.CreateICloudCredentialResponse": {
+            credential?: components["schemas"]["dto.CloudCredentialDTO"];
+            needs_2fa?: boolean;
         };
         "dto.CreateManualStackRequestDTO": {
             /**
@@ -10142,10 +10398,14 @@ export interface components {
             asset_ids?: string[];
         };
         "dto.CreateRepositoryRequestDTO": {
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            cloud_credential_id?: string;
             /** @example Family Photos */
             name: string;
         };
         "dto.CreateRepositoryResponseDTO": {
+            cloud_import_error?: string;
+            cloud_import_run_id?: string;
             repository?: components["schemas"]["dto.RepositoryDTO"];
         };
         "dto.DateRangeDTO": {
@@ -10343,6 +10603,9 @@ export interface components {
             offset?: number;
             total?: number;
         };
+        "dto.ListCloudCredentialsResponse": {
+            credentials?: components["schemas"]["dto.CloudCredentialDTO"][];
+        };
         "dto.ListDuplicateGroupsResponseDTO": {
             groups?: components["schemas"]["dto.DuplicateGroupDTO"][];
             /** @example 20 */
@@ -10357,9 +10620,6 @@ export interface components {
             offset?: number;
             people?: components["schemas"]["dto.PersonSummaryDTO"][];
             total?: number;
-        };
-        "dto.ListProvidersResponse": {
-            providers?: components["schemas"]["dto.CloudProviderStatusDTO"][];
         };
         "dto.ListRepositoriesResponseDTO": {
             repositories?: components["schemas"]["dto.RepositoryDTO"][];
@@ -10726,6 +10986,15 @@ export interface components {
             otpauth_uri?: string;
             secret?: string;
         };
+        "dto.RepositoryCloudStatusDTO": {
+            credential?: components["schemas"]["dto.CloudCredentialDTO"];
+            /** @example true */
+            enabled?: boolean;
+            last_import_run_id?: string;
+            latest_run?: components["schemas"]["dto.CloudImportRunDTO"];
+            /** @example icloud */
+            provider?: string;
+        };
         "dto.RepositoryDTO": {
             default_owner_id?: number;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
@@ -10999,6 +11268,9 @@ export interface components {
              */
             stack_size?: number;
         };
+        "dto.StartCloudImportResponse": {
+            run?: components["schemas"]["dto.CloudImportRunDTO"];
+        };
         "dto.StudioEditAdjustmentsDTO": {
             /** @example 0 */
             blacks?: number;
@@ -11056,11 +11328,6 @@ export interface components {
             otpauth_uri?: string;
             secret?: string;
             setup_token?: string;
-        };
-        "dto.TriggerSyncRequest": {
-            provider: components["schemas"]["cloud.ProviderKind"];
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            repository_id: string;
         };
         "dto.UpdateAlbumRequestDTO": {
             album_name?: string;
