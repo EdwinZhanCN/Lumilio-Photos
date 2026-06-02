@@ -8,6 +8,7 @@ import type {
 } from "../auth.type.ts";
 
 const mfaStatusQueryKey = ["get", "/api/v1/auth/mfa"];
+const passkeysQueryKey = ["get", "/api/v1/auth/mfa/passkeys"];
 
 export function useMFAStatus(): UseQueryResult<ApiResult<MFAStatus>, unknown> {
   return $api.useQuery(
@@ -39,7 +40,11 @@ export function useDisableTOTP() {
 
   return $api.useMutation("post", "/api/v1/auth/mfa/totp/disable", {
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: mfaStatusQueryKey });
+      // Disabling TOTP cascades to passkeys on the server, so refresh both.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: mfaStatusQueryKey }),
+        queryClient.invalidateQueries({ queryKey: passkeysQueryKey }),
+      ]);
     },
   });
 }
@@ -54,9 +59,4 @@ export function useRegenerateRecoveryCodes() {
   });
 }
 
-export type {
-  ApiResult,
-  MFAStatus,
-  RecoveryCodesResponse,
-  TOTPSetupResponse,
-};
+export type { ApiResult, MFAStatus, RecoveryCodesResponse, TOTPSetupResponse };

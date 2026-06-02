@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -14,156 +13,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
-
-// BeginRegistrationPasskey creates WebAuthn creation options for a staged registration session.
-// @Summary Begin passkey registration
-// @Description Create WebAuthn registration options for a staged registration session.
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.RegistrationSessionRequestDTO true "Registration session"
-// @Success 200 {object} api.Result{data=dto.PasskeyOptionsResponseDTO} "Passkey registration options created successfully"
-// @Failure 400 {object} api.Result "Invalid or expired registration session"
-// @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/auth/passkeys/register/options [post]
-func (h *AuthHandler) BeginRegistrationPasskey(c *gin.Context) {
-	var req dto.RegistrationSessionRequestDTO
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
-		return
-	}
-
-	response, err := h.authService.BeginPasskeyRegistration(c.Request.Context(), req.RegistrationSessionID, requestOrigin(c))
-	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrRegistrationSessionNotFound),
-			errors.Is(err, service.ErrRegistrationSessionExpired):
-			api.GinBadRequest(c, err, "Registration session is invalid or expired")
-		default:
-			api.GinInternalError(c, err, "Failed to start passkey registration")
-		}
-		return
-	}
-
-	api.GinSuccess(c, dto.ToPasskeyOptionsResponseDTO(response))
-}
-
-// VerifyRegistrationPasskey finishes staged passkey registration and creates the user account.
-// @Summary Verify passkey registration
-// @Description Verify a staged registration passkey response, create the user, and issue session tokens.
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.RegistrationPasskeyVerifyRequestDTO true "Passkey registration verification payload"
-// @Success 200 {object} api.Result{data=dto.AuthResponseDTO} "Passkey registration verified successfully"
-// @Failure 400 {object} api.Result "Invalid request data"
-// @Failure 401 {object} api.Result "Invalid or expired passkey registration challenge"
-// @Failure 409 {object} api.Result "User already exists"
-// @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/auth/passkeys/register/verify [post]
-func (h *AuthHandler) VerifyRegistrationPasskey(c *gin.Context) {
-	var req dto.RegistrationPasskeyVerifyRequestDTO
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
-		return
-	}
-
-	credentialJSON, err := json.Marshal(req.Credential)
-	if err != nil {
-		api.GinBadRequest(c, err, "Invalid passkey credential payload")
-		return
-	}
-
-	response, err := h.authService.VerifyPasskeyRegistration(c.Request.Context(), req.RegistrationSessionID, req.ChallengeToken, credentialJSON)
-	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrUserAlreadyExists):
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "User already exists")
-		case errors.Is(err, service.ErrRegistrationSessionNotFound),
-			errors.Is(err, service.ErrRegistrationSessionExpired),
-			errors.Is(err, service.ErrInvalidPasskeyChallenge),
-			errors.Is(err, service.ErrExpiredPasskeyChallenge):
-			api.GinUnauthorized(c, err, "Invalid or expired passkey registration challenge")
-		default:
-			api.GinInternalError(c, err, "Failed to verify passkey registration")
-		}
-		return
-	}
-
-	api.GinSuccess(c, dto.ToAuthResponseDTO(response))
-}
-
-// BeginRegistrationTOTPSetup creates TOTP setup data for a staged registration session.
-// @Summary Begin staged TOTP setup
-// @Description Generate TOTP setup data for a staged registration session.
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.RegistrationSessionRequestDTO true "Registration session"
-// @Success 200 {object} api.Result{data=dto.RegistrationTOTPSetupResponseDTO} "TOTP setup created successfully"
-// @Failure 400 {object} api.Result "Invalid or expired registration session"
-// @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/auth/register/totp/setup [post]
-func (h *AuthHandler) BeginRegistrationTOTPSetup(c *gin.Context) {
-	var req dto.RegistrationSessionRequestDTO
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
-		return
-	}
-
-	response, err := h.authService.BeginRegistrationTOTPSetup(c.Request.Context(), req.RegistrationSessionID)
-	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrRegistrationSessionNotFound),
-			errors.Is(err, service.ErrRegistrationSessionExpired):
-			api.GinBadRequest(c, err, "Registration session is invalid or expired")
-		default:
-			api.GinInternalError(c, err, "Failed to start TOTP setup")
-		}
-		return
-	}
-
-	api.GinSuccess(c, dto.ToRegistrationTOTPSetupResponseDTO(response))
-}
-
-// CompleteRegistrationTOTP finishes staged TOTP registration and creates the user account.
-// @Summary Complete staged TOTP registration
-// @Description Verify the staged TOTP code, create the user account, and issue session tokens plus recovery codes.
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.RegistrationTOTPCompleteRequestDTO true "TOTP verification payload"
-// @Success 200 {object} api.Result{data=dto.RegistrationTOTPCompleteResponseDTO} "TOTP registration completed successfully"
-// @Failure 400 {object} api.Result "Invalid or expired registration session"
-// @Failure 409 {object} api.Result "User already exists"
-// @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/auth/register/totp/complete [post]
-func (h *AuthHandler) CompleteRegistrationTOTP(c *gin.Context) {
-	var req dto.RegistrationTOTPCompleteRequestDTO
-	if err := c.ShouldBindJSON(&req); err != nil {
-		api.GinBadRequest(c, err, "Invalid request data")
-		return
-	}
-
-	response, err := h.authService.CompleteRegistrationTOTP(c.Request.Context(), req.RegistrationSessionID, req.Code)
-	if err != nil {
-		switch {
-		case errors.Is(err, service.ErrInvalidMFACode),
-			errors.Is(err, service.ErrRegistrationTOTPNotPrepared):
-			api.GinBadRequest(c, err, "Invalid TOTP setup or verification code")
-		case errors.Is(err, service.ErrRegistrationSessionNotFound),
-			errors.Is(err, service.ErrRegistrationSessionExpired):
-			api.GinBadRequest(c, err, "Registration session is invalid or expired")
-		case errors.Is(err, service.ErrUserAlreadyExists):
-			api.GinError(c, http.StatusConflict, err, http.StatusConflict, "User already exists")
-		default:
-			api.GinInternalError(c, err, "Failed to complete TOTP registration")
-		}
-		return
-	}
-
-	api.GinSuccess(c, dto.ToRegistrationTOTPCompleteResponseDTO(response))
-}
 
 // BeginPasskeyLogin creates WebAuthn request options for username-first passkey login.
 // @Summary Begin passkey login
@@ -290,7 +139,12 @@ func (h *AuthHandler) BeginPasskeyEnrollment(c *gin.Context) {
 
 	response, err := h.authService.BeginPasskeyEnrollment(c.Request.Context(), user.UserID, requestOrigin(c))
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to start passkey enrollment")
+		switch {
+		case errors.Is(err, service.ErrTOTPRequiredForPasskey):
+			api.GinBadRequest(c, err, "Enable TOTP before adding a passkey")
+		default:
+			api.GinInternalError(c, err, "Failed to start passkey enrollment")
+		}
 		return
 	}
 
@@ -334,6 +188,8 @@ func (h *AuthHandler) VerifyPasskeyEnrollment(c *gin.Context) {
 		case errors.Is(err, service.ErrInvalidPasskeyChallenge),
 			errors.Is(err, service.ErrExpiredPasskeyChallenge):
 			api.GinBadRequest(c, err, "Invalid or expired passkey challenge")
+		case errors.Is(err, service.ErrTOTPRequiredForPasskey):
+			api.GinBadRequest(c, err, "Enable TOTP before adding a passkey")
 		default:
 			api.GinInternalError(c, err, "Failed to enroll passkey")
 		}

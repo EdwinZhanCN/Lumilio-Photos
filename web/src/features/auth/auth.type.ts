@@ -11,25 +11,11 @@ export type TOTPSetupResponse = Schemas["dto.TOTPSetupResponseDTO"];
 export type RecoveryCodesResponse = Schemas["dto.RecoveryCodesResponseDTO"];
 export type VerifyMFARequest = Schemas["dto.VerifyMFARequestDTO"];
 export type BootstrapStatus = Schemas["dto.BootstrapStatusDTO"];
-export type RegistrationStartRequest =
-  Schemas["dto.RegistrationStartRequestDTO"];
-export type RegistrationStartResponse =
-  Schemas["dto.RegistrationStartResponseDTO"];
-export type RegistrationSessionRequest =
-  Schemas["dto.RegistrationSessionRequestDTO"];
-export type RegistrationPasskeyVerifyRequest =
-  Schemas["dto.RegistrationPasskeyVerifyRequestDTO"];
-export type RegistrationTOTPSetupResponse =
-  Schemas["dto.RegistrationTOTPSetupResponseDTO"];
-export type RegistrationTOTPCompleteRequest =
-  Schemas["dto.RegistrationTOTPCompleteRequestDTO"];
-export type RegistrationTOTPCompleteResponse =
-  Schemas["dto.RegistrationTOTPCompleteResponseDTO"];
+export type RegistrationStartRequest = Schemas["dto.RegistrationStartRequestDTO"];
 export type PasskeyOptionsRequest = Schemas["dto.PasskeyOptionsRequestDTO"];
 export type PasskeyOptionsResponse = Schemas["dto.PasskeyOptionsResponseDTO"];
 export type PasskeyVerifyRequest = Schemas["dto.PasskeyVerifyRequestDTO"];
-export type PasskeyCredentialSummary =
-  Schemas["dto.PasskeyCredentialSummaryDTO"];
+export type PasskeyCredentialSummary = Schemas["dto.PasskeyCredentialSummaryDTO"];
 export type PasskeyListResponse = Schemas["dto.PasskeyListResponseDTO"];
 export type ChangePasswordRequest = Schemas["dto.ChangePasswordRequestDTO"];
 export type ResetAccessResponse = Schemas["dto.ResetAccessResponseDTO"];
