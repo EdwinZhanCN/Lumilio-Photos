@@ -2,8 +2,6 @@ package cloud
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -18,14 +16,15 @@ import (
 	"go.uber.org/zap"
 
 	"server/internal/db/repo"
+	"server/internal/secretbox"
 	"server/internal/sourcing"
 )
 
 const (
-	CredentialStatusConnected  = "connected"
-	CredentialStatusPending2FA = "pending_2fa"
-	CredentialStatusDisabled   = "disabled"
-	CredentialStatusError      = "error"
+	CredentialStatusConnected        = "connected"
+	CredentialStatusPendingChallenge = "pending_challenge"
+	CredentialStatusDisabled         = "disabled"
+	CredentialStatusError            = "error"
 
 	ImportRunStatusQueued      = "queued"
 	ImportRunStatusRunning     = "running"
@@ -34,25 +33,25 @@ const (
 	ImportRunStatusInterrupted = "interrupted"
 )
 
-// CreateICloudCredentialInput holds the credentials for creating an iCloud connection.
-type CreateICloudCredentialInput struct {
-	Username        string
-	Password        string
-	Domain          string
+// CreateCloudCredentialInput holds provider-neutral credential inputs.
+type CreateCloudCredentialInput struct {
+	Provider        ProviderKind
 	DisplayName     string
+	Inputs          map[string]string
 	CreatedByUserID *int32
 }
 
-// CreateICloudCredentialResult is returned after attempting iCloud auth.
-type CreateICloudCredentialResult struct {
+// CreateCloudCredentialResult is returned after attempting provider auth.
+type CreateCloudCredentialResult struct {
 	Credential repo.CloudCredential
-	Needs2FA   bool
+	AuthStatus string
+	Challenge  *AuthChallenge
 }
 
-// VerifyICloudCredential2FAInput holds the 2FA verification code.
-type VerifyICloudCredential2FAInput struct {
+// VerifyCredentialChallengeInput holds provider challenge inputs.
+type VerifyCredentialChallengeInput struct {
 	CredentialID uuid.UUID
-	Code         string
+	Inputs       map[string]string
 }
 
 // StartRepositoryImportInput identifies a repository import request.
@@ -75,17 +74,19 @@ type RepositoryCloudStatus struct {
 	LatestRun  *repo.CloudImportRun
 }
 
-// CloudSyncService manages cloud credentials and repo-scoped imports.
+// CloudSyncService manages cloud providers, credentials, and repo-scoped imports.
 type CloudSyncService interface {
+	ListProviders(ctx context.Context) ([]ProviderDescriptor, error)
 	ListCredentials(ctx context.Context) ([]repo.CloudCredential, error)
-	CreateICloudCredential(ctx context.Context, input CreateICloudCredentialInput) (CreateICloudCredentialResult, error)
-	VerifyICloudCredential2FA(ctx context.Context, input VerifyICloudCredential2FAInput) error
+	CreateCredential(ctx context.Context, input CreateCloudCredentialInput) (CreateCloudCredentialResult, error)
+	VerifyCredentialChallenge(ctx context.Context, input VerifyCredentialChallengeInput) (CreateCloudCredentialResult, error)
 	DisableCredential(ctx context.Context, credentialID uuid.UUID) error
 	BindRepositoryCredentialAndStartImport(ctx context.Context, input BindRepositoryCredentialInput) (uuid.UUID, error)
 	StartRepositoryImport(ctx context.Context, input StartRepositoryImportInput) (uuid.UUID, error)
 	GetRepositoryCloudStatus(ctx context.Context, repositoryID uuid.UUID) (RepositoryCloudStatus, error)
 	GetImportRun(ctx context.Context, runID uuid.UUID) (repo.CloudImportRun, error)
 	RecoverInterruptedRuns(ctx context.Context) error
+	ProviderTitle(provider ProviderKind) string
 }
 
 type pendingICloudAuth struct {
@@ -93,7 +94,13 @@ type pendingICloudAuth struct {
 	signal   *twoFASignal
 }
 
-// twoFASignal is a TextGetter implementation that signals when 2FA is needed.
+type pendingCredentialAuth struct {
+	provider ProviderKind
+	state    any
+}
+
+// twoFASignal is a TextGetter implementation that signals when a provider
+// challenge is needed.
 type twoFASignal struct {
 	mu        sync.Mutex
 	code      string
@@ -107,7 +114,7 @@ func (s *twoFASignal) GetText(tip string) (string, error) {
 		return s.code, nil
 	}
 	s.triggered = true
-	return "", fmt.Errorf("2FA required")
+	return "", fmt.Errorf("authentication challenge required")
 }
 
 func (s *twoFASignal) setCode(code string) {
@@ -134,9 +141,11 @@ type cloudSyncService struct {
 	queries      *repo.Queries
 	materializer *sourcing.SourceMaterializer
 	logger       *zap.Logger
+	registry     *ProviderRegistry
+	secretBox    *secretbox.Box
 
 	mu            sync.Mutex
-	pendingICloud map[uuid.UUID]pendingICloudAuth
+	pendingAuth   map[uuid.UUID]pendingCredentialAuth
 	activeImports map[uuid.UUID]*activeImport // keyed by run ID
 }
 
@@ -149,122 +158,149 @@ func NewCloudSyncService(
 	if logger == nil {
 		logger = zap.NewNop()
 	}
+	scopedLogger := logger.With(zap.String("component", "cloud_sync_service"))
+	box, err := secretbox.New(strings.TrimSpace(os.Getenv("LUMILIO_SECRET_KEY")), "cloud.credentials.encryption.v1")
+	if err != nil {
+		scopedLogger.Warn("cloud credential secret box unavailable", zap.Error(err))
+	}
 	return &cloudSyncService{
 		queries:       queries,
 		materializer:  materializer,
-		logger:        logger.With(zap.String("component", "cloud_sync_service")),
-		pendingICloud: make(map[uuid.UUID]pendingICloudAuth),
+		logger:        scopedLogger,
+		registry:      NewDefaultProviderRegistry(),
+		secretBox:     box,
+		pendingAuth:   make(map[uuid.UUID]pendingCredentialAuth),
 		activeImports: make(map[uuid.UUID]*activeImport),
 	}
 }
 
 // RecoverInterruptedRuns flags any import run left in queued/running (e.g. by a
-// crash or restart) as interrupted, so repositories are not stuck with a
-// permanently "running" import that blocks new imports in the UI.
+// crash or restart) as interrupted.
 func (s *cloudSyncService) RecoverInterruptedRuns(ctx context.Context) error {
 	return s.queries.MarkStaleCloudImportRunsInterrupted(ctx)
+}
+
+func (s *cloudSyncService) ListProviders(ctx context.Context) ([]ProviderDescriptor, error) {
+	_ = ctx
+	providers := s.registry.List()
+	descriptors := make([]ProviderDescriptor, 0, len(providers))
+	for _, provider := range providers {
+		descriptors = append(descriptors, provider.Descriptor())
+	}
+	return descriptors, nil
 }
 
 func (s *cloudSyncService) ListCredentials(ctx context.Context) ([]repo.CloudCredential, error) {
 	return s.queries.ListCloudCredentials(ctx)
 }
 
-func (s *cloudSyncService) CreateICloudCredential(ctx context.Context, input CreateICloudCredentialInput) (CreateICloudCredentialResult, error) {
-	username := strings.TrimSpace(input.Username)
-	password := strings.TrimSpace(input.Password)
-	if username == "" || password == "" {
-		return CreateICloudCredentialResult{}, fmt.Errorf("username and password are required")
+func (s *cloudSyncService) ProviderTitle(provider ProviderKind) string {
+	credentialProvider, err := s.registry.Get(provider)
+	if err != nil {
+		return string(provider)
 	}
-	domain := normalizeICloudDomain(input.Domain)
-	accountHash := accountIdentifierHash(username)
+	return credentialProvider.Descriptor().Title
+}
+
+func (s *cloudSyncService) CreateCredential(ctx context.Context, input CreateCloudCredentialInput) (CreateCloudCredentialResult, error) {
+	provider, err := s.registry.Get(input.Provider)
+	if err != nil {
+		return CreateCloudCredentialResult{}, err
+	}
+
+	identity, err := provider.Identity(input.Inputs)
+	if err != nil {
+		return CreateCloudCredentialResult{}, err
+	}
 
 	credentialID := uuid.New()
 	displayName := strings.TrimSpace(input.DisplayName)
 	if displayName == "" {
-		displayName = maskAccount(username)
+		displayName = identity.DefaultDisplayName
 	}
+	artifactDir := provider.DefaultArtifactDir(credentialID)
 
-	cookieDir := credentialCookieDir(credentialID)
-	existing, err := s.queries.GetCloudCredentialByAccount(ctx, repo.GetCloudCredentialByAccountParams{
-		Provider:              string(ProviderICloud),
-		AccountIdentifierHash: accountHash,
-		Domain:                domain,
+	existing, err := s.queries.GetCloudCredentialByIdentity(ctx, repo.GetCloudCredentialByIdentityParams{
+		Provider:     string(input.Provider),
+		IdentityHash: identity.IdentityHash,
 	})
 	if err == nil {
 		credentialID = uuid.UUID(existing.CredentialID.Bytes)
-		cookieDir = existing.CookieDir
-		displayName = existing.DisplayName
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return CreateICloudCredentialResult{}, err
-	}
-
-	if err := ensurePrivateDir(cookieDir); err != nil {
-		return CreateICloudCredentialResult{}, err
-	}
-
-	signal := &twoFASignal{}
-	provider := NewICloudProvider(ICloudConfig{
-		Username:  username,
-		Password:  password,
-		Domain:    domain,
-		CookieDir: cookieDir,
-	})
-	provider.SetTwoFACodeGetter(signal)
-
-	if err := provider.ForceAuth(ctx); err != nil {
-		if signal.wasTriggered() {
-			credential, saveErr := s.upsertCredentialForAuth(ctx, credentialID, displayName, accountHash, maskAccount(username), domain, cookieDir, CredentialStatusPending2FA, input.CreatedByUserID)
-			if saveErr != nil {
-				return CreateICloudCredentialResult{}, saveErr
-			}
-			s.mu.Lock()
-			s.pendingICloud[credentialID] = pendingICloudAuth{provider: provider, signal: signal}
-			s.mu.Unlock()
-			return CreateICloudCredentialResult{Credential: credential, Needs2FA: true}, nil
+		if strings.TrimSpace(existing.DisplayName) != "" {
+			displayName = existing.DisplayName
 		}
-		return CreateICloudCredentialResult{}, fmt.Errorf("icloud authentication failed: %w", err)
+		if existing.ArtifactDir != nil && strings.TrimSpace(*existing.ArtifactDir) != "" {
+			artifactDir = *existing.ArtifactDir
+		}
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return CreateCloudCredentialResult{}, err
 	}
 
-	credential, err := s.upsertCredentialForAuth(ctx, credentialID, displayName, accountHash, maskAccount(username), domain, cookieDir, CredentialStatusConnected, input.CreatedByUserID)
+	authResult, err := provider.Authenticate(ctx, CredentialAuthInput{
+		CredentialID: credentialID,
+		DisplayName:  displayName,
+		Inputs:       input.Inputs,
+		ArtifactDir:  artifactDir,
+		Identity:     identity,
+	})
 	if err != nil {
-		return CreateICloudCredentialResult{}, err
+		return CreateCloudCredentialResult{}, err
 	}
-	return CreateICloudCredentialResult{Credential: credential}, nil
+
+	credential, err := s.upsertCredentialForAuth(ctx, credentialID, input.Provider, displayName, identity, authResult, input.CreatedByUserID)
+	if err != nil {
+		return CreateCloudCredentialResult{}, err
+	}
+	if authResult.PendingState != nil {
+		s.mu.Lock()
+		s.pendingAuth[credentialID] = pendingCredentialAuth{provider: input.Provider, state: authResult.PendingState}
+		s.mu.Unlock()
+	}
+	return CreateCloudCredentialResult{
+		Credential: credential,
+		AuthStatus: authResult.AuthStatus,
+		Challenge:  authResult.Challenge,
+	}, nil
 }
 
-func (s *cloudSyncService) VerifyICloudCredential2FA(ctx context.Context, input VerifyICloudCredential2FAInput) error {
-	code := strings.TrimSpace(input.Code)
-	if code == "" {
-		return fmt.Errorf("2FA code is required")
-	}
-
+func (s *cloudSyncService) VerifyCredentialChallenge(ctx context.Context, input VerifyCredentialChallengeInput) (CreateCloudCredentialResult, error) {
 	s.mu.Lock()
-	pending, ok := s.pendingICloud[input.CredentialID]
+	pending, ok := s.pendingAuth[input.CredentialID]
 	s.mu.Unlock()
 	if !ok {
-		return fmt.Errorf("no pending iCloud 2FA session for credential")
+		return CreateCloudCredentialResult{}, fmt.Errorf("no pending authentication challenge for credential")
 	}
 
-	pending.signal.setCode(code)
-	if err := pending.provider.ForceAuth(ctx); err != nil {
+	credential, err := s.queries.GetCloudCredential(ctx, toPGUUID(input.CredentialID))
+	if err != nil {
+		return CreateCloudCredentialResult{}, err
+	}
+	provider, err := s.registry.Get(pending.provider)
+	if err != nil {
+		return CreateCloudCredentialResult{}, err
+	}
+
+	authResult, err := provider.VerifyChallenge(ctx, CredentialChallengeInput{
+		Credential:   credential,
+		Inputs:       input.Inputs,
+		PendingState: pending.state,
+	})
+	if err != nil {
 		_, _ = s.queries.UpdateCloudCredentialStatus(ctx, repo.UpdateCloudCredentialStatusParams{
 			CredentialID: toPGUUID(input.CredentialID),
 			Status:       CredentialStatusError,
 		})
-		return fmt.Errorf("icloud 2FA verification failed: %w", err)
+		return CreateCloudCredentialResult{}, err
 	}
 
-	if _, err := s.queries.UpdateCloudCredentialStatus(ctx, repo.UpdateCloudCredentialStatusParams{
-		CredentialID: toPGUUID(input.CredentialID),
-		Status:       CredentialStatusConnected,
-	}); err != nil {
-		return err
+	updated, err := s.updateCredentialAuthState(ctx, credential, authResult)
+	if err != nil {
+		return CreateCloudCredentialResult{}, err
 	}
-
 	s.mu.Lock()
-	delete(s.pendingICloud, input.CredentialID)
+	delete(s.pendingAuth, input.CredentialID)
 	s.mu.Unlock()
-	return nil
+	return CreateCloudCredentialResult{Credential: updated, AuthStatus: authResult.AuthStatus}, nil
 }
 
 func (s *cloudSyncService) DisableCredential(ctx context.Context, credentialID uuid.UUID) error {
@@ -274,9 +310,7 @@ func (s *cloudSyncService) DisableCredential(ctx context.Context, credentialID u
 	})
 	if err == nil {
 		s.mu.Lock()
-		delete(s.pendingICloud, credentialID)
-		// Cancel any in-flight imports using this credential; their goroutines
-		// clean up their own registry entries on exit.
+		delete(s.pendingAuth, credentialID)
 		for _, imp := range s.activeImports {
 			if imp.credentialID == credentialID && imp.cancel != nil {
 				imp.cancel()
@@ -296,10 +330,14 @@ func (s *cloudSyncService) BindRepositoryCredentialAndStartImport(ctx context.Co
 		return uuid.Nil, fmt.Errorf("cloud credential is not connected")
 	}
 
+	if _, err := s.registry.Get(ProviderKind(credential.Provider)); err != nil {
+		return uuid.Nil, err
+	}
+
 	if _, err := s.queries.UpsertRepositoryCloudBinding(ctx, repo.UpsertRepositoryCloudBindingParams{
 		RepositoryID: toPGUUID(input.RepositoryID),
 		CredentialID: toPGUUID(input.CredentialID),
-		Provider:     string(ProviderICloud),
+		Provider:     credential.Provider,
 	}); err != nil {
 		return uuid.Nil, err
 	}
@@ -311,10 +349,7 @@ func (s *cloudSyncService) BindRepositoryCredentialAndStartImport(ctx context.Co
 }
 
 func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input StartRepositoryImportInput) (uuid.UUID, error) {
-	binding, err := s.queries.GetRepositoryCloudBinding(ctx, repo.GetRepositoryCloudBindingParams{
-		RepositoryID: toPGUUID(input.RepositoryID),
-		Provider:     string(ProviderICloud),
-	})
+	binding, err := s.queries.GetActiveRepositoryCloudBinding(ctx, toPGUUID(input.RepositoryID))
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -329,11 +364,11 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 	if credential.Status != CredentialStatusConnected {
 		return uuid.Nil, fmt.Errorf("cloud credential is not connected")
 	}
+	if _, err := s.registry.Get(ProviderKind(credential.Provider)); err != nil {
+		return uuid.Nil, err
+	}
 
 	runID := uuid.New()
-
-	// Single-flight per repository: refuse to launch a second concurrent import
-	// for the same repository so runs cannot overlap (double download/count).
 	s.mu.Lock()
 	for _, imp := range s.activeImports {
 		if imp.repoID == input.RepositoryID {
@@ -349,7 +384,7 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 		RunID:        toPGUUID(runID),
 		RepositoryID: toPGUUID(input.RepositoryID),
 		CredentialID: binding.CredentialID,
-		Provider:     string(ProviderICloud),
+		Provider:     credential.Provider,
 		Status:       ImportRunStatusQueued,
 	})
 	if err != nil {
@@ -358,7 +393,7 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 	}
 	if _, err := s.queries.UpdateRepositoryCloudBindingLastRun(ctx, repo.UpdateRepositoryCloudBindingLastRunParams{
 		RepositoryID: toPGUUID(input.RepositoryID),
-		Provider:     string(ProviderICloud),
+		Provider:     credential.Provider,
 		LastImportRunID: pgtype.UUID{
 			Bytes: uuid.UUID(run.RunID.Bytes),
 			Valid: true,
@@ -377,8 +412,6 @@ func (s *cloudSyncService) StartRepositoryImport(ctx context.Context, input Star
 	return uuid.UUID(run.RunID.Bytes), nil
 }
 
-// finishActiveImport removes a run from the active registry and releases its
-// cancel function. Safe to call from the launching path or the run goroutine.
 func (s *cloudSyncService) finishActiveImport(runID uuid.UUID) {
 	s.mu.Lock()
 	entry, ok := s.activeImports[runID]
@@ -392,10 +425,7 @@ func (s *cloudSyncService) finishActiveImport(runID uuid.UUID) {
 }
 
 func (s *cloudSyncService) GetRepositoryCloudStatus(ctx context.Context, repositoryID uuid.UUID) (RepositoryCloudStatus, error) {
-	binding, err := s.queries.GetRepositoryCloudBinding(ctx, repo.GetRepositoryCloudBindingParams{
-		RepositoryID: toPGUUID(repositoryID),
-		Provider:     string(ProviderICloud),
-	})
+	binding, err := s.queries.GetActiveRepositoryCloudBinding(ctx, toPGUUID(repositoryID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return RepositoryCloudStatus{}, nil
@@ -431,14 +461,9 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 	runID := uuid.UUID(run.RunID.Bytes)
 	repositoryID := uuid.UUID(run.RepositoryID.Bytes)
 	credentialID := uuid.UUID(run.CredentialID.Bytes)
-
-	// Release the single-flight slot (and cancel func) when the run ends.
 	defer s.finishActiveImport(runID)
 
-	// Run bookkeeping (status + counts) must persist even when ctx is cancelled
-	// mid-import, so it uses a context detached from the cancellable import ctx.
 	bookkeeping := context.Background()
-
 	if _, err := s.queries.MarkCloudImportRunStarted(bookkeeping, toPGUUID(runID)); err != nil {
 		s.logger.Error("failed to mark cloud import started", zap.String("run_id", runID.String()), zap.Error(err))
 		return
@@ -459,28 +484,27 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 		}
 	}
 
-	if strings.TrimSpace(credential.CookieDir) == "" {
-		err := fmt.Errorf("cloud credential has no cookie directory")
+	credentialProvider, err := s.registry.Get(ProviderKind(credential.Provider))
+	if err != nil {
 		finish(ImportRunStatusFailed, err)
 		return
 	}
-
-	provider := NewICloudProvider(ICloudConfig{
-		Domain:    credential.Domain,
-		CookieDir: credential.CookieDir,
-	})
-	if err := provider.ForceAuth(ctx); err != nil {
-		_, _ = s.queries.UpdateCloudCredentialStatus(bookkeeping, repo.UpdateCloudCredentialStatusParams{
-			CredentialID: toPGUUID(credentialID),
-			Status:       CredentialStatusError,
-		})
-		finish(ImportRunStatusFailed, fmt.Errorf("icloud session is not valid; reconnect the credential"))
+	provider, err := credentialProvider.NewImporter(ctx, credential)
+	if err != nil {
+		finish(ImportRunStatusFailed, err)
 		return
 	}
+	if authenticator, ok := provider.(interface{ ForceAuth(context.Context) error }); ok {
+		if err := authenticator.ForceAuth(ctx); err != nil {
+			_, _ = s.queries.UpdateCloudCredentialStatus(bookkeeping, repo.UpdateCloudCredentialStatusParams{
+				CredentialID: toPGUUID(credentialID),
+				Status:       CredentialStatusError,
+			})
+			finish(ImportRunStatusFailed, fmt.Errorf("cloud credential session is not valid; reconnect the credential"))
+			return
+		}
+	}
 
-	// Coalesce progress: the producer (discovery) and consumer (materialize)
-	// goroutines both report per-file deltas. Accumulate them and flush on a
-	// timer into a single counts UPDATE instead of one UPDATE per delta.
 	var pmu sync.Mutex
 	var acc ImportProgressDelta
 	progress := func(delta ImportProgressDelta) {
@@ -542,15 +566,15 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 		zap.String("run_id", runID.String()),
 		zap.String("repository_id", repositoryID.String()),
 		zap.String("credential_id", credentialID.String()),
+		zap.String("provider", credential.Provider),
 	)
 
 	runErr := consumer.Run(ctx)
 	close(flusherDone)
-	flush() // persist any remaining counts before flipping status
+	flush()
 
 	switch {
 	case ctx.Err() != nil:
-		// Cancelled (e.g. credential disabled or shutdown): not a failure.
 		finish(ImportRunStatusInterrupted, nil)
 	case runErr != nil:
 		finish(ImportRunStatusFailed, runErr)
@@ -562,24 +586,18 @@ func (s *cloudSyncService) runImport(ctx context.Context, run repo.CloudImportRu
 func (s *cloudSyncService) upsertCredentialForAuth(
 	ctx context.Context,
 	credentialID uuid.UUID,
+	provider ProviderKind,
 	displayName string,
-	accountHash string,
-	maskedAccount string,
-	domain string,
-	cookieDir string,
-	status string,
+	identity CredentialIdentity,
+	authResult CredentialAuthResult,
 	createdByUserID *int32,
 ) (repo.CloudCredential, error) {
-	existing, err := s.queries.GetCloudCredentialByAccount(ctx, repo.GetCloudCredentialByAccountParams{
-		Provider:              string(ProviderICloud),
-		AccountIdentifierHash: accountHash,
-		Domain:                domain,
+	existing, err := s.queries.GetCloudCredentialByIdentity(ctx, repo.GetCloudCredentialByIdentityParams{
+		Provider:     string(provider),
+		IdentityHash: identity.IdentityHash,
 	})
 	if err == nil {
-		return s.queries.UpdateCloudCredentialStatus(ctx, repo.UpdateCloudCredentialStatusParams{
-			CredentialID: existing.CredentialID,
-			Status:       status,
-		})
+		return s.updateCredentialAuthState(ctx, existing, authResult)
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return repo.CloudCredential{}, err
@@ -590,72 +608,57 @@ func (s *cloudSyncService) upsertCredentialForAuth(
 		v := *createdByUserID
 		userID = &v
 	}
+	publicConfig, err := marshalPublicConfig(authResult.PublicConfig)
+	if err != nil {
+		return repo.CloudCredential{}, err
+	}
+	artifactDir := nullableString(authResult.ArtifactDir)
 	return s.queries.CreateCloudCredential(ctx, repo.CreateCloudCredentialParams{
-		CredentialID:          toPGUUID(credentialID),
-		Provider:              string(ProviderICloud),
-		DisplayName:           displayName,
-		AccountIdentifierHash: accountHash,
-		MaskedAccount:         maskedAccount,
-		Domain:                domain,
-		Status:                status,
-		CookieDir:             cookieDir,
-		CreatedByUserID:       userID,
+		CredentialID:     toPGUUID(credentialID),
+		Provider:         string(provider),
+		DisplayName:      displayName,
+		IdentityHash:     identity.IdentityHash,
+		MaskedIdentity:   identity.MaskedIdentity,
+		Status:           authResult.Status,
+		PublicConfig:     publicConfig,
+		SecretCiphertext: authResult.SecretCiphertext,
+		ArtifactDir:      artifactDir,
+		CreatedByUserID:  userID,
 	})
 }
 
-func normalizeICloudDomain(domain string) string {
-	switch strings.ToLower(strings.TrimSpace(domain)) {
-	case "cn":
-		return "cn"
-	default:
-		return "com"
+func (s *cloudSyncService) updateCredentialAuthState(ctx context.Context, credential repo.CloudCredential, authResult CredentialAuthResult) (repo.CloudCredential, error) {
+	publicConfig := authResult.PublicConfig
+	if publicConfig == nil {
+		publicConfig = unmarshalPublicConfig(credential.PublicConfig)
 	}
+	publicConfigBytes, err := marshalPublicConfig(publicConfig)
+	if err != nil {
+		return repo.CloudCredential{}, err
+	}
+	secretCiphertext := authResult.SecretCiphertext
+	if secretCiphertext == nil {
+		secretCiphertext = credential.SecretCiphertext
+	}
+	artifactDir := authResult.ArtifactDir
+	if strings.TrimSpace(artifactDir) == "" {
+		artifactDir = stringPtrValue(credential.ArtifactDir)
+	}
+	return s.queries.UpdateCloudCredentialAuthState(ctx, repo.UpdateCloudCredentialAuthStateParams{
+		CredentialID:     credential.CredentialID,
+		Status:           authResult.Status,
+		PublicConfig:     publicConfigBytes,
+		SecretCiphertext: secretCiphertext,
+		ArtifactDir:      nullableString(artifactDir),
+	})
 }
 
-func accountIdentifierHash(username string) string {
-	sum := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(username))))
-	return hex.EncodeToString(sum[:])
-}
-
-func maskAccount(username string) string {
-	username = strings.TrimSpace(username)
-	if username == "" {
-		return ""
+func nullableString(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
 	}
-	at := strings.Index(username, "@")
-	if at < 0 {
-		// Not an email-shaped identifier; mask the whole token.
-		return maskToken(username)
-	}
-	return maskToken(username[:at]) + username[at:]
-}
-
-// maskToken obscures a token while keeping a hint of its first/last character.
-func maskToken(s string) string {
-	switch len(s) {
-	case 0:
-		return ""
-	case 1:
-		return "*"
-	case 2:
-		return s[:1] + "*"
-	default:
-		return s[:1] + strings.Repeat("*", len(s)-2) + s[len(s)-1:]
-	}
-}
-
-func credentialCookieDir(credentialID uuid.UUID) string {
-	return filepath.Join(defaultICloudCookieDir(), credentialID.String())
-}
-
-func ensurePrivateDir(path string) error {
-	if err := os.MkdirAll(path, 0o700); err != nil {
-		return fmt.Errorf("create credential cookie dir: %w", err)
-	}
-	if err := os.Chmod(path, 0o700); err != nil {
-		return fmt.Errorf("secure credential cookie dir: %w", err)
-	}
-	return nil
+	return &value
 }
 
 func defaultStagingDir() string {

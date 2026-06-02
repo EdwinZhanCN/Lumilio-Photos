@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -23,6 +24,34 @@ type CloudHandler struct {
 // NewCloudHandler creates a CloudHandler.
 func NewCloudHandler(cloudService cloud.CloudSyncService) *CloudHandler {
 	return &CloudHandler{cloudService: cloudService}
+}
+
+// ListProviders returns available cloud providers.
+// @Summary List cloud providers
+// @Description List cloud provider descriptors for credential creation.
+// @Tags cloud
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} api.Result{data=dto.ListCloudProvidersResponse} "Provider list"
+// @Failure 401 {object} api.Result "Unauthorized"
+// @Failure 500 {object} api.Result "Internal server error"
+// @Router /api/v1/cloud/providers [get]
+func (h *CloudHandler) ListProviders(c *gin.Context) {
+	if _, ok := requireAdminUser(c); !ok {
+		return
+	}
+
+	providers, err := h.cloudService.ListProviders(c.Request.Context())
+	if err != nil {
+		api.GinInternalError(c, err, "Failed to list cloud providers")
+		return
+	}
+
+	items := make([]dto.CloudProviderDTO, 0, len(providers))
+	for _, provider := range providers {
+		items = append(items, toCloudProviderDTO(provider))
+	}
+	api.GinSuccess(c, dto.ListCloudProvidersResponse{Providers: items})
 }
 
 // ListCredentials returns all saved cloud credentials.
@@ -48,31 +77,31 @@ func (h *CloudHandler) ListCredentials(c *gin.Context) {
 
 	items := make([]dto.CloudCredentialDTO, 0, len(credentials))
 	for _, credential := range credentials {
-		items = append(items, toCloudCredentialDTO(credential))
+		items = append(items, toCloudCredentialDTO(credential, h.cloudService.ProviderTitle(cloud.ProviderKind(credential.Provider))))
 	}
 	api.GinSuccess(c, dto.ListCloudCredentialsResponse{Credentials: items})
 }
 
-// CreateICloudCredential initiates iCloud credential creation.
-// @Summary Create iCloud credential
-// @Description Authenticate with iCloud and save a repo-reusable credential session. If 2FA is required, returns needs_2fa=true.
+// CreateCredential initiates cloud credential creation.
+// @Summary Create cloud credential
+// @Description Authenticate with a cloud provider and save a repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.
 // @Tags cloud
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param request body dto.CreateICloudCredentialRequest true "iCloud credential"
-// @Success 200 {object} api.Result{data=dto.CreateICloudCredentialResponse} "Credential creation result"
+// @Param request body dto.CreateCloudCredentialRequest true "Cloud credential"
+// @Success 200 {object} api.Result{data=dto.CreateCloudCredentialResponse} "Credential creation result"
 // @Failure 400 {object} api.Result "Invalid request"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/cloud/icloud/credentials [post]
-func (h *CloudHandler) CreateICloudCredential(c *gin.Context) {
+// @Router /api/v1/cloud/credentials [post]
+func (h *CloudHandler) CreateCredential(c *gin.Context) {
 	user, ok := requireAdminUser(c)
 	if !ok {
 		return
 	}
 
-	var req dto.CreateICloudCredentialRequest
+	var req dto.CreateCloudCredentialRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
@@ -82,39 +111,39 @@ func (h *CloudHandler) CreateICloudCredential(c *gin.Context) {
 	defer cancel()
 
 	createdBy := int32(user.UserID)
-	result, err := h.cloudService.CreateICloudCredential(ctx, cloud.CreateICloudCredentialInput{
-		Username:        req.Username,
-		Password:        req.Password,
-		Domain:          req.Domain,
+	result, err := h.cloudService.CreateCredential(ctx, cloud.CreateCloudCredentialInput{
+		Provider:        cloud.ProviderKind(req.Provider),
 		DisplayName:     req.DisplayName,
+		Inputs:          req.Inputs,
 		CreatedByUserID: &createdBy,
 	})
 	if err != nil {
-		api.GinInternalError(c, err, "Failed to create iCloud credential")
+		api.GinInternalError(c, err, "Failed to create cloud credential")
 		return
 	}
 
-	api.GinSuccess(c, dto.CreateICloudCredentialResponse{
-		Credential: toCloudCredentialDTO(result.Credential),
-		Needs2FA:   result.Needs2FA,
+	api.GinSuccess(c, dto.CreateCloudCredentialResponse{
+		Credential: toCloudCredentialDTO(result.Credential, h.cloudService.ProviderTitle(cloud.ProviderKind(result.Credential.Provider))),
+		AuthStatus: result.AuthStatus,
+		Challenge:  toCloudAuthChallengeDTO(result.Challenge),
 	})
 }
 
-// VerifyICloudCredential2FA submits a 2FA code for a pending iCloud credential.
-// @Summary Verify iCloud credential 2FA
-// @Description Submit a two-factor authentication code to complete iCloud credential creation.
+// VerifyCredentialAuthChallenge submits provider-specific challenge inputs.
+// @Summary Verify cloud credential challenge
+// @Description Submit challenge inputs to complete cloud credential creation.
 // @Tags cloud
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path string true "Credential UUID"
-// @Param request body dto.VerifyICloud2FARequest true "2FA code"
-// @Success 200 {object} api.Result "2FA verified successfully"
+// @Param request body dto.VerifyCloudAuthChallengeRequest true "Challenge inputs"
+// @Success 200 {object} api.Result{data=dto.VerifyCloudAuthChallengeResponse} "Challenge verified successfully"
 // @Failure 400 {object} api.Result "Invalid request"
 // @Failure 401 {object} api.Result "Unauthorized"
 // @Failure 500 {object} api.Result "Internal server error"
-// @Router /api/v1/cloud/icloud/credentials/{id}/verify-2fa [post]
-func (h *CloudHandler) VerifyICloudCredential2FA(c *gin.Context) {
+// @Router /api/v1/cloud/credentials/{id}/auth-challenge [post]
+func (h *CloudHandler) VerifyCredentialAuthChallenge(c *gin.Context) {
 	if _, ok := requireAdminUser(c); !ok {
 		return
 	}
@@ -125,7 +154,7 @@ func (h *CloudHandler) VerifyICloudCredential2FA(c *gin.Context) {
 		return
 	}
 
-	var req dto.VerifyICloud2FARequest
+	var req dto.VerifyCloudAuthChallengeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		api.GinBadRequest(c, err, "Invalid request data")
 		return
@@ -134,15 +163,19 @@ func (h *CloudHandler) VerifyICloudCredential2FA(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
-	if err := h.cloudService.VerifyICloudCredential2FA(ctx, cloud.VerifyICloudCredential2FAInput{
+	result, err := h.cloudService.VerifyCredentialChallenge(ctx, cloud.VerifyCredentialChallengeInput{
 		CredentialID: credentialID,
-		Code:         req.Code,
-	}); err != nil {
-		api.GinInternalError(c, err, "2FA verification failed")
+		Inputs:       req.Inputs,
+	})
+	if err != nil {
+		api.GinInternalError(c, err, "Cloud credential challenge verification failed")
 		return
 	}
 
-	api.GinSuccess(c, gin.H{"message": "iCloud credential authenticated successfully"})
+	api.GinSuccess(c, dto.VerifyCloudAuthChallengeResponse{
+		Credential: toCloudCredentialDTO(result.Credential, h.cloudService.ProviderTitle(cloud.ProviderKind(result.Credential.Provider))),
+		AuthStatus: result.AuthStatus,
+	})
 }
 
 // DisableCredential disables a saved cloud credential.
@@ -176,7 +209,7 @@ func (h *CloudHandler) DisableCredential(c *gin.Context) {
 	api.GinSuccess(c, gin.H{"message": "credential disabled"})
 }
 
-// StartRepositoryImport starts an iCloud import for a repository's binding.
+// StartRepositoryImport starts a cloud import for a repository's binding.
 // @Summary Start repository cloud import
 // @Description Start an import run for the repository's configured cloud credential.
 // @Tags cloud
@@ -246,7 +279,7 @@ func (h *CloudHandler) GetRepositoryCloudStatus(c *gin.Context) {
 		api.GinInternalError(c, err, "Failed to load repository cloud status")
 		return
 	}
-	api.GinSuccess(c, toRepositoryCloudStatusDTO(status))
+	api.GinSuccess(c, toRepositoryCloudStatusDTO(status, h.cloudService))
 }
 
 // GetImportRun returns a cloud import run.
@@ -292,16 +325,62 @@ func (h *CloudHandler) TriggerSync(c *gin.Context) {
 	api.GinBadRequest(c, errors.New("deprecated endpoint"), "Use repo-scoped cloud import endpoints")
 }
 
-func toCloudCredentialDTO(credential repo.CloudCredential) dto.CloudCredentialDTO {
+func toCloudProviderDTO(provider cloud.ProviderDescriptor) dto.CloudProviderDTO {
+	return dto.CloudProviderDTO{
+		ID:              string(provider.ID),
+		Title:           provider.Title,
+		Description:     provider.Description,
+		Status:          provider.Status,
+		FormFields:      toCloudProviderFieldDTOs(provider.FormFields),
+		ChallengeFields: toCloudProviderFieldDTOs(provider.ChallengeFields),
+		SecurityNote:    provider.SecurityNote,
+	}
+}
+
+func toCloudProviderFieldDTOs(fields []cloud.ProviderField) []dto.CloudProviderFieldDTO {
+	items := make([]dto.CloudProviderFieldDTO, 0, len(fields))
+	for _, field := range fields {
+		options := make([]dto.Option, 0, len(field.Options))
+		for _, option := range field.Options {
+			options = append(options, dto.Option{Value: option.Value, Label: option.Label})
+		}
+		items = append(items, dto.CloudProviderFieldDTO{
+			Name:         field.Name,
+			Label:        field.Label,
+			Type:         field.Type,
+			Required:     field.Required,
+			Placeholder:  field.Placeholder,
+			HelpText:     field.HelpText,
+			Options:      options,
+			Autocomplete: field.Autocomplete,
+		})
+	}
+	return items
+}
+
+func toCloudAuthChallengeDTO(challenge *cloud.AuthChallenge) *dto.CloudAuthChallengeDTO {
+	if challenge == nil {
+		return nil
+	}
+	return &dto.CloudAuthChallengeDTO{
+		Type:        challenge.Type,
+		Title:       challenge.Title,
+		Description: challenge.Description,
+		Fields:      toCloudProviderFieldDTOs(challenge.Fields),
+	}
+}
+
+func toCloudCredentialDTO(credential repo.CloudCredential, providerTitle string) dto.CloudCredentialDTO {
 	return dto.CloudCredentialDTO{
-		ID:            uuid.UUID(credential.CredentialID.Bytes).String(),
-		Provider:      credential.Provider,
-		DisplayName:   credential.DisplayName,
-		MaskedAccount: credential.MaskedAccount,
-		Domain:        credential.Domain,
-		Status:        credential.Status,
-		CreatedAt:     pgTimeOrZero(credential.CreatedAt),
-		UpdatedAt:     pgTimeOrZero(credential.UpdatedAt),
+		ID:             uuid.UUID(credential.CredentialID.Bytes).String(),
+		Provider:       credential.Provider,
+		ProviderTitle:  providerTitle,
+		DisplayName:    credential.DisplayName,
+		MaskedIdentity: credential.MaskedIdentity,
+		Status:         credential.Status,
+		PublicConfig:   publicConfigMap(credential.PublicConfig),
+		CreatedAt:      pgTimeOrZero(credential.CreatedAt),
+		UpdatedAt:      pgTimeOrZero(credential.UpdatedAt),
 	}
 }
 
@@ -325,7 +404,7 @@ func toCloudImportRunDTO(run repo.CloudImportRun) dto.CloudImportRunDTO {
 	}
 }
 
-func toRepositoryCloudStatusDTO(status cloud.RepositoryCloudStatus) dto.RepositoryCloudStatusDTO {
+func toRepositoryCloudStatusDTO(status cloud.RepositoryCloudStatus, cloudService cloud.CloudSyncService) dto.RepositoryCloudStatusDTO {
 	if status.Binding == nil {
 		return dto.RepositoryCloudStatusDTO{}
 	}
@@ -337,7 +416,7 @@ func toRepositoryCloudStatusDTO(status cloud.RepositoryCloudStatus) dto.Reposito
 		result.LastImportRun = uuid.UUID(status.Binding.LastImportRunID.Bytes).String()
 	}
 	if status.Credential != nil {
-		credential := toCloudCredentialDTO(*status.Credential)
+		credential := toCloudCredentialDTO(*status.Credential, cloudService.ProviderTitle(cloud.ProviderKind(status.Credential.Provider)))
 		result.Credential = &credential
 	}
 	if status.LatestRun != nil {
@@ -345,6 +424,17 @@ func toRepositoryCloudStatusDTO(status cloud.RepositoryCloudStatus) dto.Reposito
 		result.LatestRun = &run
 	}
 	return result
+}
+
+func publicConfigMap(data []byte) map[string]string {
+	if len(data) == 0 {
+		return nil
+	}
+	var config map[string]string
+	if err := json.Unmarshal(data, &config); err != nil || len(config) == 0 {
+		return nil
+	}
+	return config
 }
 
 func pgTimeOrZero(value pgtype.Timestamptz) time.Time {

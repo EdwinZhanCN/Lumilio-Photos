@@ -2,15 +2,10 @@ package service
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +13,7 @@ import (
 	"server/config"
 	"server/internal/db/repo"
 	"server/internal/llm"
+	"server/internal/secretbox"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -361,7 +357,7 @@ func (s *settingsService) ensureEncryptionSecret() error {
 			return
 		}
 
-		secret, err := loadOrCreateLumilioSecretKey(s.secretPath)
+		secret, err := secretbox.LoadOrCreateLumilioSecretKey(s.secretPath)
 		if err != nil {
 			s.secretErr = err
 			return
@@ -372,90 +368,12 @@ func (s *settingsService) ensureEncryptionSecret() error {
 	return s.secretErr
 }
 
-func loadOrCreateLumilioSecretKey(configuredPath string) (string, error) {
-	keyFile := strings.TrimSpace(configuredPath)
-	if keyFile != "" {
-		if !isExplicitFilePath(keyFile) {
-			return "", errors.New("LUMILIO_SECRET_KEY must be a key file path (absolute path, ./relative, or ../relative)")
-		}
-		keyFile = filepath.Clean(keyFile)
-	} else {
-		keyFile = defaultLumilioSecretKeyPath()
-	}
-
-	content, err := os.ReadFile(keyFile)
-	switch {
-	case err == nil:
-		secret := strings.TrimSpace(string(content))
-		if secret == "" {
-			return "", fmt.Errorf("LUMILIO secret key file is empty: %s", keyFile)
-		}
-		return secret, nil
-	case errors.Is(err, os.ErrNotExist):
-		// Continue to generate a new key.
-	default:
-		return "", fmt.Errorf("read LUMILIO secret key file %s: %w", keyFile, err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(keyFile), 0o700); err != nil {
-		return "", fmt.Errorf("create secret key directory: %w", err)
-	}
-
-	random := make([]byte, 32)
-	if _, err := io.ReadFull(rand.Reader, random); err != nil {
-		return "", fmt.Errorf("generate LUMILIO secret key: %w", err)
-	}
-
-	secret := fmt.Sprintf("%x", random)
-	if err := os.WriteFile(keyFile, []byte(secret+"\n"), 0o600); err != nil {
-		return "", fmt.Errorf("persist LUMILIO secret key: %w", err)
-	}
-
-	return secret, nil
-}
-
-func isExplicitFilePath(path string) bool {
-	if filepath.IsAbs(path) {
-		return true
-	}
-	return strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../")
-}
-
-func defaultLumilioSecretKeyPath() string {
-	storagePath := strings.TrimSpace(os.Getenv("STORAGE_PATH"))
-	if storagePath != "" {
-		normalized := filepath.Clean(storagePath)
-		if strings.EqualFold(filepath.Base(normalized), "primary") {
-			normalized = filepath.Dir(normalized)
-		}
-		return filepath.Join(normalized, ".secrets", "lumilio_secret_key")
-	}
-
-	return filepath.Join("data", "storage", ".secrets", "lumilio_secret_key")
-}
-
 func (s *settingsService) encrypt(plaintext string) ([]byte, error) {
 	key, err := s.encryptionKey()
 	if err != nil {
 		return nil, err
 	}
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, fmt.Errorf("create cipher: %w", err)
-	}
-
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, fmt.Errorf("create gcm: %w", err)
-	}
-
-	nonce := make([]byte, aead.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, fmt.Errorf("generate nonce: %w", err)
-	}
-
-	return aead.Seal(nonce, nonce, []byte(plaintext), nil), nil
+	return secretbox.NewWithKey(key).Encrypt(plaintext)
 }
 
 func (s *settingsService) decrypt(ciphertext []byte) (string, error) {
@@ -463,30 +381,7 @@ func (s *settingsService) decrypt(ciphertext []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return "", fmt.Errorf("create cipher: %w", err)
-	}
-
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", fmt.Errorf("create gcm: %w", err)
-	}
-
-	if len(ciphertext) < aead.NonceSize() {
-		return "", errors.New("invalid ciphertext")
-	}
-
-	nonce := ciphertext[:aead.NonceSize()]
-	data := ciphertext[aead.NonceSize():]
-
-	plaintext, err := aead.Open(nil, nonce, data, nil)
-	if err != nil {
-		return "", fmt.Errorf("decrypt settings secret: %w", err)
-	}
-
-	return string(plaintext), nil
+	return secretbox.NewWithKey(key).Decrypt(ciphertext)
 }
 
 func cloneBytes(src []byte) []byte {

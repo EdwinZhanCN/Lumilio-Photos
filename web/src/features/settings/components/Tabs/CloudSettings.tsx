@@ -12,19 +12,23 @@ import {
 import { useI18n } from "@/lib/i18n.tsx";
 import {
   useCloudCredentials,
-  useCreateICloudCredential,
+  useCloudProviders,
+  useCreateCloudCredential,
   useDisableCloudCredential,
-  useVerifyICloudCredential2FA,
+  useVerifyCloudCredentialChallenge,
+  type CloudAuthChallenge,
   type CloudCredential,
+  type CloudProvider,
+  type CloudProviderField,
 } from "../../hooks/useCloudSync";
 
-type ProviderChoice = "icloud";
+type FormValues = Record<string, string>;
 
 const credentialStatusClass = (status?: string) => {
   switch (status) {
     case "connected":
       return "badge-success";
-    case "pending_2fa":
+    case "pending_challenge":
       return "badge-warning";
     case "error":
       return "badge-error";
@@ -33,42 +37,57 @@ const credentialStatusClass = (status?: string) => {
   }
 };
 
+const fieldInitialValues = (fields: CloudProviderField[] = []): FormValues =>
+  fields.reduce<FormValues>((acc, field) => {
+    if (field.name) {
+      acc[field.name] = field.type === "select" ? (field.options?.[0]?.value ?? "") : "";
+    }
+    return acc;
+  }, {});
+
+const requiredFieldsFilled = (fields: CloudProviderField[] = [], values: FormValues) =>
+  fields.every((field) => !field.required || !field.name || values[field.name]?.trim());
+
 export default function CloudSettings() {
   const { t } = useI18n();
+  const providersQuery = useCloudProviders();
   const credentialsQuery = useCloudCredentials();
-  const createCredential = useCreateICloudCredential();
-  const verify2FA = useVerifyICloudCredential2FA();
+  const createCredential = useCreateCloudCredential();
+  const verifyChallenge = useVerifyCloudCredentialChallenge();
   const disableCredential = useDisableCloudCredential();
 
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [providerChoice, setProviderChoice] = useState<ProviderChoice | null>(null);
+  const [providerChoice, setProviderChoice] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [domain, setDomain] = useState<"com" | "cn">("com");
+  const [formValues, setFormValues] = useState<FormValues>({});
   const [pendingCredential, setPendingCredential] = useState<CloudCredential | null>(null);
-  const [verificationCode, setVerificationCode] = useState("");
+  const [pendingChallenge, setPendingChallenge] = useState<CloudAuthChallenge | null>(null);
+  const [challengeValues, setChallengeValues] = useState<FormValues>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const providers = useMemo(
+    () => providersQuery.data?.data?.providers ?? [],
+    [providersQuery.data],
+  );
   const credentials = useMemo(
     () => credentialsQuery.data?.data?.credentials ?? [],
     [credentialsQuery.data],
   );
+  const selectedProvider = providers.find((provider) => provider.id === providerChoice) ?? null;
   const connectedCount = credentials.filter((item) => item.status === "connected").length;
 
   const resetForm = () => {
     setDisplayName("");
-    setUsername("");
-    setPassword("");
-    setDomain("com");
-    setVerificationCode("");
+    setFormValues({});
+    setChallengeValues({});
     setPendingCredential(null);
+    setPendingChallenge(null);
     setProviderChoice(null);
   };
 
   const closeModal = () => {
-    if (createCredential.isPending || verify2FA.isPending) return;
+    if (createCredential.isPending || verifyChallenge.isPending) return;
     resetForm();
     setIsAddOpen(false);
   };
@@ -80,12 +99,18 @@ export default function CloudSettings() {
     setIsAddOpen(true);
   };
 
+  const chooseProvider = (provider: CloudProvider) => {
+    if (!provider.id) return;
+    setProviderChoice(provider.id);
+    setFormValues(fieldInitialValues(provider.form_fields));
+  };
+
   const statusLabel = (status?: string) => {
     switch (status) {
       case "connected":
         return t("settings.cloud.status.connected");
-      case "pending_2fa":
-        return t("settings.cloud.status.pending2FA");
+      case "pending_challenge":
+        return t("settings.cloud.status.pendingChallenge");
       case "error":
         return t("settings.cloud.status.error");
       case "disabled":
@@ -97,6 +122,7 @@ export default function CloudSettings() {
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!selectedProvider?.id) return;
     setErrorMsg(null);
     setSuccessMsg(null);
 
@@ -104,18 +130,19 @@ export default function CloudSettings() {
       const result = await createCredential.mutateAsync({
         body: {
           display_name: displayName.trim() || undefined,
-          username: username.trim(),
-          password,
-          domain,
+          provider: selectedProvider.id,
+          inputs: formValues,
         },
       });
       const credential = result.data?.credential;
       if (!credential) {
         throw new Error(t("settings.cloud.errors.emptyCredentialResponse"));
       }
-      if (result.data?.needs_2fa) {
+      if (result.data?.auth_status === "challenge_required" && result.data.challenge) {
         setPendingCredential(credential);
-        setSuccessMsg(t("settings.cloud.messages.verificationSent"));
+        setPendingChallenge(result.data.challenge);
+        setChallengeValues(fieldInitialValues(result.data.challenge.fields));
+        setSuccessMsg(t("settings.cloud.messages.challengeRequired"));
       } else {
         resetForm();
         setIsAddOpen(false);
@@ -130,19 +157,19 @@ export default function CloudSettings() {
 
   const handleVerify = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!pendingCredential) return;
+    if (!pendingCredential?.id) return;
     setErrorMsg(null);
     setSuccessMsg(null);
 
     try {
-      await verify2FA.mutateAsync({
+      await verifyChallenge.mutateAsync({
         params: {
           path: {
             id: pendingCredential.id,
           },
         },
         body: {
-          code: verificationCode,
+          inputs: challengeValues,
         },
       });
       resetForm();
@@ -170,7 +197,7 @@ export default function CloudSettings() {
       await disableCredential.mutateAsync({
         params: {
           path: {
-            id: credential.id,
+            id: credential.id ?? "",
           },
         },
       });
@@ -178,6 +205,55 @@ export default function CloudSettings() {
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : t("settings.cloud.errors.disableFailed"));
     }
+  };
+
+  const renderField = (
+    field: CloudProviderField,
+    values: FormValues,
+    setValues: (updater: (current: FormValues) => FormValues) => void,
+    disabled: boolean,
+  ) => {
+    if (!field.name) return null;
+    const id = `cloud-field-${field.name}`;
+    const value = values[field.name] ?? "";
+    const onChange = (next: string) => {
+      setValues((current) => ({ ...current, [field.name!]: next }));
+    };
+
+    return (
+      <label key={field.name} className="form-control w-full" htmlFor={id}>
+        <span className="label-text pb-1 text-sm font-medium">{field.label}</span>
+        {field.type === "select" ? (
+          <select
+            id={id}
+            className="select select-bordered w-full"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            disabled={disabled}
+            required={field.required}
+          >
+            {(field.options ?? []).map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            id={id}
+            type={field.type || "text"}
+            className={`input input-bordered w-full ${field.type === "password" ? "font-mono" : ""}`}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={field.placeholder}
+            autoComplete={field.autocomplete}
+            disabled={disabled}
+            required={field.required}
+          />
+        )}
+        {field.help_text && <span className="mt-1 text-xs text-base-content/55">{field.help_text}</span>}
+      </label>
+    );
   };
 
   return (
@@ -214,13 +290,16 @@ export default function CloudSettings() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {credentialsQuery.isLoading && <span className="loading loading-spinner loading-sm" />}
+            {(credentialsQuery.isLoading || providersQuery.isLoading) && (
+              <span className="loading loading-spinner loading-sm" />
+            )}
             <button
               type="button"
               className="btn btn-primary btn-sm btn-circle"
               onClick={openModal}
               aria-label={t("settings.cloud.addCredential")}
               title={t("settings.cloud.addCredential")}
+              disabled={providers.length === 0}
             >
               <PlusIcon size={18} />
             </button>
@@ -256,20 +335,21 @@ export default function CloudSettings() {
                       </div>
                       <p className="mt-1 text-xs text-base-content/60">
                         {t("settings.cloud.credentialMeta", {
-                          account: credential.masked_account,
-                          domain: credential.domain,
+                          provider: credential.provider_title ?? credential.provider,
+                          identity: credential.masked_identity,
                         })}
                       </p>
                     </div>
                   </div>
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm gap-2 text-error"
-                    onClick={() => handleDisable(credential)}
-                    disabled={disableCredential.isPending || credential.status === "disabled"}
+                    className="btn btn-ghost btn-xs btn-circle text-error"
+                    onClick={() => void handleDisable(credential)}
+                    disabled={disableCredential.isPending || !credential.id}
+                    aria-label={t("settings.cloud.disable")}
+                    title={t("settings.cloud.disable")}
                   >
-                    <LogOutIcon size={15} />
-                    {t("settings.cloud.disable")}
+                    <LogOutIcon size={16} />
                   </button>
                 </div>
               </article>
@@ -278,29 +358,28 @@ export default function CloudSettings() {
         )}
       </section>
 
-      <div className="rounded-lg border border-base-300 bg-base-200/40 p-4 text-sm text-base-content/70">
-        {t("settings.cloud.securityNote")}
-      </div>
-
       {isAddOpen && (
         <div className="modal modal-open">
           <div className="modal-box max-w-lg rounded-lg">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h3 className="text-lg font-semibold">
-                  {pendingCredential
-                    ? t("settings.cloud.verifyTitle")
-                    : providerChoice
-                      ? t("settings.cloud.icloudFormTitle")
+                  {pendingChallenge
+                    ? (pendingChallenge.title ?? t("settings.cloud.verifyTitle"))
+                    : selectedProvider
+                      ? t("settings.cloud.providerFormTitle", {
+                          provider: selectedProvider.title,
+                        })
                       : t("settings.cloud.providerTitle")}
                 </h3>
                 <p className="mt-1 text-sm text-base-content/65">
-                  {pendingCredential
-                    ? t("settings.cloud.verifyDescription", {
-                        name: pendingCredential.display_name,
-                      })
-                    : providerChoice
-                      ? t("settings.cloud.icloudFormDescription")
+                  {pendingChallenge
+                    ? (pendingChallenge.description ??
+                      t("settings.cloud.verifyDescription", {
+                        name: pendingCredential?.display_name,
+                      }))
+                    : selectedProvider
+                      ? (selectedProvider.security_note ?? t("settings.cloud.providerFormDescription"))
                       : t("settings.cloud.providerDescription")}
                 </p>
               </div>
@@ -308,42 +387,43 @@ export default function CloudSettings() {
                 type="button"
                 className="btn btn-ghost btn-sm btn-circle"
                 onClick={closeModal}
-                disabled={createCredential.isPending || verify2FA.isPending}
+                disabled={createCredential.isPending || verifyChallenge.isPending}
                 aria-label={t("common.close", { defaultValue: "Close" })}
               >
                 <XIcon size={18} />
               </button>
             </div>
 
-            {!providerChoice && !pendingCredential && (
+            {!selectedProvider && !pendingChallenge && (
               <div className="grid gap-3">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 rounded-lg border border-base-300 bg-base-100 p-4 text-left transition hover:border-primary"
-                  onClick={() => setProviderChoice("icloud")}
-                >
-                  <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <CloudIcon size={20} />
-                  </div>
-                  <div>
-                    <div className="font-semibold">
-                      {t("settings.cloud.providers.icloud.title")}
+                {providers.map((provider) => (
+                  <button
+                    key={provider.id}
+                    type="button"
+                    className="flex w-full items-center gap-3 rounded-lg border border-base-300 bg-base-100 p-4 text-left transition hover:border-primary disabled:opacity-60"
+                    onClick={() => chooseProvider(provider)}
+                    disabled={provider.status !== "enabled"}
+                  >
+                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <CloudIcon size={20} />
                     </div>
-                    <div className="text-sm text-base-content/60">
-                      {t("settings.cloud.providers.icloud.description")}
+                    <div className="min-w-0">
+                      <div className="font-semibold">{provider.title}</div>
+                      <div className="text-sm text-base-content/60">{provider.description}</div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                ))}
               </div>
             )}
 
-            {providerChoice === "icloud" && !pendingCredential && (
+            {selectedProvider && !pendingChallenge && (
               <form onSubmit={handleCreate} className="space-y-4">
-                <label className="form-control w-full">
+                <label className="form-control w-full" htmlFor="cloud-display-name">
                   <span className="label-text pb-1 text-sm font-medium">
                     {t("settings.cloud.fields.label")}
                   </span>
                   <input
+                    id="cloud-display-name"
                     type="text"
                     className="input input-bordered w-full"
                     value={displayName}
@@ -352,51 +432,9 @@ export default function CloudSettings() {
                     disabled={createCredential.isPending}
                   />
                 </label>
-
-                <label className="form-control w-full">
-                  <span className="label-text pb-1 text-sm font-medium">
-                    {t("settings.cloud.fields.appleId")}
-                  </span>
-                  <input
-                    type="email"
-                    className="input input-bordered w-full"
-                    value={username}
-                    onChange={(event) => setUsername(event.target.value)}
-                    placeholder={t("settings.cloud.placeholders.appleId")}
-                    disabled={createCredential.isPending}
-                    required
-                  />
-                </label>
-
-                <label className="form-control w-full">
-                  <span className="label-text pb-1 text-sm font-medium">
-                    {t("settings.cloud.fields.password")}
-                  </span>
-                  <input
-                    type="password"
-                    className="input input-bordered w-full font-mono"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    placeholder={t("settings.cloud.placeholders.password")}
-                    disabled={createCredential.isPending}
-                    required
-                  />
-                </label>
-
-                <label className="form-control w-full">
-                  <span className="label-text pb-1 text-sm font-medium">
-                    {t("settings.cloud.fields.domain")}
-                  </span>
-                  <select
-                    className="select select-bordered w-full"
-                    value={domain}
-                    onChange={(event) => setDomain(event.target.value as "com" | "cn")}
-                    disabled={createCredential.isPending}
-                  >
-                    <option value="com">{t("settings.cloud.domain.global")}</option>
-                    <option value="cn">{t("settings.cloud.domain.china")}</option>
-                  </select>
-                </label>
+                {(selectedProvider.form_fields ?? []).map((field) =>
+                  renderField(field, formValues, setFormValues, createCredential.isPending),
+                )}
 
                 <div className="modal-action">
                   <button
@@ -410,7 +448,10 @@ export default function CloudSettings() {
                   <button
                     type="submit"
                     className="btn btn-primary gap-2"
-                    disabled={!username.trim() || !password || createCredential.isPending}
+                    disabled={
+                      !requiredFieldsFilled(selectedProvider.form_fields, formValues) ||
+                      createCredential.isPending
+                    }
                   >
                     {createCredential.isPending ? (
                       <span className="loading loading-spinner loading-xs" />
@@ -423,23 +464,16 @@ export default function CloudSettings() {
               </form>
             )}
 
-            {pendingCredential && (
+            {pendingChallenge && (
               <form onSubmit={handleVerify} className="space-y-4">
-                <input
-                  type="text"
-                  maxLength={6}
-                  className="input input-bordered w-full text-center text-xl font-semibold tracking-widest"
-                  value={verificationCode}
-                  onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, ""))}
-                  disabled={verify2FA.isPending}
-                  autoFocus
-                  required
-                />
+                {(pendingChallenge.fields ?? []).map((field) =>
+                  renderField(field, challengeValues, setChallengeValues, verifyChallenge.isPending),
+                )}
                 <div className="modal-action">
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    disabled={verify2FA.isPending}
+                    disabled={verifyChallenge.isPending}
                     onClick={closeModal}
                   >
                     {t("common.cancel", { defaultValue: "Cancel" })}
@@ -447,9 +481,12 @@ export default function CloudSettings() {
                   <button
                     type="submit"
                     className="btn btn-primary"
-                    disabled={verificationCode.length !== 6 || verify2FA.isPending}
+                    disabled={
+                      !requiredFieldsFilled(pendingChallenge.fields, challengeValues) ||
+                      verifyChallenge.isPending
+                    }
                   >
-                    {verify2FA.isPending && <span className="loading loading-spinner loading-xs" />}
+                    {verifyChallenge.isPending && <span className="loading loading-spinner loading-xs" />}
                     {t("settings.cloud.verify")}
                   </button>
                 </div>

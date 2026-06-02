@@ -752,12 +752,16 @@
     "repositories": {
       "actionsMenu": "Library actions for {{name}}",
       "assetCount": "Assets",
-      "cloudCredentialLabel": "iCloud credential",
+      "cloudCredentialLabel": "Cloud credential",
       "cloudCredentialsHintLink": "Settings",
       "cloudCredentialsHintPrefix": "Need an account?",
       "cloudCredentialsHintSuffix": ".",
       "createAction": "Add library",
       "createFailed": "Failed to create library.",
+      "cloudImportCreatePartial": "Library created, but cloud import did not start: {{error}}",
+      "cloudImportCreateSuccess": "Library created. Cloud import has started for {{name}}.",
+      "cloudImportFailed": "Failed to start cloud import.",
+      "cloudImportStarted": "Cloud import started for {{name}}.",
       "createNameLabel": "Library name",
       "createNamePlaceholder": "Family Photos",
       "createSubmit": "Create library",
@@ -782,7 +786,8 @@
       "scanFailed": "Failed to queue scan.",
       "scanQueued": "Scan queued for {{name}}.",
       "selectCloudCredential": "Select credential",
-      "sourceICloud": "iCloud",
+      "sourceCloud": "Cloud",
+      "importFromCloud": "Import from cloud",
       "sourceLabel": "Source",
       "sourceLocal": "Local",
       "title": "Libraries",
@@ -1158,60 +1163,44 @@
       "connectCredential": "Connect credential",
       "connectedAccounts_one": "{{count}} connected account",
       "connectedAccounts_other": "{{count}} connected accounts",
-      "credentialMeta": "{{account}} · iCloud {{domain}}",
+      "credentialMeta": "{{provider}} · {{identity}}",
       "description": "Manage reusable cloud credentials. Repositories choose one of these accounts when they are created from Manage.",
       "disable": "Disable",
-      "domain": {
-        "china": "Mainland China iCloud",
-        "global": "Global iCloud"
-      },
-      "empty": "No iCloud credentials are configured.",
+      "empty": "No cloud credentials are configured.",
       "errors": {
-        "createFailed": "Failed to create iCloud credential.",
+        "createFailed": "Failed to create cloud credential.",
         "disableFailed": "Failed to disable credential.",
         "emptyCredentialResponse": "Credential response was empty.",
-        "verifyFailed": "Failed to verify iCloud 2FA code."
+        "verifyFailed": "Failed to verify credential challenge."
       },
       "fields": {
-        "appleId": "Apple ID",
-        "domain": "Apple domain",
-        "label": "Label",
-        "password": "App-specific password"
+        "label": "Label"
       },
-      "icloudFormDescription": "Lumilio uses this once to authenticate and then stores only the isolated iCloud session cookie.",
-      "icloudFormTitle": "Add iCloud credential",
       "messages": {
-        "connected": "iCloud credential connected.",
+        "challengeRequired": "Additional verification is required.",
+        "connected": "Cloud credential connected.",
         "disabled": "Cloud credential disabled.",
-        "verificationSent": "Apple sent a verification code to your trusted devices.",
-        "verified": "iCloud credential verified."
+        "verified": "Cloud credential verified."
       },
       "placeholders": {
-        "appleId": "you@icloud.com",
-        "label": "Personal iCloud",
-        "password": "xxxx-xxxx-xxxx-xxxx"
+        "label": "Personal cloud account"
       },
       "providerDescription": "Choose the cloud provider to connect. More providers can be added here later.",
-      "providers": {
-        "icloud": {
-          "description": "Import originals from iCloud Photos.",
-          "title": "iCloud"
-        }
-      },
+      "providerFormDescription": "Enter the provider-specific credentials to connect this account.",
+      "providerFormTitle": "Add {{provider}} credential",
       "providerTitle": "Choose provider",
       "savedTitle": "Saved credentials",
-      "securityNote": "Lumilio stores the iCloud session cookie in an isolated credential directory. The Apple ID password is used only during authentication and is not persisted.",
       "status": {
         "connected": "Connected",
         "disabled": "Disabled",
         "error": "Error",
-        "pending2FA": "Needs 2FA",
+        "pendingChallenge": "Needs verification",
         "unknown": "Unknown"
       },
       "title": "Cloud Import",
       "verify": "Verify",
-      "verifyDescription": "Enter the 6-digit code sent to your Apple devices for {{name}}.",
-      "verifyTitle": "Two-factor authentication"
+      "verifyDescription": "Complete verification for {{name}}.",
+      "verifyTitle": "Verification required"
     },
     "language": "Language",
     "languageAndRegion": "Language & Region",

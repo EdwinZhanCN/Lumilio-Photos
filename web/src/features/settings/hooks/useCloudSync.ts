@@ -8,8 +8,18 @@ type ApiResult<T = unknown> = Omit<Schemas["api.Result"], "data"> & {
 };
 
 export type CloudCredential = Schemas["dto.CloudCredentialDTO"];
+export type CloudProvider = Schemas["dto.CloudProviderDTO"];
+export type CloudAuthChallenge = Schemas["dto.CloudAuthChallengeDTO"];
+export type CloudProviderField = Schemas["dto.CloudProviderFieldDTO"];
 export type CloudImportRun = Schemas["dto.CloudImportRunDTO"];
 export type RepositoryCloudStatus = Schemas["dto.RepositoryCloudStatusDTO"];
+
+export function useCloudProviders() {
+  return $api.useQuery("get", "/api/v1/cloud/providers", {}) as UseQueryResult<
+    ApiResult<{ providers: CloudProvider[] }>,
+    unknown
+  >;
+}
 
 export function useCloudCredentials(options?: { refetchInterval?: number }) {
   return $api.useQuery("get", "/api/v1/cloud/credentials", {}, options) as UseQueryResult<
@@ -18,18 +28,18 @@ export function useCloudCredentials(options?: { refetchInterval?: number }) {
   >;
 }
 
-export function useCreateICloudCredential() {
+export function useCreateCloudCredential() {
   const queryClient = useQueryClient();
-  return $api.useMutation("post", "/api/v1/cloud/icloud/credentials", {
+  return $api.useMutation("post", "/api/v1/cloud/credentials", {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/cloud/credentials"] });
     },
   });
 }
 
-export function useVerifyICloudCredential2FA() {
+export function useVerifyCloudCredentialChallenge() {
   const queryClient = useQueryClient();
-  return $api.useMutation("post", "/api/v1/cloud/icloud/credentials/{id}/verify-2fa", {
+  return $api.useMutation("post", "/api/v1/cloud/credentials/{id}/auth-challenge", {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["get", "/api/v1/cloud/credentials"] });
     },

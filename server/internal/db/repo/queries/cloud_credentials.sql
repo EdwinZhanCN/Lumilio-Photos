@@ -3,16 +3,17 @@ INSERT INTO cloud_credentials (
     credential_id,
     provider,
     display_name,
-    account_identifier_hash,
-    masked_account,
-    domain,
+    identity_hash,
+    masked_identity,
     status,
-    cookie_dir,
+    public_config,
+    secret_ciphertext,
+    artifact_dir,
     created_by_user_id,
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now()
 ) RETURNING *;
 
 -- name: ListCloudCredentials :many
@@ -23,13 +24,23 @@ ORDER BY created_at DESC;
 SELECT * FROM cloud_credentials
 WHERE credential_id = $1;
 
--- name: GetCloudCredentialByAccount :one
+-- name: GetCloudCredentialByIdentity :one
 SELECT * FROM cloud_credentials
-WHERE provider = $1 AND account_identifier_hash = $2 AND domain = $3;
+WHERE provider = $1 AND identity_hash = $2;
 
 -- name: UpdateCloudCredentialStatus :one
 UPDATE cloud_credentials
 SET status = $2, updated_at = now()
+WHERE credential_id = $1
+RETURNING *;
+
+-- name: UpdateCloudCredentialAuthState :one
+UPDATE cloud_credentials
+SET status = $2,
+    public_config = $3,
+    secret_ciphertext = $4,
+    artifact_dir = $5,
+    updated_at = now()
 WHERE credential_id = $1
 RETURNING *;
 
@@ -63,6 +74,12 @@ RETURNING *;
 -- name: GetRepositoryCloudBinding :one
 SELECT * FROM repository_cloud_bindings
 WHERE repository_id = $1 AND provider = $2;
+
+-- name: GetActiveRepositoryCloudBinding :one
+SELECT * FROM repository_cloud_bindings
+WHERE repository_id = $1 AND enabled = true
+ORDER BY created_at DESC
+LIMIT 1;
 
 -- name: ListRepositoryCloudBindings :many
 SELECT * FROM repository_cloud_bindings
