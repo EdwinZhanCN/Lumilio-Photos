@@ -2948,6 +2948,42 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.SetupRequestDTO": {
+                "properties": {
+                    "admin_username": {
+                        "type": "string"
+                    },
+                    "site_name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.SetupResultDTO": {
+                "properties": {
+                    "admin_username": {
+                        "type": "string"
+                    },
+                    "database_user": {
+                        "type": "string"
+                    },
+                    "password_length": {
+                        "type": "integer"
+                    },
+                    "site_name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.SetupStatusDTO": {
+                "properties": {
+                    "initialized": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
             "dto.SpeciesReferenceResponseDTO": {
                 "properties": {
                     "common_name": {
@@ -13558,6 +13594,162 @@ const docTemplate = `{
                 "summary": "Validate LLM settings",
                 "tags": [
                     "settings"
+                ]
+            }
+        },
+        "/api/v1/setup": {
+            "post": {
+                "description": "Run first-run bootstrapping: generate and rotate the database credential, persist the secret, and write system metadata. Refused once the system is already initialized.",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/dto.SetupRequestDTO",
+                                        "summary": "request",
+                                        "description": "Setup payload"
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "description": "Setup payload",
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "System initialized successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request data"
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "System already initialized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Initialize the system",
+                "tags": [
+                    "setup"
+                ]
+            }
+        },
+        "/api/v1/setup/status": {
+            "get": {
+                "description": "Report whether Lumilio has completed first-run initialization. The web frontend routes all traffic to the setup wizard while uninitialized.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Setup status retrieved successfully"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "summary": "Get system setup status",
+                "tags": [
+                    "setup"
                 ]
             }
         },

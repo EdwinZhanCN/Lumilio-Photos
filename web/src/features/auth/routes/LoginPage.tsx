@@ -1,13 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-  AlertCircle,
-  Info,
-  KeyRound,
-  LogIn,
-  ShieldCheck,
-  User,
-} from "lucide-react";
+import { ArrowLeft, Fingerprint, KeyRound, Smartphone, User } from "lucide-react";
 import { $api } from "@/lib/http-commons/queryClient";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useAuth } from "../hooks/useAuth.ts";
@@ -26,6 +19,16 @@ import {
   USERNAME_PATTERN,
   normalizeUsernameInput,
 } from "../lib/credentialPolicy.ts";
+import {
+  AuthShell,
+  Btn,
+  CardHead,
+  Field,
+  InlineError,
+  OtpInput,
+  PasswordField,
+  TextInput,
+} from "../components/ui.tsx";
 
 type AuthRedirectState = {
   from?: {
@@ -41,8 +44,6 @@ type LoginChallenge = {
   mfaMethods: MFAMethod[];
 };
 
-const RECOVERY_CODE_PATTERN = "[A-Za-z0-9]{4}-?[A-Za-z0-9]{4}";
-
 function getApiMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -57,29 +58,14 @@ function getApiMessage(error: unknown, fallback: string): string {
 
 const LoginPage: React.FC = () => {
   const { t } = useI18n();
-  const {
-    login,
-    verifyMFA,
-    completeAuth,
-    dispatch,
-    isAuthenticated,
-    isLoading,
-    error,
-  } = useAuth();
-  const passkeyOptionsMutation = $api.useMutation(
-    "post",
-    "/api/v1/auth/passkeys/login/options",
-  );
-  const passkeyVerifyMutation = $api.useMutation(
-    "post",
-    "/api/v1/auth/passkeys/login/verify",
-  );
+  const { login, verifyMFA, completeAuth, dispatch, isAuthenticated, isLoading, error } = useAuth();
+  const passkeyOptionsMutation = $api.useMutation("post", "/api/v1/auth/passkeys/login/options");
+  const passkeyVerifyMutation = $api.useMutation("post", "/api/v1/auth/passkeys/login/verify");
   const location = useLocation();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [showPasswordStep, setShowPasswordStep] = useState(false);
   const [challenge, setChallenge] = useState<LoginChallenge | null>(null);
   const [mfaCode, setMfaCode] = useState("");
   const [mfaMethod, setMfaMethod] = useState<MFAMethod>("totp");
@@ -92,16 +78,12 @@ const LoginPage: React.FC = () => {
   }, [location.state]);
 
   const passkeySupport = useMemo(() => getPasskeySupport(), []);
-  const displayName =
-    challenge?.user?.display_name || challenge?.user?.username || username;
-  const recoveryCodeAvailable =
-    challenge?.mfaMethods.includes("recovery_code") ?? false;
-  const passkeyBusy =
-    passkeyOptionsMutation.isPending || passkeyVerifyMutation.isPending;
+  const displayName = challenge?.user?.display_name || challenge?.user?.username || username;
+  const recoveryCodeAvailable = challenge?.mfaMethods.includes("recovery_code") ?? false;
+  const passkeyBusy = passkeyOptionsMutation.isPending || passkeyVerifyMutation.isPending;
   const displayError = passkeyError ?? error;
-  const passkeySupportReason = passkeySupport.reasonKey
-    ? t(passkeySupport.reasonKey)
-    : null;
+  const passkeySupportReason = passkeySupport.reasonKey ? t(passkeySupport.reasonKey) : null;
+  const usernameValid = username.trim().length >= USERNAME_MIN_LENGTH;
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -109,9 +91,7 @@ const LoginPage: React.FC = () => {
     }
   }, [isAuthenticated, isLoading, navigate, redirectTo]);
 
-  const handlePasswordLogin = async (
-    event?: React.FormEvent<HTMLFormElement>,
-  ) => {
+  const handlePasswordLogin = async (event?: React.FormEvent<HTMLFormElement>) => {
     event?.preventDefault();
     setPasskeyError(null);
     try {
@@ -132,23 +112,24 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handlePasskeyLogin = async (
-    event?: React.FormEvent<HTMLFormElement>,
-  ) => {
-    event?.preventDefault();
+  const handlePasskeyLogin = async () => {
     setPasskeyError(null);
+    if (!usernameValid) {
+      setPasskeyError(
+        t("auth.login.usernameRequiredForPasskey", {
+          defaultValue: "Enter your username to continue with a passkey.",
+        }),
+      );
+      return;
+    }
 
     try {
       const optionsResponse = await passkeyOptionsMutation.mutateAsync({
         body: { username },
       });
-      const optionsData = optionsResponse as
-        | ApiResult<PasskeyOptionsResponse>
-        | undefined;
+      const optionsData = optionsResponse as ApiResult<PasskeyOptionsResponse> | undefined;
       if (!optionsData?.data) {
-        throw new Error(
-          optionsData?.message || t("auth.login.passkeyStartError"),
-        );
+        throw new Error(optionsData?.message || t("auth.login.passkeyStartError"));
       }
 
       const credential = await getPasskeyCredential(optionsData.data.options);
@@ -160,376 +141,246 @@ const LoginPage: React.FC = () => {
       });
       const verifyData = verifyResponse as ApiResult<AuthResponse> | undefined;
       if (!verifyData?.data) {
-        throw new Error(
-          verifyData?.message || t("auth.login.passkeyVerifyError"),
-        );
+        throw new Error(verifyData?.message || t("auth.login.passkeyVerifyError"));
       }
 
       await completeAuth(verifyData.data);
       navigate(redirectTo, { replace: true });
     } catch (passkeyAuthError) {
-      setPasskeyError(
-        getApiMessage(passkeyAuthError, t("auth.login.passkeyUnavailable")),
-      );
+      setPasskeyError(getApiMessage(passkeyAuthError, t("auth.login.passkeyUnavailable")));
     }
   };
 
-  const handleVerifyMFA = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleVerifyMFA = async (code?: string) => {
     if (!challenge) return;
-
+    const value = code ?? mfaCode;
     try {
-      await verifyMFA(challenge.mfaToken, mfaCode, mfaMethod);
+      await verifyMFA(challenge.mfaToken, value, mfaMethod);
       navigate(redirectTo, { replace: true });
     } catch {
+      setMfaCode("");
       // Auth context owns MFA errors.
     }
   };
 
-  const handleBack = () => {
-    if (challenge) {
-      setChallenge(null);
-      setMfaCode("");
-      setMfaMethod("totp");
-      dispatch({ type: "AUTH_IDLE" });
-      return;
-    }
-
-    setShowPasswordStep(false);
-    setPassword("");
-    setPasskeyError(null);
+  const handleBackToLogin = () => {
+    setChallenge(null);
+    setMfaCode("");
+    setMfaMethod("totp");
     dispatch({ type: "AUTH_IDLE" });
   };
 
-  return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-base-200 px-4 py-12">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -right-48 -top-48 h-96 w-96 rounded-full bg-primary/8 blur-3xl" />
-        <div className="absolute -bottom-48 -left-48 h-96 w-96 rounded-full bg-secondary/8 blur-3xl" />
-      </div>
+  /* ----------------------------------------------------- MFA verify view --- */
+  if (challenge) {
+    const isRecovery = mfaMethod === "recovery_code";
+    return (
+      <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
+        <AuthShell appName={t("app.name", { defaultValue: "Lumilio" })}>
+          <CardHead
+            icon={isRecovery ? KeyRound : Smartphone}
+            title={
+              isRecovery
+                ? t("auth.login.recoveryTitle", {
+                    defaultValue: "Enter a recovery code",
+                  })
+                : t("auth.login.verifyTitle", {
+                    defaultValue: "Two-factor authentication",
+                  })
+            }
+            sub={
+              isRecovery
+                ? t("auth.login.recoveryHint", {
+                    defaultValue: "Use one of the codes you saved when setting up your account.",
+                  })
+                : t("auth.login.verifyPrompt", {
+                    defaultValue:
+                      "Enter the 6-digit code from your authenticator app for {{name}}.",
+                    name: displayName,
+                  })
+            }
+          />
 
-      <div className="relative w-full max-w-md">
-        <div className="card bg-base-100 shadow-2xl ring-1 ring-base-content/5">
-          <div className="card-body gap-7 p-8 sm:p-10">
-            <div className="flex flex-col items-center gap-5 text-center">
-              <div className="inline-flex items-center gap-4 text-3xl font-bold tracking-tight text-base-content sm:text-4xl">
-                <img
-                  src="/logo.png"
-                  alt={t("auth.common.logoAlt", {
-                    appName: t("app.name"),
-                  })}
-                  className="size-10 bg-contain object-contain sm:size-12"
-                />
-                <span>{t("app.name")}</span>
-              </div>
+          {displayError && (
+            <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
+          )}
 
-              <div className="space-y-1.5">
-                <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-                  {challenge
-                    ? t("auth.login.verifyTitle", {
-                        defaultValue: "Two-factor verification",
-                      })
-                    : showPasswordStep
-                      ? t("auth.login.passwordTitle", {
-                          defaultValue: "Enter your password",
-                        })
-                      : t("auth.login.usernameTitle", {
-                          defaultValue: "Continue with your username",
-                        })}
-                </h1>
-
-                {(challenge || showPasswordStep) && (
-                  <p className="text-sm text-base-content/80">
-                    {challenge
-                      ? t("auth.login.verifySubtitle", {
-                          defaultValue:
-                            "Complete sign in with your authenticator app or a recovery code.",
-                        })
-                      : t("auth.login.passwordSubtitle", {
-                          defaultValue:
-                            "Use your password if you prefer not to use a passkey on this device.",
-                        })}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {displayError && (
-              <div className="alert alert-error py-3 text-sm">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{t(displayError, { defaultValue: displayError })}</span>
-              </div>
-            )}
-
-            {challenge ? (
-              <form className="flex flex-col gap-5" onSubmit={handleVerifyMFA}>
-                <div className="flex items-start gap-3 rounded-xl border border-base-300 bg-base-200/70 p-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15">
-                    <User className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold leading-snug">
-                      {t("auth.login.verifyPrompt", {
-                        defaultValue: "Continuing as {{name}}",
-                        name: displayName,
-                      })}
-                    </p>
-                    <p className="mt-0.5 text-xs text-base-content/80">
-                      {mfaMethod === "recovery_code"
-                        ? t("auth.login.recoveryHint", {
-                            defaultValue:
-                              "Enter one of your one-time recovery codes.",
-                          })
-                        : t("auth.login.totpHint", {
-                            defaultValue:
-                              "Enter the 6-digit code from your authenticator app.",
-                          })}
-                    </p>
-                  </div>
-                </div>
-
-                <fieldset className="fieldset">
-                  <legend className="fieldset-legend text-xs font-medium uppercase tracking-wider text-base-content/70">
-                    {mfaMethod === "recovery_code"
-                      ? t("auth.login.recoveryCode", {
-                          defaultValue: "Recovery code",
-                        })
-                      : t("auth.login.authenticatorCode", {
-                          defaultValue: "Authenticator code",
-                        })}
-                  </legend>
-                  <label className="input input-bordered validator flex w-full items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 shrink-0 text-base-content/70" />
-                    <input
-                      type="text"
-                      inputMode={
-                        mfaMethod === "recovery_code" ? "text" : "numeric"
-                      }
-                      autoComplete="one-time-code"
-                      autoFocus
-                      className="grow"
-                      placeholder={
-                        mfaMethod === "recovery_code"
-                          ? t("auth.login.recoveryCodePlaceholder")
-                          : t("auth.login.authenticatorCodePlaceholder")
-                      }
-                      value={mfaCode}
-                      onChange={(event) => setMfaCode(event.target.value)}
-                      pattern={
-                        mfaMethod === "recovery_code"
-                          ? RECOVERY_CODE_PATTERN
-                          : "[0-9]{6}"
-                      }
-                      required
-                    />
-                    <div
-                      className="tooltip tooltip-left cursor-help"
-                      data-tip={
-                        mfaMethod === "recovery_code"
-                          ? t("auth.login.recoveryValidation", {
-                              defaultValue:
-                                "Enter an 8-character recovery code.",
-                            })
-                          : t("auth.login.totpValidation", {
-                              defaultValue:
-                                "Enter a 6-digit authenticator code.",
-                            })
-                      }
-                    >
-                      <Info className="h-3.5 w-3.5 text-base-content/70 transition-colors hover:text-base-content" />
-                    </div>
-                  </label>
-                </fieldset>
-
-                <div className="flex gap-2.5">
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-square"
-                    onClick={handleBack}
-                    title={t("auth.login.back", { defaultValue: "Back" })}
-                  ></button>
-                  <button
-                    type="submit"
-                    className={`btn btn-primary flex-1 ${isLoading ? "loading" : ""}`}
-                    disabled={isLoading}
-                  >
-                    {!isLoading && <ShieldCheck className="h-4 w-4" />}
-                    {isLoading
-                      ? t("auth.login.verifying", {
-                          defaultValue: "Verifying…",
-                        })
-                      : t("auth.login.verifyButton", {
-                          defaultValue: "Verify and continue",
-                        })}
-                  </button>
-                </div>
-
-                {recoveryCodeAvailable && (
-                  <div className="text-center">
-                    <button
-                      type="button"
-                      className="btn btn-link btn-sm px-0 text-xs"
-                      onClick={() =>
-                        setMfaMethod((current) =>
-                          current === "totp" ? "recovery_code" : "totp",
-                        )
-                      }
-                    >
-                      {mfaMethod === "totp"
-                        ? t("auth.login.useRecoveryCode", {
-                            defaultValue: "Use a recovery code instead",
-                          })
-                        : t("auth.login.useAuthenticatorCode", {
-                            defaultValue: "Use an authenticator code instead",
-                          })}
-                    </button>
-                  </div>
-                )}
-              </form>
-            ) : (
-              <form
-                className="flex flex-col gap-4"
-                onSubmit={
-                  showPasswordStep || !passkeySupport.supported
-                    ? handlePasswordLogin
-                    : handlePasskeyLogin
-                }
-              >
-                <fieldset className="fieldset">
-                  <legend className="fieldset-legend text-xs font-medium uppercase tracking-wider text-base-content/70">
-                    {t("auth.login.username", { defaultValue: "Username" })}
-                  </legend>
-                  <label className="input input-bordered validator flex w-full items-center gap-2">
-                    <User className="h-4 w-4 shrink-0 text-base-content/70" />
-                    <input
-                      type="text"
-                      placeholder={t("auth.login.usernamePlaceholder")}
-                      className="grow"
-                      value={username}
-                      onChange={(event) =>
-                        setUsername(normalizeUsernameInput(event.target.value))
-                      }
-                      pattern={USERNAME_PATTERN}
-                      minLength={USERNAME_MIN_LENGTH}
-                      maxLength={USERNAME_MAX_LENGTH}
-                      autoComplete="username webauthn"
-                      autoFocus
-                      required
-                    />
-                    <div
-                      className="tooltip tooltip-left cursor-help"
-                      data-tip={t("auth.login.usernameHint", {
-                        defaultValue: USERNAME_HINT,
-                      })}
-                    >
-                      <Info className="h-3.5 w-3.5 text-base-content/70 transition-colors hover:text-base-content" />
-                    </div>
-                  </label>
-                </fieldset>
-
-                {showPasswordStep && (
-                  <fieldset className="fieldset">
-                    <legend className="fieldset-legend text-xs font-medium uppercase tracking-wider text-base-content/70">
-                      {t("auth.login.password", { defaultValue: "Password" })}
-                    </legend>
-                    <label className="input input-bordered validator flex w-full items-center gap-2">
-                      <KeyRound className="h-4 w-4 shrink-0 text-base-content/70" />
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        className="grow"
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        autoComplete="current-password"
-                        required
-                      />
-                    </label>
-                  </fieldset>
-                )}
-
-                {!showPasswordStep && passkeySupportReason && (
-                  <div className="rounded-xl border border-base-300 bg-base-200/60 p-4 text-sm text-base-content/80">
-                    {passkeySupportReason}
-                  </div>
-                )}
-
-                <div className="flex gap-2.5">
-                  {showPasswordStep && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-square"
-                      onClick={handleBack}
-                      title={t("auth.login.back", { defaultValue: "Back" })}
-                    ></button>
-                  )}
-
-                  {showPasswordStep || !passkeySupport.supported ? (
-                    <button
-                      type="submit"
-                      className={`btn btn-primary flex-1 ${isLoading ? "loading" : ""}`}
-                      disabled={isLoading}
-                    >
-                      {!isLoading && <LogIn className="h-4 w-4" />}
-                      {isLoading
-                        ? t("auth.login.loading", {
-                            defaultValue: "Signing in…",
-                          })
-                        : t("auth.login.submit", {
-                            defaultValue: "Continue with password",
-                          })}
-                    </button>
-                  ) : (
-                    <div className="flex w-full flex-col gap-2.5">
-                      <button
-                        type="submit"
-                        className={`btn btn-primary w-full ${passkeyBusy ? "loading" : ""}`}
-                        disabled={passkeyBusy}
-                      >
-                        {!passkeyBusy && <ShieldCheck className="h-4 w-4" />}
-                        {passkeyBusy
-                          ? t("auth.login.passkeyLoading", {
-                              defaultValue: "Opening passkey…",
-                            })
-                          : t("auth.login.passkeySubmit", {
-                              defaultValue: "Continue with Passkey",
-                            })}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline w-full"
-                        onClick={() => {
-                          setShowPasswordStep(true);
-                          setPasskeyError(null);
-                        }}
-                      >
-                        {t("auth.login.usePasswordInstead", {
-                          defaultValue: "Use password instead",
-                        })}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </form>
-            )}
-
-            <div className="divider my-0 text-xs text-base-content/70">
-              {t("common.or", { defaultValue: "OR" })}
-            </div>
-
-            <div className="text-center">
-              <Link
-                to="/register"
-                state={location.state}
-                className="btn btn-link btn-sm"
-              >
-                {t("auth.login.register", {
-                  defaultValue: "Create an account",
+          {isRecovery ? (
+            <form
+              className="flex flex-col gap-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleVerifyMFA();
+              }}
+            >
+              <Field
+                label={t("auth.login.recoveryCode", {
+                  defaultValue: "Recovery code",
                 })}
-              </Link>
+              >
+                <TextInput
+                  icon={KeyRound}
+                  placeholder="xxxxx-xxxxx"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  autoComplete="one-time-code"
+                  autoFocus
+                />
+              </Field>
+              <Btn
+                type="submit"
+                variant="primary"
+                loading={isLoading}
+                disabled={mfaCode.trim().length < 8}
+              >
+                {t("auth.login.useRecoveryCode", {
+                  defaultValue: "Use recovery code",
+                })}
+              </Btn>
+            </form>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <OtpInput
+                value={mfaCode}
+                onChange={setMfaCode}
+                onComplete={(value) => void handleVerifyMFA(value)}
+              />
+              <Btn
+                variant="primary"
+                loading={isLoading}
+                disabled={mfaCode.length < 6}
+                onClick={() => void handleVerifyMFA()}
+              >
+                {t("auth.login.verifyButton", {
+                  defaultValue: "Verify",
+                })}
+              </Btn>
             </div>
+          )}
+
+          <div className="flex flex-col items-center gap-2 text-sm">
+            {recoveryCodeAvailable && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMfaMethod((m) => (m === "totp" ? "recovery_code" : "totp"));
+                  setMfaCode("");
+                }}
+                className="font-medium text-base-content/55 hover:text-base-content"
+              >
+                {isRecovery
+                  ? t("auth.login.useAuthenticatorCode", {
+                      defaultValue: "Use an authenticator code instead",
+                    })
+                  : t("auth.login.useRecoveryCodeInstead", {
+                      defaultValue: "Can’t access your app? Use a recovery code",
+                    })}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleBackToLogin}
+              className="flex items-center gap-1 text-base-content/40 hover:text-base-content/65"
+            >
+              <ArrowLeft size={14} />{" "}
+              {t("auth.login.backToSignIn", {
+                defaultValue: "Back to sign in",
+              })}
+            </button>
           </div>
-        </div>
+        </AuthShell>
       </div>
+    );
+  }
+
+  /* ---------------------------------------------------------- login view --- */
+  return (
+    <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
+      <AuthShell appName={t("app.name", { defaultValue: "Lumilio" })}>
+        <CardHead
+          title={t("auth.login.title", { defaultValue: "Sign in to Lumilio" })}
+          sub={t("auth.login.subtitle", {
+            defaultValue: "Use a passkey, or your username and password.",
+          })}
+        />
+
+        {displayError && (
+          <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
+        )}
+
+        <Field
+          label={t("auth.login.username", { defaultValue: "Username" })}
+          hint={t("auth.login.usernameHint", { defaultValue: USERNAME_HINT })}
+        >
+          <TextInput
+            icon={User}
+            type="text"
+            placeholder={t("auth.login.usernamePlaceholder", {
+              defaultValue: "your-username",
+            })}
+            value={username}
+            onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
+            pattern={USERNAME_PATTERN}
+            minLength={USERNAME_MIN_LENGTH}
+            maxLength={USERNAME_MAX_LENGTH}
+            autoComplete="username webauthn"
+            autoFocus
+          />
+        </Field>
+
+        {passkeySupport.supported ? (
+          <Btn
+            variant="primary"
+            icon={Fingerprint}
+            loading={passkeyBusy}
+            onClick={() => void handlePasskeyLogin()}
+          >
+            {t("auth.login.passkeySubmit", {
+              defaultValue: "Sign in with a passkey",
+            })}
+          </Btn>
+        ) : (
+          passkeySupportReason && (
+            <div className="rounded-xl border border-base-200 bg-base-200/50 px-4 py-3 text-sm text-base-content/65">
+              {passkeySupportReason}
+            </div>
+          )
+        )}
+
+        <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-base-content/35">
+          <span className="h-px grow bg-base-200" /> {t("common.or", { defaultValue: "or" })}{" "}
+          <span className="h-px grow bg-base-200" />
+        </div>
+
+        <form className="flex flex-col gap-4" onSubmit={(e) => void handlePasswordLogin(e)}>
+          <PasswordField
+            label={t("auth.login.password", { defaultValue: "Password" })}
+            value={password}
+            onChange={setPassword}
+            autoComplete="current-password"
+          />
+          <Btn
+            type="submit"
+            variant="outline"
+            loading={isLoading}
+            disabled={!usernameValid || password.length === 0}
+          >
+            {t("auth.login.submit", {
+              defaultValue: "Continue with password",
+            })}
+          </Btn>
+        </form>
+
+        <div className="text-center text-sm text-base-content/55">
+          {t("auth.login.registerPrompt", { defaultValue: "New to Lumilio?" })}{" "}
+          <Link
+            to="/register"
+            state={location.state}
+            className="font-medium text-base-content underline-offset-2 hover:underline"
+          >
+            {t("auth.login.register", { defaultValue: "Create an account" })}
+          </Link>
+        </div>
+      </AuthShell>
     </div>
   );
 };

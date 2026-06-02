@@ -245,6 +245,7 @@ func main() {
 	// Initialize controllers with new storage system
 	assetController := handler.NewAssetHandler(assetService, authService, indexingService, stackService, queries, repoManager, stagingManager, queueClient, settingsService, lumenService)
 	authController := handler.NewAuthHandler(authService)
+	setupController := handler.NewSetupHandler(service.NewSetupService(dbConfig))
 	albumController := handler.NewAlbumHandler(&albumService, queries, queueClient, settingsService, lumenService)
 	peopleController := handler.NewPeopleHandler(assetService, faceService, authService, repoManager)
 	locationController := handler.NewLocationHandler(locationService, queueClient)
@@ -273,6 +274,7 @@ func main() {
 	router := api.NewRouter(
 		assetController,
 		authController,
+		setupController,
 		albumController,
 		peopleController,
 		locationController,

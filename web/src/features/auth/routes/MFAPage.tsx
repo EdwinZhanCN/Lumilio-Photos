@@ -22,6 +22,7 @@ import {
   type RecoveryCodesResponse,
   type TOTPSetupResponse,
 } from "../hooks/useMFA.ts";
+import { OtpInput } from "../components/ui.tsx";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -120,19 +121,13 @@ export default function MFAPage(): React.ReactNode {
   const regenerateRecoveryCodes = useRegenerateRecoveryCodes();
   const autoSetupTriggeredRef = useRef(false);
 
-  const [setupResponse, setSetupResponse] = useState<TOTPSetupResponse | null>(
-    null,
-  );
+  const [setupResponse, setSetupResponse] = useState<TOTPSetupResponse | null>(null);
   const [verificationCode, setVerificationCode] = useState("");
   const [disablePassword, setDisablePassword] = useState("");
   const [regeneratePassword, setRegeneratePassword] = useState("");
   const [feedback, setFeedback] = useState<FeedbackState>(null);
-  const [revealedRecoveryCodes, setRevealedRecoveryCodes] = useState<string[]>(
-    [],
-  );
-  const [activeAction, setActiveAction] = useState<
-    "disable" | "regenerate" | null
-  >(null);
+  const [revealedRecoveryCodes, setRevealedRecoveryCodes] = useState<string[]>([]);
+  const [activeAction, setActiveAction] = useState<"disable" | "regenerate" | null>(null);
   const [qrCodeDataURL, setQrCodeDataURL] = useState<string | null>(null);
 
   const status = statusQuery.data?.data as MFAStatus | undefined;
@@ -145,8 +140,7 @@ export default function MFAPage(): React.ReactNode {
     () => revealedRecoveryCodes.join("\n"),
     [revealedRecoveryCodes],
   );
-  const isBootstrapOnboarding =
-    searchParams.get("welcome") === "bootstrap-admin";
+  const isBootstrapOnboarding = searchParams.get("welcome") === "bootstrap-admin";
   const shouldAutoStartSetup = searchParams.get("mfa") === "setup";
   const requestedAction = searchParams.get("action");
 
@@ -193,9 +187,10 @@ export default function MFAPage(): React.ReactNode {
     }
   };
 
-  const handleEnable = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleEnable = async (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
     if (!setupResponse) return;
+    if (verificationCode.length < 6) return;
 
     setFeedback(null);
 
@@ -482,9 +477,7 @@ export default function MFAPage(): React.ReactNode {
                   <div className="flex flex-wrap items-center gap-3">
                     <span
                       className={`badge font-medium ${
-                        status?.totp_enabled
-                          ? "badge-success badge-outline"
-                          : "badge-ghost"
+                        status?.totp_enabled ? "badge-success badge-outline" : "badge-ghost"
                       }`}
                     >
                       {status?.totp_enabled
@@ -511,9 +504,7 @@ export default function MFAPage(): React.ReactNode {
                         disabled={isBusy}
                         onClick={handleBeginSetup}
                       >
-                        {!beginSetupMutation.isPending && (
-                          <ShieldCheck className="h-4 w-4" />
-                        )}
+                        {!beginSetupMutation.isPending && <ShieldCheck className="h-4 w-4" />}
                         {t("settings.account.mfa.beginSetup", {
                           defaultValue: "Set up TOTP",
                         })}
@@ -526,9 +517,7 @@ export default function MFAPage(): React.ReactNode {
                           type="button"
                           className={`btn btn-outline btn-sm ${activeAction === "regenerate" ? "btn-active" : ""}`}
                           onClick={() =>
-                            setActiveAction((c) =>
-                              c === "regenerate" ? null : "regenerate",
-                            )
+                            setActiveAction((c) => (c === "regenerate" ? null : "regenerate"))
                           }
                         >
                           {t("settings.account.mfa.regenerateButton", {
@@ -539,9 +528,7 @@ export default function MFAPage(): React.ReactNode {
                           type="button"
                           className={`btn btn-outline btn-error btn-sm ${activeAction === "disable" ? "btn-active" : ""}`}
                           onClick={() =>
-                            setActiveAction((c) =>
-                              c === "disable" ? null : "disable",
-                            )
+                            setActiveAction((c) => (c === "disable" ? null : "disable"))
                           }
                         >
                           {t("settings.account.mfa.disableButton", {
@@ -568,8 +555,7 @@ export default function MFAPage(): React.ReactNode {
                     </p>
                     <h4 className="text-lg font-semibold tracking-tight">
                       {t("settings.account.mfa.setupTitle", {
-                        defaultValue:
-                          "Scan the QR code with your authenticator app",
+                        defaultValue: "Scan the QR code with your authenticator app",
                       })}
                     </h4>
                     <p className="text-sm text-base-content/80">
@@ -689,42 +675,21 @@ export default function MFAPage(): React.ReactNode {
                         defaultValue: "Verification code",
                       })}
                     </legend>
-                    <label className="input input-bordered validator flex w-full items-center gap-2">
-                      <ShieldCheck className="h-4 w-4 shrink-0 text-base-content/70" />
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="123456"
-                        className="grow font-mono tracking-widest"
-                        autoComplete="one-time-code"
-                        value={verificationCode}
-                        onChange={(event) =>
-                          setVerificationCode(event.target.value)
-                        }
-                        pattern="[0-9]{6}"
-                        required
-                      />
-                      <div
-                        className="tooltip tooltip-left cursor-help"
-                        data-tip={t("settings.account.mfa.totpValidation", {
-                          defaultValue:
-                            "Enter the current 6-digit code from your app.",
-                        })}
-                      >
-                        <Info className="h-3.5 w-3.5 text-base-content/70 transition-colors hover:text-base-content" />
-                      </div>
-                    </label>
+                    <OtpInput
+                      value={verificationCode}
+                      onChange={setVerificationCode}
+                      onComplete={() => void handleEnable()}
+                      autoFocus={false}
+                    />
                   </fieldset>
 
                   <div className="flex gap-3">
                     <button
                       type="submit"
                       className={`btn btn-primary w-full ${enableTOTP.isPending ? "loading" : ""}`}
-                      disabled={isBusy}
+                      disabled={isBusy || verificationCode.length < 6}
                     >
-                      {!enableTOTP.isPending && (
-                        <ShieldCheck className="h-4 w-4" />
-                      )}
+                      {!enableTOTP.isPending && <ShieldCheck className="h-4 w-4" />}
                       {enableTOTP.isPending
                         ? t("settings.account.mfa.enabling", {
                             defaultValue: "Enabling…",
@@ -768,9 +733,7 @@ export default function MFAPage(): React.ReactNode {
                       placeholder="••••••••"
                       className="grow"
                       value={disablePassword}
-                      onChange={(event) =>
-                        setDisablePassword(event.target.value)
-                      }
+                      onChange={(event) => setDisablePassword(event.target.value)}
                       minLength={6}
                       required
                     />
@@ -808,8 +771,7 @@ export default function MFAPage(): React.ReactNode {
                   </p>
                   <p className="mt-1.5 text-xs text-base-content/80">
                     {t("settings.account.mfa.regenerateHint", {
-                      defaultValue:
-                        "Generating new recovery codes invalidates every existing one.",
+                      defaultValue: "Generating new recovery codes invalidates every existing one.",
                     })}
                   </p>
                 </div>
@@ -827,21 +789,15 @@ export default function MFAPage(): React.ReactNode {
                       placeholder="••••••••"
                       className="grow"
                       value={regeneratePassword}
-                      onChange={(event) =>
-                        setRegeneratePassword(event.target.value)
-                      }
+                      onChange={(event) => setRegeneratePassword(event.target.value)}
                       minLength={6}
                       required
                     />
                     <div
                       className="tooltip tooltip-left cursor-help"
-                      data-tip={t(
-                        "settings.account.mfa.currentPasswordHintRegenerate",
-                        {
-                          defaultValue:
-                            "Confirm your identity before generating new codes.",
-                        },
-                      )}
+                      data-tip={t("settings.account.mfa.currentPasswordHintRegenerate", {
+                        defaultValue: "Confirm your identity before generating new codes.",
+                      })}
                     >
                       <Info className="h-3.5 w-3.5 text-base-content/70 transition-colors hover:text-base-content" />
                     </div>

@@ -16,7 +16,7 @@ import Notifications from "@/components/Notifications";
 import { SettingsProvider, useSettingsContext } from "./features/settings";
 import { useI18n } from "@/lib/i18n.tsx";
 import { $api } from "@/lib/http-commons/queryClient";
-import { AuthProvider, BootstrapGate, ProtectedRoute } from "./features/auth";
+import { AuthProvider, BootstrapGate, ProtectedRoute, SetupGate } from "./features/auth";
 import { WorkerProvider } from "@/contexts/WorkerProvider";
 import { UploadProvider } from "@/features/upload";
 
@@ -34,10 +34,7 @@ function AppShellLayout(): React.ReactNode {
         <div className="w-auto bg-base-200 shadow-lg">
           <SideBar />
         </div>
-        <div
-          id="app-scroll-container"
-          className="flex-1 overflow-y-auto overflow-x-hidden"
-        >
+        <div id="app-scroll-container" className="flex-1 overflow-y-auto overflow-x-hidden">
           <Outlet />
         </div>
       </div>
@@ -59,10 +56,7 @@ function HealthPoller(): React.ReactNode {
   const { setOnline } = useGlobal();
 
   const intervalSec = state.server?.update_timespan ?? 5;
-  const intervalMs = Math.max(
-    1000,
-    Math.min(50, Math.max(1, intervalSec)) * 1000,
-  );
+  const intervalMs = Math.max(1000, Math.min(50, Math.max(1, intervalSec)) * 1000);
 
   const healthQuery = $api.useQuery(
     "get",
@@ -95,50 +89,40 @@ function App(): React.ReactNode {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <BrowserRouter>
-              <BootstrapGate>
-                <Routes>
-                  {publicRoutes.map((route) => (
-                    <Route
-                      key={route.path}
-                      path={route.path}
-                      element={route.element}
-                    />
-                  ))}
-                  {bootstrapRoutes.map((route) => (
-                    <Route
-                      key={route.path}
-                      path={route.path}
-                      element={route.element}
-                    />
-                  ))}
-                  {protectedStandaloneRoutes.map((route) => (
-                    <Route
-                      key={route.path}
-                      path={route.path}
-                      element={<ProtectedRoute>{route.element}</ProtectedRoute>}
-                    />
-                  ))}
-                  <Route
-                    element={
-                      <ProtectedRoute>
-                        <WorkerProvider preload={["hash"]}>
-                          <UploadProvider>
-                            <AppShellLayout />
-                          </UploadProvider>
-                        </WorkerProvider>
-                      </ProtectedRoute>
-                    }
-                  >
-                    {appRoutes.map((route) => (
+              <SetupGate>
+                <BootstrapGate>
+                  <Routes>
+                    {publicRoutes.map((route) => (
+                      <Route key={route.path} path={route.path} element={route.element} />
+                    ))}
+                    {bootstrapRoutes.map((route) => (
+                      <Route key={route.path} path={route.path} element={route.element} />
+                    ))}
+                    {protectedStandaloneRoutes.map((route) => (
                       <Route
                         key={route.path}
                         path={route.path}
-                        element={route.element}
+                        element={<ProtectedRoute>{route.element}</ProtectedRoute>}
                       />
                     ))}
-                  </Route>
-                </Routes>
-              </BootstrapGate>
+                    <Route
+                      element={
+                        <ProtectedRoute>
+                          <WorkerProvider preload={["hash"]}>
+                            <UploadProvider>
+                              <AppShellLayout />
+                            </UploadProvider>
+                          </WorkerProvider>
+                        </ProtectedRoute>
+                      }
+                    >
+                      {appRoutes.map((route) => (
+                        <Route key={route.path} path={route.path} element={route.element} />
+                      ))}
+                    </Route>
+                  </Routes>
+                </BootstrapGate>
+              </SetupGate>
             </BrowserRouter>
           </AuthProvider>
           <HealthPoller />

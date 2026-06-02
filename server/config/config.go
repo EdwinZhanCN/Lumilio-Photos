@@ -222,7 +222,41 @@ func LoadAppConfigWithError() (AppConfig, error) {
 		return AppConfig{}, err
 	}
 	applyEnvOverrides(&cfg)
+	applyDBPasswordFile(&cfg)
 	return cfg, nil
+}
+
+// DBPasswordFilePath returns the path to the rotated database password secret.
+// First-run setup writes the high-entropy database password here; on subsequent
+// boots this file is the authoritative credential, superseding the temporary
+// bootstrap password supplied via env.
+func DBPasswordFilePath() string {
+	if v := strings.TrimSpace(os.Getenv("LUMILIO_DB_PASSWORD_FILE")); v != "" {
+		return v
+	}
+	return filepath.Join("data", "config", "secrets", "db_password")
+}
+
+// SystemConfigFilePath returns the path to the persisted, non-sensitive system
+// configuration payload (TOML). Its presence marks the system as initialized.
+func SystemConfigFilePath() string {
+	if v := strings.TrimSpace(os.Getenv("LUMILIO_SYSTEM_CONFIG_FILE")); v != "" {
+		return v
+	}
+	return filepath.Join("data", "config", "system.toml")
+}
+
+// applyDBPasswordFile prefers the rotated database password persisted on disk
+// over the temporary bootstrap password. Missing or empty files are ignored so
+// first boot can connect with the env-provided temporary credential.
+func applyDBPasswordFile(cfg *AppConfig) {
+	data, err := os.ReadFile(DBPasswordFilePath())
+	if err != nil {
+		return
+	}
+	if password := strings.TrimSpace(string(data)); password != "" {
+		cfg.DatabaseConfig.Password = password
+	}
 }
 
 func LoadServerConfig() ServerConfig {
