@@ -48,7 +48,7 @@ export function useAlbums(
   return useInfiniteQuery({
     queryKey: ["albums", repositoryId ?? "all"],
     initialPageParam: 0,
-    queryFn: async ({ pageParam = 0 }) => {
+    queryFn: async ({ pageParam }) => {
       const response = await fetchAlbums({
         params: {
           query: {

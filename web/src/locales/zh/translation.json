@@ -334,6 +334,14 @@
         "title": "保存管理员恢复码"
       },
       "sidebarNote": "此向导只会出现一次，直到首个管理员创建完成。",
+      "step": {
+        "admin": "管理员账户",
+        "passkey": "Passkey",
+        "recovery": "恢复码",
+        "totp": "身份验证器",
+        "welcome": "欢迎"
+      },
+      "stepNum": "第{{n}}步",
       "totp": {
         "subtitle": "管理员账户必须启用。请扫描并验证后继续。",
         "title": "添加身份验证器应用"
@@ -345,7 +353,7 @@
         "inviteTitle": "稍后邀请其他人",
         "localBody": "所有内容只存储在这台服务器上。",
         "localTitle": "你的数据留在本地",
-        "secureBody": "管理员必须启用 Passkey 和身份验证器。",
+        "secureBody": "管理员可选择 Passkey 或身份验证器应用作为第二重验证。",
         "secureTitle": "默认安全保护",
         "title": "欢迎使用流明集"
       }
