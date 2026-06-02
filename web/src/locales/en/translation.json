@@ -318,10 +318,6 @@
         "loading": "Preparing setup...",
         "statusError": "Unable to verify bootstrap status."
       },
-      "mfa": {
-        "subtitle": "Finish TOTP setup now so the first Lumilio Admin account is protected before you continue.",
-        "title": "Protect the first Admin account"
-      },
       "passkey": {
         "action": "Create admin passkey",
         "skip": "Skip — use authenticator only",
@@ -406,10 +402,14 @@
     "logout": "Logout",
     "mfa": {
       "backToSettings": "Back to settings",
-      "continueToApp": "Continue to Lumilio",
-      "doneHere": "Done with MFA settings?",
-      "pageSubtitle": "Use a TOTP app to manage sign-in verification, recovery codes, and account security from one dedicated page.",
-      "pageTitle": "Manage your authenticator setup"
+      "disableSubtitle": "Confirm with your password to turn off 2FA.",
+      "enabledTitle": "Two-factor is on",
+      "introSubtitle": "Protect your account with a TOTP authenticator app.",
+      "introTitle": "Two-factor authentication",
+      "recoverySubtitle": "Your last resort if you lose your authenticator.",
+      "regenerateSubtitle": "This invalidates your existing codes.",
+      "setupSubtitle": "Scan the code with your authenticator app.",
+      "setupTitle": "Add your authenticator"
     },
     "passkey": {
       "affordance": {
@@ -558,6 +558,7 @@
     }
   },
   "common": {
+    "back": "Back",
     "cancel": "Cancel",
     "clickToEdit": "Click to edit",
     "close": "Close",
@@ -565,6 +566,7 @@
     "copied": "Copied",
     "copy": "Copy",
     "delete": "Delete",
+    "done": "Done",
     "emptyState": {
       "description": "Items will appear here when available.",
       "title": "Nothing here yet"
@@ -746,10 +748,12 @@
     "repositories": {
       "actionsMenu": "Library actions for {{name}}",
       "assetCount": "Assets",
+      "cloudCredentialLabel": "iCloud credential",
+      "cloudCredentialsHintLink": "Settings",
+      "cloudCredentialsHintPrefix": "Need an account?",
+      "cloudCredentialsHintSuffix": ".",
       "createAction": "Add library",
-      "createDescription": "Create a repository folder inside the mounted storage root.",
       "createFailed": "Failed to create library.",
-      "createNameHint": "Use a short, recognizable name.",
       "createNameLabel": "Library name",
       "createNamePlaceholder": "Family Photos",
       "createSubmit": "Create library",
@@ -763,6 +767,7 @@
       "duplicateScan": "Scan for duplicates",
       "duplicateScanFailed": "Duplicate scan failed.",
       "empty": "No repositories are available.",
+      "noCloudCredentials": "No connected credentials",
       "primaryBadge": "Primary",
       "rebuildLocation": "Rebuild location clusters",
       "rebuildLocationQueued": "Location cluster rebuild queued.",
@@ -772,6 +777,10 @@
       "scanAllQueued_other": "Scan queued for {{count}} libraries.",
       "scanFailed": "Failed to queue scan.",
       "scanQueued": "Scan queued for {{name}}.",
+      "selectCloudCredential": "Select credential",
+      "sourceICloud": "iCloud",
+      "sourceLabel": "Source",
+      "sourceLocal": "Local",
       "title": "Libraries",
       "unavailable": "Repository options are temporarily unavailable."
     }
@@ -973,33 +982,22 @@
       "displayName": "Display name",
       "displayNameHint": "Display names support multiple languages and stay under 64 characters.",
       "mfa": {
-        "account": "Account",
         "addPasskey": "Add Passkey",
         "addPasskeyPrompt": "Add a passkey to sign in with your device's biometrics or security key.",
-        "advanced": "Advanced setup URI",
         "authenticatorAppTitle": "Authenticator App",
         "beginSetup": "Set up TOTP",
-        "bootstrapOnboarding": "This is the first Lumilio Admin account. Finish TOTP setup now so your Admin login starts protected from the first session.",
-        "bootstrapOnboardingTitle": "First Admin account",
         "confirmDisable": "Disable TOTP",
         "confirmRegenerate": "Generate new recovery codes",
         "currentPassword": "Current password",
-        "currentPasswordHint": "Confirm with your current password.",
-        "currentPasswordHintRegenerate": "Confirm your identity before generating new codes.",
         "disableButton": "Disable TOTP",
-        "disabled": "Two-factor authentication has been disabled.",
         "disabledBadge": "Disabled",
         "disableError": "Failed to disable TOTP.",
-        "disableWarning": "This will remove two-factor authentication from your account. Confirm with your current password.",
         "enableButton": "Enable TOTP",
-        "enabled": "Two-factor authentication is now enabled.",
         "enabledBadge": "Enabled",
         "enableError": "Failed to enable TOTP.",
-        "enabling": "Enabling…",
         "enrolled": "enrolled",
         "enrolledPasskeys": "Passkeys",
         "enrolledPasskeysHint": "Manage the passkey credentials registered to this account.",
-        "issuer": "Issuer",
         "noPasskeys": "No passkeys enrolled yet",
         "notConfigured": "Not configured yet. Secure your account with TOTP.",
         "notEnrolled": "Not enrolled",
@@ -1007,28 +1005,14 @@
         "passkeyDescription": "Use your device's native passkey flow for sign-in.",
         "passkeyLastUsed": "Last used",
         "passkeyTitle": "Passkeys",
-        "qrAlt": "TOTP setup QR code",
-        "qrCaption": "If scanning fails, you can still use the manual setup key.",
-        "qrError": "Failed to generate the TOTP QR code.",
-        "recoveryCodesHint": "Store these one-time codes somewhere safe. Each code can be used once if your authenticator app is unavailable.",
         "recoveryCodesTitle": "Recovery codes",
         "recoveryRemaining": "recovery codes remaining",
         "regenerateButton": "Regenerate recovery codes",
-        "regenerated": "Recovery codes regenerated successfully.",
         "regenerateError": "Failed to regenerate recovery codes.",
-        "regenerateHint": "Generating new recovery codes invalidates every existing one.",
         "regenerateTitle": "Regenerate recovery codes",
         "remainingCodes_one": "{{count}} recovery codes remaining",
         "remainingCodes_other": "{{count}} recovery codes remaining",
-        "setupDescription": "Use Duo, 1Password, Google Authenticator, or another TOTP-compatible app. If scanning fails, copy the setup details manually.",
-        "setupError": "Failed to start TOTP setup.",
-        "setupKey": "Manual setup key",
-        "setupKeyHint": "Enter this key manually in your authenticator app if you can't scan the QR code.",
-        "setupTitle": "Scan the QR code with your authenticator app",
-        "stepOne": "Step 1",
-        "stepTwo": "Verify with a 6-digit code",
-        "stepTwoLabel": "Step 2",
-        "verificationCode": "Verification code"
+        "setupError": "Failed to start TOTP setup."
       },
       "passwordDescription": "Change your account password. You will be signed out afterwards.",
       "passwordTitle": "Password",
@@ -1090,7 +1074,6 @@
       "baseUrlDescription": "Optional override for provider-compatible endpoints.",
       "clearStoredKey": "Clear stored API key",
       "description": "Configure the assistant and photo intelligence features.",
-      "enabled": "Enable agent",
       "loadError": "Failed to load AI settings.",
       "mlTitle": "Photo Intelligence",
       "modelName": "Model name",
@@ -1165,7 +1148,65 @@
     },
     "assetPage": "Asset Page",
     "cloud": {
-      "title": "Cloud Sync"
+      "addCredential": "Add credential",
+      "confirmDisable": "Disable {{name}}? Existing imports stay in Lumilio.",
+      "connectCredential": "Connect credential",
+      "connectedAccounts_one": "{{count}} connected account",
+      "connectedAccounts_other": "{{count}} connected accounts",
+      "credentialMeta": "{{account}} · iCloud {{domain}}",
+      "description": "Manage reusable cloud credentials. Repositories choose one of these accounts when they are created from Manage.",
+      "disable": "Disable",
+      "domain": {
+        "china": "Mainland China iCloud",
+        "global": "Global iCloud"
+      },
+      "empty": "No iCloud credentials are configured.",
+      "errors": {
+        "createFailed": "Failed to create iCloud credential.",
+        "disableFailed": "Failed to disable credential.",
+        "emptyCredentialResponse": "Credential response was empty.",
+        "verifyFailed": "Failed to verify iCloud 2FA code."
+      },
+      "fields": {
+        "appleId": "Apple ID",
+        "domain": "Apple domain",
+        "label": "Label",
+        "password": "App-specific password"
+      },
+      "icloudFormDescription": "Lumilio uses this once to authenticate and then stores only the isolated iCloud session cookie.",
+      "icloudFormTitle": "Add iCloud credential",
+      "messages": {
+        "connected": "iCloud credential connected.",
+        "disabled": "Cloud credential disabled.",
+        "verificationSent": "Apple sent a verification code to your trusted devices.",
+        "verified": "iCloud credential verified."
+      },
+      "placeholders": {
+        "appleId": "you@icloud.com",
+        "label": "Personal iCloud",
+        "password": "xxxx-xxxx-xxxx-xxxx"
+      },
+      "providerDescription": "Choose the cloud provider to connect. More providers can be added here later.",
+      "providers": {
+        "icloud": {
+          "description": "Import originals from iCloud Photos.",
+          "title": "iCloud"
+        }
+      },
+      "providerTitle": "Choose provider",
+      "savedTitle": "Saved credentials",
+      "securityNote": "Lumilio stores the iCloud session cookie in an isolated credential directory. The Apple ID password is used only during authentication and is not persisted.",
+      "status": {
+        "connected": "Connected",
+        "disabled": "Disabled",
+        "error": "Error",
+        "pending2FA": "Needs 2FA",
+        "unknown": "Unknown"
+      },
+      "title": "Cloud Import",
+      "verify": "Verify",
+      "verifyDescription": "Enter the 6-digit code sent to your Apple devices for {{name}}.",
+      "verifyTitle": "Two-factor authentication"
     },
     "language": "Language",
     "languageAndRegion": "Language & Region",

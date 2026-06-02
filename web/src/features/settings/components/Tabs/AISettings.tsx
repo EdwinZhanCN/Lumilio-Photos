@@ -7,7 +7,7 @@ import {
   type SystemSettings,
   type UpdateSystemSettingsPayload,
 } from "@/features/settings/hooks/useSystemSettings";
-import { SparklesIcon } from "lucide-react";
+import { SaveIcon, SparklesIcon } from "lucide-react";
 
 type AgentProvider = SystemSettings["llm"]["provider"];
 
@@ -252,14 +252,29 @@ export default function AISettings() {
 
   return (
     <div className="space-y-6">
-      <header className="space-y-2">
-        <div className="flex items-center gap-2">
-          <SparklesIcon className="size-6 text-primary" />
-          <h2 className="text-2xl font-bold">{t("settings.ai")}</h2>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <SparklesIcon className="size-6 text-primary" />
+            <h2 className="text-2xl font-bold">{t("settings.ai")}</h2>
+          </div>
+          <p className="text-base-content/70">
+            {t("settings.aiSettings.description")}
+          </p>
         </div>
-        <p className="text-base-content/70">
-          {t("settings.aiSettings.description")}
-        </p>
+        <button
+          type="button"
+          className="btn btn-primary gap-2 sm:shrink-0"
+          disabled={!isDirty || isBusy}
+          onClick={() => void persistSettings()}
+        >
+          {updateMutation.isPending ? (
+            <span className="loading loading-spinner loading-xs" />
+          ) : (
+            <SaveIcon size={16} />
+          )}
+          {updateMutation.isPending ? t("common.loading") : t("common.save")}
+        </button>
       </header>
 
       {feedback && (
@@ -270,7 +285,7 @@ export default function AISettings() {
         </div>
       )}
 
-      <section className="rounded-2xl border border-base-300 bg-base-100 p-5 space-y-5">
+      <section className="space-y-5 rounded-2xl border border-base-300 bg-base-100 p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div className="space-y-1">
             <h3 className="text-lg font-semibold">
@@ -280,26 +295,11 @@ export default function AISettings() {
               {t("settings.aiSettings.agentDescription")}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="badge badge-outline">
-              {t("settings.aiSettings.apiKeyConfigured")}:{" "}
-              {t(
-                `settings.serverSettings.booleanValues.${settings.llm.apiKeyConfigured ? "true" : "false"}`,
-              )}
-            </span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-base-300 bg-base-100 p-4 flex items-start justify-between gap-4">
-          <div>
-            <div className="font-semibold">
-              {t("settings.aiSettings.enabled")}
-            </div>
-          </div>
           <input
             type="checkbox"
-            className="toggle toggle-primary"
+            className="toggle toggle-primary mt-1 shrink-0"
             checked={form.llm.agentEnabled}
+            aria-label={t("settings.aiSettings.agentTitle")}
             onChange={(event) => {
               setFeedback(null);
               setForm((current) =>
@@ -392,6 +392,8 @@ export default function AISettings() {
             <input
               type="text"
               className="input input-bordered w-full"
+              autoComplete="off"
+              spellCheck={false}
               value={form.llm.baseURL}
               onChange={(event) => {
                 const baseURL = event.target.value;
@@ -419,8 +421,10 @@ export default function AISettings() {
               {t("settings.aiSettings.apiKey")}
             </span>
             <input
-              type="password"
+              type="text"
               className="input input-bordered w-full"
+              autoComplete="off"
+              spellCheck={false}
               value={form.llm.apiKey}
               disabled={form.llm.clearStoredKey}
               placeholder={t("settings.aiSettings.apiKeyPlaceholder")}
@@ -446,40 +450,42 @@ export default function AISettings() {
           </label>
         </div>
 
-        <label className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            className="checkbox checkbox-primary"
-            checked={form.llm.clearStoredKey}
-            onChange={(event) => {
-              const clearStoredKey = event.target.checked;
-              setFeedback(null);
-              setForm((current) =>
-                current
-                  ? {
-                      ...current,
-                      llm: {
-                        ...current.llm,
-                        clearStoredKey,
-                        apiKey: clearStoredKey ? "" : current.llm.apiKey,
-                      },
-                    }
-                  : current,
-              );
-            }}
-          />
-          <span>{t("settings.aiSettings.clearStoredKey")}</span>
-        </label>
+        <div className="flex flex-col gap-3 rounded-lg bg-base-200/60 px-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-base-content/70">
+            {t("settings.aiSettings.apiKeyConfigured")}:{" "}
+            <span className="font-medium text-base-content">
+              {t(
+                `settings.serverSettings.booleanValues.${settings.llm.apiKeyConfigured ? "true" : "false"}`,
+              )}
+            </span>
+          </span>
+          <label className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-primary checkbox-sm"
+              checked={form.llm.clearStoredKey}
+              onChange={(event) => {
+                const clearStoredKey = event.target.checked;
+                setFeedback(null);
+                setForm((current) =>
+                  current
+                    ? {
+                        ...current,
+                        llm: {
+                          ...current.llm,
+                          clearStoredKey,
+                          apiKey: clearStoredKey ? "" : current.llm.apiKey,
+                        },
+                      }
+                    : current,
+                );
+              }}
+            />
+            <span>{t("settings.aiSettings.clearStoredKey")}</span>
+          </label>
+        </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!isDirty || isBusy}
-            onClick={() => void persistSettings()}
-          >
-            {updateMutation.isPending ? t("common.loading") : t("common.save")}
-          </button>
           <button
             type="button"
             className="btn btn-outline"

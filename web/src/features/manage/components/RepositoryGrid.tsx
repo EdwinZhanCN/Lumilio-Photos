@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Cloud,
@@ -395,9 +396,6 @@ function AddRepositoryModal({
               <h3 className="text-base font-semibold">
                 {t("manage.repositories.createTitle")}
               </h3>
-              <p className="text-sm text-base-content/60">
-                {t("manage.repositories.createDescription")}
-              </p>
             </div>
           </div>
           <button
@@ -428,15 +426,10 @@ function AddRepositoryModal({
               autoFocus
               required
             />
-            <span className="label pt-2">
-              <span className="label-text-alt text-base-content/55">
-                {t("manage.repositories.createNameHint")}
-              </span>
-            </span>
           </label>
 
           <div className="space-y-2">
-            <span className="text-sm font-medium">Source</span>
+            <span className="text-sm font-medium">{t("manage.repositories.sourceLabel")}</span>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -444,7 +437,7 @@ function AddRepositoryModal({
                 onClick={() => setSource("local")}
                 disabled={createMutation.isPending}
               >
-                Local
+                {t("manage.repositories.sourceLocal")}
               </button>
               <button
                 type="button"
@@ -453,17 +446,20 @@ function AddRepositoryModal({
                 disabled={createMutation.isPending}
               >
                 <Cloud size={15} />
-                iCloud
+                {t("manage.repositories.sourceICloud")}
               </button>
             </div>
           </div>
 
           {source === "icloud" && (
-            <label className="form-control w-full">
-              <span className="label pb-1">
-                <span className="label-text font-medium">iCloud credential</span>
-              </span>
+            <div className="form-control w-full">
+              <label className="label pb-1" htmlFor="repository-cloud-credential">
+                <span className="label-text font-medium">
+                  {t("manage.repositories.cloudCredentialLabel")}
+                </span>
+              </label>
               <select
+                id="repository-cloud-credential"
                 className="select select-bordered w-full"
                 value={credentialId}
                 onChange={(event) => setCredentialId(event.target.value)}
@@ -471,7 +467,9 @@ function AddRepositoryModal({
                 required
               >
                 <option value="">
-                  {credentials.length === 0 ? "No connected credentials" : "Select credential"}
+                  {credentials.length === 0
+                    ? t("manage.repositories.noCloudCredentials")
+                    : t("manage.repositories.selectCloudCredential")}
                 </option>
                 {credentials.map((credential) => (
                   <option key={credential.id} value={credential.id}>
@@ -479,12 +477,18 @@ function AddRepositoryModal({
                   </option>
                 ))}
               </select>
-              <span className="label pt-2">
-                <span className="label-text-alt text-base-content/55">
-                  Manage iCloud credentials in Settings before creating an iCloud import repo.
-                </span>
-              </span>
-            </label>
+              <p className="mt-2 text-xs leading-relaxed text-base-content/60">
+                {t("manage.repositories.cloudCredentialsHintPrefix")}{" "}
+                <Link
+                  to="/settings?tab=cloud"
+                  className="link link-primary font-medium"
+                  onClick={handleClose}
+                >
+                  {t("manage.repositories.cloudCredentialsHintLink")}
+                </Link>
+                {t("manage.repositories.cloudCredentialsHintSuffix")}
+              </p>
+            </div>
           )}
 
           <div className="modal-action">

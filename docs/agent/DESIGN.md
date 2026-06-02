@@ -74,6 +74,7 @@ AI and ML:
 - Prefer existing feature components before creating new shared abstractions.
 - Put domain behavior in feature hooks/services, not generic UI components.
 - Keep pages thin; route components should compose hooks and feature components.
+- Page-level route headers must use the shared `PageHeader` component. Put primary page actions, such as opening an editor or creating a resource, in the `PageHeader` action slot instead of building bespoke header rows inside page content.
 - Use `lucide-react` for icons.
 - Keep user-facing copy i18n-ready through the existing i18n layer.
 - Use TanStack Query lifecycle states instead of hand-rolled loading/cache state.
