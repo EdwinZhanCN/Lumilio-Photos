@@ -11,7 +11,7 @@ This file is the short entry point for humans and coding agents working in Lumil
 
 The system is local-first: preserve original media, keep repository/storage semantics explicit, make ML/AI optional, and prefer boring configuration that boots cleanly in Docker and local dev.
 
-## Documentation
+## Documentation (MUST READ BEFORE ANY CHANGES)
 
 - `docs/agent/architecture.md`: system map, backend/frontend boundaries, config/runtime notes.
 - `docs/agent/BACKEND.md`: backend runtime, package map, config, queues, storage, API contracts.

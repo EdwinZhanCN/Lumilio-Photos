@@ -233,7 +233,7 @@ func DBPasswordFilePath() string {
 	if v := strings.TrimSpace(os.Getenv("LUMILIO_DB_PASSWORD_FILE")); v != "" {
 		return v
 	}
-	return filepath.Join("data", "config", "secrets", "db_password")
+	return filepath.Join("data", "storage", ".secrets", "db_password")
 }
 
 // ResolveDBPasswordFilePath returns the configured rotated database password

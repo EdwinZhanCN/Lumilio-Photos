@@ -8,10 +8,9 @@
  * @since 1.1.0
  */
 
-import {
-  globalPerformancePreferences,
-  PerformanceProfile,
-} from "./performancePreferences.ts";
+// Fixed adaptive memory constraint multiplier. Batch sizing always favors a
+// conservative memory footprint and lets device capabilities drive the rest.
+export const ADAPTIVE_MEMORY_CONSTRAINT_MULTIPLIER = 0.8;
 
 // Device capability metrics
 export interface DeviceCapabilities {
@@ -172,14 +171,11 @@ export class SmartBatchSizer {
       batchSize = this.adaptBatchSize(batchSize, history, config);
     }
 
-    // Apply user performance preferences
-    batchSize = this.applyPerformancePreferences(batchSize);
+    // Apply adaptive device-based adjustments
+    batchSize = this.applyAdaptiveProfile(batchSize);
 
-    // Apply priority adjustments (after preferences to respect user choice)
-    if (
-      priority >= ProcessingPriority.HIGH &&
-      globalPerformancePreferences.shouldPrioritizeUserOperations()
-    ) {
+    // Boost batch size for user-visible (high priority) operations
+    if (priority >= ProcessingPriority.HIGH) {
       batchSize = Math.ceil(batchSize * config.priorityMultiplier);
     }
 
@@ -317,11 +313,10 @@ export class SmartBatchSizer {
   ): number {
     const config = DEFAULT_CONFIGS[operationType] || DEFAULT_CONFIGS.thumbnail;
 
-    // Apply user memory preference constraints
-    const memoryMultiplier =
-      globalPerformancePreferences.getMemoryConstraintMultiplier();
+    // Apply the fixed adaptive memory constraint
+    const memoryMultiplier = ADAPTIVE_MEMORY_CONSTRAINT_MULTIPLIER;
 
-    // Reduce batch size under memory pressure or user preference
+    // Reduce batch size under memory pressure or conservative memory budget
     if (this.isMemoryPressureDetected() || memoryMultiplier < 1.0) {
       batchSize = Math.ceil(batchSize * Math.min(0.6, memoryMultiplier));
     }
@@ -335,23 +330,14 @@ export class SmartBatchSizer {
   }
 
   /**
-   * Applies user performance preferences to batch size
+   * Applies the fixed adaptive profile: batch size scales with device
+   * capabilities only.
    */
-  private applyPerformancePreferences(batchSize: number): number {
-    const preferences = globalPerformancePreferences.getPreferences();
-    const multiplier = globalPerformancePreferences.getBatchSizeMultiplier();
-
-    // Apply the multiplier based on user preference
-    batchSize = Math.ceil(batchSize * multiplier);
-
-    // Special handling for adaptive mode
-    if (preferences.profile === PerformanceProfile.ADAPTIVE) {
-      // Use device capabilities more heavily
-      if (this.deviceCapabilities.isLowEndDevice) {
-        batchSize = Math.ceil(batchSize * 0.7);
-      } else if (this.deviceCapabilities.cpuCores >= 8) {
-        batchSize = Math.ceil(batchSize * 1.3);
-      }
+  private applyAdaptiveProfile(batchSize: number): number {
+    if (this.deviceCapabilities.isLowEndDevice) {
+      batchSize = Math.ceil(batchSize * 0.7);
+    } else if (this.deviceCapabilities.cpuCores >= 8) {
+      batchSize = Math.ceil(batchSize * 1.3);
     }
 
     return batchSize;
