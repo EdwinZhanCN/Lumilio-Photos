@@ -296,8 +296,10 @@ const DuplicateGroupCard = ({ group, status }: DuplicateGroupCardProps) => {
 function DuplicatesContent() {
   const { t } = useI18n();
   const showMessage = useMessage();
-  const { scopedRepositoryId } = useWorkingRepository();
+  const { repositories, repositoriesQuery, scopedRepositoryId } =
+    useWorkingRepository();
   const [status, setStatus] = useState<DuplicateStatus>("pending");
+  const [isScanningRepositories, setIsScanningRepositories] = useState(false);
   const summaryQuery = useDuplicateSummary(scopedRepositoryId);
   const groupQuery = useDuplicateGroupList({
     repositoryId: scopedRepositoryId,
@@ -311,6 +313,20 @@ function DuplicatesContent() {
   const isInitialLoading = groupQuery.isLoading;
   const hasGroups = groupQuery.groups.length > 0;
   const hasSummaryError = summaryQuery.isError;
+  const scanRepositoryIds = useMemo(
+    () =>
+      scopedRepositoryId
+        ? [scopedRepositoryId]
+        : repositories.map((repository) => repository.id).filter(Boolean),
+    [repositories, scopedRepositoryId],
+  );
+  const canScan =
+    scanRepositoryIds.length > 0 &&
+    (Boolean(scopedRepositoryId) || repositoriesQuery.isSuccess);
+  const isScanPending = detectMutation.isPending || isScanningRepositories;
+  const scanLabel = scopedRepositoryId
+    ? t("duplicates.scan")
+    : t("duplicates.scanAll");
 
   const lastDetectedLabel = useMemo(() => {
     if (!summary?.last_detected_at) {
@@ -328,7 +344,7 @@ function DuplicatesContent() {
   }, [summary?.last_detected_at, t]);
 
   const handleScan = async () => {
-    if (!scopedRepositoryId) {
+    if (!canScan) {
       showMessage(
         "error",
         t("duplicates.scanError", {
@@ -338,17 +354,23 @@ function DuplicatesContent() {
       return;
     }
     try {
-      const result = await detectMutation.mutateAsync({
-        repositoryId: scopedRepositoryId,
-      });
+      setIsScanningRepositories(true);
+      const result = { groups: 0, exact: 0, phash: 0, mixed: 0 };
+      for (const repositoryId of scanRepositoryIds) {
+        const current = await detectMutation.mutateAsync({ repositoryId });
+        result.groups += current.groups ?? 0;
+        result.exact += current.exact_groups ?? 0;
+        result.phash += current.phash_groups ?? 0;
+        result.mixed += current.mixed_groups ?? 0;
+      }
       showMessage(
         "success",
-        t("duplicates.scanSuccess", {
-          groups: result.groups ?? 0,
-          exact: result.exact_groups ?? 0,
-          phash: result.phash_groups ?? 0,
-          mixed: result.mixed_groups ?? 0,
-        }),
+        scopedRepositoryId
+          ? t("duplicates.scanSuccess", result)
+          : t("duplicates.scanAllSuccess", {
+              ...result,
+              count: scanRepositoryIds.length,
+            }),
       );
     } catch (err) {
       showMessage(
@@ -357,6 +379,8 @@ function DuplicatesContent() {
           message: err instanceof Error ? err.message : String(err),
         }),
       );
+    } finally {
+      setIsScanningRepositories(false);
     }
   };
 
@@ -371,9 +395,9 @@ function DuplicatesContent() {
             type="button"
             className="btn btn-primary btn-sm rounded-full"
             onClick={handleScan}
-            disabled={detectMutation.isPending || !scopedRepositoryId}
+            disabled={isScanPending || !canScan}
           >
-            {detectMutation.isPending ? (
+            {isScanPending ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
                 {t("duplicates.scanning")}
@@ -381,7 +405,7 @@ function DuplicatesContent() {
             ) : (
               <>
                 <RefreshCw className="size-4" />
-                {t("duplicates.scan")}
+                {scanLabel}
               </>
             )}
           </button>
