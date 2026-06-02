@@ -152,7 +152,7 @@ SET
     ELSE location_clusters.geocode_status
   END,
   updated_at = CURRENT_TIMESTAMP
-RETURNING cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at
+RETURNING cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at, search_vector
 `
 
 type InsertLocationClustersForScopeParams struct {
@@ -187,6 +187,7 @@ func (q *Queries) InsertLocationClustersForScope(ctx context.Context, arg Insert
 			&i.GeocodedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}
@@ -199,7 +200,7 @@ func (q *Queries) InsertLocationClustersForScope(ctx context.Context, arg Insert
 }
 
 const listLocationClusters = `-- name: ListLocationClusters :many
-SELECT cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at
+SELECT cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at, search_vector
 FROM location_clusters
 WHERE ($1::uuid IS NULL OR repository_id = $1::uuid)
   AND ($2::integer IS NULL OR owner_id = $2::integer)
@@ -249,6 +250,7 @@ func (q *Queries) ListLocationClusters(ctx context.Context, arg ListLocationClus
 			&i.GeocodedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}
@@ -261,7 +263,7 @@ func (q *Queries) ListLocationClusters(ctx context.Context, arg ListLocationClus
 }
 
 const listPendingLocationClusters = `-- name: ListPendingLocationClusters :many
-SELECT cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at
+SELECT cluster_id, owner_id, repository_id, geohash, precision, centroid_latitude, centroid_longitude, photo_count, label, country, region, city, provider, geocode_status, geocoded_at, created_at, updated_at, search_vector
 FROM location_clusters
 WHERE geocode_status = 'pending'
   AND ($1::uuid IS NULL OR repository_id = $1::uuid)
@@ -303,6 +305,7 @@ func (q *Queries) ListPendingLocationClusters(ctx context.Context, arg ListPendi
 			&i.GeocodedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}

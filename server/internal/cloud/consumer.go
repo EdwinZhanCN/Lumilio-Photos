@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"server/internal/service"
 	"server/internal/sourcing"
 )
 
@@ -18,8 +17,8 @@ import (
 type CloudSyncConsumer struct {
 	source       sourcing.AssetSource
 	materializer *sourcing.SourceMaterializer
-	assetService service.AssetService
 	state        SyncStateStore
+	onProgress   func(delta ImportProgressDelta)
 	logger       *zap.Logger
 }
 
@@ -27,8 +26,8 @@ type CloudSyncConsumer struct {
 func NewCloudSyncConsumer(
 	source sourcing.AssetSource,
 	materializer *sourcing.SourceMaterializer,
-	assetService service.AssetService,
 	state SyncStateStore,
+	onProgress func(delta ImportProgressDelta),
 	logger *zap.Logger,
 ) *CloudSyncConsumer {
 	if logger == nil {
@@ -37,8 +36,8 @@ func NewCloudSyncConsumer(
 	return &CloudSyncConsumer{
 		source:       source,
 		materializer: materializer,
-		assetService: assetService,
 		state:        state,
+		onProgress:   onProgress,
 		logger:       logger.With(zap.String("component", "cloud_sync_consumer")),
 	}
 }
@@ -52,17 +51,6 @@ func (c *CloudSyncConsumer) Run(ctx context.Context) error {
 	}
 
 	for candidate := range ch {
-		// Handle remote deletes (one-way sync tombstone)
-		if action, _ := candidate.Metadata["action"].(string); action == "delete" {
-			if err := c.handleRemoteDelete(ctx, candidate); err != nil {
-				c.logger.Error("failed to handle remote delete",
-					zap.String("remote_key", candidate.SourcePath),
-					zap.Error(err),
-				)
-			}
-			continue
-		}
-
 		// Materialize: staging → inbox → asset record → pipeline
 		asset, err := c.materializer.Materialize(ctx, candidate)
 		if err != nil {
@@ -73,27 +61,40 @@ func (c *CloudSyncConsumer) Run(ctx context.Context) error {
 			)
 			// Clean up staging file on failure
 			os.Remove(candidate.SourcePath)
+			c.progress(ImportProgressDelta{Failed: 1})
 			continue
 		}
 
-		// Mark as synced with asset_id for future tombstone reconciliation.
-		// Only mark after successful materialize so failed imports are retried.
+		provider := candidate.Metadata["provider"].(ProviderKind)
+		remoteKey := candidate.Metadata["remote_key"].(string)
+		etag := candidate.Metadata["remote_etag"].(string)
+
+		// Record the synced etag so subsequent runs skip this remote file via
+		// IsFileSynced. We do this for both freshly ingested assets and content
+		// that the materializer deduped away (asset == nil); otherwise deduped
+		// remote keys are never recorded and get re-downloaded on every run.
+		var assetUUID uuid.UUID
 		if asset != nil {
-			assetUUID := uuid.UUID(asset.AssetID.Bytes)
-			provider := candidate.Metadata["provider"].(ProviderKind)
-			remoteKey := candidate.Metadata["remote_key"].(string)
-			etag := candidate.Metadata["remote_etag"].(string)
+			assetUUID = uuid.UUID(asset.AssetID.Bytes)
+		}
+		if err := c.state.MarkFileSynced(ctx, candidate.RepositoryID, provider, remoteKey, etag, assetUUID); err != nil {
+			c.logger.Warn("failed to mark cloud file as synced",
+				zap.String("remote_key", remoteKey),
+				zap.String("asset_id", assetUUID.String()),
+				zap.Error(err),
+			)
+		}
 
-			if err := c.state.MarkFileSynced(ctx, candidate.RepositoryID, provider, remoteKey, etag, assetUUID); err != nil {
-				c.logger.Warn("failed to mark cloud file as synced",
-					zap.String("remote_key", remoteKey),
-					zap.String("asset_id", assetUUID.String()),
-					zap.Error(err),
-				)
-			}
-
+		if asset != nil {
+			c.progress(ImportProgressDelta{Imported: 1})
 			c.logger.Info("cloud asset ingested",
 				zap.String("asset_id", assetUUID.String()),
+				zap.String("remote_key", remoteKey),
+			)
+		} else {
+			// Downloaded but deduplicated (already present/unchanged).
+			c.progress(ImportProgressDelta{Skipped: 1})
+			c.logger.Debug("cloud asset deduplicated",
 				zap.String("remote_key", remoteKey),
 			)
 		}
@@ -102,30 +103,8 @@ func (c *CloudSyncConsumer) Run(ctx context.Context) error {
 	return nil
 }
 
-// handleRemoteDelete soft-deletes the local asset mapped to a remote file
-// that has been deleted in the cloud.
-func (c *CloudSyncConsumer) handleRemoteDelete(ctx context.Context, candidate sourcing.IngestSource) error {
-	provider, _ := candidate.Metadata["provider"].(ProviderKind)
-	remoteKey := candidate.SourcePath
-
-	assetID, err := c.state.GetAssetIDByRemoteKey(ctx, candidate.RepositoryID, provider, remoteKey)
-	if err != nil {
-		return fmt.Errorf("lookup asset id: %w", err)
+func (c *CloudSyncConsumer) progress(delta ImportProgressDelta) {
+	if c.onProgress != nil {
+		c.onProgress(delta)
 	}
-	if assetID == uuid.Nil {
-		// Never synced, nothing to delete
-		return nil
-	}
-
-	// Soft-delete via AssetService (moves file to trash + marks deleted)
-	err = c.assetService.DeleteAsset(ctx, assetID)
-	if err != nil {
-		return fmt.Errorf("soft delete asset %s: %w", assetID.String(), err)
-	}
-
-	c.logger.Info("remote delete synced",
-		zap.String("asset_id", assetID.String()),
-		zap.String("remote_key", remoteKey),
-	)
-	return nil
 }

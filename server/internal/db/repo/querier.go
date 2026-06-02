@@ -55,10 +55,13 @@ type Querier interface {
 	CountPhotoMapPoints(ctx context.Context, arg CountPhotoMapPointsParams) (int64, error)
 	CountRepositories(ctx context.Context) (int64, error)
 	CountRepositoriesByStatus(ctx context.Context, status dbtypes.RepoStatus) (int64, error)
+	CountRepositoryCloudBindingsByCredential(ctx context.Context, credentialID pgtype.UUID) (int64, error)
 	CountRunningRepositoryScanRuns(ctx context.Context, arg CountRunningRepositoryScanRunsParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
 	CreateAlbum(ctx context.Context, arg CreateAlbumParams) (Album, error)
 	CreateAsset(ctx context.Context, arg CreateAssetParams) (Asset, error)
+	CreateCloudCredential(ctx context.Context, arg CreateCloudCredentialParams) (CloudCredential, error)
+	CreateCloudImportRun(ctx context.Context, arg CreateCloudImportRunParams) (CloudImportRun, error)
 	CreateDuplicateGroup(ctx context.Context, arg CreateDuplicateGroupParams) (pgtype.UUID, error)
 	CreateFaceCluster(ctx context.Context, arg CreateFaceClusterParams) (FaceCluster, error)
 	CreateFaceClusterMember(ctx context.Context, arg CreateFaceClusterMemberParams) (FaceClusterMember, error)
@@ -80,6 +83,7 @@ type Querier interface {
 	DeleteAlbum(ctx context.Context, albumID int32) error
 	DeleteAllEmbeddingsForAsset(ctx context.Context, assetID pgtype.UUID) error
 	DeleteAsset(ctx context.Context, assetID pgtype.UUID) error
+	DeleteCloudCredential(ctx context.Context, credentialID pgtype.UUID) error
 	DeleteEmbedding(ctx context.Context, arg DeleteEmbeddingParams) error
 	DeleteEmptyUnconfirmedFaceClusters(ctx context.Context) error
 	DeleteExpiredRegistrationSessions(ctx context.Context) error
@@ -119,6 +123,7 @@ type Querier interface {
 	// Find assets that share base names but are not yet in any stack.
 	// Includes taken_time and upload_time for time-based clustering.
 	FindCandidatesForStackingByName(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingByNameRow, error)
+	FinishCloudImportRun(ctx context.Context, arg FinishCloudImportRunParams) (CloudImportRun, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAssetCountScopedParams) (int64, error)
 	GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error)
@@ -134,7 +139,6 @@ type Querier interface {
 	GetAssetByID(ctx context.Context, assetID pgtype.UUID) (Asset, error)
 	GetAssetByRepositoryAndStoragePathAny(ctx context.Context, arg GetAssetByRepositoryAndStoragePathAnyParams) (Asset, error)
 	GetAssetExifRaw(ctx context.Context, assetID pgtype.UUID) (json.RawMessage, error)
-	GetAssetIDByCloudFile(ctx context.Context, arg GetAssetIDByCloudFileParams) (pgtype.UUID, error)
 	GetAssetStatsForOwner(ctx context.Context, ownerID int32) (GetAssetStatsForOwnerRow, error)
 	GetAssetWithRelations(ctx context.Context, assetID pgtype.UUID) (GetAssetWithRelationsRow, error)
 	GetAssetWithTags(ctx context.Context, assetID pgtype.UUID) (GetAssetWithTagsRow, error)
@@ -167,6 +171,9 @@ type Querier interface {
 	// 获取相机+镜头组合统计
 	GetCameraLensStats(ctx context.Context, arg GetCameraLensStatsParams) ([]GetCameraLensStatsRow, error)
 	GetCheckpoint(ctx context.Context, id string) ([]byte, error)
+	GetCloudCredential(ctx context.Context, credentialID pgtype.UUID) (CloudCredential, error)
+	GetCloudCredentialByAccount(ctx context.Context, arg GetCloudCredentialByAccountParams) (CloudCredential, error)
+	GetCloudImportRun(ctx context.Context, runID pgtype.UUID) (CloudImportRun, error)
 	GetCloudSyncCursor(ctx context.Context, arg GetCloudSyncCursorParams) (string, error)
 	GetCloudSyncFile(ctx context.Context, arg GetCloudSyncFileParams) (GetCloudSyncFileRow, error)
 	GetClusterMergeCandidates(ctx context.Context, arg GetClusterMergeCandidatesParams) ([]GetClusterMergeCandidatesRow, error)
@@ -232,6 +239,7 @@ type Querier interface {
 	// Repository Asset Statistics (kept for repository management)
 	GetRepositoryAssetStats(ctx context.Context, arg GetRepositoryAssetStatsParams) (GetRepositoryAssetStatsRow, error)
 	GetRepositoryByPath(ctx context.Context, path string) (Repository, error)
+	GetRepositoryCloudBinding(ctx context.Context, arg GetRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
 	GetRepositoryScanRun(ctx context.Context, scanID pgtype.UUID) (RepositoryScanRun, error)
 	GetReverseGeocodeCache(ctx context.Context, arg GetReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	GetSettings(ctx context.Context) (Setting, error)
@@ -269,6 +277,7 @@ type Querier interface {
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserMFAStatus(ctx context.Context, userID int32) (GetUserMFAStatusRow, error)
 	GetUserTOTPCredential(ctx context.Context, userID int32) (UserMfaTotpCredential, error)
+	IncrementCloudImportRunCounts(ctx context.Context, arg IncrementCloudImportRunCountsParams) (CloudImportRun, error)
 	InsertDuplicateGroupAsset(ctx context.Context, arg InsertDuplicateGroupAssetParams) error
 	// Stores pair-level evidence. Callers must order endpoints so asset_id_a < asset_id_b.
 	InsertDuplicateGroupEdge(ctx context.Context, arg InsertDuplicateGroupEdgeParams) error
@@ -278,6 +287,8 @@ type Querier interface {
 	ListAssetEmbeddings(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListAssetEmbeddingsRow, error)
 	ListAssetsByRepositoryAny(ctx context.Context, repositoryID pgtype.UUID) ([]Asset, error)
 	ListBioAlbumAssetsMissingSpeciesPredictions(ctx context.Context, albumID int32) ([]Asset, error)
+	ListCloudCredentials(ctx context.Context) ([]CloudCredential, error)
+	ListCloudImportRunsForRepository(ctx context.Context, arg ListCloudImportRunsForRepositoryParams) ([]CloudImportRun, error)
 	// Paginated list of duplicate groups for the given repository and status.
 	// Pending groups are returned newest-first; resolved groups by resolution time.
 	ListDuplicateGroups(ctx context.Context, arg ListDuplicateGroupsParams) ([]DuplicateGroup, error)
@@ -292,16 +303,19 @@ type Querier interface {
 	ListPhotoAssetsMissingFaceResults(ctx context.Context, arg ListPhotoAssetsMissingFaceResultsParams) ([]Asset, error)
 	ListPhotoAssetsMissingOCRResults(ctx context.Context, arg ListPhotoAssetsMissingOCRResultsParams) ([]Asset, error)
 	ListRepositories(ctx context.Context) ([]Repository, error)
+	ListRepositoryCloudBindings(ctx context.Context, repositoryID pgtype.UUID) ([]RepositoryCloudBinding, error)
 	ListRepositoryScanRuns(ctx context.Context, arg ListRepositoryScanRunsParams) ([]RepositoryScanRun, error)
 	ListTags(ctx context.Context, arg ListTagsParams) ([]Tag, error)
 	ListUserWebAuthnCredentialSummaries(ctx context.Context, userID int32) ([]ListUserWebAuthnCredentialSummariesRow, error)
 	ListUserWebAuthnCredentials(ctx context.Context, userID int32) ([]UserWebauthnCredential, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	ListUsersWithStats(ctx context.Context, arg ListUsersWithStatsParams) ([]ListUsersWithStatsRow, error)
+	MarkCloudImportRunStarted(ctx context.Context, runID pgtype.UUID) (CloudImportRun, error)
 	MarkCloudSyncFile(ctx context.Context, arg MarkCloudSyncFileParams) error
 	MarkDuplicateGroupDismissed(ctx context.Context, groupID pgtype.UUID) error
 	MarkDuplicateGroupMerged(ctx context.Context, arg MarkDuplicateGroupMergedParams) error
 	MarkLocationClustersGeocodeDisabled(ctx context.Context, arg MarkLocationClustersGeocodeDisabledParams) error
+	MarkStaleCloudImportRunsInterrupted(ctx context.Context) error
 	// ============================================================================
 	// Metadata merge helpers (used inside merge transactions)
 	// ============================================================================
@@ -351,6 +365,7 @@ type Querier interface {
 	UpdateAssetStatus(ctx context.Context, arg UpdateAssetStatusParams) (Asset, error)
 	UpdateAssetStatusWithErrors(ctx context.Context, arg UpdateAssetStatusWithErrorsParams) (Asset, error)
 	UpdateAssetStoragePathAndStatus(ctx context.Context, arg UpdateAssetStoragePathAndStatusParams) (Asset, error)
+	UpdateCloudCredentialStatus(ctx context.Context, arg UpdateCloudCredentialStatusParams) (CloudCredential, error)
 	UpdateDiscoveredAssetByID(ctx context.Context, arg UpdateDiscoveredAssetByIDParams) (Asset, error)
 	// Resets all asset roles in a group, then flags the chosen keeper.
 	UpdateDuplicateGroupKeeperRole(ctx context.Context, arg UpdateDuplicateGroupKeeperRoleParams) error
@@ -362,6 +377,7 @@ type Querier interface {
 	UpdateOCRResultStats(ctx context.Context, assetID pgtype.UUID) error
 	UpdateRegistrationSessionTOTPSecret(ctx context.Context, arg UpdateRegistrationSessionTOTPSecretParams) (RegistrationSession, error)
 	UpdateRepository(ctx context.Context, arg UpdateRepositoryParams) (Repository, error)
+	UpdateRepositoryCloudBindingLastRun(ctx context.Context, arg UpdateRepositoryCloudBindingLastRunParams) (RepositoryCloudBinding, error)
 	UpdateRepositoryLastSync(ctx context.Context, arg UpdateRepositoryLastSyncParams) (Repository, error)
 	UpdateRepositoryStatus(ctx context.Context, arg UpdateRepositoryStatusParams) (Repository, error)
 	UpdateTag(ctx context.Context, arg UpdateTagParams) (Tag, error)
@@ -377,6 +393,7 @@ type Querier interface {
 	UpsertEmbedding(ctx context.Context, arg UpsertEmbeddingParams) error
 	// Embedding spaces
 	UpsertEmbeddingSpace(ctx context.Context, arg UpsertEmbeddingSpaceParams) (EmbeddingSpace, error)
+	UpsertRepositoryCloudBinding(ctx context.Context, arg UpsertRepositoryCloudBindingParams) (RepositoryCloudBinding, error)
 	UpsertReverseGeocodeCache(ctx context.Context, arg UpsertReverseGeocodeCacheParams) (ReverseGeocodeCache, error)
 	UpsertSettings(ctx context.Context, arg UpsertSettingsParams) (Setting, error)
 	UpsertUserTOTPCredential(ctx context.Context, arg UpsertUserTOTPCredentialParams) (UserMfaTotpCredential, error)

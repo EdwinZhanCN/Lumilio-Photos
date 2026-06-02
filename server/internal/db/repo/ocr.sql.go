@@ -46,7 +46,7 @@ func (q *Queries) CreateOCRResult(ctx context.Context, arg CreateOCRResultParams
 const createOCRTextItem = `-- name: CreateOCRTextItem :one
 INSERT INTO ocr_text_items (asset_id, text_content, confidence, bounding_box, text_length, area_pixels)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at
+RETURNING id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at, search_vector
 `
 
 type CreateOCRTextItemParams struct {
@@ -77,6 +77,7 @@ func (q *Queries) CreateOCRTextItem(ctx context.Context, arg CreateOCRTextItemPa
 		&i.TextLength,
 		&i.AreaPixels,
 		&i.CreatedAt,
+		&i.SearchVector,
 	)
 	return i, err
 }
@@ -100,7 +101,7 @@ func (q *Queries) DeleteOCRTextItemsByAsset(ctx context.Context, assetID pgtype.
 }
 
 const getHighConfidenceTextItems = `-- name: GetHighConfidenceTextItems :many
-SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at FROM ocr_text_items
+SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at, search_vector FROM ocr_text_items
 WHERE confidence >= $1
 ORDER BY confidence DESC, text_length DESC
 LIMIT $2
@@ -129,6 +130,7 @@ func (q *Queries) GetHighConfidenceTextItems(ctx context.Context, arg GetHighCon
 			&i.TextLength,
 			&i.AreaPixels,
 			&i.CreatedAt,
+			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}
@@ -247,7 +249,7 @@ func (q *Queries) GetOCRTextItemStatsByAsset(ctx context.Context, assetID pgtype
 }
 
 const getOCRTextItemsByAsset = `-- name: GetOCRTextItemsByAsset :many
-SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at FROM ocr_text_items
+SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at, search_vector FROM ocr_text_items
 WHERE asset_id = $1
 ORDER BY confidence DESC, text_length DESC
 `
@@ -270,6 +272,7 @@ func (q *Queries) GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUI
 			&i.TextLength,
 			&i.AreaPixels,
 			&i.CreatedAt,
+			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}
@@ -282,7 +285,7 @@ func (q *Queries) GetOCRTextItemsByAsset(ctx context.Context, assetID pgtype.UUI
 }
 
 const getOCRTextItemsByAssetWithLimit = `-- name: GetOCRTextItemsByAssetWithLimit :many
-SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at FROM ocr_text_items
+SELECT id, asset_id, text_content, confidence, bounding_box, text_length, area_pixels, created_at, search_vector FROM ocr_text_items
 WHERE asset_id = $1
 ORDER BY confidence DESC, text_length DESC
 LIMIT $2
@@ -311,6 +314,7 @@ func (q *Queries) GetOCRTextItemsByAssetWithLimit(ctx context.Context, arg GetOC
 			&i.TextLength,
 			&i.AreaPixels,
 			&i.CreatedAt,
+			&i.SearchVector,
 		); err != nil {
 			return nil, err
 		}

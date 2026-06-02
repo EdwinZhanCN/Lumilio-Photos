@@ -38,32 +38,6 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
-            "cloud.ProviderKind": {
-                "enum": [
-                    "icloud",
-                    "s3"
-                ],
-                "example": "icloud",
-                "type": "string",
-                "x-enum-varnames": [
-                    "ProviderICloud",
-                    "ProviderS3"
-                ]
-            },
-            "cloud.SyncMode": {
-                "enum": [
-                    "import",
-                    "one_way",
-                    "import",
-                    "one_way"
-                ],
-                "example": "import",
-                "type": "string",
-                "x-enum-varnames": [
-                    "SyncModeImport",
-                    "SyncModeOneWay"
-                ]
-            },
             "data": {
                 "properties": {
                     "data": {
@@ -906,62 +880,97 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
-            "dto.CloudProviderStatusDTO": {
+            "dto.CloudCredentialDTO": {
                 "properties": {
-                    "connected": {
-                        "example": true,
-                        "type": "boolean"
+                    "created_at": {
+                        "type": "string"
                     },
-                    "last_cursor": {
+                    "display_name": {
+                        "example": "Personal iCloud",
+                        "type": "string"
+                    },
+                    "domain": {
+                        "example": "com",
+                        "type": "string"
+                    },
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "masked_account": {
+                        "example": "u***r@icloud.com",
                         "type": "string"
                     },
                     "provider": {
                         "example": "icloud",
                         "type": "string"
                     },
-                    "sync_mode": {
-                        "example": "import",
+                    "status": {
+                        "example": "connected",
                         "type": "string"
                     },
-                    "synced_file_count": {
-                        "example": 42,
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "dto.CloudImportRunDTO": {
+                "properties": {
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "credential_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "downloaded_count": {
+                        "example": 80,
                         "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
-            "dto.ConnectICloudRequest": {
-                "properties": {
-                    "domain": {
-                        "enum": [
-                            "com",
-                            "cn"
-                        ],
-                        "example": "com",
+                    },
+                    "error": {
                         "type": "string"
                     },
-                    "password": {
-                        "example": "app-specific-password",
+                    "failed_count": {
+                        "example": 5,
+                        "type": "integer"
+                    },
+                    "finished_at": {
                         "type": "string"
                     },
-                    "sync_mode": {
-                        "$ref": "#/components/schemas/cloud.SyncMode"
-                    },
-                    "username": {
-                        "example": "user@icloud.com",
+                    "id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "type": "string"
-                    }
-                },
-                "required": [
-                    "password",
-                    "username"
-                ],
-                "type": "object"
-            },
-            "dto.ConnectICloudResponse": {
-                "properties": {
-                    "needs_2fa": {
-                        "type": "boolean"
+                    },
+                    "imported_count": {
+                        "example": 75,
+                        "type": "integer"
+                    },
+                    "provider": {
+                        "example": "icloud",
+                        "type": "string"
+                    },
+                    "repository_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
+                    "skipped_count": {
+                        "example": 40,
+                        "type": "integer"
+                    },
+                    "started_at": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "example": "running",
+                        "type": "string"
+                    },
+                    "total_seen": {
+                        "example": 120,
+                        "type": "integer"
+                    },
+                    "updated_at": {
+                        "type": "string"
                     }
                 },
                 "type": "object"
@@ -990,6 +999,46 @@ const docTemplate = `{
                 ],
                 "type": "object"
             },
+            "dto.CreateICloudCredentialRequest": {
+                "properties": {
+                    "display_name": {
+                        "example": "Personal iCloud",
+                        "type": "string"
+                    },
+                    "domain": {
+                        "enum": [
+                            "com",
+                            "cn"
+                        ],
+                        "example": "com",
+                        "type": "string"
+                    },
+                    "password": {
+                        "example": "app-specific-password",
+                        "type": "string"
+                    },
+                    "username": {
+                        "example": "user@icloud.com",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "password",
+                    "username"
+                ],
+                "type": "object"
+            },
+            "dto.CreateICloudCredentialResponse": {
+                "properties": {
+                    "credential": {
+                        "$ref": "#/components/schemas/dto.CloudCredentialDTO"
+                    },
+                    "needs_2fa": {
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
             "dto.CreateManualStackRequestDTO": {
                 "properties": {
                     "asset_ids": {
@@ -1008,6 +1057,10 @@ const docTemplate = `{
             },
             "dto.CreateRepositoryRequestDTO": {
                 "properties": {
+                    "cloud_credential_id": {
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "type": "string"
+                    },
                     "name": {
                         "example": "Family Photos",
                         "type": "string"
@@ -1020,6 +1073,12 @@ const docTemplate = `{
             },
             "dto.CreateRepositoryResponseDTO": {
                 "properties": {
+                    "cloud_import_error": {
+                        "type": "string"
+                    },
+                    "cloud_import_run_id": {
+                        "type": "string"
+                    },
                     "repository": {
                         "$ref": "#/components/schemas/dto.RepositoryDTO"
                     }
@@ -1497,6 +1556,18 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.ListCloudCredentialsResponse": {
+                "properties": {
+                    "credentials": {
+                        "items": {
+                            "$ref": "#/components/schemas/dto.CloudCredentialDTO"
+                        },
+                        "type": "array",
+                        "uniqueItems": false
+                    }
+                },
+                "type": "object"
+            },
             "dto.ListDuplicateGroupsResponseDTO": {
                 "properties": {
                     "groups": {
@@ -1538,18 +1609,6 @@ const docTemplate = `{
                     },
                     "total": {
                         "type": "integer"
-                    }
-                },
-                "type": "object"
-            },
-            "dto.ListProvidersResponse": {
-                "properties": {
-                    "providers": {
-                        "items": {
-                            "$ref": "#/components/schemas/dto.CloudProviderStatusDTO"
-                        },
-                        "type": "array",
-                        "uniqueItems": false
                     }
                 },
                 "type": "object"
@@ -2506,6 +2565,28 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.RepositoryCloudStatusDTO": {
+                "properties": {
+                    "credential": {
+                        "$ref": "#/components/schemas/dto.CloudCredentialDTO"
+                    },
+                    "enabled": {
+                        "example": true,
+                        "type": "boolean"
+                    },
+                    "last_import_run_id": {
+                        "type": "string"
+                    },
+                    "latest_run": {
+                        "$ref": "#/components/schemas/dto.CloudImportRunDTO"
+                    },
+                    "provider": {
+                        "example": "icloud",
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
             "dto.RepositoryDTO": {
                 "properties": {
                     "default_owner_id": {
@@ -3110,6 +3191,14 @@ const docTemplate = `{
                 },
                 "type": "object"
             },
+            "dto.StartCloudImportResponse": {
+                "properties": {
+                    "run": {
+                        "$ref": "#/components/schemas/dto.CloudImportRunDTO"
+                    }
+                },
+                "type": "object"
+            },
             "dto.StudioEditAdjustmentsDTO": {
                 "properties": {
                     "blacks": {
@@ -3238,22 +3327,6 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
-                "type": "object"
-            },
-            "dto.TriggerSyncRequest": {
-                "properties": {
-                    "provider": {
-                        "$ref": "#/components/schemas/cloud.ProviderKind"
-                    },
-                    "repository_id": {
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "provider",
-                    "repository_id"
-                ],
                 "type": "object"
             },
             "dto.UpdateAlbumRequestDTO": {
@@ -10756,9 +10829,149 @@ const docTemplate = `{
                 ]
             }
         },
-        "/api/v1/cloud/icloud/connect": {
+        "/api/v1/cloud/credentials": {
+            "get": {
+                "description": "List configured cloud credentials without exposing secrets.",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Credential list"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "List cloud credentials",
+                "tags": [
+                    "cloud"
+                ]
+            }
+        },
+        "/api/v1/cloud/credentials/{id}": {
+            "delete": {
+                "description": "Disable a saved cloud credential so it cannot start new imports.",
+                "parameters": [
+                    {
+                        "description": "Credential UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Credential disabled"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Disable cloud credential",
+                "tags": [
+                    "cloud"
+                ]
+            }
+        },
+        "/api/v1/cloud/icloud/credentials": {
             "post": {
-                "description": "Start iCloud authentication. If 2FA is required, returns needs_2fa=true.",
+                "description": "Authenticate with iCloud and save a repo-reusable credential session. If 2FA is required, returns needs_2fa=true.",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -10768,15 +10981,15 @@ const docTemplate = `{
                                         "type": "object"
                                     },
                                     {
-                                        "$ref": "#/components/schemas/dto.ConnectICloudRequest",
+                                        "$ref": "#/components/schemas/dto.CreateICloudCredentialRequest",
                                         "summary": "request",
-                                        "description": "iCloud credentials"
+                                        "description": "iCloud credential"
                                     }
                                 ]
                             }
                         }
                     },
-                    "description": "iCloud credentials",
+                    "description": "iCloud credential",
                     "required": true
                 },
                 "responses": {
@@ -10815,7 +11028,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Connection result"
+                        "description": "Credential creation result"
                     },
                     "400": {
                         "content": {
@@ -10853,15 +11066,26 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "summary": "Connect to iCloud",
+                "summary": "Create iCloud credential",
                 "tags": [
                     "cloud"
                 ]
             }
         },
-        "/api/v1/cloud/icloud/verify-2fa": {
+        "/api/v1/cloud/icloud/credentials/{id}/verify-2fa": {
             "post": {
-                "description": "Submit a two-factor authentication code to complete iCloud login.",
+                "description": "Submit a two-factor authentication code to complete iCloud credential creation.",
+                "parameters": [
+                    {
+                        "description": "Credential UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -10929,15 +11153,26 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "summary": "Verify iCloud 2FA",
+                "summary": "Verify iCloud credential 2FA",
                 "tags": [
                     "cloud"
                 ]
             }
         },
-        "/api/v1/cloud/providers": {
+        "/api/v1/cloud/import-runs/{id}": {
             "get": {
-                "description": "Get the status of all configured cloud storage providers.",
+                "description": "Return a cloud import run by ID.",
+                "parameters": [
+                    {
+                        "description": "Import run UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "content": {
@@ -10974,73 +11209,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Provider list"
-                    },
-                    "401": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
-                                }
-                            }
-                        },
-                        "description": "Unauthorized"
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
-                                }
-                            }
-                        },
-                        "description": "Internal server error"
-                    }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "summary": "List cloud providers",
-                "tags": [
-                    "cloud"
-                ]
-            }
-        },
-        "/api/v1/cloud/sync": {
-            "post": {
-                "description": "Start a sync operation for the specified cloud provider.",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "oneOf": [
-                                    {
-                                        "type": "object"
-                                    },
-                                    {
-                                        "$ref": "#/components/schemas/dto.TriggerSyncRequest",
-                                        "summary": "request",
-                                        "description": "Sync configuration"
-                                    }
-                                ]
-                            }
-                        }
-                    },
-                    "description": "Sync configuration",
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
-                                }
-                            }
-                        },
-                        "description": "Sync started"
+                        "description": "Import run"
                     },
                     "400": {
                         "content": {
@@ -11078,41 +11247,16 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "summary": "Trigger cloud sync",
+                "summary": "Get cloud import run",
                 "tags": [
                     "cloud"
                 ]
             }
         },
-        "/api/v1/cloud/{provider}": {
-            "delete": {
-                "description": "Remove a cloud provider's configuration and stop any active sync.",
-                "parameters": [
-                    {
-                        "description": "Provider name",
-                        "in": "path",
-                        "name": "provider",
-                        "required": true,
-                        "schema": {
-                            "enum": [
-                                "icloud",
-                                "s3"
-                            ],
-                            "type": "string"
-                        }
-                    }
-                ],
+        "/api/v1/cloud/sync": {
+            "post": {
+                "description": "Deprecated. Use repo-scoped cloud import endpoints instead.",
                 "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
-                                }
-                            }
-                        },
-                        "description": "Disconnected successfully"
-                    },
                     "400": {
                         "content": {
                             "application/json": {
@@ -11121,27 +11265,7 @@ const docTemplate = `{
                                 }
                             }
                         },
-                        "description": "Invalid provider"
-                    },
-                    "401": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
-                                }
-                            }
-                        },
-                        "description": "Unauthorized"
-                    },
-                    "500": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/api.Result"
-                                }
-                            }
-                        },
-                        "description": "Internal server error"
+                        "description": "Deprecated endpoint"
                     }
                 },
                 "security": [
@@ -11149,7 +11273,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "summary": "Disconnect cloud provider",
+                "summary": "Deprecated cloud sync endpoint",
                 "tags": [
                     "cloud"
                 ]
@@ -12972,6 +13096,194 @@ const docTemplate = `{
                 "summary": "Update repository",
                 "tags": [
                     "repositories"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/cloud": {
+            "get": {
+                "description": "Return cloud credential binding and latest import run for a repository.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Repository cloud status"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Get repository cloud status",
+                "tags": [
+                    "cloud"
+                ]
+            }
+        },
+        "/api/v1/repositories/{id}/cloud/import": {
+            "post": {
+                "description": "Start an import run for the repository's configured cloud credential.",
+                "parameters": [
+                    {
+                        "description": "Repository UUID",
+                        "in": "path",
+                        "name": "id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/data"
+                                        }
+                                    ],
+                                    "description": "Standard API response wrapper",
+                                    "properties": {
+                                        "code": {
+                                            "description": "Business status code (0 for success, non-zero for errors)",
+                                            "example": 0,
+                                            "type": "integer"
+                                        },
+                                        "data": {
+                                            "description": "Business data, ignore empty values",
+                                            "type": "object"
+                                        },
+                                        "error": {
+                                            "description": "Debug error message, ignore empty values",
+                                            "example": "error details",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "description": "User readable message",
+                                            "example": "success",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "description": "Import started"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/api.Result"
+                                }
+                            }
+                        },
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "summary": "Start repository cloud import",
+                "tags": [
+                    "cloud"
                 ]
             }
         },

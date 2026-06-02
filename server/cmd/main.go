@@ -256,12 +256,16 @@ func main() {
 	agentController := handler.NewAgentHandler(agentService)
 	capabilitiesController := handler.NewCapabilitiesHandler(settingsService, lumenService)
 	settingsController := handler.NewSettingsHandler(settingsService)
-	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, appConfig.StorageConfig.Path)
-	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
-
 	// Initialize Cloud Sync service and handler
-	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, assetService, appLogger.Named("cloud_sync"))
+	cloudSyncService := cloud.NewCloudSyncService(queries, sourceMaterializer, appLogger.Named("cloud_sync"))
+	// Reconcile import runs left "running"/"queued" by a previous crash/restart
+	// so repositories are not stuck with an import that never finishes.
+	if err := cloudSyncService.RecoverInterruptedRuns(ctx); err != nil {
+		appLogger.Warn("failed to recover interrupted cloud import runs", zap.Error(err))
+	}
 	cloudController := handler.NewCloudHandler(cloudSyncService)
+	repositoryScanController := handler.NewRepositoryScanHandler(repositoryScanner, repoManager, appConfig.StorageConfig.Path, cloudSyncService)
+	duplicateController := handler.NewDuplicateHandler(duplicateService, queries)
 
 	// Initialize Swagger docs
 	docs.SwaggerInfo.Title = "Lumilio-Photos API"
