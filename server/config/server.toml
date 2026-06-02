@@ -17,6 +17,7 @@ host = "db"
 port = "5432"
 user = "postgres"
 password = "postgres"
+password_file = "/data/config/secrets/db_password"
 name = "lumiliophotos"
 ssl = "disable"
 

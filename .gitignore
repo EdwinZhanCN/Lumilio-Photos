@@ -65,6 +65,7 @@ debug
 # Go specific
 *.out
 go.work
+server/.cache/
 
 # Misc
 *.DS_Store

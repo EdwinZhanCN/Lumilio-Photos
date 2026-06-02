@@ -1,7 +1,6 @@
 import React, { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import QRCode from "qrcode";
 import {
-  Aperture,
   ArrowRight,
   Check,
   CircleAlert,
@@ -10,6 +9,7 @@ import {
   Eye,
   EyeOff,
   Fingerprint,
+  Info,
   KeyRound,
   Lock,
   ScanFace,
@@ -37,20 +37,15 @@ export const Brand: React.FC<{
   size?: number;
   withWord?: boolean;
   className?: string;
-}> = ({ appName = "Lumilio", size = 36, withWord = true, className }) => (
+}> = ({ appName = "Lumilio Photos", size = 36, withWord = true, className }) => (
   <div className={cx("flex items-center gap-2.5", className)}>
-    <div
-      className="grid place-items-center rounded-xl bg-neutral text-neutral-content shadow-sm"
+    <img
+      src="/logo.png"
+      alt={`${appName} logo`}
+      className="shrink-0 object-contain"
       style={{ width: size, height: size }}
-    >
-      <Aperture size={size * 0.58} strokeWidth={1.75} />
-    </div>
-    {withWord && (
-      <span className="text-[1.35rem] font-semibold tracking-tight text-base-content">
-        {appName}
-        <span className="font-normal text-base-content/45"> Photos</span>
-      </span>
-    )}
+    />
+    {withWord && <span className="text-[1.35rem] font-semibold tracking-tight text-base-content">{appName}</span>}
   </div>
 );
 
@@ -59,9 +54,8 @@ export const Brand: React.FC<{
 export const AuthShell: React.FC<{
   children: ReactNode;
   width?: number;
-  footer?: ReactNode;
   appName?: string;
-}> = ({ children, width = 440, footer, appName }) => (
+}> = ({ children, width = 440, appName }) => (
   <div className="screen-in w-full" style={{ maxWidth: width }}>
     <div className="mb-7 flex justify-center">
       <Brand appName={appName} />
@@ -69,9 +63,6 @@ export const AuthShell: React.FC<{
     <div className="card border border-base-200 bg-base-100 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_32px_-12px_rgba(0,0,0,0.12)]">
       <div className="card-body gap-5 p-7 sm:p-8">{children}</div>
     </div>
-    <p className="mt-6 text-center text-xs text-base-content/40">
-      {footer ?? "Self-hosted · Your photos never leave your server"}
-    </p>
   </div>
 );
 
@@ -109,26 +100,48 @@ export const CardHead: React.FC<{
 
 export const Field: React.FC<{
   label?: ReactNode;
-  hint?: ReactNode;
+  hint?: string;
   error?: ReactNode;
   htmlFor?: string;
   children: ReactNode;
-}> = ({ label, hint, error, htmlFor, children }) => (
-  <label className="form-control w-full" htmlFor={htmlFor}>
-    {(label || hint) && (
-      <div className="mb-1.5 flex items-baseline justify-between">
-        {label && <span className="text-sm font-medium text-base-content/80">{label}</span>}
-        {hint && <span className="text-xs text-base-content/45">{hint}</span>}
-      </div>
-    )}
-    {children}
-    {error && (
-      <span className="mt-1.5 flex items-center gap-1 text-xs font-medium text-error">
-        <CircleAlert size={13} /> {error}
-      </span>
-    )}
-  </label>
-);
+}> = ({ label, hint, error, htmlFor, children }) => {
+  return (
+    <div className="form-control w-full min-w-0">
+      {(label || hint) && (
+        <div className="mb-1.5 flex min-w-0 items-center gap-1.5">
+          {label && (
+            <label
+              className="min-w-0 text-sm font-medium text-base-content/80"
+              htmlFor={htmlFor}
+            >
+              {label}
+            </label>
+          )}
+          {hint && (
+            <div
+              className="tooltip tooltip-right inline-flex"
+              data-tip={hint}
+            >
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs h-5 min-h-0 w-5 shrink-0 rounded-full p-0 text-base-content/40 hover:bg-base-200 hover:text-base-content/70"
+                aria-label={hint}
+              >
+                <Info size={13} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {children}
+      {error && (
+        <span className="mt-1.5 flex items-center gap-1 text-xs font-medium text-error">
+          <CircleAlert size={13} /> {error}
+        </span>
+      )}
+    </div>
+  );
+};
 
 type TextInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   icon?: LucideIcon;
@@ -143,7 +156,7 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
     return (
       <div
         className={cx(
-          "input input-bordered flex items-center gap-2.5 bg-base-100",
+          "input input-bordered flex w-full min-w-0 items-center gap-2.5 bg-base-100",
           invalid && "input-error",
           className,
         )}
@@ -151,7 +164,7 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
         <Icon size={17} className="shrink-0 text-base-content/40" />
         <input
           ref={ref}
-          className="grow bg-transparent outline-none placeholder:text-base-content/35"
+          className="min-w-0 grow bg-transparent outline-none placeholder:text-base-content/35"
           {...props}
         />
       </div>
@@ -160,7 +173,11 @@ export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(func
   return (
     <input
       ref={ref}
-      className={cx("input input-bordered w-full bg-base-100", invalid && "input-error", className)}
+      className={cx(
+        "input input-bordered w-full min-w-0 bg-base-100",
+        invalid && "input-error",
+        className,
+      )}
       {...props}
     />
   );
@@ -188,7 +205,7 @@ const STRENGTH_COLORS = ["bg-base-300", "bg-error", "bg-warning", "bg-success/70
 
 type PasswordFieldProps = {
   label?: ReactNode;
-  hint?: ReactNode;
+  hint?: string;
   error?: ReactNode;
   value: string;
   onChange: (value: string) => void;
@@ -218,7 +235,7 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
     <Field label={label} hint={hint} error={error}>
       <div
         className={cx(
-          "input input-bordered flex items-center gap-2.5 bg-base-100",
+          "input input-bordered flex w-full min-w-0 items-center gap-2.5 bg-base-100",
           !!error && "input-error",
         )}
       >
@@ -226,7 +243,7 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
         <input
           ref={inputRef}
           type={show ? "text" : "password"}
-          className="grow bg-transparent outline-none placeholder:text-base-content/35"
+          className="min-w-0 grow bg-transparent outline-none placeholder:text-base-content/35"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
