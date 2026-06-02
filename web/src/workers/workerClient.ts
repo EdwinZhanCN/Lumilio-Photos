@@ -114,7 +114,7 @@ export class AppWorkerClient {
         return this.toolWorker;
 
       default:
-        throw new Error(`Unknown worker type: ${type}`);
+        throw new Error(`Unknown worker type: ${String(type)}`);
     }
   }
 
@@ -151,9 +151,7 @@ export class AppWorkerClient {
           worker.removeEventListener("message", handler);
           this.justifiedInitPromise = null;
           reject(
-            new Error(
-              e.data?.payload?.error || "Justified layout init failed",
-            ),
+            new Error(e.data?.payload?.error || "Justified layout init failed"),
           );
         }
       };
@@ -276,14 +274,15 @@ export class AppWorkerClient {
   // --- Hash Generation (Worker Pool) ---
   async generateHash(
     data: FileList | File[],
-    onItemComplete?: (result: SingleHashResult) => void
+    onItemComplete?: (result: SingleHashResult) => void,
   ): Promise<{ status: string }> {
     const filesArray = Array.isArray(data) ? data : Array.from(data);
     if (filesArray.length === 0) return { status: "complete" };
 
     const total = filesArray.length;
     let processed = 0;
-    const maxThreads = globalPerformancePreferences.getMaxConcurrentOperations();
+    const maxThreads =
+      globalPerformancePreferences.getMaxConcurrentOperations();
 
     return new Promise((resolve, reject) => {
       let currentIndex = 0;
@@ -308,7 +307,7 @@ export class AppWorkerClient {
                 onItemComplete({
                   index: fileIndex,
                   hash: e.data.payload.hash,
-                  error: e.data.payload.error
+                  error: e.data.payload.error,
                 });
               } catch (err) {
                 console.error("Error in onItemComplete callback:", err);
@@ -316,8 +315,8 @@ export class AppWorkerClient {
             }
             processed++;
             this.eventTarget.dispatchEvent(
-              new CustomEvent("progress", { 
-                detail: { processed, total } 
+              new CustomEvent("progress", {
+                detail: { processed, total },
               }),
             );
           } else if (e.data.type === "HASH_COMPLETE") {
@@ -336,8 +335,9 @@ export class AppWorkerClient {
           type: "GENERATE_HASH",
           data: [file],
           config: {
-            memoryMultiplier: globalPerformancePreferences.getMemoryConstraintMultiplier()
-          }
+            memoryMultiplier:
+              globalPerformancePreferences.getMemoryConstraintMultiplier(),
+          },
         });
       };
 
@@ -349,7 +349,7 @@ export class AppWorkerClient {
   }
 
   abortGenerateHash() {
-    this.hashWorkers.forEach(w => w.postMessage({ type: "ABORT" }));
+    this.hashWorkers.forEach((w) => w.postMessage({ type: "ABORT" }));
   }
 
   // --- Tool Runtime ---
@@ -432,9 +432,10 @@ export class AppWorkerClient {
 
         if (type === "TOOL_COMPLETE") {
           worker.removeEventListener("message", handler);
-          const bytes = payload.bytes instanceof Uint8Array
-            ? payload.bytes
-            : new Uint8Array(payload.bytes);
+          const bytes =
+            payload.bytes instanceof Uint8Array
+              ? payload.bytes
+              : new Uint8Array(payload.bytes);
 
           resolve({
             fileName: payload.fileName || "tool-output.bin",
@@ -449,9 +450,7 @@ export class AppWorkerClient {
         if (type === "ERROR" && payload.stage === "run_tool") {
           worker.removeEventListener("message", handler);
           reject(
-            new Error(
-              payload.error || `Tool execution failed: ${toolId}`,
-            ),
+            new Error(payload.error || `Tool execution failed: ${toolId}`),
           );
         }
       };
@@ -577,7 +576,7 @@ export class AppWorkerClient {
       this.generateThumbnailworker.terminate();
       this.generateThumbnailworker = null;
     }
-    this.hashWorkers.forEach(w => {
+    this.hashWorkers.forEach((w) => {
       if (w) w.terminate();
     });
     this.hashWorkers = [];
