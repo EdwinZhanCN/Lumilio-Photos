@@ -636,6 +636,8 @@
     "noScanYet": "运行一次扫描以查找资料库中的重复照片。",
     "pageTitle": "重复照片",
     "scan": "立即扫描",
+    "scanAll": "扫描全部",
+    "scanAllSuccess_other": "已扫描 {{count}} 个资源库，共发现 {{groups}} 个重复合集（精确 {{exact}}、相似 {{phash}}、混合 {{mixed}}）",
     "scanError": "扫描失败：{{message}}",
     "scanning": "扫描中...",
     "scanSuccess": "共发现 {{groups}} 个重复合集（精确 {{exact}}、相似 {{phash}}、混合 {{mixed}}）",
