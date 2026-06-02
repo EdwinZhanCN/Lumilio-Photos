@@ -32,7 +32,7 @@ import {
 const STATUS_OPTIONS: DuplicateStatus[] = ["pending", "merged", "dismissed"];
 
 type StatusBadgeProps = {
-  method?: DuplicateMethod | string;
+  method?: string;
 };
 
 function getMethodLabel(t: (key: string) => string, method: DuplicateMethod) {

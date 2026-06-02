@@ -1,5 +1,13 @@
-import React, { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import React, {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import QRCode from "qrcode";
+import { useI18n } from "@/lib/i18n.tsx";
 import {
   ArrowRight,
   Check,
@@ -37,7 +45,12 @@ export const Brand: React.FC<{
   size?: number;
   withWord?: boolean;
   className?: string;
-}> = ({ appName = "Lumilio Photos", size = 36, withWord = true, className }) => (
+}> = ({
+  appName = "Lumilio Photos",
+  size = 36,
+  withWord = true,
+  className,
+}) => (
   <div className={cx("flex items-center gap-2.5", className)}>
     <img
       src="/logo.png"
@@ -45,7 +58,11 @@ export const Brand: React.FC<{
       className="shrink-0 object-contain"
       style={{ width: size, height: size }}
     />
-    {withWord && <span className="text-[1.35rem] font-semibold tracking-tight text-base-content">{appName}</span>}
+    {withWord && (
+      <span className="text-[1.35rem] font-semibold tracking-tight text-base-content">
+        {appName}
+      </span>
+    )}
   </div>
 );
 
@@ -83,7 +100,12 @@ export const CardHead: React.FC<{
 }> = ({ icon: Icon, title, sub, tone = "neutral" }) => (
   <div className="flex flex-col gap-3">
     {Icon && (
-      <div className={cx("grid h-11 w-11 place-items-center rounded-xl", HEAD_TONES[tone])}>
+      <div
+        className={cx(
+          "grid h-11 w-11 place-items-center rounded-xl",
+          HEAD_TONES[tone],
+        )}
+      >
         <Icon size={22} />
       </div>
     )}
@@ -91,7 +113,11 @@ export const CardHead: React.FC<{
       <h1 className="text-[1.4rem] font-semibold leading-tight tracking-tight text-base-content">
         {title}
       </h1>
-      {sub && <p className="mt-1.5 text-sm leading-relaxed text-base-content/55">{sub}</p>}
+      {sub && (
+        <p className="mt-1.5 text-sm leading-relaxed text-base-content/55">
+          {sub}
+        </p>
+      )}
     </div>
   </div>
 );
@@ -118,10 +144,7 @@ export const Field: React.FC<{
             </label>
           )}
           {hint && (
-            <div
-              className="tooltip tooltip-right inline-flex"
-              data-tip={hint}
-            >
+            <div className="tooltip tooltip-right inline-flex" data-tip={hint}>
               <button
                 type="button"
                 className="btn btn-ghost btn-xs h-5 min-h-0 w-5 shrink-0 rounded-full p-0 text-base-content/40 hover:bg-base-200 hover:text-base-content/70"
@@ -148,40 +171,39 @@ type TextInputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   invalid?: boolean;
 };
 
-export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(function TextInput(
-  { icon: Icon, invalid, className, ...props },
-  ref,
-) {
-  if (Icon) {
+export const TextInput = React.forwardRef<HTMLInputElement, TextInputProps>(
+  function TextInput({ icon: Icon, invalid, className, ...props }, ref) {
+    if (Icon) {
+      return (
+        <div
+          className={cx(
+            "input input-bordered flex w-full min-w-0 items-center gap-2.5 bg-base-100",
+            invalid && "input-error",
+            className,
+          )}
+        >
+          <Icon size={17} className="shrink-0 text-base-content/40" />
+          <input
+            ref={ref}
+            className="min-w-0 grow bg-transparent outline-none placeholder:text-base-content/35"
+            {...props}
+          />
+        </div>
+      );
+    }
     return (
-      <div
+      <input
+        ref={ref}
         className={cx(
-          "input input-bordered flex w-full min-w-0 items-center gap-2.5 bg-base-100",
+          "input input-bordered w-full min-w-0 bg-base-100",
           invalid && "input-error",
           className,
         )}
-      >
-        <Icon size={17} className="shrink-0 text-base-content/40" />
-        <input
-          ref={ref}
-          className="min-w-0 grow bg-transparent outline-none placeholder:text-base-content/35"
-          {...props}
-        />
-      </div>
+        {...props}
+      />
     );
-  }
-  return (
-    <input
-      ref={ref}
-      className={cx(
-        "input input-bordered w-full min-w-0 bg-base-100",
-        invalid && "input-error",
-        className,
-      )}
-      {...props}
-    />
-  );
-});
+  },
+);
 
 /* ------------------------------------------------------------- password --- */
 
@@ -201,7 +223,13 @@ export function passwordStrength(pw: string): PasswordStrength {
   return { score: s, label: STRENGTH_LABELS[s] };
 }
 
-const STRENGTH_COLORS = ["bg-base-300", "bg-error", "bg-warning", "bg-success/70", "bg-success"];
+const STRENGTH_COLORS = [
+  "bg-base-300",
+  "bg-error",
+  "bg-warning",
+  "bg-success/70",
+  "bg-success",
+];
 
 type PasswordFieldProps = {
   label?: ReactNode;
@@ -230,7 +258,8 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
 }) => {
   const [show, setShow] = useState(false);
   const st = passwordStrength(value);
-  const label_ = strengthLabels && st.score > 0 ? strengthLabels[st.score] : st.label;
+  const label_ =
+    strengthLabels && st.score > 0 ? strengthLabels[st.score] : st.label;
   return (
     <Field label={label} hint={hint} error={error}>
       <div
@@ -272,7 +301,9 @@ export const PasswordField: React.FC<PasswordFieldProps> = ({
               />
             ))}
           </div>
-          <span className="w-12 text-right text-xs font-medium text-base-content/50">{label_}</span>
+          <span className="w-12 text-right text-xs font-medium text-base-content/50">
+            {label_}
+          </span>
         </div>
       )}
     </Field>
@@ -315,7 +346,11 @@ export const Btn: React.FC<BtnProps> = ({
     disabled={loading || disabled}
     {...props}
   >
-    {loading ? <span className="loading loading-spinner loading-sm" /> : Icon && <Icon size={18} />}
+    {loading ? (
+      <span className="loading loading-spinner loading-sm" />
+    ) : (
+      Icon && <Icon size={18} />
+    )}
     {children}
   </button>
 );
@@ -329,7 +364,14 @@ export const OtpInput: React.FC<{
   onComplete?: (value: string) => void;
   autoFocus?: boolean;
   invalid?: boolean;
-}> = ({ length = 6, value, onChange, onComplete, autoFocus = true, invalid }) => {
+}> = ({
+  length = 6,
+  value,
+  onChange,
+  onComplete,
+  autoFocus = true,
+  invalid,
+}) => {
   const refs = useRef<Array<HTMLInputElement | null>>([]);
   const chars = Array.from({ length }, (_, i) => value[i] ?? "");
 
@@ -367,7 +409,9 @@ export const OtpInput: React.FC<{
 
   const paste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const txt = (e.clipboardData.getData("text") || "").replace(/\D/g, "").slice(0, length);
+    const txt = (e.clipboardData.getData("text") || "")
+      .replace(/\D/g, "")
+      .slice(0, length);
     if (!txt) return;
     onChange(txt);
     refs.current[Math.min(txt.length, length - 1)]?.focus();
@@ -403,7 +447,10 @@ export const OtpInput: React.FC<{
 
 /* ------------------------------------------------------------------ qr --- */
 
-export const AuthQR: React.FC<{ value: string; size?: number }> = ({ value, size = 168 }) => {
+export const AuthQR: React.FC<{ value: string; size?: number }> = ({
+  value,
+  size = 168,
+}) => {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -432,7 +479,12 @@ export const AuthQR: React.FC<{ value: string; size?: number }> = ({ value, size
   return (
     <div className="inline-block rounded-2xl border border-base-200 bg-white p-3.5 shadow-sm">
       {dataUrl ? (
-        <img src={dataUrl} alt="Authenticator QR code" width={size} height={size} />
+        <img
+          src={dataUrl}
+          alt="Authenticator QR code"
+          width={size}
+          height={size}
+        />
       ) : (
         <div
           className="grid place-items-center text-base-content/30"
@@ -466,7 +518,8 @@ export const CopyButton: React.FC<{
         onClick={copy}
         className="btn btn-outline h-11 min-h-11 w-full gap-2 rounded-xl border-base-300 font-medium normal-case text-base-content hover:bg-base-200"
       >
-        {done ? <Check size={16} /> : <Copy size={16} />} {done ? copiedLabel : label}
+        {done ? <Check size={16} /> : <Copy size={16} />}{" "}
+        {done ? copiedLabel : label}
       </button>
     );
   }
@@ -476,14 +529,18 @@ export const CopyButton: React.FC<{
       onClick={copy}
       className="btn btn-ghost btn-sm gap-1.5 rounded-lg text-base-content/60 hover:text-base-content"
     >
-      {done ? <Check size={14} /> : <Copy size={14} />} {done ? copiedLabel : label}
+      {done ? <Check size={14} /> : <Copy size={14} />}{" "}
+      {done ? copiedLabel : label}
     </button>
   );
 };
 
 /* ----------------------------------------------------------- flow steps --- */
 
-export const FlowSteps: React.FC<{ steps: string[]; current: number }> = ({ steps, current }) => (
+export const FlowSteps: React.FC<{ steps: string[]; current: number }> = ({
+  steps,
+  current,
+}) => (
   <ul className="mb-1 flex items-center gap-1.5 text-xs font-medium">
     {steps.map((s, i) => {
       const done = i < current;
@@ -502,8 +559,14 @@ export const FlowSteps: React.FC<{ steps: string[]; current: number }> = ({ step
           >
             {done ? <Check size={11} /> : i + 1}
           </span>
-          <span className={active ? "text-base-content" : "text-base-content/40"}>{s}</span>
-          {i < steps.length - 1 && <span className="mx-0.5 h-px w-4 bg-base-300" />}
+          <span
+            className={active ? "text-base-content" : "text-base-content/40"}
+          >
+            {s}
+          </span>
+          {i < steps.length - 1 && (
+            <span className="mx-0.5 h-px w-4 bg-base-300" />
+          )}
         </li>
       );
     })}
@@ -517,46 +580,57 @@ export type StepperStep = { key: string; label: string; icon: LucideIcon };
 export const Stepper: React.FC<{ steps: StepperStep[]; current: number }> = ({
   steps,
   current,
-}) => (
-  <ol className="flex flex-col gap-1">
-    {steps.map((s, i) => {
-      const done = i < current;
-      const active = i === current;
-      const Icon = s.icon;
-      return (
-        <li key={s.key} className="flex items-center gap-3 rounded-lg px-2.5 py-2">
-          <span
-            className={cx(
-              "grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors",
-              done
-                ? "bg-success/15 text-success"
-                : active
-                  ? "bg-neutral text-neutral-content"
-                  : "bg-base-200 text-base-content/35",
-            )}
+}) => {
+  const { t } = useI18n();
+  return (
+    <ol className="flex flex-col gap-1">
+      {steps.map((s, i) => {
+        const done = i < current;
+        const active = i === current;
+        const Icon = s.icon;
+        return (
+          <li
+            key={s.key}
+            className="flex items-center gap-3 rounded-lg px-2.5 py-2"
           >
-            {done ? <Check size={16} /> : <Icon size={16} />}
-          </span>
-          <div className="leading-tight">
-            <p
+            <span
               className={cx(
-                "text-sm font-medium",
-                active
-                  ? "text-base-content"
-                  : done
-                    ? "text-base-content/70"
-                    : "text-base-content/40",
+                "grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors",
+                done
+                  ? "bg-success/15 text-success"
+                  : active
+                    ? "bg-neutral text-neutral-content"
+                    : "bg-base-200 text-base-content/35",
               )}
             >
-              {s.label}
-            </p>
-            <p className="text-[0.7rem] text-base-content/35">Step {i + 1}</p>
-          </div>
-        </li>
-      );
-    })}
-  </ol>
-);
+              {done ? <Check size={16} /> : <Icon size={16} />}
+            </span>
+            <div className="leading-tight">
+              <p
+                className={cx(
+                  "text-sm font-medium",
+                  active
+                    ? "text-base-content"
+                    : done
+                      ? "text-base-content/70"
+                      : "text-base-content/40",
+                )}
+              >
+                {s.label}
+              </p>
+              <p className="text-[0.7rem] text-base-content/35">
+                {t("auth.bootstrap.stepNum", {
+                  defaultValue: "Step {{n}}",
+                  n: i + 1,
+                })}
+              </p>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+};
 
 /* --------------------------------------------------- passkey affordance --- */
 
@@ -585,7 +659,9 @@ export const PasskeyAffordance: React.FC<{
       ) : (
         <div className="space-y-1">
           <p className="font-medium text-base-content">{headline}</p>
-          <p className="text-sm leading-relaxed text-base-content/55">{description}</p>
+          <p className="text-sm leading-relaxed text-base-content/55">
+            {description}
+          </p>
         </div>
       )}
     </div>
@@ -658,7 +734,9 @@ export const RecoveryCodesPanel: React.FC<{
       <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-2xl border border-base-200 bg-base-200/40 p-5 font-mono text-[0.92rem] tabular-nums text-base-content">
         {codes.map((c, i) => (
           <div key={c} className="flex items-center gap-2">
-            <span className="w-4 text-right text-xs text-base-content/35">{i + 1}</span>
+            <span className="w-4 text-right text-xs text-base-content/35">
+              {i + 1}
+            </span>
             <span className="tracking-tight">{c}</span>
           </div>
         ))}
@@ -673,7 +751,11 @@ export const RecoveryCodesPanel: React.FC<{
           {pulled ? "Downloaded" : "Download"}
         </button>
         <div className="flex-1">
-          <CopyButton text={codes.join("\n")} label="Copy all" variant="block" />
+          <CopyButton
+            text={codes.join("\n")}
+            label="Copy all"
+            variant="block"
+          />
         </div>
       </div>
       <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-base-200 px-4 py-3 transition hover:bg-base-200/40">
@@ -685,7 +767,13 @@ export const RecoveryCodesPanel: React.FC<{
         />
         <span className="text-sm text-base-content/80">{checkboxLabel}</span>
       </label>
-      <Btn variant="primary" icon={ArrowRight} disabled={!saved} loading={busy} onClick={onConfirm}>
+      <Btn
+        variant="primary"
+        icon={ArrowRight}
+        disabled={!saved}
+        loading={busy}
+        onClick={onConfirm}
+      >
         {confirmLabel}
       </Btn>
     </>
@@ -720,7 +808,8 @@ export const TotpSetupPanel: React.FC<{
   const [reveal, setReveal] = useState(false);
   const copy = {
     open: steps?.open ?? "Open your authenticator app",
-    openSub: steps?.openSub ?? "Google Authenticator, 1Password, Authy, or similar.",
+    openSub:
+      steps?.openSub ?? "Google Authenticator, 1Password, Authy, or similar.",
     scan: steps?.scan ?? "Scan this QR code",
     enter: steps?.enter ?? "Enter the 6-digit code",
   };
@@ -784,7 +873,12 @@ export const TotpSetupPanel: React.FC<{
           </div>
         </li>
       </ol>
-      <Btn variant="primary" loading={busy} onClick={onVerify} disabled={code.length < 6}>
+      <Btn
+        variant="primary"
+        loading={busy}
+        onClick={onVerify}
+        disabled={code.length < 6}
+      >
         {verifyLabel}
       </Btn>
     </>
@@ -793,7 +887,9 @@ export const TotpSetupPanel: React.FC<{
 
 /* --------------------------------------------------------------- alert --- */
 
-export const InlineError: React.FC<{ children: ReactNode }> = ({ children }) => (
+export const InlineError: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => (
   <div className="flex items-start gap-2 rounded-xl bg-error/10 px-3.5 py-2.5 text-sm text-error">
     <CircleAlert size={15} className="mt-0.5 shrink-0" />
     <span>{children}</span>
@@ -825,7 +921,9 @@ export const SuccessCard: React.FC<{
         <Icon size={38} />
       </div>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-base-content">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-base-content">
+          {title}
+        </h1>
         <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-base-content/55">
           {subtitle}
         </p>
@@ -835,7 +933,12 @@ export const SuccessCard: React.FC<{
           <Lock size={13} /> {badge}
         </div>
       )}
-      <Btn variant="neutral" icon={ArrowRight} className="w-full" onClick={onCta}>
+      <Btn
+        variant="neutral"
+        icon={ArrowRight}
+        className="w-full"
+        onClick={onCta}
+      >
         {ctaLabel}
       </Btn>
     </div>

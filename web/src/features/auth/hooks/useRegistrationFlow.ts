@@ -21,10 +21,7 @@ import type {
   RegistrationTOTPCompleteResponse,
   RegistrationTOTPSetupResponse,
 } from "../auth.type.ts";
-import {
-  createPasskeyCredential,
-  getPasskeySupport,
-} from "../lib/webauthn.ts";
+import { createPasskeyCredential, getPasskeySupport } from "../lib/webauthn.ts";
 
 type AuthRedirectState = {
   from?: {
@@ -34,7 +31,11 @@ type AuthRedirectState = {
   };
 };
 
-export type RegistrationFlowStep = "credentials" | "choose" | "totp" | "recovery";
+export type RegistrationFlowStep =
+  | "credentials"
+  | "choose"
+  | "totp"
+  | "recovery";
 
 type RegistrationFlow = {
   sessionId: string;
@@ -80,7 +81,12 @@ function getApiMessage(error: unknown, fallback: string): string {
 export function useRegistrationFlow(): RegistrationFlowState {
   const { t } = useI18n();
   const queryClient = useQueryClient();
-  const { completeAuth, isAuthenticated, isLoading, error: authError } = useAuth();
+  const {
+    completeAuth,
+    isAuthenticated,
+    isLoading,
+    error: authError,
+  } = useAuth();
   const startRegistrationMutation = $api.useMutation(
     "post",
     "/api/v1/auth/register/start",
@@ -111,10 +117,11 @@ export function useRegistrationFlow(): RegistrationFlowState {
   const [step, setStep] = useState<RegistrationFlowStep>("credentials");
   const [flow, setFlow] = useState<RegistrationFlow | null>(null);
   const [flowError, setFlowError] = useState<string | null>(null);
-  const [capabilityMessage, setCapabilityMessage] = useState<string | null>(null);
-  const [totpSetup, setTotpSetup] = useState<RegistrationTOTPSetupResponse | null>(
+  const [capabilityMessage, setCapabilityMessage] = useState<string | null>(
     null,
   );
+  const [totpSetup, setTotpSetup] =
+    useState<RegistrationTOTPSetupResponse | null>(null);
   const [totpCode, setTotpCode] = useState("");
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [qrCodeDataURL, setQrCodeDataURL] = useState<string | null>(null);
@@ -155,7 +162,7 @@ export function useRegistrationFlow(): RegistrationFlowState {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && step !== "recovery") {
-      navigate(redirectTo, { replace: true });
+      void navigate(redirectTo, { replace: true });
     }
   }, [isAuthenticated, isLoading, navigate, redirectTo, step]);
 
@@ -199,10 +206,13 @@ export function useRegistrationFlow(): RegistrationFlowState {
         registration_session_id: sessionId,
       },
     });
-    const payload =
-      setupResponse as ApiResult<RegistrationTOTPSetupResponse> | undefined;
+    const payload = setupResponse as
+      | ApiResult<RegistrationTOTPSetupResponse>
+      | undefined;
     if (!payload?.data) {
-      throw new Error(payload?.message || t("auth.register.totpSetupStartError"));
+      throw new Error(
+        payload?.message || t("auth.register.totpSetupStartError"),
+      );
     }
 
     setTotpSetup(payload.data);
@@ -210,9 +220,7 @@ export function useRegistrationFlow(): RegistrationFlowState {
     setStep("totp");
   };
 
-  const handleStartRegistration = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  const handleStartRegistration = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFlowError(null);
 
@@ -231,8 +239,9 @@ export function useRegistrationFlow(): RegistrationFlowState {
           password,
         },
       });
-      const payload =
-        response as ApiResult<RegistrationStartResponse> | undefined;
+      const payload = response as
+        | ApiResult<RegistrationStartResponse>
+        | undefined;
       if (!payload?.data) {
         throw new Error(payload?.message || t("auth.register.startError"));
       }
@@ -253,7 +262,9 @@ export function useRegistrationFlow(): RegistrationFlowState {
       );
       await startTotpSetup(nextFlow.sessionId);
     } catch (registrationError) {
-      setFlowError(getApiMessage(registrationError, t("auth.register.startError")));
+      setFlowError(
+        getApiMessage(registrationError, t("auth.register.startError")),
+      );
     }
   };
 
@@ -267,15 +278,18 @@ export function useRegistrationFlow(): RegistrationFlowState {
           registration_session_id: flow.sessionId,
         },
       });
-      const optionsData =
-        optionsResponse as ApiResult<PasskeyOptionsResponse> | undefined;
+      const optionsData = optionsResponse as
+        | ApiResult<PasskeyOptionsResponse>
+        | undefined;
       if (!optionsData?.data) {
         throw new Error(
           optionsData?.message || t("auth.register.passkeyStartError"),
         );
       }
 
-      const credential = await createPasskeyCredential(optionsData.data.options);
+      const credential = await createPasskeyCredential(
+        optionsData.data.options,
+      );
       const verifyResponse = await passkeyVerifyMutation.mutateAsync({
         body: {
           registration_session_id: flow.sessionId,
@@ -294,7 +308,7 @@ export function useRegistrationFlow(): RegistrationFlowState {
       await queryClient.invalidateQueries({
         queryKey: bootstrapStatusQueryKey,
       });
-      navigate(redirectTo, { replace: true });
+      void navigate(redirectTo, { replace: true });
     } catch (passkeyError) {
       setFlowError(
         getApiMessage(passkeyError, t("auth.register.passkeyVerifyError")),
@@ -309,13 +323,13 @@ export function useRegistrationFlow(): RegistrationFlowState {
     try {
       await startTotpSetup(flow.sessionId);
     } catch (totpError) {
-      setFlowError(getApiMessage(totpError, t("auth.register.totpSetupStartError")));
+      setFlowError(
+        getApiMessage(totpError, t("auth.register.totpSetupStartError")),
+      );
     }
   };
 
-  const handleCompleteTotp = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  const handleCompleteTotp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!flow) return;
 
@@ -328,8 +342,9 @@ export function useRegistrationFlow(): RegistrationFlowState {
           code: totpCode,
         },
       });
-      const payload =
-        response as ApiResult<RegistrationTOTPCompleteResponse> | undefined;
+      const payload = response as
+        | ApiResult<RegistrationTOTPCompleteResponse>
+        | undefined;
       if (!payload?.data?.auth) {
         throw new Error(
           payload?.message || t("auth.register.totpSetupCompleteError"),
@@ -350,7 +365,7 @@ export function useRegistrationFlow(): RegistrationFlowState {
   };
 
   const handleFinish = () => {
-    navigate(redirectTo, { replace: true });
+    void navigate(redirectTo, { replace: true });
   };
 
   return {

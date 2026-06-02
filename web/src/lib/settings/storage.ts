@@ -5,7 +5,7 @@ export interface VersionedStorageConfig {
 }
 
 export interface VersionedStorageReadResult {
-  candidate: unknown | null;
+  candidate: unknown;
   needsRewrite: boolean;
   source: "none" | "primary" | "legacy";
 }
@@ -26,12 +26,13 @@ export function parseJSON(raw: string | null): unknown {
 export function extractVersionedCandidate(
   raw: unknown,
   version: number,
-): { candidate: unknown | null; needsRewrite: boolean } {
+): { candidate: unknown; needsRewrite: boolean } {
   if (!isRecord(raw)) {
     return { candidate: null, needsRewrite: false };
   }
 
-  const storedVersion = typeof raw.version === "number" ? raw.version : undefined;
+  const storedVersion =
+    typeof raw.version === "number" ? raw.version : undefined;
   if (storedVersion === version && "data" in raw) {
     return { candidate: raw.data, needsRewrite: false };
   }

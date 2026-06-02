@@ -91,7 +91,7 @@ export default function ChangePasswordPage(): React.ReactNode {
       });
 
       logout();
-      navigate("/login", { replace: true });
+      void navigate("/login", { replace: true });
     } catch (error) {
       setErrorMessage(
         getErrorMessage(

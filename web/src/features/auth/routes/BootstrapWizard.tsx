@@ -11,6 +11,7 @@ import {
   UserCog,
   Users,
   User,
+  type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n.tsx";
 import { useRegistrationFlow } from "../hooks/useRegistrationFlow.ts";
@@ -37,12 +38,12 @@ import {
   type StepperStep,
 } from "../components/ui.tsx";
 
-const STEPPER: StepperStep[] = [
-  { key: "welcome", label: "Welcome", icon: Server },
-  { key: "admin", label: "Admin account", icon: UserCog },
-  { key: "passkey", label: "Passkey", icon: Fingerprint },
-  { key: "totp", label: "Authenticator", icon: Smartphone },
-  { key: "recovery", label: "Recovery codes", icon: KeyRound },
+const STEP_CONFIG: Array<{ key: string; icon: LucideIcon }> = [
+  { key: "welcome", icon: Server },
+  { key: "admin", icon: UserCog },
+  { key: "passkey", icon: Fingerprint },
+  { key: "totp", icon: Smartphone },
+  { key: "recovery", icon: KeyRound },
 ];
 
 const FLOW_INDEX: Record<string, number> = {
@@ -80,10 +81,41 @@ const BootstrapWizard: React.FC = () => {
 
   const appName = t("app.name", { defaultValue: "Lumilio Photos" });
   const current = welcomed ? (FLOW_INDEX[step] ?? 1) : 0;
-  const localizedSteps = STEPPER.map((s) => ({
-    ...s,
-    label: t(`auth.bootstrap.step.${s.key}`, { defaultValue: s.label }),
-  }));
+  const localizedSteps: StepperStep[] = [
+    {
+      key: "welcome",
+      label: t("auth.bootstrap.step.welcome", { defaultValue: "Welcome" }),
+      icon: Server,
+    },
+    {
+      key: "admin",
+      label: t("auth.bootstrap.step.admin", {
+        defaultValue: "Admin account",
+      }),
+      icon: UserCog,
+    },
+    {
+      key: "passkey",
+      label: t("auth.bootstrap.step.passkey", {
+        defaultValue: "Passkey",
+      }),
+      icon: Fingerprint,
+    },
+    {
+      key: "totp",
+      label: t("auth.bootstrap.step.totp", {
+        defaultValue: "Authenticator",
+      }),
+      icon: Smartphone,
+    },
+    {
+      key: "recovery",
+      label: t("auth.bootstrap.step.recovery", {
+        defaultValue: "Recovery codes",
+      }),
+      icon: KeyRound,
+    },
+  ];
 
   const submitTotp = () => {
     void handleCompleteTotp({
@@ -98,7 +130,8 @@ const BootstrapWizard: React.FC = () => {
         defaultValue: "Secured by default",
       }),
       t("auth.bootstrap.welcome.secureBody", {
-        defaultValue: "Passkey + authenticator required for the admin.",
+        defaultValue:
+          "Passkey or authenticator app — pick one as the second factor.",
       }),
     ],
     [
@@ -123,7 +156,11 @@ const BootstrapWizard: React.FC = () => {
 
   return (
     <div className="grid min-h-screen place-items-center bg-base-200 px-4 py-10">
-      <div className="screen-in w-full" style={{ maxWidth: 880 }} key={`bootstrap-${current}`}>
+      <div
+        className="screen-in w-full"
+        style={{ maxWidth: 880 }}
+        key={`bootstrap-${current}`}
+      >
         <div className="overflow-hidden rounded-2xl border border-base-200 bg-base-100 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_18px_44px_-18px_rgba(0,0,0,0.18)] md:grid md:grid-cols-[260px_1fr]">
           {/* sidebar */}
           <aside className="hidden flex-col justify-between border-r border-base-200 bg-base-200/30 p-6 md:flex">
@@ -131,7 +168,9 @@ const BootstrapWizard: React.FC = () => {
               <Brand appName={appName} size={32} />
               <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-base-200 px-2.5 py-1 text-[0.68rem] font-medium uppercase tracking-wide text-base-content/55">
                 <Sparkles size={12} />{" "}
-                {t("auth.bootstrap.firstRun", { defaultValue: "First-run setup" })}
+                {t("auth.bootstrap.firstRun", {
+                  defaultValue: "First-run setup",
+                })}
               </div>
               <div className="mt-7">
                 <Stepper steps={localizedSteps} current={current} />
@@ -149,7 +188,9 @@ const BootstrapWizard: React.FC = () => {
           <section className="p-7 sm:p-9">
             {displayError && (
               <div className="mb-5">
-                <InlineError>{t(displayError, { defaultValue: displayError })}</InlineError>
+                <InlineError>
+                  {t(displayError, { defaultValue: displayError })}
+                </InlineError>
               </div>
             )}
 
@@ -177,9 +218,14 @@ const BootstrapWizard: React.FC = () => {
                       key={title}
                       className="flex items-start gap-3 rounded-xl border border-base-200 px-4 py-3"
                     >
-                      <Icon size={18} className="mt-0.5 shrink-0 text-base-content/45" />
+                      <Icon
+                        size={18}
+                        className="mt-0.5 shrink-0 text-base-content/45"
+                      />
                       <div>
-                        <p className="text-sm font-medium text-base-content">{title}</p>
+                        <p className="text-sm font-medium text-base-content">
+                          {title}
+                        </p>
                         <p className="text-xs text-base-content/55">{body}</p>
                       </div>
                     </div>
@@ -197,7 +243,9 @@ const BootstrapWizard: React.FC = () => {
                   className="self-start px-6"
                   onClick={() => setWelcomed(true)}
                 >
-                  {t("auth.bootstrap.welcome.cta", { defaultValue: "Begin setup" })}
+                  {t("auth.bootstrap.welcome.cta", {
+                    defaultValue: "Begin setup",
+                  })}
                 </Btn>
               </div>
             )}
@@ -209,10 +257,14 @@ const BootstrapWizard: React.FC = () => {
                     defaultValue: "Create the administrator",
                   })}
                   sub={t("auth.bootstrap.admin.subtitle", {
-                    defaultValue: "This account can manage the server, libraries, and members.",
+                    defaultValue:
+                      "This account can manage the server, libraries, and members.",
                   })}
                 />
-                <form className="mt-5 flex flex-col gap-4" onSubmit={handleStartRegistration}>
+                <form
+                  className="mt-5 flex flex-col gap-4"
+                  onSubmit={handleStartRegistration}
+                >
                   <Field
                     label={t("auth.register.username", {
                       defaultValue: "Admin username",
@@ -228,7 +280,9 @@ const BootstrapWizard: React.FC = () => {
                         defaultValue: "admin",
                       })}
                       value={username}
-                      onChange={(e) => setUsername(normalizeUsernameInput(e.target.value))}
+                      onChange={(e) =>
+                        setUsername(normalizeUsernameInput(e.target.value))
+                      }
                       pattern={USERNAME_PATTERN}
                       minLength={USERNAME_MIN_LENGTH}
                       maxLength={USERNAME_MAX_LENGTH}
@@ -263,7 +317,12 @@ const BootstrapWizard: React.FC = () => {
                     autoComplete="new-password"
                     inputRef={confirmPasswordRef}
                   />
-                  <Btn type="submit" variant="neutral" loading={isBusy} className="self-start px-6">
+                  <Btn
+                    type="submit"
+                    variant="neutral"
+                    loading={isBusy}
+                    className="self-start px-6"
+                  >
                     {t("auth.bootstrap.admin.submit", {
                       defaultValue: "Create admin & continue",
                     })}
@@ -288,7 +347,9 @@ const BootstrapWizard: React.FC = () => {
                 <div className="mt-5 flex flex-col gap-4">
                   {capabilityMessage && (
                     <div className="rounded-xl border border-base-200 bg-base-200/60 px-4 py-3 text-sm text-base-content/70">
-                      {t(capabilityMessage, { defaultValue: capabilityMessage })}
+                      {t(capabilityMessage, {
+                        defaultValue: capabilityMessage,
+                      })}
                     </div>
                   )}
                   <PasskeyAffordance />
@@ -325,7 +386,8 @@ const BootstrapWizard: React.FC = () => {
                     defaultValue: "Add an authenticator app",
                   })}
                   sub={t("auth.bootstrap.totp.subtitle", {
-                    defaultValue: "Required for the admin account. Scan and verify to continue.",
+                    defaultValue:
+                      "Required for the admin account. Scan and verify to continue.",
                   })}
                 />
                 <div className="mt-5 flex flex-col gap-4">
@@ -354,7 +416,8 @@ const BootstrapWizard: React.FC = () => {
                     defaultValue: "Save admin recovery codes",
                   })}
                   sub={t("auth.bootstrap.recovery.subtitle", {
-                    defaultValue: "The only way to recover the server if every factor is lost.",
+                    defaultValue:
+                      "The only way to recover the server if every factor is lost.",
                   })}
                 />
                 <div className="mt-5 flex flex-col gap-4">
@@ -364,7 +427,8 @@ const BootstrapWizard: React.FC = () => {
                       defaultValue: "Finish & open dashboard",
                     })}
                     checkboxLabel={t("auth.register.recoverySavedConfirm", {
-                      defaultValue: "I’ve saved my recovery codes somewhere safe",
+                      defaultValue:
+                        "I’ve saved my recovery codes somewhere safe",
                     })}
                     onConfirm={handleFinish}
                   />
@@ -374,7 +438,7 @@ const BootstrapWizard: React.FC = () => {
 
             {/* mobile progress */}
             <div className="mt-7 flex items-center gap-1.5 md:hidden">
-              {STEPPER.map((s, i) => (
+              {STEP_CONFIG.map((s, i) => (
                 <span
                   key={s.key}
                   className={
