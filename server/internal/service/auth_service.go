@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"server/internal/db/repo"
+	"server/internal/secretbox"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -108,15 +108,15 @@ const mediaTokenScope = "media"
 
 // NewAuthService creates a new authentication service
 func NewAuthService(queries *repo.Queries, db *pgxpool.Pool) *AuthService {
-	rootSecret, err := loadOrCreateLumilioSecretKey(strings.TrimSpace(os.Getenv("LUMILIO_SECRET_KEY")))
+	rootSecret, err := secretbox.LoadOrCreateLumilioSecretKey(strings.TrimSpace(os.Getenv("LUMILIO_SECRET_KEY")))
 	if err != nil {
 		panic(fmt.Sprintf("failed to initialize JWT secret from LUMILIO_SECRET_KEY: %v", err))
 	}
-	jwtSecret := deriveScopedSecret(rootSecret, "jwt.signing.v1")
-	mfaTokenSecret := deriveScopedSecret(rootSecret, "mfa.signing.v1")
-	passkeyTokenSecret := deriveScopedSecret(rootSecret, "passkey.signing.v1")
-	mediaTokenSecret := deriveScopedSecret(rootSecret, "media.url.signing.v1")
-	mfaEncryptKey := deriveScopedSecret(rootSecret, "mfa.encryption.v1")
+	jwtSecret := secretbox.DeriveScopedSecret(rootSecret, "jwt.signing.v1")
+	mfaTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "mfa.signing.v1")
+	passkeyTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "passkey.signing.v1")
+	mediaTokenSecret := secretbox.DeriveScopedSecret(rootSecret, "media.url.signing.v1")
+	mfaEncryptKey := secretbox.DeriveScopedSecret(rootSecret, "mfa.encryption.v1")
 
 	// Access token TTL (default: 15 minutes)
 	accessTokenTTL := 15 * time.Minute
@@ -157,13 +157,6 @@ func NewAuthService(queries *repo.Queries, db *pgxpool.Pool) *AuthService {
 		webauthnRPID:           loadWebAuthnRPID(),
 		webauthnAllowedOrigins: loadWebAuthnAllowedOrigins(),
 	}
-}
-
-func deriveScopedSecret(rootSecret string, scope string) []byte {
-	sum := sha256.Sum256([]byte(scope + "\x00" + rootSecret))
-	derived := make([]byte, len(sum))
-	copy(derived, sum[:])
-	return derived
 }
 
 // Login authenticates a user and returns tokens

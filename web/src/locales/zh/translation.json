@@ -751,12 +751,16 @@
     "repositories": {
       "actionsMenu": "{{name}} 的资源库操作",
       "assetCount": "资源数量",
-      "cloudCredentialLabel": "iCloud 凭证",
+      "cloudCredentialLabel": "云凭证",
       "cloudCredentialsHintLink": "设置",
       "cloudCredentialsHintPrefix": "需要账号？前往",
       "cloudCredentialsHintSuffix": "。",
       "createAction": "添加资源库",
       "createFailed": "创建资源库失败。",
+      "cloudImportCreatePartial": "资源库已创建，但云导入未启动：{{error}}",
+      "cloudImportCreateSuccess": "资源库已创建，已为 {{name}} 启动云导入。",
+      "cloudImportFailed": "启动云导入失败。",
+      "cloudImportStarted": "已为 {{name}} 启动云导入。",
       "createNameLabel": "资源库名称",
       "createNamePlaceholder": "家庭照片",
       "createSubmit": "创建资源库",
@@ -781,7 +785,8 @@
       "scanFailed": "加入扫描队列失败。",
       "scanQueued": "已为 {{name}} 加入扫描队列。",
       "selectCloudCredential": "选择凭证",
-      "sourceICloud": "iCloud",
+      "sourceCloud": "云导入",
+      "importFromCloud": "从云端导入",
       "sourceLabel": "来源",
       "sourceLocal": "本地",
       "title": "资源库",
@@ -1156,60 +1161,44 @@
       "confirmDisable": "要停用 {{name}} 吗？已导入的内容会继续保留在 Lumilio。",
       "connectCredential": "连接凭证",
       "connectedAccounts_other": "{{count}} 个已连接账号",
-      "credentialMeta": "{{account}} · iCloud {{domain}}",
+      "credentialMeta": "{{provider}} · {{identity}}",
       "description": "管理可复用的云账号凭证。通过 Manage 创建仓库时，可以选择其中一个账号作为导入来源。",
       "disable": "停用",
-      "domain": {
-        "china": "中国大陆 iCloud",
-        "global": "全球 iCloud"
-      },
-      "empty": "尚未配置 iCloud 凭证。",
+      "empty": "尚未配置云凭证。",
       "errors": {
-        "createFailed": "创建 iCloud 凭证失败。",
+        "createFailed": "创建云凭证失败。",
         "disableFailed": "停用凭证失败。",
         "emptyCredentialResponse": "凭证响应为空。",
-        "verifyFailed": "验证 iCloud 双重认证代码失败。"
+        "verifyFailed": "验证凭证挑战失败。"
       },
       "fields": {
-        "appleId": "Apple ID",
-        "domain": "Apple 域",
-        "label": "标签",
-        "password": "App 专用密码"
+        "label": "标签"
       },
-      "icloudFormDescription": "Lumilio 只在认证时使用该密码，之后仅保存隔离的 iCloud session cookie。",
-      "icloudFormTitle": "添加 iCloud 凭证",
       "messages": {
-        "connected": "iCloud 凭证已连接。",
+        "challengeRequired": "需要完成额外验证。",
+        "connected": "云凭证已连接。",
         "disabled": "云凭证已停用。",
-        "verificationSent": "Apple 已向你的受信任设备发送验证码。",
-        "verified": "iCloud 凭证已验证。"
+        "verified": "云凭证已验证。"
       },
       "placeholders": {
-        "appleId": "you@icloud.com",
-        "label": "个人 iCloud",
-        "password": "xxxx-xxxx-xxxx-xxxx"
+        "label": "个人云账号"
       },
       "providerDescription": "选择要连接的云服务。之后新增其他 provider 时也会从这里进入。",
-      "providers": {
-        "icloud": {
-          "description": "从 iCloud Photos 导入原始媒体。",
-          "title": "iCloud"
-        }
-      },
+      "providerFormDescription": "输入该 provider 需要的认证信息来连接账号。",
+      "providerFormTitle": "添加 {{provider}} 凭证",
       "providerTitle": "选择云服务",
       "savedTitle": "已保存凭证",
-      "securityNote": "Lumilio 会把 iCloud session cookie 保存在隔离的凭证目录中。Apple ID 密码只在认证期间使用，不会被持久化保存。",
       "status": {
         "connected": "已连接",
         "disabled": "已停用",
         "error": "错误",
-        "pending2FA": "需要 2FA",
+        "pendingChallenge": "需要验证",
         "unknown": "未知"
       },
       "title": "云导入",
       "verify": "验证",
-      "verifyDescription": "输入 Apple 发送到受信任设备的 6 位验证码，用于验证 {{name}}。",
-      "verifyTitle": "双重认证"
+      "verifyDescription": "完成 {{name}} 的验证。",
+      "verifyTitle": "需要验证"
     },
     "language": "语言",
     "languageAndRegion": "语言和地区",

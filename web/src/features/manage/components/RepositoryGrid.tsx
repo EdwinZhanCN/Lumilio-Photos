@@ -146,12 +146,12 @@ function RepositoryCard({
                   {t("manage.repositories.primaryBadge")}
                 </span>
               )}
-              {hasCloudBinding && (
-                <span className="badge badge-info badge-sm gap-1">
-                  <Cloud size={12} />
-                  iCloud
-                </span>
-              )}
+	      {hasCloudBinding && (
+	        <span className="badge badge-info badge-sm gap-1">
+	          <Cloud size={12} />
+	          {t("manage.repositories.sourceCloud")}
+	        </span>
+	      )}
             </div>
             <p
               className="mt-1 truncate text-xs text-base-content/55"
@@ -269,8 +269,8 @@ function RepositoryCard({
                   ) : (
                     <CloudDownload size={16} className="text-base-content/70" />
                   )}
-                  <span>Import from iCloud</span>
-                </button>
+	                  <span>{t("manage.repositories.importFromCloud")}</span>
+	                </button>
               )}
             </div>
           )}
@@ -317,7 +317,7 @@ function AddRepositoryModal({
   const createMutation = $api.useMutation("post", "/api/v1/repositories");
   const credentialsQuery = useCloudCredentials();
   const [name, setName] = useState("");
-  const [source, setSource] = useState<"local" | "icloud">("local");
+  const [source, setSource] = useState<"local" | "cloud">("local");
   const [credentialId, setCredentialId] = useState("");
 
   const credentials = useMemo(
@@ -338,13 +338,13 @@ function AddRepositoryModal({
       event.preventDefault();
       const trimmedName = name.trim();
       if (!trimmedName || createMutation.isPending) return;
-      if (source === "icloud" && !credentialId) return;
+      if (source === "cloud" && !credentialId) return;
 
       try {
         const response = await createMutation.mutateAsync({
           body: {
             name: trimmedName,
-            cloud_credential_id: source === "icloud" ? credentialId : undefined,
+            cloud_credential_id: source === "cloud" ? credentialId : undefined,
           },
         });
         await Promise.all([
@@ -361,9 +361,13 @@ function AddRepositoryModal({
         showMessage(
           response.data?.cloud_import_error ? "info" : "success",
           response.data?.cloud_import_error
-            ? `Repository created, but iCloud import did not start: ${response.data.cloud_import_error}`
-            : source === "icloud"
-              ? `Repository created. iCloud import has started for ${trimmedName}.`
+            ? t("manage.repositories.cloudImportCreatePartial", {
+                error: response.data.cloud_import_error,
+              })
+            : source === "cloud"
+              ? t("manage.repositories.cloudImportCreateSuccess", {
+                  name: trimmedName,
+                })
               : t("manage.repositories.createSuccess", { name: trimmedName }),
         );
         setName("");
@@ -441,17 +445,17 @@ function AddRepositoryModal({
               </button>
               <button
                 type="button"
-                className={`btn btn-sm gap-2 ${source === "icloud" ? "btn-primary" : "btn-outline"}`}
-                onClick={() => setSource("icloud")}
+                className={`btn btn-sm gap-2 ${source === "cloud" ? "btn-primary" : "btn-outline"}`}
+                onClick={() => setSource("cloud")}
                 disabled={createMutation.isPending}
               >
                 <Cloud size={15} />
-                {t("manage.repositories.sourceICloud")}
+                {t("manage.repositories.sourceCloud")}
               </button>
             </div>
           </div>
 
-          {source === "icloud" && (
+          {source === "cloud" && (
             <div className="form-control w-full">
               <label className="label pb-1" htmlFor="repository-cloud-credential">
                 <span className="label-text font-medium">
@@ -473,7 +477,8 @@ function AddRepositoryModal({
                 </option>
                 {credentials.map((credential) => (
                   <option key={credential.id} value={credential.id}>
-                    {credential.display_name} · {credential.masked_account}
+                    {credential.display_name} · {credential.provider_title ?? credential.provider} ·{" "}
+                    {credential.masked_identity}
                   </option>
                 ))}
               </select>
@@ -506,7 +511,7 @@ function AddRepositoryModal({
               disabled={
                 !name.trim() ||
                 createMutation.isPending ||
-                (source === "icloud" && !credentialId)
+                (source === "cloud" && !credentialId)
               }
             >
               {createMutation.isPending ? (
@@ -675,11 +680,16 @@ export default function RepositoryGrid() {
             },
           },
         });
-        showMessage("success", `iCloud import started for ${getRepositoryDisplayName(repository, t)}.`);
+        showMessage(
+          "success",
+          t("manage.repositories.cloudImportStarted", {
+            name: getRepositoryDisplayName(repository, t),
+          }),
+        );
       } catch (error) {
         showMessage(
           "error",
-          error instanceof Error ? error.message : "Failed to start iCloud import.",
+          error instanceof Error ? error.message : t("manage.repositories.cloudImportFailed"),
         );
       }
     },

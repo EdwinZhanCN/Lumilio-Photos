@@ -2,35 +2,84 @@ package dto
 
 import "time"
 
-// CreateICloudCredentialRequest is the request body for creating an iCloud credential.
-type CreateICloudCredentialRequest struct {
-	Username    string `json:"username" binding:"required" example:"user@icloud.com"`
-	Password    string `json:"password" binding:"required" example:"app-specific-password"`
-	Domain      string `json:"domain,omitempty" binding:"omitempty,oneof=com cn" example:"com"`
-	DisplayName string `json:"display_name,omitempty" example:"Personal iCloud"`
+// CloudProviderFieldDTO describes one provider-specific form input.
+type CloudProviderFieldDTO struct {
+	Name         string   `json:"name" example:"username"`
+	Label        string   `json:"label" example:"Apple ID"`
+	Type         string   `json:"type" example:"email"`
+	Required     bool     `json:"required" example:"true"`
+	Placeholder  string   `json:"placeholder,omitempty" example:"you@example.com"`
+	HelpText     string   `json:"help_text,omitempty"`
+	Options      []Option `json:"options,omitempty"`
+	Autocomplete string   `json:"autocomplete,omitempty" example:"username"`
 }
 
-// VerifyICloud2FARequest is the request body for submitting a 2FA code.
-type VerifyICloud2FARequest struct {
-	Code string `json:"code" binding:"required" example:"123456"`
+// Option is a generic select option.
+type Option struct {
+	Value string `json:"value" example:"com"`
+	Label string `json:"label" example:"Global"`
+}
+
+// CloudProviderDTO describes a cloud provider that can create credentials.
+type CloudProviderDTO struct {
+	ID              string                  `json:"id" example:"icloud"`
+	Title           string                  `json:"title" example:"iCloud"`
+	Description     string                  `json:"description" example:"Import originals from iCloud Photos."`
+	Status          string                  `json:"status" example:"enabled"`
+	FormFields      []CloudProviderFieldDTO `json:"form_fields"`
+	ChallengeFields []CloudProviderFieldDTO `json:"challenge_fields,omitempty"`
+	SecurityNote    string                  `json:"security_note,omitempty"`
+}
+
+// ListCloudProvidersResponse is the response for listing provider descriptors.
+type ListCloudProvidersResponse struct {
+	Providers []CloudProviderDTO `json:"providers"`
+}
+
+// CreateCloudCredentialRequest is the provider-neutral request body for creating a cloud credential.
+type CreateCloudCredentialRequest struct {
+	Provider    string            `json:"provider" binding:"required" example:"icloud"`
+	DisplayName string            `json:"display_name,omitempty" example:"Personal cloud account"`
+	Inputs      map[string]string `json:"inputs" binding:"required"`
+}
+
+// VerifyCloudAuthChallengeRequest submits provider-specific challenge inputs.
+type VerifyCloudAuthChallengeRequest struct {
+	Inputs map[string]string `json:"inputs" binding:"required"`
+}
+
+// CloudAuthChallengeDTO describes a pending credential authentication challenge.
+type CloudAuthChallengeDTO struct {
+	Type        string                  `json:"type" example:"verification_code"`
+	Title       string                  `json:"title" example:"Verification required"`
+	Description string                  `json:"description" example:"Enter the code sent to your trusted devices."`
+	Fields      []CloudProviderFieldDTO `json:"fields"`
 }
 
 // CloudCredentialDTO is a safe public view of a saved cloud credential.
 type CloudCredentialDTO struct {
-	ID            string    `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	Provider      string    `json:"provider" example:"icloud"`
-	DisplayName   string    `json:"display_name" example:"Personal iCloud"`
-	MaskedAccount string    `json:"masked_account" example:"u***r@icloud.com"`
-	Domain        string    `json:"domain" example:"com"`
-	Status        string    `json:"status" example:"connected"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID             string            `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Provider       string            `json:"provider" example:"icloud"`
+	ProviderTitle  string            `json:"provider_title" example:"iCloud"`
+	DisplayName    string            `json:"display_name" example:"Personal cloud account"`
+	MaskedIdentity string            `json:"masked_identity" example:"u***r@example.com"`
+	Status         string            `json:"status" example:"connected"`
+	PublicConfig   map[string]string `json:"public_config,omitempty"`
+	CreatedAt      time.Time         `json:"created_at"`
+	UpdatedAt      time.Time         `json:"updated_at"`
 }
 
-// CreateICloudCredentialResponse is the response for iCloud credential creation.
-type CreateICloudCredentialResponse struct {
+// CreateCloudCredentialResponse is the response for credential creation.
+type CreateCloudCredentialResponse struct {
+	Credential CloudCredentialDTO     `json:"credential"`
+	AuthStatus string                 `json:"auth_status" example:"connected"`
+	Challenge  *CloudAuthChallengeDTO `json:"challenge,omitempty"`
+}
+
+// VerifyCloudAuthChallengeResponse is returned after challenge verification.
+type VerifyCloudAuthChallengeResponse struct {
 	Credential CloudCredentialDTO `json:"credential"`
-	Needs2FA   bool               `json:"needs_2fa"`
+	AuthStatus string             `json:"auth_status" example:"connected"`
 }
 
 // ListCloudCredentialsResponse is the response for listing cloud credentials.

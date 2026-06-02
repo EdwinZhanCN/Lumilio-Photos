@@ -6,17 +6,19 @@ import (
 	"path/filepath"
 	"testing"
 
+	"server/internal/secretbox"
+
 	"github.com/stretchr/testify/require"
 )
 
 func TestLoadOrCreateLumilioSecretKey_AutoGenerateAndReuse(t *testing.T) {
 	keyFile := filepath.Join(t.TempDir(), "lumilio_secret_key")
 
-	first, err := loadOrCreateLumilioSecretKey(keyFile)
+	first, err := secretbox.LoadOrCreateLumilioSecretKey(keyFile)
 	require.NoError(t, err)
 	require.Len(t, first, 64)
 
-	second, err := loadOrCreateLumilioSecretKey(keyFile)
+	second, err := secretbox.LoadOrCreateLumilioSecretKey(keyFile)
 	require.NoError(t, err)
 	require.Equal(t, first, second)
 
@@ -30,7 +32,7 @@ func TestLoadOrCreateLumilioSecretKey_AutoGenerateAndReuse(t *testing.T) {
 }
 
 func TestLoadOrCreateLumilioSecretKey_RejectsRawText(t *testing.T) {
-	_, err := loadOrCreateLumilioSecretKey("my-raw-secret-value")
+	_, err := secretbox.LoadOrCreateLumilioSecretKey("my-raw-secret-value")
 	require.ErrorContains(t, err, "must be a key file path")
 }
 
@@ -49,4 +51,20 @@ func TestSettingsService_LoadsSecretFromPathEnv(t *testing.T) {
 	content, err := os.ReadFile(keyFile)
 	require.NoError(t, err)
 	require.NotEmpty(t, bytes.TrimSpace(content))
+}
+
+func TestSecretBox_ScopeIsolation(t *testing.T) {
+	root := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	left := secretbox.NewFromRoot(root, "left.scope")
+	right := secretbox.NewFromRoot(root, "right.scope")
+
+	ciphertext, err := left.Encrypt("secret value")
+	require.NoError(t, err)
+
+	plaintext, err := left.Decrypt(ciphertext)
+	require.NoError(t, err)
+	require.Equal(t, "secret value", plaintext)
+
+	_, err = right.Decrypt(ciphertext)
+	require.Error(t, err)
 }

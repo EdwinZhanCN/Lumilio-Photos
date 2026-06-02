@@ -28,29 +28,31 @@ INSERT INTO cloud_credentials (
     credential_id,
     provider,
     display_name,
-    account_identifier_hash,
-    masked_account,
-    domain,
+    identity_hash,
+    masked_identity,
     status,
-    cookie_dir,
+    public_config,
+    secret_ciphertext,
+    artifact_dir,
     created_by_user_id,
     created_at,
     updated_at
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, now(), now()
-) RETURNING credential_id, provider, display_name, account_identifier_hash, masked_account, domain, status, cookie_dir, created_by_user_id, created_at, updated_at
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now()
+) RETURNING credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext
 `
 
 type CreateCloudCredentialParams struct {
-	CredentialID          pgtype.UUID `db:"credential_id" json:"credential_id"`
-	Provider              string      `db:"provider" json:"provider"`
-	DisplayName           string      `db:"display_name" json:"display_name"`
-	AccountIdentifierHash string      `db:"account_identifier_hash" json:"account_identifier_hash"`
-	MaskedAccount         string      `db:"masked_account" json:"masked_account"`
-	Domain                string      `db:"domain" json:"domain"`
-	Status                string      `db:"status" json:"status"`
-	CookieDir             string      `db:"cookie_dir" json:"cookie_dir"`
-	CreatedByUserID       *int32      `db:"created_by_user_id" json:"created_by_user_id"`
+	CredentialID     pgtype.UUID `db:"credential_id" json:"credential_id"`
+	Provider         string      `db:"provider" json:"provider"`
+	DisplayName      string      `db:"display_name" json:"display_name"`
+	IdentityHash     string      `db:"identity_hash" json:"identity_hash"`
+	MaskedIdentity   string      `db:"masked_identity" json:"masked_identity"`
+	Status           string      `db:"status" json:"status"`
+	PublicConfig     []byte      `db:"public_config" json:"public_config"`
+	SecretCiphertext []byte      `db:"secret_ciphertext" json:"secret_ciphertext"`
+	ArtifactDir      *string     `db:"artifact_dir" json:"artifact_dir"`
+	CreatedByUserID  *int32      `db:"created_by_user_id" json:"created_by_user_id"`
 }
 
 func (q *Queries) CreateCloudCredential(ctx context.Context, arg CreateCloudCredentialParams) (CloudCredential, error) {
@@ -58,11 +60,12 @@ func (q *Queries) CreateCloudCredential(ctx context.Context, arg CreateCloudCred
 		arg.CredentialID,
 		arg.Provider,
 		arg.DisplayName,
-		arg.AccountIdentifierHash,
-		arg.MaskedAccount,
-		arg.Domain,
+		arg.IdentityHash,
+		arg.MaskedIdentity,
 		arg.Status,
-		arg.CookieDir,
+		arg.PublicConfig,
+		arg.SecretCiphertext,
+		arg.ArtifactDir,
 		arg.CreatedByUserID,
 	)
 	var i CloudCredential
@@ -70,14 +73,15 @@ func (q *Queries) CreateCloudCredential(ctx context.Context, arg CreateCloudCred
 		&i.CredentialID,
 		&i.Provider,
 		&i.DisplayName,
-		&i.AccountIdentifierHash,
-		&i.MaskedAccount,
-		&i.Domain,
+		&i.IdentityHash,
+		&i.MaskedIdentity,
 		&i.Status,
-		&i.CookieDir,
+		&i.ArtifactDir,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PublicConfig,
+		&i.SecretCiphertext,
 	)
 	return i, err
 }
@@ -179,8 +183,30 @@ func (q *Queries) FinishCloudImportRun(ctx context.Context, arg FinishCloudImpor
 	return i, err
 }
 
+const getActiveRepositoryCloudBinding = `-- name: GetActiveRepositoryCloudBinding :one
+SELECT repository_id, credential_id, provider, enabled, last_import_run_id, created_at, updated_at FROM repository_cloud_bindings
+WHERE repository_id = $1 AND enabled = true
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetActiveRepositoryCloudBinding(ctx context.Context, repositoryID pgtype.UUID) (RepositoryCloudBinding, error) {
+	row := q.db.QueryRow(ctx, getActiveRepositoryCloudBinding, repositoryID)
+	var i RepositoryCloudBinding
+	err := row.Scan(
+		&i.RepositoryID,
+		&i.CredentialID,
+		&i.Provider,
+		&i.Enabled,
+		&i.LastImportRunID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getCloudCredential = `-- name: GetCloudCredential :one
-SELECT credential_id, provider, display_name, account_identifier_hash, masked_account, domain, status, cookie_dir, created_by_user_id, created_at, updated_at FROM cloud_credentials
+SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
 WHERE credential_id = $1
 `
 
@@ -191,44 +217,45 @@ func (q *Queries) GetCloudCredential(ctx context.Context, credentialID pgtype.UU
 		&i.CredentialID,
 		&i.Provider,
 		&i.DisplayName,
-		&i.AccountIdentifierHash,
-		&i.MaskedAccount,
-		&i.Domain,
+		&i.IdentityHash,
+		&i.MaskedIdentity,
 		&i.Status,
-		&i.CookieDir,
+		&i.ArtifactDir,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PublicConfig,
+		&i.SecretCiphertext,
 	)
 	return i, err
 }
 
-const getCloudCredentialByAccount = `-- name: GetCloudCredentialByAccount :one
-SELECT credential_id, provider, display_name, account_identifier_hash, masked_account, domain, status, cookie_dir, created_by_user_id, created_at, updated_at FROM cloud_credentials
-WHERE provider = $1 AND account_identifier_hash = $2 AND domain = $3
+const getCloudCredentialByIdentity = `-- name: GetCloudCredentialByIdentity :one
+SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
+WHERE provider = $1 AND identity_hash = $2
 `
 
-type GetCloudCredentialByAccountParams struct {
-	Provider              string `db:"provider" json:"provider"`
-	AccountIdentifierHash string `db:"account_identifier_hash" json:"account_identifier_hash"`
-	Domain                string `db:"domain" json:"domain"`
+type GetCloudCredentialByIdentityParams struct {
+	Provider     string `db:"provider" json:"provider"`
+	IdentityHash string `db:"identity_hash" json:"identity_hash"`
 }
 
-func (q *Queries) GetCloudCredentialByAccount(ctx context.Context, arg GetCloudCredentialByAccountParams) (CloudCredential, error) {
-	row := q.db.QueryRow(ctx, getCloudCredentialByAccount, arg.Provider, arg.AccountIdentifierHash, arg.Domain)
+func (q *Queries) GetCloudCredentialByIdentity(ctx context.Context, arg GetCloudCredentialByIdentityParams) (CloudCredential, error) {
+	row := q.db.QueryRow(ctx, getCloudCredentialByIdentity, arg.Provider, arg.IdentityHash)
 	var i CloudCredential
 	err := row.Scan(
 		&i.CredentialID,
 		&i.Provider,
 		&i.DisplayName,
-		&i.AccountIdentifierHash,
-		&i.MaskedAccount,
-		&i.Domain,
+		&i.IdentityHash,
+		&i.MaskedIdentity,
 		&i.Status,
-		&i.CookieDir,
+		&i.ArtifactDir,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PublicConfig,
+		&i.SecretCiphertext,
 	)
 	return i, err
 }
@@ -339,7 +366,7 @@ func (q *Queries) IncrementCloudImportRunCounts(ctx context.Context, arg Increme
 }
 
 const listCloudCredentials = `-- name: ListCloudCredentials :many
-SELECT credential_id, provider, display_name, account_identifier_hash, masked_account, domain, status, cookie_dir, created_by_user_id, created_at, updated_at FROM cloud_credentials
+SELECT credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext FROM cloud_credentials
 ORDER BY created_at DESC
 `
 
@@ -356,14 +383,15 @@ func (q *Queries) ListCloudCredentials(ctx context.Context) ([]CloudCredential, 
 			&i.CredentialID,
 			&i.Provider,
 			&i.DisplayName,
-			&i.AccountIdentifierHash,
-			&i.MaskedAccount,
-			&i.Domain,
+			&i.IdentityHash,
+			&i.MaskedIdentity,
 			&i.Status,
-			&i.CookieDir,
+			&i.ArtifactDir,
 			&i.CreatedByUserID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.PublicConfig,
+			&i.SecretCiphertext,
 		); err != nil {
 			return nil, err
 		}
@@ -499,11 +527,56 @@ func (q *Queries) MarkStaleCloudImportRunsInterrupted(ctx context.Context) error
 	return err
 }
 
+const updateCloudCredentialAuthState = `-- name: UpdateCloudCredentialAuthState :one
+UPDATE cloud_credentials
+SET status = $2,
+    public_config = $3,
+    secret_ciphertext = $4,
+    artifact_dir = $5,
+    updated_at = now()
+WHERE credential_id = $1
+RETURNING credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext
+`
+
+type UpdateCloudCredentialAuthStateParams struct {
+	CredentialID     pgtype.UUID `db:"credential_id" json:"credential_id"`
+	Status           string      `db:"status" json:"status"`
+	PublicConfig     []byte      `db:"public_config" json:"public_config"`
+	SecretCiphertext []byte      `db:"secret_ciphertext" json:"secret_ciphertext"`
+	ArtifactDir      *string     `db:"artifact_dir" json:"artifact_dir"`
+}
+
+func (q *Queries) UpdateCloudCredentialAuthState(ctx context.Context, arg UpdateCloudCredentialAuthStateParams) (CloudCredential, error) {
+	row := q.db.QueryRow(ctx, updateCloudCredentialAuthState,
+		arg.CredentialID,
+		arg.Status,
+		arg.PublicConfig,
+		arg.SecretCiphertext,
+		arg.ArtifactDir,
+	)
+	var i CloudCredential
+	err := row.Scan(
+		&i.CredentialID,
+		&i.Provider,
+		&i.DisplayName,
+		&i.IdentityHash,
+		&i.MaskedIdentity,
+		&i.Status,
+		&i.ArtifactDir,
+		&i.CreatedByUserID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.PublicConfig,
+		&i.SecretCiphertext,
+	)
+	return i, err
+}
+
 const updateCloudCredentialStatus = `-- name: UpdateCloudCredentialStatus :one
 UPDATE cloud_credentials
 SET status = $2, updated_at = now()
 WHERE credential_id = $1
-RETURNING credential_id, provider, display_name, account_identifier_hash, masked_account, domain, status, cookie_dir, created_by_user_id, created_at, updated_at
+RETURNING credential_id, provider, display_name, identity_hash, masked_identity, status, artifact_dir, created_by_user_id, created_at, updated_at, public_config, secret_ciphertext
 `
 
 type UpdateCloudCredentialStatusParams struct {
@@ -518,14 +591,15 @@ func (q *Queries) UpdateCloudCredentialStatus(ctx context.Context, arg UpdateClo
 		&i.CredentialID,
 		&i.Provider,
 		&i.DisplayName,
-		&i.AccountIdentifierHash,
-		&i.MaskedAccount,
-		&i.Domain,
+		&i.IdentityHash,
+		&i.MaskedIdentity,
 		&i.Status,
-		&i.CookieDir,
+		&i.ArtifactDir,
 		&i.CreatedByUserID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.PublicConfig,
+		&i.SecretCiphertext,
 	)
 	return i, err
 }

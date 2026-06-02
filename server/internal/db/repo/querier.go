@@ -124,6 +124,7 @@ type Querier interface {
 	// Includes taken_time and upload_time for time-based clustering.
 	FindCandidatesForStackingByName(ctx context.Context, repositoryID pgtype.UUID) ([]FindCandidatesForStackingByNameRow, error)
 	FinishCloudImportRun(ctx context.Context, arg FinishCloudImportRunParams) (CloudImportRun, error)
+	GetActiveRepositoryCloudBinding(ctx context.Context, repositoryID pgtype.UUID) (RepositoryCloudBinding, error)
 	GetAlbumAssetCount(ctx context.Context, albumID int32) (int64, error)
 	GetAlbumAssetCountScoped(ctx context.Context, arg GetAlbumAssetCountScopedParams) (int64, error)
 	GetAlbumAssets(ctx context.Context, albumID int32) ([]GetAlbumAssetsRow, error)
@@ -172,7 +173,7 @@ type Querier interface {
 	GetCameraLensStats(ctx context.Context, arg GetCameraLensStatsParams) ([]GetCameraLensStatsRow, error)
 	GetCheckpoint(ctx context.Context, id string) ([]byte, error)
 	GetCloudCredential(ctx context.Context, credentialID pgtype.UUID) (CloudCredential, error)
-	GetCloudCredentialByAccount(ctx context.Context, arg GetCloudCredentialByAccountParams) (CloudCredential, error)
+	GetCloudCredentialByIdentity(ctx context.Context, arg GetCloudCredentialByIdentityParams) (CloudCredential, error)
 	GetCloudImportRun(ctx context.Context, runID pgtype.UUID) (CloudImportRun, error)
 	GetCloudSyncCursor(ctx context.Context, arg GetCloudSyncCursorParams) (string, error)
 	GetCloudSyncFile(ctx context.Context, arg GetCloudSyncFileParams) (GetCloudSyncFileRow, error)
@@ -365,6 +366,7 @@ type Querier interface {
 	UpdateAssetStatus(ctx context.Context, arg UpdateAssetStatusParams) (Asset, error)
 	UpdateAssetStatusWithErrors(ctx context.Context, arg UpdateAssetStatusWithErrorsParams) (Asset, error)
 	UpdateAssetStoragePathAndStatus(ctx context.Context, arg UpdateAssetStoragePathAndStatusParams) (Asset, error)
+	UpdateCloudCredentialAuthState(ctx context.Context, arg UpdateCloudCredentialAuthStateParams) (CloudCredential, error)
 	UpdateCloudCredentialStatus(ctx context.Context, arg UpdateCloudCredentialStatusParams) (CloudCredential, error)
 	UpdateDiscoveredAssetByID(ctx context.Context, arg UpdateDiscoveredAssetByIDParams) (Asset, error)
 	// Resets all asset roles in a group, then flags the chosen keeper.

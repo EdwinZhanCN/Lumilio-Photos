@@ -5817,7 +5817,80 @@ export interface paths {
             };
         };
         put?: never;
-        post?: never;
+        /**
+         * Create cloud credential
+         * @description Authenticate with a cloud provider and save a repo-reusable credential. Provider-specific challenges return auth_status=challenge_required.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Cloud credential */
+            requestBody: {
+                content: {
+                    "application/json": Record<string, never> | components["schemas"]["dto.CreateCloudCredentialRequest"];
+                };
+            };
+            responses: {
+                /** @description Credential creation result */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
+                    };
+                };
+                /** @description Invalid request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -5893,7 +5966,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/cloud/icloud/credentials": {
+    "/api/v1/cloud/credentials/{id}/auth-challenge": {
         parameters: {
             query?: never;
             header?: never;
@@ -5903,24 +5976,27 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Create iCloud credential
-         * @description Authenticate with iCloud and save a repo-reusable credential session. If 2FA is required, returns needs_2fa=true.
+         * Verify cloud credential challenge
+         * @description Submit challenge inputs to complete cloud credential creation.
          */
         post: {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    /** @description Credential UUID */
+                    id: string;
+                };
                 cookie?: never;
             };
-            /** @description iCloud credential */
+            /** @description Challenge inputs */
             requestBody: {
                 content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.CreateICloudCredentialRequest"];
+                    "application/json": Record<string, never> | components["schemas"]["dto.VerifyCloudAuthChallengeRequest"];
                 };
             };
             responses: {
-                /** @description Credential creation result */
+                /** @description Challenge verified successfully */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -5945,80 +6021,6 @@ export interface paths {
                              */
                             message?: string;
                         } & components["schemas"]["data"];
-                    };
-                };
-                /** @description Invalid request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-                /** @description Internal server error */
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/cloud/icloud/credentials/{id}/verify-2fa": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Verify iCloud credential 2FA
-         * @description Submit a two-factor authentication code to complete iCloud credential creation.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Credential UUID */
-                    id: string;
-                };
-                cookie?: never;
-            };
-            /** @description 2FA code */
-            requestBody: {
-                content: {
-                    "application/json": Record<string, never> | components["schemas"]["dto.VerifyICloud2FARequest"];
-                };
-            };
-            responses: {
-                /** @description 2FA verified successfully */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["api.Result"];
                     };
                 };
                 /** @description Invalid request */
@@ -6113,6 +6115,81 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+                /** @description Internal server error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["api.Result"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cloud/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List cloud providers
+         * @description List cloud provider descriptors for credential creation.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Provider list */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            /**
+                             * @description Business status code (0 for success, non-zero for errors)
+                             * @example 0
+                             */
+                            code?: number;
+                            /** @description Business data, ignore empty values */
+                            data?: Record<string, never>;
+                            /**
+                             * @description Debug error message, ignore empty values
+                             * @example error details
+                             */
+                            error?: string;
+                            /**
+                             * @description User readable message
+                             * @example success
+                             */
+                            message?: string;
+                        } & components["schemas"]["data"];
                     };
                 };
                 /** @description Unauthorized */
@@ -9974,18 +10051,30 @@ export interface components {
             current_password: string;
             new_password: string;
         };
+        "dto.CloudAuthChallengeDTO": {
+            /** @example Enter the code sent to your trusted devices. */
+            description?: string;
+            fields?: components["schemas"]["dto.CloudProviderFieldDTO"][];
+            /** @example Verification required */
+            title?: string;
+            /** @example verification_code */
+            type?: string;
+        };
         "dto.CloudCredentialDTO": {
             created_at?: string;
-            /** @example Personal iCloud */
+            /** @example Personal cloud account */
             display_name?: string;
-            /** @example com */
-            domain?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             id?: string;
-            /** @example u***r@icloud.com */
-            masked_account?: string;
+            /** @example u***r@example.com */
+            masked_identity?: string;
             /** @example icloud */
             provider?: string;
+            /** @example iCloud */
+            provider_title?: string;
+            public_config?: {
+                [key: string]: string;
+            };
             /** @example connected */
             status?: string;
             updated_at?: string;
@@ -10017,6 +10106,35 @@ export interface components {
             total_seen?: number;
             updated_at?: string;
         };
+        "dto.CloudProviderDTO": {
+            challenge_fields?: components["schemas"]["dto.CloudProviderFieldDTO"][];
+            /** @example Import originals from iCloud Photos. */
+            description?: string;
+            form_fields?: components["schemas"]["dto.CloudProviderFieldDTO"][];
+            /** @example icloud */
+            id?: string;
+            security_note?: string;
+            /** @example enabled */
+            status?: string;
+            /** @example iCloud */
+            title?: string;
+        };
+        "dto.CloudProviderFieldDTO": {
+            /** @example username */
+            autocomplete?: string;
+            help_text?: string;
+            /** @example Apple ID */
+            label?: string;
+            /** @example username */
+            name?: string;
+            options?: components["schemas"]["dto.Option"][];
+            /** @example you@example.com */
+            placeholder?: string;
+            /** @example true */
+            required?: boolean;
+            /** @example email */
+            type?: string;
+        };
         "dto.CreateAlbumRequestDTO": {
             album_name: string;
             /** @enum {string} */
@@ -10024,22 +10142,20 @@ export interface components {
             cover_asset_id?: string;
             description?: string;
         };
-        "dto.CreateICloudCredentialRequest": {
-            /** @example Personal iCloud */
+        "dto.CreateCloudCredentialRequest": {
+            /** @example Personal cloud account */
             display_name?: string;
-            /**
-             * @example com
-             * @enum {string}
-             */
-            domain?: "com" | "cn";
-            /** @example app-specific-password */
-            password: string;
-            /** @example user@icloud.com */
-            username: string;
+            inputs: {
+                [key: string]: string;
+            };
+            /** @example icloud */
+            provider: string;
         };
-        "dto.CreateICloudCredentialResponse": {
+        "dto.CreateCloudCredentialResponse": {
+            /** @example connected */
+            auth_status?: string;
+            challenge?: components["schemas"]["dto.CloudAuthChallengeDTO"];
             credential?: components["schemas"]["dto.CloudCredentialDTO"];
-            needs_2fa?: boolean;
         };
         "dto.CreateManualStackRequestDTO": {
             /**
@@ -10259,6 +10375,9 @@ export interface components {
         "dto.ListCloudCredentialsResponse": {
             credentials?: components["schemas"]["dto.CloudCredentialDTO"][];
         };
+        "dto.ListCloudProvidersResponse": {
+            providers?: components["schemas"]["dto.CloudProviderDTO"][];
+        };
         "dto.ListDuplicateGroupsResponseDTO": {
             groups?: components["schemas"]["dto.DuplicateGroupDTO"][];
             /** @example 20 */
@@ -10457,6 +10576,12 @@ export interface components {
         "dto.MessageResponseDTO": {
             /** @example Operation completed successfully */
             message?: string;
+        };
+        "dto.Option": {
+            /** @example Global */
+            label?: string;
+            /** @example com */
+            value?: string;
         };
         "dto.OptionsResponseDTO": {
             camera_models?: string[];
@@ -11060,9 +11185,15 @@ export interface components {
         "dto.ValidateLLMSettingsResponseDTO": {
             valid?: boolean;
         };
-        "dto.VerifyICloud2FARequest": {
-            /** @example 123456 */
-            code: string;
+        "dto.VerifyCloudAuthChallengeRequest": {
+            inputs: {
+                [key: string]: string;
+            };
+        };
+        "dto.VerifyCloudAuthChallengeResponse": {
+            /** @example connected */
+            auth_status?: string;
+            credential?: components["schemas"]["dto.CloudCredentialDTO"];
         };
         "dto.VerifyMFARequestDTO": {
             code: string;

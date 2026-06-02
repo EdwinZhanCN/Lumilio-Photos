@@ -181,17 +181,18 @@ type AssetTag struct {
 }
 
 type CloudCredential struct {
-	CredentialID          pgtype.UUID        `db:"credential_id" json:"credential_id"`
-	Provider              string             `db:"provider" json:"provider"`
-	DisplayName           string             `db:"display_name" json:"display_name"`
-	AccountIdentifierHash string             `db:"account_identifier_hash" json:"account_identifier_hash"`
-	MaskedAccount         string             `db:"masked_account" json:"masked_account"`
-	Domain                string             `db:"domain" json:"domain"`
-	Status                string             `db:"status" json:"status"`
-	CookieDir             string             `db:"cookie_dir" json:"cookie_dir"`
-	CreatedByUserID       *int32             `db:"created_by_user_id" json:"created_by_user_id"`
-	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	CredentialID     pgtype.UUID        `db:"credential_id" json:"credential_id"`
+	Provider         string             `db:"provider" json:"provider"`
+	DisplayName      string             `db:"display_name" json:"display_name"`
+	IdentityHash     string             `db:"identity_hash" json:"identity_hash"`
+	MaskedIdentity   string             `db:"masked_identity" json:"masked_identity"`
+	Status           string             `db:"status" json:"status"`
+	ArtifactDir      *string            `db:"artifact_dir" json:"artifact_dir"`
+	CreatedByUserID  *int32             `db:"created_by_user_id" json:"created_by_user_id"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PublicConfig     []byte             `db:"public_config" json:"public_config"`
+	SecretCiphertext []byte             `db:"secret_ciphertext" json:"secret_ciphertext"`
 }
 
 type CloudImportRun struct {

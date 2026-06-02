@@ -196,17 +196,6 @@ func (r *Client) signInSRP(password string) error {
 	m1 := computeM1Full(A, B, K, r.appleID, salt)
 	m2 := srpComputeHAMK(A, m1, K)
 
-	fmt.Printf("[SRP DEBUG] protocol=%s, iterations=%d\n", initResp.Protocol, initResp.Iteration)
-	fmt.Printf("[SRP DEBUG] salt=%s\n", hex.EncodeToString(salt))
-	fmt.Printf("[SRP DEBUG] B=%s...\n", hex.EncodeToString(B.Bytes())[:64])
-	fmt.Printf("[SRP DEBUG] u=%s\n", hex.EncodeToString(u.Bytes()))
-	fmt.Printf("[SRP DEBUG] passHash=%x\n", sha256.Sum256([]byte(password)))
-	fmt.Printf("[SRP DEBUG] derivedPwd=%s\n", hex.EncodeToString(derivedPassword))
-	fmt.Printf("[SRP DEBUG] x=%s\n", hex.EncodeToString(x.Bytes()))
-	fmt.Printf("[SRP DEBUG] K=%s\n", hex.EncodeToString(K))
-	fmt.Printf("[SRP DEBUG] M1=%s\n", hex.EncodeToString(m1))
-	fmt.Printf("[SRP DEBUG] M2=%s\n", hex.EncodeToString(m2))
-
 	// Step 6: Send complete request
 	completeBody := map[string]any{
 		"accountName": r.appleID,
