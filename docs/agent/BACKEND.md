@@ -87,6 +87,12 @@ After API changes, run:
 make dto
 ```
 
+After SQL schema or SQL queries change, run:
+
+```bash
+cd server && sqlc generate
+```
+
 Do not hand-edit generated OpenAPI or frontend schema artifacts.
 
 ## Queues And Processing

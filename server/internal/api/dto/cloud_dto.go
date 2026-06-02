@@ -1,13 +1,13 @@
 package dto
 
-import "server/internal/cloud"
+import "time"
 
-// ConnectICloudRequest is the request body for connecting to iCloud.
-type ConnectICloudRequest struct {
-	Username string         `json:"username" binding:"required" example:"user@icloud.com"`
-	Password string         `json:"password" binding:"required" example:"app-specific-password"`
-	Domain   string         `json:"domain,omitempty" binding:"omitempty,oneof=com cn" example:"com"`
-	SyncMode cloud.SyncMode `json:"sync_mode,omitempty" binding:"omitempty,oneof=import one_way" example:"import"`
+// CreateICloudCredentialRequest is the request body for creating an iCloud credential.
+type CreateICloudCredentialRequest struct {
+	Username    string `json:"username" binding:"required" example:"user@icloud.com"`
+	Password    string `json:"password" binding:"required" example:"app-specific-password"`
+	Domain      string `json:"domain,omitempty" binding:"omitempty,oneof=com cn" example:"com"`
+	DisplayName string `json:"display_name,omitempty" example:"Personal iCloud"`
 }
 
 // VerifyICloud2FARequest is the request body for submitting a 2FA code.
@@ -15,27 +15,58 @@ type VerifyICloud2FARequest struct {
 	Code string `json:"code" binding:"required" example:"123456"`
 }
 
-// ConnectICloudResponse is the response for the iCloud connect endpoint.
-type ConnectICloudResponse struct {
-	Needs2FA bool `json:"needs_2fa"`
+// CloudCredentialDTO is a safe public view of a saved cloud credential.
+type CloudCredentialDTO struct {
+	ID            string    `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Provider      string    `json:"provider" example:"icloud"`
+	DisplayName   string    `json:"display_name" example:"Personal iCloud"`
+	MaskedAccount string    `json:"masked_account" example:"u***r@icloud.com"`
+	Domain        string    `json:"domain" example:"com"`
+	Status        string    `json:"status" example:"connected"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
-// TriggerSyncRequest is the request body for triggering a cloud sync.
-type TriggerSyncRequest struct {
-	Provider     cloud.ProviderKind `json:"provider" binding:"required" example:"icloud"`
-	RepositoryID string             `json:"repository_id" binding:"required" example:"550e8400-e29b-41d4-a716-446655440000"`
+// CreateICloudCredentialResponse is the response for iCloud credential creation.
+type CreateICloudCredentialResponse struct {
+	Credential CloudCredentialDTO `json:"credential"`
+	Needs2FA   bool               `json:"needs_2fa"`
 }
 
-// CloudProviderStatusDTO is the response for a single provider's status.
-type CloudProviderStatusDTO struct {
-	Provider        string `json:"provider" example:"icloud"`
-	SyncMode        string `json:"sync_mode" example:"import"`
-	Connected       bool   `json:"connected" example:"true"`
-	LastCursor      string `json:"last_cursor,omitempty"`
-	SyncedFileCount int64  `json:"synced_file_count" example:"42"`
+// ListCloudCredentialsResponse is the response for listing cloud credentials.
+type ListCloudCredentialsResponse struct {
+	Credentials []CloudCredentialDTO `json:"credentials"`
 }
 
-// ListProvidersResponse is the response for the list providers endpoint.
-type ListProvidersResponse struct {
-	Providers []CloudProviderStatusDTO `json:"providers"`
+// CloudImportRunDTO is a safe public view of a repo-scoped cloud import run.
+type CloudImportRunDTO struct {
+	ID              string     `json:"id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	RepositoryID    string     `json:"repository_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	CredentialID    string     `json:"credential_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	Provider        string     `json:"provider" example:"icloud"`
+	Status          string     `json:"status" example:"running"`
+	TotalSeen       int64      `json:"total_seen" example:"120"`
+	DownloadedCount int64      `json:"downloaded_count" example:"80"`
+	ImportedCount   int64      `json:"imported_count" example:"75"`
+	SkippedCount    int64      `json:"skipped_count" example:"40"`
+	FailedCount     int64      `json:"failed_count" example:"5"`
+	Error           *string    `json:"error,omitempty"`
+	StartedAt       *time.Time `json:"started_at,omitempty"`
+	FinishedAt      *time.Time `json:"finished_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+// StartCloudImportResponse is returned when a cloud import run is queued.
+type StartCloudImportResponse struct {
+	Run CloudImportRunDTO `json:"run"`
+}
+
+// RepositoryCloudStatusDTO describes a repository's cloud binding.
+type RepositoryCloudStatusDTO struct {
+	Provider      string              `json:"provider,omitempty" example:"icloud"`
+	Enabled       bool                `json:"enabled" example:"true"`
+	Credential    *CloudCredentialDTO `json:"credential,omitempty"`
+	LatestRun     *CloudImportRunDTO  `json:"latest_run,omitempty"`
+	LastImportRun string              `json:"last_import_run_id,omitempty"`
 }

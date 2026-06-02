@@ -16,9 +16,9 @@ type CloudImportSourceConfig struct {
 	Provider   CloudProvider
 	State      SyncStateStore
 	StagingDir string // temporary download directory, e.g. /tmp/lumilio-cloud-sync
-	SyncMode   SyncMode
 	RepoID     uuid.UUID
 	OwnerID    *int32 // optional; when nil the materializer falls back to repository default
+	OnProgress func(delta ImportProgressDelta)
 	Logger     *zap.Logger
 }
 
@@ -30,9 +30,9 @@ type CloudImportSource struct {
 	provider   CloudProvider
 	state      SyncStateStore
 	stagingDir string
-	syncMode   SyncMode
 	repoID     uuid.UUID
 	ownerID    *int32
+	onProgress func(delta ImportProgressDelta)
 	logger     *zap.Logger
 }
 
@@ -44,16 +44,13 @@ func NewCloudImportSource(cfg CloudImportSourceConfig) *CloudImportSource {
 	if cfg.StagingDir == "" {
 		cfg.StagingDir = os.TempDir()
 	}
-	if cfg.SyncMode == "" {
-		cfg.SyncMode = SyncModeImport
-	}
 	return &CloudImportSource{
 		provider:   cfg.Provider,
 		state:      cfg.State,
 		stagingDir: cfg.StagingDir,
-		syncMode:   cfg.SyncMode,
 		repoID:     cfg.RepoID,
 		ownerID:    cfg.OwnerID,
+		onProgress: cfg.OnProgress,
 		logger:     cfg.Logger.With(zap.String("component", "cloud_import_source"), zap.String("provider", string(cfg.Provider.Name()))),
 	}
 }
@@ -95,35 +92,24 @@ func (s *CloudImportSource) Discover(ctx context.Context) (<-chan sourcing.Inges
 			}
 
 			for _, ra := range page.Assets {
+				s.progress(ImportProgressDelta{TotalSeen: 1})
+
 				select {
 				case <-ctx.Done():
 					return
 				default:
 				}
 
-				// Handle remote deletes (tombstone) — only in one-way sync mode
+				// Import-only mode ignores remote tombstones. Lumilio never deletes
+				// local media because an upstream cloud provider reports a delete.
 				if ra.Deleted {
-					if s.syncMode != SyncModeOneWay {
-						continue
-					}
-					select {
-					case <-ctx.Done():
-						return
-					case ch <- sourcing.IngestSource{
-						RepositoryID: s.repoID,
-						Kind:         sourcing.IngestSourceCloud,
-						SourcePath:   ra.RemoteKey,
-						Metadata: map[string]any{
-							"action":   "delete",
-							"provider": s.provider.Name(),
-						},
-					}:
-					}
+					s.progress(ImportProgressDelta{Skipped: 1})
 					continue
 				}
 
 				// Skip already-synced files (etag-based dedup)
 				if synced, _ := s.state.IsFileSynced(ctx, s.repoID, s.provider.Name(), ra.RemoteKey, ra.ETag); synced {
+					s.progress(ImportProgressDelta{Skipped: 1})
 					continue
 				}
 
@@ -134,8 +120,10 @@ func (s *CloudImportSource) Discover(ctx context.Context) (<-chan sourcing.Inges
 						zap.String("remote_key", ra.RemoteKey),
 						zap.Error(err),
 					)
+					s.progress(ImportProgressDelta{Failed: 1})
 					continue
 				}
+				s.progress(ImportProgressDelta{Downloaded: 1})
 
 				select {
 				case <-ctx.Done():
@@ -174,4 +162,10 @@ func (s *CloudImportSource) Discover(ctx context.Context) (<-chan sourcing.Inges
 	}()
 
 	return ch, nil
+}
+
+func (s *CloudImportSource) progress(delta ImportProgressDelta) {
+	if s.onProgress != nil {
+		s.onProgress(delta)
+	}
 }

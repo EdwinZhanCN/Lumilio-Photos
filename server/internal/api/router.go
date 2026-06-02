@@ -187,11 +187,14 @@ type DuplicateControllerInterface interface {
 
 // CloudControllerInterface defines the cloud sync endpoints.
 type CloudControllerInterface interface {
-	ConnectICloud(c *gin.Context)   // POST   /cloud/icloud/connect
-	VerifyICloud2FA(c *gin.Context) // POST   /cloud/icloud/verify-2fa
-	ListProviders(c *gin.Context)   // GET    /cloud/providers
-	TriggerSync(c *gin.Context)     // POST   /cloud/sync
-	Disconnect(c *gin.Context)      // DELETE /cloud/:provider
+	ListCredentials(c *gin.Context)           // GET    /cloud/credentials
+	CreateICloudCredential(c *gin.Context)    // POST   /cloud/icloud/credentials
+	VerifyICloudCredential2FA(c *gin.Context) // POST /cloud/icloud/credentials/:id/verify-2fa
+	DisableCredential(c *gin.Context)         // DELETE /cloud/credentials/:id
+	StartRepositoryImport(c *gin.Context)     // POST   /repositories/:id/cloud/import
+	GetRepositoryCloudStatus(c *gin.Context)  // GET   /repositories/:id/cloud
+	GetImportRun(c *gin.Context)              // GET    /cloud/import-runs/:id
+	TriggerSync(c *gin.Context)               // POST   /cloud/sync (deprecated)
 }
 
 // SetupControllerInterface defines the zero-config first-run setup endpoints.
@@ -302,6 +305,8 @@ func NewRouter(
 			repositories.GET("/:id", repositoryScanController.GetRepository)
 			repositories.PATCH("/:id", repositoryScanController.UpdateRepository)
 			repositories.DELETE("/:id", repositoryScanController.DeleteRepository)
+			repositories.GET("/:id/cloud", cloudController.GetRepositoryCloudStatus)
+			repositories.POST("/:id/cloud/import", cloudController.StartRepositoryImport)
 			repositories.POST("/:id/scan", repositoryScanController.QueueRepositoryScan)
 			repositories.GET("/:id/scans/latest", repositoryScanController.GetLatestRepositoryScan)
 			repositories.GET("/:id/scans", repositoryScanController.ListRepositoryScans)
@@ -415,11 +420,12 @@ func NewRouter(
 		cloud := v1.Group("/cloud")
 		cloud.Use(authController.AuthMiddleware(), authController.RequireAdmin())
 		{
-			cloud.GET("/providers", cloudController.ListProviders)
-			cloud.POST("/icloud/connect", cloudController.ConnectICloud)
-			cloud.POST("/icloud/verify-2fa", cloudController.VerifyICloud2FA)
+			cloud.GET("/credentials", cloudController.ListCredentials)
+			cloud.POST("/icloud/credentials", cloudController.CreateICloudCredential)
+			cloud.POST("/icloud/credentials/:id/verify-2fa", cloudController.VerifyICloudCredential2FA)
+			cloud.DELETE("/credentials/:id", cloudController.DisableCredential)
+			cloud.GET("/import-runs/:id", cloudController.GetImportRun)
 			cloud.POST("/sync", cloudController.TriggerSync)
-			cloud.DELETE("/:provider", cloudController.Disconnect)
 		}
 
 		// Admin routes for queue monitoring (read-only)
