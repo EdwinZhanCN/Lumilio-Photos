@@ -3,10 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import PhotoPicker from "@/components/PhotoPicker";
 import { useI18n } from "@/lib/i18n";
 import { StudioHome } from "@/features/studio/home/StudioHome";
-import {
-  StudioEditor,
-  type StudioEditorActivity,
-} from "@/features/studio/editor/StudioEditor";
+import { StudioEditor, type StudioEditorActivity } from "@/features/studio/editor/StudioEditor";
 import {
   clearRecentEdits,
   readRecentEdits,
@@ -91,6 +88,8 @@ export function StudioEditMvp(): React.JSX.Element {
           <PhotoPicker
             scopeId="studio:editor"
             title={t("studio.pickPhoto", { defaultValue: "Pick a photo to edit" })}
+            initialFilters={{ raw: false }}
+            lockedFields={["type", "raw"]}
             onSelect={handlePicked}
           />
         </div>
