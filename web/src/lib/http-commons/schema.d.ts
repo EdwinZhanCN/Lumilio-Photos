@@ -8805,7 +8805,7 @@ export interface paths {
         put?: never;
         /**
          * Initialize the system
-         * @description Run first-run bootstrapping: generate and rotate the database credential, persist the secret, and write system metadata. Refused once the system is already initialized.
+         * @description Run first-run bootstrapping: generate and rotate the database credential, then persist the secret. Refused once the system is already initialized.
          */
         post: {
             parameters: {
@@ -8814,8 +8814,8 @@ export interface paths {
                 path?: never;
                 cookie?: never;
             };
-            /** @description Setup payload */
-            requestBody: {
+            /** @description Optional empty setup payload */
+            requestBody?: {
                 content: {
                     "application/json": Record<string, never> | components["schemas"]["dto.SetupRequestDTO"];
                 };
@@ -8892,7 +8892,7 @@ export interface paths {
         };
         /**
          * Get system setup status
-         * @description Report whether Lumilio has completed first-run initialization. The web frontend routes all traffic to the setup wizard while uninitialized.
+         * @description Report whether Lumilio has rotated the temporary database credential. The web frontend runs setup as a preflight while uninitialized.
          */
         get: {
             parameters: {
@@ -11187,15 +11187,10 @@ export interface components {
             status?: string;
             total_chunks?: number;
         };
-        "dto.SetupRequestDTO": {
-            admin_username?: string;
-            site_name?: string;
-        };
+        "dto.SetupRequestDTO": Record<string, never>;
         "dto.SetupResultDTO": {
-            admin_username?: string;
             database_user?: string;
             password_length?: number;
-            site_name?: string;
         };
         "dto.SetupStatusDTO": {
             initialized?: boolean;
