@@ -318,10 +318,6 @@
         "loading": "正在准备初始化...",
         "statusError": "无法验证初始化状态。"
       },
-      "mfa": {
-        "subtitle": "请立即完成身份验证器设置，确保首个 Lumilio 管理员账户在继续前已受到保护。",
-        "title": "保护首个管理员账户"
-      },
       "passkey": {
         "action": "创建管理员 Passkey",
         "skip": "跳过，改用身份验证器",
@@ -406,10 +402,14 @@
     "logout": "退出登录",
     "mfa": {
       "backToSettings": "返回设置",
-      "continueToApp": "继续使用应用",
-      "doneHere": "已完成当前操作？",
-      "pageSubtitle": "在同一页面集中管理验证、恢复码及账户安全设置。",
-      "pageTitle": "管理身份验证器设置"
+      "disableSubtitle": "输入密码以关闭双重认证。",
+      "enabledTitle": "双重认证已开启",
+      "introSubtitle": "使用 TOTP 身份验证器应用保护你的账户。",
+      "introTitle": "双重认证",
+      "recoverySubtitle": "当你无法使用身份验证器时，这是最后的恢复方式。",
+      "regenerateSubtitle": "这会让现有恢复码失效。",
+      "setupSubtitle": "使用身份验证器应用扫描二维码。",
+      "setupTitle": "添加身份验证器"
     },
     "passkey": {
       "affordance": {
@@ -558,6 +558,7 @@
     }
   },
   "common": {
+    "back": "返回",
     "cancel": "取消",
     "clickToEdit": "点击编辑",
     "close": "关闭",
@@ -565,6 +566,7 @@
     "copied": "已复制",
     "copy": "复制",
     "delete": "删除",
+    "done": "完成",
     "emptyState": {
       "description": "去管理页面上传资源吧！",
       "title": "这里还没有内容"
@@ -746,10 +748,12 @@
     "repositories": {
       "actionsMenu": "{{name}} 的资源库操作",
       "assetCount": "资源数量",
+      "cloudCredentialLabel": "iCloud 凭证",
+      "cloudCredentialsHintLink": "设置",
+      "cloudCredentialsHintPrefix": "需要账号？前往",
+      "cloudCredentialsHintSuffix": "。",
       "createAction": "添加资源库",
-      "createDescription": "在已挂载的存储根目录中创建一个资源库文件夹。",
       "createFailed": "创建资源库失败。",
-      "createNameHint": "使用简短、容易识别的名称。",
       "createNameLabel": "资源库名称",
       "createNamePlaceholder": "家庭照片",
       "createSubmit": "创建资源库",
@@ -763,6 +767,7 @@
       "duplicateScan": "扫描重复项",
       "duplicateScanFailed": "重复项扫描失败。",
       "empty": "暂无可用仓库。",
+      "noCloudCredentials": "没有已连接凭证",
       "primaryBadge": "主仓库",
       "rebuildLocation": "重建位置聚类",
       "rebuildLocationQueued": "位置聚类重建已加入队列。",
@@ -772,6 +777,10 @@
       "scanAllQueued_other": "已为 {{count}} 个库添加扫描队列。",
       "scanFailed": "加入扫描队列失败。",
       "scanQueued": "已为 {{name}} 加入扫描队列。",
+      "selectCloudCredential": "选择凭证",
+      "sourceICloud": "iCloud",
+      "sourceLabel": "来源",
+      "sourceLocal": "本地",
       "title": "资源库",
       "unavailable": "仓库选项暂时不可用。"
     }
@@ -973,33 +982,22 @@
       "displayName": "显示名称",
       "displayNameHint": "显示名称支持多种语言，且不超过 64 个字符。",
       "mfa": {
-        "account": "账户",
         "addPasskey": "添加通行密钥",
         "addPasskeyPrompt": "添加通行密钥后，即可使用设备的生物识别或安全密钥登录。",
-        "advanced": "高级设置 URI",
         "authenticatorAppTitle": "身份验证器应用",
         "beginSetup": "设置身份验证器",
-        "bootstrapOnboarding": "这是流明集的首个管理员账户。请立即完成身份验证器设置，以确保管理员登录从首次会话起即受到保护。",
-        "bootstrapOnboardingTitle": "首个管理员账户",
         "confirmDisable": "确认禁用",
         "confirmRegenerate": "确认重新生成",
         "currentPassword": "当前密码",
-        "currentPasswordHint": "请输入当前密码以确认此安全变更。",
-        "currentPasswordHintRegenerate": "在生成新恢复码前请先确认身份。",
         "disableButton": "禁用双重验证",
-        "disabled": "双重验证已禁用。",
         "disabledBadge": "未启用",
         "disableError": "禁用双重验证失败。",
-        "disableWarning": "禁用双重验证会降低账户安全性。请使用当前密码确认操作。",
         "enableButton": "启用双重验证",
-        "enabled": "双重验证已启用。",
         "enabledBadge": "已启用",
         "enableError": "启用双重验证失败。",
-        "enabling": "启用中…",
         "enrolled": "个已注册",
         "enrolledPasskeys": "通行密钥",
         "enrolledPasskeysHint": "管理此账户已注册的通行密钥凭证。",
-        "issuer": "签发方",
         "noPasskeys": "尚未注册通行密钥",
         "notConfigured": "尚未配置。使用 TOTP 保护你的账户安全。",
         "notEnrolled": "未注册",
@@ -1007,28 +1005,14 @@
         "passkeyDescription": "使用设备原生的通行密钥流程进行登录。",
         "passkeyLastUsed": "上次使用",
         "passkeyTitle": "通行密钥",
-        "qrAlt": "身份验证器设置二维码",
-        "qrCaption": "如无法扫码，仍可使用手动设置密钥。",
-        "qrError": "生成身份验证器二维码失败。",
-        "recoveryCodesHint": "请妥善保管这些一次性恢复码。每个恢复码仅可使用一次。",
         "recoveryCodesTitle": "恢复码",
         "recoveryRemaining": "个恢复码剩余",
         "regenerateButton": "重新生成恢复码",
-        "regenerated": "恢复码已重新生成。",
         "regenerateError": "重新生成恢复码失败。",
-        "regenerateHint": "重新生成后，现有恢复码将立即失效。",
         "regenerateTitle": "重新生成恢复码",
         "remainingCodes_one": "剩余 {{count}} 个恢复码",
         "remainingCodes_other": "剩余 {{count}} 个恢复码",
-        "setupDescription": "请使用 Duo、1Password、Google Authenticator 或其他兼容 TOTP 的应用。如无法扫码，可手动复制设置信息。",
-        "setupError": "启动身份验证器设置失败。",
-        "setupKey": "手动设置密钥",
-        "setupKeyHint": "若无法扫描二维码，请在身份验证器应用中手动输入此密钥。",
-        "setupTitle": "在身份验证器应用中扫描二维码",
-        "stepOne": "步骤 1",
-        "stepTwo": "使用 6 位验证码完成验证",
-        "stepTwoLabel": "步骤 2",
-        "verificationCode": "验证码"
+        "setupError": "启动身份验证器设置失败。"
       },
       "passwordDescription": "修改你的账户密码。修改后需重新登录。",
       "passwordTitle": "密码",
@@ -1090,7 +1074,6 @@
       "baseUrlDescription": "可选，用于覆盖兼容提供方的接口地址。",
       "clearStoredKey": "清除已保存的 API Key",
       "description": "配置智能助手和照片智能能力。",
-      "enabled": "启用 Agent",
       "loadError": "加载 AI 设置失败。",
       "mlTitle": "照片智能",
       "modelName": "模型名称",
@@ -1165,7 +1148,64 @@
     },
     "assetPage": "资源页面",
     "cloud": {
-      "title": "云同步"
+      "addCredential": "添加凭证",
+      "confirmDisable": "要停用 {{name}} 吗？已导入的内容会继续保留在 Lumilio。",
+      "connectCredential": "连接凭证",
+      "connectedAccounts_other": "{{count}} 个已连接账号",
+      "credentialMeta": "{{account}} · iCloud {{domain}}",
+      "description": "管理可复用的云账号凭证。通过 Manage 创建仓库时，可以选择其中一个账号作为导入来源。",
+      "disable": "停用",
+      "domain": {
+        "china": "中国大陆 iCloud",
+        "global": "全球 iCloud"
+      },
+      "empty": "尚未配置 iCloud 凭证。",
+      "errors": {
+        "createFailed": "创建 iCloud 凭证失败。",
+        "disableFailed": "停用凭证失败。",
+        "emptyCredentialResponse": "凭证响应为空。",
+        "verifyFailed": "验证 iCloud 双重认证代码失败。"
+      },
+      "fields": {
+        "appleId": "Apple ID",
+        "domain": "Apple 域",
+        "label": "标签",
+        "password": "App 专用密码"
+      },
+      "icloudFormDescription": "Lumilio 只在认证时使用该密码，之后仅保存隔离的 iCloud session cookie。",
+      "icloudFormTitle": "添加 iCloud 凭证",
+      "messages": {
+        "connected": "iCloud 凭证已连接。",
+        "disabled": "云凭证已停用。",
+        "verificationSent": "Apple 已向你的受信任设备发送验证码。",
+        "verified": "iCloud 凭证已验证。"
+      },
+      "placeholders": {
+        "appleId": "you@icloud.com",
+        "label": "个人 iCloud",
+        "password": "xxxx-xxxx-xxxx-xxxx"
+      },
+      "providerDescription": "选择要连接的云服务。之后新增其他 provider 时也会从这里进入。",
+      "providers": {
+        "icloud": {
+          "description": "从 iCloud Photos 导入原始媒体。",
+          "title": "iCloud"
+        }
+      },
+      "providerTitle": "选择云服务",
+      "savedTitle": "已保存凭证",
+      "securityNote": "Lumilio 会把 iCloud session cookie 保存在隔离的凭证目录中。Apple ID 密码只在认证期间使用，不会被持久化保存。",
+      "status": {
+        "connected": "已连接",
+        "disabled": "已停用",
+        "error": "错误",
+        "pending2FA": "需要 2FA",
+        "unknown": "未知"
+      },
+      "title": "云导入",
+      "verify": "验证",
+      "verifyDescription": "输入 Apple 发送到受信任设备的 6 位验证码，用于验证 {{name}}。",
+      "verifyTitle": "双重认证"
     },
     "language": "语言",
     "languageAndRegion": "语言和地区",
