@@ -8,6 +8,8 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  Cloud,
+  CloudDownload,
   Copy,
   Ellipsis,
   Folder,
@@ -29,6 +31,11 @@ import {
 import { getRepositoryDisplayName } from "@/features/settings/hooks/useWorkingRepository";
 import { useRepositoryScan } from "@/features/manage/hooks/useRepositoryScan";
 import { useDetectDuplicates } from "@/features/collections/hooks/useDuplicates";
+import {
+  useCloudCredentials,
+  useRepositoryCloudStatus,
+  useStartRepositoryCloudImport,
+} from "@/features/settings/hooks/useCloudSync";
 
 const getViewerTimeZone = () =>
   typeof Intl !== "undefined"
@@ -76,28 +83,37 @@ function RepositoryCard({
   isDetecting,
   isDuplicateScanning,
   isRebuildingLocation,
+  isCloudImporting,
   onScan,
   onDetectStacks,
   onDuplicateScan,
   onLocationRebuild,
+  onCloudImport,
 }: {
   repository: IndexingRepositoryOption;
   isScanning: boolean;
   isDetecting: boolean;
   isDuplicateScanning: boolean;
   isRebuildingLocation: boolean;
+  isCloudImporting: boolean;
   onScan: (repository: IndexingRepositoryOption) => void;
   onDetectStacks: (repository: IndexingRepositoryOption) => void;
   onDuplicateScan: (repository: IndexingRepositoryOption) => void;
   onLocationRebuild: (repository: IndexingRepositoryOption) => void;
+  onCloudImport: (repository: IndexingRepositoryOption) => void;
 }) {
   const { t } = useI18n();
   const countQuery = useRepositoryAssetCount(repository.id);
+  const cloudStatusQuery = useRepositoryCloudStatus(repository.id);
+  const cloudStatus = cloudStatusQuery.data?.data;
+  const latestRun = cloudStatus?.latest_run;
   const name = getRepositoryDisplayName(repository, t);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const isBusy =
-    isScanning || isDetecting || isDuplicateScanning || isRebuildingLocation;
+    isScanning || isDetecting || isDuplicateScanning || isRebuildingLocation || isCloudImporting;
+  const hasCloudBinding = Boolean(cloudStatus?.credential);
+  const latestRunStatus = latestRun?.status;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -127,6 +143,12 @@ function RepositoryCard({
               {repository.isPrimary && (
                 <span className="badge badge-primary badge-sm">
                   {t("manage.repositories.primaryBadge")}
+                </span>
+              )}
+              {hasCloudBinding && (
+                <span className="badge badge-info badge-sm gap-1">
+                  <Cloud size={12} />
+                  iCloud
                 </span>
               )}
             </div>
@@ -231,6 +253,24 @@ function RepositoryCard({
                 )}
                 <span>{t("manage.repositories.rebuildLocation")}</span>
               </button>
+              {hasCloudBinding && (
+                <button
+                  type="button"
+                  className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-base-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onCloudImport(repository);
+                  }}
+                  disabled={isBusy || latestRunStatus === "running" || latestRunStatus === "queued"}
+                >
+                  {isCloudImporting || latestRunStatus === "running" || latestRunStatus === "queued" ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : (
+                    <CloudDownload size={16} className="text-base-content/70" />
+                  )}
+                  <span>Import from iCloud</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -249,6 +289,15 @@ function RepositoryCard({
             {t("manage.repositories.assetCount")}
           </div>
         </div>
+        {hasCloudBinding && latestRun && (
+          <div className="text-right text-xs text-base-content/60">
+            <div className="font-medium capitalize text-base-content/80">{latestRun.status}</div>
+            <div>
+              {(latestRun.imported_count ?? 0).toLocaleString()} imported ·{" "}
+              {(latestRun.failed_count ?? 0).toLocaleString()} failed
+            </div>
+          </div>
+        )}
       </div>
     </article>
   );
@@ -265,11 +314,21 @@ function AddRepositoryModal({
   const showMessage = useMessage();
   const queryClient = useQueryClient();
   const createMutation = $api.useMutation("post", "/api/v1/repositories");
+  const credentialsQuery = useCloudCredentials();
   const [name, setName] = useState("");
+  const [source, setSource] = useState<"local" | "icloud">("local");
+  const [credentialId, setCredentialId] = useState("");
+
+  const credentials = useMemo(
+    () => (credentialsQuery.data?.data?.credentials ?? []).filter((item) => item.status === "connected"),
+    [credentialsQuery.data],
+  );
 
   const handleClose = useCallback(() => {
     if (createMutation.isPending) return;
     setName("");
+    setSource("local");
+    setCredentialId("");
     onClose();
   }, [createMutation.isPending, onClose]);
 
@@ -278,11 +337,13 @@ function AddRepositoryModal({
       event.preventDefault();
       const trimmedName = name.trim();
       if (!trimmedName || createMutation.isPending) return;
+      if (source === "icloud" && !credentialId) return;
 
       try {
-        await createMutation.mutateAsync({
+        const response = await createMutation.mutateAsync({
           body: {
             name: trimmedName,
+            cloud_credential_id: source === "icloud" ? credentialId : undefined,
           },
         });
         await Promise.all([
@@ -297,10 +358,16 @@ function AddRepositoryModal({
           }),
         ]);
         showMessage(
-          "success",
-          t("manage.repositories.createSuccess", { name: trimmedName }),
+          response.data?.cloud_import_error ? "info" : "success",
+          response.data?.cloud_import_error
+            ? `Repository created, but iCloud import did not start: ${response.data.cloud_import_error}`
+            : source === "icloud"
+              ? `Repository created. iCloud import has started for ${trimmedName}.`
+              : t("manage.repositories.createSuccess", { name: trimmedName }),
         );
         setName("");
+        setSource("local");
+        setCredentialId("");
         onClose();
       } catch (error) {
         showMessage(
@@ -311,7 +378,7 @@ function AddRepositoryModal({
         );
       }
     },
-    [createMutation, name, onClose, queryClient, showMessage, t],
+    [createMutation, credentialId, name, onClose, queryClient, showMessage, source, t],
   );
 
   if (!isOpen) return null;
@@ -368,6 +435,58 @@ function AddRepositoryModal({
             </span>
           </label>
 
+          <div className="space-y-2">
+            <span className="text-sm font-medium">Source</span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className={`btn btn-sm ${source === "local" ? "btn-primary" : "btn-outline"}`}
+                onClick={() => setSource("local")}
+                disabled={createMutation.isPending}
+              >
+                Local
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm gap-2 ${source === "icloud" ? "btn-primary" : "btn-outline"}`}
+                onClick={() => setSource("icloud")}
+                disabled={createMutation.isPending}
+              >
+                <Cloud size={15} />
+                iCloud
+              </button>
+            </div>
+          </div>
+
+          {source === "icloud" && (
+            <label className="form-control w-full">
+              <span className="label pb-1">
+                <span className="label-text font-medium">iCloud credential</span>
+              </span>
+              <select
+                className="select select-bordered w-full"
+                value={credentialId}
+                onChange={(event) => setCredentialId(event.target.value)}
+                disabled={createMutation.isPending || credentialsQuery.isLoading}
+                required
+              >
+                <option value="">
+                  {credentials.length === 0 ? "No connected credentials" : "Select credential"}
+                </option>
+                {credentials.map((credential) => (
+                  <option key={credential.id} value={credential.id}>
+                    {credential.display_name} · {credential.masked_account}
+                  </option>
+                ))}
+              </select>
+              <span className="label pt-2">
+                <span className="label-text-alt text-base-content/55">
+                  Manage iCloud credentials in Settings before creating an iCloud import repo.
+                </span>
+              </span>
+            </label>
+          )}
+
           <div className="modal-action">
             <button
               type="button"
@@ -380,7 +499,11 @@ function AddRepositoryModal({
             <button
               type="submit"
               className="btn btn-primary gap-2"
-              disabled={!name.trim() || createMutation.isPending}
+              disabled={
+                !name.trim() ||
+                createMutation.isPending ||
+                (source === "icloud" && !credentialId)
+              }
             >
               {createMutation.isPending ? (
                 <span className="loading loading-spinner loading-xs" />
@@ -424,6 +547,7 @@ export default function RepositoryGrid() {
     "post",
     "/api/v1/locations/rebuild",
   );
+  const cloudImportMutation = useStartRepositoryCloudImport();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const repositoryIds = useMemo(
@@ -532,6 +656,32 @@ export default function RepositoryGrid() {
     [locationRebuildMutation, showMessage, t],
   );
 
+  const cloudImportingRepositoryId =
+    cloudImportMutation.isPending && cloudImportMutation.variables
+      ? (cloudImportMutation.variables as { params?: { path?: { id?: string } } }).params?.path?.id
+      : undefined;
+
+  const handleCloudImport = useCallback(
+    async (repository: IndexingRepositoryOption) => {
+      try {
+        await cloudImportMutation.mutateAsync({
+          params: {
+            path: {
+              id: repository.id,
+            },
+          },
+        });
+        showMessage("success", `iCloud import started for ${getRepositoryDisplayName(repository, t)}.`);
+      } catch (error) {
+        showMessage(
+          "error",
+          error instanceof Error ? error.message : "Failed to start iCloud import.",
+        );
+      }
+    },
+    [cloudImportMutation, showMessage, t],
+  );
+
   const handleScanAll = useCallback(async () => {
     try {
       await scanRepositories(repositoryIds);
@@ -617,10 +767,12 @@ export default function RepositoryGrid() {
                 duplicateScanningRepositoryId === repository.id
               }
               isRebuildingLocation={rebuildingLocationId === repository.id}
+              isCloudImporting={cloudImportingRepositoryId === repository.id}
               onScan={handleScanRepository}
               onDetectStacks={handleDetectStacks}
               onDuplicateScan={handleDuplicateScan}
               onLocationRebuild={handleLocationRebuild}
+              onCloudImport={handleCloudImport}
             />
           ))}
         </div>

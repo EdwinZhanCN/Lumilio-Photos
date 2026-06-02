@@ -180,11 +180,44 @@ type AssetTag struct {
 	Source     string         `db:"source" json:"source"`
 }
 
+type CloudCredential struct {
+	CredentialID          pgtype.UUID        `db:"credential_id" json:"credential_id"`
+	Provider              string             `db:"provider" json:"provider"`
+	DisplayName           string             `db:"display_name" json:"display_name"`
+	AccountIdentifierHash string             `db:"account_identifier_hash" json:"account_identifier_hash"`
+	MaskedAccount         string             `db:"masked_account" json:"masked_account"`
+	Domain                string             `db:"domain" json:"domain"`
+	Status                string             `db:"status" json:"status"`
+	CookieDir             string             `db:"cookie_dir" json:"cookie_dir"`
+	CreatedByUserID       *int32             `db:"created_by_user_id" json:"created_by_user_id"`
+	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type CloudImportRun struct {
+	RunID           pgtype.UUID        `db:"run_id" json:"run_id"`
+	RepositoryID    pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	CredentialID    pgtype.UUID        `db:"credential_id" json:"credential_id"`
+	Provider        string             `db:"provider" json:"provider"`
+	Status          string             `db:"status" json:"status"`
+	TotalSeen       int64              `db:"total_seen" json:"total_seen"`
+	DownloadedCount int64              `db:"downloaded_count" json:"downloaded_count"`
+	ImportedCount   int64              `db:"imported_count" json:"imported_count"`
+	SkippedCount    int64              `db:"skipped_count" json:"skipped_count"`
+	FailedCount     int64              `db:"failed_count" json:"failed_count"`
+	Error           *string            `db:"error" json:"error"`
+	StartedAt       pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	FinishedAt      pgtype.Timestamptz `db:"finished_at" json:"finished_at"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type CloudSyncCursor struct {
 	RepositoryID pgtype.UUID        `db:"repository_id" json:"repository_id"`
 	Provider     string             `db:"provider" json:"provider"`
 	CursorValue  string             `db:"cursor_value" json:"cursor_value"`
 	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	CredentialID pgtype.UUID        `db:"credential_id" json:"credential_id"`
 }
 
 type CloudSyncFile struct {
@@ -195,6 +228,7 @@ type CloudSyncFile struct {
 	LocalHash    string             `db:"local_hash" json:"local_hash"`
 	AssetID      pgtype.UUID        `db:"asset_id" json:"asset_id"`
 	SyncedAt     pgtype.Timestamptz `db:"synced_at" json:"synced_at"`
+	CredentialID pgtype.UUID        `db:"credential_id" json:"credential_id"`
 }
 
 type DuplicateGroup struct {
@@ -350,6 +384,7 @@ type LocationCluster struct {
 	GeocodedAt        pgtype.Timestamptz `db:"geocoded_at" json:"geocoded_at"`
 	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	SearchVector      interface{}        `db:"search_vector" json:"search_vector"`
 }
 
 type LocationClusterAsset struct {
@@ -383,8 +418,9 @@ type OcrTextItem struct {
 	BoundingBox []byte `db:"bounding_box" json:"bounding_box"`
 	TextLength  int32  `db:"text_length" json:"text_length"`
 	// Approximate area of text region, can be used to filter larger text
-	AreaPixels *float32           `db:"area_pixels" json:"area_pixels"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	AreaPixels   *float32           `db:"area_pixels" json:"area_pixels"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	SearchVector interface{}        `db:"search_vector" json:"search_vector"`
 }
 
 type RefreshToken struct {
@@ -417,6 +453,16 @@ type Repository struct {
 	CreatedAt      pgtype.Timestamptz       `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz       `db:"updated_at" json:"updated_at"`
 	DefaultOwnerID *int32                   `db:"default_owner_id" json:"default_owner_id"`
+}
+
+type RepositoryCloudBinding struct {
+	RepositoryID    pgtype.UUID        `db:"repository_id" json:"repository_id"`
+	CredentialID    pgtype.UUID        `db:"credential_id" json:"credential_id"`
+	Provider        string             `db:"provider" json:"provider"`
+	Enabled         bool               `db:"enabled" json:"enabled"`
+	LastImportRunID pgtype.UUID        `db:"last_import_run_id" json:"last_import_run_id"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type RepositoryScanRun struct {

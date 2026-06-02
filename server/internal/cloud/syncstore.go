@@ -24,28 +24,27 @@ type SyncStateStore interface {
 	// IsFileSynced checks whether a remote file (key + etag) has already been ingested.
 	IsFileSynced(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, remoteKey, etag string) (bool, error)
 
-	// MarkFileSynced records that a remote file was successfully ingested and
-	// maps it to a local asset for later tombstone reconciliation.
+	// MarkFileSynced records that a remote file was successfully ingested. A
+	// nil assetID is stored when the file was deduped (already present), which
+	// still records the etag so later runs skip it.
 	MarkFileSynced(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, remoteKey, etag string, assetID uuid.UUID) error
-
-	// GetAssetIDByRemoteKey looks up the local asset ID mapped to a remote file.
-	// Returns uuid.Nil when no mapping exists.
-	GetAssetIDByRemoteKey(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, remoteKey string) (uuid.UUID, error)
 }
 
 // pgSyncStateStore is the PostgreSQL-backed implementation of SyncStateStore.
 type pgSyncStateStore struct {
-	queries *repo.Queries
+	queries      *repo.Queries
+	credentialID uuid.UUID
 }
 
 // NewPGSyncStateStore creates a SyncStateStore backed by PostgreSQL via sqlc-generated queries.
-func NewPGSyncStateStore(queries *repo.Queries) SyncStateStore {
-	return &pgSyncStateStore{queries: queries}
+func NewPGSyncStateStore(queries *repo.Queries, credentialID uuid.UUID) SyncStateStore {
+	return &pgSyncStateStore{queries: queries, credentialID: credentialID}
 }
 
 func (s *pgSyncStateStore) GetCursor(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind) (string, error) {
 	val, err := s.queries.GetCloudSyncCursor(ctx, repo.GetCloudSyncCursorParams{
 		RepositoryID: toPGUUID(repositoryID),
+		CredentialID: toPGUUID(s.credentialID),
 		Provider:     string(provider),
 	})
 	if err != nil {
@@ -60,6 +59,7 @@ func (s *pgSyncStateStore) GetCursor(ctx context.Context, repositoryID uuid.UUID
 func (s *pgSyncStateStore) SaveCursor(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, cursor string) error {
 	return s.queries.UpsertCloudSyncCursor(ctx, repo.UpsertCloudSyncCursorParams{
 		RepositoryID: toPGUUID(repositoryID),
+		CredentialID: toPGUUID(s.credentialID),
 		Provider:     string(provider),
 		CursorValue:  cursor,
 	})
@@ -68,6 +68,7 @@ func (s *pgSyncStateStore) SaveCursor(ctx context.Context, repositoryID uuid.UUI
 func (s *pgSyncStateStore) IsFileSynced(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, remoteKey, etag string) (bool, error) {
 	row, err := s.queries.GetCloudSyncFile(ctx, repo.GetCloudSyncFileParams{
 		RepositoryID: toPGUUID(repositoryID),
+		CredentialID: toPGUUID(s.credentialID),
 		Provider:     string(provider),
 		RemoteKey:    remoteKey,
 	})
@@ -87,30 +88,13 @@ func (s *pgSyncStateStore) MarkFileSynced(ctx context.Context, repositoryID uuid
 	}
 	return s.queries.MarkCloudSyncFile(ctx, repo.MarkCloudSyncFileParams{
 		RepositoryID: toPGUUID(repositoryID),
+		CredentialID: toPGUUID(s.credentialID),
 		Provider:     string(provider),
 		RemoteKey:    remoteKey,
 		Etag:         etag,
 		LocalHash:    "", // filled lazily; materializer computes BLAKE3
 		AssetID:      pgAssetID,
 	})
-}
-
-func (s *pgSyncStateStore) GetAssetIDByRemoteKey(ctx context.Context, repositoryID uuid.UUID, provider ProviderKind, remoteKey string) (uuid.UUID, error) {
-	pgID, err := s.queries.GetAssetIDByCloudFile(ctx, repo.GetAssetIDByCloudFileParams{
-		RepositoryID: toPGUUID(repositoryID),
-		Provider:     string(provider),
-		RemoteKey:    remoteKey,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return uuid.Nil, nil
-		}
-		return uuid.Nil, err
-	}
-	if !pgID.Valid {
-		return uuid.Nil, nil
-	}
-	return uuid.UUID(pgID.Bytes), nil
 }
 
 func toPGUUID(id uuid.UUID) pgtype.UUID {

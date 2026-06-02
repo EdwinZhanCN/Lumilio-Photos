@@ -11,36 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getAssetIDByCloudFile = `-- name: GetAssetIDByCloudFile :one
-SELECT asset_id FROM cloud_sync_files
-WHERE repository_id = $1 AND provider = $2 AND remote_key = $3
-`
-
-type GetAssetIDByCloudFileParams struct {
-	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
-	Provider     string      `db:"provider" json:"provider"`
-	RemoteKey    string      `db:"remote_key" json:"remote_key"`
-}
-
-func (q *Queries) GetAssetIDByCloudFile(ctx context.Context, arg GetAssetIDByCloudFileParams) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, getAssetIDByCloudFile, arg.RepositoryID, arg.Provider, arg.RemoteKey)
-	var asset_id pgtype.UUID
-	err := row.Scan(&asset_id)
-	return asset_id, err
-}
-
 const getCloudSyncCursor = `-- name: GetCloudSyncCursor :one
 SELECT cursor_value FROM cloud_sync_cursors
-WHERE repository_id = $1 AND provider = $2
+WHERE repository_id = $1 AND credential_id = $2 AND provider = $3
 `
 
 type GetCloudSyncCursorParams struct {
 	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	CredentialID pgtype.UUID `db:"credential_id" json:"credential_id"`
 	Provider     string      `db:"provider" json:"provider"`
 }
 
 func (q *Queries) GetCloudSyncCursor(ctx context.Context, arg GetCloudSyncCursorParams) (string, error) {
-	row := q.db.QueryRow(ctx, getCloudSyncCursor, arg.RepositoryID, arg.Provider)
+	row := q.db.QueryRow(ctx, getCloudSyncCursor, arg.RepositoryID, arg.CredentialID, arg.Provider)
 	var cursor_value string
 	err := row.Scan(&cursor_value)
 	return cursor_value, err
@@ -48,11 +31,12 @@ func (q *Queries) GetCloudSyncCursor(ctx context.Context, arg GetCloudSyncCursor
 
 const getCloudSyncFile = `-- name: GetCloudSyncFile :one
 SELECT etag, local_hash FROM cloud_sync_files
-WHERE repository_id = $1 AND provider = $2 AND remote_key = $3
+WHERE repository_id = $1 AND credential_id = $2 AND provider = $3 AND remote_key = $4
 `
 
 type GetCloudSyncFileParams struct {
 	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	CredentialID pgtype.UUID `db:"credential_id" json:"credential_id"`
 	Provider     string      `db:"provider" json:"provider"`
 	RemoteKey    string      `db:"remote_key" json:"remote_key"`
 }
@@ -63,21 +47,27 @@ type GetCloudSyncFileRow struct {
 }
 
 func (q *Queries) GetCloudSyncFile(ctx context.Context, arg GetCloudSyncFileParams) (GetCloudSyncFileRow, error) {
-	row := q.db.QueryRow(ctx, getCloudSyncFile, arg.RepositoryID, arg.Provider, arg.RemoteKey)
+	row := q.db.QueryRow(ctx, getCloudSyncFile,
+		arg.RepositoryID,
+		arg.CredentialID,
+		arg.Provider,
+		arg.RemoteKey,
+	)
 	var i GetCloudSyncFileRow
 	err := row.Scan(&i.Etag, &i.LocalHash)
 	return i, err
 }
 
 const markCloudSyncFile = `-- name: MarkCloudSyncFile :exec
-INSERT INTO cloud_sync_files (repository_id, provider, remote_key, etag, local_hash, asset_id, synced_at)
-VALUES ($1, $2, $3, $4, $5, $6, now())
-ON CONFLICT (repository_id, provider, remote_key)
-DO UPDATE SET etag = $4, local_hash = $5, asset_id = $6, synced_at = now()
+INSERT INTO cloud_sync_files (repository_id, credential_id, provider, remote_key, etag, local_hash, asset_id, synced_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+ON CONFLICT (repository_id, credential_id, provider, remote_key)
+DO UPDATE SET etag = $5, local_hash = $6, asset_id = $7, synced_at = now()
 `
 
 type MarkCloudSyncFileParams struct {
 	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	CredentialID pgtype.UUID `db:"credential_id" json:"credential_id"`
 	Provider     string      `db:"provider" json:"provider"`
 	RemoteKey    string      `db:"remote_key" json:"remote_key"`
 	Etag         string      `db:"etag" json:"etag"`
@@ -88,6 +78,7 @@ type MarkCloudSyncFileParams struct {
 func (q *Queries) MarkCloudSyncFile(ctx context.Context, arg MarkCloudSyncFileParams) error {
 	_, err := q.db.Exec(ctx, markCloudSyncFile,
 		arg.RepositoryID,
+		arg.CredentialID,
 		arg.Provider,
 		arg.RemoteKey,
 		arg.Etag,
@@ -98,19 +89,25 @@ func (q *Queries) MarkCloudSyncFile(ctx context.Context, arg MarkCloudSyncFilePa
 }
 
 const upsertCloudSyncCursor = `-- name: UpsertCloudSyncCursor :exec
-INSERT INTO cloud_sync_cursors (repository_id, provider, cursor_value, updated_at)
-VALUES ($1, $2, $3, now())
-ON CONFLICT (repository_id, provider)
-DO UPDATE SET cursor_value = $3, updated_at = now()
+INSERT INTO cloud_sync_cursors (repository_id, credential_id, provider, cursor_value, updated_at)
+VALUES ($1, $2, $3, $4, now())
+ON CONFLICT (repository_id, credential_id, provider)
+DO UPDATE SET cursor_value = $4, updated_at = now()
 `
 
 type UpsertCloudSyncCursorParams struct {
 	RepositoryID pgtype.UUID `db:"repository_id" json:"repository_id"`
+	CredentialID pgtype.UUID `db:"credential_id" json:"credential_id"`
 	Provider     string      `db:"provider" json:"provider"`
 	CursorValue  string      `db:"cursor_value" json:"cursor_value"`
 }
 
 func (q *Queries) UpsertCloudSyncCursor(ctx context.Context, arg UpsertCloudSyncCursorParams) error {
-	_, err := q.db.Exec(ctx, upsertCloudSyncCursor, arg.RepositoryID, arg.Provider, arg.CursorValue)
+	_, err := q.db.Exec(ctx, upsertCloudSyncCursor,
+		arg.RepositoryID,
+		arg.CredentialID,
+		arg.Provider,
+		arg.CursorValue,
+	)
 	return err
 }

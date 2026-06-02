@@ -13,6 +13,7 @@ import (
 
 	"server/internal/api"
 	"server/internal/api/dto"
+	"server/internal/cloud"
 	"server/internal/db/repo"
 	"server/internal/storage"
 	"server/internal/storage/repocfg"
@@ -30,16 +31,18 @@ type RepositoryScanService interface {
 }
 
 type RepositoryScanHandler struct {
-	scanService RepositoryScanService
-	repoManager storage.RepositoryManager
-	storageRoot string
+	scanService  RepositoryScanService
+	repoManager  storage.RepositoryManager
+	storageRoot  string
+	cloudService cloud.CloudSyncService
 }
 
-func NewRepositoryScanHandler(scanService RepositoryScanService, repoManager storage.RepositoryManager, storageRoot string) *RepositoryScanHandler {
+func NewRepositoryScanHandler(scanService RepositoryScanService, repoManager storage.RepositoryManager, storageRoot string, cloudService cloud.CloudSyncService) *RepositoryScanHandler {
 	return &RepositoryScanHandler{
-		scanService: scanService,
-		repoManager: repoManager,
-		storageRoot: storageRoot,
+		scanService:  scanService,
+		repoManager:  repoManager,
+		storageRoot:  storageRoot,
+		cloudService: cloudService,
 	}
 }
 
@@ -99,8 +102,39 @@ func (h *RepositoryScanHandler) CreateRepository(c *gin.Context) {
 		return
 	}
 
+	var cloudImportRunID *string
+	var cloudImportError *string
+	if strings.TrimSpace(req.CloudCredentialID) != "" {
+		if h.cloudService == nil {
+			errText := "cloud service unavailable"
+			cloudImportError = &errText
+		} else {
+			credentialID, parseErr := uuid.Parse(req.CloudCredentialID)
+			if parseErr != nil {
+				errText := "invalid cloud_credential_id"
+				cloudImportError = &errText
+			} else {
+				repositoryID := uuid.UUID(dbRepo.RepoID.Bytes)
+				runID, bindErr := h.cloudService.BindRepositoryCredentialAndStartImport(c.Request.Context(), cloud.BindRepositoryCredentialInput{
+					RepositoryID: repositoryID,
+					CredentialID: credentialID,
+					OwnerID:      ownerID,
+				})
+				if bindErr != nil {
+					errText := bindErr.Error()
+					cloudImportError = &errText
+				} else {
+					runIDText := runID.String()
+					cloudImportRunID = &runIDText
+				}
+			}
+		}
+	}
+
 	api.GinSuccess(c, dto.CreateRepositoryResponseDTO{
-		Repository: toRepositoryDTO(dbRepo),
+		Repository:       toRepositoryDTO(dbRepo),
+		CloudImportRunID: cloudImportRunID,
+		CloudImportError: cloudImportError,
 	})
 }
 

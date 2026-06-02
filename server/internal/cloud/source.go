@@ -27,18 +27,6 @@ const (
 	ProviderS3     ProviderKind = "s3"
 )
 
-// SyncMode controls how cloud changes are applied to the local repository.
-type SyncMode string
-
-const (
-	// SyncModeImport downloads new and changed files only. Remote deletes are ignored.
-	SyncModeImport SyncMode = "import"
-
-	// SyncModeOneWay downloads new/changed files and soft-deletes local assets
-	// when the corresponding remote file has been deleted (tombstone).
-	SyncModeOneWay SyncMode = "one_way"
-)
-
 // ReleaseAsset describes a single file discovered in cloud storage.
 type ReleaseAsset struct {
 	Provider   ProviderKind
@@ -49,6 +37,15 @@ type ReleaseAsset struct {
 	ETag       string // for change detection
 	ModifiedAt time.Time
 	Deleted    bool // true when the provider reports a tombstone
+}
+
+// ImportProgressDelta records incremental progress for a cloud import run.
+type ImportProgressDelta struct {
+	TotalSeen  int64
+	Downloaded int64
+	Imported   int64
+	Skipped    int64
+	Failed     int64
 }
 
 // Cursor is an opaque pagination marker returned by cloud providers.

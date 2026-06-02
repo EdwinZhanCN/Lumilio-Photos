@@ -3,7 +3,8 @@ package dto
 import "time"
 
 type CreateRepositoryRequestDTO struct {
-	Name string `json:"name" binding:"required" example:"Family Photos"`
+	Name              string `json:"name" binding:"required" example:"Family Photos"`
+	CloudCredentialID string `json:"cloud_credential_id,omitempty" example:"550e8400-e29b-41d4-a716-446655440000"`
 }
 
 type RepositoryDTO struct {
@@ -33,7 +34,9 @@ type ListRepositoriesResponseDTO struct {
 }
 
 type CreateRepositoryResponseDTO struct {
-	Repository RepositoryDTO `json:"repository"`
+	Repository       RepositoryDTO `json:"repository"`
+	CloudImportRunID *string       `json:"cloud_import_run_id,omitempty"`
+	CloudImportError *string       `json:"cloud_import_error,omitempty"`
 }
 
 type RepositoryScanRequestDTO struct {
