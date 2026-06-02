@@ -69,7 +69,6 @@ export interface UploadContextValue {
 
   // Settings
   maxPreviewCount: number;
-  maxTotalFiles: number;
   previewCount: number; // Number of files with previews
 }
 

@@ -3,7 +3,6 @@ import { useUploadProcess } from "./hooks/useUploadProcess";
 import { uploadReducer, initialState } from "./reducers";
 import { useMessage } from "@/hooks/util-hooks/useMessage";
 import { UploadContext } from "./upload.type.ts";
-import { useSettingsContext } from "@/features/settings";
 import { useI18n } from "@/lib/i18n"; // Import useI18n
 
 /**
@@ -46,10 +45,6 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(uploadReducer, initialState);
   const showMessage = useMessage();
   const uploadProcess = useUploadProcess();
-  const { state: settings } = useSettingsContext();
-
-  // Get settings with defaults
-  const maxTotalFiles = settings.ui.upload?.max_total_files ?? 100;
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -81,38 +76,16 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     async (files: File[]) => {
       if (files.length === 0) return;
 
-      // Check total files limit
-      const availableSlots = maxTotalFiles - state.files.length;
-      if (availableSlots <= 0) {
-        showMessage(
-          "error",
-          t("upload.UploadProvider.max_files_allowed", {
-            count: maxTotalFiles,
-          }),
-        );
-        return;
-      }
-
-      const filesToAdd = files.slice(0, availableSlots);
-      if (files.length > availableSlots) {
-        showMessage(
-          "hint",
-          t("upload.UploadProvider.files_exceeded_limit", {
-            count: files.length - availableSlots,
-          }),
-        );
-      }
-
       // Add files with empty preview strings initially
       dispatch({
         type: "ADD_FILES",
         payload: {
-          files: filesToAdd,
-          previews: filesToAdd.map(() => ""),
+          files,
+          previews: files.map(() => ""),
         },
       });
     },
-    [state.files.length, maxTotalFiles, showMessage, t],
+    [],
   );
 
   const clearFiles = useCallback(() => {
@@ -159,7 +132,6 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       previewProgress: null,
       fileProgress: uploadProcess.fileProgress,
       maxPreviewCount: 0,
-      maxTotalFiles,
       previewCount: 0,
     }),
     [
@@ -175,7 +147,6 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       uploadProcess.uploadProgress,
       uploadProcess.hashcodeProgress,
       uploadProcess.fileProgress,
-      maxTotalFiles,
     ],
   );
 

@@ -7,7 +7,10 @@
  * @since 1.1.0
  */
 
-import { globalPerformancePreferences } from "@/lib/utils/performancePreferences.ts";
+import {
+  ADAPTIVE_MEMORY_CONSTRAINT_MULTIPLIER,
+  detectDeviceCapabilities,
+} from "@/lib/utils/smartBatchSizing.ts";
 import type {
   LayoutBox,
   LayoutConfig,
@@ -281,8 +284,7 @@ export class AppWorkerClient {
 
     const total = filesArray.length;
     let processed = 0;
-    const maxThreads =
-      globalPerformancePreferences.getMaxConcurrentOperations();
+    const maxThreads = detectDeviceCapabilities().maxConcurrency;
 
     return new Promise((resolve, reject) => {
       let currentIndex = 0;
@@ -335,8 +337,7 @@ export class AppWorkerClient {
           type: "GENERATE_HASH",
           data: [file],
           config: {
-            memoryMultiplier:
-              globalPerformancePreferences.getMemoryConstraintMultiplier(),
+            memoryMultiplier: ADAPTIVE_MEMORY_CONSTRAINT_MULTIPLIER,
           },
         });
       };

@@ -15,14 +15,8 @@ import { useWorkingRepository } from "@/features/settings";
 
 function UnifiedUploadSection(): React.JSX.Element {
   const { t } = useI18n(); // Initialize useI18n
-  const {
-    state,
-    addFiles,
-    clearFiles,
-    uploadFiles,
-    isProcessing,
-    maxTotalFiles,
-  } = useUploadContext();
+  const { state, addFiles, clearFiles, uploadFiles, isProcessing } =
+    useUploadContext();
 
   const { files } = state;
   const fileCount = files.length;
@@ -158,12 +152,6 @@ function UnifiedUploadSection(): React.JSX.Element {
                 <h3 className="font-semibold text-base">
                   {t("upload.UnifiedUploadSection.upload_information_title")}
                 </h3>
-                <p>
-                  <span className="font-medium">
-                    {t("upload.UnifiedUploadSection.max_files_label")}
-                  </span>{" "}
-                  {maxTotalFiles}
-                </p>
                 {uploadConfig && (
                   <div className="mt-2 space-y-1 text-xs text-base-content/70">
                     <p>
@@ -186,9 +174,6 @@ function UnifiedUploadSection(): React.JSX.Element {
                     </p>
                   </div>
                 )}
-                <p className="text-base-content/70 text-xs mt-2">
-                  {t("upload.UnifiedUploadSection.change_limits_settings_hint")}
-                </p>
               </div>
             </div>
           </div>
@@ -244,7 +229,7 @@ function UnifiedUploadSection(): React.JSX.Element {
           <button
             onClick={() => fileInputRef.current?.click()}
             className="btn btn-outline btn-sm gap-2"
-            disabled={isProcessing || fileCount >= maxTotalFiles}
+            disabled={isProcessing}
           >
             <FolderPlus className="w-4 h-4" />
             {t("upload.UnifiedUploadSection.add_files_button")}

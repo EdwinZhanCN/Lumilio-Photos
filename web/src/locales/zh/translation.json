@@ -411,6 +411,11 @@
       "pageSubtitle": "在同一页面集中管理验证、恢复码及账户安全设置。",
       "pageTitle": "管理身份验证器设置"
     },
+    "passkey": {
+      "affordance": {
+        "activeLabel": "Passkey 已启用"
+      }
+    },
     "register": {
       "confirmPassword": "确认密码",
       "confirmPasswordHint": "两次输入的密码必须完全一致。",
@@ -1164,50 +1169,6 @@
     },
     "language": "语言",
     "languageAndRegion": "语言和地区",
-    "performance": "性能",
-    "performanceSettings": {
-      "advancedDescription": "配置更细的性能参数。",
-      "advancedTitle": "高级控制",
-      "availableMemory": "可用内存",
-      "changesApply": "更改会立即作用于新的处理任务。",
-      "cpuCores": "CPU 核心数",
-      "currentProfile": "当前预设",
-      "description": "配置本地处理任务的性能策略。",
-      "deviceType": "设备类型",
-      "deviceTypeValues": {
-        "desktop": "桌面端",
-        "lowEnd": "低配",
-        "mobile": "移动端"
-      },
-      "maxConcurrency": "最大并发",
-      "maxConcurrentOperations": "最大并发操作数",
-      "maxConcurrentOperationsDescription": "浏览器同时运行的重处理任务上限。",
-      "prioritizeUserOperations": "优先用户操作",
-      "prioritizeUserOperationsDescription": "优先处理与当前用户交互相关的操作。",
-      "profileDescription": "选择并发和内存使用的默认预设。",
-      "profiles": {
-        "adaptive": {
-          "description": "根据检测到的设备能力自动调整处理策略。",
-          "label": "自适应"
-        },
-        "balanced": {
-          "description": "在处理速度和内存占用之间保持平衡。",
-          "label": "平衡"
-        },
-        "memory_saver": {
-          "description": "降低内存占用和处理并发。",
-          "label": "节省内存"
-        },
-        "speed": {
-          "description": "提高并发，以优先提升处理速度。",
-          "label": "优先速度"
-        }
-      },
-      "profileTitle": "性能预设",
-      "reset": "恢复默认",
-      "respectMemoryLimits": "遵守内存限制",
-      "respectMemoryLimitsDescription": "当可用内存受限时，降低处理强度。"
-    },
     "region": "地区",
     "regionOptions": {
       "china": "中国大陆",
@@ -1252,31 +1213,6 @@
       "workingRepositoryUnavailable": "仓库选项暂时不可用。"
     },
     "title": "设置",
-    "upload": "上传",
-    "uploadSettings": {
-      "advancedDescription": "配置本地上传参数。",
-      "advancedDisabledHint": "启用后端管理上传配置时，这些字段不可用。",
-      "advancedTitle": "高级本地覆盖",
-      "basicDescription": "配置上传限制和默认行为。",
-      "basicTitle": "基础控制",
-      "chunkSize": "分片大小",
-      "chunkSizeDescription": "浏览器上传器对单个文件使用的分片大小。",
-      "chunkSizeUnit": "MB",
-      "controlModeDescription": "设置上传分片大小和并发参数的来源。",
-      "controlModeTitle": "上传调优来源",
-      "description": "配置当前浏览器的上传设置。",
-      "localMode": "本地覆盖",
-      "localModeHint": "分片大小和并发将使用本地配置值。",
-      "lowPowerMode": "低功耗模式",
-      "lowPowerModeDescription": "使用更保守的默认值，以降低上传期间的 CPU 和内存占用。",
-      "maxConcurrentChunks": "最大并发分片数",
-      "maxConcurrentChunksDescription": "浏览器对每个文件可并行上传的分片数量。",
-      "maxTotalFiles": "单次最多文件数",
-      "maxTotalFilesDescription": "一次上传批次中允许加入的最大文件数量。",
-      "recommended": "推荐",
-      "serverMode": "后端管理",
-      "serverModeHint": "分片大小和并发将使用后端建议值。本地高级值会保留，但不会生效。"
-    },
     "users": {
       "active": "活跃",
       "adminOnly": "只有管理员可以管理用户。",
@@ -1452,12 +1388,10 @@
     "UnifiedUploadSection": {
       "add_files_button": "添加文件",
       "cannot_clear_while_processing": "处理过程中无法清除文件",
-      "change_limits_settings_hint": "在设置 → 界面设置中更改限制。",
       "clear_button": "清除",
       "default_upload_target": "默认资源库",
       "default_upload_target_hint": "当前未选择具体工作资源库；上传会进入主/默认资源库。",
       "drag_drop_or_click": "拖拽或点击上传",
-      "max_files_label": "最大文件数：",
       "no_files_selected_for_upload": "未选择要上传的文件",
       "no_valid_files_selected": "未选择有效文件",
       "server_chunk_size": "服务器分块大小",
@@ -1489,10 +1423,6 @@
       "uploadFailed": "上传失败"
     },
     "UploadProvider": {
-      "files_exceeded_limit_one": "{{count}} 个文件超出限制。",
-      "files_exceeded_limit_other": "{{count}} 个文件超出限制。",
-      "max_files_allowed_one": "最多允许 {{count}} 个文件。",
-      "max_files_allowed_other": "最多允许 {{count}} 个文件。",
       "no_files_selected_for_upload_message": "未选择要上传的文件",
       "upload_failed_generic": "上传失败"
     }

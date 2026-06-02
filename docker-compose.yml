@@ -10,8 +10,8 @@ services:
             POSTGRES_USER: postgres
             # Temporary bootstrap credential. The first-run web setup wizard
             # generates a high-entropy password and rotates this role via
-            # ALTER USER; the new secret is persisted to the server's config
-            # volume (see app_config below) and used on every subsequent boot.
+            # ALTER USER; the new secret is persisted under the mounted storage
+            # volume (.secrets/db_password) and used on every subsequent boot.
             POSTGRES_PASSWORD: postgres
         # Database ingress is reachable on the internal application network as
         # `db:5432`. The host port mapping below is optional and only needed for
@@ -53,7 +53,9 @@ services:
             DB_NAME: lumiliophotos
             DB_SSL: disable
             # Optional override for server.toml [database].password_file.
-            LUMILIO_DB_PASSWORD_FILE: /data/config/secrets/db_password
+            # Lives under the mounted storage volume so it persists alongside
+            # the user's media and survives container/volume recreation.
+            LUMILIO_DB_PASSWORD_FILE: /data/storage/.secrets/db_password
             ML_CLIP_ENABLED: ${ML_CLIP_ENABLED:-false}
             ML_BIOCLIP_ENABLED: ${ML_BIOCLIP_ENABLED:-false}
             ML_OCR_ENABLED: ${ML_OCR_ENABLED:-false}
@@ -72,9 +74,9 @@ services:
         #                   capabilities: [gpu]
         volumes:
             # Replace /PATH/TO/YOUR/ASSETS with your host storage root directory.
+            # This is the only mounted volume: media, the rotated DB secret
+            # (.secrets/db_password), and the server secret key all live here.
             - /PATH/TO/YOUR/ASSETS:/data/storage
-            # Persistent home for the rotated DB secret and system config TOML.
-            - app_config:/data/config
         ports:
             - "6680:6680"
         extra_hosts:
@@ -108,4 +110,3 @@ services:
 
 volumes:
     db_data:
-    app_config:
